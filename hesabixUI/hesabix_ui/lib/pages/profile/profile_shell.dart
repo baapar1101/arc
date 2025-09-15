@@ -145,19 +145,24 @@ class _ProfileShellState extends State<ProfileShell> {
                   final bool isHovered = i == _hoverIndex;
                   final bool isSelected = i == selectedIndex;
                   final bool active = isSelected || isHovered;
-                  final double radius = (isHovered && !isSelected) ? 0 : 8;
+                  final BorderRadius br = (isSelected && useRail)
+                      ? BorderRadius.zero
+                      : (isHovered ? BorderRadius.zero : BorderRadius.circular(8));
+                  final Color bgColor = active
+                      ? (isHovered && !isSelected ? activeBg.withValues(alpha: 0.85) : activeBg)
+                      : Colors.transparent;
                   return MouseRegion(
                     onEnter: (_) => setState(() => _hoverIndex = i),
                     onExit: (_) => setState(() => _hoverIndex = -1),
                     child: InkWell(
-                      borderRadius: BorderRadius.circular(radius),
+                      borderRadius: br,
                       onTap: () => onSelect(i),
                       child: Container(
                         margin: EdgeInsets.zero,
                         padding: EdgeInsets.symmetric(horizontal: railExtended ? 12 : 0, vertical: 10),
                         decoration: BoxDecoration(
-                          color: active ? activeBg : Colors.transparent,
-                          borderRadius: BorderRadius.circular(radius),
+                          color: bgColor,
+                          borderRadius: br,
                         ),
                         child: Row(
                           mainAxisAlignment: railExtended ? MainAxisAlignment.start : MainAxisAlignment.center,
