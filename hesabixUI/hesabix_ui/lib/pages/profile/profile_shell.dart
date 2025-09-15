@@ -145,7 +145,7 @@ class _ProfileShellState extends State<ProfileShell> {
                   final bool isHovered = i == _hoverIndex;
                   final bool isSelected = i == selectedIndex;
                   final bool active = isSelected || isHovered;
-                  final double radius = isHovered ? 0 : 8;
+                  final double radius = (isHovered && !isSelected) ? 0 : 8;
                   return MouseRegion(
                     onEnter: (_) => setState(() => _hoverIndex = i),
                     onExit: (_) => setState(() => _hoverIndex = -1),
