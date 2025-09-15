@@ -29,5 +29,12 @@
   "refresh": "Refresh"
   ,
   "captchaRequired": "Captcha is required."
+  ,
+  "sendReset": "Send reset code"
+  ,
+  "registerFailed": "Registration failed. Please try again.",
+  "resetFailed": "Request failed. Please try again."
+  ,
+  "fixFormErrors": "Please fix the form errors."
 }
 

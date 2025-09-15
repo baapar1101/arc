@@ -265,6 +265,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Captcha is required.'**
   String get captchaRequired;
+
+  /// No description provided for @sendReset.
+  ///
+  /// In en, this message translates to:
+  /// **'Send reset code'**
+  String get sendReset;
+
+  /// No description provided for @registerFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Registration failed. Please try again.'**
+  String get registerFailed;
+
+  /// No description provided for @resetFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Request failed. Please try again.'**
+  String get resetFailed;
+
+  /// No description provided for @fixFormErrors.
+  ///
+  /// In en, this message translates to:
+  /// **'Please fix the form errors.'**
+  String get fixFormErrors;
 }
 
 class _AppLocalizationsDelegate

@@ -92,4 +92,16 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get captchaRequired => 'کد امنیتی الزامی است.';
+
+  @override
+  String get sendReset => 'ارسال کد بازیابی';
+
+  @override
+  String get registerFailed => 'عضویت ناموفق بود. لطفاً دوباره تلاش کنید.';
+
+  @override
+  String get resetFailed => 'ارسال کد بازیابی ناموفق بود. لطفاً دوباره تلاش کنید.';
+
+  @override
+  String get fixFormErrors => 'لطفاً خطاهای فرم را برطرف کنید.';
 }

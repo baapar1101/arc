@@ -29,6 +29,10 @@ class Settings(BaseSettings):
 	captcha_secret: str = "change_me_captcha"
 	reset_password_ttl_seconds: int = 3600
 
+	# Phone normalization
+	# Used as default region when parsing phone numbers without a country code
+	default_phone_region: str = "IR"
+
 	# CORS
 	cors_allowed_origins: list[str] = ["*"]
 

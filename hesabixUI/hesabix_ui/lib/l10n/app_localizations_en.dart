@@ -93,4 +93,16 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get captchaRequired => 'Captcha is required.';
+
+  @override
+  String get sendReset => 'Send reset code';
+
+  @override
+  String get registerFailed => 'Registration failed. Please try again.';
+
+  @override
+  String get resetFailed => 'Request failed. Please try again.';
+
+  @override
+  String get fixFormErrors => 'Please fix the form errors.';
 }

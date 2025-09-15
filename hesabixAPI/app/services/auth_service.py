@@ -22,9 +22,14 @@ def _normalize_email(email: str | None) -> str | None:
 def _normalize_mobile(mobile: str | None) -> str | None:
 	if not mobile:
 		return None
-	# Try parse as international; fallback no region
+	# Clean input: keep digits and leading plus
+	raw = mobile.strip()
+	raw = ''.join(ch for ch in raw if ch.isdigit() or ch == '+')
 	try:
-		num = phonenumbers.parse(mobile, None)
+		from app.core.settings import get_settings
+		settings = get_settings()
+		region = None if raw.startswith('+') else settings.default_phone_region
+		num = phonenumbers.parse(raw, region)
 		if not phonenumbers.is_valid_number(num):
 			return None
 		return phonenumbers.format_number(num, phonenumbers.PhoneNumberFormat.E164)
