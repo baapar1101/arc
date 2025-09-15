@@ -1,0 +1,31 @@
+{
+  "@@locale": "fa",
+  "appTitle": "حسابیکس",
+  "login": "ورود",
+  "username": "نام کاربری",
+  "password": "رمز عبور",
+  "submit": "ثبت",
+  "loginFailed": "ورود ناموفق بود. لطفاً دوباره تلاش کنید.",
+  "homeWelcome": "ورود موفقیت‌آمیز!",
+  "language": "زبان",
+  "requiredField": "ضروری است"
+  ,
+  "register": "عضویت",
+  "forgotPassword": "فراموشی رمز",
+  "firstName": "نام",
+  "lastName": "نام خانوادگی",
+  "email": "ایمیل",
+  "mobile": "شماره موبایل",
+  "registerSuccess": "عضویت با موفقیت انجام شد.",
+  "forgotSent": "لینک بازیابی به ایمیل ارسال شد."
+  ,
+  "identifier": "ایمیل یا شماره موبایل",
+  "theme": "تم",
+  "system": "سیستمی",
+  "light": "روشن",
+  "dark": "تیره",
+  "welcomeTitle": "حسابداری ابری حسابیکس",
+  "welcomeSubtitle": "حسابداری هوشمند، امن و همیشه در دسترس برای کسب‌وکار شما.",
+  "brandTagline": "مدیریت مالی هرجا و هر زمان با اطمینان."
+}
+

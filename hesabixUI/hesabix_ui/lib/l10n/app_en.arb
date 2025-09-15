@@ -1,0 +1,31 @@
+{
+  "@@locale": "en",
+  "appTitle": "Hesabix",
+  "login": "Login",
+  "username": "Username",
+  "password": "Password",
+  "submit": "Submit",
+  "loginFailed": "Login failed. Please try again.",
+  "homeWelcome": "Signed in successfully!",
+  "language": "Language",
+  "requiredField": "is required"
+  ,
+  "register": "Register",
+  "forgotPassword": "Forgot password",
+  "firstName": "First name",
+  "lastName": "Last name",
+  "email": "Email",
+  "mobile": "Mobile number",
+  "registerSuccess": "Registration successful.",
+  "forgotSent": "Reset link sent to your email."
+  ,
+  "identifier": "Email or mobile",
+  "theme": "Theme",
+  "system": "System",
+  "light": "Light",
+  "dark": "Dark",
+  "welcomeTitle": "Hesabix Cloud Accounting",
+  "welcomeSubtitle": "Smart, secure, and always available accounting for your business.",
+  "brandTagline": "Manage your finances anywhere, anytime with confidence."
+}
+
