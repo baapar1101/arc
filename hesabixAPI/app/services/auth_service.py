@@ -54,6 +54,10 @@ def register_user(*, db: Session, first_name: str | None, last_name: str | None,
 	mobile_n = _normalize_mobile(mobile)
 	if not email_n and not mobile_n:
 		from app.core.responses import ApiError
+		# اگر کاربر موبایل وارد کرده اما نامعتبر بوده، پیام دقیق‌تر بدهیم
+		if mobile and mobile.strip():
+			raise ApiError("INVALID_MOBILE", "Invalid mobile number")
+		# در غیر این صورت، هیچ شناسهٔ معتبری ارائه نشده است
 		raise ApiError("IDENTIFIER_REQUIRED", "Email or mobile is required")
 
 	repo = UserRepository(db)

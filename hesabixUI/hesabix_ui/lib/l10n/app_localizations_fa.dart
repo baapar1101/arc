@@ -100,7 +100,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get registerFailed => 'عضویت ناموفق بود. لطفاً دوباره تلاش کنید.';
 
   @override
-  String get resetFailed => 'ارسال کد بازیابی ناموفق بود. لطفاً دوباره تلاش کنید.';
+  String get resetFailed =>
+      'ارسال کد بازیابی ناموفق بود. لطفاً دوباره تلاش کنید.';
 
   @override
   String get fixFormErrors => 'لطفاً خطاهای فرم را برطرف کنید.';

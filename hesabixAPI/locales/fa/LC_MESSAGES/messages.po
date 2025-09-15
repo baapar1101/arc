@@ -52,6 +52,9 @@ msgstr "این ایمیل قبلاً استفاده شده است."
 msgid "MOBILE_IN_USE"
 msgstr "این شماره موبایل قبلاً استفاده شده است."
 
+msgid "INVALID_MOBILE"
+msgstr "شماره موبایل نامعتبر است."
+
 msgid "ACCOUNT_DISABLED"
 msgstr "حساب کاربری شما غیرفعال است."
 
