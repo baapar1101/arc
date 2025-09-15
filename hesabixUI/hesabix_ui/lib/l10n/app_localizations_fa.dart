@@ -135,4 +135,19 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get cancel => 'انصراف';
+
+  @override
+  String get newBusiness => 'کسب‌وکار جدید';
+
+  @override
+  String get businesses => 'کسب‌وکارها';
+
+  @override
+  String get support => 'پشتیبانی';
+
+  @override
+  String get changePassword => 'تغییر کلمه عبور';
+
+  @override
+  String get marketing => 'بازاریابی';
 }

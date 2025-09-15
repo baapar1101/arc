@@ -135,4 +135,19 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get cancel => 'Cancel';
+
+  @override
+  String get newBusiness => 'New business';
+
+  @override
+  String get businesses => 'Businesses';
+
+  @override
+  String get support => 'Support';
+
+  @override
+  String get changePassword => 'Change password';
+
+  @override
+  String get marketing => 'Marketing';
 }

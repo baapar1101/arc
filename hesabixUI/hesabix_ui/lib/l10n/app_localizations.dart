@@ -339,10 +339,46 @@ abstract class AppLocalizations {
   String get menu;
 
   /// No description provided for @ok.
+  ///
+  /// In en, this message translates to:
+  /// **'OK'**
   String get ok;
 
   /// No description provided for @cancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
   String get cancel;
+
+  /// No description provided for @newBusiness.
+  ///
+  /// In en, this message translates to:
+  /// **'New business'**
+  String get newBusiness;
+
+  /// No description provided for @businesses.
+  ///
+  /// In en, this message translates to:
+  /// **'Businesses'**
+  String get businesses;
+
+  /// No description provided for @support.
+  ///
+  /// In en, this message translates to:
+  /// **'Support'**
+  String get support;
+
+  /// No description provided for @changePassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Change password'**
+  String get changePassword;
+
+  /// No description provided for @marketing.
+  ///
+  /// In en, this message translates to:
+  /// **'Marketing'**
+  String get marketing;
 }
 
 class _AppLocalizationsDelegate

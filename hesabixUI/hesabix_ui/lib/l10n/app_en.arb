@@ -48,5 +48,11 @@
   ,
   "ok": "OK",
   "cancel": "Cancel"
+  ,
+  "newBusiness": "New business",
+  "businesses": "Businesses",
+  "support": "Support",
+  "changePassword": "Change password",
+  "marketing": "Marketing"
 }
 

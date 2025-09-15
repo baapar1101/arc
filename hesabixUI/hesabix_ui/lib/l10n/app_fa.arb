@@ -46,6 +46,11 @@
   "logoutConfirmMessage": "آیا برای خروج مطمئن هستید؟",
   "menu": "منو"
   ,
+  "newBusiness": "کسب‌وکار جدید",
+  "businesses": "کسب‌وکارها",
+  "support": "پشتیبانی",
+  "changePassword": "تغییر کلمه عبور",
+  "marketing": "بازاریابی",
   "ok": "تایید",
   "cancel": "انصراف"
 }

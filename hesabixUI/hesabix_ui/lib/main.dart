@@ -6,6 +6,11 @@ import 'pages/login_page.dart';
 import 'pages/home_page.dart';
 import 'pages/profile/profile_shell.dart';
 import 'pages/profile/profile_dashboard_page.dart';
+import 'pages/profile/new_business_page.dart';
+import 'pages/profile/businesses_page.dart';
+import 'pages/profile/support_page.dart';
+import 'pages/profile/change_password_page.dart';
+import 'pages/profile/marketing_page.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'core/locale_controller.dart';
 import 'core/api_client.dart';
@@ -112,6 +117,31 @@ class _MyAppState extends State<MyApp> {
               path: '/user/profile/dashboard',
               name: 'profile_dashboard',
               builder: (context, state) => const ProfileDashboardPage(),
+            ),
+            GoRoute(
+              path: '/user/profile/new-business',
+              name: 'profile_new_business',
+              builder: (context, state) => const NewBusinessPage(),
+            ),
+            GoRoute(
+              path: '/user/profile/businesses',
+              name: 'profile_businesses',
+              builder: (context, state) => const BusinessesPage(),
+            ),
+            GoRoute(
+              path: '/user/profile/support',
+              name: 'profile_support',
+              builder: (context, state) => const SupportPage(),
+            ),
+            GoRoute(
+              path: '/user/profile/marketing',
+              name: 'profile_marketing',
+              builder: (context, state) => const MarketingPage(),
+            ),
+            GoRoute(
+              path: '/user/profile/change-password',
+              name: 'profile_change_password',
+              builder: (context, state) => const ChangePasswordPage(),
             ),
           ],
         ),

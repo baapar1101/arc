@@ -8,12 +8,19 @@ import '../../widgets/theme_mode_switcher.dart';
 import '../../widgets/logout_button.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 
-class ProfileShell extends StatelessWidget {
+class ProfileShell extends StatefulWidget {
   final Widget child;
   final AuthStore authStore;
   final LocaleController? localeController;
   final ThemeController? themeController;
   const ProfileShell({super.key, required this.child, required this.authStore, this.localeController, this.themeController});
+
+  @override
+  State<ProfileShell> createState() => _ProfileShellState();
+}
+
+class _ProfileShellState extends State<ProfileShell> {
+  int _hoverIndex = -1;
 
   @override
   Widget build(BuildContext context) {
@@ -22,10 +29,19 @@ class ProfileShell extends StatelessWidget {
     final bool railExtended = width >= 1100;
     final ColorScheme scheme = Theme.of(context).colorScheme;
     final String location = GoRouterState.of(context).uri.toString();
+    final bool isDark = Theme.of(context).brightness == Brightness.dark;
+    final String logoAsset = isDark
+        ? 'assets/images/logo-light.png'
+        : 'assets/images/logo-light.png';
 
     final t = AppLocalizations.of(context);
     final destinations = <_Dest>[
       _Dest(t.dashboard, Icons.dashboard_outlined, Icons.dashboard, '/user/profile/dashboard'),
+      _Dest(t.newBusiness, Icons.add_business, Icons.add_business, '/user/profile/new-business'),
+      _Dest(t.businesses, Icons.business, Icons.business, '/user/profile/businesses'),
+      _Dest(t.support, Icons.support_agent, Icons.support_agent, '/user/profile/support'),
+      _Dest(t.marketing, Icons.campaign, Icons.campaign, '/user/profile/marketing'),
+      _Dest(t.changePassword, Icons.password, Icons.password, '/user/profile/change-password'),
     ];
 
     int selectedIndex = 0;
@@ -44,7 +60,7 @@ class ProfileShell extends StatelessWidget {
     }
 
     Future<void> onLogout() async {
-      await authStore.saveApiKey(null);
+      await widget.authStore.saveApiKey(null);
       if (!context.mounted) return;
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
@@ -67,12 +83,9 @@ class ProfileShell extends StatelessWidget {
       title: Row(
         children: [
           const SizedBox(width: 12),
-          // Logo placeholder (can replace with AssetImage)
-          CircleAvatar(backgroundColor: appBarFg.withOpacity(0.15), child: Icon(Icons.account_balance, color: appBarFg)),
+          Image.asset(logoAsset, height: 28),
           const SizedBox(width: 12),
           Text(t.appTitle, style: TextStyle(color: appBarFg, fontWeight: FontWeight.w700)),
-          const SizedBox(width: 8),
-          Text(destinations[selectedIndex].label, style: TextStyle(color: appBarFg.withOpacity(0.85))),
         ],
       ),
       leading: useRail
@@ -85,15 +98,15 @@ class ProfileShell extends StatelessWidget {
               ),
             ),
       actions: [
-        if (themeController != null) ...[
-          ThemeModeSwitcher(controller: themeController!),
+        if (widget.themeController != null) ...[
+          ThemeModeSwitcher(controller: widget.themeController!),
           const SizedBox(width: 8),
         ],
-        if (localeController != null) ...[
-          LanguageSwitcher(controller: localeController!),
+        if (widget.localeController != null) ...[
+          LanguageSwitcher(controller: widget.localeController!),
           const SizedBox(width: 8),
         ],
-        LogoutButton(authStore: authStore),
+        LogoutButton(authStore: widget.authStore),
       ],
     );
 
@@ -102,35 +115,75 @@ class ProfileShell extends StatelessWidget {
       child: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(16),
-          child: child,
+          child: widget.child,
         ),
       ),
     );
+
+    // Side colors and styles
+    final Color sideBg = Theme.of(context).brightness == Brightness.dark
+        ? scheme.surfaceContainerHighest
+        : scheme.surfaceContainerLow;
+    final Color sideFg = scheme.onSurfaceVariant;
+    final Color activeBg = scheme.primaryContainer;
+    final Color activeFg = scheme.onPrimaryContainer;
 
     if (useRail) {
       return Scaffold(
         appBar: appBar,
         body: Row(
           children: [
-            NavigationRail(
-              selectedIndex: selectedIndex,
-              extended: railExtended,
-              leading: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                child: CircleAvatar(
-                  backgroundColor: scheme.primary,
-                  child: const Icon(Icons.person, color: Colors.white),
-                ),
+            Container(
+              width: railExtended ? 240 : 88,
+              height: double.infinity,
+              color: sideBg,
+              child: ListView.builder(
+                padding: EdgeInsets.zero,
+                itemCount: destinations.length,
+                itemBuilder: (ctx, i) {
+                  final d = destinations[i];
+                  final bool isHovered = i == _hoverIndex;
+                  final bool isSelected = i == selectedIndex;
+                  final bool active = isSelected || isHovered;
+                  final double radius = isHovered ? 0 : 8;
+                  return MouseRegion(
+                    onEnter: (_) => setState(() => _hoverIndex = i),
+                    onExit: (_) => setState(() => _hoverIndex = -1),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(radius),
+                      onTap: () => onSelect(i),
+                      child: Container(
+                        margin: EdgeInsets.zero,
+                        padding: EdgeInsets.symmetric(horizontal: railExtended ? 12 : 0, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: active ? activeBg : Colors.transparent,
+                          borderRadius: BorderRadius.circular(radius),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: railExtended ? MainAxisAlignment.start : MainAxisAlignment.center,
+                          children: [
+                            Icon(d.icon, color: active ? activeFg : sideFg),
+                            if (railExtended) ...[
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  d.label,
+                                  style: TextStyle(
+                                    color: active ? activeFg : sideFg,
+                                    fontWeight: active ? FontWeight.w600 : FontWeight.w400,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                },
               ),
-              destinations: [
-                for (final d in destinations)
-                  NavigationRailDestination(
-                    icon: Icon(d.icon),
-                    selectedIcon: Icon(d.selectedIcon),
-                    label: Text(d.label),
-                  ),
-              ],
-              onDestinationSelected: onSelect,
             ),
             const VerticalDivider(width: 1),
             Expanded(child: content),
@@ -142,31 +195,31 @@ class ProfileShell extends StatelessWidget {
     return Scaffold(
       appBar: appBar,
       drawer: Drawer(
+        backgroundColor: sideBg,
         child: SafeArea(
-          child: Column(
+          child: ListView(
+            padding: const EdgeInsets.symmetric(vertical: 8),
             children: [
-              UserAccountsDrawerHeader(
-                currentAccountPicture: CircleAvatar(
-                  backgroundColor: scheme.primary,
-                  child: const Icon(Icons.person, color: Colors.white),
-                ),
-                accountName: const Text(''),
-                accountEmail: const Text(''),
-              ),
-              for (int i = 0; i < destinations.length; i++)
-                ListTile(
-                  leading: Icon(destinations[i].selectedIcon),
-                  title: Text(destinations[i].label),
-                  selected: i == selectedIndex,
-                  onTap: () {
-                    Navigator.of(context).pop();
-                    onSelect(i);
-                  },
-                ),
-              const Spacer(),
+              for (int i = 0; i < destinations.length; i++) ...[
+                Builder(builder: (ctx) {
+                  final d = destinations[i];
+                  final bool active = i == selectedIndex;
+                  return ListTile(
+                    leading: Icon(d.selectedIcon, color: active ? activeFg : sideFg),
+                    title: Text(d.label, style: TextStyle(color: active ? activeFg : sideFg, fontWeight: active ? FontWeight.w600 : FontWeight.w400)),
+                    selected: active,
+                    selectedTileColor: activeBg,
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      onSelect(i);
+                    },
+                  );
+                }),
+              ],
+              const Divider(),
               ListTile(
                 leading: const Icon(Icons.logout),
-                title: const Text('خروج'),
+                title: Text(t.logout),
                 onTap: onLogout,
               ),
             ],
