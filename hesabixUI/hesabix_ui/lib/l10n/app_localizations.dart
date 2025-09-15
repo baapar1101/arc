@@ -247,6 +247,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Manage your finances anywhere, anytime with confidence.'**
   String get brandTagline;
+
+  /// No description provided for @captcha.
+  ///
+  /// In en, this message translates to:
+  /// **'Captcha'**
+  String get captcha;
+
+  /// No description provided for @refresh.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh'**
+  String get refresh;
+
+  /// No description provided for @captchaRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Captcha is required.'**
+  String get captchaRequired;
 }
 
 class _AppLocalizationsDelegate

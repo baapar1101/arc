@@ -83,4 +83,13 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get brandTagline => 'مدیریت مالی هرجا و هر زمان با اطمینان.';
+
+  @override
+  String get captcha => 'کد امنیتی';
+
+  @override
+  String get refresh => 'تازه‌سازی';
+
+  @override
+  String get captchaRequired => 'کد امنیتی الزامی است.';
 }

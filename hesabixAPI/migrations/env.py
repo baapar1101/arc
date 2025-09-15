@@ -7,6 +7,7 @@ from alembic import context
 
 from adapters.db.session import Base
 from app.core.settings import get_settings
+import adapters.db.models  # noqa: F401  # Import models to register metadata
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

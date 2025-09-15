@@ -84,4 +84,13 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get brandTagline =>
       'Manage your finances anywhere, anytime with confidence.';
+
+  @override
+  String get captcha => 'Captcha';
+
+  @override
+  String get refresh => 'Refresh';
+
+  @override
+  String get captchaRequired => 'Captcha is required.';
 }

@@ -39,6 +39,8 @@ dependencies:
   dio: ^5.7.0
   go_router: ^14.2.7
   shared_preferences: ^2.3.2
+  flutter_secure_storage: ^9.2.2
+  uuid: ^4.4.2
 
 dev_dependencies:
   flutter_test:

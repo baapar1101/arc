@@ -14,9 +14,14 @@ dependencies = [
   "sqlalchemy>=2.0.30",
   "pymysql>=1.1.0",
   "pydantic>=2.7.0",
+  "email-validator>=2.0.0.post2",
   "pydantic-settings>=2.3.0",
   "structlog>=24.1.0",
-  "alembic>=1.13.2"
+  "alembic>=1.13.2",
+  "argon2-cffi>=23.1.0",
+  "pillow>=10.3.0",
+  "phonenumbers>=8.13.40",
+  "Babel>=2.15.0"
 ]
 
 [project.optional-dependencies]

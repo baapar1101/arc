@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
 import '../config/app_config.dart';
+import 'auth_store.dart';
 
 class ApiClientOptions {
   final Duration connectTimeout;
@@ -19,9 +20,14 @@ class ApiClientOptions {
 class ApiClient {
   final Dio _dio;
   static Locale? _currentLocale;
+  static AuthStore? _authStore;
 
   static void setCurrentLocale(Locale locale) {
     _currentLocale = locale;
+  }
+
+  static void bindAuthStore(AuthStore store) {
+    _authStore = store;
   }
 
   ApiClient._(this._dio);
@@ -46,6 +52,14 @@ class ApiClient {
           final lang = _currentLocale?.toLanguageTag();
           if (lang != null && lang.isNotEmpty) {
             options.headers['Accept-Language'] = lang;
+          }
+          final apiKey = _authStore?.apiKey;
+          if (apiKey != null && apiKey.isNotEmpty) {
+            options.headers['Authorization'] = 'ApiKey $apiKey';
+          }
+          final deviceId = _authStore?.deviceId;
+          if (deviceId != null && deviceId.isNotEmpty) {
+            options.headers['X-Device-Id'] = deviceId;
           }
           if (kDebugMode) {
             // ignore: avoid_print

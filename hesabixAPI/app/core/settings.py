@@ -23,6 +23,15 @@ class Settings(BaseSettings):
 	# Logging
 	log_level: str = "INFO"
 
+	# Captcha / Security
+	captcha_length: int = 5
+	captcha_ttl_seconds: int = 180
+	captcha_secret: str = "change_me_captcha"
+	reset_password_ttl_seconds: int = 3600
+
+	# CORS
+	cors_allowed_origins: list[str] = ["*"]
+
 	@property
 	def mysql_dsn(self) -> str:
 		return (

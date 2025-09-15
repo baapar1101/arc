@@ -11,6 +11,7 @@ import 'core/locale_controller.dart';
 import 'core/api_client.dart';
 import 'theme/theme_controller.dart';
 import 'theme/app_theme.dart';
+import 'core/auth_store.dart';
 
 void main() {
   runApp(const MyApp());
@@ -26,6 +27,7 @@ class MyApp extends StatefulWidget {
 class _MyAppState extends State<MyApp> {
   LocaleController? _controller;
   ThemeController? _themeController;
+  AuthStore? _authStore;
 
   @override
   void initState() {
@@ -51,12 +53,23 @@ class _MyAppState extends State<MyApp> {
           });
       });
     });
+
+    final store = AuthStore();
+    store.load().then((_) {
+      setState(() {
+        _authStore = store
+          ..addListener(() {
+            setState(() {});
+          });
+        ApiClient.bindAuthStore(store);
+      });
+    });
   }
 
   // Root of application with GoRouter
   @override
   Widget build(BuildContext context) {
-    if (_controller == null || _themeController == null) {
+    if (_controller == null || _themeController == null || _authStore == null) {
       return const MaterialApp(
         home: Scaffold(body: Center(child: CircularProgressIndicator())),
       );
@@ -74,6 +87,7 @@ class _MyAppState extends State<MyApp> {
           builder: (context, state) => LoginPage(
             localeController: controller,
             themeController: themeController,
+            authStore: _authStore!,
           ),
         ),
         GoRoute(

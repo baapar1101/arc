@@ -1,0 +1,61 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: hesabix-api\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2025-09-15 00:00+0000\n"
+"PO-Revision-Date: 2025-09-15 00:00+0000\n"
+"Last-Translator: \n"
+"Language-Team: fa\n"
+"Language: fa\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+# Common / Errors
+msgid "OK"
+msgstr "باشه"
+
+msgid "HTTP_ERROR"
+msgstr "درخواست ناموفق بود"
+
+msgid "VALIDATION_ERROR"
+msgstr "خطای اعتبارسنجی"
+
+msgid "STRING_TOO_SHORT"
+msgstr "رشته خیلی کوتاه است"
+
+msgid "STRING_TOO_LONG"
+msgstr "رشته خیلی بلند است"
+
+msgid "FIELD_REQUIRED"
+msgstr "فیلد الزامی است"
+
+msgid "INVALID_EMAIL"
+msgstr "ایمیل نامعتبر است"
+
+# Auth
+msgid "INVALID_CAPTCHA"
+msgstr "کد امنیتی نامعتبر است."
+
+msgid "INVALID_CREDENTIALS"
+msgstr "ایمیل/موبایل یا رمز عبور نادرست است."
+
+msgid "IDENTIFIER_REQUIRED"
+msgstr "شناسه ورود الزامی است."
+
+msgid "INVALID_IDENTIFIER"
+msgstr "شناسه باید ایمیل یا شماره موبایل معتبر باشد."
+
+msgid "EMAIL_IN_USE"
+msgstr "این ایمیل قبلاً استفاده شده است."
+
+msgid "MOBILE_IN_USE"
+msgstr "این شماره موبایل قبلاً استفاده شده است."
+
+msgid "ACCOUNT_DISABLED"
+msgstr "حساب کاربری شما غیرفعال است."
+
+msgid "RESET_TOKEN_INVALID_OR_EXPIRED"
+msgstr "توکن بازنشانی نامعتبر یا منقضی شده است."
+
+
