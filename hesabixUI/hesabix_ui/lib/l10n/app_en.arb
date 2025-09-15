@@ -36,5 +36,17 @@
   "resetFailed": "Request failed. Please try again."
   ,
   "fixFormErrors": "Please fix the form errors."
+  ,
+  "dashboard": "Dashboard",
+  "profile": "Profile",
+  "settings": "Settings",
+  "logout": "Logout",
+  "logoutDone": "Signed out.",
+  "logoutConfirmTitle": "Sign out",
+  "logoutConfirmMessage": "Are you sure you want to sign out?",
+  "menu": "Menu"
+  ,
+  "ok": "OK",
+  "cancel": "Cancel"
 }
 

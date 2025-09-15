@@ -105,4 +105,34 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get fixFormErrors => 'Please fix the form errors.';
+
+  @override
+  String get dashboard => 'Dashboard';
+
+  @override
+  String get profile => 'Profile';
+
+  @override
+  String get settings => 'Settings';
+
+  @override
+  String get logout => 'Logout';
+
+  @override
+  String get logoutDone => 'Signed out.';
+
+  @override
+  String get logoutConfirmTitle => 'Sign out';
+
+  @override
+  String get logoutConfirmMessage => 'Are you sure you want to sign out?';
+
+  @override
+  String get menu => 'Menu';
+
+  @override
+  String get ok => 'OK';
+
+  @override
+  String get cancel => 'Cancel';
 }

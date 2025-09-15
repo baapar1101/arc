@@ -35,13 +35,21 @@ class AuthStore with ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     _apiKey = key;
     if (key == null) {
-      await _secure.delete(key: _kApiKey);
-      await prefs.remove(_kApiKey);
+      if (kIsWeb) {
+        await prefs.remove(_kApiKey);
+      } else {
+        try {
+          await _secure.delete(key: _kApiKey);
+        } catch (_) {}
+        await prefs.remove(_kApiKey);
+      }
     } else {
       if (kIsWeb) {
         await prefs.setString(_kApiKey, key);
       } else {
-        await _secure.write(key: _kApiKey, value: key);
+        try {
+          await _secure.write(key: _kApiKey, value: key);
+        } catch (_) {}
         await prefs.setString(_kApiKey, key);
       }
     }

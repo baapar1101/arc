@@ -76,33 +76,47 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
   }
 
   Future<void> _refreshCaptcha(String scope) async {
-    final api = ApiClient();
-    final res = await api.post<Map<String, dynamic>>('/api/v1/auth/captcha');
-    final data = res.data!['data'] as Map<String, dynamic>;
-    final id = data['captcha_id'] as String;
-    final imgB64 = data['image_base64'] as String;
-    final bytes = base64Decode(imgB64);
-    final ttl = (data['ttl_seconds'] as num?)?.toInt();
-    setState(() {
-      if (scope == 'login') _loginCaptchaId = id;
-      if (scope == 'register') _registerCaptchaId = id;
-      if (scope == 'forgot') _forgotCaptchaId = id;
-      if (scope == 'login') _loginCaptchaImage = bytes;
-      if (scope == 'register') _registerCaptchaImage = bytes;
-      if (scope == 'forgot') _forgotCaptchaImage = bytes;
-    });
-    if (ttl != null && ttl > 0) {
-      final delay = Duration(seconds: ttl);
-      if (scope == 'login') {
-        _loginCaptchaTimer?.cancel();
-        _loginCaptchaTimer = Timer(delay, () => _refreshCaptcha('login'));
-      } else if (scope == 'register') {
-        _registerCaptchaTimer?.cancel();
-        _registerCaptchaTimer = Timer(delay, () => _refreshCaptcha('register'));
-      } else if (scope == 'forgot') {
-        _forgotCaptchaTimer?.cancel();
-        _forgotCaptchaTimer = Timer(delay, () => _refreshCaptcha('forgot'));
+    try {
+      final api = ApiClient();
+      final res = await api.post<Map<String, dynamic>>('/api/v1/auth/captcha');
+      final body = res.data;
+      if (body is! Map<String, dynamic>) return;
+      final data = body['data'];
+      if (data is! Map<String, dynamic>) return;
+      final String? id = data['captcha_id'] as String?;
+      final String? imgB64 = data['image_base64'] as String?;
+      final int? ttl = (data['ttl_seconds'] as num?)?.toInt();
+      if (id == null || imgB64 == null) return;
+      Uint8List bytes;
+      try {
+        bytes = base64Decode(imgB64);
+      } catch (_) {
+        return;
       }
+      if (!mounted) return;
+      setState(() {
+        if (scope == 'login') _loginCaptchaId = id;
+        if (scope == 'register') _registerCaptchaId = id;
+        if (scope == 'forgot') _forgotCaptchaId = id;
+        if (scope == 'login') _loginCaptchaImage = bytes;
+        if (scope == 'register') _registerCaptchaImage = bytes;
+        if (scope == 'forgot') _forgotCaptchaImage = bytes;
+      });
+      if (ttl != null && ttl > 0) {
+        final delay = Duration(seconds: ttl);
+        if (scope == 'login') {
+          _loginCaptchaTimer?.cancel();
+          _loginCaptchaTimer = Timer(delay, () => _refreshCaptcha('login'));
+        } else if (scope == 'register') {
+          _registerCaptchaTimer?.cancel();
+          _registerCaptchaTimer = Timer(delay, () => _refreshCaptcha('register'));
+        } else if (scope == 'forgot') {
+          _forgotCaptchaTimer?.cancel();
+          _forgotCaptchaTimer = Timer(delay, () => _refreshCaptcha('forgot'));
+        }
+      }
+    } catch (_) {
+      // سکوت: خطای شبکه/شکل پاسخ نباید باعث کرش شود
     }
   }
 
@@ -119,18 +133,63 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     try {
       if (e is DioException) {
         final data = e.response?.data;
-        if (data is Map && data['error'] is Map && data['error']['message'] is String) {
-          return data['error']['message'] as String;
-        }
-        if (data is Map && data['detail'] is List) {
-          final details = data['detail'] as List;
-          if (details.isNotEmpty && details.first is Map && (details.first as Map)['msg'] is String) {
-            return (details.first as Map)['msg'] as String;
+        if (data is Map) {
+          final err = data['error'] is Map ? data['error'] as Map : null;
+          List<dynamic>? details;
+          if (err != null && err['details'] is List) {
+            details = err['details'] as List;
+          } else if (data['detail'] is List) {
+            details = data['detail'] as List;
+          }
+          if (details != null && details.isNotEmpty) {
+            final parts = <String>[];
+            for (final item in details) {
+              if (item is Map) {
+                final fieldRaw = (item['field'] ?? (item['loc'] is List ? (item['loc'] as List).isNotEmpty ? (item['loc'] as List).last?.toString() : null : null))?.toString();
+                final String? message = (item['message'] ?? item['msg'])?.toString();
+                String label = '';
+                switch (fieldRaw) {
+                  case 'password':
+                    label = t.password;
+                    break;
+                  case 'email':
+                    label = t.email;
+                    break;
+                  case 'mobile':
+                    label = t.mobile;
+                    break;
+                  case 'first_name':
+                    label = t.firstName;
+                    break;
+                  case 'last_name':
+                    label = t.lastName;
+                    break;
+                  case 'captcha':
+                  case 'captcha_code':
+                    label = t.captcha;
+                    break;
+                  case 'identifier':
+                    label = t.identifier;
+                    break;
+                  default:
+                    label = fieldRaw ?? '';
+                }
+                if (message != null && message.isNotEmpty) {
+                  parts.add(label.isNotEmpty ? '$label: $message' : message);
+                }
+              }
+            }
+            if (parts.isNotEmpty) {
+              return parts.join('\n');
+            }
+          }
+          if (err != null && err['message'] is String) {
+            return err['message'] as String;
           }
         }
       }
     } catch (_) {}
-    return t.loginFailed;
+    return '';
   }
 
   void _showSnack(String message) {
@@ -165,15 +224,20 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
           'device_id': widget.authStore.deviceId,
         },
       );
-      final data = res.data?['data'] as Map<String, dynamic>?;
-      final apiKey = data?['api_key'] as String?;
+      Map<String, dynamic>? data;
+      final body = res.data;
+      if (body is Map<String, dynamic>) {
+        final inner = body['data'];
+        if (inner is Map<String, dynamic>) data = inner;
+      }
+      final apiKey = data != null ? data['api_key'] as String? : null;
       if (apiKey != null && apiKey.isNotEmpty) {
         await widget.authStore.saveApiKey(apiKey);
       }
 
       if (!mounted) return;
       _showSnack(t.homeWelcome);
-      context.go('/');
+      context.go('/user/profile/dashboard');
     } catch (e) {
       final msg = _extractErrorMessage(e, AppLocalizations.of(context));
       _showSnack(msg);
@@ -219,7 +283,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     setState(() => _loadingRegister = true);
     try {
       final api = ApiClient();
-      await api.post<Map<String, dynamic>>(
+      final res = await api.post<Map<String, dynamic>>(
         '/api/v1/auth/register',
         data: {
           'first_name': _firstNameCtrl.text.trim(),
@@ -229,12 +293,26 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
           'password': _registerPasswordCtrl.text,
           'captcha_id': _registerCaptchaId,
           'captcha_code': _registerCaptchaCtrl.text.trim(),
+          'device_id': widget.authStore.deviceId,
         },
       );
 
       if (!mounted) return;
-      _showSnack(t.registerSuccess);
-      DefaultTabController.of(context).animateTo(0);
+      Map<String, dynamic>? data;
+      final body = res.data;
+      if (body is Map<String, dynamic>) {
+        final inner = body['data'];
+        if (inner is Map<String, dynamic>) data = inner;
+      }
+      final apiKey = data != null ? data['api_key'] as String? : null;
+      if (apiKey != null && apiKey.isNotEmpty) {
+        await widget.authStore.saveApiKey(apiKey);
+        _showSnack(t.registerSuccess);
+        context.go('/user/profile/dashboard');
+      } else {
+        _showSnack(t.registerSuccess);
+        context.go('/user/profile/dashboard');
+      }
     } catch (e) {
       if (!mounted) return;
       final msg = _extractErrorMessage(e, AppLocalizations.of(context));

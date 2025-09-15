@@ -105,4 +105,34 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get fixFormErrors => 'لطفاً خطاهای فرم را برطرف کنید.';
+
+  @override
+  String get dashboard => 'داشبورد';
+
+  @override
+  String get profile => 'پروفایل';
+
+  @override
+  String get settings => 'تنظیمات';
+
+  @override
+  String get logout => 'خروج';
+
+  @override
+  String get logoutDone => 'خروج انجام شد';
+
+  @override
+  String get logoutConfirmTitle => 'تایید خروج';
+
+  @override
+  String get logoutConfirmMessage => 'آیا برای خروج مطمئن هستید؟';
+
+  @override
+  String get menu => 'منو';
+
+  @override
+  String get ok => 'تایید';
+
+  @override
+  String get cancel => 'انصراف';
 }

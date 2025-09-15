@@ -14,6 +14,7 @@ class RegisterRequest(CaptchaSolve):
 	email: EmailStr | None = None
 	mobile: str | None = Field(default=None, max_length=32)
 	password: str = Field(..., min_length=8, max_length=128)
+	device_id: str | None = Field(default=None, max_length=100)
 
 
 class LoginRequest(CaptchaSolve):

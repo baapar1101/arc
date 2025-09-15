@@ -36,5 +36,17 @@
   "resetFailed": "ارسال کد بازیابی ناموفق بود. لطفاً دوباره تلاش کنید."
   ,
   "fixFormErrors": "لطفاً خطاهای فرم را برطرف کنید."
+  ,
+  "dashboard": "داشبورد",
+  "profile": "پروفایل",
+  "settings": "تنظیمات",
+  "logout": "خروج",
+  "logoutDone": "خروج انجام شد",
+  "logoutConfirmTitle": "تایید خروج",
+  "logoutConfirmMessage": "آیا برای خروج مطمئن هستید؟",
+  "menu": "منو"
+  ,
+  "ok": "تایید",
+  "cancel": "انصراف"
 }
 

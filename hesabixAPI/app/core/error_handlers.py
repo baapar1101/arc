@@ -16,12 +16,20 @@ def _translate_validation_error(request: Request, exc: RequestValidationError) -
 			content={"success": False, "error": {"code": "VALIDATION_ERROR", "message": "Validation error", "details": exc.errors()}},
 		)
 
+	# translated details
 	details: list[dict[str, Any]] = []
 	for err in exc.errors():
 		type_ = err.get("type")
 		loc = err.get("loc", [])
 		ctx = err.get("ctx", {}) or {}
 		msg = err.get("msg", "")
+
+		# extract field name (skip body/query/path)
+		field_name = None
+		if isinstance(loc, (list, tuple)):
+			for part in loc:
+				if str(part) not in ("body", "query", "path"):
+					field_name = str(part)
 
 		if type_ == "string_too_short":
 			msg = translator.t("STRING_TOO_SHORT")
@@ -35,7 +43,12 @@ def _translate_validation_error(request: Request, exc: RequestValidationError) -
 				msg = f"{msg} (حداکثر {max_len})"
 		elif type_ in {"missing", "value_error.missing"}:
 			msg = translator.t("FIELD_REQUIRED")
-		elif type_ in {"value_error.email", "email", "value_error.email"}:
+		# broader email detection
+		elif (
+			type_ in {"value_error.email", "email"}
+			or (field_name == "email" and isinstance(type_, str) and type_.startswith("value_error"))
+			or (isinstance(msg, str) and "email address" in msg.lower())
+		):
 			msg = translator.t("INVALID_EMAIL")
 
 		details.append({"loc": loc, "msg": msg, "type": type_})

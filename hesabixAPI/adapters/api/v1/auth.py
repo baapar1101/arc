@@ -26,7 +26,7 @@ def generate_captcha(db: Session = Depends(get_db)) -> dict:
 
 
 @router.post("/register", summary="Register new user")
-def register(payload: RegisterRequest, db: Session = Depends(get_db)) -> dict:
+def register(request: Request, payload: RegisterRequest, db: Session = Depends(get_db)) -> dict:
 	user_id = register_user(
 		db=db,
 		first_name=payload.first_name,
@@ -37,7 +37,16 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)) -> dict:
 		captcha_id=payload.captcha_id,
 		captcha_code=payload.captcha_code,
 	)
-	return success_response({"user_id": user_id})
+	# Create a session api key similar to login
+	user_agent = request.headers.get("User-Agent")
+	ip = request.client.host if request.client else None
+	from app.core.security import generate_api_key
+	from adapters.db.repositories.api_key_repo import ApiKeyRepository
+	api_key, key_hash = generate_api_key()
+	api_repo = ApiKeyRepository(db)
+	api_repo.create_session_key(user_id=user_id, key_hash=key_hash, device_id=payload.device_id, user_agent=user_agent, ip=ip, expires_at=None)
+	user = {"id": user_id, "first_name": payload.first_name, "last_name": payload.last_name, "email": payload.email, "mobile": payload.mobile}
+	return success_response({"api_key": api_key, "expires_at": None, "user": user})
 
 
 @router.post("/login", summary="Login with email or mobile")

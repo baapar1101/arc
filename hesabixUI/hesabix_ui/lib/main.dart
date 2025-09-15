@@ -80,6 +80,13 @@ class _MyAppState extends State<MyApp> {
 
     final router = GoRouter(
       initialLocation: '/login',
+      redirect: (context, state) {
+        final hasKey = _authStore!.apiKey != null && _authStore!.apiKey!.isNotEmpty;
+        final loggingIn = state.matchedLocation == '/login';
+        if (!hasKey && !loggingIn) return '/login';
+        if (hasKey && loggingIn) return '/user/profile/dashboard';
+        return null;
+      },
       routes: <RouteBase>[
         GoRoute(
           path: '/login',
@@ -99,7 +106,7 @@ class _MyAppState extends State<MyApp> {
           ),
         ),
         ShellRoute(
-          builder: (context, state, child) => ProfileShell(child: child),
+          builder: (context, state, child) => ProfileShell(child: child, authStore: _authStore!, localeController: controller, themeController: themeController),
           routes: [
             GoRoute(
               path: '/user/profile/dashboard',
