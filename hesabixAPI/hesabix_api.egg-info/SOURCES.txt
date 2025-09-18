@@ -20,6 +20,8 @@ app/__init__.py
 app/main.py
 app/core/__init__.py
 app/core/auth_dependency.py
+app/core/calendar.py
+app/core/calendar_middleware.py
 app/core/error_handlers.py
 app/core/i18n.py
 app/core/i18n_catalog.py
@@ -27,6 +29,7 @@ app/core/logging.py
 app/core/responses.py
 app/core/security.py
 app/core/settings.py
+app/core/smart_normalizer.py
 app/services/api_key_service.py
 app/services/auth_service.py
 app/services/captcha_service.py
@@ -37,5 +40,6 @@ hesabix_api.egg-info/requires.txt
 hesabix_api.egg-info/top_level.txt
 migrations/env.py
 migrations/versions/20250915_000001_init_auth_tables.py
+migrations/versions/20250916_000002_add_referral_fields.py
 tests/__init__.py
 tests/test_health.py

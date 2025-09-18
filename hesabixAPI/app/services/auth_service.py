@@ -45,7 +45,19 @@ def _detect_identifier(identifier: str) -> tuple[str, str | None, str | None]:
 	return ("mobile", None, mobile) if mobile else ("invalid", None, None)
 
 
-def register_user(*, db: Session, first_name: str | None, last_name: str | None, email: str | None, mobile: str | None, password: str, captcha_id: str, captcha_code: str) -> int:
+def _generate_referral_code(db: Session) -> str:
+	from secrets import token_urlsafe
+	repo = UserRepository(db)
+	# try a few times to ensure uniqueness
+	for _ in range(10):
+		code = token_urlsafe(8).replace('-', '').replace('_', '')[:10]
+		if not repo.get_by_referral_code(code):
+			return code
+	# fallback longer code
+	return token_urlsafe(12).replace('-', '').replace('_', '')[:12]
+
+
+def register_user(*, db: Session, first_name: str | None, last_name: str | None, email: str | None, mobile: str | None, password: str, captcha_id: str, captcha_code: str, referrer_code: str | None = None) -> int:
 	if not validate_captcha(db, captcha_id, captcha_code):
 		from app.core.responses import ApiError
 		raise ApiError("INVALID_CAPTCHA", "Invalid captcha code")
@@ -69,7 +81,22 @@ def register_user(*, db: Session, first_name: str | None, last_name: str | None,
 		raise ApiError("MOBILE_IN_USE", "Mobile is already in use")
 
 	pwd_hash = hash_password(password)
-	user = repo.create(email=email_n, mobile=mobile_n, password_hash=pwd_hash, first_name=first_name, last_name=last_name)
+	referred_by_user_id = None
+	if referrer_code:
+		ref_user = repo.get_by_referral_code(referrer_code)
+		if ref_user:
+			# prevent self-referral at signup theoretically not applicable; rule kept for safety
+			referred_by_user_id = ref_user.id
+	referral_code = _generate_referral_code(db)
+	user = repo.create(
+		email=email_n,
+		mobile=mobile_n,
+		password_hash=pwd_hash,
+		first_name=first_name,
+		last_name=last_name,
+		referral_code=referral_code,
+		referred_by_user_id=referred_by_user_id,
+	)
 	return user.id
 
 
@@ -104,6 +131,7 @@ def login_user(*, db: Session, identifier: str, password: str, captcha_id: str, 
 		"last_name": user.last_name,
 		"email": user.email,
 		"mobile": user.mobile,
+		"referral_code": getattr(user, "referral_code", None),
 	}
 	return api_key, expires_at, user_data
 
@@ -152,19 +180,110 @@ def reset_password(*, db: Session, token: str, new_password: str, captcha_id: st
 		raise ApiError("RESET_TOKEN_INVALID_OR_EXPIRED", "Reset token is invalid or expired")
 
 	# Update user password
-	user_repo = UserRepository(db)
-	user = user_repo.db.get(type(user_repo).db.registry.mapped_classes['User'], pr.user_id)  # not ideal, fallback to direct get
-	# Safer: direct session get
 	from adapters.db.models.user import User
-	user = user_repo.db.get(User, pr.user_id)
+	user = db.get(User, pr.user_id)
 	if not user:
 		from app.core.responses import ApiError
 		raise ApiError("RESET_TOKEN_INVALID_OR_EXPIRED", "Reset token is invalid or expired")
 	user.password_hash = hash_password(new_password)
-	user_repo.db.add(user)
-	user_repo.db.commit()
+	db.add(user)
+	db.commit()
 
 	pr_repo.mark_used(pr)
 
 
 
+
+def change_password(*, db: Session, user_id: int, current_password: str, new_password: str, confirm_password: str, translator=None) -> None:
+	"""
+	تغییر کلمه عبور کاربر
+	"""
+	# بررسی تطبیق کلمه عبور جدید و تکرار آن
+	if new_password != confirm_password:
+		from app.core.responses import ApiError
+		raise ApiError("PASSWORDS_DO_NOT_MATCH", "New password and confirm password do not match", translator=translator)
+	
+	# بررسی اینکه کلمه عبور جدید با کلمه عبور فعلی متفاوت باشد
+	if current_password == new_password:
+		from app.core.responses import ApiError
+		raise ApiError("SAME_PASSWORD", "New password must be different from current password", translator=translator)
+	
+	# دریافت کاربر
+	from adapters.db.models.user import User
+	user = db.get(User, user_id)
+	if not user:
+		from app.core.responses import ApiError
+		raise ApiError("USER_NOT_FOUND", "User not found", translator=translator)
+	
+	# بررسی کلمه عبور فعلی
+	if not verify_password(current_password, user.password_hash):
+		from app.core.responses import ApiError
+		raise ApiError("INVALID_CURRENT_PASSWORD", "Current password is incorrect", translator=translator)
+	
+	# بررسی اینکه کاربر فعال باشد
+	if not user.is_active:
+		from app.core.responses import ApiError
+		raise ApiError("ACCOUNT_DISABLED", "Your account is disabled", translator=translator)
+	
+	# تغییر کلمه عبور
+	user.password_hash = hash_password(new_password)
+	db.add(user)
+	db.commit()
+
+
+def referral_stats(*, db: Session, user_id: int, start: datetime | None = None, end: datetime | None = None) -> dict:
+	from adapters.db.repositories.user_repo import UserRepository
+	repo = UserRepository(db)
+	# totals
+	total = repo.count_referred(user_id)
+	# month
+	now = datetime.utcnow()
+	month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+	next_month = (month_start.replace(day=28) + timedelta(days=4)).replace(day=1)
+	month_count = repo.count_referred_between(user_id, month_start, next_month)
+	# today
+	today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+	tomorrow = today_start + timedelta(days=1)
+	today_count = repo.count_referred_between(user_id, today_start, tomorrow)
+	# custom range
+	custom = None
+	if start and end:
+		custom = repo.count_referred_between(user_id, start, end)
+	return {
+		"total": total,
+		"this_month": month_count,
+		"today": today_count,
+		"range": custom,
+	}
+
+
+def referral_list(*, db: Session, user_id: int, start: datetime | None = None, end: datetime | None = None, search: str | None = None, page: int = 1, limit: int = 20) -> dict:
+	from adapters.db.repositories.user_repo import UserRepository
+	repo = UserRepository(db)
+	page = max(1, page)
+	limit = max(1, min(100, limit))
+	offset = (page - 1) * limit
+	items = repo.list_referred(user_id, start_dt=start, end_dt=end, search=search, offset=offset, limit=limit)
+	total = repo.count_referred_filtered(user_id, start_dt=start, end_dt=end, search=search)
+	def mask_email(email: str | None) -> str | None:
+		if not email:
+			return None
+		try:
+			local, _, domain = email.partition('@')
+			if len(local) <= 2:
+				masked_local = local[0] + "*"
+			else:
+				masked_local = local[0] + "*" * (len(local) - 2) + local[-1]
+			return masked_local + "@" + domain
+		except Exception:
+			return email
+	result = []
+	for u in items:
+		result.append({
+			"id": u.id,
+			"first_name": u.first_name,
+			"last_name": u.last_name,
+			"email": mask_email(u.email),
+			"created_at": u.created_at.isoformat(),
+		})
+	return {"items": result, "total": total, "page": page, "limit": limit}

@@ -18,7 +18,8 @@
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="A new Flutter project.">
+  <meta name="description" content="Hesabix - سیستم مدیریت مالی">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
@@ -32,8 +33,30 @@
   <title>Hesabix</title>
   <link rel="icon" type="image/x-icon" href="assets/images/favicon.ico">
   <link rel="manifest" href="manifest.json">
+  
+  <!-- Suppress Intl.v8BreakIterator deprecation warning -->
+  <script>
+    // Override console.warn to filter out Intl.v8BreakIterator deprecation warnings
+    const originalWarn = console.warn;
+    console.warn = function(...args) {
+      const message = args.join(' ');
+      if (message.includes('Intl.v8BreakIterator is deprecated') || 
+          message.includes('Please use Intl.Segmenter instead')) {
+        return; // Suppress this specific warning
+      }
+      originalWarn.apply(console, args);
+    };
+  </script>
 </head>
 <body>
+  <script>
+    // Configure Flutter to use path-based routing instead of hash routing
+    window.flutterConfiguration = {
+      canvasKitBaseUrl: "canvaskit/",
+      renderer: "canvaskit",
+      usePathUrlStrategy: true
+    };
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

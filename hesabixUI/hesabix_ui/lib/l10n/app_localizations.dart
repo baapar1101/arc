@@ -379,6 +379,162 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Marketing'**
   String get marketing;
+
+  /// No description provided for @marketingReport.
+  ///
+  /// In en, this message translates to:
+  /// **'Marketing report'**
+  String get marketingReport;
+
+  /// No description provided for @today.
+  ///
+  /// In en, this message translates to:
+  /// **'Today'**
+  String get today;
+
+  /// No description provided for @thisMonth.
+  ///
+  /// In en, this message translates to:
+  /// **'This month'**
+  String get thisMonth;
+
+  /// No description provided for @total.
+  ///
+  /// In en, this message translates to:
+  /// **'Total'**
+  String get total;
+
+  /// No description provided for @dateFrom.
+  ///
+  /// In en, this message translates to:
+  /// **'From date'**
+  String get dateFrom;
+
+  /// No description provided for @dateTo.
+  ///
+  /// In en, this message translates to:
+  /// **'To date'**
+  String get dateTo;
+
+  /// No description provided for @applyFilter.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply filter'**
+  String get applyFilter;
+
+  /// No description provided for @copied.
+  ///
+  /// In en, this message translates to:
+  /// **'Copied'**
+  String get copied;
+
+  /// No description provided for @copyLink.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy link'**
+  String get copyLink;
+
+  /// No description provided for @loading.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading...'**
+  String get loading;
+
+  /// No description provided for @currentPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Current password'**
+  String get currentPassword;
+
+  /// No description provided for @newPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'New password'**
+  String get newPassword;
+
+  /// No description provided for @confirmPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm new password'**
+  String get confirmPassword;
+
+  /// No description provided for @changePasswordSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Password changed successfully'**
+  String get changePasswordSuccess;
+
+  /// No description provided for @changePasswordFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to change password. Please try again.'**
+  String get changePasswordFailed;
+
+  /// No description provided for @passwordsDoNotMatch.
+  ///
+  /// In en, this message translates to:
+  /// **'New password and confirm password do not match'**
+  String get passwordsDoNotMatch;
+
+  /// No description provided for @samePassword.
+  ///
+  /// In en, this message translates to:
+  /// **'New password must be different from current password'**
+  String get samePassword;
+
+  /// No description provided for @invalidCurrentPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Current password is incorrect'**
+  String get invalidCurrentPassword;
+
+  /// No description provided for @passwordChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'Password changed successfully'**
+  String get passwordChanged;
+
+  /// No description provided for @changePasswordDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your current password and choose a new secure password'**
+  String get changePasswordDescription;
+
+  /// No description provided for @changePasswordButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Change Password'**
+  String get changePasswordButton;
+
+  /// No description provided for @passwordMinLength.
+  ///
+  /// In en, this message translates to:
+  /// **'Password must be at least 8 characters'**
+  String get passwordMinLength;
+
+  /// No description provided for @calendar.
+  ///
+  /// In en, this message translates to:
+  /// **'Calendar'**
+  String get calendar;
+
+  /// No description provided for @gregorian.
+  ///
+  /// In en, this message translates to:
+  /// **'Gregorian'**
+  String get gregorian;
+
+  /// No description provided for @jalali.
+  ///
+  /// In en, this message translates to:
+  /// **'Jalali'**
+  String get jalali;
+
+  /// No description provided for @calendarType.
+  ///
+  /// In en, this message translates to:
+  /// **'Calendar Type'**
+  String get calendarType;
 }
 
 class _AppLocalizationsDelegate

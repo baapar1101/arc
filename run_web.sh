@@ -187,6 +187,11 @@ echo "میزبان: $HOST  | پورت: $PORT  | حالت: $MODE"
 echo "دستور: flutter run -d web-server $MODE_FLAG --web-port $PORT --web-hostname $HOST ${DART_DEFINE_ARGS[*]:-}"
 
 cd "$APP_DIR"
+
+# تنظیم mirror برای حل مشکل دسترسی به pub.dev
+export PUB_HOSTED_URL="https://pub.flutter-io.cn"
+export FLUTTER_STORAGE_BASE_URL="https://storage.flutter-io.cn"
+
 exec flutter run -d web-server $MODE_FLAG --web-port "$PORT" --web-hostname "$HOST" ${DART_DEFINE_ARGS[@]:-}
 
 

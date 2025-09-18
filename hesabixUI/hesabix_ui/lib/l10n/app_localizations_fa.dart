@@ -150,4 +150,85 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get marketing => 'بازاریابی';
+
+  @override
+  String get marketingReport => 'گزارش بازاریابی';
+
+  @override
+  String get today => 'امروز';
+
+  @override
+  String get thisMonth => 'این ماه';
+
+  @override
+  String get total => 'کل';
+
+  @override
+  String get dateFrom => 'از تاریخ';
+
+  @override
+  String get dateTo => 'تا تاریخ';
+
+  @override
+  String get applyFilter => 'اعمال فیلتر';
+
+  @override
+  String get copied => 'کپی شد';
+
+  @override
+  String get copyLink => 'کپی لینک';
+
+  @override
+  String get loading => 'در حال بارگذاری...';
+
+  @override
+  String get currentPassword => 'کلمه عبور فعلی';
+
+  @override
+  String get newPassword => 'کلمه عبور جدید';
+
+  @override
+  String get confirmPassword => 'تکرار کلمه عبور جدید';
+
+  @override
+  String get changePasswordSuccess => 'کلمه عبور با موفقیت تغییر کرد';
+
+  @override
+  String get changePasswordFailed =>
+      'تغییر کلمه عبور ناموفق بود. لطفاً دوباره تلاش کنید.';
+
+  @override
+  String get passwordsDoNotMatch => 'کلمه عبور جدید و تکرار آن مطابقت ندارند';
+
+  @override
+  String get samePassword =>
+      'کلمه عبور جدید باید با کلمه عبور فعلی متفاوت باشد';
+
+  @override
+  String get invalidCurrentPassword => 'کلمه عبور فعلی اشتباه است';
+
+  @override
+  String get passwordChanged => 'کلمه عبور با موفقیت تغییر کرد';
+
+  @override
+  String get changePasswordDescription =>
+      'کلمه عبور فعلی خود را وارد کرده و کلمه عبور جدید امنی انتخاب کنید';
+
+  @override
+  String get changePasswordButton => 'تغییر کلمه عبور';
+
+  @override
+  String get passwordMinLength => 'کلمه عبور باید حداقل 8 کاراکتر باشد';
+
+  @override
+  String get calendar => 'تقویم';
+
+  @override
+  String get gregorian => 'میلادی';
+
+  @override
+  String get jalali => 'شمسی';
+
+  @override
+  String get calendarType => 'نوع تقویم';
 }

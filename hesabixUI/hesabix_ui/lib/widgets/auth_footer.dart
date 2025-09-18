@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
 
 import '../core/locale_controller.dart';
+import '../core/calendar_controller.dart';
 import '../theme/theme_controller.dart';
 import 'language_switcher.dart';
+import 'calendar_switcher.dart';
 import 'theme_mode_switcher.dart';
 
 class AuthFooter extends StatelessWidget {
   final LocaleController localeController;
+  final CalendarController calendarController;
   final ThemeController? themeController;
-  const AuthFooter({super.key, required this.localeController, this.themeController});
+  const AuthFooter({super.key, required this.localeController, required this.calendarController, this.themeController});
 
   @override
   Widget build(BuildContext context) {
@@ -17,6 +20,8 @@ class AuthFooter extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
+          CalendarSwitcher(controller: calendarController),
+          const SizedBox(width: 8),
           if (themeController != null) ...[
             ThemeModeSwitcher(controller: themeController!),
             const SizedBox(width: 8),

@@ -15,6 +15,7 @@ class RegisterRequest(CaptchaSolve):
 	mobile: str | None = Field(default=None, max_length=32)
 	password: str = Field(..., min_length=8, max_length=128)
 	device_id: str | None = Field(default=None, max_length=100)
+	referrer_code: str | None = Field(default=None, min_length=4, max_length=32)
 
 
 class LoginRequest(CaptchaSolve):
@@ -30,6 +31,12 @@ class ForgotPasswordRequest(CaptchaSolve):
 class ResetPasswordRequest(CaptchaSolve):
 	token: str = Field(..., min_length=16)
 	new_password: str = Field(..., min_length=8, max_length=128)
+
+
+class ChangePasswordRequest(BaseModel):
+	current_password: str = Field(..., min_length=8, max_length=128)
+	new_password: str = Field(..., min_length=8, max_length=128)
+	confirm_password: str = Field(..., min_length=8, max_length=128)
 
 
 class CreateApiKeyRequest(BaseModel):

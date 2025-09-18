@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/auth_store.dart';
 import '../../core/locale_controller.dart';
+import '../../core/calendar_controller.dart';
 import '../../theme/theme_controller.dart';
 import '../../widgets/language_switcher.dart';
+import '../../widgets/calendar_switcher.dart';
 import '../../widgets/theme_mode_switcher.dart';
 import '../../widgets/logout_button.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
@@ -12,8 +14,9 @@ class ProfileShell extends StatefulWidget {
   final Widget child;
   final AuthStore authStore;
   final LocaleController? localeController;
+  final CalendarController? calendarController;
   final ThemeController? themeController;
-  const ProfileShell({super.key, required this.child, required this.authStore, this.localeController, this.themeController});
+  const ProfileShell({super.key, required this.child, required this.authStore, this.localeController, this.calendarController, this.themeController});
 
   @override
   State<ProfileShell> createState() => _ProfileShellState();
@@ -70,7 +73,7 @@ class _ProfileShellState extends State<ProfileShell> {
 
     // Brand top bar with contrast color
     final Color appBarBg = Theme.of(context).brightness == Brightness.dark
-        ? scheme.surfaceVariant
+        ? scheme.surfaceContainerHighest
         : scheme.primary;
     final Color appBarFg = Theme.of(context).brightness == Brightness.dark
         ? scheme.onSurfaceVariant
@@ -98,12 +101,20 @@ class _ProfileShellState extends State<ProfileShell> {
               ),
             ),
       actions: [
-        if (widget.themeController != null) ...[
-          ThemeModeSwitcher(controller: widget.themeController!),
-          const SizedBox(width: 8),
+        if (widget.calendarController != null) ...[
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4.0),
+            child: CalendarSwitcher(controller: widget.calendarController!),
+          ),
         ],
         if (widget.localeController != null) ...[
-          LanguageSwitcher(controller: widget.localeController!),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4.0),
+            child: LanguageSwitcher(controller: widget.localeController!),
+          ),
+        ],
+        if (widget.themeController != null) ...[
+          ThemeModeSwitcher(controller: widget.themeController!),
           const SizedBox(width: 8),
         ],
         LogoutButton(authStore: widget.authStore),

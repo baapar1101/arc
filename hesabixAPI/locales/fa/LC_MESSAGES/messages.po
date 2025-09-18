@@ -58,7 +58,29 @@ msgstr "شماره موبایل نامعتبر است."
 msgid "ACCOUNT_DISABLED"
 msgstr "حساب کاربری شما غیرفعال است."
 
+# Change Password
+msgid "PASSWORDS_DO_NOT_MATCH"
+msgstr "کلمه عبور جدید و تکرار آن مطابقت ندارند"
+
+msgid "SAME_PASSWORD"
+msgstr "کلمه عبور جدید باید با کلمه عبور فعلی متفاوت باشد"
+
+msgid "INVALID_CURRENT_PASSWORD"
+msgstr "کلمه عبور فعلی اشتباه است"
+
 msgid "RESET_TOKEN_INVALID_OR_EXPIRED"
 msgstr "توکن بازنشانی نامعتبر یا منقضی شده است."
+
+msgid "PASSWORD_MIN_LENGTH"
+msgstr "کلمه عبور باید حداقل 8 کاراکتر باشد"
+
+msgid "CALENDAR_TYPE"
+msgstr "نوع تقویم"
+
+msgid "GREGORIAN"
+msgstr "میلادی"
+
+msgid "JALALI"
+msgstr "شمسی"
 
 

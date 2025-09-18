@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_web_plugins/url_strategy.dart';
 
 import 'pages/login_page.dart';
 import 'pages/home_page.dart';
@@ -13,12 +14,15 @@ import 'pages/profile/change_password_page.dart';
 import 'pages/profile/marketing_page.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'core/locale_controller.dart';
+import 'core/calendar_controller.dart';
 import 'core/api_client.dart';
 import 'theme/theme_controller.dart';
 import 'theme/app_theme.dart';
 import 'core/auth_store.dart';
 
 void main() {
+  // Use path-based routing instead of hash routing
+  usePathUrlStrategy();
   runApp(const MyApp());
 }
 
@@ -31,6 +35,7 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   LocaleController? _controller;
+  CalendarController? _calendarController;
   ThemeController? _themeController;
   AuthStore? _authStore;
 
@@ -46,6 +51,16 @@ class _MyAppState extends State<MyApp> {
             setState(() {});
           });
         ApiClient.setCurrentLocale(c.locale);
+      });
+    });
+
+    CalendarController.load().then((cc) {
+      setState(() {
+        _calendarController = cc
+          ..addListener(() {
+            setState(() {});
+          });
+        ApiClient.bindCalendarController(cc);
       });
     });
 
@@ -74,9 +89,20 @@ class _MyAppState extends State<MyApp> {
   // Root of application with GoRouter
   @override
   Widget build(BuildContext context) {
-    if (_controller == null || _themeController == null || _authStore == null) {
+    if (_controller == null || _calendarController == null || _themeController == null || _authStore == null) {
       return const MaterialApp(
-        home: Scaffold(body: Center(child: CircularProgressIndicator())),
+        home: Scaffold(
+          body: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 16),
+                Text('Loading...'),
+              ],
+            ),
+          ),
+        ),
       );
     }
 
@@ -84,12 +110,39 @@ class _MyAppState extends State<MyApp> {
     final themeController = _themeController!;
 
     final router = GoRouter(
-      initialLocation: '/login',
+      initialLocation: '/',
       redirect: (context, state) {
+        final currentPath = state.uri.path;
+        
+        // اگر authStore هنوز load نشده، منتظر بمان
+        if (_authStore == null) {
+          return null;
+        }
+        
         final hasKey = _authStore!.apiKey != null && _authStore!.apiKey!.isNotEmpty;
-        final loggingIn = state.matchedLocation == '/login';
-        if (!hasKey && !loggingIn) return '/login';
-        if (hasKey && loggingIn) return '/user/profile/dashboard';
+        
+        // اگر API key ندارد
+        if (!hasKey) {
+          // اگر در login نیست، به login برود
+          if (currentPath != '/login') {
+            return '/login';
+          }
+          // اگر در login است، بماند
+          return null;
+        }
+        
+        // اگر API key دارد
+        // اگر در login است، به dashboard برود
+        if (currentPath == '/login') {
+          return '/user/profile/dashboard';
+        }
+        
+        // اگر در root است، به dashboard برود
+        if (currentPath == '/') {
+          return '/user/profile/dashboard';
+        }
+        
+        // برای سایر صفحات (شامل صفحات profile)، redirect نکن (بماند)
         return null;
       },
       routes: <RouteBase>[
@@ -98,20 +151,19 @@ class _MyAppState extends State<MyApp> {
           name: 'login',
           builder: (context, state) => LoginPage(
             localeController: controller,
+            calendarController: _calendarController!,
             themeController: themeController,
             authStore: _authStore!,
           ),
         ),
-        GoRoute(
-          path: '/',
-          name: 'home',
-          builder: (context, state) => HomePage(
-            localeController: controller,
-            themeController: themeController,
-          ),
-        ),
         ShellRoute(
-          builder: (context, state, child) => ProfileShell(child: child, authStore: _authStore!, localeController: controller, themeController: themeController),
+          builder: (context, state, child) => ProfileShell(
+            authStore: _authStore!,
+            localeController: controller,
+            calendarController: _calendarController!,
+            themeController: themeController,
+            child: child,
+          ),
           routes: [
             GoRoute(
               path: '/user/profile/dashboard',
@@ -136,7 +188,7 @@ class _MyAppState extends State<MyApp> {
             GoRoute(
               path: '/user/profile/marketing',
               name: 'profile_marketing',
-              builder: (context, state) => const MarketingPage(),
+              builder: (context, state) => MarketingPage(calendarController: _calendarController!),
             ),
             GoRoute(
               path: '/user/profile/change-password',

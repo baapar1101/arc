@@ -32,10 +32,14 @@ def _translate_validation_error(request: Request, exc: RequestValidationError) -
 					field_name = str(part)
 
 		if type_ == "string_too_short":
-			msg = translator.t("STRING_TOO_SHORT")
-			min_len = ctx.get("min_length")
-			if min_len is not None:
-				msg = f"{msg} (حداقل {min_len})"
+			# Check if it's a password field
+			if field_name and "password" in field_name.lower():
+				msg = translator.t("PASSWORD_MIN_LENGTH")
+			else:
+				msg = translator.t("STRING_TOO_SHORT")
+				min_len = ctx.get("min_length")
+				if min_len is not None:
+					msg = f"{msg} (حداقل {min_len})"
 		elif type_ == "string_too_long":
 			msg = translator.t("STRING_TOO_LONG")
 			max_len = ctx.get("max_length")

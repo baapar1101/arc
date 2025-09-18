@@ -150,4 +150,86 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get marketing => 'Marketing';
+
+  @override
+  String get marketingReport => 'Marketing report';
+
+  @override
+  String get today => 'Today';
+
+  @override
+  String get thisMonth => 'This month';
+
+  @override
+  String get total => 'Total';
+
+  @override
+  String get dateFrom => 'From date';
+
+  @override
+  String get dateTo => 'To date';
+
+  @override
+  String get applyFilter => 'Apply filter';
+
+  @override
+  String get copied => 'Copied';
+
+  @override
+  String get copyLink => 'Copy link';
+
+  @override
+  String get loading => 'Loading...';
+
+  @override
+  String get currentPassword => 'Current password';
+
+  @override
+  String get newPassword => 'New password';
+
+  @override
+  String get confirmPassword => 'Confirm new password';
+
+  @override
+  String get changePasswordSuccess => 'Password changed successfully';
+
+  @override
+  String get changePasswordFailed =>
+      'Failed to change password. Please try again.';
+
+  @override
+  String get passwordsDoNotMatch =>
+      'New password and confirm password do not match';
+
+  @override
+  String get samePassword =>
+      'New password must be different from current password';
+
+  @override
+  String get invalidCurrentPassword => 'Current password is incorrect';
+
+  @override
+  String get passwordChanged => 'Password changed successfully';
+
+  @override
+  String get changePasswordDescription =>
+      'Enter your current password and choose a new secure password';
+
+  @override
+  String get changePasswordButton => 'Change Password';
+
+  @override
+  String get passwordMinLength => 'Password must be at least 8 characters';
+
+  @override
+  String get calendar => 'Calendar';
+
+  @override
+  String get gregorian => 'Gregorian';
+
+  @override
+  String get jalali => 'Jalali';
+
+  @override
+  String get calendarType => 'Calendar Type';
 }

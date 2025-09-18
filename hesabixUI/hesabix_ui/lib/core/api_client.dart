@@ -4,6 +4,7 @@ import 'package:flutter/widgets.dart';
 
 import '../config/app_config.dart';
 import 'auth_store.dart';
+import 'calendar_controller.dart';
 
 class ApiClientOptions {
   final Duration connectTimeout;
@@ -21,6 +22,7 @@ class ApiClient {
   final Dio _dio;
   static Locale? _currentLocale;
   static AuthStore? _authStore;
+  static CalendarController? _calendarController;
 
   static void setCurrentLocale(Locale locale) {
     _currentLocale = locale;
@@ -28,6 +30,10 @@ class ApiClient {
 
   static void bindAuthStore(AuthStore store) {
     _authStore = store;
+  }
+
+  static void bindCalendarController(CalendarController controller) {
+    _calendarController = controller;
   }
 
   ApiClient._(this._dio);
@@ -60,6 +66,10 @@ class ApiClient {
           final deviceId = _authStore?.deviceId;
           if (deviceId != null && deviceId.isNotEmpty) {
             options.headers['X-Device-Id'] = deviceId;
+          }
+          final calendarType = _calendarController?.calendarType.value;
+          if (calendarType != null && calendarType.isNotEmpty) {
+            options.headers['X-Calendar-Type'] = calendarType;
           }
           if (kDebugMode) {
             // ignore: avoid_print
@@ -105,6 +115,22 @@ class ApiClient {
 
   Future<Response<T>> delete<T>(String path, {Object? data, Map<String, dynamic>? query, Options? options, CancelToken? cancelToken}) {
     return _dio.delete<T>(path, data: data, queryParameters: query, options: options, cancelToken: cancelToken);
+  }
+
+  // Change Password API
+  Future<Response<Map<String, dynamic>>> changePassword({
+    required String currentPassword,
+    required String newPassword,
+    required String confirmPassword,
+  }) {
+    return post<Map<String, dynamic>>(
+      '/api/v1/auth/change-password',
+      data: {
+        'current_password': currentPassword,
+        'new_password': newPassword,
+        'confirm_password': confirmPassword,
+      },
+    );
   }
 }
 

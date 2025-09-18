@@ -9,15 +9,18 @@ import 'package:dio/dio.dart';
 import '../core/api_client.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../core/locale_controller.dart';
+import '../core/calendar_controller.dart';
 import '../theme/theme_controller.dart';
 import '../widgets/auth_footer.dart';
 import '../core/auth_store.dart';
+import '../core/referral_store.dart';
 
 class LoginPage extends StatefulWidget {
   final LocaleController localeController;
+  final CalendarController calendarController;
   final ThemeController? themeController;
   final AuthStore authStore;
-  const LoginPage({super.key, required this.localeController, this.themeController, required this.authStore});
+  const LoginPage({super.key, required this.localeController, required this.calendarController, this.themeController, required this.authStore});
 
   @override
   State<LoginPage> createState() => _LoginPageState();
@@ -127,6 +130,8 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     _refreshCaptcha('login');
     _refreshCaptcha('register');
     _refreshCaptcha('forgot');
+    // ذخیره کد معرف از URL (اگر وجود داشت)
+    unawaited(ReferralStore.captureFromCurrentUrl());
   }
 
   String _extractErrorMessage(Object e, AppLocalizations t) {
@@ -222,6 +227,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
           'captcha_id': _loginCaptchaId,
           'captcha_code': _loginCaptchaCtrl.text.trim(),
           'device_id': widget.authStore.deviceId,
+          'referrer_code': await ReferralStore.getReferrerCode(),
         },
       );
       Map<String, dynamic>? data;
@@ -233,11 +239,23 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
       final apiKey = data != null ? data['api_key'] as String? : null;
       if (apiKey != null && apiKey.isNotEmpty) {
         await widget.authStore.saveApiKey(apiKey);
+        // ذخیره کد بازاریابی کاربر برای صفحه Marketing
+        final user = data?['user'] as Map<String, dynamic>?;
+        final String? myRef = user != null ? user['referral_code'] as String? : null;
+        unawaited(ReferralStore.saveUserReferralCode(myRef));
       }
 
       if (!mounted) return;
       _showSnack(t.homeWelcome);
-      context.go('/user/profile/dashboard');
+      // بعد از login موفق، به صفحه قبلی یا dashboard برود
+      final currentPath = GoRouterState.of(context).uri.path;
+      if (currentPath.startsWith('/user/profile/') || currentPath.startsWith('/acc/')) {
+        // اگر در صفحه محافظت شده بود، همان صفحه را refresh کند
+        context.go(currentPath);
+      } else {
+        // وگرنه به dashboard برود
+        context.go('/user/profile/dashboard');
+      }
     } catch (e) {
       final msg = _extractErrorMessage(e, AppLocalizations.of(context));
       _showSnack(msg);
@@ -294,6 +312,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
           'captcha_id': _registerCaptchaId,
           'captcha_code': _registerCaptchaCtrl.text.trim(),
           'device_id': widget.authStore.deviceId,
+          'referrer_code': await ReferralStore.getReferrerCode(),
         },
       );
 
@@ -307,12 +326,15 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
       final apiKey = data != null ? data['api_key'] as String? : null;
       if (apiKey != null && apiKey.isNotEmpty) {
         await widget.authStore.saveApiKey(apiKey);
-        _showSnack(t.registerSuccess);
-        context.go('/user/profile/dashboard');
-      } else {
-        _showSnack(t.registerSuccess);
-        context.go('/user/profile/dashboard');
       }
+      // ذخیره کد بازاریابی کاربر
+      final user = data?['user'] as Map<String, dynamic>?;
+      final String? myRef = user != null ? user['referral_code'] as String? : null;
+      unawaited(ReferralStore.saveUserReferralCode(myRef));
+      _showSnack(t.registerSuccess);
+      // پاکسازی کد معرف پس از ثبت‌نام موفق
+      unawaited(ReferralStore.clearReferrer());
+      context.go('/user/profile/dashboard');
     } catch (e) {
       if (!mounted) return;
       final msg = _extractErrorMessage(e, AppLocalizations.of(context));
@@ -347,6 +369,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
           'identifier': _forgotIdentifierCtrl.text.trim(),
           'captcha_id': _forgotCaptchaId,
           'captcha_code': _forgotCaptchaCtrl.text.trim(),
+          'referrer_code': await ReferralStore.getReferrerCode(),
         },
       );
 
@@ -691,7 +714,11 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                             const SizedBox(height: 8),
                             Text(t.brandTagline, textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodySmall),
                             const SizedBox(height: 12),
-                            AuthFooter(localeController: widget.localeController, themeController: widget.themeController),
+                            AuthFooter(
+                              localeController: widget.localeController,
+                              calendarController: widget.calendarController,
+                              themeController: widget.themeController,
+                            ),
                           ],
                         ),
                       ),
