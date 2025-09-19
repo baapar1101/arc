@@ -35,9 +35,12 @@ app/core/smart_normalizer.py
 app/services/api_key_service.py
 app/services/auth_service.py
 app/services/captcha_service.py
-app/services/pdf_service.py
 app/services/query_service.py
-app/services/user_context_service.py
+app/services/pdf/__init__.py
+app/services/pdf/base_pdf_service.py
+app/services/pdf/modules/__init__.py
+app/services/pdf/modules/marketing/__init__.py
+app/services/pdf/modules/marketing/marketing_module.py
 hesabix_api.egg-info/PKG-INFO
 hesabix_api.egg-info/SOURCES.txt
 hesabix_api.egg-info/dependency_links.txt
