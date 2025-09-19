@@ -338,6 +338,18 @@ abstract class AppLocalizations {
   /// **'Menu'**
   String get menu;
 
+  /// No description provided for @systemSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'System Settings'**
+  String get systemSettings;
+
+  /// No description provided for @adminTools.
+  ///
+  /// In en, this message translates to:
+  /// **'Admin Tools'**
+  String get adminTools;
+
   /// No description provided for @ok.
   ///
   /// In en, this message translates to:

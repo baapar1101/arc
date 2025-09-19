@@ -26,6 +26,17 @@ class _ProfileShellState extends State<ProfileShell> {
   int _hoverIndex = -1;
 
   @override
+  void initState() {
+    super.initState();
+    // اضافه کردن listener برای AuthStore
+    widget.authStore.addListener(() {
+      if (mounted) {
+        setState(() {});
+      }
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
     final bool useRail = width >= 700;
@@ -47,16 +58,27 @@ class _ProfileShellState extends State<ProfileShell> {
       _Dest(t.changePassword, Icons.password, Icons.password, '/user/profile/change-password'),
     ];
 
+    // اضافه کردن منوی تنظیمات سیستم برای ادمین‌ها
+    final adminDestinations = <_Dest>[
+      _Dest(t.systemSettings, Icons.admin_panel_settings, Icons.admin_panel_settings, '/user/profile/system-settings'),
+    ];
+
+    // ترکیب منوهای عادی و ادمین
+    final allDestinations = <_Dest>[
+      ...destinations,
+      if (widget.authStore.isSuperAdmin) ...adminDestinations,
+    ];
+
     int selectedIndex = 0;
-    for (int i = 0; i < destinations.length; i++) {
-      if (location.startsWith(destinations[i].path)) {
+    for (int i = 0; i < allDestinations.length; i++) {
+      if (location.startsWith(allDestinations[i].path)) {
         selectedIndex = i;
         break;
       }
     }
 
     Future<void> onSelect(int index) async {
-      final path = destinations[index].path;
+      final path = allDestinations[index].path;
       if (GoRouterState.of(context).uri.toString() != path) {
         context.go(path);
       }
@@ -150,9 +172,9 @@ class _ProfileShellState extends State<ProfileShell> {
               color: sideBg,
               child: ListView.builder(
                 padding: EdgeInsets.zero,
-                itemCount: destinations.length,
+                itemCount: allDestinations.length,
                 itemBuilder: (ctx, i) {
-                  final d = destinations[i];
+                  final d = allDestinations[i];
                   final bool isHovered = i == _hoverIndex;
                   final bool isSelected = i == selectedIndex;
                   final bool active = isSelected || isHovered;
@@ -216,9 +238,9 @@ class _ProfileShellState extends State<ProfileShell> {
           child: ListView(
             padding: const EdgeInsets.symmetric(vertical: 8),
             children: [
-              for (int i = 0; i < destinations.length; i++) ...[
+              for (int i = 0; i < allDestinations.length; i++) ...[
                 Builder(builder: (ctx) {
-                  final d = destinations[i];
+                  final d = allDestinations[i];
                   final bool active = i == selectedIndex;
                   return ListTile(
                     leading: Icon(d.selectedIcon, color: active ? activeFg : sideFg),

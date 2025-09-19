@@ -131,6 +131,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get menu => 'Menu';
 
   @override
+  String get systemSettings => 'System Settings';
+
+  @override
+  String get adminTools => 'Admin Tools';
+
+  @override
   String get ok => 'OK';
 
   @override

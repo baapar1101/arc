@@ -46,6 +46,8 @@
   "logoutConfirmMessage": "Are you sure you want to sign out?",
   "menu": "Menu"
   ,
+  "systemSettings": "System Settings",
+  "adminTools": "Admin Tools",
   "ok": "OK",
   "cancel": "Cancel",
   "columnSettings": "Column Settings",

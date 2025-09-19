@@ -239,10 +239,19 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
       final apiKey = data != null ? data['api_key']?.toString() : null;
       if (apiKey != null && apiKey.isNotEmpty) {
         await widget.authStore.saveApiKey(apiKey);
-        // ذخیره کد بازاریابی کاربر برای صفحه Marketing
-        final user = data?['user'] as Map<String, dynamic>?;
-        final String? myRef = user != null ? user['referral_code']?.toString() : null;
-        unawaited(ReferralStore.saveUserReferralCode(myRef));
+      }
+      
+      // ذخیره کد بازاریابی کاربر برای صفحه Marketing
+      final user = data?['user'] as Map<String, dynamic>?;
+      final String? myRef = user != null ? user['referral_code']?.toString() : null;
+      unawaited(ReferralStore.saveUserReferralCode(myRef));
+      
+      // ذخیره دسترسی‌های اپلیکیشن
+      final appPermissions = user?['app_permissions'] as Map<String, dynamic>?;
+      final isSuperAdmin = appPermissions?['superadmin'] == true;
+      
+      if (appPermissions != null) {
+        await widget.authStore.saveAppPermissions(appPermissions, isSuperAdmin);
       }
 
       if (!mounted) return;
@@ -327,10 +336,19 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
       if (apiKey != null && apiKey.isNotEmpty) {
         await widget.authStore.saveApiKey(apiKey);
       }
+      
       // ذخیره کد بازاریابی کاربر
       final user = data?['user'] as Map<String, dynamic>?;
       final String? myRef = user != null ? user['referral_code'] as String? : null;
       unawaited(ReferralStore.saveUserReferralCode(myRef));
+      
+      // ذخیره دسترسی‌های اپلیکیشن
+      final appPermissions = user?['app_permissions'] as Map<String, dynamic>?;
+      final isSuperAdmin = appPermissions?['superadmin'] == true;
+      
+      if (appPermissions != null) {
+        await widget.authStore.saveAppPermissions(appPermissions, isSuperAdmin);
+      }
       _showSnack(t.registerSuccess);
       // پاکسازی کد معرف پس از ثبت‌نام موفق
       unawaited(ReferralStore.clearReferrer());

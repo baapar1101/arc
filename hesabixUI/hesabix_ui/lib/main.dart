@@ -11,6 +11,7 @@ import 'pages/profile/businesses_page.dart';
 import 'pages/profile/support_page.dart';
 import 'pages/profile/change_password_page.dart';
 import 'pages/profile/marketing_page.dart';
+import 'pages/system_settings_page.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'core/locale_controller.dart';
 import 'core/calendar_controller.dart';
@@ -18,6 +19,7 @@ import 'core/api_client.dart';
 import 'theme/theme_controller.dart';
 import 'theme/app_theme.dart';
 import 'core/auth_store.dart';
+import 'core/permission_guard.dart';
 
 void main() {
   // Use path-based routing instead of hash routing
@@ -217,6 +219,21 @@ class _MyAppState extends State<MyApp> {
               ),
             ),
           ),
+          GoRoute(
+            path: '/user/profile/system-settings',
+            builder: (context, state) => const Scaffold(
+              body: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(),
+                    SizedBox(height: 16),
+                    Text('Loading...'),
+                  ],
+                ),
+              ),
+            ),
+          ),
           // Catch-all route برای هر URL دیگر
           GoRoute(
             path: '/:path(.*)',
@@ -338,6 +355,21 @@ class _MyAppState extends State<MyApp> {
               path: '/user/profile/change-password',
               name: 'profile_change_password',
               builder: (context, state) => const ChangePasswordPage(),
+            ),
+            GoRoute(
+              path: '/user/profile/system-settings',
+              name: 'profile_system_settings',
+              builder: (context, state) {
+                // بررسی دسترسی SuperAdmin
+                if (_authStore == null) {
+                  return PermissionGuard.buildAccessDeniedPage();
+                }
+                
+                if (!_authStore!.isSuperAdmin) {
+                  return PermissionGuard.buildAccessDeniedPage();
+                }
+                return const SystemSettingsPage();
+              },
             ),
           ],
         ),

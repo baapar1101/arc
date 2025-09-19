@@ -28,6 +28,15 @@ def generate_captcha(db: Session = Depends(get_db)) -> dict:
 	})
 
 
+@router.get("/me", summary="Get current user info")
+def get_current_user_info(
+    request: Request,
+    ctx: AuthContext = Depends(get_current_user)
+) -> dict:
+    """دریافت اطلاعات کاربر کنونی"""
+    return success_response(ctx.to_dict(), request)
+
+
 @router.post("/register", summary="Register new user")
 def register(request: Request, payload: RegisterRequest, db: Session = Depends(get_db)) -> dict:
 	user_id = register_user(

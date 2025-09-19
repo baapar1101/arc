@@ -131,6 +131,12 @@ class AppLocalizationsFa extends AppLocalizations {
   String get menu => 'منو';
 
   @override
+  String get systemSettings => 'تنظیمات سیستم';
+
+  @override
+  String get adminTools => 'ابزارهای مدیریتی';
+
+  @override
   String get ok => 'تایید';
 
   @override
