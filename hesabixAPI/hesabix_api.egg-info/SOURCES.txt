@@ -11,11 +11,13 @@ adapters/db/__init__.py
 adapters/db/session.py
 adapters/db/models/__init__.py
 adapters/db/models/api_key.py
+adapters/db/models/business.py
 adapters/db/models/captcha.py
 adapters/db/models/password_reset.py
 adapters/db/models/user.py
 adapters/db/repositories/api_key_repo.py
 adapters/db/repositories/base_repo.py
+adapters/db/repositories/business_repo.py
 adapters/db/repositories/password_reset_repo.py
 adapters/db/repositories/user_repo.py
 app/__init__.py
@@ -47,6 +49,9 @@ hesabix_api.egg-info/dependency_links.txt
 hesabix_api.egg-info/requires.txt
 hesabix_api.egg-info/top_level.txt
 migrations/env.py
+migrations/versions/20250117_000003_add_business_table.py
+migrations/versions/20250117_000004_add_business_contact_fields.py
+migrations/versions/20250117_000005_add_business_geographic_fields.py
 migrations/versions/20250915_000001_init_auth_tables.py
 migrations/versions/20250916_000002_add_referral_fields.py
 tests/__init__.py
