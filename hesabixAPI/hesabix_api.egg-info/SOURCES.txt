@@ -12,6 +12,7 @@ adapters/db/session.py
 adapters/db/models/__init__.py
 adapters/db/models/api_key.py
 adapters/db/models/business.py
+adapters/db/models/business_permission.py
 adapters/db/models/captcha.py
 adapters/db/models/password_reset.py
 adapters/db/models/user.py
@@ -52,6 +53,8 @@ migrations/env.py
 migrations/versions/20250117_000003_add_business_table.py
 migrations/versions/20250117_000004_add_business_contact_fields.py
 migrations/versions/20250117_000005_add_business_geographic_fields.py
+migrations/versions/20250117_000006_add_app_permissions_to_users.py
+migrations/versions/20250117_000007_create_business_permissions_table.py
 migrations/versions/20250915_000001_init_auth_tables.py
 migrations/versions/20250916_000002_add_referral_fields.py
 tests/__init__.py

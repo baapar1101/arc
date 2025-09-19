@@ -26,8 +26,26 @@ class UserRepository(BaseRepository[User]):
 		stmt = select(User).where(User.referral_code == referral_code)
 		return self.db.execute(stmt).scalars().first()
 
+	def is_first_user(self) -> bool:
+		"""بررسی اینکه آیا این اولین کاربر سیستم است یا نه"""
+		stmt = select(func.count()).select_from(User)
+		count = self.db.execute(stmt).scalar() or 0
+		return count == 0
+
 	def create(self, *, email: str | None, mobile: str | None, password_hash: str, first_name: str | None, last_name: str | None, referral_code: str, referred_by_user_id: int | None = None) -> User:
-		user = User(email=email, mobile=mobile, password_hash=password_hash, first_name=first_name, last_name=last_name, referral_code=referral_code, referred_by_user_id=referred_by_user_id)
+		# تعیین دسترسی‌های برنامه بر اساس اینکه آیا کاربر اول است یا نه
+		app_permissions = {"superadmin": True} if self.is_first_user() else {}
+		
+		user = User(
+			email=email, 
+			mobile=mobile, 
+			password_hash=password_hash, 
+			first_name=first_name, 
+			last_name=last_name, 
+			referral_code=referral_code, 
+			referred_by_user_id=referred_by_user_id,
+			app_permissions=app_permissions
+		)
 		self.db.add(user)
 		self.db.commit()
 		self.db.refresh(user)
@@ -85,6 +103,7 @@ class UserRepository(BaseRepository[User]):
 			"is_active": user.is_active,
 			"referral_code": user.referral_code,
 			"referred_by_user_id": user.referred_by_user_id,
+			"app_permissions": user.app_permissions,
 			"created_at": user.created_at,
 			"updated_at": user.updated_at,
 		}

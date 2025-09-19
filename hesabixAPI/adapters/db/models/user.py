@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import String, DateTime, Boolean, Integer, ForeignKey
+from sqlalchemy import String, DateTime, Boolean, Integer, ForeignKey, JSON
 from sqlalchemy.orm import Mapped, mapped_column
 
 from adapters.db.session import Base
@@ -21,6 +21,8 @@ class User(Base):
 	# Marketing/Referral fields
 	referral_code: Mapped[str] = mapped_column(String(32), unique=True, index=True, nullable=False)
 	referred_by_user_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+	# App permissions
+	app_permissions: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 	created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 	updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 

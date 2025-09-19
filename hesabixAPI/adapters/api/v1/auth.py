@@ -51,7 +51,7 @@ def register(request: Request, payload: RegisterRequest, db: Session = Depends(g
 	api_repo.create_session_key(user_id=user_id, key_hash=key_hash, device_id=payload.device_id, user_agent=user_agent, ip=ip, expires_at=None)
 	from adapters.db.models.user import User
 	user_obj = db.get(User, user_id)
-	user = {"id": user_id, "first_name": payload.first_name, "last_name": payload.last_name, "email": payload.email, "mobile": payload.mobile, "referral_code": getattr(user_obj, "referral_code", None)}
+	user = {"id": user_id, "first_name": payload.first_name, "last_name": payload.last_name, "email": payload.email, "mobile": payload.mobile, "referral_code": getattr(user_obj, "referral_code", None), "app_permissions": getattr(user_obj, "app_permissions", None)}
 	response_data = {"api_key": api_key, "expires_at": None, "user": user}
 	formatted_data = format_datetime_fields(response_data, request)
 	return success_response(formatted_data, request)
