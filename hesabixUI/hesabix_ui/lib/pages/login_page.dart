@@ -86,8 +86,8 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
       if (body is! Map<String, dynamic>) return;
       final data = body['data'];
       if (data is! Map<String, dynamic>) return;
-      final String? id = data['captcha_id'] as String?;
-      final String? imgB64 = data['image_base64'] as String?;
+      final String? id = data['captcha_id']?.toString();
+      final String? imgB64 = data['image_base64']?.toString();
       final int? ttl = (data['ttl_seconds'] as num?)?.toInt();
       if (id == null || imgB64 == null) return;
       Uint8List bytes;
@@ -236,12 +236,12 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
         final inner = body['data'];
         if (inner is Map<String, dynamic>) data = inner;
       }
-      final apiKey = data != null ? data['api_key'] as String? : null;
+      final apiKey = data != null ? data['api_key']?.toString() : null;
       if (apiKey != null && apiKey.isNotEmpty) {
         await widget.authStore.saveApiKey(apiKey);
         // ذخیره کد بازاریابی کاربر برای صفحه Marketing
         final user = data?['user'] as Map<String, dynamic>?;
-        final String? myRef = user != null ? user['referral_code'] as String? : null;
+        final String? myRef = user != null ? user['referral_code']?.toString() : null;
         unawaited(ReferralStore.saveUserReferralCode(myRef));
       }
 
@@ -323,7 +323,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
         final inner = body['data'];
         if (inner is Map<String, dynamic>) data = inner;
       }
-      final apiKey = data != null ? data['api_key'] as String? : null;
+      final apiKey = data != null ? data['api_key']?.toString() : null;
       if (apiKey != null && apiKey.isNotEmpty) {
         await widget.authStore.saveApiKey(apiKey);
       }

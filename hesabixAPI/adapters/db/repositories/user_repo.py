@@ -6,11 +6,13 @@ from sqlalchemy import select, func, and_, or_
 from sqlalchemy.orm import Session
 
 from adapters.db.models.user import User
+from adapters.db.repositories.base_repo import BaseRepository
+from adapters.api.v1.schemas import QueryInfo
 
 
-class UserRepository:
+class UserRepository(BaseRepository[User]):
 	def __init__(self, db: Session) -> None:
-		self.db = db
+		super().__init__(db, User)
 
 	def get_by_email(self, email: str) -> Optional[User]:
 		stmt = select(User).where(User.email == email)
@@ -71,5 +73,20 @@ class UserRepository:
 			stmt = stmt.where(or_(User.first_name.ilike(like), User.last_name.ilike(like), User.email.ilike(like)))
 		stmt = stmt.order_by(User.created_at.desc()).offset(offset).limit(limit)
 		return self.db.execute(stmt).scalars().all()
+	
+	def to_dict(self, user: User) -> dict:
+		"""تبدیل User object به dictionary برای API response"""
+		return {
+			"id": user.id,
+			"email": user.email,
+			"mobile": user.mobile,
+			"first_name": user.first_name,
+			"last_name": user.last_name,
+			"is_active": user.is_active,
+			"referral_code": user.referral_code,
+			"referred_by_user_id": user.referred_by_user_id,
+			"created_at": user.created_at,
+			"updated_at": user.updated_at,
+		}
 
 

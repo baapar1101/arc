@@ -88,7 +88,7 @@ class AppLocalizationsFa extends AppLocalizations {
   String get captcha => 'کد امنیتی';
 
   @override
-  String get refresh => 'تازه‌سازی';
+  String get refresh => 'بروزرسانی';
 
   @override
   String get captchaRequired => 'کد امنیتی الزامی است.';
@@ -135,6 +135,37 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get cancel => 'انصراف';
+
+  @override
+  String get columnSettings => 'تنظیمات ستون‌ها';
+
+  @override
+  String get columnSettingsDescription =>
+      'مدیریت نمایش و ترتیب ستون‌های این جدول';
+
+  @override
+  String get columnName => 'نام ستون';
+
+  @override
+  String get visibility => 'نمایش';
+
+  @override
+  String get order => 'ترتیب';
+
+  @override
+  String get visible => 'نمایش';
+
+  @override
+  String get hidden => 'مخفی';
+
+  @override
+  String get resetToDefaults => 'بازگردانی به پیش‌فرض';
+
+  @override
+  String get save => 'ذخیره';
+
+  @override
+  String get error => 'خطا';
 
   @override
   String get newBusiness => 'کسب‌وکار جدید';
@@ -231,4 +262,184 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get calendarType => 'نوع تقویم';
+
+  @override
+  String get dataLoadingError => 'خطا در بارگذاری داده‌ها';
+
+  @override
+  String get yourReferralLink => 'لینک معرفی شما';
+
+  @override
+  String get filtersAndSearch => 'فیلترها و جستجو';
+
+  @override
+  String get hideFilters => 'مخفی کردن فیلترها';
+
+  @override
+  String get showFilters => 'نمایش فیلترها';
+
+  @override
+  String get clear => 'پاک کردن';
+
+  @override
+  String get searchInNameEmail => 'جستجو در نام، نام خانوادگی و ایمیل...';
+
+  @override
+  String get recordsPerPage => 'سطر در هر صفحه';
+
+  @override
+  String get records => 'رکورد';
+
+  @override
+  String get test => 'تست';
+
+  @override
+  String get user => 'کاربر';
+
+  @override
+  String showingRecords(Object end, Object start, Object total) {
+    return 'نمایش $start تا $end از $total رکورد';
+  }
+
+  @override
+  String get previousPage => 'صفحه قبل';
+
+  @override
+  String get nextPage => 'صفحه بعد';
+
+  @override
+  String pageOf(Object current, Object total) {
+    return '$current از $total';
+  }
+
+  @override
+  String get referralList => 'لیست معرفی‌ها';
+
+  @override
+  String get dateRangeFilter => 'فیلتر بازه زمانی';
+
+  @override
+  String get columnSearch => 'جستجو در ستون';
+
+  @override
+  String searchInColumn(Object column) {
+    return 'جستجو در $column';
+  }
+
+  @override
+  String get searchType => 'نوع جستجو';
+
+  @override
+  String get contains => 'شامل';
+
+  @override
+  String get startsWith => 'شروع با';
+
+  @override
+  String get endsWith => 'خاتمه با';
+
+  @override
+  String get exactMatch => 'مطابقت دقیق';
+
+  @override
+  String get searchValue => 'مقدار جستجو';
+
+  @override
+  String get applyColumnFilter => 'اعمال فیلتر ستون';
+
+  @override
+  String get clearColumnFilter => 'پاک کردن فیلتر ستون';
+
+  @override
+  String get activeFilters => 'فیلترهای فعال';
+
+  @override
+  String get selectDate => 'انتخاب تاریخ';
+
+  @override
+  String get noDataFound => 'هیچ داده‌ای یافت نشد';
+
+  @override
+  String get marketingReportSubtitle => 'مدیریت و تحلیل معرفی‌های کاربران';
+
+  @override
+  String get showing => 'نمایش';
+
+  @override
+  String get to => 'تا';
+
+  @override
+  String get ofText => 'از';
+
+  @override
+  String get results => 'نتیجه';
+
+  @override
+  String get firstPage => 'صفحه اول';
+
+  @override
+  String get lastPage => 'صفحه آخر';
+
+  @override
+  String get exportToExcel => 'خروجی اکسل';
+
+  @override
+  String get exportToPdf => 'خروجی PDF';
+
+  @override
+  String get exportSelected => 'خروجی انتخاب شده‌ها';
+
+  @override
+  String get exportAll => 'خروجی همه';
+
+  @override
+  String get exporting => 'در حال خروجی...';
+
+  @override
+  String get exportSuccess => 'خروجی با موفقیت انجام شد';
+
+  @override
+  String get exportError => 'خطا در خروجی';
+
+  @override
+  String get export => 'خروجی';
+
+  @override
+  String get rowNumber => 'ردیف';
+
+  @override
+  String get registrationDate => 'تاریخ ثبت';
+
+  @override
+  String get selectedRange => 'بازه انتخابی';
+
+  @override
+  String get page => 'صفحه';
+
+  @override
+  String get equals => 'برابر';
+
+  @override
+  String get greater_than => 'بزرگتر از';
+
+  @override
+  String get greater_equal => 'بزرگتر یا برابر';
+
+  @override
+  String get less_than => 'کوچکتر از';
+
+  @override
+  String get less_equal => 'کوچکتر یا برابر';
+
+  @override
+  String get not_equals => 'مخالف';
+
+  @override
+  String get starts_with => 'شروع با';
+
+  @override
+  String get ends_with => 'پایان با';
+
+  @override
+  String get in_list => 'در لیست';
 }

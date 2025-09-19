@@ -41,7 +41,7 @@ class CalendarConverter:
             "date_only": jalali.strftime("%Y/%m/%d"),
             "time_only": jalali.strftime("%H:%M:%S"),
             "is_leap_year": jalali.isleap(),
-            "month_days": jalali.days_in_month,
+            "month_days": jdatetime.j_days_in_month[jalali.month - 1],
         }
     
     @staticmethod

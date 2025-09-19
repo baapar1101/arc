@@ -1,14 +1,10 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../core/referral_store.dart';
 import '../../core/api_client.dart';
 import '../../core/calendar_controller.dart';
-import '../../core/date_utils.dart';
-import '../../widgets/jalali_date_picker.dart';
-import '../../widgets/date_input_field.dart';
+import '../../widgets/data_table/data_table.dart';
 
 class MarketingPage extends StatefulWidget {
   final CalendarController calendarController;
@@ -27,35 +23,13 @@ class _MarketingPageState extends State<MarketingPage> {
   int? _rangeCount;
   DateTime? _fromDate;
   DateTime? _toDate;
-  // list state
-  bool _loadingList = false;
-  int _page = 1;
-  int _limit = 10;
-  int _total = 0;
-  List<Map<String, dynamic>> _items = const [];
-  final TextEditingController _searchCtrl = TextEditingController();
-  Timer? _searchDebounce;
+  Set<int> _selectedRows = <int>{};
 
   @override
   void initState() {
     super.initState();
     _loadReferralCode();
     _fetchStats();
-    _fetchList();
-    _searchCtrl.addListener(() {
-      _searchDebounce?.cancel();
-      _searchDebounce = Timer(const Duration(milliseconds: 400), () {
-        _page = 1;
-        _fetchList(withRange: true);
-      });
-    });
-  }
-
-  @override
-  void dispose() {
-    _searchCtrl.dispose();
-    _searchDebounce?.cancel();
-    super.dispose();
   }
 
   Future<void> _loadReferralCode() async {
@@ -72,7 +46,6 @@ class _MarketingPageState extends State<MarketingPage> {
       final api = ApiClient();
       final params = <String, dynamic>{};
       if (withRange && _fromDate != null && _toDate != null) {
-        // use ISO8601 date-time boundaries: start at 00:00, end next day 00:00
         final start = DateTime(_fromDate!.year, _fromDate!.month, _fromDate!.day);
         final endExclusive = DateTime(_toDate!.year, _toDate!.month, _toDate!.day).add(const Duration(days: 1));
         params['start'] = start.toIso8601String();
@@ -92,252 +65,346 @@ class _MarketingPageState extends State<MarketingPage> {
         }
       }
     } catch (_) {
-      // silent fail: نمایش خطا ضروری نیست
+      // silent fail
     } finally {
       if (mounted) setState(() => _loading = false);
     }
   }
 
-
-  Future<void> _fetchList({bool withRange = false}) async {
-    setState(() => _loadingList = true);
-    try {
-      final api = ApiClient();
-      final params = <String, dynamic>{
-        'page': _page,
-        'limit': _limit,
-      };
-      final q = _searchCtrl.text.trim();
-      if (q.isNotEmpty) params['search'] = q;
-      if (withRange && _fromDate != null && _toDate != null) {
-        final start = DateTime(_fromDate!.year, _fromDate!.month, _fromDate!.day);
-        final endExclusive = DateTime(_toDate!.year, _toDate!.month, _toDate!.day).add(const Duration(days: 1));
-        params['start'] = start.toIso8601String();
-        params['end'] = endExclusive.toIso8601String();
-      }
-      final res = await api.get<Map<String, dynamic>>('/api/v1/auth/referrals/list', query: params);
-      final body = res.data;
-      if (body is Map<String, dynamic>) {
-        final data = body['data'];
-        if (data is Map<String, dynamic>) {
-          final items = (data['items'] as List?)?.cast<Map<String, dynamic>>() ?? const [];
-          setState(() {
-            _items = items;
-            _total = (data['total'] as num?)?.toInt() ?? 0;
-            _page = (data['page'] as num?)?.toInt() ?? _page;
-            _limit = (data['limit'] as num?)?.toInt() ?? _limit;
-          });
-        }
-      }
-    } catch (_) {
-    } finally {
-      if (mounted) setState(() => _loadingList = false);
-    }
-  }
-
-  void _applyFilters() {
-    _page = 1;
-    _fetchStats(withRange: true);
-    _fetchList(withRange: true);
-  }
-
   @override
   Widget build(BuildContext context) {
-    final t = AppLocalizations.of(context);
+    final t = Localizations.of<AppLocalizations>(context, AppLocalizations)!;
     final code = _referralCode;
     final inviteLink = (code == null || code.isEmpty) ? null : ReferralStore.buildInviteLink(code);
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(t.marketingReport, style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 12),
-          if (code == null || code.isEmpty) Text(t.loading, style: Theme.of(context).textTheme.bodyMedium),
-          if (inviteLink != null) ...[
-            Row(
+    final theme = Theme.of(context);
+    
+    return Scaffold(
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: theme.dividerColor.withValues(alpha: 0.5),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primaryContainer,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(
+                      Icons.analytics, 
+                      size: 24, 
+                      color: theme.colorScheme.onPrimaryContainer,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(child: SelectableText(inviteLink)),
-                const SizedBox(width: 8),
-                OutlinedButton.icon(
-                  onPressed: () async {
-                    await Clipboard.setData(ClipboardData(text: inviteLink));
-                    if (!mounted) return;
-                    ScaffoldMessenger.of(context)
-                      ..hideCurrentSnackBar()
-                      ..showSnackBar(SnackBar(content: Text(t.copied)));
-                  },
-                  icon: const Icon(Icons.link),
-                  label: Text(t.copyLink),
-                ),
+                Text(
+                  t.marketingReport,
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                            color: theme.colorScheme.onSurface,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          t.marketingReportSubtitle,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
               ],
+              ),
             ),
-          ],
-          const SizedBox(height: 16),
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: [
-              _StatCard(title: t.today, value: _todayCount, loading: _loading),
-              _StatCard(title: t.thisMonth, value: _monthCount, loading: _loading),
-              _StatCard(title: t.total, value: _totalCount, loading: _loading),
-              _StatCard(title: '${t.dateFrom}-${t.dateTo}', value: _rangeCount, loading: _loading),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: DateInputField(
-                  value: _fromDate,
-                  onChanged: (date) {
-                    setState(() {
-                      _fromDate = date;
-                    });
-                  },
-                  labelText: t.dateFrom,
-                  calendarController: widget.calendarController,
-                  enabled: !_loading,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: DateInputField(
-                  value: _toDate,
-                  onChanged: (date) {
-                    setState(() {
-                      _toDate = date;
-                    });
-                  },
-                  labelText: t.dateTo,
-                  calendarController: widget.calendarController,
-                  enabled: !_loading,
-                ),
-              ),
-              const SizedBox(width: 8),
-              FilledButton(
-                onPressed: _loading || _fromDate == null || _toDate == null ? null : _applyFilters,
-                child: _loading ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2)) : Text(t.applyFilter),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _searchCtrl,
-                  decoration: InputDecoration(
-                    prefixIcon: const Icon(Icons.search),
-                    hintText: t.email,
-                    border: const OutlineInputBorder(),
-                    isDense: true,
+            const SizedBox(height: 24),
+            
+            // Referral Link Card
+            if (inviteLink != null) ...[
+              Card(
+                elevation: 2,
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.primaryContainer,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Icon(
+                              Icons.link, 
+                              color: theme.colorScheme.onPrimaryContainer,
+                              size: 18,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            t.yourReferralLink,
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
+                              color: theme.colorScheme.onSurface,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: theme.dividerColor),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: SelectableText(
+                                inviteLink,
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  fontFamily: 'monospace',
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            FilledButton.icon(
+                              onPressed: () async {
+                                await Clipboard.setData(ClipboardData(text: inviteLink));
+                                if (!mounted) return;
+                                final messenger = ScaffoldMessenger.of(context);
+                                messenger
+                                  ..hideCurrentSnackBar()
+                                  ..showSnackBar(
+                                    SnackBar(
+                                      content: Text(t.copied),
+                                      backgroundColor: theme.colorScheme.primary,
+                                    ),
+                                  );
+                              },
+                              icon: const Icon(Icons.copy, size: 18),
+                              label: Text(t.copyLink),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
-              DropdownButton<int>(
-                value: _limit,
-                items: const [10, 20, 50].map((e) => DropdownMenuItem(value: e, child: Text('per: ' + e.toString()))).toList(),
-                onChanged: (v) {
-                  if (v == null) return;
-                  setState(() => _limit = v);
-                  _page = 1;
-                  _fetchList(withRange: true);
+              const SizedBox(height: 24),
+            ],
+            
+            // Stats Cards
+            Wrap(
+              spacing: 16,
+              runSpacing: 16,
+              children: [
+                _StatCard(
+                  title: t.today,
+                  value: _todayCount,
+                  loading: _loading,
+                  icon: Icons.today,
+                  color: Colors.blue,
+                ),
+                _StatCard(
+                  title: t.thisMonth,
+                  value: _monthCount,
+                  loading: _loading,
+                  icon: Icons.calendar_month,
+                  color: Colors.green,
+                ),
+                _StatCard(
+                  title: t.total,
+                  value: _totalCount,
+                  loading: _loading,
+                  icon: Icons.people,
+                  color: Colors.orange,
+                ),
+                _StatCard(
+                  title: '${t.dateFrom}-${t.dateTo}',
+                  value: _rangeCount,
+                  loading: _loading,
+                  icon: Icons.date_range,
+                  color: Colors.purple,
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            
+            // Data Table using new widget
+            DataTableWidget<Map<String, dynamic>>(
+              config: DataTableConfig<Map<String, dynamic>>(
+                title: t.referralList,
+                endpoint: '/api/v1/auth/referrals/list',
+                excelEndpoint: '/api/v1/auth/referrals/export/excel',
+                pdfEndpoint: '/api/v1/auth/referrals/export/pdf',
+                getExportParams: () => {
+                  'user_id': 'current_user', // Example parameter
+                },
+                            columns: [
+                  TextColumn(
+                    'first_name',
+                    t.firstName,
+                    sortable: true,
+                    searchable: true,
+                    width: ColumnWidth.small,
+                  ),
+                  TextColumn(
+                    'last_name',
+                    t.lastName,
+                    sortable: true,
+                    searchable: true,
+                    width: ColumnWidth.small,
+                  ),
+                  TextColumn(
+                    'email',
+                    t.email,
+                    sortable: true,
+                    searchable: true,
+                    width: ColumnWidth.large,
+                  ),
+                  DateColumn(
+                    'created_at',
+                    t.register,
+                    sortable: true,
+                    searchable: true,
+                    width: ColumnWidth.medium,
+                    showTime: false,
+                  ),
+                ],
+                searchFields: ['first_name', 'last_name', 'email'],
+                filterFields: ['first_name', 'last_name', 'email', 'created_at'],
+                dateRangeField: 'created_at',
+                showSearch: true,
+                showFilters: true,
+                showColumnSearch: true,
+                showPagination: true,
+                showActiveFilters: true,
+                enableSorting: true,
+                enableGlobalSearch: true,
+                enableDateRangeFilter: true,
+                showRowNumbers: true,
+                enableRowSelection: true,
+                enableMultiRowSelection: true,
+                selectedRows: _selectedRows,
+                onRowSelectionChanged: (selectedRows) {
+                                setState(() {
+                    _selectedRows = selectedRows;
+                                });
+                              },
+                defaultPageSize: 20,
+                pageSizeOptions: const [10, 20, 50, 100],
+                showRefreshButton: true,
+                showClearFiltersButton: true,
+                emptyStateMessage: 'هیچ معرفی‌ای یافت نشد',
+                loadingMessage: 'در حال بارگذاری معرفی‌ها...',
+                errorMessage: 'خطا در بارگذاری معرفی‌ها',
+                enableHorizontalScroll: true,
+                minTableWidth: 600,
+                showBorder: true,
+                borderRadius: BorderRadius.circular(8),
+                padding: const EdgeInsets.all(16),
+                onDateRangeApply: (fromDate, toDate) {
+                                setState(() {
+                    _fromDate = fromDate;
+                    _toDate = toDate;
+                  });
+                  _fetchStats(withRange: true);
+                },
+                onDateRangeClear: () {
+                  setState(() {
+                    _fromDate = null;
+                    _toDate = null;
+                  });
+                  _fetchStats();
                 },
               ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Card(
-            clipBehavior: Clip.antiAlias,
-            child: Column(
-              children: [
-                if (_loadingList)
-                  const LinearProgressIndicator(minHeight: 2)
-                else
-                  const SizedBox(height: 2),
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: DataTable(
-                    columns: [
-                      DataColumn(label: Text(t.firstName)),
-                      DataColumn(label: Text(t.lastName)),
-                      DataColumn(label: Text(t.email)),
-                      DataColumn(label: Text(t.register)),
-                    ],
-                    rows: _items.map((e) {
-                      final createdAt = (e['created_at'] as String?) ?? '';
-                      DateTime? date;
-                      if (createdAt.isNotEmpty) {
-                        try {
-                          date = DateTime.parse(createdAt.substring(0, 10));
-                        } catch (e) {
-                          // Ignore parsing errors
-                        }
-                      }
-                      final dateStr = date != null 
-                          ? HesabixDateUtils.formatForDisplay(date, widget.calendarController.isJalali)
-                          : '';
-                      return DataRow(cells: [
-                        DataCell(Text((e['first_name'] ?? '') as String)),
-                        DataCell(Text((e['last_name'] ?? '') as String)),
-                        DataCell(Text((e['email'] ?? '') as String)),
-                        DataCell(Text(dateStr)),
-                      ]);
-                    }).toList(),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                  child: Row(
-                    children: [
-                      Text('${((_page - 1) * _limit + 1).clamp(0, _total)} - ${(_page * _limit).clamp(0, _total)} / $_total'),
-                      const Spacer(),
-                      IconButton(
-                        onPressed: _page > 1 && !_loadingList ? () { setState(() => _page -= 1); _fetchList(withRange: true); } : null,
-                        icon: const Icon(Icons.chevron_right),
-                        tooltip: 'Prev',
-                      ),
-                      IconButton(
-                        onPressed: (_page * _limit) < _total && !_loadingList ? () { setState(() => _page += 1); _fetchList(withRange: true); } : null,
-                        icon: const Icon(Icons.chevron_left),
-                        tooltip: 'Next',
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+              fromJson: (json) => json,
+              calendarController: widget.calendarController,
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 }
 
 class _StatCard extends StatelessWidget {
-  final String title; 
-  final int? value; 
+  final String title;
+  final int? value;
   final bool loading;
-  const _StatCard({required this.title, required this.value, required this.loading});
+  final IconData icon;
+  final Color color;
+  
+  const _StatCard({
+    required this.title,
+    required this.value,
+    required this.loading,
+    required this.icon,
+    required this.color,
+  });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return SizedBox(
-      width: 240,
+      width: 200,
       child: Card(
+        elevation: 2,
         child: Padding(
-          padding: const EdgeInsets.all(16.0),
+          padding: const EdgeInsets.all(20.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(title, style: theme.textTheme.titleMedium),
-              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Icon(icon, color: color, size: 24),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
               loading
-                  ? const SizedBox(height: 22, width: 22, child: CircularProgressIndicator(strokeWidth: 2))
-                  : Text((value ?? 0).toString(), style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w600)),
+                  ? const SizedBox(
+                      height: 28,
+                      width: 28,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Text(
+                      (value ?? 0).toString(),
+                      style: theme.textTheme.headlineMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: color,
+                      ),
+                    ),
             ],
           ),
         ),
@@ -345,5 +412,3 @@ class _StatCard extends StatelessWidget {
     );
   }
 }
-
-

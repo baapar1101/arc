@@ -6,6 +6,7 @@ adapters/api/v1/__init__.py
 adapters/api/v1/auth.py
 adapters/api/v1/health.py
 adapters/api/v1/schemas.py
+adapters/api/v1/users.py
 adapters/db/__init__.py
 adapters/db/session.py
 adapters/db/models/__init__.py
@@ -14,6 +15,7 @@ adapters/db/models/captcha.py
 adapters/db/models/password_reset.py
 adapters/db/models/user.py
 adapters/db/repositories/api_key_repo.py
+adapters/db/repositories/base_repo.py
 adapters/db/repositories/password_reset_repo.py
 adapters/db/repositories/user_repo.py
 app/__init__.py
@@ -33,6 +35,9 @@ app/core/smart_normalizer.py
 app/services/api_key_service.py
 app/services/auth_service.py
 app/services/captcha_service.py
+app/services/pdf_service.py
+app/services/query_service.py
+app/services/user_context_service.py
 hesabix_api.egg-info/PKG-INFO
 hesabix_api.egg-info/SOURCES.txt
 hesabix_api.egg-info/dependency_links.txt

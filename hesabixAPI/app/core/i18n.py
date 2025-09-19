@@ -46,3 +46,8 @@ async def locale_dependency(request: Request) -> Translator:
 	return Translator(lang)
 
 
+def get_translator(locale: str = "fa") -> Translator:
+	"""Get translator for the given locale"""
+	return Translator(locale)
+
+

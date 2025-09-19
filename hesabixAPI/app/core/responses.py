@@ -29,7 +29,11 @@ def format_datetime_fields(data: Any, request: Request) -> Any:
 		for key, value in data.items():
 			if isinstance(value, datetime):
 				formatted_data[key] = CalendarConverter.format_datetime(value, calendar_type)
-				formatted_data[f"{key}_raw"] = value.isoformat()  # Keep original for reference
+				# Convert raw date to the same calendar type as the formatted date
+				if calendar_type == "jalali":
+					formatted_data[f"{key}_raw"] = CalendarConverter.to_jalali(value)["formatted"]
+				else:
+					formatted_data[f"{key}_raw"] = value.isoformat()
 			elif isinstance(value, (dict, list)):
 				formatted_data[key] = format_datetime_fields(value, request)
 			else:

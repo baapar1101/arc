@@ -4,7 +4,6 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
 
 import 'pages/login_page.dart';
-import 'pages/home_page.dart';
 import 'pages/profile/profile_shell.dart';
 import 'pages/profile/profile_dashboard_page.dart';
 import 'pages/profile/new_business_page.dart';
@@ -89,20 +88,164 @@ class _MyAppState extends State<MyApp> {
   // Root of application with GoRouter
   @override
   Widget build(BuildContext context) {
+    // اگر هنوز loading است، یک router ساده با loading page بساز
     if (_controller == null || _calendarController == null || _themeController == null || _authStore == null) {
-      return const MaterialApp(
-        home: Scaffold(
-          body: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                CircularProgressIndicator(),
-                SizedBox(height: 16),
-                Text('Loading...'),
-              ],
+      final loadingRouter = GoRouter(
+        redirect: (context, state) {
+          // در حین loading، هیچ redirect نکن - URL را حفظ کن
+          return null;
+        },
+        routes: <RouteBase>[
+          GoRoute(
+            path: '/',
+            builder: (context, state) => const Scaffold(
+              body: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(),
+                    SizedBox(height: 16),
+                    Text('Loading...'),
+                  ],
+                ),
+              ),
             ),
           ),
-        ),
+          // برای سایر مسیرها هم loading page نمایش بده
+          GoRoute(
+            path: '/login',
+            builder: (context, state) => const Scaffold(
+              body: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(),
+                    SizedBox(height: 16),
+                    Text('Loading...'),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          GoRoute(
+            path: '/user/profile/dashboard',
+            builder: (context, state) => const Scaffold(
+              body: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(),
+                    SizedBox(height: 16),
+                    Text('Loading...'),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          GoRoute(
+            path: '/user/profile/marketing',
+            builder: (context, state) => const Scaffold(
+              body: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(),
+                    SizedBox(height: 16),
+                    Text('Loading...'),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          GoRoute(
+            path: '/user/profile/new-business',
+            builder: (context, state) => const Scaffold(
+              body: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(),
+                    SizedBox(height: 16),
+                    Text('Loading...'),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          GoRoute(
+            path: '/user/profile/businesses',
+            builder: (context, state) => const Scaffold(
+              body: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(),
+                    SizedBox(height: 16),
+                    Text('Loading...'),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          GoRoute(
+            path: '/user/profile/support',
+            builder: (context, state) => const Scaffold(
+              body: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(),
+                    SizedBox(height: 16),
+                    Text('Loading...'),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          GoRoute(
+            path: '/user/profile/change-password',
+            builder: (context, state) => const Scaffold(
+              body: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(),
+                    SizedBox(height: 16),
+                    Text('Loading...'),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          // Catch-all route برای هر URL دیگر
+          GoRoute(
+            path: '/:path(.*)',
+            builder: (context, state) => const Scaffold(
+              body: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(),
+                    SizedBox(height: 16),
+                    Text('Loading...'),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+
+      return MaterialApp.router(
+        title: 'Hesabix',
+        routerConfig: loadingRouter,
+        locale: const Locale('en'),
+        supportedLocales: const [Locale('en'), Locale('fa')],
+        localizationsDelegates: const [
+          GlobalMaterialLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+        ],
       );
     }
 
@@ -143,6 +286,7 @@ class _MyAppState extends State<MyApp> {
         }
         
         // برای سایر صفحات (شامل صفحات profile)، redirect نکن (بماند)
+        // این مهم است: اگر کاربر در صفحات profile است، بماند
         return null;
       },
       routes: <RouteBase>[

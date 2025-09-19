@@ -14,7 +14,7 @@ class ReferralStore {
   static Future<void> captureFromCurrentUrl() async {
     try {
       String? ref = Uri.base.queryParameters['ref'];
-      // اگر در hash بود (مثلاً #/login?ref=CODE) از fragment بخوان
+      // اگر در hash بود (مثلاً /login?ref=CODE) از fragment بخوان
       if (ref == null || ref.trim().isEmpty) {
         final frag = Uri.base.fragment; // مثل '/login?ref=CODE'
         if (frag.isNotEmpty) {
@@ -58,7 +58,7 @@ class ReferralStore {
   static String buildInviteLink(String referralCode) {
     final origin = Uri.base.origin; // دامنه پویا
     // استفاده از Hash URL Strategy برای سازگاری کامل با Flutter Web
-    return '$origin/#/login?ref=$referralCode';
+    return '$origin/login?ref=$referralCode';
   }
 
   static Future<void> saveUserReferralCode(String? code) async {

@@ -1,6 +1,23 @@
 from __future__ import annotations
 
+from typing import Any
 from pydantic import BaseModel, EmailStr, Field
+
+
+class FilterItem(BaseModel):
+	property: str = Field(..., description="نام فیلد مورد نظر برای اعمال فیلتر")
+	operator: str = Field(..., description="نوع عملگر: =, >, >=, <, <=, !=, *, ?*, *?, in")
+	value: Any = Field(..., description="مقدار مورد نظر")
+
+
+class QueryInfo(BaseModel):
+	sort_by: str | None = Field(default=None, description="نام فیلد مورد نظر برای مرتب سازی")
+	sort_desc: bool = Field(default=False, description="false = مرتب سازی صعودی، true = مرتب سازی نزولی")
+	take: int = Field(default=10, ge=1, le=1000, description="حداکثر تعداد رکورد بازگشتی")
+	skip: int = Field(default=0, ge=0, description="تعداد رکوردی که از ابتدای لیست صرف نظر می شود")
+	search: str | None = Field(default=None, description="عبارت جستجو")
+	search_fields: list[str] | None = Field(default=None, description="آرایه ای از فیلدهایی که جستجو در آن انجام می گیرد")
+	filters: list[FilterItem] | None = Field(default=None, description="آرایه ای از اشیا برای اعمال فیلتر بر روی لیست")
 
 
 class CaptchaSolve(BaseModel):

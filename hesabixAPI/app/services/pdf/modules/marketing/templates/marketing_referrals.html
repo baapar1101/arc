@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="{{ locale }}" dir="{{ 'rtl' if locale == 'fa' else 'ltr' }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ t('marketingReport') }} - {{ t('referralList') }}</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 2cm;
+            @top-center {
+                content: "{{ t('marketingReport') }} - {{ t('referralList') }}";
+                font-family: 'Vazirmatn', Arial, sans-serif;
+                font-size: 14px;
+                color: #333;
+            }
+            @bottom-center {
+                content: "{{ t('page') }} " counter(page) " {{ t('ofText') }} " counter(pages);
+                font-family: 'Vazirmatn', Arial, sans-serif;
+                font-size: 12px;
+                color: #666;
+            }
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: {{ 'Vazirmatn' if locale == 'fa' else 'Arial' }}, Arial, sans-serif;
+            font-size: 12px;
+            line-height: 1.6;
+            color: #333;
+            direction: {{ 'rtl' if locale == 'fa' else 'ltr' }};
+            text-align: {{ 'right' if locale == 'fa' else 'left' }};
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 10px;
+        }
+        
+        .header h1 {
+            font-size: 24px;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+        
+        .header .subtitle {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        
+        .report-info {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            border-right: 4px solid #667eea;
+        }
+        
+        .report-info .info-item {
+            text-align: center;
+        }
+        
+        .report-info .info-item .label {
+            font-size: 11px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        
+        .report-info .info-item .value {
+            font-size: 16px;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .filters-info {
+            margin-bottom: 20px;
+            padding: 15px;
+            background-color: #e3f2fd;
+            border-radius: 8px;
+            border-right: 4px solid #2196f3;
+        }
+        
+        .filters-info h3 {
+            font-size: 14px;
+            margin-bottom: 10px;
+            color: #1976d2;
+        }
+        
+        .filter-item {
+            display: inline-block;
+            margin-{{ 'left' if locale == 'fa' else 'right' }}: 15px;
+            margin-bottom: 5px;
+            padding: 5px 10px;
+            background-color: white;
+            border-radius: 15px;
+            font-size: 11px;
+            color: #1976d2;
+            border: 1px solid #bbdefb;
+        }
+        
+        .table-container {
+            margin-top: 20px;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+            background-color: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        
+        th {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 12px 8px;
+            text-align: center;
+            font-weight: bold;
+            font-size: 12px;
+            border: none;
+        }
+        
+        td {
+            padding: 10px 8px;
+            text-align: center;
+            border-bottom: 1px solid #e0e0e0;
+            font-size: 11px;
+        }
+        
+        tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+        
+        tr:hover {
+            background-color: #e3f2fd;
+        }
+        
+        .row-number {
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .name-cell {
+            text-align: {{ 'right' if locale == 'fa' else 'left' }};
+            font-weight: 500;
+        }
+        
+        .email-cell {
+            text-align: {{ 'right' if locale == 'fa' else 'left' }};
+            color: #666;
+        }
+        
+        .date-cell {
+            color: #666;
+            font-size: 10px;
+        }
+        
+        .footer {
+            margin-top: 30px;
+            padding: 20px;
+            text-align: center;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            border-top: 3px solid #667eea;
+        }
+        
+        .footer .generated-info {
+            font-size: 11px;
+            color: #666;
+            margin-bottom: 10px;
+        }
+        
+        .footer .company-info {
+            font-size: 12px;
+            color: #333;
+            font-weight: 500;
+        }
+        
+        .no-data {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .no-data .icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+            color: #ccc;
+        }
+        
+        .stats-summary {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            border-radius: 8px;
+        }
+        
+        .stats-summary .stat-item {
+            text-align: center;
+        }
+        
+        .stats-summary .stat-item .number {
+            font-size: 20px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .stats-summary .stat-item .label {
+            font-size: 11px;
+            opacity: 0.9;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>{{ t('marketingReport') }}</h1>
+        <div class="subtitle">{{ t('referralList') }}</div>
+    </div>
+    
+    {% if stats %}
+    <div class="stats-summary">
+        <div class="stat-item">
+            <div class="number">{{ stats.today or 0 }}</div>
+            <div class="label">{{ t('today') }}</div>
+        </div>
+        <div class="stat-item">
+            <div class="number">{{ stats.this_month or 0 }}</div>
+            <div class="label">{{ t('thisMonth') }}</div>
+        </div>
+        <div class="stat-item">
+            <div class="number">{{ stats.total or 0 }}</div>
+            <div class="label">{{ t('total') }}</div>
+        </div>
+        {% if stats.range %}
+        <div class="stat-item">
+            <div class="number">{{ stats.range }}</div>
+            <div class="label">{{ t('selectedRange') }}</div>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+    
+    <div class="report-info">
+        <div class="info-item">
+            <div class="label">{{ t('reportDate') }}</div>
+            <div class="value">{{ report_date }}</div>
+        </div>
+        <div class="info-item">
+            <div class="label">{{ t('totalRecords') }}</div>
+            <div class="value">{{ total_count }}</div>
+        </div>
+        <div class="info-item">
+            <div class="label">{{ t('displayedRecords') }}</div>
+            <div class="value">{{ items|length }}</div>
+        </div>
+        {% if selected_only %}
+        <div class="info-item">
+            <div class="label">{{ t('outputType') }}</div>
+            <div class="value">{{ t('selectedOnly') }}</div>
+        </div>
+        {% endif %}
+    </div>
+    
+    {% if filters %}
+    <div class="filters-info">
+        <h3>{{ t('activeFilters') }}:</h3>
+        {% for filter in filters %}
+        <span class="filter-item">{{ filter }}</span>
+        {% endfor %}
+    </div>
+    {% endif %}
+    
+    <div class="table-container">
+        {% if items %}
+        <table>
+            <thead>
+                <tr>
+                    <th style="width: 5%;">{{ t('rowNumber') }}</th>
+                    <th style="width: 25%;">{{ t('firstName') }}</th>
+                    <th style="width: 25%;">{{ t('lastName') }}</th>
+                    <th style="width: 30%;">{{ t('email') }}</th>
+                    <th style="width: 15%;">{{ t('registrationDate') }}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in items %}
+                <tr>
+                    <td class="row-number">{{ loop.index }}</td>
+                    <td class="name-cell">{{ item.first_name or '-' }}</td>
+                    <td class="name-cell">{{ item.last_name or '-' }}</td>
+                    <td class="email-cell">{{ item.email or '-' }}</td>
+                    <td class="date-cell">{{ item.formatted_created_at }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="no-data">
+            <div class="icon">📊</div>
+            <div>{{ t('noDataFound') }}</div>
+        </div>
+        {% endif %}
+    </div>
+    
+    <div class="footer">
+        <div class="generated-info">
+            {{ t('reportGeneratedOn') }} {{ report_date }} {{ t('at') }} {{ report_time }}
+        </div>
+        <div class="company-info">
+            {{ t('hesabixAccountingSystem') }}
+        </div>
+    </div>
+</body>
+</html>

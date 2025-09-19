@@ -167,13 +167,13 @@ abstract class AppLocalizations {
   /// No description provided for @firstName.
   ///
   /// In en, this message translates to:
-  /// **'First name'**
+  /// **'First Name'**
   String get firstName;
 
   /// No description provided for @lastName.
   ///
   /// In en, this message translates to:
-  /// **'Last name'**
+  /// **'Last Name'**
   String get lastName;
 
   /// No description provided for @email.
@@ -349,6 +349,66 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Cancel'**
   String get cancel;
+
+  /// No description provided for @columnSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Column Settings'**
+  String get columnSettings;
+
+  /// No description provided for @columnSettingsDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage column visibility and order for this table'**
+  String get columnSettingsDescription;
+
+  /// No description provided for @columnName.
+  ///
+  /// In en, this message translates to:
+  /// **'Column Name'**
+  String get columnName;
+
+  /// No description provided for @visibility.
+  ///
+  /// In en, this message translates to:
+  /// **'Visibility'**
+  String get visibility;
+
+  /// No description provided for @order.
+  ///
+  /// In en, this message translates to:
+  /// **'Order'**
+  String get order;
+
+  /// No description provided for @visible.
+  ///
+  /// In en, this message translates to:
+  /// **'Visible'**
+  String get visible;
+
+  /// No description provided for @hidden.
+  ///
+  /// In en, this message translates to:
+  /// **'Hidden'**
+  String get hidden;
+
+  /// No description provided for @resetToDefaults.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset to Defaults'**
+  String get resetToDefaults;
+
+  /// No description provided for @save.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get save;
+
+  /// No description provided for @error.
+  ///
+  /// In en, this message translates to:
+  /// **'Error'**
+  String get error;
 
   /// No description provided for @newBusiness.
   ///
@@ -535,6 +595,354 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Calendar Type'**
   String get calendarType;
+
+  /// No description provided for @dataLoadingError.
+  ///
+  /// In en, this message translates to:
+  /// **'Error loading data'**
+  String get dataLoadingError;
+
+  /// No description provided for @yourReferralLink.
+  ///
+  /// In en, this message translates to:
+  /// **'Your referral link'**
+  String get yourReferralLink;
+
+  /// No description provided for @filtersAndSearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Filters and search'**
+  String get filtersAndSearch;
+
+  /// No description provided for @hideFilters.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide filters'**
+  String get hideFilters;
+
+  /// No description provided for @showFilters.
+  ///
+  /// In en, this message translates to:
+  /// **'Show filters'**
+  String get showFilters;
+
+  /// No description provided for @clear.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear'**
+  String get clear;
+
+  /// No description provided for @searchInNameEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'Search in name, last name and email...'**
+  String get searchInNameEmail;
+
+  /// No description provided for @recordsPerPage.
+  ///
+  /// In en, this message translates to:
+  /// **'Records per page'**
+  String get recordsPerPage;
+
+  /// No description provided for @records.
+  ///
+  /// In en, this message translates to:
+  /// **'records'**
+  String get records;
+
+  /// No description provided for @test.
+  ///
+  /// In en, this message translates to:
+  /// **'Test'**
+  String get test;
+
+  /// No description provided for @user.
+  ///
+  /// In en, this message translates to:
+  /// **'User'**
+  String get user;
+
+  /// No description provided for @showingRecords.
+  ///
+  /// In en, this message translates to:
+  /// **'Showing {start} to {end} of {total} records'**
+  String showingRecords(Object end, Object start, Object total);
+
+  /// No description provided for @previousPage.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous page'**
+  String get previousPage;
+
+  /// No description provided for @nextPage.
+  ///
+  /// In en, this message translates to:
+  /// **'Next page'**
+  String get nextPage;
+
+  /// No description provided for @pageOf.
+  ///
+  /// In en, this message translates to:
+  /// **'{current} of {total}'**
+  String pageOf(Object current, Object total);
+
+  /// No description provided for @referralList.
+  ///
+  /// In en, this message translates to:
+  /// **'Referral List'**
+  String get referralList;
+
+  /// No description provided for @dateRangeFilter.
+  ///
+  /// In en, this message translates to:
+  /// **'Date Range Filter'**
+  String get dateRangeFilter;
+
+  /// No description provided for @columnSearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Column Search'**
+  String get columnSearch;
+
+  /// No description provided for @searchInColumn.
+  ///
+  /// In en, this message translates to:
+  /// **'Search in {column}'**
+  String searchInColumn(Object column);
+
+  /// No description provided for @searchType.
+  ///
+  /// In en, this message translates to:
+  /// **'Search Type'**
+  String get searchType;
+
+  /// No description provided for @contains.
+  ///
+  /// In en, this message translates to:
+  /// **'contains'**
+  String get contains;
+
+  /// No description provided for @startsWith.
+  ///
+  /// In en, this message translates to:
+  /// **'Starts With'**
+  String get startsWith;
+
+  /// No description provided for @endsWith.
+  ///
+  /// In en, this message translates to:
+  /// **'Ends With'**
+  String get endsWith;
+
+  /// No description provided for @exactMatch.
+  ///
+  /// In en, this message translates to:
+  /// **'Exact Match'**
+  String get exactMatch;
+
+  /// No description provided for @searchValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Search Value'**
+  String get searchValue;
+
+  /// No description provided for @applyColumnFilter.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply Column Filter'**
+  String get applyColumnFilter;
+
+  /// No description provided for @clearColumnFilter.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear Column Filter'**
+  String get clearColumnFilter;
+
+  /// No description provided for @activeFilters.
+  ///
+  /// In en, this message translates to:
+  /// **'Active Filters'**
+  String get activeFilters;
+
+  /// No description provided for @selectDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Select Date'**
+  String get selectDate;
+
+  /// No description provided for @noDataFound.
+  ///
+  /// In en, this message translates to:
+  /// **'No data found'**
+  String get noDataFound;
+
+  /// No description provided for @marketingReportSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage and analyze user referrals'**
+  String get marketingReportSubtitle;
+
+  /// No description provided for @showing.
+  ///
+  /// In en, this message translates to:
+  /// **'Showing'**
+  String get showing;
+
+  /// No description provided for @to.
+  ///
+  /// In en, this message translates to:
+  /// **'to'**
+  String get to;
+
+  /// No description provided for @ofText.
+  ///
+  /// In en, this message translates to:
+  /// **'of'**
+  String get ofText;
+
+  /// No description provided for @results.
+  ///
+  /// In en, this message translates to:
+  /// **'results'**
+  String get results;
+
+  /// No description provided for @firstPage.
+  ///
+  /// In en, this message translates to:
+  /// **'First page'**
+  String get firstPage;
+
+  /// No description provided for @lastPage.
+  ///
+  /// In en, this message translates to:
+  /// **'Last page'**
+  String get lastPage;
+
+  /// No description provided for @exportToExcel.
+  ///
+  /// In en, this message translates to:
+  /// **'Export to Excel'**
+  String get exportToExcel;
+
+  /// No description provided for @exportToPdf.
+  ///
+  /// In en, this message translates to:
+  /// **'Export to PDF'**
+  String get exportToPdf;
+
+  /// No description provided for @exportSelected.
+  ///
+  /// In en, this message translates to:
+  /// **'Export Selected'**
+  String get exportSelected;
+
+  /// No description provided for @exportAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Export All'**
+  String get exportAll;
+
+  /// No description provided for @exporting.
+  ///
+  /// In en, this message translates to:
+  /// **'Exporting...'**
+  String get exporting;
+
+  /// No description provided for @exportSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Export completed successfully'**
+  String get exportSuccess;
+
+  /// No description provided for @exportError.
+  ///
+  /// In en, this message translates to:
+  /// **'Export error'**
+  String get exportError;
+
+  /// No description provided for @export.
+  ///
+  /// In en, this message translates to:
+  /// **'Export'**
+  String get export;
+
+  /// No description provided for @rowNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Row'**
+  String get rowNumber;
+
+  /// No description provided for @registrationDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Registration Date'**
+  String get registrationDate;
+
+  /// No description provided for @selectedRange.
+  ///
+  /// In en, this message translates to:
+  /// **'Selected Range'**
+  String get selectedRange;
+
+  /// No description provided for @page.
+  ///
+  /// In en, this message translates to:
+  /// **'Page'**
+  String get page;
+
+  /// No description provided for @equals.
+  ///
+  /// In en, this message translates to:
+  /// **'equals'**
+  String get equals;
+
+  /// No description provided for @greater_than.
+  ///
+  /// In en, this message translates to:
+  /// **'greater than'**
+  String get greater_than;
+
+  /// No description provided for @greater_equal.
+  ///
+  /// In en, this message translates to:
+  /// **'greater or equal'**
+  String get greater_equal;
+
+  /// No description provided for @less_than.
+  ///
+  /// In en, this message translates to:
+  /// **'less than'**
+  String get less_than;
+
+  /// No description provided for @less_equal.
+  ///
+  /// In en, this message translates to:
+  /// **'less or equal'**
+  String get less_equal;
+
+  /// No description provided for @not_equals.
+  ///
+  /// In en, this message translates to:
+  /// **'not equals'**
+  String get not_equals;
+
+  /// No description provided for @starts_with.
+  ///
+  /// In en, this message translates to:
+  /// **'starts with'**
+  String get starts_with;
+
+  /// No description provided for @ends_with.
+  ///
+  /// In en, this message translates to:
+  /// **'ends with'**
+  String get ends_with;
+
+  /// No description provided for @in_list.
+  ///
+  /// In en, this message translates to:
+  /// **'in list'**
+  String get in_list;
 }
 
 class _AppLocalizationsDelegate

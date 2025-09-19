@@ -82,3 +82,123 @@ msgstr "Gregorian"
 
 msgid "JALALI"
 msgstr "Jalali"
+
+msgid "rowNumber"
+msgstr "Row"
+
+msgid "firstName"
+msgstr "First Name"
+
+msgid "lastName"
+msgstr "Last Name"
+
+msgid "registrationDate"
+msgstr "Registration Date"
+
+msgid "selectedRange"
+msgstr "Selected Range"
+
+msgid "page"
+msgstr "Page"
+
+msgid "equals"
+msgstr "equals"
+
+msgid "greater_than"
+msgstr "greater than"
+
+msgid "greater_equal"
+msgstr "greater or equal"
+
+msgid "less_than"
+msgstr "less than"
+
+msgid "less_equal"
+msgstr "less or equal"
+
+msgid "not_equals"
+msgstr "not equals"
+
+msgid "contains"
+msgstr "contains"
+
+msgid "starts_with"
+msgstr "starts with"
+
+msgid "ends_with"
+msgstr "ends with"
+
+msgid "in_list"
+msgstr "in list"
+
+msgid "active"
+msgstr "Active"
+
+msgid "inactive"
+msgstr "Inactive"
+
+msgid "allFields"
+msgstr "All Fields"
+
+msgid "in"
+msgstr "in"
+
+msgid "reportDate"
+msgstr "Report Date"
+
+msgid "totalRecords"
+msgstr "Total Records"
+
+msgid "displayedRecords"
+msgstr "Displayed Records"
+
+msgid "outputType"
+msgstr "Output Type"
+
+msgid "selectedOnly"
+msgstr "Selected Only"
+
+msgid "reportGeneratedOn"
+msgstr "Report generated on"
+
+msgid "at"
+msgstr "at"
+
+msgid "hesabixAccountingSystem"
+msgstr "Hesabix Accounting System"
+
+msgid "marketingReport"
+msgstr "Marketing Report"
+
+msgid "referralList"
+msgstr "Referral List"
+
+msgid "thisMonth"
+msgstr "This Month"
+
+msgid "today"
+msgstr "Today"
+
+msgid "total"
+msgstr "Total"
+
+msgid "email"
+msgstr "Email"
+
+msgid "ofText"
+msgstr "of"
+
+msgid "noDataFound"
+msgstr "No data found"
+
+msgid "activeFilters"
+msgstr "Active Filters"
+
+msgid "search"
+msgstr "Search"
+
+msgid "referralCode"
+msgstr "Referral Code"
+
+msgid "status"
+msgstr "Status"

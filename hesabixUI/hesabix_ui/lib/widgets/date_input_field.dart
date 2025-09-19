@@ -58,7 +58,7 @@ class _DateInputFieldState extends State<DateInputField> {
   void didUpdateWidget(DateInputField oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.value != widget.value || 
-        oldWidget.calendarController.isJalali != widget.calendarController.isJalali) {
+        (oldWidget.calendarController.isJalali == true) != (widget.calendarController.isJalali == true)) {
       _updateDisplayValue();
     }
   }
@@ -76,7 +76,7 @@ class _DateInputFieldState extends State<DateInputField> {
   void _updateDisplayValue() {
     final displayValue = HesabixDateUtils.formatForDisplay(
       widget.value, 
-      widget.calendarController.isJalali
+      widget.calendarController.isJalali == true
     );
     _controller.text = displayValue;
   }
@@ -91,7 +91,7 @@ class _DateInputFieldState extends State<DateInputField> {
 
     DateTime? selectedDate;
     
-    if (widget.calendarController.isJalali) {
+    if (widget.calendarController.isJalali == true) {
       selectedDate = await showJalaliDatePicker(
         context: context,
         initialDate: initialDate,

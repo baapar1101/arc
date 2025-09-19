@@ -42,10 +42,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get forgotPassword => 'Forgot password';
 
   @override
-  String get firstName => 'First name';
+  String get firstName => 'First Name';
 
   @override
-  String get lastName => 'Last name';
+  String get lastName => 'Last Name';
 
   @override
   String get email => 'Email';
@@ -135,6 +135,37 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get cancel => 'Cancel';
+
+  @override
+  String get columnSettings => 'Column Settings';
+
+  @override
+  String get columnSettingsDescription =>
+      'Manage column visibility and order for this table';
+
+  @override
+  String get columnName => 'Column Name';
+
+  @override
+  String get visibility => 'Visibility';
+
+  @override
+  String get order => 'Order';
+
+  @override
+  String get visible => 'Visible';
+
+  @override
+  String get hidden => 'Hidden';
+
+  @override
+  String get resetToDefaults => 'Reset to Defaults';
+
+  @override
+  String get save => 'Save';
+
+  @override
+  String get error => 'Error';
 
   @override
   String get newBusiness => 'New business';
@@ -232,4 +263,184 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get calendarType => 'Calendar Type';
+
+  @override
+  String get dataLoadingError => 'Error loading data';
+
+  @override
+  String get yourReferralLink => 'Your referral link';
+
+  @override
+  String get filtersAndSearch => 'Filters and search';
+
+  @override
+  String get hideFilters => 'Hide filters';
+
+  @override
+  String get showFilters => 'Show filters';
+
+  @override
+  String get clear => 'Clear';
+
+  @override
+  String get searchInNameEmail => 'Search in name, last name and email...';
+
+  @override
+  String get recordsPerPage => 'Records per page';
+
+  @override
+  String get records => 'records';
+
+  @override
+  String get test => 'Test';
+
+  @override
+  String get user => 'User';
+
+  @override
+  String showingRecords(Object end, Object start, Object total) {
+    return 'Showing $start to $end of $total records';
+  }
+
+  @override
+  String get previousPage => 'Previous page';
+
+  @override
+  String get nextPage => 'Next page';
+
+  @override
+  String pageOf(Object current, Object total) {
+    return '$current of $total';
+  }
+
+  @override
+  String get referralList => 'Referral List';
+
+  @override
+  String get dateRangeFilter => 'Date Range Filter';
+
+  @override
+  String get columnSearch => 'Column Search';
+
+  @override
+  String searchInColumn(Object column) {
+    return 'Search in $column';
+  }
+
+  @override
+  String get searchType => 'Search Type';
+
+  @override
+  String get contains => 'contains';
+
+  @override
+  String get startsWith => 'Starts With';
+
+  @override
+  String get endsWith => 'Ends With';
+
+  @override
+  String get exactMatch => 'Exact Match';
+
+  @override
+  String get searchValue => 'Search Value';
+
+  @override
+  String get applyColumnFilter => 'Apply Column Filter';
+
+  @override
+  String get clearColumnFilter => 'Clear Column Filter';
+
+  @override
+  String get activeFilters => 'Active Filters';
+
+  @override
+  String get selectDate => 'Select Date';
+
+  @override
+  String get noDataFound => 'No data found';
+
+  @override
+  String get marketingReportSubtitle => 'Manage and analyze user referrals';
+
+  @override
+  String get showing => 'Showing';
+
+  @override
+  String get to => 'to';
+
+  @override
+  String get ofText => 'of';
+
+  @override
+  String get results => 'results';
+
+  @override
+  String get firstPage => 'First page';
+
+  @override
+  String get lastPage => 'Last page';
+
+  @override
+  String get exportToExcel => 'Export to Excel';
+
+  @override
+  String get exportToPdf => 'Export to PDF';
+
+  @override
+  String get exportSelected => 'Export Selected';
+
+  @override
+  String get exportAll => 'Export All';
+
+  @override
+  String get exporting => 'Exporting...';
+
+  @override
+  String get exportSuccess => 'Export completed successfully';
+
+  @override
+  String get exportError => 'Export error';
+
+  @override
+  String get export => 'Export';
+
+  @override
+  String get rowNumber => 'Row';
+
+  @override
+  String get registrationDate => 'Registration Date';
+
+  @override
+  String get selectedRange => 'Selected Range';
+
+  @override
+  String get page => 'Page';
+
+  @override
+  String get equals => 'equals';
+
+  @override
+  String get greater_than => 'greater than';
+
+  @override
+  String get greater_equal => 'greater or equal';
+
+  @override
+  String get less_than => 'less than';
+
+  @override
+  String get less_equal => 'less or equal';
+
+  @override
+  String get not_equals => 'not equals';
+
+  @override
+  String get starts_with => 'starts with';
+
+  @override
+  String get ends_with => 'ends with';
+
+  @override
+  String get in_list => 'in list';
 }

@@ -5,6 +5,7 @@ from app.core.settings import get_settings
 from app.core.logging import configure_logging
 from adapters.api.v1.health import router as health_router
 from adapters.api.v1.auth import router as auth_router
+from adapters.api.v1.users import router as users_router
 from app.core.i18n import negotiate_locale, Translator
 from app.core.error_handlers import register_error_handlers
 from app.core.smart_normalizer import smart_normalize_json, SmartNormalizerConfig
@@ -60,6 +61,7 @@ def create_app() -> FastAPI:
 
     application.include_router(health_router, prefix=settings.api_v1_prefix)
     application.include_router(auth_router, prefix=settings.api_v1_prefix)
+    application.include_router(users_router, prefix=settings.api_v1_prefix)
 
     register_error_handlers(application)
 

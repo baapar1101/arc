@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:persian_datetime_picker/persian_datetime_picker.dart' as picker;
 import 'package:shamsi_date/shamsi_date.dart';
 
 /// DatePicker سفارشی برای تقویم شمسی
@@ -124,7 +123,7 @@ class _JalaliDatePickerState extends State<JalaliDatePicker> {
   }
 
   Widget _buildCalendar() {
-    return picker.PersianCalendarDatePicker(
+    return _CustomPersianCalendar(
       initialDate: _selectedJalali,
       firstDate: Jalali.fromDateTime(widget.firstDate ?? DateTime(1900)),
       lastDate: Jalali.fromDateTime(widget.lastDate ?? DateTime(2100)),
@@ -155,4 +154,192 @@ Future<DateTime?> showJalaliDatePicker({
       helpText: helpText,
     ),
   );
+}
+
+/// Custom Persian Calendar Widget with proper Persian month names
+class _CustomPersianCalendar extends StatefulWidget {
+  final Jalali initialDate;
+  final Jalali firstDate;
+  final Jalali lastDate;
+  final ValueChanged<Jalali> onDateChanged;
+
+  const _CustomPersianCalendar({
+    required this.initialDate,
+    required this.firstDate,
+    required this.lastDate,
+    required this.onDateChanged,
+  });
+
+  @override
+  State<_CustomPersianCalendar> createState() => _CustomPersianCalendarState();
+}
+
+class _CustomPersianCalendarState extends State<_CustomPersianCalendar> {
+  late Jalali _currentDate;
+  late Jalali _selectedDate;
+
+  // Persian month names
+  static const List<String> _monthNames = [
+    'فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور',
+    'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند'
+  ];
+
+  // Persian day names (abbreviated)
+  static const List<String> _dayNames = [
+    'ش', 'ی', 'د', 'س', 'چ', 'پ', 'ج'
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _currentDate = widget.initialDate;
+    _selectedDate = widget.initialDate;
+  }
+
+  void _previousMonth() {
+    setState(() {
+      if (_currentDate.month == 1) {
+        _currentDate = Jalali(_currentDate.year - 1, 12, 1);
+      } else {
+        _currentDate = Jalali(_currentDate.year, _currentDate.month - 1, 1);
+      }
+    });
+  }
+
+  void _nextMonth() {
+    setState(() {
+      if (_currentDate.month == 12) {
+        _currentDate = Jalali(_currentDate.year + 1, 1, 1);
+      } else {
+        _currentDate = Jalali(_currentDate.year, _currentDate.month + 1, 1);
+      }
+    });
+  }
+
+  void _selectDate(Jalali date) {
+    setState(() {
+      _selectedDate = date;
+    });
+    widget.onDateChanged(date);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    
+    // Get the first day of the month and calculate the starting day
+    final firstDayOfMonth = Jalali(_currentDate.year, _currentDate.month, 1);
+    final lastDayOfMonth = Jalali(_currentDate.year, _currentDate.month, _currentDate.monthLength);
+    
+    // Calculate the starting weekday (0 = Saturday, 6 = Friday)
+    // Convert Jalali to DateTime to get weekday, then adjust for Persian calendar
+    final gregorianFirstDay = firstDayOfMonth.toDateTime();
+    final startWeekday = (gregorianFirstDay.weekday + 1) % 7; // Adjust for Persian week start (Saturday)
+    
+    return Column(
+      children: [
+        // Month/Year header
+        Container(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              IconButton(
+                onPressed: _previousMonth,
+                icon: const Icon(Icons.chevron_left),
+              ),
+              Text(
+                '${_monthNames[_currentDate.month - 1]} ${_currentDate.year}',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              IconButton(
+                onPressed: _nextMonth,
+                icon: const Icon(Icons.chevron_right),
+              ),
+            ],
+          ),
+        ),
+        
+        // Day names header
+        Row(
+          children: _dayNames.map((day) => Expanded(
+            child: Center(
+              child: Text(
+                day,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                ),
+              ),
+            ),
+          )).toList(),
+        ),
+        
+        const SizedBox(height: 8),
+        
+        // Calendar grid
+        Expanded(
+          child: GridView.builder(
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 7,
+              childAspectRatio: 1.0,
+            ),
+            itemCount: 42, // 6 weeks * 7 days
+            itemBuilder: (context, index) {
+              final dayIndex = index - startWeekday;
+              final day = dayIndex + 1;
+              
+              if (dayIndex < 0 || day > lastDayOfMonth.day.toInt()) {
+                return const SizedBox.shrink();
+              }
+              
+              final date = Jalali(_currentDate.year, _currentDate.month, day);
+              final isSelected = date.year == _selectedDate.year &&
+                                date.month == _selectedDate.month &&
+                                date.day == _selectedDate.day;
+              final isToday = date.year == Jalali.now().year &&
+                             date.month == Jalali.now().month &&
+                             date.day == Jalali.now().day;
+              
+              return GestureDetector(
+                onTap: () => _selectDate(date),
+                child: Container(
+                  margin: const EdgeInsets.all(2),
+                  decoration: BoxDecoration(
+                    color: isSelected 
+                        ? theme.colorScheme.primary
+                        : isToday 
+                            ? theme.colorScheme.primary.withValues(alpha: 0.1)
+                            : Colors.transparent,
+                    borderRadius: BorderRadius.circular(8),
+                    border: isToday && !isSelected
+                        ? Border.all(color: theme.colorScheme.primary, width: 1)
+                        : null,
+                  ),
+                  child: Center(
+                    child: Text(
+                      day.toString(),
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: isSelected 
+                            ? theme.colorScheme.onPrimary
+                            : isToday
+                                ? theme.colorScheme.primary
+                                : theme.colorScheme.onSurface,
+                        fontWeight: isSelected || isToday 
+                            ? FontWeight.bold 
+                            : FontWeight.normal,
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
 }

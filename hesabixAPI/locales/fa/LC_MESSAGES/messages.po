@@ -83,4 +83,124 @@ msgstr "میلادی"
 msgid "JALALI"
 msgstr "شمسی"
 
+msgid "rowNumber"
+msgstr "ردیف"
+
+msgid "firstName"
+msgstr "نام"
+
+msgid "lastName"
+msgstr "نام خانوادگی"
+
+msgid "registrationDate"
+msgstr "تاریخ ثبت"
+
+msgid "selectedRange"
+msgstr "بازه انتخابی"
+
+msgid "page"
+msgstr "صفحه"
+
+msgid "equals"
+msgstr "برابر"
+
+msgid "greater_than"
+msgstr "بزرگتر از"
+
+msgid "greater_equal"
+msgstr "بزرگتر یا برابر"
+
+msgid "less_than"
+msgstr "کوچکتر از"
+
+msgid "less_equal"
+msgstr "کوچکتر یا برابر"
+
+msgid "not_equals"
+msgstr "مخالف"
+
+msgid "contains"
+msgstr "شامل"
+
+msgid "starts_with"
+msgstr "شروع با"
+
+msgid "ends_with"
+msgstr "پایان با"
+
+msgid "in_list"
+msgstr "در لیست"
+
+msgid "active"
+msgstr "فعال"
+
+msgid "inactive"
+msgstr "غیرفعال"
+
+msgid "allFields"
+msgstr "همه فیلدها"
+
+msgid "in"
+msgstr "در"
+
+msgid "reportDate"
+msgstr "تاریخ گزارش"
+
+msgid "totalRecords"
+msgstr "تعداد کل رکوردها"
+
+msgid "displayedRecords"
+msgstr "تعداد نمایش داده شده"
+
+msgid "outputType"
+msgstr "نوع خروجی"
+
+msgid "selectedOnly"
+msgstr "انتخاب شده‌ها"
+
+msgid "reportGeneratedOn"
+msgstr "گزارش در تاریخ"
+
+msgid "at"
+msgstr "و ساعت"
+
+msgid "hesabixAccountingSystem"
+msgstr "سیستم حسابداری حسابیکس - Hesabix Accounting System"
+
+msgid "marketingReport"
+msgstr "گزارش بازاریابی"
+
+msgid "referralList"
+msgstr "لیست معرفی‌ها"
+
+msgid "thisMonth"
+msgstr "این ماه"
+
+msgid "today"
+msgstr "امروز"
+
+msgid "total"
+msgstr "کل"
+
+msgid "email"
+msgstr "ایمیل"
+
+msgid "ofText"
+msgstr "از"
+
+msgid "noDataFound"
+msgstr "هیچ داده‌ای برای نمایش وجود ندارد"
+
+msgid "activeFilters"
+msgstr "فیلترهای فعال"
+
+msgid "search"
+msgstr "جستجو"
+
+msgid "referralCode"
+msgstr "کد معرف"
+
+msgid "status"
+msgstr "وضعیت"
+
 
