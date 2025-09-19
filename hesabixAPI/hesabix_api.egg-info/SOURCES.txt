@@ -4,6 +4,7 @@ adapters/__init__.py
 adapters/api/__init__.py
 adapters/api/v1/__init__.py
 adapters/api/v1/auth.py
+adapters/api/v1/businesses.py
 adapters/api/v1/health.py
 adapters/api/v1/schemas.py
 adapters/api/v1/users.py
@@ -37,9 +38,9 @@ app/core/responses.py
 app/core/security.py
 app/core/settings.py
 app/core/smart_normalizer.py
-app/core/permissions/__init__.py
 app/services/api_key_service.py
 app/services/auth_service.py
+app/services/business_service.py
 app/services/captcha_service.py
 app/services/query_service.py
 app/services/pdf/__init__.py
