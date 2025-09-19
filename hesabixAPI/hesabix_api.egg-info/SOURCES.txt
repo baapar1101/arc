@@ -18,6 +18,7 @@ adapters/db/models/password_reset.py
 adapters/db/models/user.py
 adapters/db/repositories/api_key_repo.py
 adapters/db/repositories/base_repo.py
+adapters/db/repositories/business_permission_repo.py
 adapters/db/repositories/business_repo.py
 adapters/db/repositories/password_reset_repo.py
 adapters/db/repositories/user_repo.py
@@ -31,10 +32,12 @@ app/core/error_handlers.py
 app/core/i18n.py
 app/core/i18n_catalog.py
 app/core/logging.py
+app/core/permissions.py
 app/core/responses.py
 app/core/security.py
 app/core/settings.py
 app/core/smart_normalizer.py
+app/core/permissions/__init__.py
 app/services/api_key_service.py
 app/services/auth_service.py
 app/services/captcha_service.py
@@ -59,3 +62,4 @@ migrations/versions/20250915_000001_init_auth_tables.py
 migrations/versions/20250916_000002_add_referral_fields.py
 tests/__init__.py
 tests/test_health.py
+tests/test_permissions.py

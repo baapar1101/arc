@@ -24,7 +24,8 @@ class AuthContext:
 		calendar_type: CalendarType = "jalali",
 		timezone: Optional[str] = None,
 		business_id: Optional[int] = None,
-		fiscal_year_id: Optional[int] = None
+		fiscal_year_id: Optional[int] = None,
+		db: Optional[Session] = None
 	) -> None:
 		self.user = user
 		self.api_key_id = api_key_id
@@ -33,6 +34,13 @@ class AuthContext:
 		self.timezone = timezone
 		self.business_id = business_id
 		self.fiscal_year_id = fiscal_year_id
+		self.db = db
+		
+		# دسترسی‌های اپلیکیشن
+		self.app_permissions = user.app_permissions or {}
+		
+		# دسترسی‌های کسب و کار (در صورت وجود business_id)
+		self.business_permissions = self._get_business_permissions() if business_id and db else {}
 		
 		# ایجاد translator برای زبان تشخیص داده شده
 		self._translator = Translator(language)
@@ -71,6 +79,138 @@ class AuthContext:
 		"""بررسی فعال بودن کاربر"""
 		return self.user.is_active
 	
+	def _get_business_permissions(self) -> dict:
+		"""دریافت دسترسی‌های کسب و کار از دیتابیس"""
+		if not self.business_id or not self.db:
+			return {}
+		
+		from adapters.db.repositories.business_permission_repo import BusinessPermissionRepository
+		repo = BusinessPermissionRepository(self.db)
+		permission_obj = repo.get_by_user_and_business(self.user.id, self.business_id)
+		
+		if permission_obj and permission_obj.business_permissions:
+			return permission_obj.business_permissions
+		return {}
+	
+	# بررسی دسترسی‌های اپلیکیشن
+	def has_app_permission(self, permission: str) -> bool:
+		"""بررسی دسترسی در سطح اپلیکیشن"""
+		# SuperAdmin تمام دسترسی‌های اپلیکیشن را دارد
+		if self.app_permissions.get("superadmin", False):
+			return True
+		
+		return self.app_permissions.get(permission, False)
+	
+	def is_superadmin(self) -> bool:
+		"""بررسی superadmin بودن"""
+		return self.has_app_permission("superadmin")
+	
+	def can_manage_users(self) -> bool:
+		"""بررسی دسترسی مدیریت کاربران در سطح اپلیکیشن"""
+		return self.has_app_permission("user_management")
+	
+	def can_manage_businesses(self) -> bool:
+		"""بررسی دسترسی مدیریت کسب و کارها"""
+		return self.has_app_permission("business_management")
+	
+	def can_access_system_settings(self) -> bool:
+		"""بررسی دسترسی به تنظیمات سیستم"""
+		return self.has_app_permission("system_settings")
+	
+	def is_business_owner(self) -> bool:
+		"""بررسی اینکه آیا کاربر مالک کسب و کار است یا نه"""
+		if not self.business_id or not self.db:
+			return False
+		
+		from adapters.db.models.business import Business
+		business = self.db.get(Business, self.business_id)
+		return business and business.owner_id == self.user.id
+	
+	# بررسی دسترسی‌های کسب و کار
+	def has_business_permission(self, section: str, action: str) -> bool:
+		"""بررسی دسترسی در سطح کسب و کار"""
+		if not self.business_id:
+			return False
+		
+		# SuperAdmin تمام دسترسی‌ها را دارد
+		if self.is_superadmin():
+			return True
+		
+		# مالک کسب و کار تمام دسترسی‌ها را دارد
+		if self.is_business_owner():
+			return True
+		
+		# بررسی دسترسی‌های عادی
+		if not self.business_permissions:
+			return False
+		
+		# بررسی وجود بخش
+		if section not in self.business_permissions:
+			return False
+		
+		section_perms = self.business_permissions[section]
+		
+		# اگر بخش خالی است، فقط خواندن
+		if not section_perms:
+			return action == "read"
+		
+		# بررسی دسترسی خاص
+		return section_perms.get(action, False)
+	
+	def can_read_section(self, section: str) -> bool:
+		"""بررسی دسترسی خواندن بخش در کسب و کار"""
+		if not self.business_id:
+			return False
+		
+		# SuperAdmin و مالک کسب و کار دسترسی کامل دارند
+		if self.is_superadmin() or self.is_business_owner():
+			return True
+		
+		return section in self.business_permissions
+	
+	def can_write_section(self, section: str) -> bool:
+		"""بررسی دسترسی نوشتن در بخش"""
+		return self.has_business_permission(section, "write")
+	
+	def can_delete_section(self, section: str) -> bool:
+		"""بررسی دسترسی حذف در بخش"""
+		return self.has_business_permission(section, "delete")
+	
+	def can_approve_section(self, section: str) -> bool:
+		"""بررسی دسترسی تأیید در بخش"""
+		return self.has_business_permission(section, "approve")
+	
+	def can_export_section(self, section: str) -> bool:
+		"""بررسی دسترسی صادرات در بخش"""
+		return self.has_business_permission(section, "export")
+	
+	def can_manage_business_users(self) -> bool:
+		"""بررسی دسترسی مدیریت کاربران کسب و کار"""
+		return self.has_business_permission("settings", "manage_users")
+	
+	# ترکیب دسترسی‌ها
+	def has_any_permission(self, section: str, action: str) -> bool:
+		"""بررسی دسترسی در هر دو سطح"""
+		# SuperAdmin دسترسی کامل دارد
+		if self.is_superadmin():
+			return True
+		
+		# بررسی دسترسی کسب و کار
+		return self.has_business_permission(section, action)
+	
+	def can_access_business(self, business_id: int) -> bool:
+		"""بررسی دسترسی به کسب و کار خاص"""
+		# SuperAdmin دسترسی به همه کسب و کارها دارد
+		if self.is_superadmin():
+			return True
+		
+		# اگر مالک کسب و کار است، دسترسی دارد
+		if self.is_business_owner() and business_id == self.business_id:
+			return True
+		
+		# بررسی دسترسی‌های کسب و کار
+		return business_id == self.business_id
+	
 	def to_dict(self) -> dict:
 		"""تبدیل به dictionary برای استفاده در API"""
 		return {
@@ -82,10 +222,17 @@ class AuthContext:
 				"mobile": self.user.mobile,
 				"referral_code": getattr(self.user, "referral_code", None),
 				"is_active": self.user.is_active,
+				"app_permissions": self.app_permissions,
 				"created_at": self.user.created_at.isoformat() if self.user.created_at else None,
 				"updated_at": self.user.updated_at.isoformat() if self.user.updated_at else None,
 			},
 			"api_key_id": self.api_key_id,
+			"permissions": {
+				"app_permissions": self.app_permissions,
+				"business_permissions": self.business_permissions,
+				"is_superadmin": self.is_superadmin(),
+				"is_business_owner": self.is_business_owner(),
+			},
 			"settings": {
 				"language": self.language,
 				"calendar_type": self.calendar_type,
@@ -139,7 +286,8 @@ def get_current_user(
 		calendar_type=calendar_type,
 		timezone=timezone,
 		business_id=business_id,
-		fiscal_year_id=fiscal_year_id
+		fiscal_year_id=fiscal_year_id,
+		db=db
 	)
 
 
