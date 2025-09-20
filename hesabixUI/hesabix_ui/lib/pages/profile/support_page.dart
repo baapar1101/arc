@@ -129,7 +129,7 @@ class _SupportPageState extends State<SupportPage> {
                   },
                   defaultPageSize: 20,
                   pageSizeOptions: const [10, 20, 50, 100],
-                  showRefreshButton: true,
+                  showFiltersButton: false,
                   showClearFiltersButton: true,
                   emptyStateMessage: t.noTickets,
                   loadingMessage: t.loadingTickets,

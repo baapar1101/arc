@@ -772,7 +772,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
         const Spacer(),
         
         // Filter buttons
-        if (widget.config.showFilters) ...[
+        if (widget.config.showFilters && widget.config.showFiltersButton) ...[
           Tooltip(
             message: _showFilters ? t.hideFilters : t.showFilters,
             child: IconButton(
@@ -807,37 +807,74 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
           const SizedBox(width: 8),
         ],
         
-        if (widget.config.showRefreshButton)
-          IconButton(
-            onPressed: _fetchData,
-            icon: const Icon(Icons.refresh),
-            tooltip: t.refresh,
-          ),
-          
         // Custom header actions
         if (widget.config.customHeaderActions != null) ...[
           const SizedBox(width: 8),
           ...widget.config.customHeaderActions!,
         ],
         
-        // Column settings button (moved after refresh button)
-        if (widget.config.showColumnSettingsButton && widget.config.enableColumnSettings) ...[
-          const SizedBox(width: 4),
-          Tooltip(
-            message: t.columnSettings,
-            child: IconButton(
-              onPressed: _isLoadingColumnSettings ? null : _openColumnSettingsDialog,
-              icon: _isLoadingColumnSettings
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.view_column),
-              tooltip: t.columnSettings,
-            ),
-          ),
-        ],
+        // Actions menu
+        PopupMenuButton<String>(
+          icon: const Icon(Icons.more_vert),
+          tooltip: 'عملیات',
+          onSelected: (value) {
+            switch (value) {
+              case 'refresh':
+                _fetchData();
+                break;
+              case 'filters':
+                setState(() {
+                  _showFilters = !_showFilters;
+                });
+                break;
+              case 'columnSettings':
+                _openColumnSettingsDialog();
+                break;
+            }
+          },
+          itemBuilder: (context) => [
+            if (widget.config.showRefreshButton)
+              PopupMenuItem(
+                value: 'refresh',
+                child: Row(
+                  children: [
+                    const Icon(Icons.refresh, size: 20),
+                    const SizedBox(width: 8),
+                    Text(t.refresh),
+                  ],
+                ),
+              ),
+            if (widget.config.showFilters && widget.config.showFiltersButton)
+              PopupMenuItem(
+                value: 'filters',
+                child: Row(
+                  children: [
+                    Icon(_showFilters ? Icons.filter_list_off : Icons.filter_list, size: 20),
+                    const SizedBox(width: 8),
+                    Text(_showFilters ? t.hideFilters : t.showFilters),
+                  ],
+                ),
+              ),
+            if (widget.config.showColumnSettingsButton && widget.config.enableColumnSettings)
+              PopupMenuItem(
+                value: 'columnSettings',
+                enabled: !_isLoadingColumnSettings,
+                child: Row(
+                  children: [
+                    _isLoadingColumnSettings
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.view_column, size: 20),
+                    const SizedBox(width: 8),
+                    Text(t.columnSettings),
+                  ],
+                ),
+              ),
+          ],
+        ),
       ],
     );
   }

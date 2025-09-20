@@ -60,6 +60,34 @@ class TicketRepository(BaseRepository[Ticket]):
             )\
             .filter(Ticket.user_id == user_id)
         
+        # اعمال فیلترها
+        if query_info.filters:
+            for filter_item in query_info.filters:
+                if filter_item.property == "title" and hasattr(Ticket, "title"):
+                    if filter_item.operator == "*":
+                        query = query.filter(Ticket.title.ilike(f"%{filter_item.value}%"))
+                    elif filter_item.operator == "*?":
+                        query = query.filter(Ticket.title.ilike(f"{filter_item.value}%"))
+                    elif filter_item.operator == "?*":
+                        query = query.filter(Ticket.title.ilike(f"%{filter_item.value}"))
+                    elif filter_item.operator == "=":
+                        query = query.filter(Ticket.title == filter_item.value)
+                elif filter_item.property == "category.name":
+                    query = query.join(Ticket.category).filter(Ticket.category.has(name=filter_item.value))
+                elif filter_item.property == "priority.name":
+                    query = query.join(Ticket.priority).filter(Ticket.priority.has(name=filter_item.value))
+                elif filter_item.property == "status.name":
+                    query = query.join(Ticket.status).filter(Ticket.status.has(name=filter_item.value))
+                elif filter_item.property == "description" and hasattr(Ticket, "description"):
+                    if filter_item.operator == "*":
+                        query = query.filter(Ticket.description.ilike(f"%{filter_item.value}%"))
+                    elif filter_item.operator == "*?":
+                        query = query.filter(Ticket.description.ilike(f"{filter_item.value}%"))
+                    elif filter_item.operator == "?*":
+                        query = query.filter(Ticket.description.ilike(f"%{filter_item.value}"))
+                    elif filter_item.operator == "=":
+                        query = query.filter(Ticket.description == filter_item.value)
+        
         # اعمال جستجو
         if query_info.search and query_info.search_fields:
             search_conditions = []
@@ -97,6 +125,43 @@ class TicketRepository(BaseRepository[Ticket]):
                 joinedload(Ticket.priority),
                 joinedload(Ticket.status)
             )
+        
+        # اعمال فیلترها
+        if query_info.filters:
+            for filter_item in query_info.filters:
+                if filter_item.property == "title" and hasattr(Ticket, "title"):
+                    if filter_item.operator == "*":
+                        query = query.filter(Ticket.title.ilike(f"%{filter_item.value}%"))
+                    elif filter_item.operator == "*?":
+                        query = query.filter(Ticket.title.ilike(f"{filter_item.value}%"))
+                    elif filter_item.operator == "?*":
+                        query = query.filter(Ticket.title.ilike(f"%{filter_item.value}"))
+                    elif filter_item.operator == "=":
+                        query = query.filter(Ticket.title == filter_item.value)
+                elif filter_item.property == "category.name":
+                    query = query.join(Ticket.category).filter(Ticket.category.has(name=filter_item.value))
+                elif filter_item.property == "priority.name":
+                    query = query.join(Ticket.priority).filter(Ticket.priority.has(name=filter_item.value))
+                elif filter_item.property == "status.name":
+                    query = query.join(Ticket.status).filter(Ticket.status.has(name=filter_item.value))
+                elif filter_item.property == "description" and hasattr(Ticket, "description"):
+                    if filter_item.operator == "*":
+                        query = query.filter(Ticket.description.ilike(f"%{filter_item.value}%"))
+                    elif filter_item.operator == "*?":
+                        query = query.filter(Ticket.description.ilike(f"{filter_item.value}%"))
+                    elif filter_item.operator == "?*":
+                        query = query.filter(Ticket.description.ilike(f"%{filter_item.value}"))
+                    elif filter_item.operator == "=":
+                        query = query.filter(Ticket.description == filter_item.value)
+                elif filter_item.property == "user_email":
+                    query = query.join(Ticket.user).filter(Ticket.user.has(email=filter_item.value))
+                elif filter_item.property == "user_name":
+                    query = query.join(Ticket.user).filter(
+                        or_(
+                            Ticket.user.has(first_name=filter_item.value),
+                            Ticket.user.has(last_name=filter_item.value)
+                        )
+                    )
         
         # اعمال جستجو
         if query_info.search and query_info.search_fields:

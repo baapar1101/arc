@@ -214,6 +214,9 @@ class DataTableConfig<T> {
   
   // Custom header actions
   final List<Widget>? customHeaderActions;
+  
+  // Show individual action buttons
+  final bool showFiltersButton;
 
   const DataTableConfig({
     required this.endpoint,
@@ -276,6 +279,7 @@ class DataTableConfig<T> {
     this.initialColumnSettings,
     this.onColumnSettingsChanged,
     this.customHeaderActions,
+    this.showFiltersButton = true,
   });
 
   /// Get column width as double
