@@ -212,6 +212,21 @@ class DataTableUtils {
   /// Get cell value from item
   static dynamic getCellValue(dynamic item, String key) {
     if (item is Map<String, dynamic>) {
+      // Handle nested properties like 'priority.name' or 'status.name'
+      if (key.contains('.')) {
+        final parts = key.split('.');
+        dynamic current = item;
+        
+        for (final part in parts) {
+          if (current is Map<String, dynamic> && current.containsKey(part)) {
+            current = current[part];
+          } else {
+            return null;
+          }
+        }
+        return current;
+      }
+      
       return item[key];
     }
     // For custom objects, try to access property using reflection

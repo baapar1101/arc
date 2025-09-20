@@ -19,7 +19,7 @@ def success_response(data: Any, request: Request = None) -> dict[str, Any]:
 
 def format_datetime_fields(data: Any, request: Request) -> Any:
 	"""Recursively format datetime fields based on calendar type"""
-	if not hasattr(request.state, 'calendar_type'):
+	if not request or not hasattr(request.state, 'calendar_type'):
 		return data
 	
 	calendar_type = request.state.calendar_type

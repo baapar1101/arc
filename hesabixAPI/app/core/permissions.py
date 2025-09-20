@@ -12,11 +12,20 @@ def require_app_permission(permission: str):
     """Decorator برای بررسی دسترسی در سطح اپلیکیشن"""
     def decorator(func: Callable) -> Callable:
         @wraps(func)
-        def wrapper(*args, **kwargs) -> Any:
-            ctx = get_current_user()
+        async def wrapper(*args, **kwargs) -> Any:
+            # پیدا کردن AuthContext در kwargs
+            ctx = None
+            for key, value in kwargs.items():
+                if isinstance(value, AuthContext):
+                    ctx = value
+                    break
+            
+            if not ctx:
+                raise ApiError("UNAUTHORIZED", "Authentication required", http_status=401)
+            
             if not ctx.has_app_permission(permission):
                 raise ApiError("FORBIDDEN", f"Missing app permission: {permission}", http_status=403)
-            return func(*args, **kwargs)
+            return await func(*args, **kwargs)
         return wrapper
     return decorator
 

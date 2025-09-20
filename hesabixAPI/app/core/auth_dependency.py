@@ -117,6 +117,10 @@ class AuthContext:
 		"""بررسی دسترسی به تنظیمات سیستم"""
 		return self.has_app_permission("system_settings")
 	
+	def can_access_support_operator(self) -> bool:
+		"""بررسی دسترسی به پنل اپراتور پشتیبانی"""
+		return self.has_app_permission("support_operator")
+	
 	def is_business_owner(self) -> bool:
 		"""بررسی اینکه آیا کاربر مالک کسب و کار است یا نه"""
 		if not self.business_id or not self.db:

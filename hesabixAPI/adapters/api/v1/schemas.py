@@ -1,6 +1,8 @@
-from typing import Any, List, Optional, Union
+from typing import Any, List, Optional, Union, Generic, TypeVar
 from pydantic import BaseModel, EmailStr, Field
 from enum import Enum
+
+T = TypeVar('T')
 
 
 class FilterItem(BaseModel):
@@ -222,5 +224,26 @@ class BusinessSummaryResponse(BaseModel):
 	total_businesses: int = Field(..., description="تعداد کل کسب و کارها")
 	by_type: dict = Field(..., description="تعداد بر اساس نوع")
 	by_field: dict = Field(..., description="تعداد بر اساس زمینه فعالیت")
+
+
+class PaginatedResponse(BaseModel, Generic[T]):
+	"""پاسخ صفحه‌بندی شده برای لیست‌ها"""
+	items: List[T] = Field(..., description="آیتم‌های صفحه")
+	total: int = Field(..., description="تعداد کل آیتم‌ها")
+	page: int = Field(..., description="شماره صفحه فعلی")
+	limit: int = Field(..., description="تعداد آیتم در هر صفحه")
+	total_pages: int = Field(..., description="تعداد کل صفحات")
+
+	@classmethod
+	def create(cls, items: List[T], total: int, page: int, limit: int) -> 'PaginatedResponse[T]':
+		"""ایجاد پاسخ صفحه‌بندی شده"""
+		total_pages = (total + limit - 1) // limit
+		return cls(
+			items=items,
+			total=total,
+			page=page,
+			limit=limit,
+			total_pages=total_pages
+		)
 
 

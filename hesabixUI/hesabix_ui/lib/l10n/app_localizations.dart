@@ -185,7 +185,7 @@ abstract class AppLocalizations {
   /// No description provided for @mobile.
   ///
   /// In en, this message translates to:
-  /// **'Mobile number'**
+  /// **'Mobile'**
   String get mobile;
 
   /// No description provided for @registerSuccess.
@@ -955,6 +955,510 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'in list'**
   String get in_list;
+
+  /// No description provided for @businessBasicInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Basic Business Information'**
+  String get businessBasicInfo;
+
+  /// No description provided for @businessContactInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Contact Information'**
+  String get businessContactInfo;
+
+  /// No description provided for @businessLegalInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Legal Information'**
+  String get businessLegalInfo;
+
+  /// No description provided for @businessGeographicInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Geographic Information'**
+  String get businessGeographicInfo;
+
+  /// No description provided for @businessConfirmation.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirmation'**
+  String get businessConfirmation;
+
+  /// No description provided for @businessName.
+  ///
+  /// In en, this message translates to:
+  /// **'Business Name'**
+  String get businessName;
+
+  /// No description provided for @businessType.
+  ///
+  /// In en, this message translates to:
+  /// **'Business Type'**
+  String get businessType;
+
+  /// No description provided for @businessField.
+  ///
+  /// In en, this message translates to:
+  /// **'Business Field'**
+  String get businessField;
+
+  /// No description provided for @address.
+  ///
+  /// In en, this message translates to:
+  /// **'Address'**
+  String get address;
+
+  /// No description provided for @phone.
+  ///
+  /// In en, this message translates to:
+  /// **'Phone'**
+  String get phone;
+
+  /// No description provided for @postalCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Postal Code'**
+  String get postalCode;
+
+  /// No description provided for @nationalId.
+  ///
+  /// In en, this message translates to:
+  /// **'National ID'**
+  String get nationalId;
+
+  /// No description provided for @registrationNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Registration Number'**
+  String get registrationNumber;
+
+  /// No description provided for @economicId.
+  ///
+  /// In en, this message translates to:
+  /// **'Economic ID'**
+  String get economicId;
+
+  /// No description provided for @country.
+  ///
+  /// In en, this message translates to:
+  /// **'Country'**
+  String get country;
+
+  /// No description provided for @province.
+  ///
+  /// In en, this message translates to:
+  /// **'Province'**
+  String get province;
+
+  /// No description provided for @city.
+  ///
+  /// In en, this message translates to:
+  /// **'City'**
+  String get city;
+
+  /// No description provided for @step.
+  ///
+  /// In en, this message translates to:
+  /// **'Step'**
+  String get step;
+
+  /// No description provided for @previous.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous'**
+  String get previous;
+
+  /// No description provided for @next.
+  ///
+  /// In en, this message translates to:
+  /// **'Next'**
+  String get next;
+
+  /// No description provided for @createBusiness.
+  ///
+  /// In en, this message translates to:
+  /// **'Create Business'**
+  String get createBusiness;
+
+  /// No description provided for @confirmInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm Information'**
+  String get confirmInfo;
+
+  /// No description provided for @confirmInfoMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure about the entered information?'**
+  String get confirmInfoMessage;
+
+  /// No description provided for @businessCreatedSuccessfully.
+  ///
+  /// In en, this message translates to:
+  /// **'Business created successfully'**
+  String get businessCreatedSuccessfully;
+
+  /// No description provided for @businessCreationFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to create business'**
+  String get businessCreationFailed;
+
+  /// No description provided for @pleaseFillRequiredFields.
+  ///
+  /// In en, this message translates to:
+  /// **'Please fill all required fields'**
+  String get pleaseFillRequiredFields;
+
+  /// No description provided for @required.
+  ///
+  /// In en, this message translates to:
+  /// **'required'**
+  String get required;
+
+  /// No description provided for @example.
+  ///
+  /// In en, this message translates to:
+  /// **'Example'**
+  String get example;
+
+  /// No description provided for @phoneExample.
+  ///
+  /// In en, this message translates to:
+  /// **'02112345678'**
+  String get phoneExample;
+
+  /// No description provided for @mobileExample.
+  ///
+  /// In en, this message translates to:
+  /// **'09123456789'**
+  String get mobileExample;
+
+  /// No description provided for @nationalIdExample.
+  ///
+  /// In en, this message translates to:
+  /// **'1234567890'**
+  String get nationalIdExample;
+
+  /// No description provided for @company.
+  ///
+  /// In en, this message translates to:
+  /// **'Company'**
+  String get company;
+
+  /// No description provided for @shop.
+  ///
+  /// In en, this message translates to:
+  /// **'Shop'**
+  String get shop;
+
+  /// No description provided for @store.
+  ///
+  /// In en, this message translates to:
+  /// **'Store'**
+  String get store;
+
+  /// No description provided for @union.
+  ///
+  /// In en, this message translates to:
+  /// **'Union'**
+  String get union;
+
+  /// No description provided for @club.
+  ///
+  /// In en, this message translates to:
+  /// **'Club'**
+  String get club;
+
+  /// No description provided for @institute.
+  ///
+  /// In en, this message translates to:
+  /// **'Institute'**
+  String get institute;
+
+  /// No description provided for @individual.
+  ///
+  /// In en, this message translates to:
+  /// **'Individual'**
+  String get individual;
+
+  /// No description provided for @manufacturing.
+  ///
+  /// In en, this message translates to:
+  /// **'Manufacturing'**
+  String get manufacturing;
+
+  /// No description provided for @trading.
+  ///
+  /// In en, this message translates to:
+  /// **'Trading'**
+  String get trading;
+
+  /// No description provided for @service.
+  ///
+  /// In en, this message translates to:
+  /// **'Service'**
+  String get service;
+
+  /// No description provided for @other.
+  ///
+  /// In en, this message translates to:
+  /// **'Other'**
+  String get other;
+
+  /// No description provided for @newTicket.
+  ///
+  /// In en, this message translates to:
+  /// **'New Ticket'**
+  String get newTicket;
+
+  /// No description provided for @ticketTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Ticket Title'**
+  String get ticketTitle;
+
+  /// No description provided for @ticketDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Problem Description'**
+  String get ticketDescription;
+
+  /// No description provided for @category.
+  ///
+  /// In en, this message translates to:
+  /// **'Category'**
+  String get category;
+
+  /// No description provided for @priority.
+  ///
+  /// In en, this message translates to:
+  /// **'Priority'**
+  String get priority;
+
+  /// No description provided for @status.
+  ///
+  /// In en, this message translates to:
+  /// **'Status'**
+  String get status;
+
+  /// No description provided for @messages.
+  ///
+  /// In en, this message translates to:
+  /// **'Messages'**
+  String get messages;
+
+  /// No description provided for @sendMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Send Message'**
+  String get sendMessage;
+
+  /// No description provided for @messageHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Type your message...'**
+  String get messageHint;
+
+  /// No description provided for @createTicket.
+  ///
+  /// In en, this message translates to:
+  /// **'Create Ticket'**
+  String get createTicket;
+
+  /// No description provided for @ticketCreated.
+  ///
+  /// In en, this message translates to:
+  /// **'Ticket created successfully'**
+  String get ticketCreated;
+
+  /// No description provided for @messageSent.
+  ///
+  /// In en, this message translates to:
+  /// **'Message sent'**
+  String get messageSent;
+
+  /// No description provided for @loadingTickets.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading tickets...'**
+  String get loadingTickets;
+
+  /// No description provided for @noTickets.
+  ///
+  /// In en, this message translates to:
+  /// **'No tickets found'**
+  String get noTickets;
+
+  /// No description provided for @ticketDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Ticket Details'**
+  String get ticketDetails;
+
+  /// No description provided for @supportTickets.
+  ///
+  /// In en, this message translates to:
+  /// **'Support Tickets'**
+  String get supportTickets;
+
+  /// No description provided for @ticketCreatedAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Created At'**
+  String get ticketCreatedAt;
+
+  /// No description provided for @ticketUpdatedAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Last Updated'**
+  String get ticketUpdatedAt;
+
+  /// No description provided for @ticketLoadingError.
+  ///
+  /// In en, this message translates to:
+  /// **'Error loading tickets'**
+  String get ticketLoadingError;
+
+  /// No description provided for @ticketId.
+  ///
+  /// In en, this message translates to:
+  /// **'Ticket ID'**
+  String get ticketId;
+
+  /// No description provided for @createdAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Created At'**
+  String get createdAt;
+
+  /// No description provided for @updatedAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Updated At'**
+  String get updatedAt;
+
+  /// No description provided for @assignedTo.
+  ///
+  /// In en, this message translates to:
+  /// **'Assigned To'**
+  String get assignedTo;
+
+  /// No description provided for @low.
+  ///
+  /// In en, this message translates to:
+  /// **'Low'**
+  String get low;
+
+  /// No description provided for @medium.
+  ///
+  /// In en, this message translates to:
+  /// **'Medium'**
+  String get medium;
+
+  /// No description provided for @high.
+  ///
+  /// In en, this message translates to:
+  /// **'High'**
+  String get high;
+
+  /// No description provided for @urgent.
+  ///
+  /// In en, this message translates to:
+  /// **'Urgent'**
+  String get urgent;
+
+  /// No description provided for @open.
+  ///
+  /// In en, this message translates to:
+  /// **'Open'**
+  String get open;
+
+  /// No description provided for @inProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'In Progress'**
+  String get inProgress;
+
+  /// No description provided for @waitingForUser.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for User'**
+  String get waitingForUser;
+
+  /// No description provided for @closed.
+  ///
+  /// In en, this message translates to:
+  /// **'Closed'**
+  String get closed;
+
+  /// No description provided for @resolved.
+  ///
+  /// In en, this message translates to:
+  /// **'Resolved'**
+  String get resolved;
+
+  /// No description provided for @technicalIssue.
+  ///
+  /// In en, this message translates to:
+  /// **'Technical Issue'**
+  String get technicalIssue;
+
+  /// No description provided for @featureRequest.
+  ///
+  /// In en, this message translates to:
+  /// **'Feature Request'**
+  String get featureRequest;
+
+  /// No description provided for @question.
+  ///
+  /// In en, this message translates to:
+  /// **'Question'**
+  String get question;
+
+  /// No description provided for @complaint.
+  ///
+  /// In en, this message translates to:
+  /// **'Complaint'**
+  String get complaint;
+
+  /// No description provided for @operatorPanel.
+  ///
+  /// In en, this message translates to:
+  /// **'Operator Panel'**
+  String get operatorPanel;
+
+  /// No description provided for @allTickets.
+  ///
+  /// In en, this message translates to:
+  /// **'All Tickets'**
+  String get allTickets;
+
+  /// No description provided for @assignTicket.
+  ///
+  /// In en, this message translates to:
+  /// **'Assign Ticket'**
+  String get assignTicket;
+
+  /// No description provided for @changeStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Change Status'**
+  String get changeStatus;
+
+  /// No description provided for @internalMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Internal Message'**
+  String get internalMessage;
+
+  /// No description provided for @operator.
+  ///
+  /// In en, this message translates to:
+  /// **'Operator'**
+  String get operator;
 }
 
 class _AppLocalizationsDelegate

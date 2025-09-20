@@ -193,6 +193,8 @@ class AuthStore with ChangeNotifier {
     
     return _appPermissions?[permission] == true;
   }
+
+  bool get canAccessSupportOperator => hasAppPermission('support_operator');
 }
 
 

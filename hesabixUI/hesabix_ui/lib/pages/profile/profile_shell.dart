@@ -58,14 +58,20 @@ class _ProfileShellState extends State<ProfileShell> {
       _Dest(t.changePassword, Icons.password, Icons.password, '/user/profile/change-password'),
     ];
 
+    // اضافه کردن منوی اپراتور پشتیبانی
+    final operatorDestinations = <_Dest>[
+      _Dest(t.operatorPanel, Icons.support_agent, Icons.support_agent, '/user/profile/operator'),
+    ];
+
     // اضافه کردن منوی تنظیمات سیستم برای ادمین‌ها
     final adminDestinations = <_Dest>[
       _Dest(t.systemSettings, Icons.admin_panel_settings, Icons.admin_panel_settings, '/user/profile/system-settings'),
     ];
 
-    // ترکیب منوهای عادی و ادمین
+    // ترکیب منوهای عادی، اپراتور و ادمین
     final allDestinations = <_Dest>[
       ...destinations,
+      if (widget.authStore.canAccessSupportOperator) ...operatorDestinations,
       if (widget.authStore.isSuperAdmin) ...adminDestinations,
     ];
 

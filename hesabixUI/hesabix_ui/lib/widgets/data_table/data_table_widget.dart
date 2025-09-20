@@ -814,6 +814,12 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
             tooltip: t.refresh,
           ),
           
+        // Custom header actions
+        if (widget.config.customHeaderActions != null) ...[
+          const SizedBox(width: 8),
+          ...widget.config.customHeaderActions!,
+        ],
+        
         // Column settings button (moved after refresh button)
         if (widget.config.showColumnSettingsButton && widget.config.enableColumnSettings) ...[
           const SizedBox(width: 4),

@@ -8,4 +8,7 @@ from .password_reset import PasswordReset  # noqa: F401
 from .business import Business  # noqa: F401
 from .business_permission import BusinessPermission  # noqa: F401
 
+# Import support models
+from .support import *  # noqa: F401, F403
+
 

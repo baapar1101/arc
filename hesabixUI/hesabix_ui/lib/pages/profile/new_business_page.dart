@@ -23,7 +23,7 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
   }
 
   void _nextStep() {
-    if (_currentStep < 4) {
+    if (_currentStep < 3) {
       setState(() {
         _currentStep++;
       });
@@ -65,18 +65,36 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
         return _businessData.isStep2Valid();
       case 2:
         return _businessData.isStep3Valid();
-      case 3:
-        return _businessData.isStep4Valid();
       default:
         return false;
     }
   }
 
+  bool _isMobile(BuildContext context) {
+    return MediaQuery.of(context).size.width < 768;
+  }
+
+  String _getCurrentStepTitle(AppLocalizations t) {
+    switch (_currentStep) {
+      case 0:
+        return t.businessBasicInfo;
+      case 1:
+        return t.businessContactInfo;
+      case 2:
+        return t.businessLegalInfo;
+      case 3:
+        return t.businessConfirmation;
+      default:
+        return '';
+    }
+  }
+
   Future<void> _submitBusiness() async {
+    final t = Localizations.of<AppLocalizations>(context, AppLocalizations)!;
     if (!_businessData.isFormValid()) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('لطفاً تمام فیلدهای اجباری را پر کنید'),
+        SnackBar(
+          content: Text(t.pleaseFillRequiredFields),
           backgroundColor: Colors.red,
         ),
       );
@@ -92,8 +110,8 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
       
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('کسب و کار با موفقیت ایجاد شد'),
+          SnackBar(
+            content: Text(t.businessCreatedSuccessfully),
             backgroundColor: Colors.green,
           ),
         );
@@ -103,7 +121,7 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('خطا در ایجاد کسب و کار: $e'),
+            content: Text('${t.businessCreationFailed}: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -119,40 +137,49 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
 
   @override
   Widget build(BuildContext context) {
-    final t = AppLocalizations.of(context);
+    final t = Localizations.of<AppLocalizations>(context, AppLocalizations)!;
+    final isMobile = _isMobile(context);
     
     return Scaffold(
-      appBar: AppBar(
+      appBar: isMobile ? AppBar(
         title: Text(t.newBusiness),
         centerTitle: true,
-      ),
+        elevation: 0,
+      ) : null,
       body: Column(
         children: [
           // Progress indicator
           Container(
-            padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
+            padding: EdgeInsets.fromLTRB(
+              isMobile ? 16 : 24, 
+              isMobile ? 8 : 16, 
+              isMobile ? 16 : 24, 
+              isMobile ? 8 : 8
+            ),
             child: Column(
               children: [
                 // Progress bar
                 Row(
-                  children: List.generate(5, (index) {
+                  children: List.generate(4, (index) {
                     final isActive = index <= _currentStep;
                     final isCurrent = index == _currentStep;
                     
                     return Expanded(
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 300),
-                        margin: const EdgeInsets.symmetric(horizontal: 2),
-                        height: 6,
+                        margin: EdgeInsets.symmetric(horizontal: isMobile ? 1 : 2),
+                        height: isMobile ? 4 : 6,
                         decoration: BoxDecoration(
                           color: isActive
-                              ? Theme.of(context).primaryColor
-                              : Colors.grey[300],
-                          borderRadius: BorderRadius.circular(3),
+                              ? Theme.of(context).colorScheme.primary
+                              : Theme.of(context).brightness == Brightness.dark
+                                  ? Theme.of(context).colorScheme.surfaceContainerHighest
+                                  : Theme.of(context).colorScheme.outline.withValues(alpha: 0.4),
+                          borderRadius: BorderRadius.circular(isMobile ? 2 : 3),
                           boxShadow: isCurrent
                               ? [
                                   BoxShadow(
-                                    color: Theme.of(context).primaryColor.withOpacity(0.3),
+                                    color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.4),
                                     blurRadius: 4,
                                     spreadRadius: 1,
                                   ),
@@ -166,40 +193,84 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
                 const SizedBox(height: 8),
                 // Progress text
                 Text(
-                  'مرحله ${_currentStep + 1} از 5',
+                  '${t.step} ${_currentStep + 1} ${t.ofText} 4',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
-                    fontWeight: FontWeight.w500,
+                    color: Theme.of(context).colorScheme.onSurface,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ],
             ),
           ),
           
-          // Step indicator
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                _buildStepIndicator(0, 'اطلاعات پایه'),
-                _buildStepIndicator(1, 'اطلاعات تماس'),
-                _buildStepIndicator(2, 'اطلاعات قانونی'),
-                _buildStepIndicator(3, 'اطلاعات جغرافیایی'),
-                _buildStepIndicator(4, 'تأیید'),
-              ],
+          // Step indicator - فقط برای دسکتاپ
+          if (!isMobile)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  _buildStepIndicator(0, t.businessBasicInfo),
+                  _buildStepIndicator(1, t.businessContactInfo),
+                  _buildStepIndicator(2, t.businessLegalInfo),
+                  _buildStepIndicator(3, t.businessConfirmation),
+                ],
+              ),
             ),
-          ),
           
-          // Form content with scroll
+          // Current step title for mobile
+          if (isMobile)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.primaryContainer,
+                border: Border(
+                  bottom: BorderSide(
+                    color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
+                    width: 1,
+                  ),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.primary,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Center(
+                      child: Text(
+                        '${_currentStep + 1}',
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onPrimary,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      _getCurrentStepTitle(t),
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.onPrimaryContainer,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          
+          // Form content
           Expanded(
             child: SingleChildScrollView(
-              child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  minHeight: MediaQuery.of(context).size.height - 
-                    kToolbarHeight - 
-                    200, // برای progress indicator، step indicator و navigation buttons
-                ),
+              child: SizedBox(
+                height: MediaQuery.of(context).size.height - 200, // ارتفاع مناسب برای اسکرول
                 child: PageView(
                   controller: _pageController,
                   physics: const NeverScrollableScrollPhysics(),
@@ -213,7 +284,6 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
                     _buildStep2(),
                     _buildStep3(),
                     _buildStep4(),
-                    _buildStep5(),
                   ],
                 ),
               ),
@@ -222,47 +292,85 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
           
           // Navigation buttons
           Container(
-            padding: const EdgeInsets.all(24),
+            padding: EdgeInsets.all(isMobile ? 16 : 24),
             decoration: BoxDecoration(
               color: Theme.of(context).scaffoldBackgroundColor,
               border: Border(
                 top: BorderSide(
-                  color: Theme.of(context).dividerColor.withOpacity(0.1),
+                  color: Theme.of(context).dividerColor.withValues(alpha: 0.2),
                   width: 1,
                 ),
               ),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                _buildNavigationButton(
-                  text: 'قبلی',
-                  icon: Icons.arrow_back_ios,
-                  onPressed: _currentStep > 0 ? _previousStep : null,
-                  isPrimary: false,
-                ),
-                Row(
-                  children: [
-                    if (_currentStep < 4) ...[
-                      _buildNavigationButton(
-                        text: 'بعدی',
-                        icon: Icons.arrow_forward_ios,
-                        onPressed: _canGoToNextStep() ? _nextStep : null,
-                        isPrimary: true,
-                      ),
-                    ] else ...[
-                      _buildNavigationButton(
-                        text: 'ایجاد کسب و کار',
-                        icon: Icons.check,
-                        onPressed: _isLoading ? null : _submitBusiness,
-                        isPrimary: true,
-                        isLoading: _isLoading,
-                      ),
-                    ],
-                  ],
+              boxShadow: [
+                BoxShadow(
+                  color: Theme.of(context).shadowColor.withValues(alpha: 0.1),
+                  blurRadius: 4,
+                  offset: const Offset(0, -2),
                 ),
               ],
             ),
+            child: isMobile 
+                ? Column(
+                    children: [
+                      // Next/Submit button - full width on mobile
+                      SizedBox(
+                        width: double.infinity,
+                        child: _buildNavigationButton(
+                          text: _currentStep < 3 ? t.next : t.createBusiness,
+                          icon: _currentStep < 3 ? Icons.arrow_forward_ios : Icons.check,
+                          onPressed: _currentStep < 3 
+                              ? (_canGoToNextStep() ? _nextStep : null)
+                              : (_isLoading ? null : _submitBusiness),
+                          isPrimary: true,
+                          isLoading: _isLoading,
+                        ),
+                      ),
+                      // Previous button - full width on mobile
+                      if (_currentStep > 0) ...[
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          width: double.infinity,
+                          child: _buildNavigationButton(
+                            text: t.previous,
+                            icon: Icons.arrow_back_ios,
+                            onPressed: _previousStep,
+                            isPrimary: false,
+                          ),
+                        ),
+                      ],
+                    ],
+                  )
+                : Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      _buildNavigationButton(
+                        text: t.previous,
+                        icon: Icons.arrow_back_ios,
+                        onPressed: _currentStep > 0 ? _previousStep : null,
+                        isPrimary: false,
+                      ),
+                      Row(
+                        children: [
+                          if (_currentStep < 3) ...[
+                            _buildNavigationButton(
+                              text: t.next,
+                              icon: Icons.arrow_forward_ios,
+                              onPressed: _canGoToNextStep() ? _nextStep : null,
+                              isPrimary: true,
+                            ),
+                          ] else ...[
+                            _buildNavigationButton(
+                              text: t.createBusiness,
+                              icon: Icons.check,
+                              onPressed: _isLoading ? null : _submitBusiness,
+                              isPrimary: true,
+                              isLoading: _isLoading,
+                            ),
+                          ],
+                        ],
+                      ),
+                    ],
+                  ),
           ),
         ],
       ),
@@ -280,14 +388,14 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
           color: isActive
-              ? Theme.of(context).primaryColor.withOpacity(0.1)
-              : Colors.transparent,
+              ? Theme.of(context).colorScheme.primaryContainer
+              : Theme.of(context).colorScheme.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: isActive
-                ? Theme.of(context).primaryColor
-                : Colors.grey[300]!,
-            width: 1,
+                ? Theme.of(context).colorScheme.primary
+                : Theme.of(context).colorScheme.outlineVariant,
+            width: 1.5,
           ),
         ),
         child: Row(
@@ -299,18 +407,26 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
               height: 24,
               decoration: BoxDecoration(
                 color: isActive
-                    ? Theme.of(context).primaryColor
-                    : Colors.grey[300],
+                    ? Theme.of(context).colorScheme.primary
+                    : Theme.of(context).colorScheme.outline,
                 shape: BoxShape.circle,
                 boxShadow: isCurrent
                     ? [
                         BoxShadow(
-                          color: Theme.of(context).primaryColor.withOpacity(0.3),
+                          color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.4),
                           blurRadius: 6,
                           spreadRadius: 2,
                         ),
                       ]
-                    : null,
+                    : isActive
+                        ? [
+                            BoxShadow(
+                              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.2),
+                              blurRadius: 3,
+                              spreadRadius: 1,
+                            ),
+                          ]
+                        : null,
               ),
               child: Center(
                 child: isActive
@@ -322,7 +438,9 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
                     : Text(
                         '${step + 1}',
                         style: TextStyle(
-                          color: Colors.grey[600],
+                          color: isActive
+                              ? Theme.of(context).colorScheme.onPrimary
+                              : Theme.of(context).colorScheme.onSurface,
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
                         ),
@@ -334,10 +452,10 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
               title,
               style: TextStyle(
                 color: isActive
-                    ? Theme.of(context).primaryColor
-                    : Colors.grey[600],
+                    ? Theme.of(context).colorScheme.onPrimaryContainer
+                    : Theme.of(context).colorScheme.onSurface,
                 fontSize: 12,
-                fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
+                fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
               ),
             ),
           ],
@@ -368,14 +486,14 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
               : Theme.of(context).colorScheme.onSurface,
           elevation: isPrimary ? 2 : 0,
           shadowColor: isPrimary
-              ? Theme.of(context).primaryColor.withOpacity(0.3)
+              ? Theme.of(context).primaryColor.withValues(alpha: 0.3)
               : null,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
             side: isPrimary
                 ? BorderSide.none
                 : BorderSide(
-                    color: Theme.of(context).colorScheme.outline.withOpacity(0.3),
+                    color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
                     width: 1,
                   ),
           ),
@@ -435,26 +553,41 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
   }
 
   Widget _buildStep1() {
-    return SingleChildScrollView(
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 600),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+    final t = Localizations.of<AppLocalizations>(context, AppLocalizations)!;
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 600),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
                 Text(
-                  'اطلاعات پایه کسب و کار',
+                  t.businessBasicInfo,
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
                 const SizedBox(height: 24),
                 
                 // نام کسب و کار
                 TextFormField(
-                  decoration: const InputDecoration(
-                    labelText: 'نام کسب و کار *',
-                    border: OutlineInputBorder(),
+                  decoration: InputDecoration(
+                    labelText: '${t.businessName} *',
+                    border: OutlineInputBorder(
+                      borderSide: BorderSide(
+                        color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
+                      ),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderSide: BorderSide(
+                        color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderSide: BorderSide(
+                        color: Theme.of(context).primaryColor,
+                        width: 2,
+                      ),
+                    ),
                   ),
                   onChanged: (value) {
                     setState(() {
@@ -463,7 +596,7 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
                   },
                   validator: (value) {
                     if (value == null || value.isEmpty) {
-                      return 'نام کسب و کار اجباری است';
+                      return '${t.businessName} ${t.required}';
                     }
                     return null;
                   },
@@ -472,9 +605,24 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
                 
                 // نوع کسب و کار
                 DropdownButtonFormField<BusinessType>(
-                  decoration: const InputDecoration(
-                    labelText: 'نوع کسب و کار *',
-                    border: OutlineInputBorder(),
+                  decoration: InputDecoration(
+                    labelText: '${t.businessType} *',
+                    border: OutlineInputBorder(
+                      borderSide: BorderSide(
+                        color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
+                      ),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderSide: BorderSide(
+                        color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderSide: BorderSide(
+                        color: Theme.of(context).primaryColor,
+                        width: 2,
+                      ),
+                    ),
                   ),
                   value: _businessData.businessType,
                   items: BusinessType.values.map((type) {
@@ -490,7 +638,7 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
                   },
                   validator: (value) {
                     if (value == null) {
-                      return 'نوع کسب و کار اجباری است';
+                      return '${t.businessType} ${t.required}';
                     }
                     return null;
                   },
@@ -499,9 +647,24 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
                 
                 // زمینه فعالیت
                 DropdownButtonFormField<BusinessField>(
-                  decoration: const InputDecoration(
-                    labelText: 'زمینه فعالیت *',
-                    border: OutlineInputBorder(),
+                  decoration: InputDecoration(
+                    labelText: '${t.businessField} *',
+                    border: OutlineInputBorder(
+                      borderSide: BorderSide(
+                        color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
+                      ),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderSide: BorderSide(
+                        color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderSide: BorderSide(
+                        color: Theme.of(context).primaryColor,
+                        width: 2,
+                      ),
+                    ),
                   ),
                   value: _businessData.businessField,
                   items: BusinessField.values.map((field) {
@@ -517,13 +680,12 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
                   },
                   validator: (value) {
                     if (value == null) {
-                      return 'زمینه فعالیت اجباری است';
+                      return '${t.businessField} ${t.required}';
                     }
                     return null;
                   },
                 ),
-              ],
-            ),
+            ],
           ),
         ),
       ),
@@ -531,26 +693,41 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
   }
 
   Widget _buildStep2() {
-    return SingleChildScrollView(
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 800),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+    final t = Localizations.of<AppLocalizations>(context, AppLocalizations)!;
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 800),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
                 Text(
-                  'اطلاعات تماس',
+                  t.businessContactInfo,
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
                 const SizedBox(height: 24),
                 
                 // آدرس - تمام عرض
                 TextFormField(
-                  decoration: const InputDecoration(
-                    labelText: 'آدرس',
-                    border: OutlineInputBorder(),
+                  decoration: InputDecoration(
+                    labelText: t.address,
+                    border: OutlineInputBorder(
+                      borderSide: BorderSide(
+                        color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
+                      ),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderSide: BorderSide(
+                        color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderSide: BorderSide(
+                        color: Theme.of(context).primaryColor,
+                        width: 2,
+                      ),
+                    ),
                   ),
                   maxLines: 3,
                   onChanged: (value) {
@@ -570,10 +747,25 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
                           Expanded(
                             child: TextFormField(
                               decoration: InputDecoration(
-                                labelText: 'تلفن ثابت',
-                                border: const OutlineInputBorder(),
+                                labelText: t.phone,
+                                border: OutlineInputBorder(
+                                  borderSide: BorderSide(
+                                    color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
+                                  ),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderSide: BorderSide(
+                                    color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
+                                  ),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderSide: BorderSide(
+                                    color: Theme.of(context).primaryColor,
+                                    width: 2,
+                                  ),
+                                ),
                                 errorText: _businessData.getValidationError('phone'),
-                                helperText: 'مثال: 02112345678',
+                                helperText: '${t.example}: ${t.phoneExample}',
                               ),
                               keyboardType: TextInputType.phone,
                               onChanged: (value) {
@@ -587,10 +779,25 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
                           Expanded(
                             child: TextFormField(
                               decoration: InputDecoration(
-                                labelText: 'موبایل',
-                                border: const OutlineInputBorder(),
+                                labelText: t.mobile,
+                                border: OutlineInputBorder(
+                                  borderSide: BorderSide(
+                                    color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
+                                  ),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderSide: BorderSide(
+                                    color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
+                                  ),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderSide: BorderSide(
+                                    color: Theme.of(context).primaryColor,
+                                    width: 2,
+                                  ),
+                                ),
                                 errorText: _businessData.getValidationError('mobile'),
-                                helperText: 'مثال: 09123456789',
+                                helperText: '${t.example}: ${t.mobileExample}',
                               ),
                               keyboardType: TextInputType.phone,
                               onChanged: (value) {
@@ -607,10 +814,25 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
                         children: [
                           TextFormField(
                             decoration: InputDecoration(
-                              labelText: 'تلفن ثابت',
-                              border: const OutlineInputBorder(),
+                              labelText: t.phone,
+                              border: OutlineInputBorder(
+                                borderSide: BorderSide(
+                                  color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
+                                ),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderSide: BorderSide(
+                                  color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderSide: BorderSide(
+                                  color: Theme.of(context).primaryColor,
+                                  width: 2,
+                                ),
+                              ),
                               errorText: _businessData.getValidationError('phone'),
-                              helperText: 'مثال: 02112345678',
+                              helperText: '${t.example}: ${t.phoneExample}',
                             ),
                             keyboardType: TextInputType.phone,
                             onChanged: (value) {
@@ -622,10 +844,25 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
                           const SizedBox(height: 16),
                           TextFormField(
                             decoration: InputDecoration(
-                              labelText: 'موبایل',
-                              border: const OutlineInputBorder(),
+                              labelText: t.mobile,
+                              border: OutlineInputBorder(
+                                borderSide: BorderSide(
+                                  color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
+                                ),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderSide: BorderSide(
+                                  color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderSide: BorderSide(
+                                  color: Theme.of(context).primaryColor,
+                                  width: 2,
+                                ),
+                              ),
                               errorText: _businessData.getValidationError('mobile'),
-                              helperText: 'مثال: 09123456789',
+                              helperText: '${t.example}: ${t.mobileExample}',
                             ),
                             keyboardType: TextInputType.phone,
                             onChanged: (value) {
@@ -643,9 +880,24 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
                 
                 // کد پستی
                 TextFormField(
-                  decoration: const InputDecoration(
-                    labelText: 'کد پستی',
-                    border: OutlineInputBorder(),
+                  decoration: InputDecoration(
+                    labelText: t.postalCode,
+                    border: OutlineInputBorder(
+                      borderSide: BorderSide(
+                        color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
+                      ),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderSide: BorderSide(
+                        color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderSide: BorderSide(
+                        color: Theme.of(context).primaryColor,
+                        width: 2,
+                      ),
+                    ),
                   ),
                   keyboardType: TextInputType.number,
                   onChanged: (value) {
@@ -654,8 +906,203 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
                     });
                   },
                 ),
-              ],
-            ),
+                const SizedBox(height: 24),
+                
+                // فیلدهای جغرافیایی
+                Text(
+                  t.businessGeographicInfo,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                
+                // فیلدهای جغرافیایی در دو ستون
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    if (constraints.maxWidth > 600) {
+                      return Column(
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextFormField(
+                                  decoration: InputDecoration(
+                                    labelText: t.country,
+                                    border: OutlineInputBorder(
+                                      borderSide: BorderSide(
+                                        color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
+                                      ),
+                                    ),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderSide: BorderSide(
+                                        color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
+                                      ),
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderSide: BorderSide(
+                                        color: Theme.of(context).primaryColor,
+                                        width: 2,
+                                      ),
+                                    ),
+                                  ),
+                                  onChanged: (value) {
+                                    setState(() {
+                                      _businessData.country = value;
+                                    });
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: TextFormField(
+                                  decoration: InputDecoration(
+                                    labelText: t.province,
+                                    border: OutlineInputBorder(
+                                      borderSide: BorderSide(
+                                        color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
+                                      ),
+                                    ),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderSide: BorderSide(
+                                        color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
+                                      ),
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderSide: BorderSide(
+                                        color: Theme.of(context).primaryColor,
+                                        width: 2,
+                                      ),
+                                    ),
+                                  ),
+                                  onChanged: (value) {
+                                    setState(() {
+                                      _businessData.province = value;
+                                    });
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          TextFormField(
+                            decoration: InputDecoration(
+                              labelText: t.city,
+                              border: OutlineInputBorder(
+                                borderSide: BorderSide(
+                                  color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
+                                ),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderSide: BorderSide(
+                                  color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderSide: BorderSide(
+                                  color: Theme.of(context).primaryColor,
+                                  width: 2,
+                                ),
+                              ),
+                            ),
+                            onChanged: (value) {
+                              setState(() {
+                                _businessData.city = value;
+                              });
+                            },
+                          ),
+                        ],
+                      );
+                    } else {
+                      return Column(
+                        children: [
+                          TextFormField(
+                            decoration: InputDecoration(
+                              labelText: t.country,
+                              border: OutlineInputBorder(
+                                borderSide: BorderSide(
+                                  color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
+                                ),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderSide: BorderSide(
+                                  color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderSide: BorderSide(
+                                  color: Theme.of(context).primaryColor,
+                                  width: 2,
+                                ),
+                              ),
+                            ),
+                            onChanged: (value) {
+                              setState(() {
+                                _businessData.country = value;
+                              });
+                            },
+                          ),
+                          const SizedBox(height: 16),
+                          TextFormField(
+                            decoration: InputDecoration(
+                              labelText: t.province,
+                              border: OutlineInputBorder(
+                                borderSide: BorderSide(
+                                  color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
+                                ),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderSide: BorderSide(
+                                  color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderSide: BorderSide(
+                                  color: Theme.of(context).primaryColor,
+                                  width: 2,
+                                ),
+                              ),
+                            ),
+                            onChanged: (value) {
+                              setState(() {
+                                _businessData.province = value;
+                              });
+                            },
+                          ),
+                          const SizedBox(height: 16),
+                          TextFormField(
+                            decoration: InputDecoration(
+                              labelText: t.city,
+                              border: OutlineInputBorder(
+                                borderSide: BorderSide(
+                                  color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
+                                ),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderSide: BorderSide(
+                                  color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderSide: BorderSide(
+                                  color: Theme.of(context).primaryColor,
+                                  width: 2,
+                                ),
+                              ),
+                            ),
+                            onChanged: (value) {
+                              setState(() {
+                                _businessData.city = value;
+                              });
+                            },
+                          ),
+                        ],
+                      );
+                    }
+                  },
+                ),
+            ],
           ),
         ),
       ),
@@ -663,17 +1110,17 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
   }
 
   Widget _buildStep3() {
-    return SingleChildScrollView(
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 800),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+    final t = Localizations.of<AppLocalizations>(context, AppLocalizations)!;
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 800),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
                 Text(
-                  'اطلاعات قانونی',
+                  t.businessLegalInfo,
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
                 const SizedBox(height: 24),
@@ -689,10 +1136,25 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
                               Expanded(
                                 child: TextFormField(
                                   decoration: InputDecoration(
-                                    labelText: 'کد ملی',
-                                    border: const OutlineInputBorder(),
+                                    labelText: t.nationalId,
+                                    border: OutlineInputBorder(
+                                      borderSide: BorderSide(
+                                        color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
+                                      ),
+                                    ),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderSide: BorderSide(
+                                        color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
+                                      ),
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderSide: BorderSide(
+                                        color: Theme.of(context).primaryColor,
+                                        width: 2,
+                                      ),
+                                    ),
                                     errorText: _businessData.getValidationError('nationalId'),
-                                    helperText: 'مثال: 1234567890',
+                                    helperText: '${t.example}: ${t.nationalIdExample}',
                                   ),
                                   keyboardType: TextInputType.number,
                                   onChanged: (value) {
@@ -705,9 +1167,24 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
                               const SizedBox(width: 16),
                               Expanded(
                                 child: TextFormField(
-                                  decoration: const InputDecoration(
-                                    labelText: 'شماره ثبت',
-                                    border: OutlineInputBorder(),
+                                  decoration: InputDecoration(
+                                    labelText: t.registrationNumber,
+                                    border: OutlineInputBorder(
+                                      borderSide: BorderSide(
+                                        color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
+                                      ),
+                                    ),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderSide: BorderSide(
+                                        color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
+                                      ),
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderSide: BorderSide(
+                                        color: Theme.of(context).primaryColor,
+                                        width: 2,
+                                      ),
+                                    ),
                                   ),
                                   keyboardType: TextInputType.text,
                                   onChanged: (value) {
@@ -721,8 +1198,8 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
                           ),
                           const SizedBox(height: 16),
                           TextFormField(
-                            decoration: const InputDecoration(
-                              labelText: 'شناسه اقتصادی',
+                            decoration: InputDecoration(
+                              labelText: t.economicId,
                               border: OutlineInputBorder(),
                             ),
                             keyboardType: TextInputType.text,
@@ -739,10 +1216,25 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
                         children: [
                           TextFormField(
                             decoration: InputDecoration(
-                              labelText: 'کد ملی',
-                              border: const OutlineInputBorder(),
+                              labelText: t.nationalId,
+                              border: OutlineInputBorder(
+                                borderSide: BorderSide(
+                                  color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
+                                ),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderSide: BorderSide(
+                                  color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderSide: BorderSide(
+                                  color: Theme.of(context).primaryColor,
+                                  width: 2,
+                                ),
+                              ),
                               errorText: _businessData.getValidationError('nationalId'),
-                              helperText: 'مثال: 1234567890',
+                              helperText: '${t.example}: ${t.nationalIdExample}',
                             ),
                             keyboardType: TextInputType.number,
                             onChanged: (value) {
@@ -753,9 +1245,24 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
                           ),
                           const SizedBox(height: 16),
                           TextFormField(
-                            decoration: const InputDecoration(
-                              labelText: 'شماره ثبت',
-                              border: OutlineInputBorder(),
+                            decoration: InputDecoration(
+                              labelText: t.registrationNumber,
+                              border: OutlineInputBorder(
+                                borderSide: BorderSide(
+                                  color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
+                                ),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderSide: BorderSide(
+                                  color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderSide: BorderSide(
+                                  color: Theme.of(context).primaryColor,
+                                  width: 2,
+                                ),
+                              ),
                             ),
                             keyboardType: TextInputType.text,
                             onChanged: (value) {
@@ -766,9 +1273,24 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
                           ),
                           const SizedBox(height: 16),
                           TextFormField(
-                            decoration: const InputDecoration(
-                              labelText: 'شناسه اقتصادی',
-                              border: OutlineInputBorder(),
+                            decoration: InputDecoration(
+                              labelText: t.economicId,
+                              border: OutlineInputBorder(
+                                borderSide: BorderSide(
+                                  color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
+                                ),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderSide: BorderSide(
+                                  color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderSide: BorderSide(
+                                  color: Theme.of(context).primaryColor,
+                                  width: 2,
+                                ),
+                              ),
                             ),
                             keyboardType: TextInputType.text,
                             onChanged: (value) {
@@ -782,144 +1304,26 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
                     }
                   },
                 ),
-              ],
-            ),
+            ],
           ),
         ),
       ),
     );
   }
+
 
   Widget _buildStep4() {
-    return SingleChildScrollView(
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 800),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+    final t = Localizations.of<AppLocalizations>(context, AppLocalizations)!;
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 600),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
                 Text(
-                  'اطلاعات جغرافیایی',
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-                const SizedBox(height: 24),
-                
-                // فیلدهای جغرافیایی در دو ستون
-                LayoutBuilder(
-                  builder: (context, constraints) {
-                    if (constraints.maxWidth > 600) {
-                      return Column(
-                        children: [
-                          Row(
-                            children: [
-                              Expanded(
-                                child: TextFormField(
-                                  decoration: const InputDecoration(
-                                    labelText: 'کشور',
-                                    border: OutlineInputBorder(),
-                                  ),
-                                  onChanged: (value) {
-                                    setState(() {
-                                      _businessData.country = value;
-                                    });
-                                  },
-                                ),
-                              ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: TextFormField(
-                                  decoration: const InputDecoration(
-                                    labelText: 'استان',
-                                    border: OutlineInputBorder(),
-                                  ),
-                                  onChanged: (value) {
-                                    setState(() {
-                                      _businessData.province = value;
-                                    });
-                                  },
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 16),
-                          TextFormField(
-                            decoration: const InputDecoration(
-                              labelText: 'شهر',
-                              border: OutlineInputBorder(),
-                            ),
-                            onChanged: (value) {
-                              setState(() {
-                                _businessData.city = value;
-                              });
-                            },
-                          ),
-                        ],
-                      );
-                    } else {
-                      return Column(
-                        children: [
-                          TextFormField(
-                            decoration: const InputDecoration(
-                              labelText: 'کشور',
-                              border: OutlineInputBorder(),
-                            ),
-                            onChanged: (value) {
-                              setState(() {
-                                _businessData.country = value;
-                              });
-                            },
-                          ),
-                          const SizedBox(height: 16),
-                          TextFormField(
-                            decoration: const InputDecoration(
-                              labelText: 'استان',
-                              border: OutlineInputBorder(),
-                            ),
-                            onChanged: (value) {
-                              setState(() {
-                                _businessData.province = value;
-                              });
-                            },
-                          ),
-                          const SizedBox(height: 16),
-                          TextFormField(
-                            decoration: const InputDecoration(
-                              labelText: 'شهر',
-                              border: OutlineInputBorder(),
-                            ),
-                            onChanged: (value) {
-                              setState(() {
-                                _businessData.city = value;
-                              });
-                            },
-                          ),
-                        ],
-                      );
-                    }
-                  },
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStep5() {
-    return SingleChildScrollView(
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 600),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'تأیید اطلاعات',
+                  t.confirmInfo,
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
                 const SizedBox(height: 24),
@@ -931,35 +1335,42 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
                     color: Theme.of(context).colorScheme.surface,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: Theme.of(context).dividerColor.withOpacity(0.2),
+                      color: Theme.of(context).dividerColor.withValues(alpha: 0.3),
                     ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Theme.of(context).shadowColor.withValues(alpha: 0.1),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildSummaryItem('نام کسب و کار', _businessData.name),
-                      _buildSummaryItem('نوع کسب و کار', _businessData.businessType?.displayName ?? ''),
-                      _buildSummaryItem('زمینه فعالیت', _businessData.businessField?.displayName ?? ''),
+                      _buildSummaryItem(t.businessName, _businessData.name),
+                      _buildSummaryItem(t.businessType, _businessData.businessType?.displayName ?? ''),
+                      _buildSummaryItem(t.businessField, _businessData.businessField?.displayName ?? ''),
                       if (_businessData.address?.isNotEmpty == true)
-                        _buildSummaryItem('آدرس', _businessData.address!),
+                        _buildSummaryItem(t.address, _businessData.address!),
                       if (_businessData.phone?.isNotEmpty == true)
-                        _buildSummaryItem('تلفن ثابت', _businessData.phone!),
+                        _buildSummaryItem(t.phone, _businessData.phone!),
                       if (_businessData.mobile?.isNotEmpty == true)
-                        _buildSummaryItem('موبایل', _businessData.mobile!),
+                        _buildSummaryItem(t.mobile, _businessData.mobile!),
                       if (_businessData.nationalId?.isNotEmpty == true)
-                        _buildSummaryItem('کد ملی', _businessData.nationalId!),
+                        _buildSummaryItem(t.nationalId, _businessData.nationalId!),
                       if (_businessData.registrationNumber?.isNotEmpty == true)
-                        _buildSummaryItem('شماره ثبت', _businessData.registrationNumber!),
+                        _buildSummaryItem(t.registrationNumber, _businessData.registrationNumber!),
                       if (_businessData.economicId?.isNotEmpty == true)
-                        _buildSummaryItem('شناسه اقتصادی', _businessData.economicId!),
+                        _buildSummaryItem(t.economicId, _businessData.economicId!),
                       if (_businessData.country?.isNotEmpty == true)
-                        _buildSummaryItem('کشور', _businessData.country!),
+                        _buildSummaryItem(t.country, _businessData.country!),
                       if (_businessData.province?.isNotEmpty == true)
-                        _buildSummaryItem('استان', _businessData.province!),
+                        _buildSummaryItem(t.province, _businessData.province!),
                       if (_businessData.city?.isNotEmpty == true)
-                        _buildSummaryItem('شهر', _businessData.city!),
+                        _buildSummaryItem(t.city, _businessData.city!),
                       if (_businessData.postalCode?.isNotEmpty == true)
-                        _buildSummaryItem('کد پستی', _businessData.postalCode!),
+                        _buildSummaryItem(t.postalCode, _businessData.postalCode!),
                     ],
                   ),
                 ),
@@ -974,16 +1385,19 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
                       size: 20,
                     ),
                     const SizedBox(width: 8),
-                    const Expanded(
+                    Expanded(
                       child: Text(
-                        'آیا از صحت اطلاعات وارد شده اطمینان دارید؟',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        t.confirmInfoMessage,
+                        style: TextStyle(
+                          fontSize: 16, 
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(context).colorScheme.onSurface,
+                        ),
                       ),
                     ),
                   ],
                 ),
-              ],
-            ),
+            ],
           ),
         ),
       ),
@@ -1002,14 +1416,17 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
               '$label:',
               style: TextStyle(
                 fontWeight: FontWeight.w500,
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
               ),
             ),
           ),
           Expanded(
             child: Text(
               value,
-              style: const TextStyle(fontWeight: FontWeight.w400),
+              style: TextStyle(
+                fontWeight: FontWeight.w400,
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
             ),
           ),
         ],

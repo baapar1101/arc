@@ -11,6 +11,7 @@ import 'pages/profile/businesses_page.dart';
 import 'pages/profile/support_page.dart';
 import 'pages/profile/change_password_page.dart';
 import 'pages/profile/marketing_page.dart';
+import 'pages/profile/operator/operator_tickets_page.dart';
 import 'pages/system_settings_page.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'core/locale_controller.dart';
@@ -344,7 +345,7 @@ class _MyAppState extends State<MyApp> {
             GoRoute(
               path: '/user/profile/support',
               name: 'profile_support',
-              builder: (context, state) => const SupportPage(),
+              builder: (context, state) => SupportPage(calendarController: _calendarController),
             ),
             GoRoute(
               path: '/user/profile/marketing',
@@ -355,6 +356,21 @@ class _MyAppState extends State<MyApp> {
               path: '/user/profile/change-password',
               name: 'profile_change_password',
               builder: (context, state) => const ChangePasswordPage(),
+            ),
+            GoRoute(
+              path: '/user/profile/operator',
+              name: 'profile_operator',
+              builder: (context, state) {
+                // بررسی دسترسی اپراتور پشتیبانی
+                if (_authStore == null) {
+                  return PermissionGuard.buildAccessDeniedPage();
+                }
+                
+                if (!_authStore!.canAccessSupportOperator) {
+                  return PermissionGuard.buildAccessDeniedPage();
+                }
+                return OperatorTicketsPage(calendarController: _calendarController);
+              },
             ),
             GoRoute(
               path: '/user/profile/system-settings',

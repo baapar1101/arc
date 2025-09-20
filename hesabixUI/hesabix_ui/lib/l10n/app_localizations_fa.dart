@@ -51,7 +51,7 @@ class AppLocalizationsFa extends AppLocalizations {
   String get email => 'ایمیل';
 
   @override
-  String get mobile => 'شماره موبایل';
+  String get mobile => 'موبایل';
 
   @override
   String get registerSuccess => 'عضویت با موفقیت انجام شد.';
@@ -66,7 +66,7 @@ class AppLocalizationsFa extends AppLocalizations {
   String get theme => 'تم';
 
   @override
-  String get system => 'سیستمی';
+  String get system => 'سیستم';
 
   @override
   String get light => 'روشن';
@@ -448,4 +448,256 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get in_list => 'در لیست';
+
+  @override
+  String get businessBasicInfo => 'اطلاعات پایه کسب و کار';
+
+  @override
+  String get businessContactInfo => 'اطلاعات تماس';
+
+  @override
+  String get businessLegalInfo => 'اطلاعات قانونی';
+
+  @override
+  String get businessGeographicInfo => 'اطلاعات جغرافیایی';
+
+  @override
+  String get businessConfirmation => 'تأیید';
+
+  @override
+  String get businessName => 'نام کسب و کار';
+
+  @override
+  String get businessType => 'نوع کسب و کار';
+
+  @override
+  String get businessField => 'زمینه فعالیت';
+
+  @override
+  String get address => 'آدرس';
+
+  @override
+  String get phone => 'تلفن ثابت';
+
+  @override
+  String get postalCode => 'کد پستی';
+
+  @override
+  String get nationalId => 'کد ملی';
+
+  @override
+  String get registrationNumber => 'شماره ثبت';
+
+  @override
+  String get economicId => 'شناسه اقتصادی';
+
+  @override
+  String get country => 'کشور';
+
+  @override
+  String get province => 'استان';
+
+  @override
+  String get city => 'شهر';
+
+  @override
+  String get step => 'مرحله';
+
+  @override
+  String get previous => 'قبلی';
+
+  @override
+  String get next => 'بعدی';
+
+  @override
+  String get createBusiness => 'ایجاد کسب و کار';
+
+  @override
+  String get confirmInfo => 'تأیید اطلاعات';
+
+  @override
+  String get confirmInfoMessage => 'آیا از صحت اطلاعات وارد شده اطمینان دارید؟';
+
+  @override
+  String get businessCreatedSuccessfully => 'کسب و کار با موفقیت ایجاد شد';
+
+  @override
+  String get businessCreationFailed => 'خطا در ایجاد کسب و کار';
+
+  @override
+  String get pleaseFillRequiredFields => 'لطفاً تمام فیلدهای اجباری را پر کنید';
+
+  @override
+  String get required => 'اجباری است';
+
+  @override
+  String get example => 'مثال';
+
+  @override
+  String get phoneExample => '02112345678';
+
+  @override
+  String get mobileExample => '09123456789';
+
+  @override
+  String get nationalIdExample => '1234567890';
+
+  @override
+  String get company => 'شرکت';
+
+  @override
+  String get shop => 'مغازه';
+
+  @override
+  String get store => 'فروشگاه';
+
+  @override
+  String get union => 'اتحادیه';
+
+  @override
+  String get club => 'باشگاه';
+
+  @override
+  String get institute => 'موسسه';
+
+  @override
+  String get individual => 'شخصی';
+
+  @override
+  String get manufacturing => 'تولیدی';
+
+  @override
+  String get trading => 'بازرگانی';
+
+  @override
+  String get service => 'خدماتی';
+
+  @override
+  String get other => 'سایر';
+
+  @override
+  String get newTicket => 'تیکت جدید';
+
+  @override
+  String get ticketTitle => 'عنوان تیکت';
+
+  @override
+  String get ticketDescription => 'شرح مشکل';
+
+  @override
+  String get category => 'دسته‌بندی';
+
+  @override
+  String get priority => 'اولویت';
+
+  @override
+  String get status => 'وضعیت';
+
+  @override
+  String get messages => 'پیام‌ها';
+
+  @override
+  String get sendMessage => 'ارسال پیام';
+
+  @override
+  String get messageHint => 'پیام خود را بنویسید...';
+
+  @override
+  String get createTicket => 'ایجاد تیکت';
+
+  @override
+  String get ticketCreated => 'تیکت با موفقیت ایجاد شد';
+
+  @override
+  String get messageSent => 'پیام ارسال شد';
+
+  @override
+  String get loadingTickets => 'در حال بارگذاری تیکت‌ها...';
+
+  @override
+  String get noTickets => 'هیچ تیکتی یافت نشد';
+
+  @override
+  String get ticketDetails => 'جزئیات تیکت';
+
+  @override
+  String get supportTickets => 'تیکت‌های پشتیبانی';
+
+  @override
+  String get ticketCreatedAt => 'تاریخ ایجاد';
+
+  @override
+  String get ticketUpdatedAt => 'آخرین بروزرسانی';
+
+  @override
+  String get ticketLoadingError => 'خطا در بارگذاری تیکت‌ها';
+
+  @override
+  String get ticketId => 'شماره تیکت';
+
+  @override
+  String get createdAt => 'تاریخ ایجاد';
+
+  @override
+  String get updatedAt => 'تاریخ به‌روزرسانی';
+
+  @override
+  String get assignedTo => 'تخصیص یافته به';
+
+  @override
+  String get low => 'کم';
+
+  @override
+  String get medium => 'متوسط';
+
+  @override
+  String get high => 'بالا';
+
+  @override
+  String get urgent => 'فوری';
+
+  @override
+  String get open => 'باز';
+
+  @override
+  String get inProgress => 'در حال پیگیری';
+
+  @override
+  String get waitingForUser => 'در انتظار کاربر';
+
+  @override
+  String get closed => 'بسته';
+
+  @override
+  String get resolved => 'حل شده';
+
+  @override
+  String get technicalIssue => 'مشکل فنی';
+
+  @override
+  String get featureRequest => 'درخواست ویژگی';
+
+  @override
+  String get question => 'سوال';
+
+  @override
+  String get complaint => 'شکایت';
+
+  @override
+  String get operatorPanel => 'پنل اپراتور';
+
+  @override
+  String get allTickets => 'تمام تیکت‌ها';
+
+  @override
+  String get assignTicket => 'تخصیص تیکت';
+
+  @override
+  String get changeStatus => 'تغییر وضعیت';
+
+  @override
+  String get internalMessage => 'پیام داخلی';
+
+  @override
+  String get operator => 'اپراتور';
 }

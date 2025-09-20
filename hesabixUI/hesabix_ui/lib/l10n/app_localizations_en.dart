@@ -51,7 +51,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get email => 'Email';
 
   @override
-  String get mobile => 'Mobile number';
+  String get mobile => 'Mobile';
 
   @override
   String get registerSuccess => 'Registration successful.';
@@ -449,4 +449,257 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get in_list => 'in list';
+
+  @override
+  String get businessBasicInfo => 'Basic Business Information';
+
+  @override
+  String get businessContactInfo => 'Contact Information';
+
+  @override
+  String get businessLegalInfo => 'Legal Information';
+
+  @override
+  String get businessGeographicInfo => 'Geographic Information';
+
+  @override
+  String get businessConfirmation => 'Confirmation';
+
+  @override
+  String get businessName => 'Business Name';
+
+  @override
+  String get businessType => 'Business Type';
+
+  @override
+  String get businessField => 'Business Field';
+
+  @override
+  String get address => 'Address';
+
+  @override
+  String get phone => 'Phone';
+
+  @override
+  String get postalCode => 'Postal Code';
+
+  @override
+  String get nationalId => 'National ID';
+
+  @override
+  String get registrationNumber => 'Registration Number';
+
+  @override
+  String get economicId => 'Economic ID';
+
+  @override
+  String get country => 'Country';
+
+  @override
+  String get province => 'Province';
+
+  @override
+  String get city => 'City';
+
+  @override
+  String get step => 'Step';
+
+  @override
+  String get previous => 'Previous';
+
+  @override
+  String get next => 'Next';
+
+  @override
+  String get createBusiness => 'Create Business';
+
+  @override
+  String get confirmInfo => 'Confirm Information';
+
+  @override
+  String get confirmInfoMessage =>
+      'Are you sure about the entered information?';
+
+  @override
+  String get businessCreatedSuccessfully => 'Business created successfully';
+
+  @override
+  String get businessCreationFailed => 'Failed to create business';
+
+  @override
+  String get pleaseFillRequiredFields => 'Please fill all required fields';
+
+  @override
+  String get required => 'required';
+
+  @override
+  String get example => 'Example';
+
+  @override
+  String get phoneExample => '02112345678';
+
+  @override
+  String get mobileExample => '09123456789';
+
+  @override
+  String get nationalIdExample => '1234567890';
+
+  @override
+  String get company => 'Company';
+
+  @override
+  String get shop => 'Shop';
+
+  @override
+  String get store => 'Store';
+
+  @override
+  String get union => 'Union';
+
+  @override
+  String get club => 'Club';
+
+  @override
+  String get institute => 'Institute';
+
+  @override
+  String get individual => 'Individual';
+
+  @override
+  String get manufacturing => 'Manufacturing';
+
+  @override
+  String get trading => 'Trading';
+
+  @override
+  String get service => 'Service';
+
+  @override
+  String get other => 'Other';
+
+  @override
+  String get newTicket => 'New Ticket';
+
+  @override
+  String get ticketTitle => 'Ticket Title';
+
+  @override
+  String get ticketDescription => 'Problem Description';
+
+  @override
+  String get category => 'Category';
+
+  @override
+  String get priority => 'Priority';
+
+  @override
+  String get status => 'Status';
+
+  @override
+  String get messages => 'Messages';
+
+  @override
+  String get sendMessage => 'Send Message';
+
+  @override
+  String get messageHint => 'Type your message...';
+
+  @override
+  String get createTicket => 'Create Ticket';
+
+  @override
+  String get ticketCreated => 'Ticket created successfully';
+
+  @override
+  String get messageSent => 'Message sent';
+
+  @override
+  String get loadingTickets => 'Loading tickets...';
+
+  @override
+  String get noTickets => 'No tickets found';
+
+  @override
+  String get ticketDetails => 'Ticket Details';
+
+  @override
+  String get supportTickets => 'Support Tickets';
+
+  @override
+  String get ticketCreatedAt => 'Created At';
+
+  @override
+  String get ticketUpdatedAt => 'Last Updated';
+
+  @override
+  String get ticketLoadingError => 'Error loading tickets';
+
+  @override
+  String get ticketId => 'Ticket ID';
+
+  @override
+  String get createdAt => 'Created At';
+
+  @override
+  String get updatedAt => 'Updated At';
+
+  @override
+  String get assignedTo => 'Assigned To';
+
+  @override
+  String get low => 'Low';
+
+  @override
+  String get medium => 'Medium';
+
+  @override
+  String get high => 'High';
+
+  @override
+  String get urgent => 'Urgent';
+
+  @override
+  String get open => 'Open';
+
+  @override
+  String get inProgress => 'In Progress';
+
+  @override
+  String get waitingForUser => 'Waiting for User';
+
+  @override
+  String get closed => 'Closed';
+
+  @override
+  String get resolved => 'Resolved';
+
+  @override
+  String get technicalIssue => 'Technical Issue';
+
+  @override
+  String get featureRequest => 'Feature Request';
+
+  @override
+  String get question => 'Question';
+
+  @override
+  String get complaint => 'Complaint';
+
+  @override
+  String get operatorPanel => 'Operator Panel';
+
+  @override
+  String get allTickets => 'All Tickets';
+
+  @override
+  String get assignTicket => 'Assign Ticket';
+
+  @override
+  String get changeStatus => 'Change Status';
+
+  @override
+  String get internalMessage => 'Internal Message';
+
+  @override
+  String get operator => 'Operator';
 }

@@ -7,6 +7,11 @@ from adapters.api.v1.health import router as health_router
 from adapters.api.v1.auth import router as auth_router
 from adapters.api.v1.users import router as users_router
 from adapters.api.v1.businesses import router as businesses_router
+from adapters.api.v1.support.tickets import router as support_tickets_router
+from adapters.api.v1.support.operator import router as support_operator_router
+from adapters.api.v1.support.categories import router as support_categories_router
+from adapters.api.v1.support.priorities import router as support_priorities_router
+from adapters.api.v1.support.statuses import router as support_statuses_router
 from app.core.i18n import negotiate_locale, Translator
 from app.core.error_handlers import register_error_handlers
 from app.core.smart_normalizer import smart_normalize_json, SmartNormalizerConfig
@@ -262,6 +267,13 @@ def create_app() -> FastAPI:
     application.include_router(auth_router, prefix=settings.api_v1_prefix)
     application.include_router(users_router, prefix=settings.api_v1_prefix)
     application.include_router(businesses_router, prefix=settings.api_v1_prefix)
+    
+    # Support endpoints
+    application.include_router(support_tickets_router, prefix=f"{settings.api_v1_prefix}/support")
+    application.include_router(support_operator_router, prefix=f"{settings.api_v1_prefix}/support/operator")
+    application.include_router(support_categories_router, prefix=f"{settings.api_v1_prefix}/metadata/categories")
+    application.include_router(support_priorities_router, prefix=f"{settings.api_v1_prefix}/metadata/priorities")
+    application.include_router(support_statuses_router, prefix=f"{settings.api_v1_prefix}/metadata/statuses")
 
     register_error_handlers(application)
 
@@ -289,11 +301,10 @@ def create_app() -> FastAPI:
         
         # اضافه کردن security schemes
         openapi_schema["components"]["securitySchemes"] = {
-            "BearerAuth": {
+            "ApiKeyAuth": {
                 "type": "http",
-                "scheme": "bearer",
-                "bearerFormat": "API Key",
-                "description": "کلید API برای احراز هویت. فرمت: Bearer sk_your_api_key_here"
+                "scheme": "ApiKey",
+                "description": "کلید API برای احراز هویت. فرمت: ApiKey sk_your_api_key_here"
             }
         }
         
@@ -301,9 +312,9 @@ def create_app() -> FastAPI:
         for path, methods in openapi_schema["paths"].items():
             for method, details in methods.items():
                 if method in ["get", "post", "put", "delete", "patch"]:
-                    # تمام endpoint های auth و users نیاز به احراز هویت دارند
-                    if "/auth/" in path or "/users" in path:
-                        details["security"] = [{"BearerAuth": []}]
+                    # تمام endpoint های auth، users و support نیاز به احراز هویت دارند
+                    if "/auth/" in path or "/users" in path or "/support" in path:
+                        details["security"] = [{"ApiKeyAuth": []}]
         
         application.openapi_schema = openapi_schema
         return application.openapi_schema

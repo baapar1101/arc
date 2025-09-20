@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from sqlalchemy import String, DateTime, Boolean, Integer, ForeignKey, JSON
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from adapters.db.session import Base
 
@@ -25,5 +25,8 @@ class User(Base):
 	app_permissions: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 	created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 	updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+	
+	# Support relationships
+	tickets = relationship("Ticket", foreign_keys="Ticket.user_id", back_populates="user")
 
 

@@ -211,6 +211,9 @@ class DataTableConfig<T> {
   final bool showColumnSettingsButton;
   final ColumnSettings? initialColumnSettings;
   final void Function(ColumnSettings settings)? onColumnSettingsChanged;
+  
+  // Custom header actions
+  final List<Widget>? customHeaderActions;
 
   const DataTableConfig({
     required this.endpoint,
@@ -272,6 +275,7 @@ class DataTableConfig<T> {
     this.showColumnSettingsButton = true,
     this.initialColumnSettings,
     this.onColumnSettingsChanged,
+    this.customHeaderActions,
   });
 
   /// Get column width as double
