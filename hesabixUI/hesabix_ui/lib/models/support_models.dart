@@ -44,6 +44,32 @@ class SupportCategory {
           return DateTime.now();
         }
       }
+      
+      // Try to parse raw date if formatted is not available
+      final raw = dateTime['raw'] as String?;
+      if (raw != null) {
+        try {
+          return DateTime.parse(raw);
+        } catch (e) {
+          return DateTime.now();
+        }
+      }
+      
+      // Try to parse individual date components
+      final year = dateTime['year'] as int?;
+      final month = dateTime['month'] as int?;
+      final day = dateTime['day'] as int?;
+      final hour = dateTime['hour'] as int? ?? 0;
+      final minute = dateTime['minute'] as int? ?? 0;
+      final second = dateTime['second'] as int? ?? 0;
+      
+      if (year != null && month != null && day != null) {
+        try {
+          return DateTime(year, month, day, hour, minute, second);
+        } catch (e) {
+          return DateTime.now();
+        }
+      }
     }
     return DateTime.now();
   }

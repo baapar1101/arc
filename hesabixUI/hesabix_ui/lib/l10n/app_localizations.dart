@@ -1319,7 +1319,7 @@ abstract class AppLocalizations {
   /// No description provided for @ticketLoadingError.
   ///
   /// In en, this message translates to:
-  /// **'Error loading tickets'**
+  /// **'Error loading ticket'**
   String get ticketLoadingError;
 
   /// No description provided for @ticketId.
@@ -1343,7 +1343,7 @@ abstract class AppLocalizations {
   /// No description provided for @assignedTo.
   ///
   /// In en, this message translates to:
-  /// **'Assigned To'**
+  /// **'Assigned to'**
   String get assignedTo;
 
   /// No description provided for @low.
@@ -1442,6 +1442,126 @@ abstract class AppLocalizations {
   /// **'Assign Ticket'**
   String get assignTicket;
 
+  /// No description provided for @createNewTicket.
+  ///
+  /// In en, this message translates to:
+  /// **'Create New Ticket'**
+  String get createNewTicket;
+
+  /// No description provided for @createSupportTicket.
+  ///
+  /// In en, this message translates to:
+  /// **'Create Support Ticket'**
+  String get createSupportTicket;
+
+  /// No description provided for @ticketTitleLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Ticket Title'**
+  String get ticketTitleLabel;
+
+  /// No description provided for @ticketTitleHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a short and clear title for your issue'**
+  String get ticketTitleHint;
+
+  /// No description provided for @categoryLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Category'**
+  String get categoryLabel;
+
+  /// No description provided for @priorityLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Priority'**
+  String get priorityLabel;
+
+  /// No description provided for @descriptionLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Problem Description'**
+  String get descriptionLabel;
+
+  /// No description provided for @descriptionHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Please describe your problem or question in detail...'**
+  String get descriptionHint;
+
+  /// No description provided for @submitTicket.
+  ///
+  /// In en, this message translates to:
+  /// **'Submit Ticket'**
+  String get submitTicket;
+
+  /// No description provided for @submittingTicket.
+  ///
+  /// In en, this message translates to:
+  /// **'Submitting...'**
+  String get submittingTicket;
+
+  /// No description provided for @ticketTitleRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Ticket title is required'**
+  String get ticketTitleRequired;
+
+  /// No description provided for @ticketTitleMinLength.
+  ///
+  /// In en, this message translates to:
+  /// **'Title must be at least 5 characters'**
+  String get ticketTitleMinLength;
+
+  /// No description provided for @categoryRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Please select a category'**
+  String get categoryRequired;
+
+  /// No description provided for @priorityRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Please select a priority'**
+  String get priorityRequired;
+
+  /// No description provided for @descriptionRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Problem description is required'**
+  String get descriptionRequired;
+
+  /// No description provided for @descriptionMinLength.
+  ///
+  /// In en, this message translates to:
+  /// **'Description must be at least 10 characters'**
+  String get descriptionMinLength;
+
+  /// No description provided for @loadingData.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading...'**
+  String get loadingData;
+
+  /// No description provided for @retry.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry'**
+  String get retry;
+
+  /// No description provided for @ticketCreatedSuccessfully.
+  ///
+  /// In en, this message translates to:
+  /// **'Ticket created successfully'**
+  String get ticketCreatedSuccessfully;
+
+  /// No description provided for @pleaseSelectCategoryAndPriority.
+  ///
+  /// In en, this message translates to:
+  /// **'Please select category and priority'**
+  String get pleaseSelectCategoryAndPriority;
+
   /// No description provided for @changeStatus.
   ///
   /// In en, this message translates to:
@@ -1489,6 +1609,180 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Operator'**
   String get operator;
+
+  /// No description provided for @ticketNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Ticket #{number}'**
+  String ticketNumber(Object number);
+
+  /// No description provided for @ticketNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'Ticket not found'**
+  String get ticketNotFound;
+
+  /// No description provided for @noMessagesFound.
+  ///
+  /// In en, this message translates to:
+  /// **'No messages found'**
+  String get noMessagesFound;
+
+  /// No description provided for @writeYourMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Write your message...'**
+  String get writeYourMessage;
+
+  /// No description provided for @writeYourResponse.
+  ///
+  /// In en, this message translates to:
+  /// **'Write your response...'**
+  String get writeYourResponse;
+
+  /// No description provided for @sendingMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Sending message...'**
+  String get sendingMessage;
+
+  /// No description provided for @messageSentSuccessfully.
+  ///
+  /// In en, this message translates to:
+  /// **'Message sent successfully'**
+  String get messageSentSuccessfully;
+
+  /// No description provided for @errorSendingMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Error sending message'**
+  String get errorSendingMessage;
+
+  /// No description provided for @statusUpdatedSuccessfully.
+  ///
+  /// In en, this message translates to:
+  /// **'Status updated successfully'**
+  String get statusUpdatedSuccessfully;
+
+  /// No description provided for @errorUpdatingStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Error updating status'**
+  String get errorUpdatingStatus;
+
+  /// No description provided for @ticketClosed.
+  ///
+  /// In en, this message translates to:
+  /// **'Ticket is closed'**
+  String get ticketClosed;
+
+  /// No description provided for @ticketResolved.
+  ///
+  /// In en, this message translates to:
+  /// **'Ticket is resolved'**
+  String get ticketResolved;
+
+  /// No description provided for @daysAgo.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} days ago'**
+  String daysAgo(Object count);
+
+  /// No description provided for @hoursAgo.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} hours ago'**
+  String hoursAgo(Object count);
+
+  /// No description provided for @minutesAgo.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} minutes ago'**
+  String minutesAgo(Object count);
+
+  /// No description provided for @justNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Just now'**
+  String get justNow;
+
+  /// No description provided for @conversation.
+  ///
+  /// In en, this message translates to:
+  /// **'Conversation'**
+  String get conversation;
+
+  /// No description provided for @ticketInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Ticket Information'**
+  String get ticketInfo;
+
+  /// No description provided for @createdBy.
+  ///
+  /// In en, this message translates to:
+  /// **'Created by'**
+  String get createdBy;
+
+  /// No description provided for @lastUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'Last updated'**
+  String get lastUpdated;
+
+  /// No description provided for @messageCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} messages'**
+  String messageCount(Object count);
+
+  /// No description provided for @replyAsOperator.
+  ///
+  /// In en, this message translates to:
+  /// **'Reply as Operator'**
+  String get replyAsOperator;
+
+  /// No description provided for @replyAsUser.
+  ///
+  /// In en, this message translates to:
+  /// **'Reply as User'**
+  String get replyAsUser;
+
+  /// No description provided for @internalNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Internal Note'**
+  String get internalNote;
+
+  /// No description provided for @publicMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Public Message'**
+  String get publicMessage;
+
+  /// No description provided for @markAsInternal.
+  ///
+  /// In en, this message translates to:
+  /// **'Mark as Internal'**
+  String get markAsInternal;
+
+  /// No description provided for @markAsPublic.
+  ///
+  /// In en, this message translates to:
+  /// **'Mark as Public'**
+  String get markAsPublic;
+
+  /// No description provided for @ticketDetailsDialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Ticket Details'**
+  String get ticketDetailsDialog;
+
+  /// No description provided for @close.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get close;
 }
 
 class _AppLocalizationsDelegate

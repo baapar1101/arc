@@ -632,7 +632,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get ticketUpdatedAt => 'Last Updated';
 
   @override
-  String get ticketLoadingError => 'Error loading tickets';
+  String get ticketLoadingError => 'Error loading ticket';
 
   @override
   String get ticketId => 'Ticket ID';
@@ -644,7 +644,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get updatedAt => 'Updated At';
 
   @override
-  String get assignedTo => 'Assigned To';
+  String get assignedTo => 'Assigned to';
 
   @override
   String get low => 'Low';
@@ -695,6 +695,69 @@ class AppLocalizationsEn extends AppLocalizations {
   String get assignTicket => 'Assign Ticket';
 
   @override
+  String get createNewTicket => 'Create New Ticket';
+
+  @override
+  String get createSupportTicket => 'Create Support Ticket';
+
+  @override
+  String get ticketTitleLabel => 'Ticket Title';
+
+  @override
+  String get ticketTitleHint => 'Enter a short and clear title for your issue';
+
+  @override
+  String get categoryLabel => 'Category';
+
+  @override
+  String get priorityLabel => 'Priority';
+
+  @override
+  String get descriptionLabel => 'Problem Description';
+
+  @override
+  String get descriptionHint =>
+      'Please describe your problem or question in detail...';
+
+  @override
+  String get submitTicket => 'Submit Ticket';
+
+  @override
+  String get submittingTicket => 'Submitting...';
+
+  @override
+  String get ticketTitleRequired => 'Ticket title is required';
+
+  @override
+  String get ticketTitleMinLength => 'Title must be at least 5 characters';
+
+  @override
+  String get categoryRequired => 'Please select a category';
+
+  @override
+  String get priorityRequired => 'Please select a priority';
+
+  @override
+  String get descriptionRequired => 'Problem description is required';
+
+  @override
+  String get descriptionMinLength =>
+      'Description must be at least 10 characters';
+
+  @override
+  String get loadingData => 'Loading...';
+
+  @override
+  String get retry => 'Retry';
+
+  @override
+  String get ticketCreatedSuccessfully => 'Ticket created successfully';
+
+  @override
+  String get pleaseSelectCategoryAndPriority =>
+      'Please select category and priority';
+
+  @override
   String get changeStatus => 'Change Status';
 
   @override
@@ -717,4 +780,101 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get operator => 'Operator';
+
+  @override
+  String ticketNumber(Object number) {
+    return 'Ticket #$number';
+  }
+
+  @override
+  String get ticketNotFound => 'Ticket not found';
+
+  @override
+  String get noMessagesFound => 'No messages found';
+
+  @override
+  String get writeYourMessage => 'Write your message...';
+
+  @override
+  String get writeYourResponse => 'Write your response...';
+
+  @override
+  String get sendingMessage => 'Sending message...';
+
+  @override
+  String get messageSentSuccessfully => 'Message sent successfully';
+
+  @override
+  String get errorSendingMessage => 'Error sending message';
+
+  @override
+  String get statusUpdatedSuccessfully => 'Status updated successfully';
+
+  @override
+  String get errorUpdatingStatus => 'Error updating status';
+
+  @override
+  String get ticketClosed => 'Ticket is closed';
+
+  @override
+  String get ticketResolved => 'Ticket is resolved';
+
+  @override
+  String daysAgo(Object count) {
+    return '$count days ago';
+  }
+
+  @override
+  String hoursAgo(Object count) {
+    return '$count hours ago';
+  }
+
+  @override
+  String minutesAgo(Object count) {
+    return '$count minutes ago';
+  }
+
+  @override
+  String get justNow => 'Just now';
+
+  @override
+  String get conversation => 'Conversation';
+
+  @override
+  String get ticketInfo => 'Ticket Information';
+
+  @override
+  String get createdBy => 'Created by';
+
+  @override
+  String get lastUpdated => 'Last updated';
+
+  @override
+  String messageCount(Object count) {
+    return '$count messages';
+  }
+
+  @override
+  String get replyAsOperator => 'Reply as Operator';
+
+  @override
+  String get replyAsUser => 'Reply as User';
+
+  @override
+  String get internalNote => 'Internal Note';
+
+  @override
+  String get publicMessage => 'Public Message';
+
+  @override
+  String get markAsInternal => 'Mark as Internal';
+
+  @override
+  String get markAsPublic => 'Mark as Public';
+
+  @override
+  String get ticketDetailsDialog => 'Ticket Details';
+
+  @override
+  String get close => 'Close';
 }

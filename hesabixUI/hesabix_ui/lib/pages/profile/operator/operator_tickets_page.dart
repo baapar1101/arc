@@ -5,7 +5,7 @@ import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/services/support_service.dart';
 import 'package:hesabix_ui/models/support_models.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table.dart';
-import 'operator_ticket_detail_page.dart';
+import 'package:hesabix_ui/widgets/support/ticket_details_dialog.dart';
 
 class OperatorTicketsPage extends StatefulWidget {
   final CalendarController? calendarController;
@@ -17,19 +17,44 @@ class OperatorTicketsPage extends StatefulWidget {
 
 class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
   Set<int> _selectedRows = <int>{};
+  
+  // Support data for filters
+  final SupportService _supportService = SupportService(ApiClient());
+  List<SupportStatus> _statuses = [];
+  List<SupportPriority> _priorities = [];
 
   @override
   void initState() {
     super.initState();
+    _loadMetadata();
+  }
+
+  Future<void> _loadMetadata() async {
+    try {
+      final statuses = await _supportService.getStatuses();
+      final priorities = await _supportService.getPriorities();
+      
+      setState(() {
+        _statuses = statuses;
+        _priorities = priorities;
+      });
+    } catch (e) {
+      // Handle error silently for now, filters will just be empty
+    }
   }
 
 
   void _navigateToTicketDetail(Map<String, dynamic> ticketData) {
     final ticket = SupportTicket.fromJson(ticketData);
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => OperatorTicketDetailPage(ticket: ticket),
+    showDialog(
+      context: context,
+      builder: (context) => TicketDetailsDialog(
+        ticket: ticket,
+        isOperator: true,
+        onTicketUpdated: () {
+          // Refresh the data table if needed
+          setState(() {});
+        },
       ),
     );
   }
@@ -98,6 +123,13 @@ class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
                       sortable: true,
                       searchable: true,
                       width: ColumnWidth.small,
+                      filterType: ColumnFilterType.multiSelect,
+                      filterOptions: _priorities.map((priority) => FilterOption(
+                        value: priority.name,
+                        label: priority.name,
+                        description: priority.description,
+                        color: priority.color != null ? Color(int.parse(priority.color!.replaceFirst('#', '0xFF'))) : null,
+                      )).toList(),
                     ),
                     TextColumn(
                       'status.name',
@@ -105,6 +137,13 @@ class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
                       sortable: true,
                       searchable: true,
                       width: ColumnWidth.small,
+                      filterType: ColumnFilterType.multiSelect,
+                      filterOptions: _statuses.map((status) => FilterOption(
+                        value: status.name,
+                        label: status.name,
+                        description: status.description,
+                        color: status.color != null ? Color(int.parse(status.color!.replaceFirst('#', '0xFF'))) : null,
+                      )).toList(),
                     ),
                     TextColumn(
                       'assigned_operator.first_name',

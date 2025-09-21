@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
+import 'package:hesabix_ui/core/api_client.dart';
+import 'package:hesabix_ui/services/support_service.dart';
 import 'package:hesabix_ui/models/support_models.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table.dart';
-import 'ticket_detail_page.dart';
+import 'package:hesabix_ui/widgets/support/ticket_details_dialog.dart';
 import 'create_ticket_page.dart';
 
 class SupportPage extends StatefulWidget {
@@ -16,19 +18,37 @@ class SupportPage extends StatefulWidget {
 
 class _SupportPageState extends State<SupportPage> {
   Set<int> _selectedRows = <int>{};
+  
+  // Support data for filters
+  final SupportService _supportService = SupportService(ApiClient());
+  List<SupportStatus> _statuses = [];
+  List<SupportPriority> _priorities = [];
 
   @override
   void initState() {
     super.initState();
+    _loadMetadata();
+  }
+
+  Future<void> _loadMetadata() async {
+    try {
+      final statuses = await _supportService.getStatuses();
+      final priorities = await _supportService.getPriorities();
+      
+      setState(() {
+        _statuses = statuses;
+        _priorities = priorities;
+      });
+    } catch (e) {
+      // Handle error silently for now, filters will just be empty
+    }
   }
 
 
   void _navigateToCreateTicket() async {
-    final result = await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const CreateTicketPage(),
-      ),
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => const CreateTicketPage(),
     );
     
     if (result == true) {
@@ -38,10 +58,15 @@ class _SupportPageState extends State<SupportPage> {
 
   void _navigateToTicketDetail(Map<String, dynamic> ticketData) {
     final ticket = SupportTicket.fromJson(ticketData);
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => TicketDetailPage(ticket: ticket),
+    showDialog(
+      context: context,
+      builder: (context) => TicketDetailsDialog(
+        ticket: ticket,
+        isOperator: false,
+        onTicketUpdated: () {
+          // Refresh the data table if needed
+          setState(() {});
+        },
       ),
     );
   }
@@ -82,6 +107,13 @@ class _SupportPageState extends State<SupportPage> {
                       sortable: true,
                       searchable: true,
                       width: ColumnWidth.small,
+                      filterType: ColumnFilterType.multiSelect,
+                      filterOptions: _priorities.map((priority) => FilterOption(
+                        value: priority.name,
+                        label: priority.name,
+                        description: priority.description,
+                        color: priority.color != null ? Color(int.parse(priority.color!.replaceFirst('#', '0xFF'))) : null,
+                      )).toList(),
                     ),
                     TextColumn(
                       'status.name',
@@ -89,6 +121,13 @@ class _SupportPageState extends State<SupportPage> {
                       sortable: true,
                       searchable: true,
                       width: ColumnWidth.small,
+                      filterType: ColumnFilterType.multiSelect,
+                      filterOptions: _statuses.map((status) => FilterOption(
+                        value: status.name,
+                        label: status.name,
+                        description: status.description,
+                        color: status.color != null ? Color(int.parse(status.color!.replaceFirst('#', '0xFF'))) : null,
+                      )).toList(),
                     ),
                     DateColumn(
                       'created_at',

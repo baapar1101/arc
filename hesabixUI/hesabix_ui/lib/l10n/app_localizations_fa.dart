@@ -140,7 +140,7 @@ class AppLocalizationsFa extends AppLocalizations {
   String get ok => 'تایید';
 
   @override
-  String get cancel => 'انصراف';
+  String get cancel => 'لغو';
 
   @override
   String get columnSettings => 'تنظیمات ستون‌ها';
@@ -630,7 +630,7 @@ class AppLocalizationsFa extends AppLocalizations {
   String get ticketUpdatedAt => 'آخرین بروزرسانی';
 
   @override
-  String get ticketLoadingError => 'خطا در بارگذاری تیکت‌ها';
+  String get ticketLoadingError => 'خطا در بارگذاری تیکت';
 
   @override
   String get ticketId => 'شماره تیکت';
@@ -693,6 +693,67 @@ class AppLocalizationsFa extends AppLocalizations {
   String get assignTicket => 'تخصیص تیکت';
 
   @override
+  String get createNewTicket => 'ایجاد تیکت جدید';
+
+  @override
+  String get createSupportTicket => 'ایجاد تیکت پشتیبانی';
+
+  @override
+  String get ticketTitleLabel => 'عنوان تیکت';
+
+  @override
+  String get ticketTitleHint => 'عنوان کوتاه و واضح برای مشکل خود وارد کنید';
+
+  @override
+  String get categoryLabel => 'دسته‌بندی';
+
+  @override
+  String get priorityLabel => 'اولویت';
+
+  @override
+  String get descriptionLabel => 'شرح مشکل';
+
+  @override
+  String get descriptionHint => 'مشکل یا سوال خود را به تفصیل شرح دهید...';
+
+  @override
+  String get submitTicket => 'ارسال تیکت';
+
+  @override
+  String get submittingTicket => 'در حال ارسال...';
+
+  @override
+  String get ticketTitleRequired => 'عنوان تیکت الزامی است';
+
+  @override
+  String get ticketTitleMinLength => 'عنوان باید حداقل 5 کاراکتر باشد';
+
+  @override
+  String get categoryRequired => 'لطفاً دسته‌بندی را انتخاب کنید';
+
+  @override
+  String get priorityRequired => 'لطفاً اولویت را انتخاب کنید';
+
+  @override
+  String get descriptionRequired => 'شرح مشکل الزامی است';
+
+  @override
+  String get descriptionMinLength => 'شرح باید حداقل 10 کاراکتر باشد';
+
+  @override
+  String get loadingData => 'در حال بارگذاری...';
+
+  @override
+  String get retry => 'تلاش مجدد';
+
+  @override
+  String get ticketCreatedSuccessfully => 'تیکت با موفقیت ایجاد شد';
+
+  @override
+  String get pleaseSelectCategoryAndPriority =>
+      'لطفاً دسته‌بندی و اولویت را انتخاب کنید';
+
+  @override
   String get changeStatus => 'تغییر وضعیت';
 
   @override
@@ -715,4 +776,101 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get operator => 'اپراتور';
+
+  @override
+  String ticketNumber(Object number) {
+    return 'تیکت #$number';
+  }
+
+  @override
+  String get ticketNotFound => 'تیکت یافت نشد';
+
+  @override
+  String get noMessagesFound => 'هیچ پیامی یافت نشد';
+
+  @override
+  String get writeYourMessage => 'پیام خود را بنویسید...';
+
+  @override
+  String get writeYourResponse => 'پاسخ خود را بنویسید...';
+
+  @override
+  String get sendingMessage => 'در حال ارسال پیام...';
+
+  @override
+  String get messageSentSuccessfully => 'پیام با موفقیت ارسال شد';
+
+  @override
+  String get errorSendingMessage => 'خطا در ارسال پیام';
+
+  @override
+  String get statusUpdatedSuccessfully => 'وضعیت با موفقیت به‌روزرسانی شد';
+
+  @override
+  String get errorUpdatingStatus => 'خطا در به‌روزرسانی وضعیت';
+
+  @override
+  String get ticketClosed => 'تیکت بسته است';
+
+  @override
+  String get ticketResolved => 'تیکت حل شده است';
+
+  @override
+  String daysAgo(Object count) {
+    return '$count روز پیش';
+  }
+
+  @override
+  String hoursAgo(Object count) {
+    return '$count ساعت پیش';
+  }
+
+  @override
+  String minutesAgo(Object count) {
+    return '$count دقیقه پیش';
+  }
+
+  @override
+  String get justNow => 'همین الان';
+
+  @override
+  String get conversation => 'مکالمه';
+
+  @override
+  String get ticketInfo => 'اطلاعات تیکت';
+
+  @override
+  String get createdBy => 'ایجاد شده توسط';
+
+  @override
+  String get lastUpdated => 'آخرین بروزرسانی';
+
+  @override
+  String messageCount(Object count) {
+    return '$count پیام';
+  }
+
+  @override
+  String get replyAsOperator => 'پاسخ به عنوان اپراتور';
+
+  @override
+  String get replyAsUser => 'پاسخ به عنوان کاربر';
+
+  @override
+  String get internalNote => 'یادداشت داخلی';
+
+  @override
+  String get publicMessage => 'پیام عمومی';
+
+  @override
+  String get markAsInternal => 'علامت‌گذاری به عنوان داخلی';
+
+  @override
+  String get markAsPublic => 'علامت‌گذاری به عنوان عمومی';
+
+  @override
+  String get ticketDetailsDialog => 'جزئیات تیکت';
+
+  @override
+  String get close => 'بستن';
 }

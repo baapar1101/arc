@@ -55,6 +55,9 @@ class MessageRepository(BaseRepository[Message]):
         is_internal: bool = False
     ) -> Message:
         """ایجاد پیام جدید"""
+        from datetime import datetime
+        from adapters.db.models.support.ticket import Ticket
+        
         message = Message(
             ticket_id=ticket_id,
             sender_id=sender_id,
@@ -64,6 +67,12 @@ class MessageRepository(BaseRepository[Message]):
         )
         
         self.db.add(message)
+        
+        # Update ticket's updated_at field
+        ticket = self.db.query(Ticket).filter(Ticket.id == ticket_id).first()
+        if ticket:
+            ticket.updated_at = datetime.utcnow()
+        
         self.db.commit()
         self.db.refresh(message)
         return message

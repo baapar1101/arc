@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/models/support_models.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
+import 'package:hesabix_ui/l10n/app_localizations.dart';
 
 class MessageBubble extends StatelessWidget {
   final SupportMessage message;
@@ -17,9 +18,9 @@ class MessageBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     final isUser = message.isFromUser;
     final isOperator = message.isFromOperator;
-    final isSystem = message.isFromSystem;
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
@@ -84,7 +85,7 @@ class MessageBubble extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        _formatTime(message.createdAt),
+                        _formatTime(message.createdAt, l10n),
                         style: TextStyle(
                           fontSize: 11,
                           color: _getTimeColor(theme, isUser),
@@ -170,18 +171,25 @@ class MessageBubble extends StatelessWidget {
     }
   }
 
-  String _formatTime(DateTime dateTime) {
+  String _formatTime(DateTime dateTime, AppLocalizations l10n) {
     final now = DateTime.now();
     final difference = now.difference(dateTime);
 
+    // If the difference is negative (future time), show just now
+    if (difference.isNegative) {
+      return l10n.justNow;
+    }
+
     if (difference.inDays > 0) {
-      return '${difference.inDays} روز پیش';
+      return l10n.daysAgo(difference.inDays.toString());
     } else if (difference.inHours > 0) {
-      return '${difference.inHours} ساعت پیش';
+      return l10n.hoursAgo(difference.inHours.toString());
     } else if (difference.inMinutes > 0) {
-      return '${difference.inMinutes} دقیقه پیش';
+      return l10n.minutesAgo(difference.inMinutes.toString());
+    } else if (difference.inSeconds > 10) {
+      return l10n.justNow;
     } else {
-      return 'همین الان';
+      return l10n.justNow;
     }
   }
 }
