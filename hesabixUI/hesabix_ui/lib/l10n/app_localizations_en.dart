@@ -195,7 +195,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get today => 'Today';
 
   @override
-  String get thisMonth => 'This month';
+  String get thisMonth => 'This Month';
 
   @override
   String get total => 'Total';
@@ -696,6 +696,21 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get changeStatus => 'Change Status';
+
+  @override
+  String get multiSelectFilter => 'Multi-Select Filter';
+
+  @override
+  String get selectFilterOptions => 'Select Filter Options';
+
+  @override
+  String get noFilterOptionsAvailable => 'No filter options available';
+
+  @override
+  String get marketingDescription => 'Manage referrals and marketing codes';
+
+  @override
+  String get referralCode => 'Referral Code';
 
   @override
   String get internalMessage => 'Internal Message';

@@ -290,6 +290,7 @@ class _MarketingPageState extends State<MarketingPage> {
                     searchable: true,
                     width: ColumnWidth.medium,
                     showTime: false,
+                    filterType: ColumnFilterType.dateRange,
                   ),
                 ],
                 searchFields: ['first_name', 'last_name', 'email'],

@@ -182,6 +182,42 @@ class DataTableUtils {
     );
   }
 
+  /// Create filter item for multi-select
+  static FilterItem createMultiSelectFilter(
+    String field,
+    List<String> values,
+  ) {
+    return FilterItem(
+      property: field,
+      operator: 'in',
+      value: values,
+    );
+  }
+
+  /// Create filter item for date range
+  static List<FilterItem> createDateRangeFilter(
+    String field,
+    DateTime startDate,
+    DateTime endDate,
+  ) {
+    final start = DateTime(startDate.year, startDate.month, startDate.day);
+    final endExclusive = DateTime(endDate.year, endDate.month, endDate.day)
+        .add(const Duration(days: 1));
+    
+    return [
+      FilterItem(
+        property: field,
+        operator: '>=',
+        value: start.toIso8601String(),
+      ),
+      FilterItem(
+        property: field,
+        operator: '<',
+        value: endExclusive.toIso8601String(),
+      ),
+    ];
+  }
+
   /// Get column label by key
   static String getColumnLabel(String key, List<DataTableColumn> columns) {
     final column = columns.firstWhere(
@@ -189,6 +225,34 @@ class DataTableUtils {
       orElse: () => TextColumn(key, key),
     );
     return column.label;
+  }
+
+  /// Get column filter type
+  static ColumnFilterType? getColumnFilterType(String key, List<DataTableColumn> columns) {
+    final column = columns.firstWhere(
+      (col) => col.key == key,
+      orElse: () => TextColumn(key, key),
+    );
+    return column.filterType;
+  }
+
+  /// Get column filter options
+  static List<FilterOption>? getColumnFilterOptions(String key, List<DataTableColumn> columns) {
+    final column = columns.firstWhere(
+      (col) => col.key == key,
+      orElse: () => TextColumn(key, key),
+    );
+    return column.filterOptions;
+  }
+
+  /// Check if column has date range filter
+  static bool isDateRangeFilter(String key, List<DataTableColumn> columns) {
+    return getColumnFilterType(key, columns) == ColumnFilterType.dateRange;
+  }
+
+  /// Check if column has multi-select filter
+  static bool isMultiSelectFilter(String key, List<DataTableColumn> columns) {
+    return getColumnFilterType(key, columns) == ColumnFilterType.multiSelect;
   }
 
   /// Check if column is searchable

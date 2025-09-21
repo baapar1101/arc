@@ -7,7 +7,6 @@ import 'package:dio/dio.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
-import 'package:hesabix_ui/widgets/date_input_field.dart';
 import 'data_table_config.dart';
 import 'data_table_search_dialog.dart';
 import 'column_settings_dialog.dart';
@@ -34,7 +33,6 @@ class DataTableWidget<T> extends StatefulWidget {
 class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
   // Data state
   List<T> _items = [];
-  bool _loading = false;
   bool _loadingList = false;
   String? _error;
 
@@ -44,17 +42,19 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
   int _total = 0;
   int _totalPages = 0;
 
-  // Search and filter state
+  // Search state
   final TextEditingController _searchCtrl = TextEditingController();
   Timer? _searchDebounce;
-  bool _showFilters = false;
-  DateTime? _fromDate;
-  DateTime? _toDate;
 
   // Column search state
   final Map<String, String> _columnSearchValues = {};
   final Map<String, String> _columnSearchTypes = {};
   final Map<String, TextEditingController> _columnSearchControllers = {};
+  
+  // Enhanced filter state
+  final Map<String, List<String>> _columnMultiSelectValues = {};
+  final Map<String, DateTime?> _columnDateFromValues = {};
+  final Map<String, DateTime?> _columnDateToValues = {};
 
   // Sorting state
   String? _sortBy;
@@ -69,9 +69,13 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
   List<DataTableColumn> _visibleColumns = [];
   bool _isLoadingColumnSettings = false;
   
+  // Scroll controller for horizontal scrolling
+  late ScrollController _horizontalScrollController;
+  
   @override
   void initState() {
     super.initState();
+    _horizontalScrollController = ScrollController();
     _limit = widget.config.defaultPageSize;
     _setupSearchListener();
     _loadColumnSettings();
@@ -82,6 +86,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
   void dispose() {
     _searchCtrl.dispose();
     _searchDebounce?.cancel();
+    _horizontalScrollController.dispose();
     for (var controller in _columnSearchControllers.values) {
       controller.dispose();
     }
@@ -208,19 +213,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
   List<FilterItem> _buildFilters() {
     final filters = <FilterItem>[];
 
-    // Date range filters
-    if (widget.config.enableDateRangeFilter && 
-        widget.config.dateRangeField != null && 
-        _fromDate != null && 
-        _toDate != null) {
-      filters.addAll(DataTableUtils.createDateRangeFilters(
-        widget.config.dateRangeField!,
-        _fromDate!,
-        _toDate!,
-      ));
-    }
-
-    // Column search filters
+    // Text search filters
     for (var entry in _columnSearchValues.entries) {
       final columnName = entry.key;
       final searchValue = entry.value.trim();
@@ -235,10 +228,43 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
       }
     }
 
+    // Multi-select filters
+    for (var entry in _columnMultiSelectValues.entries) {
+      final columnName = entry.key;
+      final selectedValues = entry.value;
+      
+      if (selectedValues.isNotEmpty) {
+        filters.add(DataTableUtils.createMultiSelectFilter(
+          columnName,
+          selectedValues,
+        ));
+      }
+    }
+
+    // Date range filters
+    for (var entry in _columnDateFromValues.entries) {
+      final columnName = entry.key;
+      final fromDate = entry.value;
+      final toDate = _columnDateToValues[columnName];
+      
+      if (fromDate != null && toDate != null) {
+        filters.addAll(DataTableUtils.createDateRangeFilter(
+          columnName,
+          fromDate,
+          toDate,
+        ));
+      }
+    }
+
     return filters;
   }
 
   void _openColumnSearchDialog(String columnName, String columnLabel) {
+    // Get column configuration
+    final column = widget.config.getColumnByKey(columnName);
+    final filterType = column?.filterType;
+    final filterOptions = column?.filterOptions;
+
     // Initialize controller if not exists
     if (!_columnSearchControllers.containsKey(columnName)) {
       _columnSearchControllers[columnName] = TextEditingController(
@@ -256,6 +282,9 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
         columnLabel: columnLabel,
         searchValue: _columnSearchValues[columnName] ?? '',
         searchType: _columnSearchTypes[columnName] ?? '*',
+        filterType: filterType,
+        filterOptions: filterOptions,
+        calendarController: widget.calendarController,
         onApply: (value, type) {
           setState(() {
             _columnSearchValues[columnName] = value;
@@ -264,10 +293,28 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
           _page = 1;
           _fetchData();
         },
+        onApplyMultiSelect: (values) {
+          setState(() {
+            _columnMultiSelectValues[columnName] = values;
+          });
+          _page = 1;
+          _fetchData();
+        },
+        onApplyDateRange: (fromDate, toDate) {
+          setState(() {
+            _columnDateFromValues[columnName] = fromDate;
+            _columnDateToValues[columnName] = toDate;
+          });
+          _page = 1;
+          _fetchData();
+        },
         onClear: () {
           setState(() {
             _columnSearchValues.remove(columnName);
             _columnSearchTypes.remove(columnName);
+            _columnMultiSelectValues.remove(columnName);
+            _columnDateFromValues.remove(columnName);
+            _columnDateToValues.remove(columnName);
             _columnSearchControllers[columnName]?.clear();
           });
           _page = 1;
@@ -279,21 +326,22 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
 
 
   bool _hasActiveFilters() {
-    return _fromDate != null || 
-           _toDate != null || 
-           _searchCtrl.text.isNotEmpty || 
-           _columnSearchValues.isNotEmpty;
+    return _searchCtrl.text.isNotEmpty || 
+           _columnSearchValues.isNotEmpty ||
+           _columnMultiSelectValues.isNotEmpty ||
+           _columnDateFromValues.isNotEmpty;
   }
 
   void _clearAllFilters() {
     setState(() {
-      _fromDate = null;
-      _toDate = null;
       _searchCtrl.clear();
       _sortBy = null;
       _sortDesc = false;
       _columnSearchValues.clear();
       _columnSearchTypes.clear();
+      _columnMultiSelectValues.clear();
+      _columnDateFromValues.clear();
+      _columnDateToValues.clear();
       _selectedRows.clear();
       for (var controller in _columnSearchControllers.values) {
         controller.clear();
@@ -302,9 +350,6 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     _page = 1;
     _fetchData();
     // Call the callback if provided
-    if (widget.config.onDateRangeClear != null) {
-      widget.config.onDateRangeClear!();
-    }
     if (widget.config.onRowSelectionChanged != null) {
       widget.config.onRowSelectionChanged!(_selectedRows);
     }
@@ -481,21 +526,6 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
         }
       });
 
-      // Add date range filter
-      if (_fromDate != null && _toDate != null && widget.config.dateRangeField != null) {
-        final start = DateTime(_fromDate!.year, _fromDate!.month, _fromDate!.day);
-        final endExclusive = DateTime(_toDate!.year, _toDate!.month, _toDate!.day).add(const Duration(days: 1));
-        filters.add({
-          'property': widget.config.dateRangeField!,
-          'operator': '>=',
-          'value': start.toIso8601String(),
-        });
-        filters.add({
-          'property': widget.config.dateRangeField!,
-          'operator': '<',
-          'value': endExclusive.toIso8601String(),
-        });
-      }
 
       final queryInfo = {
         'sort_by': _sortBy,
@@ -692,9 +722,9 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
               const SizedBox(height: 16),
             ],
             
-            // Search and Filters
-            if (widget.config.showSearch || widget.config.showFilters) ...[
-              _buildSearchAndFilters(t, theme),
+            // Search
+            if (widget.config.showSearch) ...[
+              _buildSearch(t, theme),
               const SizedBox(height: 12),
             ],
             
@@ -703,14 +733,20 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
               ActiveFiltersWidget(
                 columnSearchValues: _columnSearchValues,
                 columnSearchTypes: _columnSearchTypes,
-                fromDate: _fromDate,
-                toDate: _toDate,
+                columnMultiSelectValues: _columnMultiSelectValues,
+                columnDateFromValues: _columnDateFromValues,
+                columnDateToValues: _columnDateToValues,
+                fromDate: null,
+                toDate: null,
                 columns: widget.config.columns,
                 calendarController: widget.calendarController,
                 onRemoveColumnFilter: (columnName) {
                   setState(() {
                     _columnSearchValues.remove(columnName);
                     _columnSearchTypes.remove(columnName);
+                    _columnMultiSelectValues.remove(columnName);
+                    _columnDateFromValues.remove(columnName);
+                    _columnDateToValues.remove(columnName);
                     _columnSearchControllers[columnName]?.clear();
                   });
                   _page = 1;
@@ -771,22 +807,6 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
         ],
         const Spacer(),
         
-        // Filter buttons
-        if (widget.config.showFilters && widget.config.showFiltersButton) ...[
-          Tooltip(
-            message: _showFilters ? t.hideFilters : t.showFilters,
-            child: IconButton(
-              onPressed: () {
-                setState(() {
-                  _showFilters = !_showFilters;
-                });
-              },
-              icon: Icon(_showFilters ? Icons.filter_list_off : Icons.filter_list),
-              tooltip: _showFilters ? t.hideFilters : t.showFilters,
-            ),
-          ),
-          const SizedBox(width: 4),
-        ],
         
         // Clear filters button (only show when filters are applied)
         if (widget.config.showClearFiltersButton && _hasActiveFilters()) ...[
@@ -822,11 +842,6 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
               case 'refresh':
                 _fetchData();
                 break;
-              case 'filters':
-                setState(() {
-                  _showFilters = !_showFilters;
-                });
-                break;
               case 'columnSettings':
                 _openColumnSettingsDialog();
                 break;
@@ -841,17 +856,6 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                     const Icon(Icons.refresh, size: 20),
                     const SizedBox(width: 8),
                     Text(t.refresh),
-                  ],
-                ),
-              ),
-            if (widget.config.showFilters && widget.config.showFiltersButton)
-              PopupMenuItem(
-                value: 'filters',
-                child: Row(
-                  children: [
-                    Icon(_showFilters ? Icons.filter_list_off : Icons.filter_list, size: 20),
-                    const SizedBox(width: 8),
-                    Text(_showFilters ? t.hideFilters : t.showFilters),
                   ],
                 ),
               ),
@@ -1151,128 +1155,23 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     );
   }
 
-  Widget _buildSearchAndFilters(AppLocalizations t, ThemeData theme) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.2),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: theme.dividerColor.withValues(alpha: 0.3)),
-      ),
-      child: Column(
+  Widget _buildSearch(AppLocalizations t, ThemeData theme) {
+    return Row(
         children: [
-          // Main controls row
-          Row(
-            children: [
-              if (widget.config.showSearch) ...[
-                Expanded(
-                  child: TextField(
-                    controller: _searchCtrl,
-                    decoration: InputDecoration(
-                      prefixIcon: const Icon(Icons.search, size: 18),
-                      hintText: t.searchInNameEmail,
-                      border: const OutlineInputBorder(),
-                      isDense: true,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-              ],
-            ],
-          ),
-          
-          // Date range filters (if enabled and expanded)
-          if (widget.config.showFilters && 
-              widget.config.enableDateRangeFilter && 
-              widget.config.dateRangeField != null && 
-              _showFilters) ...[
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-                borderRadius: BorderRadius.circular(4),
-                border: Border.all(color: theme.dividerColor.withValues(alpha: 0.2)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(Icons.date_range, color: theme.primaryColor, size: 16),
-                      const SizedBox(width: 6),
-                      Text(
-                        t.dateRangeFilter,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                          color: theme.primaryColor,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: widget.calendarController != null ? DateInputField(
-                          value: _fromDate,
-                          onChanged: (date) {
-                            setState(() {
-                              _fromDate = date;
-                            });
-                          },
-                          labelText: t.dateFrom,
-                          calendarController: widget.calendarController!,
-                          enabled: !_loading,
-                        ) : const SizedBox.shrink(),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: widget.calendarController != null ? DateInputField(
-                          value: _toDate,
-                          onChanged: (date) {
-                            setState(() {
-                              _toDate = date;
-                            });
-                          },
-                          labelText: t.dateTo,
-                          calendarController: widget.calendarController!,
-                          enabled: !_loading,
-                        ) : const SizedBox.shrink(),
-                      ),
-                      const SizedBox(width: 8),
-                      FilledButton.icon(
-                        onPressed: _loading || _fromDate == null || _toDate == null ? null : () {
-                          _page = 1;
-                          _fetchData();
-                          // Call the callback if provided
-                          if (widget.config.onDateRangeApply != null) {
-                            widget.config.onDateRangeApply!(_fromDate, _toDate);
-                          }
-                        },
-                        icon: _loading 
-                            ? const SizedBox(
-                                height: 14, 
-                                width: 14, 
-                                child: CircularProgressIndicator(strokeWidth: 2),
-                              ) 
-                            : const Icon(Icons.check, size: 16),
-                        label: Text(t.applyFilter),
-                        style: FilledButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          minimumSize: const Size(0, 32),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+          Expanded(
+            child: TextField(
+              controller: _searchCtrl,
+              decoration: InputDecoration(
+                prefixIcon: const Icon(Icons.search, size: 18),
+                hintText: t.searchInNameEmail,
+                border: const OutlineInputBorder(),
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               ),
             ),
-          ],
+          ),
         ],
-      ),
-    );
+      );
   }
 
   Widget _buildDataTable(AppLocalizations t, ThemeData theme) {
@@ -1371,6 +1270,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
               )
             : const SizedBox.shrink(),
         size: ColumnSize.S,
+        fixedWidth: 50.0,
       ));
     }
     
@@ -1385,6 +1285,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
           ),
         ),
         size: ColumnSize.S,
+        fixedWidth: 60.0,
       ));
     }
     
@@ -1408,14 +1309,19 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
           enabled: widget.config.enableSorting && column.sortable,
         ),
         size: DataTableUtils.getColumnSize(column.width),
+        fixedWidth: DataTableUtils.getColumnWidth(column.width),
       );
     }));
 
-    return DataTable2(
-      columnSpacing: 12,
-      horizontalMargin: 12,
-      minWidth: widget.config.minTableWidth ?? 600,
-      columns: columns,
+    return Scrollbar(
+      controller: _horizontalScrollController,
+      thumbVisibility: true,
+      child: DataTable2(
+        columnSpacing: 8,
+        horizontalMargin: 8,
+        minWidth: widget.config.minTableWidth ?? 600,
+        horizontalScrollController: _horizontalScrollController,
+        columns: columns,
       rows: _items.asMap().entries.map((entry) {
         final index = entry.key;
         final item = entry.value;
@@ -1474,6 +1380,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
           cells: cells,
         );
       }).toList(),
+      ),
     );
   }
 
@@ -1573,57 +1480,71 @@ class _ColumnHeaderWithSearch extends StatelessWidget {
       onTap: enabled ? () => onSort(sortBy) : null,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 8.0),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              text,
-              style: theme.textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w600,
-                color: isActive ? theme.colorScheme.primary : theme.colorScheme.onSurface,
-              ),
-            ),
-            if (enabled) ...[
-              const SizedBox(width: 4),
-              if (isActive)
-                Icon(
-                  sortDesc ? Icons.arrow_downward : Icons.arrow_upward,
-                  size: 16,
-                  color: theme.colorScheme.primary,
-                )
-              else
-                Icon(
-                  Icons.unfold_more,
-                  size: 16,
-                  color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+        child: Container(
+          width: double.infinity,
+          child: Row(
+            mainAxisSize: MainAxisSize.max,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        text,
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: isActive ? theme.colorScheme.primary : theme.colorScheme.onSurface,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (enabled) ...[
+                      const SizedBox(width: 4),
+                      if (isActive)
+                        Icon(
+                          sortDesc ? Icons.arrow_downward : Icons.arrow_upward,
+                          size: 16,
+                          color: theme.colorScheme.primary,
+                        )
+                      else
+                        Icon(
+                          Icons.unfold_more,
+                          size: 16,
+                          color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                        ),
+                    ],
+                  ],
                 ),
+              ),
+              const SizedBox(width: 8),
+              // Search button
+              InkWell(
+                onTap: onSearch,
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: hasActiveFilter 
+                        ? theme.colorScheme.primaryContainer
+                        : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                    borderRadius: BorderRadius.circular(12),
+                    border: hasActiveFilter 
+                        ? Border.all(color: theme.colorScheme.primary.withValues(alpha: 0.3))
+                        : null,
+                  ),
+                  child: Icon(
+                    Icons.search,
+                    size: 14,
+                    color: hasActiveFilter 
+                        ? theme.colorScheme.onPrimaryContainer
+                        : theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+                  ),
+                ),
+              ),
             ],
-            const SizedBox(width: 8),
-            // Search button
-            InkWell(
-              onTap: onSearch,
-              borderRadius: BorderRadius.circular(12),
-              child: Container(
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  color: hasActiveFilter 
-                      ? theme.colorScheme.primaryContainer
-                      : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                  borderRadius: BorderRadius.circular(12),
-                  border: hasActiveFilter 
-                      ? Border.all(color: theme.colorScheme.primary.withValues(alpha: 0.3))
-                      : null,
-                ),
-                child: Icon(
-                  Icons.search,
-                  size: 14,
-                  color: hasActiveFilter 
-                      ? theme.colorScheme.onPrimaryContainer
-                      : theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
-                ),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );

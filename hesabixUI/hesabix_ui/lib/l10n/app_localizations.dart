@@ -467,7 +467,7 @@ abstract class AppLocalizations {
   /// No description provided for @thisMonth.
   ///
   /// In en, this message translates to:
-  /// **'This month'**
+  /// **'This Month'**
   String get thisMonth;
 
   /// No description provided for @total.
@@ -1447,6 +1447,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Change Status'**
   String get changeStatus;
+
+  /// No description provided for @multiSelectFilter.
+  ///
+  /// In en, this message translates to:
+  /// **'Multi-Select Filter'**
+  String get multiSelectFilter;
+
+  /// No description provided for @selectFilterOptions.
+  ///
+  /// In en, this message translates to:
+  /// **'Select Filter Options'**
+  String get selectFilterOptions;
+
+  /// No description provided for @noFilterOptionsAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'No filter options available'**
+  String get noFilterOptionsAvailable;
+
+  /// No description provided for @marketingDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage referrals and marketing codes'**
+  String get marketingDescription;
+
+  /// No description provided for @referralCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Referral Code'**
+  String get referralCode;
 
   /// No description provided for @internalMessage.
   ///

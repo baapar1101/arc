@@ -696,6 +696,21 @@ class AppLocalizationsFa extends AppLocalizations {
   String get changeStatus => 'تغییر وضعیت';
 
   @override
+  String get multiSelectFilter => 'فیلتر چندتایی';
+
+  @override
+  String get selectFilterOptions => 'انتخاب گزینه‌های فیلتر';
+
+  @override
+  String get noFilterOptionsAvailable => 'هیچ گزینه فیلتری در دسترس نیست';
+
+  @override
+  String get marketingDescription => 'مدیریت معرفی‌ها و کدهای بازاریابی';
+
+  @override
+  String get referralCode => 'کد معرفی';
+
+  @override
   String get internalMessage => 'پیام داخلی';
 
   @override

@@ -9,6 +9,30 @@ enum ColumnWidth {
   extraLarge,
 }
 
+/// Types of column filters
+enum ColumnFilterType {
+  text,           // Text filter (default)
+  dateRange,      // Date range filter
+  multiSelect,    // Multi-select filter with checkboxes
+}
+
+/// Filter option for multi-select filters
+class FilterOption {
+  final String value;        // Value for API
+  final String label;        // Display label
+  final String? description; // Additional description
+  final IconData? icon;      // Icon
+  final Color? color;        // Icon/text color
+  
+  const FilterOption({
+    required this.value,
+    required this.label,
+    this.description,
+    this.icon,
+    this.color,
+  });
+}
+
 /// Base class for all column types
 abstract class DataTableColumn {
   final String key;
@@ -17,6 +41,8 @@ abstract class DataTableColumn {
   final bool searchable;
   final ColumnWidth width;
   final String? tooltip;
+  final ColumnFilterType? filterType;
+  final List<FilterOption>? filterOptions;
 
   const DataTableColumn({
     required this.key,
@@ -25,6 +51,8 @@ abstract class DataTableColumn {
     this.searchable = true,
     this.width = ColumnWidth.medium,
     this.tooltip,
+    this.filterType,
+    this.filterOptions,
   });
 }
 
@@ -42,6 +70,8 @@ class TextColumn extends DataTableColumn {
     super.searchable = true,
     super.width = ColumnWidth.medium,
     super.tooltip,
+    super.filterType,
+    super.filterOptions,
     this.formatter,
     this.textAlign,
     this.maxLines,
@@ -64,6 +94,8 @@ class NumberColumn extends DataTableColumn {
     super.searchable = true,
     super.width = ColumnWidth.medium,
     super.tooltip,
+    super.filterType,
+    super.filterOptions,
     this.formatter,
     this.textAlign = TextAlign.end,
     this.decimalPlaces,
@@ -86,6 +118,8 @@ class DateColumn extends DataTableColumn {
     super.searchable = true,
     super.width = ColumnWidth.medium,
     super.tooltip,
+    super.filterType,
+    super.filterOptions,
     this.formatter,
     this.textAlign = TextAlign.center,
     this.showTime = false,
@@ -105,6 +139,8 @@ class ActionColumn extends DataTableColumn {
     super.searchable = false,
     super.width = ColumnWidth.small,
     super.tooltip,
+    super.filterType,
+    super.filterOptions,
     required this.actions,
     this.showOnHover = true,
   }) : super(key: key, label: label);
@@ -122,6 +158,8 @@ class CustomColumn extends DataTableColumn {
     super.searchable = true,
     super.width = ColumnWidth.medium,
     super.tooltip,
+    super.filterType,
+    super.filterOptions,
     this.builder,
     this.formatter,
   }) : super(key: key, label: label);
@@ -227,14 +265,14 @@ class DataTableConfig<T> {
     this.title,
     this.subtitle,
     this.showSearch = true,
-    this.showFilters = true,
+    this.showFilters = false,
     this.showPagination = true,
     this.showColumnSearch = true,
     this.defaultPageSize = 20,
     this.pageSizeOptions = const [10, 20, 50, 100],
     this.enableSorting = true,
     this.enableGlobalSearch = true,
-    this.enableDateRangeFilter = true,
+    this.enableDateRangeFilter = false,
     this.onRowTap,
     this.onRowDoubleTap,
     this.customRowBuilder,
@@ -279,20 +317,20 @@ class DataTableConfig<T> {
     this.initialColumnSettings,
     this.onColumnSettingsChanged,
     this.customHeaderActions,
-    this.showFiltersButton = true,
+    this.showFiltersButton = false,
   });
 
   /// Get column width as double
   double getColumnWidth(ColumnWidth width) {
     switch (width) {
       case ColumnWidth.small:
-        return 100.0;
+        return 120.0;
       case ColumnWidth.medium:
-        return 150.0;
+        return 180.0;
       case ColumnWidth.large:
-        return 200.0;
+        return 250.0;
       case ColumnWidth.extraLarge:
-        return 300.0;
+        return 350.0;
     }
   }
 
