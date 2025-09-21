@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/widgets/admin/file_storage/storage_config_form_dialog.dart';
 import 'package:hesabix_ui/widgets/admin/file_storage/storage_config_card.dart';
+import '../../../core/api_client.dart';
 
 class StorageConfigListWidget extends StatefulWidget {
   const StorageConfigListWidget({super.key});
@@ -28,41 +29,18 @@ class _StorageConfigListWidgetState extends State<StorageConfigListWidget> {
     });
 
     try {
-      // TODO: Call API to load storage configurations
-      await Future.delayed(const Duration(seconds: 1)); // Simulate API call
+      final api = ApiClient();
+      final response = await api.get('/api/v1/admin/files/storage-configs/');
       
-      // Mock data for now
-      setState(() {
-        _storageConfigs = [
-          {
-            'id': '1',
-            'name': 'Local Storage Default',
-            'storage_type': 'local',
-            'is_default': true,
-            'is_active': true,
-            'config_data': {
-              'base_path': '/var/hesabix/files'
-            },
-            'created_at': '2024-01-01T00:00:00Z',
-          },
-          {
-            'id': '2',
-            'name': 'FTP Backup',
-            'storage_type': 'ftp',
-            'is_default': false,
-            'is_active': true,
-            'config_data': {
-              'host': 'ftp.example.com',
-              'port': 21,
-              'username': 'hesabix',
-              'password': '***',
-              'directory': '/hesabix/files'
-            },
-            'created_at': '2024-01-02T00:00:00Z',
-          },
-        ];
-        _isLoading = false;
-      });
+      if (response.data != null && response.data['success'] == true) {
+        setState(() {
+          _storageConfigs = (response.data['data']['configs'] as List<dynamic>)
+              .cast<Map<String, dynamic>>();
+          _isLoading = false;
+        });
+      } else {
+        throw Exception(response.data?['message'] ?? 'خطا در دریافت تنظیمات ذخیره‌سازی');
+      }
     } catch (e) {
       setState(() {
         _error = e.toString();
@@ -70,6 +48,7 @@ class _StorageConfigListWidgetState extends State<StorageConfigListWidget> {
       });
     }
   }
+
 
   Future<void> _addStorageConfig() async {
     final result = await showDialog<Map<String, dynamic>>(
@@ -94,7 +73,7 @@ class _StorageConfigListWidgetState extends State<StorageConfigListWidget> {
   }
 
   Future<void> _setAsDefault(String configId) async {
-    final l10n = AppLocalizations.of(context)!;
+    final l10n = AppLocalizations.of(context);
     try {
       // TODO: Call API to set as default
       await Future.delayed(const Duration(seconds: 1)); // Simulate API call
@@ -118,29 +97,44 @@ class _StorageConfigListWidgetState extends State<StorageConfigListWidget> {
   }
 
   Future<void> _testConnection(String configId) async {
-    final l10n = AppLocalizations.of(context)!;
+    final l10n = AppLocalizations.of(context);
     try {
-      // TODO: Call API to test connection
-      await Future.delayed(const Duration(seconds: 2)); // Simulate API call
+      final api = ApiClient();
+      final response = await api.post('/api/v1/admin/files/storage-configs/$configId/test');
       
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(l10n.connectionSuccessful),
-          backgroundColor: Colors.green,
-        ),
-      );
+      if (response.data != null && response.data['success'] == true) {
+        final testResult = response.data['data']['test_result'];
+        if (testResult['success'] == true) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(l10n.connectionSuccessful),
+              backgroundColor: Colors.green,
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('${l10n.connectionFailed}: ${testResult['error']}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      } else {
+        throw Exception(response.data?['message'] ?? 'خطا در تست اتصال');
+      }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(l10n.connectionFailed),
+          content: Text('${l10n.connectionFailed}: $e'),
           backgroundColor: Colors.red,
         ),
       );
     }
   }
 
+
   Future<void> _deleteConfig(String configId) async {
-    final l10n = AppLocalizations.of(context)!;
+    final l10n = AppLocalizations.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -185,7 +179,7 @@ class _StorageConfigListWidgetState extends State<StorageConfigListWidget> {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
+    final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
 
     if (_isLoading) {

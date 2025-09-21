@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
+import '../../../core/api_client.dart';
 
 class FileManagementWidget extends StatefulWidget {
   const FileManagementWidget({super.key});
@@ -36,49 +37,26 @@ class _FileManagementWidgetState extends State<FileManagementWidget>
     });
 
     try {
-      // TODO: Call API to load files
-      await Future.delayed(const Duration(seconds: 1)); // Simulate API call
+      final api = ApiClient();
       
-      setState(() {
-        _allFiles = [
-          {
-            'id': '1',
-            'original_name': 'document.pdf',
-            'file_size': 1024000,
-            'mime_type': 'application/pdf',
-            'module_context': 'tickets',
-            'created_at': '2024-01-01T10:00:00Z',
-            'expires_at': null,
-            'is_temporary': false,
-            'is_verified': true,
-          },
-          {
-            'id': '2',
-            'original_name': 'image.jpg',
-            'file_size': 512000,
-            'mime_type': 'image/jpeg',
-            'module_context': 'accounting',
-            'created_at': '2024-01-02T11:00:00Z',
-            'expires_at': '2024-01-09T11:00:00Z',
-            'is_temporary': true,
-            'is_verified': false,
-          },
-          {
-            'id': '3',
-            'original_name': 'spreadsheet.xlsx',
-            'file_size': 256000,
-            'mime_type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            'module_context': 'reports',
-            'created_at': '2024-01-03T12:00:00Z',
-            'expires_at': null,
-            'is_temporary': false,
-            'is_verified': true,
-          },
-        ];
+      // Call API to load files
+      final response = await api.get('/api/v1/admin/files/');
+      final unverifiedResponse = await api.get('/api/v1/admin/files/unverified');
+      
+      if (response.data != null && response.data['success'] == true) {
+        final files = response.data['data']['files'] as List<dynamic>;
+        final unverifiedFiles = unverifiedResponse.data != null && unverifiedResponse.data['success'] == true 
+            ? unverifiedResponse.data['data']['unverified_files'] as List<dynamic>
+            : <dynamic>[];
         
-        _unverifiedFiles = _allFiles.where((file) => file['is_verified'] == false).toList();
-        _isLoading = false;
-      });
+        setState(() {
+          _allFiles = files.cast<Map<String, dynamic>>();
+          _unverifiedFiles = unverifiedFiles.cast<Map<String, dynamic>>();
+          _isLoading = false;
+        });
+      } else {
+        throw Exception(response.data?['message'] ?? 'خطا در دریافت فایل‌ها');
+      }
     } catch (e) {
       setState(() {
         _error = e.toString();
@@ -87,8 +65,9 @@ class _FileManagementWidgetState extends State<FileManagementWidget>
     }
   }
 
+
   Future<void> _forceDeleteFile(String fileId) async {
-    final l10n = AppLocalizations.of(context)!;
+    final l10n = AppLocalizations.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -112,17 +91,21 @@ class _FileManagementWidgetState extends State<FileManagementWidget>
 
     if (confirmed == true) {
       try {
-        // TODO: Call API to force delete file
-        await Future.delayed(const Duration(seconds: 1)); // Simulate API call
+        final api = ApiClient();
+        final response = await api.delete('/api/v1/admin/files/$fileId');
         
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(l10n.fileDeleted),
-            backgroundColor: Colors.green,
-          ),
-        );
-        
-        _loadFiles();
+        if (response.data != null && response.data['success'] == true) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(l10n.fileDeleted),
+              backgroundColor: Colors.green,
+            ),
+          );
+          
+          _loadFiles();
+        } else {
+          throw Exception(response.data?['message'] ?? 'خطا در حذف فایل');
+        }
       } catch (e) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -135,7 +118,7 @@ class _FileManagementWidgetState extends State<FileManagementWidget>
   }
 
   Future<void> _restoreFile(String fileId) async {
-    final l10n = AppLocalizations.of(context)!;
+    final l10n = AppLocalizations.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -156,17 +139,21 @@ class _FileManagementWidgetState extends State<FileManagementWidget>
 
     if (confirmed == true) {
       try {
-        // TODO: Call API to restore file
-        await Future.delayed(const Duration(seconds: 1)); // Simulate API call
+        final api = ApiClient();
+        final response = await api.put('/api/v1/admin/files/$fileId/restore');
         
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(l10n.fileRestored),
-            backgroundColor: Colors.green,
-          ),
-        );
-        
-        _loadFiles();
+        if (response.data != null && response.data['success'] == true) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(l10n.fileRestored),
+              backgroundColor: Colors.green,
+            ),
+          );
+          
+          _loadFiles();
+        } else {
+          throw Exception(response.data?['message'] ?? 'خطا در بازیابی فایل');
+        }
       } catch (e) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -192,8 +179,7 @@ class _FileManagementWidgetState extends State<FileManagementWidget>
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
 
     return Column(
       children: [
@@ -224,7 +210,7 @@ class _FileManagementWidgetState extends State<FileManagementWidget>
   }
 
   Widget _buildFilesList(List<Map<String, dynamic>> files) {
-    final l10n = AppLocalizations.of(context)!;
+    final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
 
     if (_isLoading) {
@@ -337,7 +323,7 @@ class _FileManagementWidgetState extends State<FileManagementWidget>
                     children: [
                       Icon(Icons.delete, color: theme.colorScheme.error),
                       const SizedBox(width: 8),
-                      Text(AppLocalizations.of(context)!.forceDelete),
+                      Text(AppLocalizations.of(context).forceDelete),
                     ],
                   ),
                 ),
@@ -347,7 +333,7 @@ class _FileManagementWidgetState extends State<FileManagementWidget>
                     children: [
                       Icon(Icons.restore, color: theme.colorScheme.primary),
                       const SizedBox(width: 8),
-                      Text(AppLocalizations.of(context)!.restoreFile),
+                      Text(AppLocalizations.of(context).restoreFile),
                     ],
                   ),
                 ),

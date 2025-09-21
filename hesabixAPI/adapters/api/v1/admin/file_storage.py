@@ -2,9 +2,10 @@ from typing import List, Optional
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Request
 from sqlalchemy.orm import Session
+from sqlalchemy import and_
 
 from adapters.db.session import get_db
-from app.core.auth_dependency import get_current_user
+from app.core.auth_dependency import get_current_user, AuthContext
 from app.core.permissions import require_permission
 from app.core.responses import success_response
 from app.core.responses import ApiError
@@ -12,6 +13,7 @@ from app.core.i18n import locale_dependency
 from app.services.file_storage_service import FileStorageService
 from adapters.db.repositories.file_storage_repository import StorageConfigRepository, FileStorageRepository
 from adapters.db.models.user import User
+from adapters.db.models.file_storage import StorageConfig
 from adapters.api.v1.schema_models.file_storage import (
     StorageConfigCreateRequest,
     StorageConfigUpdateRequest,
@@ -36,19 +38,85 @@ async def list_all_files(
     is_temporary: Optional[bool] = Query(None),
     is_verified: Optional[bool] = Query(None),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("admin.file.view")),
+    current_user: AuthContext = Depends(get_current_user),
     translator = Depends(locale_dependency)
 ):
     """لیست تمام فایل‌ها با فیلتر"""
     try:
-        file_service = FileStorageService(db)
+        # Check permission
+        if not current_user.has_app_permission("admin.file.view"):
+            raise ApiError(
+                code="FORBIDDEN",
+                message=translator.t("FORBIDDEN", "دسترسی غیرمجاز"),
+                http_status=403,
+                translator=translator
+            )
         
-        # TODO: پیاده‌سازی pagination و فیلترها
-        statistics = await file_service.get_storage_statistics()
+        file_repo = FileStorageRepository(db)
+        
+        # محاسبه offset برای pagination
+        offset = (page - 1) * size
+        
+        # ساخت فیلترها
+        filters = []
+        if module_context:
+            filters.append(FileStorage.module_context == module_context)
+        if is_temporary is not None:
+            filters.append(FileStorage.is_temporary == is_temporary)
+        if is_verified is not None:
+            filters.append(FileStorage.is_verified == is_verified)
+        
+        # اضافه کردن فیلتر حذف نشده
+        filters.append(FileStorage.deleted_at.is_(None))
+        
+        # دریافت فایل‌ها با فیلتر و pagination
+        files_query = db.query(FileStorage).filter(and_(*filters))
+        total_count = files_query.count()
+        
+        files = files_query.order_by(FileStorage.created_at.desc()).offset(offset).limit(size).all()
+        
+        # تبدیل به فرمت مناسب
+        files_data = []
+        for file in files:
+            files_data.append({
+                "id": str(file.id),
+                "original_name": file.original_name,
+                "stored_name": file.stored_name,
+                "file_size": file.file_size,
+                "mime_type": file.mime_type,
+                "storage_type": file.storage_type,
+                "module_context": file.module_context,
+                "context_id": str(file.context_id) if file.context_id else None,
+                "is_temporary": file.is_temporary,
+                "is_verified": file.is_verified,
+                "is_active": file.is_active,
+                "created_at": file.created_at.isoformat(),
+                "updated_at": file.updated_at.isoformat(),
+                "expires_at": file.expires_at.isoformat() if file.expires_at else None,
+                "uploaded_by": file.uploaded_by,
+                "checksum": file.checksum
+            })
+        
+        # محاسبه pagination info
+        total_pages = (total_count + size - 1) // size
+        has_next = page < total_pages
+        has_prev = page > 1
         
         data = {
-            "statistics": statistics,
-            "message": translator.t("FILE_LIST_NOT_IMPLEMENTED", "File list endpoint - to be implemented")
+            "files": files_data,
+            "pagination": {
+                "page": page,
+                "size": size,
+                "total_count": total_count,
+                "total_pages": total_pages,
+                "has_next": has_next,
+                "has_prev": has_prev
+            },
+            "filters": {
+                "module_context": module_context,
+                "is_temporary": is_temporary,
+                "is_verified": is_verified
+            }
         }
         
         return success_response(data, request)
@@ -65,7 +133,7 @@ async def list_all_files(
 async def get_unverified_files(
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("admin.file.view")),
+    current_user: AuthContext = Depends(get_current_user),
     translator = Depends(locale_dependency)
 ):
     """فایل‌های تایید نشده"""
@@ -102,7 +170,7 @@ async def get_unverified_files(
 async def cleanup_temporary_files(
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("admin.file.cleanup")),
+    current_user: AuthContext = Depends(get_current_user),
     translator = Depends(locale_dependency)
 ):
     """پاکسازی فایل‌های موقت"""
@@ -130,7 +198,7 @@ async def force_delete_file(
     file_id: UUID,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("admin.file.delete")),
+    current_user: AuthContext = Depends(get_current_user),
     translator = Depends(locale_dependency)
 ):
     """حذف اجباری فایل"""
@@ -164,7 +232,7 @@ async def restore_file(
     file_id: UUID,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("admin.file.restore")),
+    current_user: AuthContext = Depends(get_current_user),
     translator = Depends(locale_dependency)
 ):
     """بازیابی فایل حذف شده"""
@@ -197,7 +265,7 @@ async def restore_file(
 async def get_file_statistics(
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("admin.file.view")),
+    current_user: AuthContext = Depends(get_current_user),
     translator = Depends(locale_dependency)
 ):
     """آمار استفاده از فضای ذخیره‌سازی"""
@@ -220,13 +288,22 @@ async def get_file_statistics(
 async def get_storage_configs(
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("admin.storage.view")),
+    current_user: AuthContext = Depends(get_current_user),
     translator = Depends(locale_dependency)
 ):
     """لیست تنظیمات ذخیره‌سازی"""
     try:
+        # Check permission
+        if not current_user.has_app_permission("admin.storage.view"):
+            raise ApiError(
+                code="FORBIDDEN",
+                message=translator.t("FORBIDDEN", "دسترسی غیرمجاز"),
+                http_status=403,
+                translator=translator
+            )
+        
         config_repo = StorageConfigRepository(db)
-        configs = await config_repo.get_all_configs()
+        configs = config_repo.get_all_configs()
         
         data = {
             "configs": [
@@ -236,6 +313,7 @@ async def get_storage_configs(
                     "storage_type": config.storage_type,
                     "is_default": config.is_default,
                     "is_active": config.is_active,
+                    "config_data": config.config_data,
                     "created_at": config.created_at.isoformat()
                 }
                 for config in configs
@@ -257,7 +335,7 @@ async def create_storage_config(
     request: Request,
     config_request: StorageConfigCreateRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("admin.storage.create")),
+    current_user: AuthContext = Depends(get_current_user),
     translator = Depends(locale_dependency)
 ):
     """ایجاد تنظیمات ذخیره‌سازی جدید"""
@@ -268,8 +346,9 @@ async def create_storage_config(
             name=config_request.name,
             storage_type=config_request.storage_type,
             config_data=config_request.config_data,
-            created_by=current_user.id,
-            is_default=config_request.is_default
+            created_by=current_user.get_user_id(),
+            is_default=config_request.is_default,
+            is_active=config_request.is_active
         )
         
         data = {
@@ -293,7 +372,7 @@ async def update_storage_config(
     request: Request,
     config_request: StorageConfigUpdateRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("admin.storage.update")),
+    current_user: AuthContext = Depends(get_current_user),
     translator = Depends(locale_dependency)
 ):
     """بروزرسانی تنظیمات ذخیره‌سازی"""
@@ -317,7 +396,7 @@ async def set_default_storage_config(
     config_id: UUID,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("admin.storage.update")),
+    current_user: AuthContext = Depends(get_current_user),
     translator = Depends(locale_dependency)
 ):
     """تنظیم به عنوان پیش‌فرض"""
@@ -351,7 +430,7 @@ async def delete_storage_config(
     config_id: UUID,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("admin.storage.delete")),
+    current_user: AuthContext = Depends(get_current_user),
     translator = Depends(locale_dependency)
 ):
     """حذف تنظیمات ذخیره‌سازی"""
@@ -382,17 +461,42 @@ async def delete_storage_config(
 
 @router.post("/storage-configs/{config_id}/test", response_model=dict)
 async def test_storage_config(
-    config_id: UUID,
+    config_id: str,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("admin.storage.test")),
+    current_user: AuthContext = Depends(get_current_user),
     translator = Depends(locale_dependency)
 ):
     """تست اتصال به storage"""
     try:
-        # TODO: پیاده‌سازی تست اتصال
-        data = {"message": translator.t("STORAGE_CONNECTION_TEST_NOT_IMPLEMENTED", "Storage connection test - to be implemented")}
+        config_repo = StorageConfigRepository(db)
+        config = db.query(StorageConfig).filter(StorageConfig.id == config_id).first()
+        
+        if not config:
+            raise ApiError(
+                code="STORAGE_CONFIG_NOT_FOUND",
+                message=translator.t("STORAGE_CONFIG_NOT_FOUND", "تنظیمات ذخیره‌سازی یافت نشد"),
+                http_status=404,
+                translator=translator
+            )
+        
+        # تست اتصال بر اساس نوع storage
+        test_result = await _test_storage_connection(config)
+        
+        if test_result["success"]:
+            data = {
+                "message": translator.t("STORAGE_CONNECTION_SUCCESS", "اتصال به storage موفقیت‌آمیز بود"),
+                "test_result": test_result
+            }
+        else:
+            data = {
+                "message": translator.t("STORAGE_CONNECTION_FAILED", "اتصال به storage ناموفق بود"),
+                "test_result": test_result
+            }
+        
         return success_response(data, request)
+    except ApiError:
+        raise
     except Exception as e:
         raise ApiError(
             code="TEST_STORAGE_CONFIG_ERROR",
@@ -400,3 +504,107 @@ async def test_storage_config(
             http_status=500,
             translator=translator
         )
+
+
+# Helper function for testing storage connections
+async def _test_storage_connection(config: StorageConfig) -> dict:
+    """تست اتصال به storage بر اساس نوع آن"""
+    import os
+    import tempfile
+    from datetime import datetime
+    
+    try:
+        if config.storage_type == "local":
+            return await _test_local_storage(config)
+        elif config.storage_type == "ftp":
+            return await _test_ftp_storage(config)
+        else:
+            return {
+                "success": False,
+                "error": f"نوع storage پشتیبانی نشده: {config.storage_type}",
+                "tested_at": datetime.utcnow().isoformat()
+            }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "tested_at": datetime.utcnow().isoformat()
+        }
+
+
+async def _test_local_storage(config: StorageConfig) -> dict:
+    """تست اتصال به local storage"""
+    import os
+    from datetime import datetime
+    
+    try:
+        base_path = config.config_data.get("base_path", "/tmp/hesabix_files")
+        
+        # بررسی وجود مسیر
+        if not os.path.exists(base_path):
+            # تلاش برای ایجاد مسیر
+            os.makedirs(base_path, exist_ok=True)
+        
+        # بررسی دسترسی نوشتن
+        test_file_path = os.path.join(base_path, f"test_connection_{datetime.utcnow().timestamp()}.txt")
+        
+        # نوشتن فایل تست
+        with open(test_file_path, "w") as f:
+            f.write("Test connection file")
+        
+        # خواندن فایل تست
+        with open(test_file_path, "r") as f:
+            content = f.read()
+        
+        # حذف فایل تست
+        os.remove(test_file_path)
+        
+        if content == "Test connection file":
+            return {
+                "success": True,
+                "message": "اتصال به local storage موفقیت‌آمیز بود",
+                "storage_type": "local",
+                "base_path": base_path,
+                "tested_at": datetime.utcnow().isoformat()
+            }
+        else:
+            return {
+                "success": False,
+                "error": "خطا در خواندن فایل تست",
+                "tested_at": datetime.utcnow().isoformat()
+            }
+            
+    except PermissionError:
+        return {
+            "success": False,
+            "error": "دسترسی به مسیر ذخیره‌سازی وجود ندارد",
+            "tested_at": datetime.utcnow().isoformat()
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": f"خطا در تست local storage: {str(e)}",
+            "tested_at": datetime.utcnow().isoformat()
+        }
+
+
+async def _test_ftp_storage(config: StorageConfig) -> dict:
+    """تست اتصال به FTP storage"""
+    from datetime import datetime
+    
+    try:
+        # TODO: پیاده‌سازی تست FTP
+        # فعلاً فقط ساختار کلی را برمی‌گردانیم
+        return {
+            "success": False,
+            "error": "تست FTP هنوز پیاده‌سازی نشده است",
+            "storage_type": "ftp",
+            "tested_at": datetime.utcnow().isoformat()
+        }
+        
+    except Exception as e:
+        return {
+            "success": False,
+            "error": f"خطا در تست FTP storage: {str(e)}",
+            "tested_at": datetime.utcnow().isoformat()
+        }

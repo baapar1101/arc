@@ -10,6 +10,7 @@ class StorageConfigCreateRequest(BaseModel):
     storage_type: str = Field(..., description="نوع ذخیره‌سازی")
     config_data: Dict[str, Any] = Field(..., description="داده‌های پیکربندی")
     is_default: bool = Field(default=False, description="آیا پیش‌فرض است")
+    is_active: bool = Field(default=True, description="آیا فعال است")
 
 
 class StorageConfigUpdateRequest(BaseModel):

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
+import '../../../core/api_client.dart';
 
 class StorageConfigFormDialog extends StatefulWidget {
   final Map<String, dynamic>? config;
@@ -94,19 +95,24 @@ class _StorageConfigFormDialogState extends State<StorageConfigFormDialog> {
     });
 
     try {
-      // TODO: Call API to save configuration
-      await Future.delayed(const Duration(seconds: 1)); // Simulate API call
+      final api = ApiClient();
+      final response = await api.post(
+        '/api/v1/admin/files/storage-configs/',
+        data: {
+          'name': _nameController.text,
+          'storage_type': _selectedStorageType,
+          'is_default': _isDefault,
+          'is_active': _isActive,
+          'config_data': _buildConfigData(),
+        },
+      );
 
-      final configData = {
-        'name': _nameController.text,
-        'storage_type': _selectedStorageType,
-        'is_default': _isDefault,
-        'is_active': _isActive,
-        'config_data': _buildConfigData(),
-      };
-
-      if (mounted) {
-        Navigator.of(context).pop(configData);
+      if (response.data != null && response.data['success'] == true) {
+        if (mounted) {
+          Navigator.of(context).pop(response.data['data']);
+        }
+      } else {
+        throw Exception(response.data?['message'] ?? 'خطا در ذخیره تنظیمات');
       }
     } catch (e) {
       if (mounted) {
@@ -128,7 +134,7 @@ class _StorageConfigFormDialogState extends State<StorageConfigFormDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
+    final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final isEditing = widget.config != null;
 

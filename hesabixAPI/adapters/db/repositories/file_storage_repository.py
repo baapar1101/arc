@@ -10,7 +10,7 @@ from adapters.db.repositories.base_repo import BaseRepository
 
 class FileStorageRepository(BaseRepository[FileStorage]):
     def __init__(self, db: Session):
-        super().__init__(FileStorage, db)
+        super().__init__(db, FileStorage)
 
     async def create_file(
         self,
@@ -177,15 +177,16 @@ class FileStorageRepository(BaseRepository[FileStorage]):
 
 class StorageConfigRepository(BaseRepository[StorageConfig]):
     def __init__(self, db: Session):
-        super().__init__(StorageConfig, db)
+        super().__init__(db, StorageConfig)
 
     async def create_config(
         self,
         name: str,
         storage_type: str,
         config_data: Dict,
-        created_by: UUID,
-        is_default: bool = False
+        created_by: int,
+        is_default: bool = False,
+        is_active: bool = True
     ) -> StorageConfig:
         # اگر این config به عنوان پیش‌فرض تنظیم می‌شود، بقیه را غیرفعال کن
         if is_default:
@@ -196,7 +197,8 @@ class StorageConfigRepository(BaseRepository[StorageConfig]):
             storage_type=storage_type,
             config_data=config_data,
             created_by=created_by,
-            is_default=is_default
+            is_default=is_default,
+            is_active=is_active
         )
         
         self.db.add(storage_config)
@@ -212,7 +214,7 @@ class StorageConfigRepository(BaseRepository[StorageConfig]):
             )
         ).first()
 
-    async def get_all_configs(self) -> List[StorageConfig]:
+    def get_all_configs(self) -> List[StorageConfig]:
         return self.db.query(StorageConfig).filter(
             StorageConfig.is_active == True
         ).order_by(desc(StorageConfig.created_at)).all()

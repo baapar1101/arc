@@ -19,165 +19,129 @@ class StorageConfigCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
+    final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final isDefault = config['is_default'] == true;
     final isActive = config['is_active'] == true;
-    final storageType = config['storage_type'] as String;
 
     return Card(
+      elevation: 2,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Header
             Row(
               children: [
                 Icon(
-                  storageType == 'local' ? Icons.storage : Icons.cloud_upload,
+                  _getStorageIcon(config['storage_type']),
                   color: theme.colorScheme.primary,
+                  size: 24,
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 12),
                 Expanded(
-                  child: Text(
-                    config['name'] ?? '',
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        config['name'] ?? 'Unknown',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        _getStorageTypeName(config['storage_type']),
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.onSurface.withOpacity(0.7),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                if (isDefault)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.primary,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      l10n.isDefault,
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: theme.colorScheme.onPrimary,
+                // Status badges
+                Row(
+                  children: [
+                    if (isDefault)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.primary,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          l10n.isDefault,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onPrimary,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
-                if (!isActive)
-                  Container(
-                    margin: const EdgeInsets.only(left: 8),
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.error,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      'Inactive',
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: theme.colorScheme.onError,
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
                       ),
+                      decoration: BoxDecoration(
+                        color: isActive ? Colors.green : Colors.red,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                        child: Text(
+                          isActive ? l10n.isActive : 'غیرفعال',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                     ),
-                  ),
+                  ],
+                ),
               ],
             ),
-            const SizedBox(height: 8),
+            
+            const SizedBox(height: 16),
+            
+            // Configuration details
+            _buildConfigDetails(context, config),
+            
+            const SizedBox(height: 16),
+            
+            // Actions
             Row(
+              mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                Icon(
-                  Icons.info_outline,
-                  size: 16,
-                  color: theme.colorScheme.onSurface.withOpacity(0.6),
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  l10n.storageType,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurface.withOpacity(0.6),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  storageType == 'local' ? l10n.localStorage : l10n.ftpStorage,
-                  style: theme.textTheme.bodySmall,
-                ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            if (storageType == 'local') ...[
-              Row(
-                children: [
-                  Icon(
-                    Icons.folder_outlined,
-                    size: 16,
-                    color: theme.colorScheme.onSurface.withOpacity(0.6),
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    l10n.basePath,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurface.withOpacity(0.6),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      config['config_data']?['base_path'] ?? '',
-                      style: theme.textTheme.bodySmall,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
-              ),
-            ] else if (storageType == 'ftp') ...[
-              Row(
-                children: [
-                  Icon(
-                    Icons.cloud_outlined,
-                    size: 16,
-                    color: theme.colorScheme.onSurface.withOpacity(0.6),
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    '${l10n.ftpHost}: ${config['config_data']?['host'] ?? ''}',
-                    style: theme.textTheme.bodySmall,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 2),
-              Row(
-                children: [
-                  Icon(
-                    Icons.person_outline,
-                    size: 16,
-                    color: theme.colorScheme.onSurface.withOpacity(0.6),
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    '${l10n.ftpUsername}: ${config['config_data']?['username'] ?? ''}',
-                    style: theme.textTheme.bodySmall,
-                  ),
-                ],
-              ),
-            ],
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                if (onEdit != null)
-                  TextButton.icon(
-                    onPressed: onEdit,
-                    icon: const Icon(Icons.edit, size: 16),
-                    label: Text(l10n.edit),
-                  ),
                 if (onTestConnection != null)
                   TextButton.icon(
                     onPressed: onTestConnection,
                     icon: const Icon(Icons.wifi_protected_setup, size: 16),
                     label: Text(l10n.testConnection),
                   ),
-                if (onSetDefault != null)
+                if (onEdit != null) ...[
+                  const SizedBox(width: 8),
+                  TextButton.icon(
+                    onPressed: onEdit,
+                    icon: const Icon(Icons.edit, size: 16),
+                    label: Text(l10n.edit),
+                  ),
+                ],
+                if (onSetDefault != null) ...[
+                  const SizedBox(width: 8),
                   TextButton.icon(
                     onPressed: onSetDefault,
                     icon: const Icon(Icons.star, size: 16),
                     label: Text(l10n.setAsDefault),
+                    style: TextButton.styleFrom(
+                      foregroundColor: theme.colorScheme.primary,
+                    ),
                   ),
-                if (onDelete != null)
+                ],
+                if (onDelete != null) ...[
+                  const SizedBox(width: 8),
                   TextButton.icon(
                     onPressed: onDelete,
                     icon: const Icon(Icons.delete, size: 16),
@@ -186,11 +150,124 @@ class StorageConfigCard extends StatelessWidget {
                       foregroundColor: theme.colorScheme.error,
                     ),
                   ),
+                ],
               ],
             ),
           ],
         ),
       ),
     );
+  }
+
+  Widget _buildConfigDetails(BuildContext context, Map<String, dynamic> config) {
+    final l10n = AppLocalizations.of(context);
+    final configData = config['config_data'] ?? {};
+    final storageType = config['storage_type'];
+
+    if (storageType == 'local') {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildDetailRow(
+            context,
+            l10n.basePath,
+            configData['base_path'] ?? 'N/A',
+            Icons.folder,
+          ),
+        ],
+      );
+    } else if (storageType == 'ftp') {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildDetailRow(
+            context,
+            l10n.ftpHost,
+            configData['host'] ?? 'N/A',
+            Icons.dns,
+          ),
+          const SizedBox(height: 8),
+          _buildDetailRow(
+            context,
+            l10n.ftpPort,
+            configData['port']?.toString() ?? 'N/A',
+            Icons.settings_ethernet,
+          ),
+          const SizedBox(height: 8),
+          _buildDetailRow(
+            context,
+            l10n.ftpUsername,
+            configData['username'] ?? 'N/A',
+            Icons.person,
+          ),
+          const SizedBox(height: 8),
+          _buildDetailRow(
+            context,
+            l10n.ftpDirectory,
+            configData['directory'] ?? 'N/A',
+            Icons.folder,
+          ),
+        ],
+      );
+    }
+
+    return const SizedBox.shrink();
+  }
+
+  Widget _buildDetailRow(
+    BuildContext context,
+    String label,
+    String value,
+    IconData icon,
+  ) {
+    final theme = Theme.of(context);
+    
+    return Row(
+      children: [
+        Icon(
+          icon,
+          size: 16,
+          color: theme.colorScheme.onSurface.withOpacity(0.6),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          '$label: ',
+          style: theme.textTheme.bodyMedium?.copyWith(
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurface.withOpacity(0.8),
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+  }
+
+  IconData _getStorageIcon(String storageType) {
+    switch (storageType) {
+      case 'local':
+        return Icons.storage;
+      case 'ftp':
+        return Icons.cloud_upload;
+      default:
+        return Icons.storage;
+    }
+  }
+
+  String _getStorageTypeName(String storageType) {
+    switch (storageType) {
+      case 'local':
+        return 'Local Storage';
+      case 'ftp':
+        return 'FTP Storage';
+      default:
+        return 'Unknown Storage';
+    }
   }
 }

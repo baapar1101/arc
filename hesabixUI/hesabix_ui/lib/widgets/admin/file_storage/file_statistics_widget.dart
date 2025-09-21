@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
+import '../../../core/api_client.dart';
 
 class FileStatisticsWidget extends StatefulWidget {
   const FileStatisticsWidget({super.key});
@@ -26,18 +27,17 @@ class _FileStatisticsWidgetState extends State<FileStatisticsWidget> {
     });
 
     try {
-      // TODO: Call API to load statistics
-      await Future.delayed(const Duration(seconds: 1)); // Simulate API call
+      final api = ApiClient();
+      final response = await api.get('/api/v1/admin/files/statistics');
       
-      setState(() {
-        _statistics = {
-          'total_files': 1250,
-          'total_size': 2048576000, // 2GB in bytes
-          'temporary_files': 45,
-          'unverified_files': 12,
-        };
-        _isLoading = false;
-      });
+      if (response.data != null && response.data['success'] == true) {
+        setState(() {
+          _statistics = response.data['data'];
+          _isLoading = false;
+        });
+      } else {
+        throw Exception(response.data?['message'] ?? 'خطا در دریافت آمار');
+      }
     } catch (e) {
       setState(() {
         _error = e.toString();
@@ -46,8 +46,9 @@ class _FileStatisticsWidgetState extends State<FileStatisticsWidget> {
     }
   }
 
+
   Future<void> _cleanupTemporaryFiles() async {
-    final l10n = AppLocalizations.of(context)!;
+    final l10n = AppLocalizations.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -68,17 +69,21 @@ class _FileStatisticsWidgetState extends State<FileStatisticsWidget> {
 
     if (confirmed == true) {
       try {
-        // TODO: Call API to cleanup temporary files
-        await Future.delayed(const Duration(seconds: 2)); // Simulate API call
+        final api = ApiClient();
+        final response = await api.post('/api/v1/admin/files/cleanup-temporary');
         
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(l10n.cleanupCompleted),
-            backgroundColor: Colors.green,
-          ),
-        );
-        
-        _loadStatistics();
+        if (response.data != null && response.data['success'] == true) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(l10n.cleanupCompleted),
+              backgroundColor: Colors.green,
+            ),
+          );
+          
+          _loadStatistics();
+        } else {
+          throw Exception(response.data?['message'] ?? 'خطا در پاکسازی فایل‌های موقت');
+        }
       } catch (e) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -90,6 +95,7 @@ class _FileStatisticsWidgetState extends State<FileStatisticsWidget> {
     }
   }
 
+
   String _formatFileSize(int bytes) {
     if (bytes < 1024) return '$bytes B';
     if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
@@ -99,7 +105,7 @@ class _FileStatisticsWidgetState extends State<FileStatisticsWidget> {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
+    final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
 
     if (_isLoading) {
