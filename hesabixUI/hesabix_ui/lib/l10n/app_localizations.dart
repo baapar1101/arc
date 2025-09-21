@@ -1783,6 +1783,444 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Close'**
   String get close;
+
+  /// No description provided for @fileStorage.
+  ///
+  /// In en, this message translates to:
+  /// **'File Management'**
+  String get fileStorage;
+
+  /// No description provided for @fileStorageSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'File Settings'**
+  String get fileStorageSettings;
+
+  /// No description provided for @storageConfigurations.
+  ///
+  /// In en, this message translates to:
+  /// **'Storage Configurations'**
+  String get storageConfigurations;
+
+  /// No description provided for @addStorageConfig.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Storage Configuration'**
+  String get addStorageConfig;
+
+  /// No description provided for @editStorageConfig.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Storage Configuration'**
+  String get editStorageConfig;
+
+  /// No description provided for @storageName.
+  ///
+  /// In en, this message translates to:
+  /// **'Configuration Name'**
+  String get storageName;
+
+  /// No description provided for @storageType.
+  ///
+  /// In en, this message translates to:
+  /// **'Storage Type'**
+  String get storageType;
+
+  /// No description provided for @localStorage.
+  ///
+  /// In en, this message translates to:
+  /// **'Local Storage'**
+  String get localStorage;
+
+  /// No description provided for @ftpStorage.
+  ///
+  /// In en, this message translates to:
+  /// **'FTP Storage'**
+  String get ftpStorage;
+
+  /// No description provided for @isDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Default'**
+  String get isDefault;
+
+  /// No description provided for @isActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Active'**
+  String get isActive;
+
+  /// No description provided for @configData.
+  ///
+  /// In en, this message translates to:
+  /// **'Configuration Data'**
+  String get configData;
+
+  /// No description provided for @basePath.
+  ///
+  /// In en, this message translates to:
+  /// **'Base Path'**
+  String get basePath;
+
+  /// No description provided for @ftpHost.
+  ///
+  /// In en, this message translates to:
+  /// **'FTP Host'**
+  String get ftpHost;
+
+  /// No description provided for @ftpPort.
+  ///
+  /// In en, this message translates to:
+  /// **'FTP Port'**
+  String get ftpPort;
+
+  /// No description provided for @ftpUsername.
+  ///
+  /// In en, this message translates to:
+  /// **'FTP Username'**
+  String get ftpUsername;
+
+  /// No description provided for @ftpPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'FTP Password'**
+  String get ftpPassword;
+
+  /// No description provided for @ftpDirectory.
+  ///
+  /// In en, this message translates to:
+  /// **'FTP Directory'**
+  String get ftpDirectory;
+
+  /// No description provided for @testConnection.
+  ///
+  /// In en, this message translates to:
+  /// **'Test Connection'**
+  String get testConnection;
+
+  /// No description provided for @connectionSuccessful.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection Successful'**
+  String get connectionSuccessful;
+
+  /// No description provided for @connectionFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection Failed'**
+  String get connectionFailed;
+
+  /// No description provided for @setAsDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Set as Default'**
+  String get setAsDefault;
+
+  /// No description provided for @fileStatistics.
+  ///
+  /// In en, this message translates to:
+  /// **'File Statistics'**
+  String get fileStatistics;
+
+  /// No description provided for @totalFiles.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Files'**
+  String get totalFiles;
+
+  /// No description provided for @totalSize.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Size'**
+  String get totalSize;
+
+  /// No description provided for @temporaryFiles.
+  ///
+  /// In en, this message translates to:
+  /// **'Temporary Files'**
+  String get temporaryFiles;
+
+  /// No description provided for @unverifiedFiles.
+  ///
+  /// In en, this message translates to:
+  /// **'Unverified Files'**
+  String get unverifiedFiles;
+
+  /// No description provided for @cleanupTemporaryFiles.
+  ///
+  /// In en, this message translates to:
+  /// **'Cleanup Temporary Files'**
+  String get cleanupTemporaryFiles;
+
+  /// No description provided for @cleanupCompleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Cleanup Completed'**
+  String get cleanupCompleted;
+
+  /// No description provided for @filesCleaned.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} files cleaned'**
+  String filesCleaned(Object count);
+
+  /// No description provided for @fileManagement.
+  ///
+  /// In en, this message translates to:
+  /// **'File Management'**
+  String get fileManagement;
+
+  /// No description provided for @allFiles.
+  ///
+  /// In en, this message translates to:
+  /// **'All Files'**
+  String get allFiles;
+
+  /// No description provided for @unverifiedFilesList.
+  ///
+  /// In en, this message translates to:
+  /// **'Unverified Files'**
+  String get unverifiedFilesList;
+
+  /// No description provided for @fileName.
+  ///
+  /// In en, this message translates to:
+  /// **'File Name'**
+  String get fileName;
+
+  /// No description provided for @fileSize.
+  ///
+  /// In en, this message translates to:
+  /// **'File Size'**
+  String get fileSize;
+
+  /// No description provided for @mimeType.
+  ///
+  /// In en, this message translates to:
+  /// **'MIME Type'**
+  String get mimeType;
+
+  /// No description provided for @moduleContext.
+  ///
+  /// In en, this message translates to:
+  /// **'Module Context'**
+  String get moduleContext;
+
+  /// No description provided for @expiresAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Expires At'**
+  String get expiresAt;
+
+  /// No description provided for @isTemporary.
+  ///
+  /// In en, this message translates to:
+  /// **'Temporary'**
+  String get isTemporary;
+
+  /// No description provided for @isVerified.
+  ///
+  /// In en, this message translates to:
+  /// **'Verified'**
+  String get isVerified;
+
+  /// No description provided for @forceDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Force Delete'**
+  String get forceDelete;
+
+  /// No description provided for @restoreFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore File'**
+  String get restoreFile;
+
+  /// No description provided for @deleteConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm Delete'**
+  String get deleteConfirm;
+
+  /// No description provided for @deleteConfirmMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to delete this file?'**
+  String get deleteConfirmMessage;
+
+  /// No description provided for @restoreConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm Restore'**
+  String get restoreConfirm;
+
+  /// No description provided for @restoreConfirmMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to restore this file?'**
+  String get restoreConfirmMessage;
+
+  /// No description provided for @fileDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'File deleted'**
+  String get fileDeleted;
+
+  /// No description provided for @fileRestored.
+  ///
+  /// In en, this message translates to:
+  /// **'File restored'**
+  String get fileRestored;
+
+  /// No description provided for @errorDeletingFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Error deleting file'**
+  String get errorDeletingFile;
+
+  /// No description provided for @errorRestoringFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Error restoring file'**
+  String get errorRestoringFile;
+
+  /// No description provided for @noFilesFound.
+  ///
+  /// In en, this message translates to:
+  /// **'No files found'**
+  String get noFilesFound;
+
+  /// No description provided for @loadingFiles.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading files...'**
+  String get loadingFiles;
+
+  /// No description provided for @errorLoadingFiles.
+  ///
+  /// In en, this message translates to:
+  /// **'Error loading files'**
+  String get errorLoadingFiles;
+
+  /// No description provided for @refreshFiles.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh Files'**
+  String get refreshFiles;
+
+  /// No description provided for @fileDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'File Details'**
+  String get fileDetails;
+
+  /// No description provided for @originalName.
+  ///
+  /// In en, this message translates to:
+  /// **'Original Name'**
+  String get originalName;
+
+  /// No description provided for @storedName.
+  ///
+  /// In en, this message translates to:
+  /// **'Stored Name'**
+  String get storedName;
+
+  /// No description provided for @filePath.
+  ///
+  /// In en, this message translates to:
+  /// **'File Path'**
+  String get filePath;
+
+  /// No description provided for @checksum.
+  ///
+  /// In en, this message translates to:
+  /// **'Checksum'**
+  String get checksum;
+
+  /// No description provided for @uploadedBy.
+  ///
+  /// In en, this message translates to:
+  /// **'Uploaded by'**
+  String get uploadedBy;
+
+  /// No description provided for @lastVerified.
+  ///
+  /// In en, this message translates to:
+  /// **'Last Verified'**
+  String get lastVerified;
+
+  /// No description provided for @developerData.
+  ///
+  /// In en, this message translates to:
+  /// **'Developer Data'**
+  String get developerData;
+
+  /// No description provided for @edit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit'**
+  String get edit;
+
+  /// No description provided for @delete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get delete;
+
+  /// No description provided for @actions.
+  ///
+  /// In en, this message translates to:
+  /// **'Actions'**
+  String get actions;
+
+  /// No description provided for @search.
+  ///
+  /// In en, this message translates to:
+  /// **'Search'**
+  String get search;
+
+  /// No description provided for @filter.
+  ///
+  /// In en, this message translates to:
+  /// **'Filter'**
+  String get filter;
+
+  /// No description provided for @apply.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply'**
+  String get apply;
+
+  /// No description provided for @reset.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset'**
+  String get reset;
+
+  /// No description provided for @of.
+  ///
+  /// In en, this message translates to:
+  /// **'of'**
+  String get of;
+
+  /// No description provided for @itemsPerPage.
+  ///
+  /// In en, this message translates to:
+  /// **'Items per page'**
+  String get itemsPerPage;
+
+  /// No description provided for @first.
+  ///
+  /// In en, this message translates to:
+  /// **'First'**
+  String get first;
+
+  /// No description provided for @last.
+  ///
+  /// In en, this message translates to:
+  /// **'Last'**
+  String get last;
 }
 
 class _AppLocalizationsDelegate

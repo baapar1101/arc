@@ -23,6 +23,9 @@ class _SupportPageState extends State<SupportPage> {
   final SupportService _supportService = SupportService(ApiClient());
   List<SupportStatus> _statuses = [];
   List<SupportPriority> _priorities = [];
+  
+  // Refresh counter to force data table refresh
+  int _refreshCounter = 0;
 
   @override
   void initState() {
@@ -52,7 +55,10 @@ class _SupportPageState extends State<SupportPage> {
     );
     
     if (result == true) {
-      // Refresh will be handled by DataTableWidget
+      // Refresh the data table after successful ticket creation
+      setState(() {
+        _refreshCounter++;
+      });
     }
   }
 
@@ -83,6 +89,7 @@ class _SupportPageState extends State<SupportPage> {
           children: [
             Expanded(
               child: DataTableWidget<Map<String, dynamic>>(
+                key: ValueKey('data_table_$_refreshCounter'),
                 config: DataTableConfig<Map<String, dynamic>>(
                   title: t.supportTickets,
                   endpoint: '/api/v1/support/search',

@@ -18,12 +18,14 @@ class DataTableWidget<T> extends StatefulWidget {
   final DataTableConfig<T> config;
   final T Function(Map<String, dynamic>) fromJson;
   final CalendarController? calendarController;
+  final VoidCallback? onRefresh;
 
   const DataTableWidget({
     super.key,
     required this.config,
     required this.fromJson,
     this.calendarController,
+    this.onRefresh,
   });
 
   @override
@@ -79,6 +81,11 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     _limit = widget.config.defaultPageSize;
     _setupSearchListener();
     _loadColumnSettings();
+    _fetchData();
+  }
+
+  /// Public method to refresh the data table
+  void refresh() {
     _fetchData();
   }
 
@@ -200,6 +207,13 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
           _totalPages = response.totalPages;
           _selectedRows.clear(); // Clear selection when data changes
         });
+        
+        // Call the refresh callback if provided
+        if (widget.onRefresh != null) {
+          widget.onRefresh!();
+        } else if (widget.config.onRefresh != null) {
+          widget.config.onRefresh!();
+        }
       }
     } catch (e) {
       setState(() {

@@ -202,3 +202,70 @@ msgstr "Referral Code"
 
 msgid "status"
 msgstr "Status"
+
+# File Storage Management
+msgid "FILE_LIST_NOT_IMPLEMENTED"
+msgstr "File list - to be implemented"
+
+msgid "FILE_LIST_ERROR"
+msgstr "Error retrieving file list"
+
+msgid "UNVERIFIED_FILES_ERROR"
+msgstr "Error retrieving unverified files"
+
+msgid "CLEANUP_COMPLETED"
+msgstr "Temporary files cleanup completed successfully"
+
+msgid "CLEANUP_ERROR"
+msgstr "Error cleaning up temporary files"
+
+msgid "FILE_DELETED_SUCCESS"
+msgstr "File deleted successfully"
+
+msgid "DELETE_FILE_ERROR"
+msgstr "Error deleting file"
+
+msgid "FILE_RESTORED_SUCCESS"
+msgstr "File restored successfully"
+
+msgid "RESTORE_FILE_ERROR"
+msgstr "Error restoring file"
+
+msgid "STATISTICS_ERROR"
+msgstr "Error retrieving statistics"
+
+msgid "STORAGE_CONFIGS_ERROR"
+msgstr "Error retrieving storage configurations"
+
+msgid "STORAGE_CONFIG_CREATED"
+msgstr "Storage configuration created successfully"
+
+msgid "CREATE_STORAGE_CONFIG_ERROR"
+msgstr "Error creating storage configuration"
+
+msgid "STORAGE_CONFIG_UPDATE_NOT_IMPLEMENTED"
+msgstr "Storage configuration update - to be implemented"
+
+msgid "UPDATE_STORAGE_CONFIG_ERROR"
+msgstr "Error updating storage configuration"
+
+msgid "STORAGE_CONFIG_NOT_FOUND"
+msgstr "Storage configuration not found"
+
+msgid "DEFAULT_STORAGE_CONFIG_UPDATED"
+msgstr "Default storage configuration updated successfully"
+
+msgid "SET_DEFAULT_STORAGE_CONFIG_ERROR"
+msgstr "Error setting default configuration"
+
+msgid "STORAGE_CONFIG_DELETED"
+msgstr "Storage configuration deleted successfully"
+
+msgid "DELETE_STORAGE_CONFIG_ERROR"
+msgstr "Error deleting storage configuration"
+
+msgid "STORAGE_CONNECTION_TEST_NOT_IMPLEMENTED"
+msgstr "Storage connection test - to be implemented"
+
+msgid "TEST_STORAGE_CONFIG_ERROR"
+msgstr "Error testing storage connection"

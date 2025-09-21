@@ -255,6 +255,9 @@ class DataTableConfig<T> {
   
   // Show individual action buttons
   final bool showFiltersButton;
+  
+  // Refresh callback
+  final VoidCallback? onRefresh;
 
   const DataTableConfig({
     required this.endpoint,
@@ -318,6 +321,7 @@ class DataTableConfig<T> {
     this.onColumnSettingsChanged,
     this.customHeaderActions,
     this.showFiltersButton = false,
+    this.onRefresh,
   });
 
   /// Get column width as double

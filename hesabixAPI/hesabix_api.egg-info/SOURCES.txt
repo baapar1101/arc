@@ -8,6 +8,9 @@ adapters/api/v1/businesses.py
 adapters/api/v1/health.py
 adapters/api/v1/schemas.py
 adapters/api/v1/users.py
+adapters/api/v1/admin/file_storage.py
+adapters/api/v1/schemas/__init__.py
+adapters/api/v1/schemas/file_storage.py
 adapters/api/v1/support/__init__.py
 adapters/api/v1/support/categories.py
 adapters/api/v1/support/operator.py
@@ -22,6 +25,7 @@ adapters/db/models/api_key.py
 adapters/db/models/business.py
 adapters/db/models/business_permission.py
 adapters/db/models/captcha.py
+adapters/db/models/file_storage.py
 adapters/db/models/password_reset.py
 adapters/db/models/user.py
 adapters/db/models/support/__init__.py
@@ -34,6 +38,7 @@ adapters/db/repositories/api_key_repo.py
 adapters/db/repositories/base_repo.py
 adapters/db/repositories/business_permission_repo.py
 adapters/db/repositories/business_repo.py
+adapters/db/repositories/file_storage_repository.py
 adapters/db/repositories/password_reset_repo.py
 adapters/db/repositories/user_repo.py
 adapters/db/repositories/support/__init__.py
@@ -61,6 +66,7 @@ app/services/api_key_service.py
 app/services/auth_service.py
 app/services/business_service.py
 app/services/captcha_service.py
+app/services/file_storage_service.py
 app/services/query_service.py
 app/services/pdf/__init__.py
 app/services/pdf/base_pdf_service.py
@@ -81,6 +87,7 @@ migrations/versions/20250117_000007_create_business_permissions_table.py
 migrations/versions/20250915_000001_init_auth_tables.py
 migrations/versions/20250916_000002_add_referral_fields.py
 migrations/versions/5553f8745c6e_add_support_tables.py
+migrations/versions/8bf0dbb9fba9_add_file_storage_tables.py
 tests/__init__.py
 tests/test_health.py
 tests/test_permissions.py

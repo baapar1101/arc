@@ -877,4 +877,227 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get close => 'Close';
+
+  @override
+  String get fileStorage => 'File Management';
+
+  @override
+  String get fileStorageSettings => 'File Settings';
+
+  @override
+  String get storageConfigurations => 'Storage Configurations';
+
+  @override
+  String get addStorageConfig => 'Add Storage Configuration';
+
+  @override
+  String get editStorageConfig => 'Edit Storage Configuration';
+
+  @override
+  String get storageName => 'Configuration Name';
+
+  @override
+  String get storageType => 'Storage Type';
+
+  @override
+  String get localStorage => 'Local Storage';
+
+  @override
+  String get ftpStorage => 'FTP Storage';
+
+  @override
+  String get isDefault => 'Default';
+
+  @override
+  String get isActive => 'Active';
+
+  @override
+  String get configData => 'Configuration Data';
+
+  @override
+  String get basePath => 'Base Path';
+
+  @override
+  String get ftpHost => 'FTP Host';
+
+  @override
+  String get ftpPort => 'FTP Port';
+
+  @override
+  String get ftpUsername => 'FTP Username';
+
+  @override
+  String get ftpPassword => 'FTP Password';
+
+  @override
+  String get ftpDirectory => 'FTP Directory';
+
+  @override
+  String get testConnection => 'Test Connection';
+
+  @override
+  String get connectionSuccessful => 'Connection Successful';
+
+  @override
+  String get connectionFailed => 'Connection Failed';
+
+  @override
+  String get setAsDefault => 'Set as Default';
+
+  @override
+  String get fileStatistics => 'File Statistics';
+
+  @override
+  String get totalFiles => 'Total Files';
+
+  @override
+  String get totalSize => 'Total Size';
+
+  @override
+  String get temporaryFiles => 'Temporary Files';
+
+  @override
+  String get unverifiedFiles => 'Unverified Files';
+
+  @override
+  String get cleanupTemporaryFiles => 'Cleanup Temporary Files';
+
+  @override
+  String get cleanupCompleted => 'Cleanup Completed';
+
+  @override
+  String filesCleaned(Object count) {
+    return '$count files cleaned';
+  }
+
+  @override
+  String get fileManagement => 'File Management';
+
+  @override
+  String get allFiles => 'All Files';
+
+  @override
+  String get unverifiedFilesList => 'Unverified Files';
+
+  @override
+  String get fileName => 'File Name';
+
+  @override
+  String get fileSize => 'File Size';
+
+  @override
+  String get mimeType => 'MIME Type';
+
+  @override
+  String get moduleContext => 'Module Context';
+
+  @override
+  String get expiresAt => 'Expires At';
+
+  @override
+  String get isTemporary => 'Temporary';
+
+  @override
+  String get isVerified => 'Verified';
+
+  @override
+  String get forceDelete => 'Force Delete';
+
+  @override
+  String get restoreFile => 'Restore File';
+
+  @override
+  String get deleteConfirm => 'Confirm Delete';
+
+  @override
+  String get deleteConfirmMessage =>
+      'Are you sure you want to delete this file?';
+
+  @override
+  String get restoreConfirm => 'Confirm Restore';
+
+  @override
+  String get restoreConfirmMessage =>
+      'Are you sure you want to restore this file?';
+
+  @override
+  String get fileDeleted => 'File deleted';
+
+  @override
+  String get fileRestored => 'File restored';
+
+  @override
+  String get errorDeletingFile => 'Error deleting file';
+
+  @override
+  String get errorRestoringFile => 'Error restoring file';
+
+  @override
+  String get noFilesFound => 'No files found';
+
+  @override
+  String get loadingFiles => 'Loading files...';
+
+  @override
+  String get errorLoadingFiles => 'Error loading files';
+
+  @override
+  String get refreshFiles => 'Refresh Files';
+
+  @override
+  String get fileDetails => 'File Details';
+
+  @override
+  String get originalName => 'Original Name';
+
+  @override
+  String get storedName => 'Stored Name';
+
+  @override
+  String get filePath => 'File Path';
+
+  @override
+  String get checksum => 'Checksum';
+
+  @override
+  String get uploadedBy => 'Uploaded by';
+
+  @override
+  String get lastVerified => 'Last Verified';
+
+  @override
+  String get developerData => 'Developer Data';
+
+  @override
+  String get edit => 'Edit';
+
+  @override
+  String get delete => 'Delete';
+
+  @override
+  String get actions => 'Actions';
+
+  @override
+  String get search => 'Search';
+
+  @override
+  String get filter => 'Filter';
+
+  @override
+  String get apply => 'Apply';
+
+  @override
+  String get reset => 'Reset';
+
+  @override
+  String get of => 'of';
+
+  @override
+  String get itemsPerPage => 'Items per page';
+
+  @override
+  String get first => 'First';
+
+  @override
+  String get last => 'Last';
 }

@@ -41,6 +41,63 @@ class _CreateTicketPageState extends State<CreateTicketPage> {
     super.dispose();
   }
 
+  void _showOverlayMessage(String message, Color backgroundColor, Duration duration) {
+    final overlay = Overlay.of(context);
+    late OverlayEntry overlayEntry;
+    
+    overlayEntry = OverlayEntry(
+      builder: (context) => Positioned(
+        top: MediaQuery.of(context).padding.top + 20,
+        left: 16,
+        right: 16,
+        child: Material(
+          color: Colors.transparent,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: backgroundColor,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.2),
+                  blurRadius: 8,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  backgroundColor == Colors.green ? Icons.check_circle : Icons.error,
+                  color: Colors.white,
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    message,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    
+    overlay.insert(overlayEntry);
+    
+    // Remove overlay after duration
+    Future.delayed(duration, () {
+      overlayEntry.remove();
+    });
+  }
+
   Future<void> _loadData() async {
     setState(() {
       _isLoading = true;
@@ -68,11 +125,10 @@ class _CreateTicketPageState extends State<CreateTicketPage> {
     if (!_formKey.currentState!.validate()) return;
     if (_selectedCategory == null || _selectedPriority == null) {
       final t = AppLocalizations.of(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(t.pleaseSelectCategoryAndPriority),
-          backgroundColor: Colors.red,
-        ),
+      _showOverlayMessage(
+        t.pleaseSelectCategoryAndPriority,
+        Colors.red,
+        const Duration(seconds: 3),
       );
       return;
     }
@@ -94,11 +150,10 @@ class _CreateTicketPageState extends State<CreateTicketPage> {
       
       if (mounted) {
         final t = AppLocalizations.of(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(t.ticketCreatedSuccessfully),
-            backgroundColor: Colors.green,
-          ),
+        _showOverlayMessage(
+          t.ticketCreatedSuccessfully,
+          Colors.green,
+          const Duration(seconds: 2),
         );
         Navigator.pop(context, true);
       }

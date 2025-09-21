@@ -44,6 +44,63 @@ class _TicketDetailsDialogState extends State<TicketDetailsDialog> {
     super.dispose();
   }
 
+  void _showOverlayMessage(String message, Color backgroundColor, Duration duration) {
+    final overlay = Overlay.of(context);
+    late OverlayEntry overlayEntry;
+    
+    overlayEntry = OverlayEntry(
+      builder: (context) => Positioned(
+        top: MediaQuery.of(context).padding.top + 20,
+        left: 16,
+        right: 16,
+        child: Material(
+          color: Colors.transparent,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: backgroundColor,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.2),
+                  blurRadius: 8,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  backgroundColor == Colors.green ? Icons.check_circle : Icons.error,
+                  color: Colors.white,
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    message,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    
+    overlay.insert(overlayEntry);
+    
+    // Remove overlay after duration
+    Future.delayed(duration, () {
+      overlayEntry.remove();
+    });
+  }
+
   Future<void> _loadMessages() async {
     if (_isLoading) return;
 
@@ -84,15 +141,11 @@ class _TicketDetailsDialogState extends State<TicketDetailsDialog> {
       
       if (mounted) {
         final l10n = AppLocalizations.of(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(l10n.ticketLoadingError),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
+        // Show error message using Overlay to appear above dialog
+        _showOverlayMessage(
+          l10n.ticketLoadingError,
+          Colors.red,
+          const Duration(seconds: 3),
         );
       }
     }
@@ -146,15 +199,11 @@ class _TicketDetailsDialogState extends State<TicketDetailsDialog> {
 
       if (mounted) {
         final l10n = AppLocalizations.of(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(l10n.messageSentSuccessfully),
-            backgroundColor: Colors.green,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
+        // Show success message using Overlay to appear above dialog
+        _showOverlayMessage(
+          l10n.messageSentSuccessfully,
+          Colors.green,
+          const Duration(seconds: 2),
         );
       }
 
@@ -167,41 +216,16 @@ class _TicketDetailsDialogState extends State<TicketDetailsDialog> {
 
       if (mounted) {
         final l10n = AppLocalizations.of(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(l10n.errorSendingMessage),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
+        // Show error message using Overlay to appear above dialog
+        _showOverlayMessage(
+          l10n.errorSendingMessage,
+          Colors.red,
+          const Duration(seconds: 3),
         );
       }
     }
   }
 
-  String _formatDate(DateTime dateTime, AppLocalizations l10n) {
-    final now = DateTime.now();
-    final difference = now.difference(dateTime);
-
-    // If the difference is negative (future time), show just now
-    if (difference.isNegative) {
-      return l10n.justNow;
-    }
-
-    if (difference.inDays > 0) {
-      return l10n.daysAgo(difference.inDays.toString());
-    } else if (difference.inHours > 0) {
-      return l10n.hoursAgo(difference.inHours.toString());
-    } else if (difference.inMinutes > 0) {
-      return l10n.minutesAgo(difference.inMinutes.toString());
-    } else if (difference.inSeconds > 10) {
-      return l10n.justNow;
-    } else {
-      return l10n.justNow;
-    }
-  }
 
   Widget _buildInfoChip(String label, String value, IconData icon) {
     return Container(
@@ -299,90 +323,60 @@ class _TicketDetailsDialogState extends State<TicketDetailsDialog> {
               ),
             ),
 
-            // Messages Section (Main Focus)
+            // Messages Section (Main Focus) - No Card Container
             Expanded(
-              child: Container(
-                margin: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.grey[50],
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.grey[200]!),
-                ),
-                child: Column(
-                  children: [
-                    // Messages Header with Ticket Info
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: const BorderRadius.only(
-                          topLeft: Radius.circular(12),
-                          topRight: Radius.circular(12),
-                        ),
-                        border: Border(
-                          bottom: BorderSide(color: Colors.grey[200]!),
-                        ),
+              child: Column(
+                children: [
+                  // Messages Header with Ticket Info
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[50],
+                      border: Border(
+                        bottom: BorderSide(color: Colors.grey[200]!),
                       ),
-                      child: Column(
-                        children: [
-                          // Conversation Title
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.chat_bubble_outline,
+                    ),
+                    child: Column(
+                      children: [
+                        // Conversation Title
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.chat_bubble_outline,
+                              color: theme.primaryColor,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              l10n.conversation,
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.bold,
                                 color: theme.primaryColor,
-                                size: 20,
                               ),
-                              const SizedBox(width: 8),
-                              Text(
-                                l10n.conversation,
-                                style: theme.textTheme.titleSmall?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                  color: theme.primaryColor,
-                                ),
+                            ),
+                            const Spacer(),
+                            Text(
+                              l10n.messageCount(_messages.length.toString()),
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: Colors.grey[600],
                               ),
-                              const Spacer(),
-                              Text(
-                                l10n.messageCount(_messages.length.toString()),
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  color: Colors.grey[600],
-                                ),
-                              ),
-                            ],
-                          ),
+                            ),
+                          ],
+                        ),
+                        if (widget.isOperator && (_ticket.user != null || _ticket.assignedOperator != null)) ...[
                           const SizedBox(height: 12),
-                          // Ticket Info Chips
+                          // Only show user info for operators
                           Wrap(
                             spacing: 8,
                             runSpacing: 8,
                             children: [
-                              _buildInfoChip(
-                                l10n.status,
-                                _ticket.status?.name ?? '',
-                                Icons.info_outline,
-                              ),
-                              _buildInfoChip(
-                                l10n.category,
-                                _ticket.category?.name ?? '',
-                                Icons.category_outlined,
-                              ),
-                              _buildInfoChip(
-                                l10n.priority,
-                                _ticket.priority?.name ?? '',
-                                Icons.priority_high,
-                              ),
-                              _buildInfoChip(
-                                l10n.createdAt,
-                                _formatDate(_ticket.createdAt, l10n),
-                                Icons.schedule,
-                              ),
-                              if (widget.isOperator && _ticket.user != null)
+                              if (_ticket.user != null)
                                 _buildInfoChip(
                                   l10n.createdBy,
                                   _ticket.user!.displayName,
                                   Icons.person,
                                 ),
-                              if (widget.isOperator && _ticket.assignedOperator != null)
+                              if (_ticket.assignedOperator != null)
                                 _buildInfoChip(
                                   l10n.assignedTo,
                                   _ticket.assignedOperator!.displayName,
@@ -391,125 +385,121 @@ class _TicketDetailsDialogState extends State<TicketDetailsDialog> {
                             ],
                           ),
                         ],
-                      ),
+                      ],
                     ),
+                  ),
 
-                    // Messages List
-                    Expanded(
-                      child: _isLoading
-                          ? const Center(
-                              child: CircularProgressIndicator(),
-                            )
-                          : _messages.isEmpty
-                              ? Center(
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(
-                                        Icons.chat_bubble_outline,
-                                        size: 48,
-                                        color: Colors.grey[400],
-                                      ),
-                                      const SizedBox(height: 16),
-                                      Text(
-                                        l10n.noMessagesFound,
-                                        style: theme.textTheme.bodyLarge?.copyWith(
-                                          color: Colors.grey[600],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                )
-                              : ListView.builder(
-                                  controller: _scrollController,
-                                  padding: const EdgeInsets.all(16),
-                                  itemCount: _messages.length,
-                                  itemBuilder: (context, index) {
-                                    final message = _messages[index];
-                                    return Padding(
-                                      padding: const EdgeInsets.only(bottom: 12),
-                                      child: MessageBubble(
-                                        message: message,
-                                      ),
-                                    );
-                                  },
-                                ),
-                    ),
-
-                    // Message Input
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: const BorderRadius.only(
-                          bottomLeft: Radius.circular(12),
-                          bottomRight: Radius.circular(12),
-                        ),
-                        border: Border(
-                          top: BorderSide(color: Colors.grey[200]!),
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: TextField(
-                              controller: _messageController,
-                              decoration: InputDecoration(
-                                hintText: widget.isOperator
-                                    ? l10n.writeYourResponse
-                                    : l10n.writeYourMessage,
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(25),
-                                  borderSide: BorderSide(color: Colors.grey[300]!),
-                                ),
-                                enabledBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(25),
-                                  borderSide: BorderSide(color: Colors.grey[300]!),
-                                ),
-                                focusedBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(25),
-                                  borderSide: BorderSide(color: theme.primaryColor),
-                                ),
-                                contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 12,
-                                ),
-                                filled: true,
-                                fillColor: Colors.grey[50],
-                              ),
-                              maxLines: null,
-                              textInputAction: TextInputAction.send,
-                              onSubmitted: (_) => _sendMessage(),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Container(
-                            decoration: BoxDecoration(
-                              color: theme.primaryColor,
-                              borderRadius: BorderRadius.circular(25),
-                            ),
-                            child: IconButton(
-                              onPressed: _isSending ? null : _sendMessage,
-                              icon: _isSending
-                                  ? const SizedBox(
-                                      width: 20,
-                                      height: 20,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                      ),
-                                    )
-                                  : const Icon(
-                                      Icons.send,
-                                      color: Colors.white,
+                  // Messages List
+                  Expanded(
+                    child: _isLoading
+                        ? const Center(
+                            child: CircularProgressIndicator(),
+                          )
+                        : _messages.isEmpty
+                            ? Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.chat_bubble_outline,
+                                      size: 48,
+                                      color: Colors.grey[400],
                                     ),
-                            ),
-                          ),
-                        ],
+                                    const SizedBox(height: 16),
+                                    Text(
+                                      l10n.noMessagesFound,
+                                      style: theme.textTheme.bodyLarge?.copyWith(
+                                        color: Colors.grey[600],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              )
+                            : ListView.builder(
+                                controller: _scrollController,
+                                padding: const EdgeInsets.all(16),
+                                itemCount: _messages.length,
+                                itemBuilder: (context, index) {
+                                  final message = _messages[index];
+                                  return Padding(
+                                    padding: const EdgeInsets.only(bottom: 12),
+                                    child: MessageBubble(
+                                      message: message,
+                                    ),
+                                  );
+                                },
+                              ),
+                  ),
+
+                  // Message Input
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[50],
+                      border: Border(
+                        top: BorderSide(color: Colors.grey[200]!),
                       ),
                     ),
-                  ],
-                ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _messageController,
+                            decoration: InputDecoration(
+                              hintText: widget.isOperator
+                                  ? l10n.writeYourResponse
+                                  : l10n.writeYourMessage,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(25),
+                                borderSide: BorderSide(color: Colors.grey[300]!),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(25),
+                                borderSide: BorderSide(color: Colors.grey[300]!),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(25),
+                                borderSide: BorderSide(color: theme.primaryColor),
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 12,
+                              ),
+                              filled: true,
+                              fillColor: Colors.white,
+                            ),
+                            maxLines: null,
+                            textInputAction: TextInputAction.send,
+                            onSubmitted: (_) => _sendMessage(),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Container(
+                          decoration: BoxDecoration(
+                            color: theme.primaryColor,
+                            borderRadius: BorderRadius.circular(25),
+                          ),
+                          child: IconButton(
+                            onPressed: _isSending ? null : _sendMessage,
+                            icon: _isSending
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                    ),
+                                  )
+                                : const Icon(
+                                    Icons.send,
+                                    color: Colors.white,
+                                  ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
           ],

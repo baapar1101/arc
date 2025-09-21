@@ -203,4 +203,71 @@ msgstr "کد معرف"
 msgid "status"
 msgstr "وضعیت"
 
+# File Storage Management
+msgid "FILE_LIST_NOT_IMPLEMENTED"
+msgstr "لیست فایل‌ها - در حال پیاده‌سازی"
+
+msgid "FILE_LIST_ERROR"
+msgstr "خطا در دریافت لیست فایل‌ها"
+
+msgid "UNVERIFIED_FILES_ERROR"
+msgstr "خطا در دریافت فایل‌های تایید نشده"
+
+msgid "CLEANUP_COMPLETED"
+msgstr "پاکسازی فایل‌های موقت با موفقیت انجام شد"
+
+msgid "CLEANUP_ERROR"
+msgstr "خطا در پاکسازی فایل‌های موقت"
+
+msgid "FILE_DELETED_SUCCESS"
+msgstr "فایل با موفقیت حذف شد"
+
+msgid "DELETE_FILE_ERROR"
+msgstr "خطا در حذف فایل"
+
+msgid "FILE_RESTORED_SUCCESS"
+msgstr "فایل با موفقیت بازیابی شد"
+
+msgid "RESTORE_FILE_ERROR"
+msgstr "خطا در بازیابی فایل"
+
+msgid "STATISTICS_ERROR"
+msgstr "خطا در دریافت آمار"
+
+msgid "STORAGE_CONFIGS_ERROR"
+msgstr "خطا در دریافت تنظیمات ذخیره‌سازی"
+
+msgid "STORAGE_CONFIG_CREATED"
+msgstr "تنظیمات ذخیره‌سازی با موفقیت ایجاد شد"
+
+msgid "CREATE_STORAGE_CONFIG_ERROR"
+msgstr "خطا در ایجاد تنظیمات ذخیره‌سازی"
+
+msgid "STORAGE_CONFIG_UPDATE_NOT_IMPLEMENTED"
+msgstr "بروزرسانی تنظیمات ذخیره‌سازی - در حال پیاده‌سازی"
+
+msgid "UPDATE_STORAGE_CONFIG_ERROR"
+msgstr "خطا در بروزرسانی تنظیمات ذخیره‌سازی"
+
+msgid "STORAGE_CONFIG_NOT_FOUND"
+msgstr "تنظیمات ذخیره‌سازی یافت نشد"
+
+msgid "DEFAULT_STORAGE_CONFIG_UPDATED"
+msgstr "تنظیمات پیش‌فرض ذخیره‌سازی با موفقیت بروزرسانی شد"
+
+msgid "SET_DEFAULT_STORAGE_CONFIG_ERROR"
+msgstr "خطا در تنظیم پیش‌فرض"
+
+msgid "STORAGE_CONFIG_DELETED"
+msgstr "تنظیمات ذخیره‌سازی با موفقیت حذف شد"
+
+msgid "DELETE_STORAGE_CONFIG_ERROR"
+msgstr "خطا در حذف تنظیمات ذخیره‌سازی"
+
+msgid "STORAGE_CONNECTION_TEST_NOT_IMPLEMENTED"
+msgstr "تست اتصال ذخیره‌سازی - در حال پیاده‌سازی"
+
+msgid "TEST_STORAGE_CONFIG_ERROR"
+msgstr "خطا در تست اتصال"
+
 

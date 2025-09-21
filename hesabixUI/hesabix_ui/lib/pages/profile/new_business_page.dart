@@ -92,10 +92,13 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
   Future<void> _submitBusiness() async {
     final t = Localizations.of<AppLocalizations>(context, AppLocalizations)!;
     if (!_businessData.isFormValid()) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(Navigator.of(context, rootNavigator: true).context).showSnackBar(
         SnackBar(
           content: Text(t.pleaseFillRequiredFields),
           backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.all(16),
+          duration: const Duration(seconds: 3),
         ),
       );
       return;
@@ -109,20 +112,26 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
       await BusinessApiService.createBusiness(_businessData);
       
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(Navigator.of(context, rootNavigator: true).context).showSnackBar(
           SnackBar(
             content: Text(t.businessCreatedSuccessfully),
             backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+            margin: const EdgeInsets.all(16),
+            duration: const Duration(seconds: 2),
           ),
         );
         Navigator.of(context).pop();
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(Navigator.of(context, rootNavigator: true).context).showSnackBar(
           SnackBar(
             content: Text('${t.businessCreationFailed}: $e'),
             backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            margin: const EdgeInsets.all(16),
+            duration: const Duration(seconds: 5),
           ),
         );
       }

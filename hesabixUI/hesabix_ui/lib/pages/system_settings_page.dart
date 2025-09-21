@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
+import 'package:hesabix_ui/pages/admin/file_storage_settings_page.dart';
 
 class SystemSettingsPage extends StatelessWidget {
   const SystemSettingsPage({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final t = AppLocalizations.of(context);
+    final t = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
@@ -70,10 +71,10 @@ class SystemSettingsPage extends StatelessWidget {
                 // Settings Cards
                 Expanded(
                   child: GridView.count(
-                    crossAxisCount: 2,
+                    crossAxisCount: 3,
                     crossAxisSpacing: 16,
                     mainAxisSpacing: 16,
-                    childAspectRatio: 1.5,
+                    childAspectRatio: 1.2,
                     children: [
                       _buildSettingCard(
                         context,
@@ -112,10 +113,24 @@ class SystemSettingsPage extends StatelessWidget {
                       ),
                       _buildSettingCard(
                         context,
+                        icon: Icons.storage,
+                        title: t.fileStorage,
+                        subtitle: t.fileStorageSettings,
+                        color: Colors.indigo,
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (context) => const FileStorageSettingsPage(),
+                            ),
+                          );
+                        },
+                      ),
+                      _buildSettingCard(
+                        context,
                         icon: Icons.tune,
                         title: 'تنظیمات پیشرفته',
                         subtitle: 'تنظیمات تخصصی سیستم',
-                        color: Colors.indigo,
+                        color: Colors.grey,
                       ),
                     ],
                   ),
@@ -164,6 +179,7 @@ class SystemSettingsPage extends StatelessWidget {
     required String title,
     required String subtitle,
     required Color color,
+    VoidCallback? onTap,
   }) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
@@ -175,7 +191,7 @@ class SystemSettingsPage extends StatelessWidget {
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
-        onTap: () {
+        onTap: onTap ?? () {
           // TODO: Navigate to specific setting
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(

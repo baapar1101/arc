@@ -22,6 +22,9 @@ class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
   final SupportService _supportService = SupportService(ApiClient());
   List<SupportStatus> _statuses = [];
   List<SupportPriority> _priorities = [];
+  
+  // Refresh counter to force data table refresh
+  int _refreshCounter = 0;
 
   @override
   void initState() {
@@ -52,8 +55,10 @@ class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
         ticket: ticket,
         isOperator: true,
         onTicketUpdated: () {
-          // Refresh the data table if needed
-          setState(() {});
+          // Refresh the data table after ticket update
+          setState(() {
+            _refreshCounter++;
+          });
         },
       ),
     );
@@ -85,6 +90,7 @@ class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
             const SizedBox(height: 16),
             Expanded(
               child: DataTableWidget<Map<String, dynamic>>(
+                key: ValueKey('data_table_$_refreshCounter'),
                 config: DataTableConfig<Map<String, dynamic>>(
                   title: 'لیست تیکت‌های پشتیبانی - پنل اپراتور',
                   endpoint: '/api/v1/support/operator/tickets/search',

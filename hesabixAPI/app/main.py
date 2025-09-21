@@ -12,6 +12,7 @@ from adapters.api.v1.support.operator import router as support_operator_router
 from adapters.api.v1.support.categories import router as support_categories_router
 from adapters.api.v1.support.priorities import router as support_priorities_router
 from adapters.api.v1.support.statuses import router as support_statuses_router
+from adapters.api.v1.admin.file_storage import router as admin_file_storage_router
 from app.core.i18n import negotiate_locale, Translator
 from app.core.error_handlers import register_error_handlers
 from app.core.smart_normalizer import smart_normalize_json, SmartNormalizerConfig
@@ -274,6 +275,9 @@ def create_app() -> FastAPI:
     application.include_router(support_categories_router, prefix=f"{settings.api_v1_prefix}/metadata/categories")
     application.include_router(support_priorities_router, prefix=f"{settings.api_v1_prefix}/metadata/priorities")
     application.include_router(support_statuses_router, prefix=f"{settings.api_v1_prefix}/metadata/statuses")
+    
+    # Admin endpoints
+    application.include_router(admin_file_storage_router, prefix=settings.api_v1_prefix)
 
     register_error_handlers(application)
 

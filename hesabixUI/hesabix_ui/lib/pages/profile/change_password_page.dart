@@ -47,10 +47,13 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
 
       if (response.statusCode == 200 && response.data?['success'] == true) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
+          ScaffoldMessenger.of(Navigator.of(context, rootNavigator: true).context).showSnackBar(
             SnackBar(
               content: Text(AppLocalizations.of(context).changePasswordSuccess),
               backgroundColor: Colors.green,
+              behavior: SnackBarBehavior.floating,
+              margin: const EdgeInsets.all(16),
+              duration: const Duration(seconds: 2),
             ),
           );
           _clearForm();
@@ -76,10 +79,12 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
 
   void _showError(String message) {
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(Navigator.of(context, rootNavigator: true).context).showSnackBar(
         SnackBar(
           content: Text(message),
           backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.all(16),
           duration: const Duration(seconds: 5), // نمایش طولانی‌تر برای خواندن
         ),
       );

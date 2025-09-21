@@ -873,4 +873,225 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get close => 'بستن';
+
+  @override
+  String get fileStorage => 'مدیریت فایل';
+
+  @override
+  String get fileStorageSettings => 'تنظیمات فایل';
+
+  @override
+  String get storageConfigurations => 'پیکربندی‌های ذخیره‌سازی';
+
+  @override
+  String get addStorageConfig => 'افزودن پیکربندی ذخیره‌سازی';
+
+  @override
+  String get editStorageConfig => 'ویرایش پیکربندی ذخیره‌سازی';
+
+  @override
+  String get storageName => 'نام پیکربندی';
+
+  @override
+  String get storageType => 'نوع ذخیره‌سازی';
+
+  @override
+  String get localStorage => 'ذخیره‌سازی محلی';
+
+  @override
+  String get ftpStorage => 'ذخیره‌سازی FTP';
+
+  @override
+  String get isDefault => 'پیش‌فرض';
+
+  @override
+  String get isActive => 'فعال';
+
+  @override
+  String get configData => 'داده‌های پیکربندی';
+
+  @override
+  String get basePath => 'مسیر پایه';
+
+  @override
+  String get ftpHost => 'میزبان FTP';
+
+  @override
+  String get ftpPort => 'پورت FTP';
+
+  @override
+  String get ftpUsername => 'نام کاربری FTP';
+
+  @override
+  String get ftpPassword => 'رمز عبور FTP';
+
+  @override
+  String get ftpDirectory => 'پوشه FTP';
+
+  @override
+  String get testConnection => 'تست اتصال';
+
+  @override
+  String get connectionSuccessful => 'اتصال موفقیت‌آمیز';
+
+  @override
+  String get connectionFailed => 'اتصال ناموفق';
+
+  @override
+  String get setAsDefault => 'تنظیم به عنوان پیش‌فرض';
+
+  @override
+  String get fileStatistics => 'آمار فایل‌ها';
+
+  @override
+  String get totalFiles => 'کل فایل‌ها';
+
+  @override
+  String get totalSize => 'حجم کل';
+
+  @override
+  String get temporaryFiles => 'فایل‌های موقت';
+
+  @override
+  String get unverifiedFiles => 'فایل‌های تایید نشده';
+
+  @override
+  String get cleanupTemporaryFiles => 'پاکسازی فایل‌های موقت';
+
+  @override
+  String get cleanupCompleted => 'پاکسازی انجام شد';
+
+  @override
+  String filesCleaned(Object count) {
+    return '$count فایل پاکسازی شد';
+  }
+
+  @override
+  String get fileManagement => 'مدیریت فایل‌ها';
+
+  @override
+  String get allFiles => 'تمام فایل‌ها';
+
+  @override
+  String get unverifiedFilesList => 'فایل‌های تایید نشده';
+
+  @override
+  String get fileName => 'نام فایل';
+
+  @override
+  String get fileSize => 'حجم فایل';
+
+  @override
+  String get mimeType => 'نوع فایل';
+
+  @override
+  String get moduleContext => 'زمینه ماژول';
+
+  @override
+  String get expiresAt => 'تاریخ انقضا';
+
+  @override
+  String get isTemporary => 'موقت';
+
+  @override
+  String get isVerified => 'تایید شده';
+
+  @override
+  String get forceDelete => 'حذف اجباری';
+
+  @override
+  String get restoreFile => 'بازیابی فایل';
+
+  @override
+  String get deleteConfirm => 'تایید حذف';
+
+  @override
+  String get deleteConfirmMessage => 'آیا از حذف این فایل مطمئن هستید؟';
+
+  @override
+  String get restoreConfirm => 'تایید بازیابی';
+
+  @override
+  String get restoreConfirmMessage => 'آیا از بازیابی این فایل مطمئن هستید؟';
+
+  @override
+  String get fileDeleted => 'فایل حذف شد';
+
+  @override
+  String get fileRestored => 'فایل بازیابی شد';
+
+  @override
+  String get errorDeletingFile => 'خطا در حذف فایل';
+
+  @override
+  String get errorRestoringFile => 'خطا در بازیابی فایل';
+
+  @override
+  String get noFilesFound => 'هیچ فایلی یافت نشد';
+
+  @override
+  String get loadingFiles => 'در حال بارگذاری فایل‌ها...';
+
+  @override
+  String get errorLoadingFiles => 'خطا در بارگذاری فایل‌ها';
+
+  @override
+  String get refreshFiles => 'تازه‌سازی فایل‌ها';
+
+  @override
+  String get fileDetails => 'جزئیات فایل';
+
+  @override
+  String get originalName => 'نام اصلی';
+
+  @override
+  String get storedName => 'نام ذخیره شده';
+
+  @override
+  String get filePath => 'مسیر فایل';
+
+  @override
+  String get checksum => 'چکسام';
+
+  @override
+  String get uploadedBy => 'آپلود شده توسط';
+
+  @override
+  String get lastVerified => 'آخرین تایید';
+
+  @override
+  String get developerData => 'داده‌های توسعه‌دهنده';
+
+  @override
+  String get edit => 'ویرایش';
+
+  @override
+  String get delete => 'حذف';
+
+  @override
+  String get actions => 'عملیات';
+
+  @override
+  String get search => 'جستجو';
+
+  @override
+  String get filter => 'فیلتر';
+
+  @override
+  String get apply => 'اعمال';
+
+  @override
+  String get reset => 'بازنشانی';
+
+  @override
+  String get of => 'از';
+
+  @override
+  String get itemsPerPage => 'آیتم در هر صفحه';
+
+  @override
+  String get first => 'اول';
+
+  @override
+  String get last => 'آخر';
 }

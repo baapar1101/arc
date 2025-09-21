@@ -11,4 +11,7 @@ from .business_permission import BusinessPermission  # noqa: F401
 # Import support models
 from .support import *  # noqa: F401, F403
 
+# Import file storage models
+from .file_storage import *  # noqa: F401, F403
+
 

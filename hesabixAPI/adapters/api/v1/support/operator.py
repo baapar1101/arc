@@ -225,6 +225,10 @@ async def send_operator_message(
         is_internal=message_request.is_internal
     )
     
+    # اگر تیکت هنوز به اپراتور تخصیص نشده، آن را تخصیص ده
+    if not ticket.assigned_operator_id:
+        ticket_repo.assign_ticket(ticket_id, current_user.get_user_id())
+    
     # Format datetime fields based on calendar type
     message_data = MessageResponse.from_orm(message).dict()
     formatted_data = format_datetime_fields(message_data, request)
