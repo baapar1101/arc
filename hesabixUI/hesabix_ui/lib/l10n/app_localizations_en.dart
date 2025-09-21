@@ -1090,9 +1090,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get reset => 'Reset';
 
   @override
-  String get of => 'of';
-
-  @override
   String get itemsPerPage => 'Items per page';
 
   @override

@@ -5,7 +5,7 @@ from sqlalchemy import and_, or_, desc, func
 from datetime import datetime, timedelta
 
 from adapters.db.models.file_storage import FileStorage, StorageConfig, FileVerification
-from adapters.db.repositories.base import BaseRepository
+from adapters.db.repositories.base_repo import BaseRepository
 
 
 class FileStorageRepository(BaseRepository[FileStorage]):

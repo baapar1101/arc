@@ -1084,9 +1084,6 @@ class AppLocalizationsFa extends AppLocalizations {
   String get reset => 'بازنشانی';
 
   @override
-  String get of => 'از';
-
-  @override
   String get itemsPerPage => 'آیتم در هر صفحه';
 
   @override

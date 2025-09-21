@@ -2198,12 +2198,6 @@ abstract class AppLocalizations {
   /// **'Reset'**
   String get reset;
 
-  /// No description provided for @of.
-  ///
-  /// In en, this message translates to:
-  /// **'of'**
-  String get of;
-
   /// No description provided for @itemsPerPage.
   ///
   /// In en, this message translates to:

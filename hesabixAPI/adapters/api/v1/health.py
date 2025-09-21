@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from .schemas import SuccessResponse
+from adapters.api.v1.schemas import SuccessResponse
 
 router = APIRouter(prefix="/health", tags=["health"]) 
 

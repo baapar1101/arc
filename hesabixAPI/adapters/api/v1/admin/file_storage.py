@@ -7,12 +7,12 @@ from adapters.db.session import get_db
 from app.core.auth_dependency import get_current_user
 from app.core.permissions import require_permission
 from app.core.responses import success_response
-from app.core.error_handlers import ApiError
+from app.core.responses import ApiError
 from app.core.i18n import locale_dependency
 from app.services.file_storage_service import FileStorageService
 from adapters.db.repositories.file_storage_repository import StorageConfigRepository, FileStorageRepository
 from adapters.db.models.user import User
-from adapters.api.v1.schemas.file_storage import (
+from adapters.api.v1.schema_models.file_storage import (
     StorageConfigCreateRequest,
     StorageConfigUpdateRequest,
     FileUploadRequest,

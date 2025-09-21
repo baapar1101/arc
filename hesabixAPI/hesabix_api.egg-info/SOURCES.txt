@@ -9,8 +9,8 @@ adapters/api/v1/health.py
 adapters/api/v1/schemas.py
 adapters/api/v1/users.py
 adapters/api/v1/admin/file_storage.py
-adapters/api/v1/schemas/__init__.py
-adapters/api/v1/schemas/file_storage.py
+adapters/api/v1/schema_models/__init__.py
+adapters/api/v1/schema_models/file_storage.py
 adapters/api/v1/support/__init__.py
 adapters/api/v1/support/categories.py
 adapters/api/v1/support/operator.py
@@ -87,7 +87,6 @@ migrations/versions/20250117_000007_create_business_permissions_table.py
 migrations/versions/20250915_000001_init_auth_tables.py
 migrations/versions/20250916_000002_add_referral_fields.py
 migrations/versions/5553f8745c6e_add_support_tables.py
-migrations/versions/8bf0dbb9fba9_add_file_storage_tables.py
 tests/__init__.py
 tests/test_health.py
 tests/test_permissions.py

@@ -137,3 +137,8 @@ def require_business_management():
 def require_system_settings():
     """دسترسی تنظیمات سیستم"""
     return require_app_permission("system_settings")
+
+
+def require_permission(permission: str):
+    """Decorator عمومی برای بررسی دسترسی - wrapper برای require_app_permission"""
+    return require_app_permission(permission)
