@@ -1,168 +1,323 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
-import 'package:hesabix_ui/pages/admin/file_storage_settings_page.dart';
 
-class SystemSettingsPage extends StatelessWidget {
+class SystemSettingsPage extends StatefulWidget {
   const SystemSettingsPage({super.key});
 
   @override
+  State<SystemSettingsPage> createState() => _SystemSettingsPageState();
+}
+
+class _SystemSettingsPageState extends State<SystemSettingsPage> {
+  late final List<SettingsItem> _settingsItems;
+
+  @override
+  void initState() {
+    super.initState();
+    _settingsItems = [
+      SettingsItem(
+        title: 'storageManagement',
+        description: 'storageManagementDescription',
+        icon: Icons.cloud_upload_outlined,
+        color: const Color(0xFF2196F3),
+        route: '/user/profile/system-settings/storage',
+      ),
+      SettingsItem(
+        title: 'systemConfiguration',
+        description: 'systemConfigurationDescription',
+        icon: Icons.settings_outlined,
+        color: const Color(0xFF4CAF50),
+        route: '/user/profile/system-settings/configuration',
+      ),
+      SettingsItem(
+        title: 'userManagement',
+        description: 'userManagementDescription',
+        icon: Icons.people_outlined,
+        color: const Color(0xFFFF9800),
+        route: '/user/profile/system-settings/users',
+      ),
+      SettingsItem(
+        title: 'systemLogs',
+        description: 'systemLogsDescription',
+        icon: Icons.analytics_outlined,
+        color: const Color(0xFF9C27B0),
+        route: '/user/profile/system-settings/logs',
+      ),
+    ];
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final t = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final t = AppLocalizations.of(context);
 
     return Scaffold(
+      backgroundColor: colorScheme.surface,
       appBar: AppBar(
-        title: Text(t.systemSettings),
-        backgroundColor: colorScheme.surface,
-        foregroundColor: colorScheme.onSurface,
+        title: Text(
+          t.systemSettingsWelcome,
+          style: const TextStyle(
+            fontWeight: FontWeight.w600,
+            fontSize: 20,
+          ),
+        ),
+        backgroundColor: Colors.transparent,
         elevation: 0,
+        centerTitle: true,
+        actions: [
+          IconButton(
+            onPressed: () => _showHelpDialog(context),
+            icon: const Icon(Icons.help_outline),
+            tooltip: t.systemSettingsWelcome,
+          ),
+        ],
       ),
-      body: Container(
-        color: colorScheme.surface,
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildWelcomeSection(theme, colorScheme, t),
+            const SizedBox(height: 24),
+            _buildSettingsList(theme, colorScheme, t),
+            const SizedBox(height: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWelcomeSection(ThemeData theme, ColorScheme colorScheme, AppLocalizations t) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            colorScheme.primary.withOpacity(0.1),
+            colorScheme.primaryContainer.withOpacity(0.3),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: colorScheme.primary.withOpacity(0.2),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  colorScheme.primary,
+                  colorScheme.primary.withOpacity(0.8),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: colorScheme.primary.withOpacity(0.3),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: const Icon(
+              Icons.admin_panel_settings_outlined,
+              color: Colors.white,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Header
-                Container(
-                  padding: const EdgeInsets.all(24),
+                Text(
+                  t.systemAdministration,
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: colorScheme.onSurface,
+                    fontSize: 18,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  t.systemSettingsDescription,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.onSurface.withOpacity(0.7),
+                    fontSize: 14,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: colorScheme.primary.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text(
+              '${_settingsItems.length}',
+              style: TextStyle(
+                color: colorScheme.primary,
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSettingsList(ThemeData theme, ColorScheme colorScheme, AppLocalizations t) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(
+              t.availableSettings,
+              style: theme.textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: colorScheme.onSurface,
+              ),
+            ),
+            const Spacer(),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: colorScheme.primary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                '${_settingsItems.length} ${t.availableSettings.toLowerCase()}',
+                style: TextStyle(
+                  color: colorScheme.primary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            int crossAxisCount = 3;
+            if (constraints.maxWidth < 600) {
+              crossAxisCount = 2;
+            } else if (constraints.maxWidth > 1200) {
+              crossAxisCount = 4;
+            }
+            
+            return GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: crossAxisCount,
+                crossAxisSpacing: 12,
+                mainAxisSpacing: 12,
+                childAspectRatio: 1.0,
+              ),
+              itemCount: _settingsItems.length,
+              itemBuilder: (context, index) {
+                return _buildSettingsCard(_settingsItems[index], theme, colorScheme, t);
+              },
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSettingsCard(SettingsItem item, ThemeData theme, ColorScheme colorScheme, AppLocalizations t) {
+    return Card(
+      elevation: 1,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: colorScheme.outline.withOpacity(0.2),
+          width: 1,
+        ),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => context.go(item.route!),
+          borderRadius: BorderRadius.circular(12),
+          hoverColor: item.color.withOpacity(0.05),
+          splashColor: item.color.withOpacity(0.1),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: colorScheme.primaryContainer,
+                    color: item.color.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    boxShadow: [
+                      BoxShadow(
+                        color: item.color.withOpacity(0.1),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Icon(
+                    item.icon,
+                    color: item.color,
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  _getLocalizedText(t, item.title),
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: colorScheme.onSurface,
+                    fontSize: 13,
+                  ),
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  _getLocalizedText(t, item.description),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurface.withOpacity(0.6),
+                    fontSize: 11,
+                  ),
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 8),
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: item.color.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.admin_panel_settings,
-                        size: 32,
-                        color: colorScheme.onPrimaryContainer,
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              t.systemSettings,
-                              style: theme.textTheme.headlineSmall?.copyWith(
-                                color: colorScheme.onPrimaryContainer,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'تنظیمات پیشرفته سیستم - فقط برای ادمین‌ها',
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                color: colorScheme.onPrimaryContainer.withOpacity(0.8),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                
-                const SizedBox(height: 24),
-                
-                // Settings Cards
-                Expanded(
-                  child: GridView.count(
-                    crossAxisCount: 3,
-                    crossAxisSpacing: 16,
-                    mainAxisSpacing: 16,
-                    childAspectRatio: 1.2,
-                    children: [
-                      _buildSettingCard(
-                        context,
-                        icon: Icons.people,
-                        title: 'مدیریت کاربران',
-                        subtitle: 'مدیریت کاربران سیستم',
-                        color: Colors.blue,
-                      ),
-                      _buildSettingCard(
-                        context,
-                        icon: Icons.business,
-                        title: 'مدیریت کسب و کارها',
-                        subtitle: 'مدیریت کسب و کارهای ثبت شده',
-                        color: Colors.green,
-                      ),
-                      _buildSettingCard(
-                        context,
-                        icon: Icons.security,
-                        title: 'امنیت سیستم',
-                        subtitle: 'تنظیمات امنیتی و دسترسی‌ها',
-                        color: Colors.orange,
-                      ),
-                      _buildSettingCard(
-                        context,
-                        icon: Icons.analytics,
-                        title: 'گزارش‌گیری',
-                        subtitle: 'گزارش‌های سیستم و آمار',
-                        color: Colors.purple,
-                      ),
-                      _buildSettingCard(
-                        context,
-                        icon: Icons.backup,
-                        title: 'پشتیبان‌گیری',
-                        subtitle: 'مدیریت پشتیبان‌ها',
-                        color: Colors.teal,
-                      ),
-                      _buildSettingCard(
-                        context,
-                        icon: Icons.storage,
-                        title: t.fileStorage,
-                        subtitle: t.fileStorageSettings,
-                        color: Colors.indigo,
-                        onTap: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (context) => const FileStorageSettingsPage(),
-                            ),
-                          );
-                        },
-                      ),
-                      _buildSettingCard(
-                        context,
-                        icon: Icons.tune,
-                        title: 'تنظیمات پیشرفته',
-                        subtitle: 'تنظیمات تخصصی سیستم',
-                        color: Colors.grey,
-                      ),
-                    ],
-                  ),
-                ),
-                
-                const SizedBox(height: 24),
-                
-                // Warning Message
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.amber.withOpacity(0.1),
-                    border: Border.all(color: Colors.amber.withOpacity(0.3)),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.warning_amber,
-                        color: Colors.amber[700],
-                        size: 20,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          'توجه: این بخش فقط برای ادمین‌های سیستم قابل دسترسی است. تغییرات در این بخش می‌تواند بر عملکرد کل سیستم تأثیر بگذارد.',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: Colors.amber[700],
-                          ),
-                        ),
-                      ),
-                    ],
+                  child: Icon(
+                    Icons.arrow_forward_ios,
+                    size: 12,
+                    color: item.color,
                   ),
                 ),
               ],
@@ -173,77 +328,73 @@ class SystemSettingsPage extends StatelessWidget {
     );
   }
 
-  Widget _buildSettingCard(
-    BuildContext context, {
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required Color color,
-    VoidCallback? onTap,
-  }) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+  String _getLocalizedText(AppLocalizations t, String key) {
+    switch (key) {
+      case 'storageManagement':
+        return t.storageManagement;
+      case 'storageManagementDescription':
+        return t.storageManagementDescription;
+      case 'systemConfiguration':
+        return t.systemConfiguration;
+      case 'systemConfigurationDescription':
+        return t.systemConfigurationDescription;
+      case 'userManagement':
+        return t.userManagement;
+      case 'userManagementDescription':
+        return t.userManagementDescription;
+      case 'systemLogs':
+        return t.systemLogs;
+      case 'systemLogsDescription':
+        return t.systemLogsDescription;
+      default:
+        return key;
+    }
+  }
 
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: onTap ?? () {
-          // TODO: Navigate to specific setting
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('$title - در حال توسعه'),
-              duration: const Duration(seconds: 2),
-            ),
-          );
-        },
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(
-                icon,
-                color: color,
-                size: 32,
-              ),
-              const SizedBox(height: 12),
-              Text(
-                title,
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: colorScheme.onSurface,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Expanded(
-                child: Text(
-                  subtitle,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: colorScheme.onSurface.withOpacity(0.7),
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  Icon(
-                    Icons.arrow_forward_ios,
-                    size: 16,
-                    color: colorScheme.onSurface.withOpacity(0.5),
-                  ),
-                ],
-              ),
-            ],
-          ),
+  void _showHelpDialog(BuildContext context) {
+    final t = AppLocalizations.of(context);
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
         ),
+        title: Row(
+          children: [
+            Icon(
+              Icons.help_outline,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+            const SizedBox(width: 8),
+            Text(t.systemSettingsWelcome),
+          ],
+        ),
+        content: Text(
+          t.systemSettingsDescription,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(t.ok),
+          ),
+        ],
       ),
     );
   }
+}
+
+class SettingsItem {
+  final String title;
+  final String description;
+  final IconData icon;
+  final Color color;
+  final String? route;
+
+  SettingsItem({
+    required this.title,
+    required this.description,
+    required this.icon,
+    required this.color,
+    this.route,
+  });
 }

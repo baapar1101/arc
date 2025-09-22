@@ -395,6 +395,23 @@
   "previous": "قبلی",
   "next": "بعدی",
   "first": "اول",
-  "last": "آخر"
+  "last": "آخر",
+  "systemSettingsWelcome": "تنظیمات سیستم",
+  "systemSettingsDescription": "مدیریت پیکربندی و مدیریت سیستم",
+  "storageManagement": "مدیریت ذخیره‌سازی",
+  "storageManagementDescription": "پیکربندی سیستم‌های ذخیره‌سازی فایل و مدیریت فایل‌ها",
+  "systemConfiguration": "پیکربندی سیستم",
+  "systemConfigurationDescription": "تنظیمات عمومی سیستم و ترجیحات",
+  "userManagement": "مدیریت کاربران",
+  "userManagementDescription": "مدیریت کاربران، نقش‌ها و مجوزها",
+  "systemLogs": "لاگ‌های سیستم",
+  "systemLogsDescription": "مشاهده لاگ‌های سیستم و نظارت",
+  "backToSettings": "بازگشت به تنظیمات",
+  "settingsOverview": "نمای کلی تنظیمات",
+  "availableSettings": "تنظیمات موجود",
+  "systemAdministration": "مدیریت سیستم",
+  "generalSettings": "تنظیمات عمومی",
+  "securitySettings": "تنظیمات امنیتی",
+  "maintenanceSettings": "تنظیمات نگهداری"
 }
 

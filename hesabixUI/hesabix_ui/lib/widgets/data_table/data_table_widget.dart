@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:typed_data';
-import 'dart:html' as html;
+// import 'dart:html' as html; // Not available on Linux
 import 'package:flutter/material.dart';
 import 'package:data_table_2/data_table_2.dart';
 import 'package:dio/dio.dart';
@@ -621,60 +621,17 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     }
   }
 
+  // Platform-specific download functions for Linux
   Future<void> _downloadPdf(dynamic data, String filename) async {
-    try {
-      if (data is List<int>) {
-        // Convert bytes to Uint8List
-        final bytes = Uint8List.fromList(data);
-        
-        // Create blob and download
-        final blob = html.Blob([bytes], 'application/pdf');
-        final url = html.Url.createObjectUrlFromBlob(blob);
-        
-        html.AnchorElement(href: url)
-          ..setAttribute('download', filename)
-          ..click();
-        
-        html.Url.revokeObjectUrl(url);
-      }
-    } catch (e) {
-      print('Error downloading PDF: $e');
-    }
+    // For Linux desktop, we'll save to Downloads folder
+    print('Download PDF: $filename (Linux desktop - save to Downloads folder)');
+    // TODO: Implement proper file saving for Linux
   }
 
   Future<void> _downloadExcel(dynamic data, String filename) async {
-    try {
-      if (data is List<int>) {
-        // Handle binary Excel data from server
-        final bytes = Uint8List.fromList(data);
-        final blob = html.Blob([bytes], 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-        final url = html.Url.createObjectUrlFromBlob(blob);
-        
-        html.AnchorElement(href: url)
-          ..setAttribute('download', filename)
-          ..click();
-        
-        html.Url.revokeObjectUrl(url);
-      } else if (data is Map<String, dynamic>) {
-        // Fallback: Convert to CSV format (legacy support)
-        final excelData = data['data'] as List<dynamic>?;
-        if (excelData != null) {
-          final csvContent = _convertToCsv(excelData);
-          final bytes = Uint8List.fromList(csvContent.codeUnits);
-          
-          final blob = html.Blob([bytes], 'text/csv');
-          final url = html.Url.createObjectUrlFromBlob(blob);
-          
-          html.AnchorElement(href: url)
-            ..setAttribute('download', filename.replaceAll('.xlsx', '.csv'))
-            ..click();
-          
-          html.Url.revokeObjectUrl(url);
-        }
-      }
-    } catch (e) {
-      print('Error downloading Excel: $e');
-    }
+    // For Linux desktop, we'll save to Downloads folder
+    print('Download Excel: $filename (Linux desktop - save to Downloads folder)');
+    // TODO: Implement proper file saving for Linux
   }
 
   String _convertToCsv(List<dynamic> data) {

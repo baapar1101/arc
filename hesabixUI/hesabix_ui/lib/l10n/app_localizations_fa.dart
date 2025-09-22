@@ -1091,4 +1091,56 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get last => 'آخر';
+
+  @override
+  String get systemSettingsWelcome => 'تنظیمات سیستم';
+
+  @override
+  String get systemSettingsDescription => 'مدیریت پیکربندی و مدیریت سیستم';
+
+  @override
+  String get storageManagement => 'مدیریت ذخیره‌سازی';
+
+  @override
+  String get storageManagementDescription =>
+      'پیکربندی سیستم‌های ذخیره‌سازی فایل و مدیریت فایل‌ها';
+
+  @override
+  String get systemConfiguration => 'پیکربندی سیستم';
+
+  @override
+  String get systemConfigurationDescription => 'تنظیمات عمومی سیستم و ترجیحات';
+
+  @override
+  String get userManagement => 'مدیریت کاربران';
+
+  @override
+  String get userManagementDescription => 'مدیریت کاربران، نقش‌ها و مجوزها';
+
+  @override
+  String get systemLogs => 'لاگ‌های سیستم';
+
+  @override
+  String get systemLogsDescription => 'مشاهده لاگ‌های سیستم و نظارت';
+
+  @override
+  String get backToSettings => 'بازگشت به تنظیمات';
+
+  @override
+  String get settingsOverview => 'نمای کلی تنظیمات';
+
+  @override
+  String get availableSettings => 'تنظیمات موجود';
+
+  @override
+  String get systemAdministration => 'مدیریت سیستم';
+
+  @override
+  String get generalSettings => 'تنظیمات عمومی';
+
+  @override
+  String get securitySettings => 'تنظیمات امنیتی';
+
+  @override
+  String get maintenanceSettings => 'تنظیمات نگهداری';
 }

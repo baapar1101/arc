@@ -236,7 +236,15 @@ class StorageConfigRepository(BaseRepository[StorageConfig]):
         self.db.query(StorageConfig).update({"is_default": False})
         self.db.commit()
 
-    async def delete_config(self, config_id: UUID) -> bool:
+    def count_files_by_storage_config(self, config_id: str) -> int:
+        """شمارش تعداد فایل‌های مربوط به یک storage config"""
+        return self.db.query(FileStorage).filter(
+            FileStorage.storage_config_id == config_id,
+            FileStorage.is_active == True,
+            FileStorage.deleted_at.is_(None)
+        ).count()
+
+    def delete_config(self, config_id: str) -> bool:
         config = self.db.query(StorageConfig).filter(StorageConfig.id == config_id).first()
         if not config:
             return False

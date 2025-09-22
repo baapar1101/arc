@@ -427,7 +427,7 @@ async def set_default_storage_config(
 
 @router.delete("/storage-configs/{config_id}", response_model=dict)
 async def delete_storage_config(
-    config_id: UUID,
+    config_id: str,
     request: Request,
     db: Session = Depends(get_db),
     current_user: AuthContext = Depends(get_current_user),
@@ -435,8 +435,28 @@ async def delete_storage_config(
 ):
     """حذف تنظیمات ذخیره‌سازی"""
     try:
+        # Check permission
+        if not current_user.has_app_permission("admin.storage.delete"):
+            raise ApiError(
+                code="FORBIDDEN",
+                message=translator.t("FORBIDDEN", "دسترسی غیرمجاز"),
+                http_status=403,
+                translator=translator
+            )
+        
         config_repo = StorageConfigRepository(db)
-        success = await config_repo.delete_config(config_id)
+        
+        # بررسی وجود فایل‌ها قبل از حذف
+        file_count = config_repo.count_files_by_storage_config(config_id)
+        if file_count > 0:
+            raise ApiError(
+                code="STORAGE_CONFIG_HAS_FILES",
+                message=translator.t("STORAGE_CONFIG_HAS_FILES", f"این تنظیمات ذخیره‌سازی دارای {file_count} فایل است و قابل حذف نیست"),
+                http_status=400,
+                translator=translator
+            )
+        
+        success = config_repo.delete_config(config_id)
         
         if not success:
             raise ApiError(
@@ -590,21 +610,131 @@ async def _test_local_storage(config: StorageConfig) -> dict:
 
 async def _test_ftp_storage(config: StorageConfig) -> dict:
     """تست اتصال به FTP storage"""
+    import ftplib
+    import tempfile
+    import os
     from datetime import datetime
     
     try:
-        # TODO: پیاده‌سازی تست FTP
-        # فعلاً فقط ساختار کلی را برمی‌گردانیم
+        # دریافت تنظیمات FTP
+        config_data = config.config_data
+        host = config_data.get("host")
+        port = int(config_data.get("port", 21))
+        username = config_data.get("username")
+        password = config_data.get("password")
+        directory = config_data.get("directory", "/")
+        use_tls = config_data.get("use_tls", False)
+        
+        # بررسی وجود پارامترهای ضروری
+        if not all([host, username, password]):
+            return {
+                "success": False,
+                "error": "پارامترهای ضروری FTP (host, username, password) موجود نیست",
+                "storage_type": "ftp",
+                "tested_at": datetime.utcnow().isoformat()
+            }
+        
+        # اتصال به FTP
+        if use_tls:
+            ftp = ftplib.FTP_TLS()
+        else:
+            ftp = ftplib.FTP()
+        
+        # تنظیم timeout
+        ftp.connect(host, port, timeout=10)
+        ftp.login(username, password)
+        
+        # تغییر به دایرکتوری مورد نظر
+        if directory and directory != "/":
+            try:
+                ftp.cwd(directory)
+            except ftplib.error_perm:
+                return {
+                    "success": False,
+                    "error": f"دسترسی به دایرکتوری {directory} وجود ندارد",
+                    "storage_type": "ftp",
+                    "tested_at": datetime.utcnow().isoformat()
+                }
+        
+        # تست نوشتن فایل
+        test_filename = f"test_connection_{datetime.utcnow().timestamp()}.txt"
+        test_content = "Test FTP connection file"
+        
+        # ایجاد فایل موقت
+        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as temp_file:
+            temp_file.write(test_content)
+            temp_file_path = temp_file.name
+        
+        try:
+            # آپلود فایل
+            with open(temp_file_path, 'rb') as file:
+                ftp.storbinary(f'STOR {test_filename}', file)
+            
+            # بررسی وجود فایل
+            file_list = []
+            ftp.retrlines('LIST', file_list.append)
+            file_exists = any(test_filename in line for line in file_list)
+            
+            if not file_exists:
+                return {
+                    "success": False,
+                    "error": "فایل تست آپلود نشد",
+                    "storage_type": "ftp",
+                    "tested_at": datetime.utcnow().isoformat()
+                }
+            
+            # حذف فایل تست
+            try:
+                ftp.delete(test_filename)
+            except ftplib.error_perm:
+                pass  # اگر نتوانست حذف کند، مهم نیست
+            
+            # بستن اتصال
+            ftp.quit()
+            
+            return {
+                "success": True,
+                "message": "اتصال به FTP server موفقیت‌آمیز بود",
+                "storage_type": "ftp",
+                "host": host,
+                "port": port,
+                "directory": directory,
+                "use_tls": use_tls,
+                "tested_at": datetime.utcnow().isoformat()
+            }
+            
+        finally:
+            # حذف فایل موقت
+            try:
+                os.unlink(temp_file_path)
+            except:
+                pass
+        
+    except ftplib.error_perm as e:
         return {
             "success": False,
-            "error": "تست FTP هنوز پیاده‌سازی نشده است",
+            "error": f"خطا در احراز هویت FTP: {str(e)}",
             "storage_type": "ftp",
             "tested_at": datetime.utcnow().isoformat()
         }
-        
+    except ftplib.error_temp as e:
+        return {
+            "success": False,
+            "error": f"خطای موقت FTP: {str(e)}",
+            "storage_type": "ftp",
+            "tested_at": datetime.utcnow().isoformat()
+        }
+    except ConnectionRefusedError:
+        return {
+            "success": False,
+            "error": "اتصال به سرور FTP رد شد. بررسی کنید که سرور در حال اجرا باشد",
+            "storage_type": "ftp",
+            "tested_at": datetime.utcnow().isoformat()
+        }
     except Exception as e:
         return {
             "success": False,
             "error": f"خطا در تست FTP storage: {str(e)}",
+            "storage_type": "ftp",
             "tested_at": datetime.utcnow().isoformat()
         }

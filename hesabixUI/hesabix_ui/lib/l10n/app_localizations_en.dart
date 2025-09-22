@@ -1097,4 +1097,58 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get last => 'Last';
+
+  @override
+  String get systemSettingsWelcome => 'System Settings';
+
+  @override
+  String get systemSettingsDescription =>
+      'Manage system configuration and administration';
+
+  @override
+  String get storageManagement => 'Storage Management';
+
+  @override
+  String get storageManagementDescription =>
+      'Configure file storage systems and manage files';
+
+  @override
+  String get systemConfiguration => 'System Configuration';
+
+  @override
+  String get systemConfigurationDescription =>
+      'General system settings and preferences';
+
+  @override
+  String get userManagement => 'User Management';
+
+  @override
+  String get userManagementDescription => 'Manage users, roles and permissions';
+
+  @override
+  String get systemLogs => 'System Logs';
+
+  @override
+  String get systemLogsDescription => 'View system logs and monitoring';
+
+  @override
+  String get backToSettings => 'Back to Settings';
+
+  @override
+  String get settingsOverview => 'Settings Overview';
+
+  @override
+  String get availableSettings => 'Available Settings';
+
+  @override
+  String get systemAdministration => 'System Administration';
+
+  @override
+  String get generalSettings => 'General Settings';
+
+  @override
+  String get securitySettings => 'Security Settings';
+
+  @override
+  String get maintenanceSettings => 'Maintenance Settings';
 }

@@ -13,6 +13,10 @@ import 'pages/profile/change_password_page.dart';
 import 'pages/profile/marketing_page.dart';
 import 'pages/profile/operator/operator_tickets_page.dart';
 import 'pages/system_settings_page.dart';
+import 'pages/admin/storage_management_page.dart';
+import 'pages/admin/system_configuration_page.dart';
+import 'pages/admin/user_management_page.dart';
+import 'pages/admin/system_logs_page.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'core/locale_controller.dart';
 import 'core/calendar_controller.dart';
@@ -386,6 +390,48 @@ class _MyAppState extends State<MyApp> {
                 }
                 return const SystemSettingsPage();
               },
+              routes: [
+                GoRoute(
+                  path: 'storage',
+                  name: 'system_settings_storage',
+                  builder: (context, state) {
+                    if (_authStore == null || !_authStore!.isSuperAdmin) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    return const AdminStorageManagementPage();
+                  },
+                ),
+                GoRoute(
+                  path: 'configuration',
+                  name: 'system_settings_configuration',
+                  builder: (context, state) {
+                    if (_authStore == null || !_authStore!.isSuperAdmin) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    return const SystemConfigurationPage();
+                  },
+                ),
+                GoRoute(
+                  path: 'users',
+                  name: 'system_settings_users',
+                  builder: (context, state) {
+                    if (_authStore == null || !_authStore!.isSuperAdmin) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    return const UserManagementPage();
+                  },
+                ),
+                GoRoute(
+                  path: 'logs',
+                  name: 'system_settings_logs',
+                  builder: (context, state) {
+                    if (_authStore == null || !_authStore!.isSuperAdmin) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    return const SystemLogsPage();
+                  },
+                ),
+              ],
             ),
           ],
         ),

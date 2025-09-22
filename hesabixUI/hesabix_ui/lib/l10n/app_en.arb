@@ -396,6 +396,23 @@
   "previous": "Previous",
   "next": "Next",
   "first": "First",
-  "last": "Last"
+  "last": "Last",
+  "systemSettingsWelcome": "System Settings",
+  "systemSettingsDescription": "Manage system configuration and administration",
+  "storageManagement": "Storage Management",
+  "storageManagementDescription": "Configure file storage systems and manage files",
+  "systemConfiguration": "System Configuration",
+  "systemConfigurationDescription": "General system settings and preferences",
+  "userManagement": "User Management",
+  "userManagementDescription": "Manage users, roles and permissions",
+  "systemLogs": "System Logs",
+  "systemLogsDescription": "View system logs and monitoring",
+  "backToSettings": "Back to Settings",
+  "settingsOverview": "Settings Overview",
+  "availableSettings": "Available Settings",
+  "systemAdministration": "System Administration",
+  "generalSettings": "General Settings",
+  "securitySettings": "Security Settings",
+  "maintenanceSettings": "Maintenance Settings"
 }
 

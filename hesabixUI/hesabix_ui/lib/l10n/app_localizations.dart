@@ -2215,6 +2215,108 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Last'**
   String get last;
+
+  /// No description provided for @systemSettingsWelcome.
+  ///
+  /// In en, this message translates to:
+  /// **'System Settings'**
+  String get systemSettingsWelcome;
+
+  /// No description provided for @systemSettingsDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage system configuration and administration'**
+  String get systemSettingsDescription;
+
+  /// No description provided for @storageManagement.
+  ///
+  /// In en, this message translates to:
+  /// **'Storage Management'**
+  String get storageManagement;
+
+  /// No description provided for @storageManagementDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Configure file storage systems and manage files'**
+  String get storageManagementDescription;
+
+  /// No description provided for @systemConfiguration.
+  ///
+  /// In en, this message translates to:
+  /// **'System Configuration'**
+  String get systemConfiguration;
+
+  /// No description provided for @systemConfigurationDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'General system settings and preferences'**
+  String get systemConfigurationDescription;
+
+  /// No description provided for @userManagement.
+  ///
+  /// In en, this message translates to:
+  /// **'User Management'**
+  String get userManagement;
+
+  /// No description provided for @userManagementDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage users, roles and permissions'**
+  String get userManagementDescription;
+
+  /// No description provided for @systemLogs.
+  ///
+  /// In en, this message translates to:
+  /// **'System Logs'**
+  String get systemLogs;
+
+  /// No description provided for @systemLogsDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'View system logs and monitoring'**
+  String get systemLogsDescription;
+
+  /// No description provided for @backToSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Back to Settings'**
+  String get backToSettings;
+
+  /// No description provided for @settingsOverview.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings Overview'**
+  String get settingsOverview;
+
+  /// No description provided for @availableSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Available Settings'**
+  String get availableSettings;
+
+  /// No description provided for @systemAdministration.
+  ///
+  /// In en, this message translates to:
+  /// **'System Administration'**
+  String get systemAdministration;
+
+  /// No description provided for @generalSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'General Settings'**
+  String get generalSettings;
+
+  /// No description provided for @securitySettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Security Settings'**
+  String get securitySettings;
+
+  /// No description provided for @maintenanceSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Maintenance Settings'**
+  String get maintenanceSettings;
 }
 
 class _AppLocalizationsDelegate

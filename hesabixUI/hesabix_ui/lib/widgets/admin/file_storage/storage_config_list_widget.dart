@@ -1,17 +1,21 @@
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/widgets/admin/file_storage/storage_config_form_dialog.dart';
 import 'package:hesabix_ui/widgets/admin/file_storage/storage_config_card.dart';
 import '../../../core/api_client.dart';
 
 class StorageConfigListWidget extends StatefulWidget {
-  const StorageConfigListWidget({super.key});
+  final VoidCallback? onRefresh;
+  
+  const StorageConfigListWidget({
+    super.key,
+    this.onRefresh,
+  });
 
   @override
-  State<StorageConfigListWidget> createState() => _StorageConfigListWidgetState();
+  State<StorageConfigListWidget> createState() => StorageConfigListWidgetState();
 }
 
-class _StorageConfigListWidgetState extends State<StorageConfigListWidget> {
+class StorageConfigListWidgetState extends State<StorageConfigListWidget> {
   List<Map<String, dynamic>> _storageConfigs = [];
   bool _isLoading = true;
   String? _error;
@@ -19,10 +23,10 @@ class _StorageConfigListWidgetState extends State<StorageConfigListWidget> {
   @override
   void initState() {
     super.initState();
-    _loadStorageConfigs();
+    loadStorageConfigs();
   }
 
-  Future<void> _loadStorageConfigs() async {
+  Future<void> loadStorageConfigs() async {
     setState(() {
       _isLoading = true;
       _error = null;
@@ -49,55 +53,7 @@ class _StorageConfigListWidgetState extends State<StorageConfigListWidget> {
     }
   }
 
-
-  Future<void> _addStorageConfig() async {
-    final result = await showDialog<Map<String, dynamic>>(
-      context: context,
-      builder: (context) => const StorageConfigFormDialog(),
-    );
-
-    if (result != null) {
-      _loadStorageConfigs();
-    }
-  }
-
-  Future<void> _editStorageConfig(Map<String, dynamic> config) async {
-    final result = await showDialog<Map<String, dynamic>>(
-      context: context,
-      builder: (context) => StorageConfigFormDialog(config: config),
-    );
-
-    if (result != null) {
-      _loadStorageConfigs();
-    }
-  }
-
-  Future<void> _setAsDefault(String configId) async {
-    final l10n = AppLocalizations.of(context);
-    try {
-      // TODO: Call API to set as default
-      await Future.delayed(const Duration(seconds: 1)); // Simulate API call
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(l10n.setAsDefault),
-          backgroundColor: Colors.green,
-        ),
-      );
-      
-      _loadStorageConfigs();
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
-
   Future<void> _testConnection(String configId) async {
-    final l10n = AppLocalizations.of(context);
     try {
       final api = ApiClient();
       final response = await api.post('/api/v1/admin/files/storage-configs/$configId/test');
@@ -107,14 +63,14 @@ class _StorageConfigListWidgetState extends State<StorageConfigListWidget> {
         if (testResult['success'] == true) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(l10n.connectionSuccessful),
+              content: Text('اتصال موفقیت‌آمیز بود'),
               backgroundColor: Colors.green,
             ),
           );
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('${l10n.connectionFailed}: ${testResult['error']}'),
+              content: Text('اتصال ناموفق: ${testResult['error']}'),
               backgroundColor: Colors.red,
             ),
           );
@@ -125,29 +81,27 @@ class _StorageConfigListWidgetState extends State<StorageConfigListWidget> {
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('${l10n.connectionFailed}: $e'),
+          content: Text('اتصال ناموفق: $e'),
           backgroundColor: Colors.red,
         ),
       );
     }
   }
 
-
   Future<void> _deleteConfig(String configId) async {
-    final l10n = AppLocalizations.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(l10n.deleteConfirm),
-        content: Text(l10n.deleteConfirmMessage),
+        title: Text('تأیید حذف'),
+        content: Text('آیا از حذف این پیکربندی اطمینان دارید؟'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: Text(l10n.cancel),
+            child: Text('لغو'),
           ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: Text(l10n.delete),
+            child: Text('حذف'),
           ),
         ],
       ),
@@ -155,36 +109,116 @@ class _StorageConfigListWidgetState extends State<StorageConfigListWidget> {
 
     if (confirmed == true) {
       try {
-        // TODO: Call API to delete config
-        await Future.delayed(const Duration(seconds: 1)); // Simulate API call
+        final api = ApiClient();
+        final response = await api.delete('/api/v1/admin/files/storage-configs/$configId');
         
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(l10n.fileDeleted),
-            backgroundColor: Colors.green,
-          ),
-        );
-        
-        _loadStorageConfigs();
+        if (response.data != null && response.data['success'] == true) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('فایل حذف شد'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          
+          // Refresh the list
+          loadStorageConfigs();
+        } else {
+          final errorMessage = response.data?['error']?['message'] ?? 
+                              response.data?['message'] ?? 
+                              'خطا در حذف تنظیمات';
+          throw Exception(errorMessage);
+        }
       } catch (e) {
+        String errorMessage = 'خطا در حذف تنظیمات';
+        
+        // بررسی نوع خطا
+        if (e.toString().contains('STORAGE_CONFIG_HAS_FILES')) {
+          errorMessage = 'این تنظیمات ذخیره‌سازی دارای فایل است و قابل حذف نیست';
+        } else if (e.toString().contains('STORAGE_CONFIG_NOT_FOUND')) {
+          errorMessage = 'تنظیمات ذخیره‌سازی یافت نشد';
+        } else if (e.toString().contains('FORBIDDEN')) {
+          errorMessage = 'دسترسی غیرمجاز';
+        } else {
+          errorMessage = e.toString().replaceFirst('Exception: ', '');
+        }
+        
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error: $e'),
+            content: Text(errorMessage),
             backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
           ),
         );
       }
     }
   }
 
+  Future<void> _setAsDefault(String configId) async {
+    try {
+      final api = ApiClient();
+      final response = await api.put('/api/v1/admin/files/storage-configs/$configId/set-default');
+      
+      if (response.data != null && response.data['success'] == true) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('تنظیمات به عنوان پیش‌فرض تنظیم شد'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        
+        // Refresh the list
+        loadStorageConfigs();
+      } else {
+        throw Exception(response.data?['message'] ?? 'خطا در تنظیم به عنوان پیش‌فرض');
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('خطا در تنظیم به عنوان پیش‌فرض: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  void _editStorageConfig(Map<String, dynamic> config) {
+    showDialog(
+      context: context,
+      builder: (context) => StorageConfigFormDialog(
+        config: config,
+        onSaved: () {
+          loadStorageConfigs();
+          // Show success message
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('تنظیمات ذخیره‌سازی به‌روزرسانی شد'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
 
     if (_isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(),
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(
+              color: theme.colorScheme.primary,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'در حال بارگذاری...',
+              style: theme.textTheme.bodyLarge,
+            ),
+          ],
+        ),
       );
     }
 
@@ -200,84 +234,124 @@ class _StorageConfigListWidgetState extends State<StorageConfigListWidget> {
             ),
             const SizedBox(height: 16),
             Text(
+              'خطا',
+              style: theme.textTheme.headlineSmall?.copyWith(
+                color: theme.colorScheme.error,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
               _error!,
-              style: theme.textTheme.bodyLarge,
+              style: theme.textTheme.bodyMedium,
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: _loadStorageConfigs,
-              child: Text(l10n.retry),
+            ElevatedButton.icon(
+              onPressed: loadStorageConfigs,
+              icon: const Icon(Icons.refresh),
+              label: Text('تلاش مجدد'),
             ),
           ],
         ),
       );
     }
 
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  l10n.storageConfigurations,
-                  style: theme.textTheme.headlineSmall,
-                ),
+    if (_storageConfigs.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.storage_outlined,
+              size: 64,
+              color: theme.colorScheme.primary.withOpacity(0.5),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'هیچ پیکربندی ذخیره‌سازی وجود ندارد',
+              style: theme.textTheme.headlineSmall?.copyWith(
+                color: theme.colorScheme.onSurface.withOpacity(0.6),
               ),
-              ElevatedButton.icon(
-                onPressed: _addStorageConfig,
-                icon: const Icon(Icons.add),
-                label: Text(l10n.addStorageConfig),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'اولین پیکربندی ذخیره‌سازی را ایجاد کنید',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurface.withOpacity(0.6),
               ),
-            ],
-          ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'از دکمه + در پایین صفحه استفاده کنید',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurface.withOpacity(0.5),
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ],
         ),
-        Expanded(
-          child: _storageConfigs.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.storage_outlined,
-                        size: 64,
-                        color: theme.colorScheme.onSurface.withOpacity(0.5),
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        l10n.noFilesFound,
-                        style: theme.textTheme.bodyLarge?.copyWith(
-                          color: theme.colorScheme.onSurface.withOpacity(0.7),
-                        ),
-                      ),
-                    ],
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: loadStorageConfigs,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header
+            Row(
+              children: [
+                Icon(
+                  Icons.storage,
+                  color: theme.colorScheme.primary,
+                  size: 28,
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  'پیکربندی‌های ذخیره‌سازی',
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: theme.colorScheme.onSurface,
                   ),
-                )
-              : ListView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: _storageConfigs.length,
-                  itemBuilder: (context, index) {
-                    final config = _storageConfigs[index];
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: StorageConfigCard(
-                        config: config,
-                        onEdit: () => _editStorageConfig(config),
-                        onSetDefault: config['is_default'] == false
-                            ? () => _setAsDefault(config['id'])
-                            : null,
-                        onTestConnection: () => _testConnection(config['id']),
-                        onDelete: config['is_default'] == false
-                            ? () => _deleteConfig(config['id'])
-                            : null,
-                      ),
-                    );
-                  },
                 ),
+                const Spacer(),
+                Text(
+                  '${_storageConfigs.length} پیکربندی',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurface.withOpacity(0.6),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            
+            // Storage Configs List
+            Expanded(
+              child: ListView.builder(
+                itemCount: _storageConfigs.length,
+                itemBuilder: (context, index) {
+                  final config = _storageConfigs[index];
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 16.0),
+                    child: StorageConfigCard(
+                      config: config,
+                      onEdit: () => _editStorageConfig(config),
+                      onSetDefault: config['is_default'] == false
+                          ? () => _setAsDefault(config['id'])
+                          : null,
+                      onTestConnection: () => _testConnection(config['id']),
+                      onDelete: () => _deleteConfig(config['id']),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 }

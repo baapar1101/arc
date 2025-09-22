@@ -23,203 +23,405 @@ class StorageConfigCard extends StatelessWidget {
     final theme = Theme.of(context);
     final isDefault = config['is_default'] == true;
     final isActive = config['is_active'] == true;
+    final storageType = config['storage_type'] ?? 'unknown';
 
     return Card(
-      elevation: 2,
+      elevation: 4,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: isDefault 
+            ? BorderSide(color: theme.colorScheme.primary, width: 2)
+            : BorderSide.none,
+      ),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          gradient: isDefault 
+              ? LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    theme.colorScheme.primary.withOpacity(0.05),
+                    theme.colorScheme.primary.withOpacity(0.02),
+                  ],
+                )
+              : null,
+        ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header
+              // Header
             Row(
+              children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: _getStorageColor(storageType).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      _getStorageIcon(storageType),
+                      color: _getStorageColor(storageType),
+                      size: 28,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                    child: Text(
+                                config['name'] ?? 'Unknown',
+                                style: theme.textTheme.titleLarge?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: theme.colorScheme.onSurface,
+                      ),
+                    ),
+                  ),
+                            if (isDefault) ...[
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: theme.colorScheme.primary,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(
-                  _getStorageIcon(config['storage_type']),
-                  color: theme.colorScheme.primary,
-                  size: 24,
+                                      Icons.star,
+                  size: 16,
+                                      color: theme.colorScheme.onPrimary,
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        config['name'] ?? 'Unknown',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        _getStorageTypeName(config['storage_type']),
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.colorScheme.onSurface.withOpacity(0.7),
-                        ),
-                      ),
-                    ],
+                const SizedBox(width: 4),
+                Text(
+                                      'پیش‌فرض',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                                        color: theme.colorScheme.onPrimary,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+              ],
+            ),
+            const SizedBox(height: 4),
+              Row(
+                children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: _getStorageColor(storageType),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                _getStorageTypeName(storageType),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                    ),
                   ),
-                ),
-                // Status badges
-                Row(
-                  children: [
-                    if (isDefault)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
+                  const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: isActive ? Colors.green : Colors.red,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                    child: Text(
+                                isActive ? 'فعال' : 'غیرفعال',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.primary,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          l10n.isDefault,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onPrimary,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              
+              const SizedBox(height: 20),
+              
+              // Configuration details
+              _buildConfigDetails(context, config),
+              
+              const SizedBox(height: 20),
+              
+              // Actions
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  if (onTestConnection != null)
+                    _buildActionButton(
+                      context: context,
+                      icon: Icons.wifi_protected_setup,
+                      label: l10n.testConnection,
+                      onPressed: onTestConnection!,
+                      color: theme.colorScheme.primary,
+                    ),
+                  if (onEdit != null) ...[
                     const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: isActive ? Colors.green : Colors.red,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                        child: Text(
-                          isActive ? l10n.isActive : 'غیرفعال',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
+                    _buildActionButton(
+                      context: context,
+                      icon: Icons.edit,
+                      label: l10n.edit,
+                      onPressed: onEdit!,
+                      color: theme.colorScheme.secondary,
                     ),
                   ],
-                ),
-              ],
-            ),
-            
-            const SizedBox(height: 16),
-            
-            // Configuration details
-            _buildConfigDetails(context, config),
-            
-            const SizedBox(height: 16),
-            
-            // Actions
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                if (onTestConnection != null)
-                  TextButton.icon(
-                    onPressed: onTestConnection,
-                    icon: const Icon(Icons.wifi_protected_setup, size: 16),
-                    label: Text(l10n.testConnection),
-                  ),
-                if (onEdit != null) ...[
-                  const SizedBox(width: 8),
-                  TextButton.icon(
-                    onPressed: onEdit,
-                    icon: const Icon(Icons.edit, size: 16),
-                    label: Text(l10n.edit),
-                  ),
-                ],
-                if (onSetDefault != null) ...[
-                  const SizedBox(width: 8),
-                  TextButton.icon(
-                    onPressed: onSetDefault,
-                    icon: const Icon(Icons.star, size: 16),
-                    label: Text(l10n.setAsDefault),
-                    style: TextButton.styleFrom(
-                      foregroundColor: theme.colorScheme.primary,
+                  if (onSetDefault != null) ...[
+                    const SizedBox(width: 8),
+                    _buildActionButton(
+                      context: context,
+                      icon: Icons.star,
+                      label: l10n.setAsDefault,
+                      onPressed: onSetDefault!,
+                      color: Colors.orange,
                     ),
-                  ),
-                ],
-                if (onDelete != null) ...[
-                  const SizedBox(width: 8),
-                  TextButton.icon(
-                    onPressed: onDelete,
-                    icon: const Icon(Icons.delete, size: 16),
-                    label: Text(l10n.delete),
-                    style: TextButton.styleFrom(
-                      foregroundColor: theme.colorScheme.error,
+                  ],
+                  if (onDelete != null) ...[
+                    const SizedBox(width: 8),
+                    _buildActionButton(
+                      context: context,
+                      icon: Icons.delete,
+                      label: l10n.delete,
+                      onPressed: onDelete!,
+                      color: theme.colorScheme.error,
                     ),
-                  ),
+                  ],
                 ],
-              ],
-            ),
-          ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActionButton({
+    required BuildContext context,
+    required IconData icon,
+    required String label,
+    required VoidCallback onPressed,
+    required Color color,
+  }) {
+    return ElevatedButton.icon(
+      onPressed: onPressed,
+      icon: Icon(icon, size: 18),
+      label: Text(label),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: color,
+        foregroundColor: Colors.white,
+        elevation: 2,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
         ),
       ),
     );
   }
 
   Widget _buildConfigDetails(BuildContext context, Map<String, dynamic> config) {
-    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
     final configData = config['config_data'] ?? {};
     final storageType = config['storage_type'];
 
     if (storageType == 'local') {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildDetailRow(
-            context,
-            l10n.basePath,
-            configData['base_path'] ?? 'N/A',
-            Icons.folder,
-          ),
-        ],
-      );
+      return _buildLocalConfigDetails(context, configData);
     } else if (storageType == 'ftp') {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildDetailRow(
-            context,
-            l10n.ftpHost,
-            configData['host'] ?? 'N/A',
-            Icons.dns,
+      return _buildFtpConfigDetails(context, configData);
+    } else {
+      return Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceVariant.withOpacity(0.5),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Text(
+          'نوع ذخیره‌سازی نامشخص',
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: theme.colorScheme.onSurface.withOpacity(0.6),
           ),
-          const SizedBox(height: 8),
-          _buildDetailRow(
-            context,
-            l10n.ftpPort,
-            configData['port']?.toString() ?? 'N/A',
-            Icons.settings_ethernet,
-          ),
-          const SizedBox(height: 8),
-          _buildDetailRow(
-            context,
-            l10n.ftpUsername,
-            configData['username'] ?? 'N/A',
-            Icons.person,
-          ),
-          const SizedBox(height: 8),
-          _buildDetailRow(
-            context,
-            l10n.ftpDirectory,
-            configData['directory'] ?? 'N/A',
-            Icons.folder,
-          ),
-        ],
+        ),
       );
     }
-
-    return const SizedBox.shrink();
   }
 
-  Widget _buildDetailRow(
-    BuildContext context,
-    String label,
-    String value,
-    IconData icon,
-  ) {
+  Widget _buildLocalConfigDetails(BuildContext context, Map<String, dynamic> configData) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final basePath = configData['base_path'] ?? '';
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: theme.colorScheme.outline.withOpacity(0.2),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+              Row(
+                children: [
+                  Icon(
+                Icons.folder_outlined,
+                size: 20,
+                color: theme.colorScheme.primary,
+              ),
+              const SizedBox(width: 8),
+                  Text(
+                'پیکربندی ذخیره‌سازی محلی',
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: theme.colorScheme.onSurface,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            l10n.basePath,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurface.withOpacity(0.6),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surface,
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(
+                color: theme.colorScheme.outline.withOpacity(0.3),
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.folder,
+                  size: 16,
+                  color: theme.colorScheme.primary,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    basePath,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontFamily: 'monospace',
+                    ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFtpConfigDetails(BuildContext context, Map<String, dynamic> configData) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final host = configData['host'] ?? '';
+    final port = configData['port'] ?? 21;
+    final username = configData['username'] ?? '';
+    final directory = configData['directory'] ?? '/';
+    final useTls = configData['use_tls'] == true;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: theme.colorScheme.outline.withOpacity(0.2),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.cloud_outlined,
+                size: 20,
+                color: theme.colorScheme.primary,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'پیکربندی FTP',
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: theme.colorScheme.onSurface,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _buildConfigRow(
+            context,
+            Icons.dns,
+            'میزبان',
+            host,
+          ),
+          const SizedBox(height: 8),
+          _buildConfigRow(
+            context,
+            Icons.settings_ethernet,
+            'پورت',
+            port.toString(),
+          ),
+          const SizedBox(height: 8),
+          _buildConfigRow(
+            context,
+            Icons.person,
+            l10n.username,
+            username,
+          ),
+          const SizedBox(height: 8),
+          _buildConfigRow(
+            context,
+            Icons.folder,
+            'دایرکتوری',
+            directory,
+          ),
+          const SizedBox(height: 8),
+          _buildConfigRow(
+            context,
+            Icons.security,
+            'امنیت',
+            useTls ? 'TLS فعال' : 'TLS غیرفعال',
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildConfigRow(BuildContext context, IconData icon, String label, String value) {
     final theme = Theme.of(context);
     
     return Row(
@@ -227,22 +429,21 @@ class StorageConfigCard extends StatelessWidget {
         Icon(
           icon,
           size: 16,
-          color: theme.colorScheme.onSurface.withOpacity(0.6),
+          color: theme.colorScheme.primary,
         ),
         const SizedBox(width: 8),
         Text(
           '$label: ',
-          style: theme.textTheme.bodyMedium?.copyWith(
-            fontWeight: FontWeight.w500,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurface.withOpacity(0.6),
           ),
         ),
         Expanded(
           child: Text(
             value,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurface.withOpacity(0.8),
+            style: theme.textTheme.bodySmall?.copyWith(
+              fontWeight: FontWeight.w500,
             ),
-            overflow: TextOverflow.ellipsis,
           ),
         ),
       ],
@@ -256,7 +457,18 @@ class StorageConfigCard extends StatelessWidget {
       case 'ftp':
         return Icons.cloud_upload;
       default:
-        return Icons.storage;
+        return Icons.help_outline;
+    }
+  }
+
+  Color _getStorageColor(String storageType) {
+    switch (storageType) {
+      case 'local':
+        return Colors.blue;
+      case 'ftp':
+        return Colors.green;
+      default:
+        return Colors.grey;
     }
   }
 
@@ -265,9 +477,9 @@ class StorageConfigCard extends StatelessWidget {
       case 'local':
         return 'Local Storage';
       case 'ftp':
-        return 'FTP Storage';
+        return 'FTP Server';
       default:
-        return 'Unknown Storage';
+        return 'Unknown';
     }
   }
 }
