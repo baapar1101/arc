@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -352,7 +351,9 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
       _showSnack(t.registerSuccess);
       // پاکسازی کد معرف پس از ثبت‌نام موفق
       unawaited(ReferralStore.clearReferrer());
-      context.go('/user/profile/dashboard');
+      if (mounted) {
+        context.go('/user/profile/dashboard');
+      }
     } catch (e) {
       if (!mounted) return;
       final msg = _extractErrorMessage(e, AppLocalizations.of(context));

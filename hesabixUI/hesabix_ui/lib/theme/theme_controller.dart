@@ -36,7 +36,7 @@ class ThemeController extends ChangeNotifier {
     _seed = c;
     notifyListeners();
     final p = await SharedPreferences.getInstance();
-    await p.setInt(_seedKey, c.value);
+    await p.setInt(_seedKey, c.toARGB32());
   }
 }
 

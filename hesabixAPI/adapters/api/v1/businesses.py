@@ -6,8 +6,7 @@ from sqlalchemy.orm import Session
 from adapters.db.session import get_db
 from adapters.api.v1.schemas import (
     BusinessCreateRequest, BusinessUpdateRequest, BusinessResponse,
-    BusinessListResponse, BusinessSummaryResponse, SuccessResponse,
-    QueryInfo
+    BusinessListResponse, BusinessSummaryResponse, SuccessResponse
 )
 from app.core.responses import success_response, format_datetime_fields
 from app.core.auth_dependency import get_current_user, AuthContext
@@ -63,10 +62,10 @@ def create_new_business(
     owner_id = ctx.get_user_id()
     business = create_business(db, business_data, owner_id)
     formatted_data = format_datetime_fields(business, request)
-    return success_response(formatted_data, request, "کسب و کار با موفقیت ایجاد شد")
+    return success_response(formatted_data, request)
 
 
-@router.get("", 
+@router.post("/list", 
     summary="لیست کسب و کارهای کاربر", 
     description="دریافت لیست کسب و کارهای کاربر جاری با قابلیت فیلتر و جستجو",
     response_model=SuccessResponse,
@@ -86,7 +85,7 @@ def create_new_business(
                                     "business_type": "شرکت",
                                     "business_field": "تولیدی",
                                     "owner_id": 1,
-                                    "created_at": "2024-01-01T00:00:00Z"
+                                    "created_at": "1403/01/01 00:00:00"
                                 }
                             ],
                             "pagination": {
@@ -109,19 +108,54 @@ def create_new_business(
 )
 def list_user_businesses(
     request: Request,
-    query_info: QueryInfo,
     ctx: AuthContext = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    take: int = 10,
+    skip: int = 0,
+    sort_by: str = "created_at",
+    sort_desc: bool = True,
+    search: str = None
 ) -> dict:
     """لیست کسب و کارهای کاربر"""
     owner_id = ctx.get_user_id()
-    query_dict = query_info.dict()
+    query_dict = {
+        "take": take,
+        "skip": skip,
+        "sort_by": sort_by,
+        "sort_desc": sort_desc,
+        "search": search
+    }
     businesses = get_businesses_by_owner(db, owner_id, query_dict)
     formatted_data = format_datetime_fields(businesses, request)
-    return success_response(formatted_data, request, "لیست کسب و کارها دریافت شد")
+    
+    # اگر formatted_data یک dict با کلید items است، آن را استخراج کنیم
+    if isinstance(formatted_data, dict) and 'items' in formatted_data:
+        items = formatted_data['items']
+    else:
+        items = formatted_data
+    
+    # برای حالا total را برابر با تعداد items قرار می‌دهیم
+    # در آینده می‌توان total را از service دریافت کرد
+    total = len(items)
+    page = (skip // take) + 1
+    total_pages = (total + take - 1) // take
+    
+    response_data = {
+        "items": items,
+        "pagination": {
+            "total": total,
+            "page": page,
+            "per_page": take,
+            "total_pages": total_pages,
+            "has_next": page < total_pages,
+            "has_prev": page > 1,
+        },
+        "query_info": query_dict
+    }
+    return success_response(response_data, request)
 
 
-@router.get("/{business_id}", 
+@router.post("/{business_id}/details", 
     summary="جزئیات کسب و کار", 
     description="دریافت جزئیات یک کسب و کار خاص",
     response_model=SuccessResponse,
@@ -141,7 +175,7 @@ def list_user_businesses(
                             "owner_id": 1,
                             "address": "تهران، خیابان ولیعصر",
                             "phone": "02112345678",
-                            "created_at": "2024-01-01T00:00:00Z"
+                            "created_at": "1403/01/01 00:00:00"
                         }
                     }
                 }
@@ -169,7 +203,7 @@ def get_business(
         raise HTTPException(status_code=404, detail="کسب و کار یافت نشد")
     
     formatted_data = format_datetime_fields(business, request)
-    return success_response(formatted_data, request, "جزئیات کسب و کار دریافت شد")
+    return success_response(formatted_data, request)
 
 
 @router.put("/{business_id}", 
@@ -266,7 +300,7 @@ def delete_business_info(
     return success_response({"ok": True}, request, "کسب و کار با موفقیت حذف شد")
 
 
-@router.get("/summary/stats", 
+@router.post("/stats", 
     summary="آمار کسب و کارها", 
     description="دریافت آمار کلی کسب و کارهای کاربر",
     response_model=SuccessResponse,
@@ -307,4 +341,4 @@ def get_business_stats(
     """آمار کسب و کارها"""
     owner_id = ctx.get_user_id()
     stats = get_business_summary(db, owner_id)
-    return success_response(stats, request, "آمار کسب و کارها دریافت شد")
+    return success_response(stats, request)

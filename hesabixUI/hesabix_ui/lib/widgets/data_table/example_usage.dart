@@ -21,7 +21,7 @@ class DataTableExampleUsage {
             DataTableAction(
               icon: Icons.edit,
               label: 'ویرایش',
-              onTap: (user) => print('Edit user: ${user.id}'),
+              onTap: (user) => debugPrint('Edit user: ${user.id}'),
             ),
           ]),
         ],
@@ -51,7 +51,7 @@ class DataTableExampleUsage {
             DataTableAction(
               icon: Icons.visibility,
               label: 'مشاهده',
-              onTap: (order) => print('View order: ${order.id}'),
+              onTap: (order) => debugPrint('View order: ${order.id}'),
             ),
           ]),
         ],

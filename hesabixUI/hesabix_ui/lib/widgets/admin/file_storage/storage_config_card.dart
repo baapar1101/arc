@@ -41,8 +41,8 @@ class StorageConfigCard extends StatelessWidget {
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: [
-                    theme.colorScheme.primary.withOpacity(0.05),
-                    theme.colorScheme.primary.withOpacity(0.02),
+                    theme.colorScheme.primary.withValues(alpha: 0.05),
+                    theme.colorScheme.primary.withValues(alpha: 0.02),
                   ],
                 )
               : null,
@@ -58,7 +58,7 @@ class StorageConfigCard extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: _getStorageColor(storageType).withOpacity(0.1),
+                      color: _getStorageColor(storageType).withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Icon(
@@ -255,13 +255,13 @@ class StorageConfigCard extends StatelessWidget {
       return Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: theme.colorScheme.surfaceVariant.withOpacity(0.5),
+          color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Text(
           'نوع ذخیره‌سازی نامشخص',
           style: theme.textTheme.bodyMedium?.copyWith(
-            color: theme.colorScheme.onSurface.withOpacity(0.6),
+            color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
           ),
         ),
       );
@@ -276,10 +276,10 @@ class StorageConfigCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: theme.colorScheme.outline.withOpacity(0.2),
+          color: theme.colorScheme.outline.withValues(alpha: 0.2),
         ),
       ),
       child: Column(
@@ -306,7 +306,7 @@ class StorageConfigCard extends StatelessWidget {
           Text(
             l10n.basePath,
             style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurface.withOpacity(0.6),
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
             ),
           ),
           const SizedBox(height: 4),
@@ -316,7 +316,7 @@ class StorageConfigCard extends StatelessWidget {
               color: theme.colorScheme.surface,
               borderRadius: BorderRadius.circular(6),
               border: Border.all(
-                color: theme.colorScheme.outline.withOpacity(0.3),
+                color: theme.colorScheme.outline.withValues(alpha: 0.3),
               ),
             ),
             child: Row(
@@ -355,10 +355,10 @@ class StorageConfigCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: theme.colorScheme.outline.withOpacity(0.2),
+          color: theme.colorScheme.outline.withValues(alpha: 0.2),
         ),
       ),
       child: Column(
@@ -435,7 +435,7 @@ class StorageConfigCard extends StatelessWidget {
         Text(
           '$label: ',
           style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.onSurface.withOpacity(0.6),
+            color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
           ),
         ),
         Expanded(

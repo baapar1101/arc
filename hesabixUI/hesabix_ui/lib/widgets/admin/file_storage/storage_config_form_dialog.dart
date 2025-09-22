@@ -252,43 +252,33 @@ class _StorageConfigFormDialogState extends State<StorageConfigFormDialog> {
                         ),
                       ),
                       const SizedBox(height: 8),
-                      Row(
+                      Column(
                         children: [
-                          Expanded(
-                            child: RadioListTile<String>(
-                              title: Row(
-                                children: [
-                                  Icon(Icons.storage, size: 20),
-                                  const SizedBox(width: 8),
-                                  Text(l10n.localStorage),
-                                ],
-                              ),
-                            value: 'local',
+                          ListTile(
+                            leading: Radio<String>(
+                              value: 'local',
+                              // ignore: deprecated_member_use
                               groupValue: _selectedStorageType,
-                              onChanged: (value) {
-                                setState(() {
-                                  _selectedStorageType = value!;
-                                });
-                              },
+                              // ignore: deprecated_member_use
+                              onChanged: (value) => setState(() => _selectedStorageType = value!),
                             ),
+                            title: Text(l10n.localStorage),
+                            trailing: Icon(Icons.storage, size: 20),
+                            onTap: () => setState(() => _selectedStorageType = 'local'),
+                            contentPadding: EdgeInsets.zero,
                           ),
-                          Expanded(
-                            child: RadioListTile<String>(
-                              title: Row(
-                                children: [
-                                  Icon(Icons.cloud_upload, size: 20),
-                                  const SizedBox(width: 8),
-                                  Text('سرور FTP'),
-                                ],
-                              ),
+                          ListTile(
+                            leading: Radio<String>(
                               value: 'ftp',
+                              // ignore: deprecated_member_use
                               groupValue: _selectedStorageType,
-                        onChanged: (value) {
-                          setState(() {
-                            _selectedStorageType = value!;
-                          });
-                        },
-                      ),
+                              // ignore: deprecated_member_use
+                              onChanged: (value) => setState(() => _selectedStorageType = value!),
+                            ),
+                            title: Text('سرور FTP'),
+                            trailing: Icon(Icons.cloud_upload, size: 20),
+                            onTap: () => setState(() => _selectedStorageType = 'ftp'),
+                            contentPadding: EdgeInsets.zero,
                           ),
                         ],
                       ),
@@ -344,7 +334,7 @@ class _StorageConfigFormDialogState extends State<StorageConfigFormDialog> {
             Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+                color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
                 borderRadius: const BorderRadius.only(
                   bottomLeft: Radius.circular(20),
                   bottomRight: Radius.circular(20),

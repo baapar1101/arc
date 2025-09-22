@@ -141,9 +141,9 @@ class MessageBubble extends StatelessWidget {
 
   Color _getBorderColor(ThemeData theme, bool isUser) {
     if (isUser) {
-      return theme.colorScheme.primary.withOpacity(0.3);
+      return theme.colorScheme.primary.withValues(alpha: 0.3);
     } else {
-      return theme.colorScheme.outline.withOpacity(0.3);
+      return theme.colorScheme.outline.withValues(alpha: 0.3);
     }
   }
 
@@ -157,7 +157,7 @@ class MessageBubble extends StatelessWidget {
 
   Color _getSenderTextColor(ThemeData theme, bool isUser) {
     if (isUser) {
-      return Colors.white.withOpacity(0.8);
+      return Colors.white.withValues(alpha: 0.8);
     } else {
       return theme.colorScheme.primary;
     }
@@ -165,9 +165,9 @@ class MessageBubble extends StatelessWidget {
 
   Color _getTimeColor(ThemeData theme, bool isUser) {
     if (isUser) {
-      return Colors.white.withOpacity(0.7);
+      return Colors.white.withValues(alpha: 0.7);
     } else {
-      return theme.colorScheme.onSurface.withOpacity(0.6);
+      return theme.colorScheme.onSurface.withValues(alpha: 0.6);
     }
   }
 

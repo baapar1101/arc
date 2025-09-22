@@ -181,6 +181,6 @@ def _business_to_dict(business: Business) -> Dict[str, Any]:
         "province": business.province,
         "city": business.city,
         "postal_code": business.postal_code,
-        "created_at": business.created_at.isoformat(),
-        "updated_at": business.updated_at.isoformat()
+        "created_at": business.created_at,  # datetime object بماند
+        "updated_at": business.updated_at   # datetime object بماند
     }

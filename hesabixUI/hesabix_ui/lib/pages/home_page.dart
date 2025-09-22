@@ -43,7 +43,6 @@ class _ThemeMenu extends StatelessWidget {
   Widget build(BuildContext context) {
     return PopupMenuButton<ThemeMode>(
       icon: const Icon(Icons.color_lens_outlined),
-      initialValue: controller.mode,
       onSelected: (mode) => controller.setMode(mode),
       itemBuilder: (context) => const [
         PopupMenuItem(value: ThemeMode.system, child: Text('System')),

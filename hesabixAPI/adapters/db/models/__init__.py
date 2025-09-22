@@ -12,6 +12,9 @@ from .business_permission import BusinessPermission  # noqa: F401
 from .support import *  # noqa: F401, F403
 
 # Import file storage models
-from .file_storage import *  # noqa: F401, F403
+from .file_storage import *
+
+# Import email config models
+from .email_config import EmailConfig  # noqa: F401, F403
 
 

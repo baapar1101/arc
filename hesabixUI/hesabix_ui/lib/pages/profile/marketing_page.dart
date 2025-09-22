@@ -189,9 +189,9 @@ class _MarketingPageState extends State<MarketingPage> {
                             const SizedBox(width: 8),
                             FilledButton.icon(
                               onPressed: () async {
+                                final messenger = ScaffoldMessenger.of(context);
                                 await Clipboard.setData(ClipboardData(text: inviteLink));
                                 if (!mounted) return;
-                                final messenger = ScaffoldMessenger.of(context);
                                 messenger
                                   ..hideCurrentSnackBar()
                                   ..showSnackBar(

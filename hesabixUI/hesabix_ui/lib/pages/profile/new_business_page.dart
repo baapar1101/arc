@@ -633,7 +633,7 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
                       ),
                     ),
                   ),
-                  value: _businessData.businessType,
+                  initialValue: _businessData.businessType,
                   items: BusinessType.values.map((type) {
                     return DropdownMenuItem(
                       value: type,
@@ -675,7 +675,7 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
                       ),
                     ),
                   ),
-                  value: _businessData.businessField,
+                  initialValue: _businessData.businessField,
                   items: BusinessField.values.map((field) {
                     return DropdownMenuItem(
                       value: field,

@@ -33,6 +33,47 @@ msgstr "Field is required"
 msgid "INVALID_EMAIL"
 msgstr "Invalid email address"
 
+# Email Configuration
+msgid "Email configurations retrieved successfully"
+msgstr "Email configurations retrieved successfully"
+
+msgid "Email configuration retrieved successfully"
+msgstr "Email configuration retrieved successfully"
+
+msgid "Email configuration created successfully"
+msgstr "Email configuration created successfully"
+
+msgid "Email configuration updated successfully"
+msgstr "Email configuration updated successfully"
+
+msgid "Email configuration deleted successfully"
+msgstr "Email configuration deleted successfully"
+
+msgid "Email configuration not found"
+msgstr "Email configuration not found"
+
+msgid "Configuration name already exists"
+msgstr "Configuration name already exists"
+
+msgid "Connection test completed"
+msgstr "Connection test completed"
+
+msgid "Email configuration activated successfully"
+msgstr "Email configuration activated successfully"
+
+msgid "Failed to activate configuration"
+msgstr "Failed to activate configuration"
+
+msgid "Email sent successfully"
+msgstr "Email sent successfully"
+msgid "Cannot delete default configuration"
+msgstr "Cannot delete default configuration"
+msgid "Failed to set default configuration"
+msgstr "Failed to set default configuration"
+
+msgid "Failed to send email"
+msgstr "Failed to send email"
+
 # Auth
 msgid "INVALID_CAPTCHA"
 msgstr "Invalid captcha code."

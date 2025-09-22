@@ -53,3 +53,12 @@ class BaseRepository(Generic[T]):
 				stmt = stmt.where(column == value)
 		
 		return self.db.execute(stmt).scalars().first() is not None
+	
+	def delete(self, obj: T) -> None:
+		"""حذف رکورد از دیتابیس"""
+		self.db.delete(obj)
+		self.db.commit()
+	
+	def update(self, obj: T) -> None:
+		"""بروزرسانی رکورد در دیتابیس"""
+		self.db.commit()

@@ -43,7 +43,7 @@ class DataTableSearchDialog extends StatefulWidget {
 class _DataTableSearchDialogState extends State<DataTableSearchDialog> {
   late TextEditingController _controller;
   late String _selectedType;
-  Set<String> _selectedValues = <String>{};
+  final Set<String> _selectedValues = <String>{};
   DateTime? _fromDate;
   DateTime? _toDate;
 
@@ -118,7 +118,7 @@ class _DataTableSearchDialogState extends State<DataTableSearchDialog> {
     return [
       // Search type dropdown
       DropdownButtonFormField<String>(
-        value: _selectedType,
+        initialValue: _selectedType,
         decoration: InputDecoration(
           labelText: t.searchType,
           border: const OutlineInputBorder(),
@@ -163,27 +163,7 @@ class _DataTableSearchDialogState extends State<DataTableSearchDialog> {
         subtitle: Text(_fromDate != null 
             ? HesabixDateUtils.formatForDisplay(_fromDate!, isJalali)
             : t.selectDate),
-        onTap: () async {
-          final date = isJalali 
-              ? await showJalaliDatePicker(
-                  context: context,
-                  initialDate: _fromDate ?? DateTime.now(),
-                  firstDate: DateTime(2000),
-                  lastDate: DateTime.now().add(const Duration(days: 365)),
-                  helpText: t.dateFrom,
-                )
-              : await showDatePicker(
-                  context: context,
-                  initialDate: _fromDate ?? DateTime.now(),
-                  firstDate: DateTime(2000),
-                  lastDate: DateTime.now().add(const Duration(days: 365)),
-                );
-          if (date != null) {
-            setState(() {
-              _fromDate = date;
-            });
-          }
-        },
+        onTap: () => _selectFromDate(t, isJalali),
       ),
       // To date
       ListTile(
@@ -192,27 +172,7 @@ class _DataTableSearchDialogState extends State<DataTableSearchDialog> {
         subtitle: Text(_toDate != null 
             ? HesabixDateUtils.formatForDisplay(_toDate!, isJalali)
             : t.selectDate),
-        onTap: () async {
-          final date = isJalali 
-              ? await showJalaliDatePicker(
-                  context: context,
-                  initialDate: _toDate ?? _fromDate ?? DateTime.now(),
-                  firstDate: _fromDate ?? DateTime(2000),
-                  lastDate: DateTime.now().add(const Duration(days: 365)),
-                  helpText: t.dateTo,
-                )
-              : await showDatePicker(
-                  context: context,
-                  initialDate: _toDate ?? _fromDate ?? DateTime.now(),
-                  firstDate: _fromDate ?? DateTime(2000),
-                  lastDate: DateTime.now().add(const Duration(days: 365)),
-                );
-          if (date != null) {
-            setState(() {
-              _toDate = date;
-            });
-          }
-        },
+        onTap: () => _selectToDate(t, isJalali),
       ),
     ];
   }
@@ -343,6 +303,56 @@ class _DataTableSearchDialogState extends State<DataTableSearchDialog> {
         break;
     }
     Navigator.of(context).pop();
+  }
+
+  Future<void> _selectFromDate(AppLocalizations t, bool isJalali) async {
+    final currentContext = context;
+    final date = isJalali 
+        ? await showJalaliDatePicker(
+            // ignore: use_build_context_synchronously
+            context: currentContext,
+            initialDate: _fromDate ?? DateTime.now(),
+            firstDate: DateTime(2000),
+            lastDate: DateTime.now().add(const Duration(days: 365)),
+            helpText: t.dateFrom,
+          )
+        : await showDatePicker(
+            // ignore: use_build_context_synchronously
+            context: currentContext,
+            initialDate: _fromDate ?? DateTime.now(),
+            firstDate: DateTime(2000),
+            lastDate: DateTime.now().add(const Duration(days: 365)),
+          );
+    if (date != null && mounted) {
+      setState(() {
+        _fromDate = date;
+      });
+    }
+  }
+
+  Future<void> _selectToDate(AppLocalizations t, bool isJalali) async {
+    final currentContext = context;
+    final date = isJalali 
+        ? await showJalaliDatePicker(
+            // ignore: use_build_context_synchronously
+            context: currentContext,
+            initialDate: _toDate ?? _fromDate ?? DateTime.now(),
+            firstDate: _fromDate ?? DateTime(2000),
+            lastDate: DateTime.now().add(const Duration(days: 365)),
+            helpText: t.dateTo,
+          )
+        : await showDatePicker(
+            // ignore: use_build_context_synchronously
+            context: currentContext,
+            initialDate: _toDate ?? _fromDate ?? DateTime.now(),
+            firstDate: _fromDate ?? DateTime(2000),
+            lastDate: DateTime.now().add(const Duration(days: 365)),
+          );
+    if (date != null && mounted) {
+      setState(() {
+        _toDate = date;
+      });
+    }
   }
 }
 

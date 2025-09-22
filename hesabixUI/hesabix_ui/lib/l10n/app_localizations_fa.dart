@@ -137,6 +137,80 @@ class AppLocalizationsFa extends AppLocalizations {
   String get adminTools => 'ابزارهای مدیریتی';
 
   @override
+  String get emailSettings => 'تنظیمات ایمیل';
+
+  @override
+  String get emailSettingsDescription =>
+      'پیکربندی تنظیمات SMTP برای ارسال ایمیل';
+
+  @override
+  String get emailConfigurations => 'پیکربندی‌های ایمیل';
+
+  @override
+  String get noEmailConfigurations => 'هیچ پیکربندی ایمیلی وجود ندارد';
+
+  @override
+  String get addEmailConfiguration => 'افزودن پیکربندی ایمیل';
+
+  @override
+  String get configurationName => 'نام پیکربندی';
+
+  @override
+  String get smtpHost => 'میزبان SMTP';
+
+  @override
+  String get smtpPort => 'پورت SMTP';
+
+  @override
+  String get smtpUsername => 'نام کاربری SMTP';
+
+  @override
+  String get smtpPassword => 'رمز عبور SMTP';
+
+  @override
+  String get fromEmail => 'ایمیل فرستنده';
+
+  @override
+  String get fromName => 'نام فرستنده';
+
+  @override
+  String get useTls => 'استفاده از TLS';
+
+  @override
+  String get useSsl => 'استفاده از SSL';
+
+  @override
+  String get isActive => 'فعال';
+
+  @override
+  String get active => 'فعال';
+
+  @override
+  String get testConnection => 'تست اتصال';
+
+  @override
+  String get sendTestEmail => 'ارسال ایمیل تست';
+
+  @override
+  String get saveConfiguration => 'ذخیره پیکربندی';
+
+  @override
+  String get deleteConfiguration => 'حذف پیکربندی';
+
+  @override
+  String get deleteConfigurationConfirm =>
+      'آیا مطمئن هستید که می‌خواهید این پیکربندی را حذف کنید؟';
+
+  @override
+  String get delete => 'حذف';
+
+  @override
+  String get invalidPort => 'پورت نامعتبر است';
+
+  @override
+  String get invalidEmail => 'ایمیل نامعتبر است';
+
+  @override
   String get ok => 'تایید';
 
   @override
@@ -576,6 +650,12 @@ class AppLocalizationsFa extends AppLocalizations {
   String get other => 'سایر';
 
   @override
+  String get owner => 'مالک';
+
+  @override
+  String get member => 'عضو';
+
+  @override
   String get newTicket => 'تیکت جدید';
 
   @override
@@ -905,9 +985,6 @@ class AppLocalizationsFa extends AppLocalizations {
   String get isDefault => 'پیش‌فرض';
 
   @override
-  String get isActive => 'فعال';
-
-  @override
   String get configData => 'داده‌های پیکربندی';
 
   @override
@@ -929,9 +1006,6 @@ class AppLocalizationsFa extends AppLocalizations {
   String get ftpDirectory => 'پوشه FTP';
 
   @override
-  String get testConnection => 'تست اتصال';
-
-  @override
   String get connectionSuccessful => 'اتصال موفقیت‌آمیز';
 
   @override
@@ -939,6 +1013,84 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get setAsDefault => 'تنظیم به عنوان پیش‌فرض';
+
+  @override
+  String get defaultConfiguration => 'پیکربندی پیشفرض';
+
+  @override
+  String get setDefaultConfirm =>
+      'آیا مطمئن هستید که می‌خواهید این پیکربندی را به عنوان پیشفرض تنظیم کنید؟';
+
+  @override
+  String get defaultSetSuccessfully => 'پیکربندی پیشفرض با موفقیت تنظیم شد';
+
+  @override
+  String get defaultSetFailed => 'تنظیم پیکربندی پیشفرض ناموفق بود';
+
+  @override
+  String get cannotDeleteDefault => 'نمی‌توان پیکربندی پیشفرض را حذف کرد';
+
+  @override
+  String get defaultConfigurationNote =>
+      'پیکربندی پیشفرض برای ارسال ایمیل‌ها استفاده می‌شود و قابل حذف نیست';
+
+  @override
+  String get setAsDefaultEmail => 'تنظیم به عنوان ایمیل پیشفرض';
+
+  @override
+  String get defaultEmailServer => 'سرور ایمیل پیشفرض';
+
+  @override
+  String get changeDefaultEmail => 'تغییر ایمیل پیشفرض';
+
+  @override
+  String get currentDefault => 'پیشفرض فعلی';
+
+  @override
+  String get makeDefault => 'پیشفرض کردن';
+
+  @override
+  String get defaultEmailNote => 'ایمیل‌ها از سرور پیشفرض ارسال می‌شوند';
+
+  @override
+  String get noDefaultSet => 'هیچ سرور ایمیل پیشفرضی تنظیم نشده است';
+
+  @override
+  String get selectDefaultServer => 'انتخاب سرور پیشفرض';
+
+  @override
+  String get defaultServerChanged => 'سرور پیشفرض تغییر کرد';
+
+  @override
+  String get defaultServerChangeFailed => 'تغییر سرور پیشفرض ناموفق بود';
+
+  @override
+  String get emailConfigSavedSuccessfully => 'تنظیمات ایمیل با موفقیت ذخیره شد';
+
+  @override
+  String get emailConfigUpdatedSuccessfully =>
+      'تنظیمات ایمیل با موفقیت به‌روزرسانی شد';
+
+  @override
+  String get editEmailConfiguration => 'ویرایش تنظیمات ایمیل';
+
+  @override
+  String get updateConfiguration => 'به‌روزرسانی تنظیمات';
+
+  @override
+  String get testEmailSubject => 'تست ایمیل';
+
+  @override
+  String get testEmailBody => 'این یک ایمیل تست است.';
+
+  @override
+  String get testEmailSentSuccessfully => 'ایمیل تست با موفقیت ارسال شد';
+
+  @override
+  String get emailConfigDeletedSuccessfully => 'تنظیمات حذف شد';
+
+  @override
+  String get confirm => 'تایید';
 
   @override
   String get fileStatistics => 'آمار فایل‌ها';
@@ -1066,9 +1218,6 @@ class AppLocalizationsFa extends AppLocalizations {
   String get edit => 'ویرایش';
 
   @override
-  String get delete => 'حذف';
-
-  @override
   String get actions => 'عملیات';
 
   @override
@@ -1143,4 +1292,58 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get maintenanceSettings => 'تنظیمات نگهداری';
+
+  @override
+  String get initializing => 'در حال راه‌اندازی...';
+
+  @override
+  String get loadingLanguageSettings => 'در حال بارگذاری تنظیمات زبان...';
+
+  @override
+  String get loadingCalendarSettings => 'در حال بارگذاری تنظیمات تقویم...';
+
+  @override
+  String get loadingThemeSettings => 'در حال بارگذاری تنظیمات تم...';
+
+  @override
+  String get loadingAuthentication => 'در حال بارگذاری احراز هویت...';
+
+  @override
+  String get businessManagementPlatform => 'پلتفرم مدیریت کسب‌وکار';
+
+  @override
+  String get businessDashboard => 'داشبورد کسب و کار';
+
+  @override
+  String get businessStatistics => 'آمار کسب و کار';
+
+  @override
+  String get recentActivities => 'فعالیت‌های اخیر';
+
+  @override
+  String get sales => 'فروش';
+
+  @override
+  String get accounting => 'حسابداری';
+
+  @override
+  String get inventory => 'موجودی';
+
+  @override
+  String get reports => 'گزارش‌ها';
+
+  @override
+  String get members => 'اعضا';
+
+  @override
+  String get backToProfile => 'بازگشت به پروفایل';
+
+  @override
+  String get noBusinessesFound => 'هیچ کسب و کاری یافت نشد';
+
+  @override
+  String get createFirstBusiness => 'اولین کسب و کار خود را ایجاد کنید';
+
+  @override
+  String get accessDenied => 'دسترسی غیرمجاز';
 }

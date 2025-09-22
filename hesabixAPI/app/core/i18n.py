@@ -51,3 +51,9 @@ def get_translator(locale: str = "fa") -> Translator:
 	return Translator(locale)
 
 
+def gettext(key: str, locale: str = "fa") -> str:
+	"""Get translation for a key using gettext"""
+	translator = get_translator(locale)
+	return translator.t(key)
+
+

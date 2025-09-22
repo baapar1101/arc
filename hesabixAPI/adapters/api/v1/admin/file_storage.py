@@ -6,14 +6,14 @@ from sqlalchemy import and_
 
 from adapters.db.session import get_db
 from app.core.auth_dependency import get_current_user, AuthContext
-from app.core.permissions import require_permission
+from app.core.permissions import require_app_permission
 from app.core.responses import success_response
 from app.core.responses import ApiError
 from app.core.i18n import locale_dependency
 from app.services.file_storage_service import FileStorageService
 from adapters.db.repositories.file_storage_repository import StorageConfigRepository, FileStorageRepository
 from adapters.db.models.user import User
-from adapters.db.models.file_storage import StorageConfig
+from adapters.db.models.file_storage import StorageConfig, FileStorage
 from adapters.api.v1.schema_models.file_storage import (
     StorageConfigCreateRequest,
     StorageConfigUpdateRequest,
@@ -30,6 +30,7 @@ router = APIRouter(prefix="/admin/files", tags=["Admin File Management"])
 
 
 @router.get("/", response_model=dict)
+@require_app_permission("superadmin")
 async def list_all_files(
     request: Request,
     page: int = Query(1, ge=1),
@@ -43,15 +44,6 @@ async def list_all_files(
 ):
     """لیست تمام فایل‌ها با فیلتر"""
     try:
-        # Check permission
-        if not current_user.has_app_permission("admin.file.view"):
-            raise ApiError(
-                code="FORBIDDEN",
-                message=translator.t("FORBIDDEN", "دسترسی غیرمجاز"),
-                http_status=403,
-                translator=translator
-            )
-        
         file_repo = FileStorageRepository(db)
         
         # محاسبه offset برای pagination
@@ -130,6 +122,7 @@ async def list_all_files(
 
 
 @router.get("/unverified", response_model=dict)
+@require_app_permission("superadmin")
 async def get_unverified_files(
     request: Request,
     db: Session = Depends(get_db),
@@ -167,6 +160,7 @@ async def get_unverified_files(
 
 
 @router.post("/cleanup-temporary", response_model=dict)
+@require_app_permission("superadmin")
 async def cleanup_temporary_files(
     request: Request,
     db: Session = Depends(get_db),
@@ -194,6 +188,7 @@ async def cleanup_temporary_files(
 
 
 @router.delete("/{file_id}", response_model=dict)
+@require_app_permission("superadmin")
 async def force_delete_file(
     file_id: UUID,
     request: Request,
@@ -228,6 +223,7 @@ async def force_delete_file(
 
 
 @router.put("/{file_id}/restore", response_model=dict)
+@require_app_permission("superadmin")
 async def restore_file(
     file_id: UUID,
     request: Request,
@@ -262,6 +258,7 @@ async def restore_file(
 
 
 @router.get("/statistics", response_model=dict)
+@require_app_permission("superadmin")
 async def get_file_statistics(
     request: Request,
     db: Session = Depends(get_db),
@@ -285,6 +282,7 @@ async def get_file_statistics(
 
 # Storage Configuration Management
 @router.get("/storage-configs/", response_model=dict)
+@require_app_permission("superadmin")
 async def get_storage_configs(
     request: Request,
     db: Session = Depends(get_db),
@@ -293,15 +291,6 @@ async def get_storage_configs(
 ):
     """لیست تنظیمات ذخیره‌سازی"""
     try:
-        # Check permission
-        if not current_user.has_app_permission("admin.storage.view"):
-            raise ApiError(
-                code="FORBIDDEN",
-                message=translator.t("FORBIDDEN", "دسترسی غیرمجاز"),
-                http_status=403,
-                translator=translator
-            )
-        
         config_repo = StorageConfigRepository(db)
         configs = config_repo.get_all_configs()
         
@@ -331,6 +320,7 @@ async def get_storage_configs(
 
 
 @router.post("/storage-configs/", response_model=dict)
+@require_app_permission("superadmin")
 async def create_storage_config(
     request: Request,
     config_request: StorageConfigCreateRequest,
@@ -367,6 +357,7 @@ async def create_storage_config(
 
 
 @router.put("/storage-configs/{config_id}", response_model=dict)
+@require_app_permission("superadmin")
 async def update_storage_config(
     config_id: UUID,
     request: Request,
@@ -392,6 +383,7 @@ async def update_storage_config(
 
 
 @router.put("/storage-configs/{config_id}/set-default", response_model=dict)
+@require_app_permission("superadmin")
 async def set_default_storage_config(
     config_id: UUID,
     request: Request,
@@ -426,6 +418,7 @@ async def set_default_storage_config(
 
 
 @router.delete("/storage-configs/{config_id}", response_model=dict)
+@require_app_permission("superadmin")
 async def delete_storage_config(
     config_id: str,
     request: Request,
@@ -435,15 +428,6 @@ async def delete_storage_config(
 ):
     """حذف تنظیمات ذخیره‌سازی"""
     try:
-        # Check permission
-        if not current_user.has_app_permission("admin.storage.delete"):
-            raise ApiError(
-                code="FORBIDDEN",
-                message=translator.t("FORBIDDEN", "دسترسی غیرمجاز"),
-                http_status=403,
-                translator=translator
-            )
-        
         config_repo = StorageConfigRepository(db)
         
         # بررسی وجود فایل‌ها قبل از حذف
@@ -480,6 +464,7 @@ async def delete_storage_config(
 
 
 @router.post("/storage-configs/{config_id}/test", response_model=dict)
+@require_app_permission("superadmin")
 async def test_storage_config(
     config_id: str,
     request: Request,

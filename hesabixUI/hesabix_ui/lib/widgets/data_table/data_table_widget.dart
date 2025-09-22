@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:typed_data';
 // import 'dart:html' as html; // Not available on Linux
 import 'package:flutter/material.dart';
 import 'package:data_table_2/data_table_2.dart';
@@ -63,7 +62,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
   bool _sortDesc = false;
 
   // Row selection state
-  Set<int> _selectedRows = <int>{};
+  final Set<int> _selectedRows = <int>{};
   bool _isExporting = false;
   
   // Column settings state
@@ -144,7 +143,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
         _visibleColumns = _getVisibleColumnsFromSettings(effectiveSettings);
       });
     } catch (e) {
-      print('Error loading column settings: $e');
+      debugPrint('Error loading column settings: $e');
       setState(() {
         _visibleColumns = List.from(widget.config.columns);
       });
@@ -466,7 +465,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
         widget.config.onColumnSettingsChanged!(validatedSettings);
       }
     } catch (e) {
-      print('Error saving column settings: $e');
+      debugPrint('Error saving column settings: $e');
       if (mounted) {
         final t = Localizations.of<AppLocalizations>(context, AppLocalizations)!;
         final messenger = ScaffoldMessenger.of(context);
@@ -624,43 +623,16 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
   // Platform-specific download functions for Linux
   Future<void> _downloadPdf(dynamic data, String filename) async {
     // For Linux desktop, we'll save to Downloads folder
-    print('Download PDF: $filename (Linux desktop - save to Downloads folder)');
+    debugPrint('Download PDF: $filename (Linux desktop - save to Downloads folder)');
     // TODO: Implement proper file saving for Linux
   }
 
   Future<void> _downloadExcel(dynamic data, String filename) async {
     // For Linux desktop, we'll save to Downloads folder
-    print('Download Excel: $filename (Linux desktop - save to Downloads folder)');
+    debugPrint('Download Excel: $filename (Linux desktop - save to Downloads folder)');
     // TODO: Implement proper file saving for Linux
   }
 
-  String _convertToCsv(List<dynamic> data) {
-    if (data.isEmpty) return '';
-    
-    // Get headers from first item
-    final firstItem = data.first as Map<String, dynamic>;
-    final headers = firstItem.keys.toList();
-    
-    // Create CSV content
-    final csvLines = <String>[];
-    
-    // Add headers
-    csvLines.add(headers.join(','));
-    
-    // Add data rows
-    for (final item in data) {
-      final row = <String>[];
-      for (final header in headers) {
-        final value = item[header]?.toString() ?? '';
-        // Escape commas and quotes
-        final escapedValue = value.replaceAll('"', '""');
-        row.add('"$escapedValue"');
-      }
-      csvLines.add(row.join(','));
-    }
-    
-    return csvLines.join('\n');
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -1451,7 +1423,7 @@ class _ColumnHeaderWithSearch extends StatelessWidget {
       onTap: enabled ? () => onSort(sortBy) : null,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 8.0),
-        child: Container(
+        child: SizedBox(
           width: double.infinity,
           child: Row(
             mainAxisSize: MainAxisSize.max,

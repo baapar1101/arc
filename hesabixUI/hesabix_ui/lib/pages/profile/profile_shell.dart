@@ -152,10 +152,7 @@ class _ProfileShellState extends State<ProfileShell> {
     final content = Container(
       color: scheme.surface,
       child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: widget.child,
-        ),
+        child: widget.child,
       ),
     );
 

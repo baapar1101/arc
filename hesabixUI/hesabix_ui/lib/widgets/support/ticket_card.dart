@@ -29,7 +29,7 @@ class TicketCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: theme.colorScheme.shadow.withOpacity(0.08),
+            color: theme.colorScheme.shadow.withValues(alpha: 0.08),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -46,7 +46,7 @@ class TicketCard extends StatelessWidget {
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                color: theme.colorScheme.outline.withOpacity(0.1),
+                color: theme.colorScheme.outline.withValues(alpha: 0.1),
                 width: 1,
               ),
             ),
@@ -78,7 +78,7 @@ class TicketCard extends StatelessWidget {
                 Text(
                   ticket.description,
                   style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurface.withOpacity(0.8),
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.8),
                     height: 1.4,
                   ),
                   maxLines: 3,
@@ -129,7 +129,7 @@ class TicketCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceVariant.withOpacity(0.5),
+        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
@@ -138,13 +138,13 @@ class TicketCard extends StatelessWidget {
           Icon(
             Icons.access_time,
             size: 12,
-            color: theme.colorScheme.onSurfaceVariant.withOpacity(0.7),
+            color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
           ),
           const SizedBox(width: 4),
           Text(
             _formatDate(dateTime, l10n),
             style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant.withOpacity(0.8),
+              color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -160,14 +160,14 @@ class TicketCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
         children: [
           CircleAvatar(
             radius: 16,
-            backgroundColor: theme.colorScheme.primary.withOpacity(0.1),
+            backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.1),
             child: Icon(
               Icons.person,
               size: 16,
@@ -182,7 +182,7 @@ class TicketCard extends StatelessWidget {
                 Text(
                   l10n.createdBy,
                   style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant.withOpacity(0.7),
+                    color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -202,7 +202,7 @@ class TicketCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
-                color: theme.colorScheme.secondary.withOpacity(0.1),
+                color: theme.colorScheme.secondary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
@@ -239,10 +239,10 @@ class TicketCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: color.withOpacity(0.2),
+          color: color.withValues(alpha: 0.2),
           width: 1,
         ),
       ),

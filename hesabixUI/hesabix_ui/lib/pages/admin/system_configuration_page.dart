@@ -65,7 +65,7 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              theme.colorScheme.primary.withOpacity(0.1),
+              theme.colorScheme.primary.withValues(alpha: 0.1),
               theme.colorScheme.surface,
             ],
           ),
@@ -232,7 +232,7 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: DropdownButtonFormField<String>(
-        value: value,
+        initialValue: value,
         decoration: InputDecoration(
           labelText: label,
           border: const OutlineInputBorder(),

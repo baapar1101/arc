@@ -137,6 +137,80 @@ class AppLocalizationsEn extends AppLocalizations {
   String get adminTools => 'Admin Tools';
 
   @override
+  String get emailSettings => 'Email Settings';
+
+  @override
+  String get emailSettingsDescription =>
+      'Configure SMTP settings for email sending';
+
+  @override
+  String get emailConfigurations => 'Email Configurations';
+
+  @override
+  String get noEmailConfigurations => 'No email configurations found';
+
+  @override
+  String get addEmailConfiguration => 'Add Email Configuration';
+
+  @override
+  String get configurationName => 'Configuration Name';
+
+  @override
+  String get smtpHost => 'SMTP Host';
+
+  @override
+  String get smtpPort => 'SMTP Port';
+
+  @override
+  String get smtpUsername => 'SMTP Username';
+
+  @override
+  String get smtpPassword => 'SMTP Password';
+
+  @override
+  String get fromEmail => 'From Email';
+
+  @override
+  String get fromName => 'From Name';
+
+  @override
+  String get useTls => 'Use TLS';
+
+  @override
+  String get useSsl => 'Use SSL';
+
+  @override
+  String get isActive => 'Active';
+
+  @override
+  String get active => 'Active';
+
+  @override
+  String get testConnection => 'Test Connection';
+
+  @override
+  String get sendTestEmail => 'Send Test Email';
+
+  @override
+  String get saveConfiguration => 'Save Configuration';
+
+  @override
+  String get deleteConfiguration => 'Delete Configuration';
+
+  @override
+  String get deleteConfigurationConfirm =>
+      'Are you sure you want to delete this configuration?';
+
+  @override
+  String get delete => 'Delete';
+
+  @override
+  String get invalidPort => 'Invalid port';
+
+  @override
+  String get invalidEmail => 'Invalid email';
+
+  @override
   String get ok => 'OK';
 
   @override
@@ -578,6 +652,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get other => 'Other';
 
   @override
+  String get owner => 'Owner';
+
+  @override
+  String get member => 'Member';
+
+  @override
   String get newTicket => 'New Ticket';
 
   @override
@@ -909,9 +989,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get isDefault => 'Default';
 
   @override
-  String get isActive => 'Active';
-
-  @override
   String get configData => 'Configuration Data';
 
   @override
@@ -933,9 +1010,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get ftpDirectory => 'FTP Directory';
 
   @override
-  String get testConnection => 'Test Connection';
-
-  @override
   String get connectionSuccessful => 'Connection Successful';
 
   @override
@@ -943,6 +1017,86 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get setAsDefault => 'Set as Default';
+
+  @override
+  String get defaultConfiguration => 'Default Configuration';
+
+  @override
+  String get setDefaultConfirm =>
+      'Are you sure you want to set this configuration as default?';
+
+  @override
+  String get defaultSetSuccessfully => 'Default configuration set successfully';
+
+  @override
+  String get defaultSetFailed => 'Failed to set default configuration';
+
+  @override
+  String get cannotDeleteDefault => 'Cannot delete default configuration';
+
+  @override
+  String get defaultConfigurationNote =>
+      'Default configuration is used for sending emails and cannot be deleted';
+
+  @override
+  String get setAsDefaultEmail => 'Set as Default Email';
+
+  @override
+  String get defaultEmailServer => 'Default Email Server';
+
+  @override
+  String get changeDefaultEmail => 'Change Default Email';
+
+  @override
+  String get currentDefault => 'Current Default';
+
+  @override
+  String get makeDefault => 'Make Default';
+
+  @override
+  String get defaultEmailNote => 'Emails are sent from the default server';
+
+  @override
+  String get noDefaultSet => 'No default email server is set';
+
+  @override
+  String get selectDefaultServer => 'Select Default Server';
+
+  @override
+  String get defaultServerChanged => 'Default server changed';
+
+  @override
+  String get defaultServerChangeFailed => 'Failed to change default server';
+
+  @override
+  String get emailConfigSavedSuccessfully =>
+      'Email configuration saved successfully';
+
+  @override
+  String get emailConfigUpdatedSuccessfully =>
+      'Email configuration updated successfully';
+
+  @override
+  String get editEmailConfiguration => 'Edit Email Configuration';
+
+  @override
+  String get updateConfiguration => 'Update Configuration';
+
+  @override
+  String get testEmailSubject => 'Test Email';
+
+  @override
+  String get testEmailBody => 'This is a test email.';
+
+  @override
+  String get testEmailSentSuccessfully => 'Test email sent successfully';
+
+  @override
+  String get emailConfigDeletedSuccessfully =>
+      'Configuration deleted successfully';
+
+  @override
+  String get confirm => 'Confirm';
 
   @override
   String get fileStatistics => 'File Statistics';
@@ -1072,9 +1226,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get edit => 'Edit';
 
   @override
-  String get delete => 'Delete';
-
-  @override
   String get actions => 'Actions';
 
   @override
@@ -1151,4 +1302,58 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get maintenanceSettings => 'Maintenance Settings';
+
+  @override
+  String get initializing => 'Initializing...';
+
+  @override
+  String get loadingLanguageSettings => 'Loading language settings...';
+
+  @override
+  String get loadingCalendarSettings => 'Loading calendar settings...';
+
+  @override
+  String get loadingThemeSettings => 'Loading theme settings...';
+
+  @override
+  String get loadingAuthentication => 'Loading authentication...';
+
+  @override
+  String get businessManagementPlatform => 'Business Management Platform';
+
+  @override
+  String get businessDashboard => 'Business Dashboard';
+
+  @override
+  String get businessStatistics => 'Business Statistics';
+
+  @override
+  String get recentActivities => 'Recent Activities';
+
+  @override
+  String get sales => 'Sales';
+
+  @override
+  String get accounting => 'Accounting';
+
+  @override
+  String get inventory => 'Inventory';
+
+  @override
+  String get reports => 'Reports';
+
+  @override
+  String get members => 'Members';
+
+  @override
+  String get backToProfile => 'Back to Profile';
+
+  @override
+  String get noBusinessesFound => 'No businesses found';
+
+  @override
+  String get createFirstBusiness => 'Create your first business';
+
+  @override
+  String get accessDenied => 'Access denied';
 }

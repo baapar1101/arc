@@ -1,23 +1,446 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
+import '../../services/business_dashboard_service.dart';
+import '../../core/api_client.dart';
+import '../../models/business_dashboard_models.dart';
 
-class BusinessesPage extends StatelessWidget {
+class BusinessesPage extends StatefulWidget {
   const BusinessesPage({super.key});
+
+  @override
+  State<BusinessesPage> createState() => _BusinessesPageState();
+}
+
+class _BusinessesPageState extends State<BusinessesPage> {
+  final BusinessDashboardService _service = BusinessDashboardService(ApiClient());
+  List<BusinessWithPermission> _businesses = [];
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadBusinesses();
+  }
+
+  Future<void> _loadBusinesses() async {
+    try {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+
+      final businesses = await _service.getUserBusinesses();
+
+      if (mounted) {
+        setState(() {
+          _businesses = businesses;
+          _loading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _error = e.toString();
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('خطا در بارگذاری کسب و کارها: $e')),
+        );
+      }
+    }
+  }
+
+  void _navigateToBusiness(int businessId) {
+    context.go('/business/$businessId/dashboard');
+  }
 
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
+
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(t.businesses, style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 8),
-          Text('${t.businesses} - sample page'),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                t.businesses,
+                style: Theme.of(context).textTheme.headlineMedium,
+              ),
+              ElevatedButton.icon(
+                onPressed: () => context.go('/user/profile/new-business'),
+                icon: const Icon(Icons.add),
+                label: Text(t.newBusiness),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          if (_loading)
+            const Center(child: CircularProgressIndicator())
+          else if (_error != null)
+            Center(
+              child: Column(
+                children: [
+                  Icon(Icons.error, size: 64, color: Colors.red),
+                  const SizedBox(height: 16),
+                  Text(_error!),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: _loadBusinesses,
+                    child: Text(t.retry),
+                  ),
+                ],
+              ),
+            )
+          else if (_businesses.isEmpty)
+            Center(
+              child: Column(
+                children: [
+                  Icon(Icons.business, size: 64, color: Colors.grey),
+                  const SizedBox(height: 16),
+                  Text(t.noBusinessesFound),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: () => context.go('/user/profile/new-business'),
+                    child: Text(t.createFirstBusiness),
+                  ),
+                ],
+              ),
+            )
+          else
+            Expanded(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  // Responsive grid based on screen width
+                  int crossAxisCount;
+                  if (constraints.maxWidth > 1200) {
+                    crossAxisCount = 4;
+                  } else if (constraints.maxWidth > 900) {
+                    crossAxisCount = 3;
+                  } else if (constraints.maxWidth > 600) {
+                    crossAxisCount = 2;
+                  } else {
+                    crossAxisCount = 1;
+                  }
+                  
+                  return GridView.builder(
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: crossAxisCount,
+                      childAspectRatio: crossAxisCount == 1 ? 4.0 : 1.3,
+                      crossAxisSpacing: 12,
+                      mainAxisSpacing: 12,
+                    ),
+                    itemCount: _businesses.length,
+                    itemBuilder: (context, index) {
+                      final business = _businesses[index];
+                      return _BusinessCard(
+                        business: business,
+                        onTap: () => _navigateToBusiness(business.id),
+                        isCompact: crossAxisCount > 1,
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
         ],
       ),
     );
+  }
+}
+
+class _BusinessCard extends StatelessWidget {
+  final BusinessWithPermission business;
+  final VoidCallback onTap;
+  final bool isCompact;
+
+  const _BusinessCard({
+    required this.business,
+    required this.onTap,
+    this.isCompact = true,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (isCompact) {
+      return _buildCompactCard(context);
+    } else {
+      return _buildWideCard(context);
+    }
+  }
+
+  Widget _buildCompactCard(BuildContext context) {
+    return Card(
+      elevation: 1,
+      margin: EdgeInsets.zero,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          padding: const EdgeInsets.all(8.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              // Header with icon and role badge
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: business.isOwner 
+                          ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.1)
+                          : Theme.of(context).colorScheme.secondary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(
+                      business.isOwner ? Icons.business : Icons.business_outlined,
+                      color: business.isOwner 
+                          ? Theme.of(context).colorScheme.primary 
+                          : Theme.of(context).colorScheme.secondary,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: business.isOwner 
+                            ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.1)
+                            : Theme.of(context).colorScheme.secondary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        business.isOwner ? AppLocalizations.of(context).owner : AppLocalizations.of(context).member,
+                        style: TextStyle(
+                          color: business.isOwner 
+                              ? Theme.of(context).colorScheme.primary
+                              : Theme.of(context).colorScheme.secondary,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              
+              const SizedBox(height: 6),
+              
+              // Business name
+              Text(
+                business.name,
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              
+              const SizedBox(height: 3),
+              
+              // Business type and field
+              Text(
+                '${_translateBusinessType(business.businessType, context)} • ${_translateBusinessField(business.businessField, context)}',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  fontSize: 11,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              
+              const SizedBox(height: 6),
+              
+              // Footer with date and arrow
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      _formatDate(business.createdAt),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        fontSize: 10,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  Icon(
+                    Icons.arrow_forward_ios,
+                    size: 12,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWideCard(BuildContext context) {
+    return Card(
+      elevation: 1,
+      margin: EdgeInsets.zero,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          padding: const EdgeInsets.all(16.0),
+          child: Row(
+            children: [
+              // Icon
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: business.isOwner 
+                      ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.1)
+                      : Theme.of(context).colorScheme.secondary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  business.isOwner ? Icons.business : Icons.business_outlined,
+                  color: business.isOwner 
+                      ? Theme.of(context).colorScheme.primary 
+                      : Theme.of(context).colorScheme.secondary,
+                  size: 24,
+                ),
+              ),
+              
+              const SizedBox(width: 16),
+              
+              // Content
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            business.name,
+                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: business.isOwner 
+                                ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.1)
+                                : Theme.of(context).colorScheme.secondary.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                                  child: Text(
+                                    business.isOwner ? AppLocalizations.of(context).owner : AppLocalizations.of(context).member,
+                            style: TextStyle(
+                              color: business.isOwner 
+                                  ? Theme.of(context).colorScheme.primary
+                                  : Theme.of(context).colorScheme.secondary,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    
+                    const SizedBox(height: 4),
+                    
+                            Text(
+                              '${_translateBusinessType(business.businessType, context)} • ${_translateBusinessField(business.businessField, context)}',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    
+                    const SizedBox(height: 8),
+                    
+                    Text(
+                      'تأسیس: ${_formatDate(business.createdAt)}',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              
+              const SizedBox(width: 16),
+              
+              // Arrow
+              Icon(
+                Icons.arrow_forward_ios,
+                size: 16,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _formatDate(String dateString) {
+    try {
+      final date = DateTime.parse(dateString);
+      return '${date.year}/${date.month}/${date.day}';
+    } catch (e) {
+      return dateString;
+    }
+  }
+
+  String _translateBusinessType(String type, BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    switch (type) {
+      case 'شرکت':
+        return l10n.company;
+      case 'مغازه':
+        return l10n.shop;
+      case 'فروشگاه':
+        return l10n.store;
+      case 'اتحادیه':
+        return l10n.union;
+      case 'باشگاه':
+        return l10n.club;
+      case 'موسسه':
+        return l10n.institute;
+      case 'شخصی':
+        return l10n.individual;
+      default:
+        return type;
+    }
+  }
+
+  String _translateBusinessField(String field, BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    switch (field) {
+      case 'تولیدی':
+        return l10n.manufacturing;
+      case 'بازرگانی':
+        return l10n.trading;
+      case 'خدماتی':
+        return l10n.service;
+      case 'سایر':
+        return l10n.other;
+      default:
+        return field;
+    }
   }
 }
 

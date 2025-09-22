@@ -62,7 +62,7 @@ class _TicketDetailsDialogState extends State<TicketDetailsDialog> {
               borderRadius: BorderRadius.circular(12),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.2),
+                  color: Colors.black.withValues(alpha: 0.2),
                   blurRadius: 8,
                   offset: const Offset(0, 4),
                 ),
@@ -275,7 +275,7 @@ class _TicketDetailsDialogState extends State<TicketDetailsDialog> {
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: theme.primaryColor.withOpacity(0.1),
+                color: theme.primaryColor.withValues(alpha: 0.1),
                 borderRadius: const BorderRadius.only(
                   topLeft: Radius.circular(20),
                   topRight: Radius.circular(20),

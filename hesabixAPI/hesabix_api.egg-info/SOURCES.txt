@@ -8,8 +8,10 @@ adapters/api/v1/businesses.py
 adapters/api/v1/health.py
 adapters/api/v1/schemas.py
 adapters/api/v1/users.py
+adapters/api/v1/admin/email_config.py
 adapters/api/v1/admin/file_storage.py
 adapters/api/v1/schema_models/__init__.py
+adapters/api/v1/schema_models/email.py
 adapters/api/v1/schema_models/file_storage.py
 adapters/api/v1/support/__init__.py
 adapters/api/v1/support/categories.py
@@ -25,6 +27,7 @@ adapters/db/models/api_key.py
 adapters/db/models/business.py
 adapters/db/models/business_permission.py
 adapters/db/models/captcha.py
+adapters/db/models/email_config.py
 adapters/db/models/file_storage.py
 adapters/db/models/password_reset.py
 adapters/db/models/user.py
@@ -38,6 +41,7 @@ adapters/db/repositories/api_key_repo.py
 adapters/db/repositories/base_repo.py
 adapters/db/repositories/business_permission_repo.py
 adapters/db/repositories/business_repo.py
+adapters/db/repositories/email_config_repository.py
 adapters/db/repositories/file_storage_repository.py
 adapters/db/repositories/password_reset_repo.py
 adapters/db/repositories/user_repo.py
@@ -66,6 +70,7 @@ app/services/api_key_service.py
 app/services/auth_service.py
 app/services/business_service.py
 app/services/captcha_service.py
+app/services/email_service.py
 app/services/file_storage_service.py
 app/services/query_service.py
 app/services/pdf/__init__.py
@@ -84,6 +89,8 @@ migrations/versions/20250117_000004_add_business_contact_fields.py
 migrations/versions/20250117_000005_add_business_geographic_fields.py
 migrations/versions/20250117_000006_add_app_permissions_to_users.py
 migrations/versions/20250117_000007_create_business_permissions_table.py
+migrations/versions/20250117_000008_add_email_config_table.py
+migrations/versions/20250117_000009_add_is_default_to_email_config.py
 migrations/versions/20250915_000001_init_auth_tables.py
 migrations/versions/20250916_000002_add_referral_fields.py
 migrations/versions/5553f8745c6e_add_support_tables.py

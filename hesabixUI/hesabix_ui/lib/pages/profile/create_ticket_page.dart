@@ -59,7 +59,7 @@ class _CreateTicketPageState extends State<CreateTicketPage> {
               borderRadius: BorderRadius.circular(12),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.2),
+                  color: Colors.black.withValues(alpha: 0.2),
                   blurRadius: 8,
                   offset: const Offset(0, 4),
                 ),
@@ -189,8 +189,8 @@ class _CreateTicketPageState extends State<CreateTicketPage> {
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [
-                    theme.colorScheme.primary.withOpacity(0.1),
-                    theme.colorScheme.primary.withOpacity(0.05),
+                    theme.colorScheme.primary.withValues(alpha: 0.1),
+                    theme.colorScheme.primary.withValues(alpha: 0.05),
                   ],
                 ),
                 borderRadius: const BorderRadius.only(
@@ -228,7 +228,7 @@ class _CreateTicketPageState extends State<CreateTicketPage> {
                         Text(
                           t.descriptionHint,
                           style: theme.textTheme.bodyMedium?.copyWith(
-                            color: theme.colorScheme.onSurface.withOpacity(0.7),
+                            color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
                           ),
                         ),
                       ],
@@ -268,7 +268,7 @@ class _CreateTicketPageState extends State<CreateTicketPage> {
             Text(
               t.loadingData,
               style: theme.textTheme.bodyLarge?.copyWith(
-                color: theme.colorScheme.onSurface.withOpacity(0.7),
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
               ),
             ),
           ],
@@ -286,13 +286,13 @@ class _CreateTicketPageState extends State<CreateTicketPage> {
               Container(
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
-                  color: Colors.red.withOpacity(0.1),
+                  color: Colors.red.withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
                   Icons.error_outline,
                   size: 48,
-                  color: Colors.red.withOpacity(0.8),
+                  color: Colors.red.withValues(alpha: 0.8),
                 ),
               ),
               const SizedBox(height: 24),
@@ -397,7 +397,7 @@ class _CreateTicketPageState extends State<CreateTicketPage> {
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(
-                color: theme.colorScheme.outline.withOpacity(0.3),
+                color: theme.colorScheme.outline.withValues(alpha: 0.3),
               ),
             ),
             focusedBorder: OutlineInputBorder(
@@ -437,7 +437,7 @@ class _CreateTicketPageState extends State<CreateTicketPage> {
         ),
         const SizedBox(height: 8),
         DropdownButtonFormField<SupportCategory>(
-          value: _selectedCategory,
+          initialValue: _selectedCategory,
           decoration: InputDecoration(
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
@@ -445,7 +445,7 @@ class _CreateTicketPageState extends State<CreateTicketPage> {
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(
-                color: theme.colorScheme.outline.withOpacity(0.3),
+                color: theme.colorScheme.outline.withValues(alpha: 0.3),
               ),
             ),
             focusedBorder: OutlineInputBorder(
@@ -493,7 +493,7 @@ class _CreateTicketPageState extends State<CreateTicketPage> {
         ),
         const SizedBox(height: 8),
         DropdownButtonFormField<SupportPriority>(
-          value: _selectedPriority,
+          initialValue: _selectedPriority,
           decoration: InputDecoration(
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
@@ -501,7 +501,7 @@ class _CreateTicketPageState extends State<CreateTicketPage> {
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(
-                color: theme.colorScheme.outline.withOpacity(0.3),
+                color: theme.colorScheme.outline.withValues(alpha: 0.3),
               ),
             ),
             focusedBorder: OutlineInputBorder(
@@ -573,7 +573,7 @@ class _CreateTicketPageState extends State<CreateTicketPage> {
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(
-                color: theme.colorScheme.outline.withOpacity(0.3),
+                color: theme.colorScheme.outline.withValues(alpha: 0.3),
               ),
             ),
             focusedBorder: OutlineInputBorder(
@@ -610,7 +610,7 @@ class _CreateTicketPageState extends State<CreateTicketPage> {
         color: theme.colorScheme.surface,
         border: Border(
           top: BorderSide(
-            color: theme.colorScheme.outline.withOpacity(0.2),
+            color: theme.colorScheme.outline.withValues(alpha: 0.2),
             width: 1,
           ),
         ),
@@ -636,7 +636,7 @@ class _CreateTicketPageState extends State<CreateTicketPage> {
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
                 elevation: 4,
-                shadowColor: theme.colorScheme.primary.withOpacity(0.3),
+                shadowColor: theme.colorScheme.primary.withValues(alpha: 0.3),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),

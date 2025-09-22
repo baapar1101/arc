@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Column settings for a specific table
@@ -58,7 +59,7 @@ class ColumnSettingsService {
       final json = jsonDecode(jsonString) as Map<String, dynamic>;
       return ColumnSettings.fromJson(json);
     } catch (e) {
-      print('Error loading column settings: $e');
+      debugPrint('Error loading column settings: $e');
       return null;
     }
   }
@@ -71,7 +72,7 @@ class ColumnSettingsService {
       final jsonString = jsonEncode(settings.toJson());
       await prefs.setString(key, jsonString);
     } catch (e) {
-      print('Error saving column settings: $e');
+      debugPrint('Error saving column settings: $e');
     }
   }
   
@@ -82,7 +83,7 @@ class ColumnSettingsService {
       final key = '$_keyPrefix$tableId';
       await prefs.remove(key);
     } catch (e) {
-      print('Error clearing column settings: $e');
+      debugPrint('Error clearing column settings: $e');
     }
   }
   

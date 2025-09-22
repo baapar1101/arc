@@ -33,6 +33,47 @@ msgstr "فیلد الزامی است"
 msgid "INVALID_EMAIL"
 msgstr "ایمیل نامعتبر است"
 
+# Email Configuration
+msgid "Email configurations retrieved successfully"
+msgstr "پیکربندی‌های ایمیل با موفقیت دریافت شد"
+
+msgid "Email configuration retrieved successfully"
+msgstr "پیکربندی ایمیل با موفقیت دریافت شد"
+
+msgid "Email configuration created successfully"
+msgstr "پیکربندی ایمیل با موفقیت ایجاد شد"
+
+msgid "Email configuration updated successfully"
+msgstr "پیکربندی ایمیل با موفقیت بروزرسانی شد"
+
+msgid "Email configuration deleted successfully"
+msgstr "پیکربندی ایمیل با موفقیت حذف شد"
+
+msgid "Email configuration not found"
+msgstr "پیکربندی ایمیل یافت نشد"
+
+msgid "Configuration name already exists"
+msgstr "نام پیکربندی قبلاً استفاده شده است"
+
+msgid "Connection test completed"
+msgstr "تست اتصال تکمیل شد"
+
+msgid "Email configuration activated successfully"
+msgstr "پیکربندی ایمیل با موفقیت فعال شد"
+
+msgid "Failed to activate configuration"
+msgstr "فعال‌سازی پیکربندی ناموفق بود"
+
+msgid "Email sent successfully"
+msgstr "ایمیل با موفقیت ارسال شد"
+msgid "Cannot delete default configuration"
+msgstr "نمی‌توان پیکربندی پیشفرض را حذف کرد"
+msgid "Failed to set default configuration"
+msgstr "تنظیم پیکربندی پیشفرض ناموفق بود"
+
+msgid "Failed to send email"
+msgstr "ارسال ایمیل ناموفق بود"
+
 # Auth
 msgid "INVALID_CAPTCHA"
 msgstr "کد امنیتی نامعتبر است."

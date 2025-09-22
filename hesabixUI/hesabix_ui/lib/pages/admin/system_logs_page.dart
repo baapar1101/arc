@@ -115,7 +115,7 @@ class _SystemLogsPageState extends State<SystemLogsPage> {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              theme.colorScheme.primary.withOpacity(0.1),
+              theme.colorScheme.primary.withValues(alpha: 0.1),
               theme.colorScheme.surface,
             ],
           ),
@@ -162,7 +162,7 @@ class _SystemLogsPageState extends State<SystemLogsPage> {
             children: [
               Expanded(
                 child: DropdownButtonFormField<String>(
-                  value: _selectedLevel,
+                  initialValue: _selectedLevel,
                   decoration: const InputDecoration(
                     labelText: 'Log Level',
                     border: OutlineInputBorder(),
@@ -180,7 +180,7 @@ class _SystemLogsPageState extends State<SystemLogsPage> {
               const SizedBox(width: 16),
               Expanded(
                 child: DropdownButtonFormField<String>(
-                  value: _selectedDateRange,
+                  initialValue: _selectedDateRange,
                   decoration: const InputDecoration(
                     labelText: 'Date Range',
                     border: OutlineInputBorder(),
@@ -212,13 +212,13 @@ class _SystemLogsPageState extends State<SystemLogsPage> {
             Icon(
               Icons.analytics_outlined,
               size: 64,
-              color: theme.colorScheme.onSurface.withOpacity(0.5),
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
             ),
             const SizedBox(height: 16),
             Text(
               'No logs found',
               style: theme.textTheme.titleLarge?.copyWith(
-                color: theme.colorScheme.onSurface.withOpacity(0.7),
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
               ),
             ),
           ],
@@ -248,7 +248,7 @@ class _SystemLogsPageState extends State<SystemLogsPage> {
         subtitle: Text(
           '${log['timestamp']} • ${log['module']}',
           style: TextStyle(
-            color: theme.colorScheme.onSurface.withOpacity(0.7),
+            color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
             fontSize: 12,
           ),
         ),
@@ -270,7 +270,7 @@ class _SystemLogsPageState extends State<SystemLogsPage> {
                   width: double.infinity,
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.surfaceVariant.withOpacity(0.5),
+                    color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(

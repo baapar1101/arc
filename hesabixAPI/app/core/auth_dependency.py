@@ -249,14 +249,16 @@ class AuthContext:
 
 def get_current_user(
 	request: Request,
-	authorization: Optional[str] = Header(default=None), 
 	db: Session = Depends(get_db)
 ) -> AuthContext:
 	"""دریافت اطلاعات کامل کاربر کنونی و تنظیمات از درخواست"""
-	if not authorization or not authorization.startswith("ApiKey "):
+	# Get authorization from request headers
+	auth_header = request.headers.get("Authorization")
+	
+	if not auth_header or not auth_header.startswith("ApiKey "):
 		raise ApiError("UNAUTHORIZED", "Missing or invalid API key", http_status=401)
 
-	api_key = authorization[len("ApiKey ") :].strip()
+	api_key = auth_header[len("ApiKey ") :].strip()
 	key_hash = hash_api_key(api_key)
 	repo = ApiKeyRepository(db)
 	obj = repo.get_by_hash(key_hash)

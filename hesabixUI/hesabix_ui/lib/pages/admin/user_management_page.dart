@@ -96,7 +96,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              theme.colorScheme.primary.withOpacity(0.1),
+              theme.colorScheme.primary.withValues(alpha: 0.1),
               theme.colorScheme.surface,
             ],
           ),
@@ -150,7 +150,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
             children: [
               Expanded(
                 child: DropdownButtonFormField<String>(
-                  value: _selectedFilter,
+                  initialValue: _selectedFilter,
                   decoration: const InputDecoration(
                     labelText: 'Filter',
                     border: OutlineInputBorder(),
@@ -190,13 +190,13 @@ class _UserManagementPageState extends State<UserManagementPage> {
             Icon(
               Icons.people_outline,
               size: 64,
-              color: theme.colorScheme.onSurface.withOpacity(0.5),
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
             ),
             const SizedBox(height: 16),
             Text(
               'No users found',
               style: theme.textTheme.titleLarge?.copyWith(
-                color: theme.colorScheme.onSurface.withOpacity(0.7),
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
               ),
             ),
           ],
@@ -301,7 +301,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
         role.toUpperCase(),
         style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
       ),
-      backgroundColor: _getRoleColor(role).withOpacity(0.2),
+      backgroundColor: _getRoleColor(role).withValues(alpha: 0.2),
       labelStyle: TextStyle(color: _getRoleColor(role)),
     );
   }

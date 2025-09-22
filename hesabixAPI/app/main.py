@@ -7,12 +7,14 @@ from adapters.api.v1.health import router as health_router
 from adapters.api.v1.auth import router as auth_router
 from adapters.api.v1.users import router as users_router
 from adapters.api.v1.businesses import router as businesses_router
+from adapters.api.v1.business_dashboard import router as business_dashboard_router
 from adapters.api.v1.support.tickets import router as support_tickets_router
 from adapters.api.v1.support.operator import router as support_operator_router
 from adapters.api.v1.support.categories import router as support_categories_router
 from adapters.api.v1.support.priorities import router as support_priorities_router
 from adapters.api.v1.support.statuses import router as support_statuses_router
 from adapters.api.v1.admin.file_storage import router as admin_file_storage_router
+from adapters.api.v1.admin.email_config import router as admin_email_config_router
 from app.core.i18n import negotiate_locale, Translator
 from app.core.error_handlers import register_error_handlers
 from app.core.smart_normalizer import smart_normalize_json, SmartNormalizerConfig
@@ -268,6 +270,7 @@ def create_app() -> FastAPI:
     application.include_router(auth_router, prefix=settings.api_v1_prefix)
     application.include_router(users_router, prefix=settings.api_v1_prefix)
     application.include_router(businesses_router, prefix=settings.api_v1_prefix)
+    application.include_router(business_dashboard_router, prefix=settings.api_v1_prefix)
     
     # Support endpoints
     application.include_router(support_tickets_router, prefix=f"{settings.api_v1_prefix}/support")
@@ -278,6 +281,7 @@ def create_app() -> FastAPI:
     
     # Admin endpoints
     application.include_router(admin_file_storage_router, prefix=settings.api_v1_prefix)
+    application.include_router(admin_email_config_router, prefix=settings.api_v1_prefix)
 
     register_error_handlers(application)
 

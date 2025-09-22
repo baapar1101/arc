@@ -44,6 +44,13 @@ class _SystemSettingsPageState extends State<SystemSettingsPage> {
         color: const Color(0xFF9C27B0),
         route: '/user/profile/system-settings/logs',
       ),
+      SettingsItem(
+        title: 'emailSettings',
+        description: 'emailSettingsDescription',
+        icon: Icons.email_outlined,
+        color: const Color(0xFFE91E63),
+        route: '/user/profile/system-settings/email',
+      ),
     ];
   }
 
@@ -55,25 +62,6 @@ class _SystemSettingsPageState extends State<SystemSettingsPage> {
 
     return Scaffold(
       backgroundColor: colorScheme.surface,
-      appBar: AppBar(
-        title: Text(
-          t.systemSettingsWelcome,
-          style: const TextStyle(
-            fontWeight: FontWeight.w600,
-            fontSize: 20,
-          ),
-        ),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        centerTitle: true,
-        actions: [
-          IconButton(
-            onPressed: () => _showHelpDialog(context),
-            icon: const Icon(Icons.help_outline),
-            tooltip: t.systemSettingsWelcome,
-          ),
-        ],
-      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
@@ -97,13 +85,13 @@ class _SystemSettingsPageState extends State<SystemSettingsPage> {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            colorScheme.primary.withOpacity(0.1),
-            colorScheme.primaryContainer.withOpacity(0.3),
+            colorScheme.primary.withValues(alpha: 0.1),
+            colorScheme.primaryContainer.withValues(alpha: 0.3),
           ],
         ),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: colorScheme.primary.withOpacity(0.2),
+          color: colorScheme.primary.withValues(alpha: 0.2),
           width: 1,
         ),
       ),
@@ -117,13 +105,13 @@ class _SystemSettingsPageState extends State<SystemSettingsPage> {
                 end: Alignment.bottomRight,
                 colors: [
                   colorScheme.primary,
-                  colorScheme.primary.withOpacity(0.8),
+                  colorScheme.primary.withValues(alpha: 0.8),
                 ],
               ),
               borderRadius: BorderRadius.circular(12),
               boxShadow: [
                 BoxShadow(
-                  color: colorScheme.primary.withOpacity(0.3),
+                  color: colorScheme.primary.withValues(alpha: 0.3),
                   blurRadius: 8,
                   offset: const Offset(0, 2),
                 ),
@@ -152,7 +140,7 @@ class _SystemSettingsPageState extends State<SystemSettingsPage> {
                 Text(
                   t.systemSettingsDescription,
                   style: theme.textTheme.bodyMedium?.copyWith(
-                    color: colorScheme.onSurface.withOpacity(0.7),
+                    color: colorScheme.onSurface.withValues(alpha: 0.7),
                     fontSize: 14,
                   ),
                 ),
@@ -162,7 +150,7 @@ class _SystemSettingsPageState extends State<SystemSettingsPage> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: colorScheme.primary.withOpacity(0.1),
+              color: colorScheme.primary.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(20),
             ),
             child: Text(
@@ -196,7 +184,7 @@ class _SystemSettingsPageState extends State<SystemSettingsPage> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
-                color: colorScheme.primary.withOpacity(0.1),
+                color: colorScheme.primary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
@@ -246,7 +234,7 @@ class _SystemSettingsPageState extends State<SystemSettingsPage> {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
         side: BorderSide(
-          color: colorScheme.outline.withOpacity(0.2),
+          color: colorScheme.outline.withValues(alpha: 0.2),
           width: 1,
         ),
       ),
@@ -255,8 +243,8 @@ class _SystemSettingsPageState extends State<SystemSettingsPage> {
         child: InkWell(
           onTap: () => context.go(item.route!),
           borderRadius: BorderRadius.circular(12),
-          hoverColor: item.color.withOpacity(0.05),
-          splashColor: item.color.withOpacity(0.1),
+          hoverColor: item.color.withValues(alpha: 0.05),
+          splashColor: item.color.withValues(alpha: 0.1),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 200),
             padding: const EdgeInsets.all(16),
@@ -267,11 +255,11 @@ class _SystemSettingsPageState extends State<SystemSettingsPage> {
                   duration: const Duration(milliseconds: 200),
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: item.color.withOpacity(0.1),
+                    color: item.color.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                     boxShadow: [
                       BoxShadow(
-                        color: item.color.withOpacity(0.1),
+                        color: item.color.withValues(alpha: 0.1),
                         blurRadius: 4,
                         offset: const Offset(0, 2),
                       ),
@@ -299,7 +287,7 @@ class _SystemSettingsPageState extends State<SystemSettingsPage> {
                 Text(
                   _getLocalizedText(t, item.description),
                   style: theme.textTheme.bodySmall?.copyWith(
-                    color: colorScheme.onSurface.withOpacity(0.6),
+                    color: colorScheme.onSurface.withValues(alpha: 0.6),
                     fontSize: 11,
                   ),
                   textAlign: TextAlign.center,
@@ -311,7 +299,7 @@ class _SystemSettingsPageState extends State<SystemSettingsPage> {
                   duration: const Duration(milliseconds: 200),
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: item.color.withOpacity(0.1),
+                    color: item.color.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(
@@ -346,41 +334,15 @@ class _SystemSettingsPageState extends State<SystemSettingsPage> {
         return t.systemLogs;
       case 'systemLogsDescription':
         return t.systemLogsDescription;
+      case 'emailSettings':
+        return t.emailSettings;
+      case 'emailSettingsDescription':
+        return t.emailSettingsDescription;
       default:
         return key;
     }
   }
 
-  void _showHelpDialog(BuildContext context) {
-    final t = AppLocalizations.of(context);
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
-        title: Row(
-          children: [
-            Icon(
-              Icons.help_outline,
-              color: Theme.of(context).colorScheme.primary,
-            ),
-            const SizedBox(width: 8),
-            Text(t.systemSettingsWelcome),
-          ],
-        ),
-        content: Text(
-          t.systemSettingsDescription,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text(t.ok),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 class SettingsItem {

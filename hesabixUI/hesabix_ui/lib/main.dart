@@ -17,6 +17,9 @@ import 'pages/admin/storage_management_page.dart';
 import 'pages/admin/system_configuration_page.dart';
 import 'pages/admin/user_management_page.dart';
 import 'pages/admin/system_logs_page.dart';
+import 'pages/admin/email_settings_page.dart';
+import 'pages/business/business_shell.dart';
+import 'pages/business/dashboard/business_dashboard_page.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'core/locale_controller.dart';
 import 'core/calendar_controller.dart';
@@ -25,6 +28,7 @@ import 'theme/theme_controller.dart';
 import 'theme/app_theme.dart';
 import 'core/auth_store.dart';
 import 'core/permission_guard.dart';
+import 'widgets/simple_splash_screen.dart';
 
 void main() {
   // Use path-based routing instead of hash routing
@@ -44,216 +48,131 @@ class _MyAppState extends State<MyApp> {
   CalendarController? _calendarController;
   ThemeController? _themeController;
   AuthStore? _authStore;
+  bool _isLoading = true;
+  DateTime? _loadStartTime;
 
   @override
   void initState() {
     super.initState();
-    LocaleController.load().then((c) {
-      setState(() {
-        _controller = c
-          ..addListener(() {
-            // Update ApiClient language header on change
-            ApiClient.setCurrentLocale(c.locale);
-            setState(() {});
-          });
-        ApiClient.setCurrentLocale(c.locale);
-      });
-    });
+    _loadStartTime = DateTime.now();
+    _loadControllers();
+  }
 
-    CalendarController.load().then((cc) {
-      setState(() {
-        _calendarController = cc
-          ..addListener(() {
-            setState(() {});
-          });
-        ApiClient.bindCalendarController(cc);
-      });
+  Future<void> _loadControllers() async {
+    // بارگذاری تمام کنترلرها
+    final localeController = await LocaleController.load();
+    final calendarController = await CalendarController.load();
+    final themeController = ThemeController();
+    await themeController.load();
+    final authStore = AuthStore();
+    await authStore.load();
+    
+    // تنظیم کنترلرها
+    setState(() {
+      _controller = localeController;
+      _calendarController = calendarController;
+      _themeController = themeController;
+      _authStore = authStore;
     });
-
-    final tc = ThemeController();
-    tc.load().then((_) {
-      setState(() {
-        _themeController = tc
-          ..addListener(() {
-            setState(() {});
-          });
-      });
+    
+    // اضافه کردن listeners
+    _controller!.addListener(() {
+      ApiClient.setCurrentLocale(_controller!.locale);
+      setState(() {});
     });
-
-    final store = AuthStore();
-    store.load().then((_) {
-      setState(() {
-        _authStore = store
-          ..addListener(() {
-            setState(() {});
-          });
-        ApiClient.bindAuthStore(store);
-      });
+    
+    _calendarController!.addListener(() {
+      setState(() {});
     });
+    
+    _themeController!.addListener(() {
+      setState(() {});
+    });
+    
+    _authStore!.addListener(() {
+      setState(() {});
+    });
+    
+    // تنظیم API Client
+    ApiClient.setCurrentLocale(_controller!.locale);
+    ApiClient.bindCalendarController(_calendarController!);
+    ApiClient.bindAuthStore(_authStore!);
+    
+    // اطمینان از حداقل 4 ثانیه نمایش splash screen
+    final elapsed = DateTime.now().difference(_loadStartTime!);
+    const minimumDuration = Duration(seconds: 4);
+    if (elapsed < minimumDuration) {
+      await Future.delayed(minimumDuration - elapsed);
+    }
+    
+    // اتمام loading
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+      });
+    }
   }
 
   // Root of application with GoRouter
   @override
   Widget build(BuildContext context) {
-    // اگر هنوز loading است، یک router ساده با loading page بساز
-    if (_controller == null || _calendarController == null || _themeController == null || _authStore == null) {
+    // اگر هنوز loading است، splash screen نمایش بده
+    if (_isLoading || 
+        _controller == null || 
+        _calendarController == null || 
+        _themeController == null || 
+        _authStore == null) {
       final loadingRouter = GoRouter(
         redirect: (context, state) {
           // در حین loading، هیچ redirect نکن - URL را حفظ کن
           return null;
         },
         routes: <RouteBase>[
-          GoRoute(
-            path: '/',
-            builder: (context, state) => const Scaffold(
-              body: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    CircularProgressIndicator(),
-                    SizedBox(height: 16),
-                    Text('Loading...'),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          // برای سایر مسیرها هم loading page نمایش بده
-          GoRoute(
-            path: '/login',
-            builder: (context, state) => const Scaffold(
-              body: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    CircularProgressIndicator(),
-                    SizedBox(height: 16),
-                    Text('Loading...'),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          GoRoute(
-            path: '/user/profile/dashboard',
-            builder: (context, state) => const Scaffold(
-              body: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    CircularProgressIndicator(),
-                    SizedBox(height: 16),
-                    Text('Loading...'),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          GoRoute(
-            path: '/user/profile/marketing',
-            builder: (context, state) => const Scaffold(
-              body: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    CircularProgressIndicator(),
-                    SizedBox(height: 16),
-                    Text('Loading...'),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          GoRoute(
-            path: '/user/profile/new-business',
-            builder: (context, state) => const Scaffold(
-              body: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    CircularProgressIndicator(),
-                    SizedBox(height: 16),
-                    Text('Loading...'),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          GoRoute(
-            path: '/user/profile/businesses',
-            builder: (context, state) => const Scaffold(
-              body: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    CircularProgressIndicator(),
-                    SizedBox(height: 16),
-                    Text('Loading...'),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          GoRoute(
-            path: '/user/profile/support',
-            builder: (context, state) => const Scaffold(
-              body: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    CircularProgressIndicator(),
-                    SizedBox(height: 16),
-                    Text('Loading...'),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          GoRoute(
-            path: '/user/profile/change-password',
-            builder: (context, state) => const Scaffold(
-              body: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    CircularProgressIndicator(),
-                    SizedBox(height: 16),
-                    Text('Loading...'),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          GoRoute(
-            path: '/user/profile/system-settings',
-            builder: (context, state) => const Scaffold(
-              body: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    CircularProgressIndicator(),
-                    SizedBox(height: 16),
-                    Text('Loading...'),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          // Catch-all route برای هر URL دیگر
+          // برای تمام مسیرها splash screen نمایش بده
           GoRoute(
             path: '/:path(.*)',
-            builder: (context, state) => const Scaffold(
-              body: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    CircularProgressIndicator(),
-                    SizedBox(height: 16),
-                    Text('Loading...'),
-                  ],
-                ),
-              ),
-            ),
+            builder: (context, state) {
+              // تشخیص نوع loading بر اساس controller های موجود
+              String loadingMessage = 'Initializing...';
+              if (_controller == null) {
+                loadingMessage = 'Loading language settings...';
+              } else if (_calendarController == null) {
+                loadingMessage = 'Loading calendar settings...';
+              } else if (_themeController == null) {
+                loadingMessage = 'Loading theme settings...';
+              } else if (_authStore == null) {
+                loadingMessage = 'Loading authentication...';
+              }
+              
+              // اگر controller موجود است، از locale آن استفاده کن
+              if (_controller != null) {
+                final isFa = _controller!.locale.languageCode == 'fa';
+                if (isFa) {
+                  if (_controller == null) {
+                    loadingMessage = 'در حال بارگذاری تنظیمات زبان...';
+                  } else if (_calendarController == null) {
+                    loadingMessage = 'در حال بارگذاری تنظیمات تقویم...';
+                  } else if (_themeController == null) {
+                    loadingMessage = 'در حال بارگذاری تنظیمات تم...';
+                  } else if (_authStore == null) {
+                    loadingMessage = 'در حال بارگذاری احراز هویت...';
+                  } else {
+                    loadingMessage = 'در حال راه‌اندازی...';
+                  }
+                }
+              }
+              
+              return SimpleSplashScreen(
+                message: loadingMessage,
+                showLogo: true,
+                displayDuration: const Duration(seconds: 4),
+                locale: _controller?.locale,
+                onComplete: () {
+                  // این callback زمانی فراخوانی می‌شود که splash screen تمام شود
+                  // اما ما از splash controller استفاده می‌کنیم
+                },
+              );
+            },
           ),
         ],
       );
@@ -264,6 +183,7 @@ class _MyAppState extends State<MyApp> {
         locale: const Locale('en'),
         supportedLocales: const [Locale('en'), Locale('fa')],
         localizationsDelegates: const [
+          AppLocalizations.delegate,
           GlobalMaterialLocalizations.delegate,
           GlobalCupertinoLocalizations.delegate,
           GlobalWidgetsLocalizations.delegate,
@@ -431,8 +351,47 @@ class _MyAppState extends State<MyApp> {
                     return const SystemLogsPage();
                   },
                 ),
+                GoRoute(
+                  path: 'email',
+                  name: 'system_settings_email',
+                  builder: (context, state) {
+                    if (_authStore == null || !_authStore!.isSuperAdmin) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    return const EmailSettingsPage();
+                  },
+                ),
               ],
             ),
+          ],
+        ),
+        GoRoute(
+          path: '/business/:business_id',
+          name: 'business_shell',
+          builder: (context, state) {
+            final businessId = int.parse(state.pathParameters['business_id']!);
+            return BusinessShell(
+              businessId: businessId,
+              authStore: _authStore!,
+              calendarController: _calendarController!,
+              child: const SizedBox.shrink(), // Will be replaced by child routes
+            );
+          },
+          routes: [
+            GoRoute(
+              path: 'dashboard',
+              name: 'business_dashboard',
+              builder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return BusinessShell(
+                  businessId: businessId,
+                  authStore: _authStore!,
+                  calendarController: _calendarController!,
+                  child: BusinessDashboardPage(businessId: businessId),
+                );
+              },
+            ),
+            // TODO: Add other business routes (sales, accounting, etc.)
           ],
         ),
       ],

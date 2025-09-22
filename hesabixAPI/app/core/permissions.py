@@ -74,7 +74,23 @@ def require_business_access(business_id_param: str = "business_id"):
     def decorator(func: Callable) -> Callable:
         @wraps(func)
         def wrapper(*args, **kwargs) -> Any:
-            ctx = get_current_user()
+            # Find request in args or kwargs
+            request = None
+            for arg in args:
+                if hasattr(arg, 'headers'):  # Check if it's a Request object
+                    request = arg
+                    break
+            
+            if not request and 'request' in kwargs:
+                request = kwargs['request']
+            
+            if not request:
+                raise ApiError("INTERNAL_ERROR", "Request not found", http_status=500)
+            
+            # Get database session
+            from adapters.db.session import get_db
+            db = next(get_db())
+            ctx = get_current_user(request, db)
             business_id = kwargs.get(business_id_param)
             if business_id and not ctx.can_access_business(business_id):
                 raise ApiError("FORBIDDEN", f"No access to business {business_id}", http_status=403)

@@ -350,6 +350,150 @@ abstract class AppLocalizations {
   /// **'Admin Tools'**
   String get adminTools;
 
+  /// No description provided for @emailSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Email Settings'**
+  String get emailSettings;
+
+  /// No description provided for @emailSettingsDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Configure SMTP settings for email sending'**
+  String get emailSettingsDescription;
+
+  /// No description provided for @emailConfigurations.
+  ///
+  /// In en, this message translates to:
+  /// **'Email Configurations'**
+  String get emailConfigurations;
+
+  /// No description provided for @noEmailConfigurations.
+  ///
+  /// In en, this message translates to:
+  /// **'No email configurations found'**
+  String get noEmailConfigurations;
+
+  /// No description provided for @addEmailConfiguration.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Email Configuration'**
+  String get addEmailConfiguration;
+
+  /// No description provided for @configurationName.
+  ///
+  /// In en, this message translates to:
+  /// **'Configuration Name'**
+  String get configurationName;
+
+  /// No description provided for @smtpHost.
+  ///
+  /// In en, this message translates to:
+  /// **'SMTP Host'**
+  String get smtpHost;
+
+  /// No description provided for @smtpPort.
+  ///
+  /// In en, this message translates to:
+  /// **'SMTP Port'**
+  String get smtpPort;
+
+  /// No description provided for @smtpUsername.
+  ///
+  /// In en, this message translates to:
+  /// **'SMTP Username'**
+  String get smtpUsername;
+
+  /// No description provided for @smtpPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'SMTP Password'**
+  String get smtpPassword;
+
+  /// No description provided for @fromEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'From Email'**
+  String get fromEmail;
+
+  /// No description provided for @fromName.
+  ///
+  /// In en, this message translates to:
+  /// **'From Name'**
+  String get fromName;
+
+  /// No description provided for @useTls.
+  ///
+  /// In en, this message translates to:
+  /// **'Use TLS'**
+  String get useTls;
+
+  /// No description provided for @useSsl.
+  ///
+  /// In en, this message translates to:
+  /// **'Use SSL'**
+  String get useSsl;
+
+  /// No description provided for @isActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Active'**
+  String get isActive;
+
+  /// No description provided for @active.
+  ///
+  /// In en, this message translates to:
+  /// **'Active'**
+  String get active;
+
+  /// No description provided for @testConnection.
+  ///
+  /// In en, this message translates to:
+  /// **'Test Connection'**
+  String get testConnection;
+
+  /// No description provided for @sendTestEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'Send Test Email'**
+  String get sendTestEmail;
+
+  /// No description provided for @saveConfiguration.
+  ///
+  /// In en, this message translates to:
+  /// **'Save Configuration'**
+  String get saveConfiguration;
+
+  /// No description provided for @deleteConfiguration.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Configuration'**
+  String get deleteConfiguration;
+
+  /// No description provided for @deleteConfigurationConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to delete this configuration?'**
+  String get deleteConfigurationConfirm;
+
+  /// No description provided for @delete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get delete;
+
+  /// No description provided for @invalidPort.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid port'**
+  String get invalidPort;
+
+  /// No description provided for @invalidEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid email'**
+  String get invalidEmail;
+
   /// No description provided for @ok.
   ///
   /// In en, this message translates to:
@@ -1208,6 +1352,18 @@ abstract class AppLocalizations {
   /// **'Other'**
   String get other;
 
+  /// No description provided for @owner.
+  ///
+  /// In en, this message translates to:
+  /// **'Owner'**
+  String get owner;
+
+  /// No description provided for @member.
+  ///
+  /// In en, this message translates to:
+  /// **'Member'**
+  String get member;
+
   /// No description provided for @newTicket.
   ///
   /// In en, this message translates to:
@@ -1844,12 +2000,6 @@ abstract class AppLocalizations {
   /// **'Default'**
   String get isDefault;
 
-  /// No description provided for @isActive.
-  ///
-  /// In en, this message translates to:
-  /// **'Active'**
-  String get isActive;
-
   /// No description provided for @configData.
   ///
   /// In en, this message translates to:
@@ -1892,12 +2042,6 @@ abstract class AppLocalizations {
   /// **'FTP Directory'**
   String get ftpDirectory;
 
-  /// No description provided for @testConnection.
-  ///
-  /// In en, this message translates to:
-  /// **'Test Connection'**
-  String get testConnection;
-
   /// No description provided for @connectionSuccessful.
   ///
   /// In en, this message translates to:
@@ -1915,6 +2059,156 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Set as Default'**
   String get setAsDefault;
+
+  /// No description provided for @defaultConfiguration.
+  ///
+  /// In en, this message translates to:
+  /// **'Default Configuration'**
+  String get defaultConfiguration;
+
+  /// No description provided for @setDefaultConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to set this configuration as default?'**
+  String get setDefaultConfirm;
+
+  /// No description provided for @defaultSetSuccessfully.
+  ///
+  /// In en, this message translates to:
+  /// **'Default configuration set successfully'**
+  String get defaultSetSuccessfully;
+
+  /// No description provided for @defaultSetFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to set default configuration'**
+  String get defaultSetFailed;
+
+  /// No description provided for @cannotDeleteDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Cannot delete default configuration'**
+  String get cannotDeleteDefault;
+
+  /// No description provided for @defaultConfigurationNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Default configuration is used for sending emails and cannot be deleted'**
+  String get defaultConfigurationNote;
+
+  /// No description provided for @setAsDefaultEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'Set as Default Email'**
+  String get setAsDefaultEmail;
+
+  /// No description provided for @defaultEmailServer.
+  ///
+  /// In en, this message translates to:
+  /// **'Default Email Server'**
+  String get defaultEmailServer;
+
+  /// No description provided for @changeDefaultEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'Change Default Email'**
+  String get changeDefaultEmail;
+
+  /// No description provided for @currentDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Current Default'**
+  String get currentDefault;
+
+  /// No description provided for @makeDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Make Default'**
+  String get makeDefault;
+
+  /// No description provided for @defaultEmailNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Emails are sent from the default server'**
+  String get defaultEmailNote;
+
+  /// No description provided for @noDefaultSet.
+  ///
+  /// In en, this message translates to:
+  /// **'No default email server is set'**
+  String get noDefaultSet;
+
+  /// No description provided for @selectDefaultServer.
+  ///
+  /// In en, this message translates to:
+  /// **'Select Default Server'**
+  String get selectDefaultServer;
+
+  /// No description provided for @defaultServerChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'Default server changed'**
+  String get defaultServerChanged;
+
+  /// No description provided for @defaultServerChangeFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to change default server'**
+  String get defaultServerChangeFailed;
+
+  /// No description provided for @emailConfigSavedSuccessfully.
+  ///
+  /// In en, this message translates to:
+  /// **'Email configuration saved successfully'**
+  String get emailConfigSavedSuccessfully;
+
+  /// No description provided for @emailConfigUpdatedSuccessfully.
+  ///
+  /// In en, this message translates to:
+  /// **'Email configuration updated successfully'**
+  String get emailConfigUpdatedSuccessfully;
+
+  /// No description provided for @editEmailConfiguration.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Email Configuration'**
+  String get editEmailConfiguration;
+
+  /// No description provided for @updateConfiguration.
+  ///
+  /// In en, this message translates to:
+  /// **'Update Configuration'**
+  String get updateConfiguration;
+
+  /// No description provided for @testEmailSubject.
+  ///
+  /// In en, this message translates to:
+  /// **'Test Email'**
+  String get testEmailSubject;
+
+  /// No description provided for @testEmailBody.
+  ///
+  /// In en, this message translates to:
+  /// **'This is a test email.'**
+  String get testEmailBody;
+
+  /// No description provided for @testEmailSentSuccessfully.
+  ///
+  /// In en, this message translates to:
+  /// **'Test email sent successfully'**
+  String get testEmailSentSuccessfully;
+
+  /// No description provided for @emailConfigDeletedSuccessfully.
+  ///
+  /// In en, this message translates to:
+  /// **'Configuration deleted successfully'**
+  String get emailConfigDeletedSuccessfully;
+
+  /// No description provided for @confirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm'**
+  String get confirm;
 
   /// No description provided for @fileStatistics.
   ///
@@ -2162,12 +2456,6 @@ abstract class AppLocalizations {
   /// **'Edit'**
   String get edit;
 
-  /// No description provided for @delete.
-  ///
-  /// In en, this message translates to:
-  /// **'Delete'**
-  String get delete;
-
   /// No description provided for @actions.
   ///
   /// In en, this message translates to:
@@ -2317,6 +2605,114 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Maintenance Settings'**
   String get maintenanceSettings;
+
+  /// No description provided for @initializing.
+  ///
+  /// In en, this message translates to:
+  /// **'Initializing...'**
+  String get initializing;
+
+  /// No description provided for @loadingLanguageSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading language settings...'**
+  String get loadingLanguageSettings;
+
+  /// No description provided for @loadingCalendarSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading calendar settings...'**
+  String get loadingCalendarSettings;
+
+  /// No description provided for @loadingThemeSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading theme settings...'**
+  String get loadingThemeSettings;
+
+  /// No description provided for @loadingAuthentication.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading authentication...'**
+  String get loadingAuthentication;
+
+  /// No description provided for @businessManagementPlatform.
+  ///
+  /// In en, this message translates to:
+  /// **'Business Management Platform'**
+  String get businessManagementPlatform;
+
+  /// No description provided for @businessDashboard.
+  ///
+  /// In en, this message translates to:
+  /// **'Business Dashboard'**
+  String get businessDashboard;
+
+  /// No description provided for @businessStatistics.
+  ///
+  /// In en, this message translates to:
+  /// **'Business Statistics'**
+  String get businessStatistics;
+
+  /// No description provided for @recentActivities.
+  ///
+  /// In en, this message translates to:
+  /// **'Recent Activities'**
+  String get recentActivities;
+
+  /// No description provided for @sales.
+  ///
+  /// In en, this message translates to:
+  /// **'Sales'**
+  String get sales;
+
+  /// No description provided for @accounting.
+  ///
+  /// In en, this message translates to:
+  /// **'Accounting'**
+  String get accounting;
+
+  /// No description provided for @inventory.
+  ///
+  /// In en, this message translates to:
+  /// **'Inventory'**
+  String get inventory;
+
+  /// No description provided for @reports.
+  ///
+  /// In en, this message translates to:
+  /// **'Reports'**
+  String get reports;
+
+  /// No description provided for @members.
+  ///
+  /// In en, this message translates to:
+  /// **'Members'**
+  String get members;
+
+  /// No description provided for @backToProfile.
+  ///
+  /// In en, this message translates to:
+  /// **'Back to Profile'**
+  String get backToProfile;
+
+  /// No description provided for @noBusinessesFound.
+  ///
+  /// In en, this message translates to:
+  /// **'No businesses found'**
+  String get noBusinessesFound;
+
+  /// No description provided for @createFirstBusiness.
+  ///
+  /// In en, this message translates to:
+  /// **'Create your first business'**
+  String get createFirstBusiness;
+
+  /// No description provided for @accessDenied.
+  ///
+  /// In en, this message translates to:
+  /// **'Access denied'**
+  String get accessDenied;
 }
 
 class _AppLocalizationsDelegate

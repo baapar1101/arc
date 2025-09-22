@@ -58,6 +58,7 @@ class StorageConfigListWidgetState extends State<StorageConfigListWidget> {
       final api = ApiClient();
       final response = await api.post('/api/v1/admin/files/storage-configs/$configId/test');
       
+      if (!mounted) return;
       if (response.data != null && response.data['success'] == true) {
         final testResult = response.data['data']['test_result'];
         if (testResult['success'] == true) {
@@ -79,6 +80,7 @@ class StorageConfigListWidgetState extends State<StorageConfigListWidget> {
         throw Exception(response.data?['message'] ?? 'خطا در تست اتصال');
       }
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('اتصال ناموفق: $e'),
@@ -112,6 +114,7 @@ class StorageConfigListWidgetState extends State<StorageConfigListWidget> {
         final api = ApiClient();
         final response = await api.delete('/api/v1/admin/files/storage-configs/$configId');
         
+        if (!mounted) return;
         if (response.data != null && response.data['success'] == true) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -142,6 +145,7 @@ class StorageConfigListWidgetState extends State<StorageConfigListWidget> {
           errorMessage = e.toString().replaceFirst('Exception: ', '');
         }
         
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(errorMessage),
@@ -158,6 +162,7 @@ class StorageConfigListWidgetState extends State<StorageConfigListWidget> {
       final api = ApiClient();
       final response = await api.put('/api/v1/admin/files/storage-configs/$configId/set-default');
       
+      if (!mounted) return;
       if (response.data != null && response.data['success'] == true) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -172,6 +177,7 @@ class StorageConfigListWidgetState extends State<StorageConfigListWidget> {
         throw Exception(response.data?['message'] ?? 'خطا در تنظیم به عنوان پیش‌فرض');
       }
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('خطا در تنظیم به عنوان پیش‌فرض: $e'),
@@ -264,20 +270,20 @@ class StorageConfigListWidgetState extends State<StorageConfigListWidget> {
             Icon(
               Icons.storage_outlined,
               size: 64,
-              color: theme.colorScheme.primary.withOpacity(0.5),
+              color: theme.colorScheme.primary.withValues(alpha: 0.5),
             ),
             const SizedBox(height: 16),
             Text(
               'هیچ پیکربندی ذخیره‌سازی وجود ندارد',
               style: theme.textTheme.headlineSmall?.copyWith(
-                color: theme.colorScheme.onSurface.withOpacity(0.6),
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
               ),
             ),
             const SizedBox(height: 8),
             Text(
               'اولین پیکربندی ذخیره‌سازی را ایجاد کنید',
               style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurface.withOpacity(0.6),
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
               ),
               textAlign: TextAlign.center,
             ),
@@ -285,7 +291,7 @@ class StorageConfigListWidgetState extends State<StorageConfigListWidget> {
             Text(
               'از دکمه + در پایین صفحه استفاده کنید',
               style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurface.withOpacity(0.5),
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
                 fontStyle: FontStyle.italic,
               ),
             ),
@@ -321,7 +327,7 @@ class StorageConfigListWidgetState extends State<StorageConfigListWidget> {
                 Text(
                   '${_storageConfigs.length} پیکربندی',
                   style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurface.withOpacity(0.6),
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                   ),
                 ),
               ],
