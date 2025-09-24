@@ -173,9 +173,7 @@ class _MyAppState extends State<MyApp> {
               if (_controller != null) {
                 final isFa = _controller!.locale.languageCode == 'fa';
                 if (isFa) {
-                  if (_controller == null) {
-                    loadingMessage = 'loadingLanguageSettings';
-                  } else if (_calendarController == null) {
+                  if (_calendarController == null) {
                     loadingMessage = 'loadingCalendarSettings';
                   } else if (_themeController == null) {
                     loadingMessage = 'loadingThemeSettings';
@@ -235,7 +233,7 @@ class _MyAppState extends State<MyApp> {
       return MaterialApp.router(
         title: 'Hesabix',
         routerConfig: loadingRouter,
-        locale: const Locale('en'),
+        locale: _controller?.locale ?? const Locale('fa'),
         supportedLocales: const [Locale('en'), Locale('fa')],
         localizationsDelegates: const [
           AppLocalizations.delegate,
