@@ -2930,6 +2930,12 @@ abstract class AppLocalizations {
   /// **'Others'**
   String get others;
 
+  /// No description provided for @pluginMarketplace.
+  ///
+  /// In en, this message translates to:
+  /// **'Plugin Marketplace'**
+  String get pluginMarketplace;
+
   /// No description provided for @practicalTools.
   ///
   /// In en, this message translates to:

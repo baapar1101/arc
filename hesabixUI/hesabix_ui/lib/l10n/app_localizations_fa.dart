@@ -1456,6 +1456,9 @@ class AppLocalizationsFa extends AppLocalizations {
   String get others => 'سایر';
 
   @override
+  String get pluginMarketplace => 'بازار افزونه‌ها';
+
+  @override
   String get practicalTools => 'ابزارهای کاربردی';
 
   @override

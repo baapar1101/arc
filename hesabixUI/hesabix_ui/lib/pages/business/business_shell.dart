@@ -388,6 +388,14 @@ class _BusinessShellState extends State<BusinessShell> {
           ),
         ],
       ),
+      _MenuItem(
+        label: t.pluginMarketplace,
+        icon: Icons.store,
+        selectedIcon: Icons.store,
+        path: '/business/${widget.businessId}/plugin-marketplace',
+        type: _MenuItemType.simple,
+        hasAddButton: false,
+      ),
     ];
 
     int selectedIndex = 0;
@@ -493,23 +501,6 @@ class _BusinessShellState extends State<BusinessShell> {
       return count;
     }
 
-    int getMenuIndexFromTotalIndex(int totalIndex) {
-      int currentIndex = 0;
-      for (int i = 0; i < menuItems.length; i++) {
-        if (currentIndex == totalIndex) return i;
-        currentIndex++;
-        
-        final item = menuItems[i];
-        if (item.type == _MenuItemType.expandable && isExpanded(item) && railExtended) {
-          final childrenCount = item.children?.length ?? 0;
-          if (totalIndex >= currentIndex && totalIndex < currentIndex + childrenCount) {
-            return i;
-          }
-          currentIndex += childrenCount;
-        }
-      }
-      return 0;
-    }
 
     // Brand top bar with contrast color
     final Color appBarBg = Theme.of(context).brightness == Brightness.dark
@@ -581,7 +572,33 @@ class _BusinessShellState extends State<BusinessShell> {
                 padding: EdgeInsets.zero,
                 itemCount: getTotalMenuItemsCount(),
                 itemBuilder: (ctx, index) {
-                  final menuIndex = getMenuIndexFromTotalIndex(index);
+                  // محاسبه ایندکس منو و تشخیص نوع آیتم
+                  int menuIndex = 0;
+                  int childIndex = -1;
+                  bool isChildItem = false;
+                  
+                  int currentIndex = 0;
+                  for (int i = 0; i < menuItems.length; i++) {
+                    final item = menuItems[i];
+                    
+                    if (currentIndex == index) {
+                      menuIndex = i;
+                      break;
+                    }
+                    currentIndex++;
+                    
+                    if (item.type == _MenuItemType.expandable && isExpanded(item) && railExtended) {
+                      final childrenCount = item.children?.length ?? 0;
+                      if (index >= currentIndex && index < currentIndex + childrenCount) {
+                        menuIndex = i;
+                        childIndex = index - currentIndex;
+                        isChildItem = true;
+                        break;
+                      }
+                      currentIndex += childrenCount;
+                    }
+                  }
+                  
                   final item = menuItems[menuIndex];
                   final bool isHovered = index == _hoverIndex;
                   final bool isSelected = menuIndex == selectedIndex;
@@ -593,155 +610,105 @@ class _BusinessShellState extends State<BusinessShell> {
                       ? (isHovered && !isSelected ? activeBg.withValues(alpha: 0.85) : activeBg)
                       : Colors.transparent;
                   
-                  // اگر آیتم بازشونده است و در حالت باز است، زیرآیتم‌ها را نمایش بده
-                  if (item.type == _MenuItemType.expandable && isExpanded(item) && railExtended) {
-                    if (index == getMenuIndexFromTotalIndex(index)) {
-                      // آیتم اصلی
-                      return MouseRegion(
-                        onEnter: (_) => setState(() => _hoverIndex = index),
-                        onExit: (_) => setState(() => _hoverIndex = -1),
-                        child: InkWell(
-                          borderRadius: br,
-                          onTap: () {
-                            setState(() {
-                              if (item.label == t.people) _isPeopleExpanded = !_isPeopleExpanded;
-                              if (item.label == t.productsAndServices) _isProductsAndServicesExpanded = !_isProductsAndServicesExpanded;
-                              if (item.label == t.banking) _isBankingExpanded = !_isBankingExpanded;
-                              if (item.label == t.accountingMenu) _isAccountingMenuExpanded = !_isAccountingMenuExpanded;
-                              if (item.label == t.warehouseManagement) _isWarehouseManagementExpanded = !_isWarehouseManagementExpanded;
-                              if (item.label == t.settings) _isBasicToolsExpanded = !_isBasicToolsExpanded;
-                            });
-                          },
-                          child: Container(
-                            margin: EdgeInsets.zero,
-                            padding: EdgeInsets.symmetric(
-                              horizontal: railExtended ? 16 : 8,
-                              vertical: 8,
-                            ),
-                            decoration: BoxDecoration(
-                              color: bgColor,
-                              borderRadius: br,
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(
-                                  active ? item.selectedIcon : item.icon,
-                                  color: active ? activeFg : sideFg,
-                                  size: 24,
+                  if (isChildItem && item.children != null && childIndex >= 0 && childIndex < item.children!.length) {
+                    // زیرآیتم
+                    final child = item.children![childIndex];
+                    return MouseRegion(
+                      onEnter: (_) => setState(() => _hoverIndex = index),
+                      onExit: (_) => setState(() => _hoverIndex = -1),
+                      child: InkWell(
+                        borderRadius: br,
+                        onTap: () => onSelectChild(menuIndex, childIndex),
+                        child: Container(
+                          margin: EdgeInsets.zero,
+                          padding: EdgeInsets.symmetric(
+                            horizontal: railExtended ? 24 : 16, // بیشتر indent برای زیرآیتم
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: bgColor,
+                            borderRadius: br,
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                child.icon,
+                                color: sideFg,
+                                size: 20,
+                              ),
+                              if (railExtended) ...[
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    child.label,
+                                    style: TextStyle(
+                                      color: sideFg,
+                                      fontWeight: FontWeight.w400,
+                                    ),
+                                  ),
                                 ),
-                                if (railExtended) ...[
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Text(
-                                      item.label,
-                                      style: TextStyle(
-                                        color: active ? activeFg : sideFg,
-                                        fontWeight: active ? FontWeight.w600 : FontWeight.w400,
+                                if (child.hasAddButton)
+                                  GestureDetector(
+                                    onTap: () {
+                                      // Navigate to add new item
+                                      if (child.label == t.receipts) {
+                                        // Navigate to add receipt
+                                      } else if (child.label == t.payments) {
+                                        // Navigate to add payment
+                                      } else if (child.label == t.products) {
+                                        // Navigate to add product
+                                      } else if (child.label == t.priceLists) {
+                                        // Navigate to add price list
+                                      } else if (child.label == t.categories) {
+                                        // Navigate to add category
+                                      } else if (child.label == t.productAttributes) {
+                                        // Navigate to add product attribute
+                                      } else if (child.label == t.accounts) {
+                                        // Navigate to add account
+                                      } else if (child.label == t.pettyCash) {
+                                        // Navigate to add petty cash
+                                      } else if (child.label == t.cashBox) {
+                                        // Navigate to add cash box
+                                      } else if (child.label == t.wallet) {
+                                        // Navigate to add wallet
+                                      } else if (child.label == t.checks) {
+                                        // Navigate to add check
+                                      } else if (child.label == t.transfers) {
+                                        // Navigate to add transfer
+                                      } else if (child.label == t.invoice) {
+                                        // Navigate to add invoice
+                                      } else if (child.label == t.expenseAndIncome) {
+                                        // Navigate to add expense/income
+                                      } else if (child.label == t.documents) {
+                                        // Navigate to add document
+                                      } else if (child.label == t.warehouses) {
+                                        // Navigate to add warehouse
+                                      } else if (child.label == t.shipments) {
+                                        // Navigate to add shipment
+                                      }
+                                    },
+                                    child: Container(
+                                      width: 20,
+                                      height: 20,
+                                      decoration: BoxDecoration(
+                                        color: sideFg.withValues(alpha: 0.1),
+                                        borderRadius: BorderRadius.circular(3),
+                                      ),
+                                      child: Icon(
+                                        Icons.add,
+                                        size: 14,
+                                        color: sideFg,
                                       ),
                                     ),
                                   ),
-                                  Icon(
-                                    isExpanded(item) ? Icons.expand_less : Icons.expand_more,
-                                    color: sideFg,
-                                    size: 20,
-                                  ),
-                                ],
                               ],
-                            ),
+                            ],
                           ),
                         ),
-                      );
-                    } else {
-                      // زیرآیتم‌ها
-                      final childIndex = index - getMenuIndexFromTotalIndex(index) - 1;
-                      if (childIndex < (item.children?.length ?? 0)) {
-                        final child = item.children![childIndex];
-                        return MouseRegion(
-                          onEnter: (_) => setState(() => _hoverIndex = index),
-                          onExit: (_) => setState(() => _hoverIndex = -1),
-                          child: InkWell(
-                            borderRadius: br,
-                            onTap: () => onSelectChild(menuIndex, childIndex),
-                            child: Container(
-                              margin: EdgeInsets.zero,
-                              padding: EdgeInsets.symmetric(
-                                horizontal: railExtended ? 24 : 16, // بیشتر indent برای زیرآیتم
-                                vertical: 8,
-                              ),
-                              decoration: BoxDecoration(
-                                color: bgColor,
-                                borderRadius: br,
-                              ),
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    child.icon,
-                                    color: sideFg,
-                                    size: 20,
-                                  ),
-                                  if (railExtended) ...[
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Text(
-                                        child.label,
-                                        style: TextStyle(
-                                          color: sideFg,
-                                          fontWeight: FontWeight.w400,
-                                        ),
-                                      ),
-                                    ),
-                                    if (child.hasAddButton)
-                                      IconButton(
-                                        icon: const Icon(Icons.add, size: 16),
-                                        onPressed: () {
-                                          // Navigate to add new item
-                                          if (child.label == t.receipts) {
-                                            // Navigate to add receipt
-                                          } else if (child.label == t.payments) {
-                                            // Navigate to add payment
-                                          } else if (child.label == t.products) {
-                                            // Navigate to add product
-                                          } else if (child.label == t.priceLists) {
-                                            // Navigate to add price list
-                                          } else if (child.label == t.categories) {
-                                            // Navigate to add category
-                                          } else if (child.label == t.productAttributes) {
-                                            // Navigate to add product attribute
-                                          } else if (child.label == t.accounts) {
-                                            // Navigate to add account
-                                          } else if (child.label == t.pettyCash) {
-                                            // Navigate to add petty cash
-                                          } else if (child.label == t.cashBox) {
-                                            // Navigate to add cash box
-                                          } else if (child.label == t.wallet) {
-                                            // Navigate to add wallet
-                                          } else if (child.label == t.checks) {
-                                            // Navigate to add check
-                                          } else if (child.label == t.transfers) {
-                                            // Navigate to add transfer
-                                          } else if (child.label == t.invoice) {
-                                            // Navigate to add invoice
-                                          } else if (child.label == t.expenseAndIncome) {
-                                            // Navigate to add expense/income
-                                          } else if (child.label == t.documents) {
-                                            // Navigate to add document
-                                          } else if (child.label == t.warehouses) {
-                                            // Navigate to add warehouse
-                                          } else if (child.label == t.shipments) {
-                                            // Navigate to add shipment
-                                          }
-                                        },
-                                      ),
-                                  ],
-                                ],
-                              ),
-                            ),
-                          ),
-                        );
-                      }
-                    }
+                      ),
+                    );
                   } else {
-                    // آیتم ساده، آیتم بازشونده در حالت بسته، یا آیتم جداکننده
+                    // آیتم اصلی (ساده، بازشونده، یا جداکننده)
                     if (item.type == _MenuItemType.separator) {
                       // آیتم جداکننده
                       return Container(
@@ -786,7 +753,7 @@ class _BusinessShellState extends State<BusinessShell> {
                         ),
                       );
                     } else {
-                      // آیتم ساده یا آیتم بازشونده در حالت بسته
+                      // آیتم ساده یا آیتم بازشونده
                       return MouseRegion(
                         onEnter: (_) => setState(() => _hoverIndex = index),
                         onExit: (_) => setState(() => _hoverIndex = -1),
@@ -839,6 +806,40 @@ class _BusinessShellState extends State<BusinessShell> {
                                       isExpanded(item) ? Icons.expand_less : Icons.expand_more,
                                       color: sideFg,
                                       size: 20,
+                                    )
+                                  else if (item.hasAddButton)
+                                    GestureDetector(
+                                      onTap: () {
+                                        // Navigate to add new item
+                                        if (item.label == t.invoice) {
+                                          // Navigate to add invoice
+                                        } else if (item.label == t.expenseAndIncome) {
+                                          // Navigate to add expense/income
+                                        } else if (item.label == t.reports) {
+                                          // Navigate to add report
+                                        } else if (item.label == t.inquiries) {
+                                          // Navigate to add inquiry
+                                        } else if (item.label == t.storageSpace) {
+                                          // Navigate to add storage space
+                                        } else if (item.label == t.taxpayers) {
+                                          // Navigate to add taxpayer
+                                        } else if (item.label == t.pluginMarketplace) {
+                                          // Navigate to add plugin
+                                        }
+                                      },
+                                      child: Container(
+                                        width: 24,
+                                        height: 24,
+                                        decoration: BoxDecoration(
+                                          color: sideFg.withValues(alpha: 0.1),
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        child: Icon(
+                                          Icons.add,
+                                          size: 16,
+                                          color: sideFg,
+                                        ),
+                                      ),
                                     ),
                                 ],
                               ],
@@ -848,7 +849,6 @@ class _BusinessShellState extends State<BusinessShell> {
                       );
                     }
                   }
-                  return const SizedBox.shrink();
                 },
               ),
             ),
@@ -933,9 +933,8 @@ class _BusinessShellState extends State<BusinessShell> {
                       children: item.children?.map((child) => ListTile(
                         leading: const SizedBox(width: 24),
                         title: Text(child.label),
-                        trailing: child.hasAddButton ? IconButton(
-                          icon: const Icon(Icons.add, size: 20),
-                          onPressed: () {
+                        trailing: child.hasAddButton ? GestureDetector(
+                          onTap: () {
                             context.pop();
                             // Navigate to add new item
                             if (child.label == t.receipts) {
@@ -974,6 +973,19 @@ class _BusinessShellState extends State<BusinessShell> {
                               // Navigate to add shipment
                             }
                           },
+                          child: Container(
+                            width: 24,
+                            height: 24,
+                            decoration: BoxDecoration(
+                              color: sideFg.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Icon(
+                              Icons.add,
+                              size: 16,
+                              color: sideFg,
+                            ),
+                          ),
                         ) : null,
                         onTap: () {
                           context.pop();

@@ -1466,6 +1466,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get others => 'Others';
 
   @override
+  String get pluginMarketplace => 'Plugin Marketplace';
+
+  @override
   String get practicalTools => 'Practical Tools';
 
   @override
