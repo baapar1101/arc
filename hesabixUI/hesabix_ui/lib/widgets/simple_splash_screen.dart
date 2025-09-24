@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
 import '../core/auth_store.dart';
+import '../l10n/app_localizations.dart';
 
 class SimpleSplashScreen extends StatefulWidget {
   final String? message;
@@ -124,33 +125,25 @@ class _SimpleSplashScreenState extends State<SimpleSplashScreen>
     super.dispose();
   }
 
-  String _getAppName() {
-    if (widget.locale != null && widget.locale!.languageCode == 'fa') {
-      return 'حسابیکس';
-    }
-    return 'Hesabix';
+  String _getAppName(BuildContext context) {
+    final t = AppLocalizations.of(context);
+    return t.appTitle;
   }
 
 
-  String _getLoadingMessage() {
-    if (widget.locale != null && widget.locale!.languageCode == 'fa') {
-      return 'در حال بارگذاری...';
-    }
-    return 'Loading...';
+  String _getLoadingMessage(BuildContext context) {
+    final t = AppLocalizations.of(context);
+    return t.loading;
   }
 
-  String _getVersionInfo() {
-    if (widget.locale != null && widget.locale!.languageCode == 'fa') {
-      return 'نسخه 1.0.0';
-    }
-    return 'Version 1.0.0';
+  String _getVersionInfo(BuildContext context) {
+    final t = AppLocalizations.of(context);
+    return t.version;
   }
 
-  String _getMotto() {
-    if (widget.locale != null && widget.locale!.languageCode == 'fa') {
-      return 'جهان با تعاون زیبا می‌شود';
-    }
-    return 'The world becomes beautiful through cooperation';
+  String _getMotto(BuildContext context) {
+    final t = AppLocalizations.of(context);
+    return t.motto;
   }
 
   @override
@@ -234,7 +227,7 @@ class _SimpleSplashScreenState extends State<SimpleSplashScreen>
                     
                     // App Name - Simple and Clean
                     Text(
-                      _getAppName(),
+                      _getAppName(context),
                       style: theme.textTheme.headlineLarge?.copyWith(
                         fontWeight: FontWeight.bold,
                         color: colorScheme.onSurface,
@@ -247,7 +240,7 @@ class _SimpleSplashScreenState extends State<SimpleSplashScreen>
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 32),
                       child: Text(
-                        _getMotto(),
+                        _getMotto(context),
                         style: theme.textTheme.bodyLarge?.copyWith(
                           color: colorScheme.onSurfaceVariant,
                           fontWeight: FontWeight.w400,
@@ -275,7 +268,7 @@ class _SimpleSplashScreenState extends State<SimpleSplashScreen>
                         
                         // Simple Loading Message
                         Text(
-                          widget.message ?? _getLoadingMessage(),
+                          widget.message ?? _getLoadingMessage(context),
                           style: theme.textTheme.bodyMedium?.copyWith(
                             color: colorScheme.onSurfaceVariant,
                             fontWeight: FontWeight.w500,
@@ -288,7 +281,7 @@ class _SimpleSplashScreenState extends State<SimpleSplashScreen>
                     
                     // Simple Version Info
                     Text(
-                      _getVersionInfo(),
+                      _getVersionInfo(context),
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
                       ),

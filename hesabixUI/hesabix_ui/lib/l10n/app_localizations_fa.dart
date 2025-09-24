@@ -1548,4 +1548,434 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get alreadyAddedWarningTitle => 'کاربر موجود';
+
+  @override
+  String get version => 'نسخه 1.0.0';
+
+  @override
+  String get motto => 'جهان با تعاون زیبا می‌شود';
+
+  @override
+  String get add => 'افزودن';
+
+  @override
+  String get view => 'مشاهده';
+
+  @override
+  String get draft => 'مدیریت پیش‌نویس‌ها';
+
+  @override
+  String get addPerson => 'افزودن شخص جدید';
+
+  @override
+  String get viewPeople => 'مشاهده لیست اشخاص';
+
+  @override
+  String get editPeople => 'ویرایش اطلاعات اشخاص';
+
+  @override
+  String get deletePeople => 'حذف اشخاص';
+
+  @override
+  String get addReceipt => 'افزودن دریافت جدید';
+
+  @override
+  String get viewReceipts => 'مشاهده دریافت‌ها';
+
+  @override
+  String get editReceipts => 'ویرایش دریافت‌ها';
+
+  @override
+  String get deleteReceipts => 'حذف دریافت‌ها';
+
+  @override
+  String get manageReceiptDrafts => 'مدیریت پیش‌نویس‌های دریافت';
+
+  @override
+  String get addPayment => 'افزودن پرداخت جدید';
+
+  @override
+  String get viewPayments => 'مشاهده پرداخت‌ها';
+
+  @override
+  String get editPayments => 'ویرایش پرداخت‌ها';
+
+  @override
+  String get deletePayments => 'حذف پرداخت‌ها';
+
+  @override
+  String get managePaymentDrafts => 'مدیریت پیش‌نویس‌های پرداخت';
+
+  @override
+  String get products => 'کالا‌ها و خدمات';
+
+  @override
+  String get addProduct => 'افزودن کالا یا خدمت';
+
+  @override
+  String get viewProducts => 'مشاهده کالاها و خدمات';
+
+  @override
+  String get editProducts => 'ویرایش کالاها و خدمات';
+
+  @override
+  String get deleteProducts => 'حذف کالاها و خدمات';
+
+  @override
+  String get priceLists => 'لیست‌های قیمت';
+
+  @override
+  String get addPriceList => 'افزودن لیست قیمت';
+
+  @override
+  String get viewPriceLists => 'مشاهده لیست‌های قیمت';
+
+  @override
+  String get editPriceLists => 'ویرایش لیست‌های قیمت';
+
+  @override
+  String get deletePriceLists => 'حذف لیست‌های قیمت';
+
+  @override
+  String get categories => 'دسته‌بندی‌ها';
+
+  @override
+  String get addCategory => 'افزودن دسته‌بندی';
+
+  @override
+  String get viewCategories => 'مشاهده دسته‌بندی‌ها';
+
+  @override
+  String get editCategories => 'ویرایش دسته‌بندی‌ها';
+
+  @override
+  String get deleteCategories => 'حذف دسته‌بندی‌ها';
+
+  @override
+  String get addInventory => 'افزودن موجودی';
+
+  @override
+  String get viewInventory => 'مشاهده موجودی';
+
+  @override
+  String get editInventory => 'ویرایش موجودی';
+
+  @override
+  String get deleteInventory => 'حذف موجودی';
+
+  @override
+  String get viewReports => 'مشاهده گزارش‌ها';
+
+  @override
+  String get generateReports => 'تولید گزارش‌ها';
+
+  @override
+  String get exportReports => 'خروجی گزارش‌ها';
+
+  @override
+  String get viewSettings => 'مشاهده تنظیمات';
+
+  @override
+  String get editSettings => 'ویرایش تنظیمات';
+
+  @override
+  String get users => 'کاربران';
+
+  @override
+  String get manageUsers => 'مدیریت کاربران';
+
+  @override
+  String get print => 'چاپ اسناد';
+
+  @override
+  String get peopleReceipts => 'دریافت از اشخاص';
+
+  @override
+  String get peoplePayments => 'پرداخت به اشخاص';
+
+  @override
+  String get storageConfigUpdated => 'تنظیمات ذخیره‌سازی به‌روزرسانی شد';
+
+  @override
+  String get storageConfigCreated => 'تنظیمات ذخیره‌سازی ایجاد شد';
+
+  @override
+  String get storageConfigDeleted => 'تنظیمات ذخیره‌سازی حذف شد';
+
+  @override
+  String get storageConfigHasFiles =>
+      'این تنظیمات ذخیره‌سازی دارای فایل است و قابل حذف نیست';
+
+  @override
+  String get storageConfigNotFound => 'تنظیمات ذخیره‌سازی یافت نشد';
+
+  @override
+  String get storageConfigSetAsDefault => 'تنظیمات به عنوان پیش‌فرض تنظیم شد';
+
+  @override
+  String get storageConfigSetDefaultFailed => 'خطا در تنظیم به عنوان پیش‌فرض';
+
+  @override
+  String get passwordChangeError => 'خطا در تغییر کلمه عبور';
+
+  @override
+  String get banking => 'بانکداری';
+
+  @override
+  String get bankAccounts => 'حساب‌های بانکی';
+
+  @override
+  String get cash => 'صندوق';
+
+  @override
+  String get pettyCash => 'تنخواه گردان';
+
+  @override
+  String get checks => 'چک';
+
+  @override
+  String get wallet => 'کیف پول';
+
+  @override
+  String get transfers => 'انتقال';
+
+  @override
+  String get invoices => 'فاکتورها';
+
+  @override
+  String get expensesIncome => 'هزینه و درآمد';
+
+  @override
+  String get accountingDocuments => 'اسناد حسابداری';
+
+  @override
+  String get chartOfAccounts => 'جدول حساب‌ها';
+
+  @override
+  String get openingBalance => 'تراز افتتاحیه';
+
+  @override
+  String get warehouse => 'انبارداری';
+
+  @override
+  String get warehouses => 'مدیریت انبارها';
+
+  @override
+  String get warehouseTransfers => 'صدور حواله';
+
+  @override
+  String get productAttributes => 'ویژگی‌های کالا و خدمات';
+
+  @override
+  String get addAttribute => 'افزودن ویژگی';
+
+  @override
+  String get viewAttributes => 'مشاهده ویژگی‌ها';
+
+  @override
+  String get editAttributes => 'ویرایش ویژگی‌ها';
+
+  @override
+  String get deleteAttributes => 'حذف ویژگی‌ها';
+
+  @override
+  String get addBankAccount => 'افزودن حساب بانکی';
+
+  @override
+  String get viewBankAccounts => 'مشاهده حساب‌های بانکی';
+
+  @override
+  String get editBankAccounts => 'ویرایش حساب‌های بانکی';
+
+  @override
+  String get deleteBankAccounts => 'حذف حساب‌های بانکی';
+
+  @override
+  String get addCash => 'افزودن صندوق';
+
+  @override
+  String get viewCash => 'مشاهده صندوق‌ها';
+
+  @override
+  String get editCash => 'ویرایش صندوق‌ها';
+
+  @override
+  String get deleteCash => 'حذف صندوق‌ها';
+
+  @override
+  String get addPettyCash => 'افزودن تنخواه';
+
+  @override
+  String get viewPettyCash => 'مشاهده تنخواه‌ها';
+
+  @override
+  String get editPettyCash => 'ویرایش تنخواه‌ها';
+
+  @override
+  String get deletePettyCash => 'حذف تنخواه‌ها';
+
+  @override
+  String get addCheck => 'افزودن چک';
+
+  @override
+  String get viewChecks => 'مشاهده چک‌ها';
+
+  @override
+  String get editChecks => 'ویرایش چک‌ها';
+
+  @override
+  String get deleteChecks => 'حذف چک‌ها';
+
+  @override
+  String get collectChecks => 'وصول چک‌ها';
+
+  @override
+  String get transferChecks => 'انتقال چک‌ها';
+
+  @override
+  String get returnChecks => 'برگشت چک‌ها';
+
+  @override
+  String get viewWallet => 'مشاهده کیف پول';
+
+  @override
+  String get chargeWallet => 'شارژ کیف پول';
+
+  @override
+  String get addTransfer => 'افزودن انتقال';
+
+  @override
+  String get viewTransfers => 'مشاهده انتقال‌ها';
+
+  @override
+  String get editTransfers => 'ویرایش انتقال‌ها';
+
+  @override
+  String get deleteTransfers => 'حذف انتقال‌ها';
+
+  @override
+  String get manageTransferDrafts => 'مدیریت پیش‌نویس‌های انتقال';
+
+  @override
+  String get addInvoice => 'افزودن فاکتور';
+
+  @override
+  String get viewInvoices => 'صورت حساب‌ها';
+
+  @override
+  String get editInvoices => 'ویرایش فاکتورها';
+
+  @override
+  String get deleteInvoices => 'حذف فاکتورها';
+
+  @override
+  String get manageInvoiceDrafts => 'مدیریت پیش‌نویس‌های فاکتور';
+
+  @override
+  String get addExpenseIncome => 'افزودن هزینه یا درآمد';
+
+  @override
+  String get viewExpensesIncome => 'مشاهده هزینه‌ها و درآمدها';
+
+  @override
+  String get editExpensesIncome => 'ویرایش هزینه‌ها و درآمدها';
+
+  @override
+  String get deleteExpensesIncome => 'حذف هزینه‌ها و درآمدها';
+
+  @override
+  String get manageExpenseIncomeDrafts => 'مدیریت پیش‌نویس‌های هزینه و درآمد';
+
+  @override
+  String get addAccountingDocument => 'افزودن سند حسابداری';
+
+  @override
+  String get viewAccountingDocuments => 'مشاهده اسناد حسابداری';
+
+  @override
+  String get editAccountingDocuments => 'ویرایش اسناد حسابداری';
+
+  @override
+  String get deleteAccountingDocuments => 'حذف اسناد حسابداری';
+
+  @override
+  String get manageAccountingDocumentDrafts => 'مدیریت پیش‌نویس‌های اسناد';
+
+  @override
+  String get addAccount => 'افزودن حساب';
+
+  @override
+  String get viewChartOfAccounts => 'مشاهده جدول حساب‌ها';
+
+  @override
+  String get editChartOfAccounts => 'ویرایش جدول حساب‌ها';
+
+  @override
+  String get deleteAccounts => 'حذف حساب‌ها';
+
+  @override
+  String get viewOpeningBalance => 'مشاهده تراز افتتاحیه';
+
+  @override
+  String get editOpeningBalance => 'ویرایش تراز افتتاحیه';
+
+  @override
+  String get addWarehouse => 'افزودن انبار';
+
+  @override
+  String get viewWarehouses => 'مشاهده انبارها';
+
+  @override
+  String get editWarehouses => 'ویرایش انبارها';
+
+  @override
+  String get deleteWarehouses => 'حذف انبارها';
+
+  @override
+  String get addWarehouseTransfer => 'افزودن حواله';
+
+  @override
+  String get viewWarehouseTransfers => 'مشاهده حواله‌ها';
+
+  @override
+  String get editWarehouseTransfers => 'ویرایش حواله‌ها';
+
+  @override
+  String get deleteWarehouseTransfers => 'حذف حواله‌ها';
+
+  @override
+  String get manageWarehouseTransferDrafts => 'مدیریت پیش‌نویس‌های حواله';
+
+  @override
+  String get printSettings => 'تنظیمات چاپ اسناد';
+
+  @override
+  String get eventHistory => 'تاریخچه رویدادها';
+
+  @override
+  String get storageSpace => 'فضای ذخیره‌سازی';
+
+  @override
+  String get viewStorage => 'مشاهده فضای ذخیره‌سازی';
+
+  @override
+  String get deleteFiles => 'حذف فایل‌ها';
+
+  @override
+  String get smsPanel => 'پنل پیامک';
+
+  @override
+  String get viewSmsHistory => 'مشاهده تاریخچه پیامک‌ها';
+
+  @override
+  String get manageSmsTemplates => 'مدیریت قالب‌های پیامک';
+
+  @override
+  String get marketplace => 'بازار افزونه‌ها';
+
+  @override
+  String get viewMarketplace => 'مشاهده افزونه‌ها';
+
+  @override
+  String get buyPlugins => 'خرید افزونه‌ها';
 }

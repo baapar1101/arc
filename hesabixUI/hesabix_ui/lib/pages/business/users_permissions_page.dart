@@ -64,14 +64,14 @@ class _UsersPermissionsPageState extends State<UsersPermissionsPage> {
           _loading = false;
           _error = e.toString();
         });
-        _showErrorSnackBar('خطا در بارگذاری کاربران: $e');
+        _showErrorSnackBar('${AppLocalizations.of(context).dataLoadingError}: $e');
       }
     }
   }
 
   Future<void> _addUser() async {
     if (_emailOrPhoneController.text.trim().isEmpty) {
-      _showErrorSnackBar('لطفاً ایمیل یا شماره تلفن را وارد کنید');
+      _showErrorSnackBar(AppLocalizations.of(context).userEmailOrPhoneHint);
       return;
     }
 
@@ -103,7 +103,7 @@ class _UsersPermissionsPageState extends State<UsersPermissionsPage> {
         _showErrorSnackBar(response.message);
       }
     } catch (e) {
-      _showErrorSnackBar('خطا در افزودن کاربر: $e');
+      _showErrorSnackBar('${AppLocalizations.of(context).userAddFailed}: $e');
     }
   }
 
@@ -124,7 +124,7 @@ class _UsersPermissionsPageState extends State<UsersPermissionsPage> {
         _showErrorSnackBar(response.message);
       }
     } catch (e) {
-      _showErrorSnackBar('خطا در به‌روزرسانی دسترسی‌ها: $e');
+      _showErrorSnackBar('${AppLocalizations.of(context).permissionsUpdateFailed}: $e');
     }
   }
 
@@ -165,7 +165,7 @@ class _UsersPermissionsPageState extends State<UsersPermissionsPage> {
         _showErrorSnackBar(response.message);
       }
     } catch (e) {
-      _showErrorSnackBar('خطا در حذف کاربر: $e');
+      _showErrorSnackBar('${t.userRemoveFailed}: $e');
     }
   }
 
@@ -309,7 +309,7 @@ class _UsersPermissionsPageState extends State<UsersPermissionsPage> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'مدیریت کاربران و دسترسی‌های کسب و کار',
+                          t.businessUsers,
                           style: theme.textTheme.bodyMedium?.copyWith(
                             color: colorScheme.onSurfaceVariant,
                           ),
@@ -324,7 +324,7 @@ class _UsersPermissionsPageState extends State<UsersPermissionsPage> {
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
-                      '${_users.length} کاربر',
+                      '${_users.length} ${t.user}',
                       style: theme.textTheme.labelMedium?.copyWith(
                         color: colorScheme.onPrimaryContainer,
                         fontWeight: FontWeight.w600,
@@ -708,7 +708,7 @@ class _UsersPermissionsPageState extends State<UsersPermissionsPage> {
           ),
           const SizedBox(width: 4),
           Text(
-            'مالک',
+            AppLocalizations.of(context).owner,
             style: TextStyle(
               color: Colors.orange.shade700,
               fontSize: 11,
@@ -778,7 +778,7 @@ class _UsersPermissionsPageState extends State<UsersPermissionsPage> {
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                'مدیریت دسترسی‌های کاربر',
+                                t.userPermissions,
                                 style: theme.textTheme.bodyMedium?.copyWith(
                                   color: colorScheme.onPrimaryContainer.withValues(alpha: 0.8),
                                 ),
@@ -805,40 +805,40 @@ class _UsersPermissionsPageState extends State<UsersPermissionsPage> {
                         children: [
                           // اشخاص
                           _buildPermissionSection(
-                            'اشخاص',
+                            t.people,
                             Icons.people,
                             [
                               _buildPermissionGroup(
-                                'اشخاص',
+                                t.people,
                                 [
-                                  _buildPermissionItem('افزودن', 'افزودن شخص جدید', _getPermission(currentPermissions, 'people', 'add'), (value) => _setPermission(currentPermissions, 'people', 'add', value), theme, colorScheme),
-                                  _buildPermissionItem('مشاهده', 'مشاهده لیست اشخاص', _getPermission(currentPermissions, 'people', 'view'), (value) => _setPermission(currentPermissions, 'people', 'view', value), theme, colorScheme),
-                                  _buildPermissionItem('ویرایش', 'ویرایش اطلاعات اشخاص', _getPermission(currentPermissions, 'people', 'edit'), (value) => _setPermission(currentPermissions, 'people', 'edit', value), theme, colorScheme),
-                                  _buildPermissionItem('حذف', 'حذف اشخاص', _getPermission(currentPermissions, 'people', 'delete'), (value) => _setPermission(currentPermissions, 'people', 'delete', value), theme, colorScheme),
+                                  _buildPermissionItem(t.add, t.addPerson, _getPermission(currentPermissions, 'people', 'add'), (value) => _setPermission(currentPermissions, 'people', 'add', value), theme, colorScheme),
+                                  _buildPermissionItem(t.view, t.viewPeople, _getPermission(currentPermissions, 'people', 'view'), (value) => _setPermission(currentPermissions, 'people', 'view', value), theme, colorScheme),
+                                  _buildPermissionItem(t.edit, t.editPeople, _getPermission(currentPermissions, 'people', 'edit'), (value) => _setPermission(currentPermissions, 'people', 'edit', value), theme, colorScheme),
+                                  _buildPermissionItem(t.delete, t.deletePeople, _getPermission(currentPermissions, 'people', 'delete'), (value) => _setPermission(currentPermissions, 'people', 'delete', value), theme, colorScheme),
                                 ],
                                 theme,
                                 colorScheme,
                               ),
                               _buildPermissionGroup(
-                                'دریافت از اشخاص',
+                                t.peopleReceipts,
                                 [
-                                  _buildPermissionItem('افزودن', 'افزودن دریافت جدید', _getPermission(currentPermissions, 'people_receipts', 'add'), (value) => _setPermission(currentPermissions, 'people_receipts', 'add', value), theme, colorScheme),
-                                  _buildPermissionItem('مشاهده', 'مشاهده دریافت‌ها', _getPermission(currentPermissions, 'people_receipts', 'view'), (value) => _setPermission(currentPermissions, 'people_receipts', 'view', value), theme, colorScheme),
-                                  _buildPermissionItem('ویرایش', 'ویرایش دریافت‌ها', _getPermission(currentPermissions, 'people_receipts', 'edit'), (value) => _setPermission(currentPermissions, 'people_receipts', 'edit', value), theme, colorScheme),
-                                  _buildPermissionItem('حذف', 'حذف دریافت‌ها', _getPermission(currentPermissions, 'people_receipts', 'delete'), (value) => _setPermission(currentPermissions, 'people_receipts', 'delete', value), theme, colorScheme),
-                                  _buildPermissionItem('مدیریت پیش‌نویس‌ها', 'مدیریت پیش‌نویس‌های دریافت', _getPermission(currentPermissions, 'people_receipts', 'draft'), (value) => _setPermission(currentPermissions, 'people_receipts', 'draft', value), theme, colorScheme),
+                                  _buildPermissionItem(t.add, t.addReceipt, _getPermission(currentPermissions, 'people_receipts', 'add'), (value) => _setPermission(currentPermissions, 'people_receipts', 'add', value), theme, colorScheme),
+                                  _buildPermissionItem(t.view, t.viewReceipts, _getPermission(currentPermissions, 'people_receipts', 'view'), (value) => _setPermission(currentPermissions, 'people_receipts', 'view', value), theme, colorScheme),
+                                  _buildPermissionItem(t.edit, t.editReceipts, _getPermission(currentPermissions, 'people_receipts', 'edit'), (value) => _setPermission(currentPermissions, 'people_receipts', 'edit', value), theme, colorScheme),
+                                  _buildPermissionItem(t.delete, t.deleteReceipts, _getPermission(currentPermissions, 'people_receipts', 'delete'), (value) => _setPermission(currentPermissions, 'people_receipts', 'delete', value), theme, colorScheme),
+                                  _buildPermissionItem(t.draft, t.manageReceiptDrafts, _getPermission(currentPermissions, 'people_receipts', 'draft'), (value) => _setPermission(currentPermissions, 'people_receipts', 'draft', value), theme, colorScheme),
                                 ],
                                 theme,
                                 colorScheme,
                               ),
                               _buildPermissionGroup(
-                                'پرداخت به اشخاص',
+                                t.peoplePayments,
                                 [
-                                  _buildPermissionItem('افزودن', 'افزودن پرداخت جدید', _getPermission(currentPermissions, 'people_payments', 'add'), (value) => _setPermission(currentPermissions, 'people_payments', 'add', value), theme, colorScheme),
-                                  _buildPermissionItem('مشاهده', 'مشاهده پرداخت‌ها', _getPermission(currentPermissions, 'people_payments', 'view'), (value) => _setPermission(currentPermissions, 'people_payments', 'view', value), theme, colorScheme),
-                                  _buildPermissionItem('ویرایش', 'ویرایش پرداخت‌ها', _getPermission(currentPermissions, 'people_payments', 'edit'), (value) => _setPermission(currentPermissions, 'people_payments', 'edit', value), theme, colorScheme),
-                                  _buildPermissionItem('حذف', 'حذف پرداخت‌ها', _getPermission(currentPermissions, 'people_payments', 'delete'), (value) => _setPermission(currentPermissions, 'people_payments', 'delete', value), theme, colorScheme),
-                                  _buildPermissionItem('مدیریت پیش‌نویس‌ها', 'مدیریت پیش‌نویس‌های پرداخت', _getPermission(currentPermissions, 'people_payments', 'draft'), (value) => _setPermission(currentPermissions, 'people_payments', 'draft', value), theme, colorScheme),
+                                  _buildPermissionItem(t.add, t.addPayment, _getPermission(currentPermissions, 'people_payments', 'add'), (value) => _setPermission(currentPermissions, 'people_payments', 'add', value), theme, colorScheme),
+                                  _buildPermissionItem(t.view, t.viewPayments, _getPermission(currentPermissions, 'people_payments', 'view'), (value) => _setPermission(currentPermissions, 'people_payments', 'view', value), theme, colorScheme),
+                                  _buildPermissionItem(t.edit, t.editPayments, _getPermission(currentPermissions, 'people_payments', 'edit'), (value) => _setPermission(currentPermissions, 'people_payments', 'edit', value), theme, colorScheme),
+                                  _buildPermissionItem(t.delete, t.deletePayments, _getPermission(currentPermissions, 'people_payments', 'delete'), (value) => _setPermission(currentPermissions, 'people_payments', 'delete', value), theme, colorScheme),
+                                  _buildPermissionItem(t.draft, t.managePaymentDrafts, _getPermission(currentPermissions, 'people_payments', 'draft'), (value) => _setPermission(currentPermissions, 'people_payments', 'draft', value), theme, colorScheme),
                                 ],
                                 theme,
                                 colorScheme,
@@ -852,16 +852,16 @@ class _UsersPermissionsPageState extends State<UsersPermissionsPage> {
 
                           // کالا و خدمات
                           _buildPermissionSection(
-                            'کالا و خدمات',
+                            t.products,
                             Icons.inventory,
                             [
                               _buildPermissionGroup(
-                                'کالا‌ها و خدمات',
+                                t.products,
                                 [
-                                  _buildPermissionItem('افزودن', 'افزودن کالا یا خدمت', _getPermission(currentPermissions, 'products', 'add'), (value) => _setPermission(currentPermissions, 'products', 'add', value), theme, colorScheme),
-                                  _buildPermissionItem('مشاهده', 'مشاهده کالاها و خدمات', _getPermission(currentPermissions, 'products', 'view'), (value) => _setPermission(currentPermissions, 'products', 'view', value), theme, colorScheme),
-                                  _buildPermissionItem('ویرایش', 'ویرایش کالاها و خدمات', _getPermission(currentPermissions, 'products', 'edit'), (value) => _setPermission(currentPermissions, 'products', 'edit', value), theme, colorScheme),
-                                  _buildPermissionItem('حذف', 'حذف کالاها و خدمات', _getPermission(currentPermissions, 'products', 'delete'), (value) => _setPermission(currentPermissions, 'products', 'delete', value), theme, colorScheme),
+                                  _buildPermissionItem(t.add, t.addProduct, _getPermission(currentPermissions, 'products', 'add'), (value) => _setPermission(currentPermissions, 'products', 'add', value), theme, colorScheme),
+                                  _buildPermissionItem(t.view, t.viewProducts, _getPermission(currentPermissions, 'products', 'view'), (value) => _setPermission(currentPermissions, 'products', 'view', value), theme, colorScheme),
+                                  _buildPermissionItem(t.edit, t.editProducts, _getPermission(currentPermissions, 'products', 'edit'), (value) => _setPermission(currentPermissions, 'products', 'edit', value), theme, colorScheme),
+                                  _buildPermissionItem(t.delete, t.deleteProducts, _getPermission(currentPermissions, 'products', 'delete'), (value) => _setPermission(currentPermissions, 'products', 'delete', value), theme, colorScheme),
                                 ],
                                 theme,
                                 colorScheme,

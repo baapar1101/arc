@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
+import 'l10n/app_localizations.dart';
 
 import 'pages/login_page.dart';
 import 'pages/profile/profile_shell.dart';
@@ -21,7 +22,6 @@ import 'pages/admin/email_settings_page.dart';
 import 'pages/business/business_shell.dart';
 import 'pages/business/dashboard/business_dashboard_page.dart';
 import 'pages/business/users_permissions_page.dart';
-import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'core/locale_controller.dart';
 import 'core/calendar_controller.dart';
 import 'core/api_client.dart';
@@ -174,29 +174,57 @@ class _MyAppState extends State<MyApp> {
                 final isFa = _controller!.locale.languageCode == 'fa';
                 if (isFa) {
                   if (_controller == null) {
-                    loadingMessage = 'در حال بارگذاری تنظیمات زبان...';
+                    loadingMessage = 'loadingLanguageSettings';
                   } else if (_calendarController == null) {
-                    loadingMessage = 'در حال بارگذاری تنظیمات تقویم...';
+                    loadingMessage = 'loadingCalendarSettings';
                   } else if (_themeController == null) {
-                    loadingMessage = 'در حال بارگذاری تنظیمات تم...';
+                    loadingMessage = 'loadingThemeSettings';
                   } else if (_authStore == null) {
-                    loadingMessage = 'در حال بارگذاری احراز هویت...';
+                    loadingMessage = 'loadingAuthentication';
                   } else {
-                    loadingMessage = 'در حال راه‌اندازی...';
+                    loadingMessage = 'initializing';
                   }
                 }
               }
               
-              return SimpleSplashScreen(
-                message: loadingMessage,
-                showLogo: true,
-                displayDuration: const Duration(seconds: 1),
-                locale: _controller?.locale,
-                authStore: _authStore,
-                onComplete: () {
-                  // این callback زمانی فراخوانی می‌شود که splash screen تمام شود
-                  // اما ما از splash controller استفاده می‌کنیم
-                  print('🔍 SPLASH DEBUG: Splash screen completed');
+              return Builder(
+                builder: (context) {
+                  final t = AppLocalizations.of(context);
+                  String localizedMessage = loadingMessage;
+                  
+                  // تبدیل کلیدهای ترجمه به متن
+                  switch (loadingMessage) {
+                    case 'loadingLanguageSettings':
+                      localizedMessage = t.loadingLanguageSettings;
+                      break;
+                    case 'loadingCalendarSettings':
+                      localizedMessage = t.loadingCalendarSettings;
+                      break;
+                    case 'loadingThemeSettings':
+                      localizedMessage = t.loadingThemeSettings;
+                      break;
+                    case 'loadingAuthentication':
+                      localizedMessage = t.loadingAuthentication;
+                      break;
+                    case 'initializing':
+                      localizedMessage = t.initializing;
+                      break;
+                    default:
+                      localizedMessage = loadingMessage;
+                  }
+                  
+                  return SimpleSplashScreen(
+                    message: localizedMessage,
+                    showLogo: true,
+                    displayDuration: const Duration(seconds: 1),
+                    locale: _controller?.locale,
+                    authStore: _authStore,
+                    onComplete: () {
+                      // این callback زمانی فراخوانی می‌شود که splash screen تمام شود
+                      // اما ما از splash controller استفاده می‌کنیم
+                      print('🔍 SPLASH DEBUG: Splash screen completed');
+                    },
+                  );
                 },
               );
             },

@@ -61,7 +61,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
       } else {
         // نمایش پیام خطای دقیق از سرور
         final errorData = response.data?['error'];
-        final errorMessage = errorData?['message'] ?? 'خطا در تغییر کلمه عبور';
+        final errorMessage = errorData?['message'] ?? AppLocalizations.of(context).changePasswordFailed;
         _showError(errorMessage);
       }
     } catch (e) {

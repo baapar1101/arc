@@ -46,7 +46,7 @@ class _BusinessesPageState extends State<BusinessesPage> {
           _error = e.toString();
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطا در بارگذاری کسب و کارها: $e')),
+          SnackBar(content: Text('${AppLocalizations.of(context).dataLoadingError}: $e')),
         );
       }
     }

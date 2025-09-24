@@ -1557,4 +1557,436 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get alreadyAddedWarningTitle => 'Existing User';
+
+  @override
+  String get version => 'Version 1.0.0';
+
+  @override
+  String get motto => 'The world becomes beautiful through cooperation';
+
+  @override
+  String get add => 'Add';
+
+  @override
+  String get view => 'View';
+
+  @override
+  String get draft => 'Manage Drafts';
+
+  @override
+  String get addPerson => 'Add New Person';
+
+  @override
+  String get viewPeople => 'View People List';
+
+  @override
+  String get editPeople => 'Edit People Information';
+
+  @override
+  String get deletePeople => 'Delete People';
+
+  @override
+  String get addReceipt => 'Add New Receipt';
+
+  @override
+  String get viewReceipts => 'View Receipts';
+
+  @override
+  String get editReceipts => 'Edit Receipts';
+
+  @override
+  String get deleteReceipts => 'Delete Receipts';
+
+  @override
+  String get manageReceiptDrafts => 'Manage Receipt Drafts';
+
+  @override
+  String get addPayment => 'Add New Payment';
+
+  @override
+  String get viewPayments => 'View Payments';
+
+  @override
+  String get editPayments => 'Edit Payments';
+
+  @override
+  String get deletePayments => 'Delete Payments';
+
+  @override
+  String get managePaymentDrafts => 'Manage Payment Drafts';
+
+  @override
+  String get products => 'Products and Services';
+
+  @override
+  String get addProduct => 'Add Product or Service';
+
+  @override
+  String get viewProducts => 'View Products and Services';
+
+  @override
+  String get editProducts => 'Edit Products and Services';
+
+  @override
+  String get deleteProducts => 'Delete Products and Services';
+
+  @override
+  String get priceLists => 'Price Lists';
+
+  @override
+  String get addPriceList => 'Add Price List';
+
+  @override
+  String get viewPriceLists => 'View Price Lists';
+
+  @override
+  String get editPriceLists => 'Edit Price Lists';
+
+  @override
+  String get deletePriceLists => 'Delete Price Lists';
+
+  @override
+  String get categories => 'Categories';
+
+  @override
+  String get addCategory => 'Add Category';
+
+  @override
+  String get viewCategories => 'View Categories';
+
+  @override
+  String get editCategories => 'Edit Categories';
+
+  @override
+  String get deleteCategories => 'Delete Categories';
+
+  @override
+  String get addInventory => 'Add Inventory';
+
+  @override
+  String get viewInventory => 'View Inventory';
+
+  @override
+  String get editInventory => 'Edit Inventory';
+
+  @override
+  String get deleteInventory => 'Delete Inventory';
+
+  @override
+  String get viewReports => 'View Reports';
+
+  @override
+  String get generateReports => 'Generate Reports';
+
+  @override
+  String get exportReports => 'Export Reports';
+
+  @override
+  String get viewSettings => 'View Settings';
+
+  @override
+  String get editSettings => 'Edit Settings';
+
+  @override
+  String get users => 'Users';
+
+  @override
+  String get manageUsers => 'Manage Users';
+
+  @override
+  String get print => 'Print Documents';
+
+  @override
+  String get peopleReceipts => 'Receipts from People';
+
+  @override
+  String get peoplePayments => 'Payments to People';
+
+  @override
+  String get storageConfigUpdated => 'Storage configuration updated';
+
+  @override
+  String get storageConfigCreated => 'Storage configuration created';
+
+  @override
+  String get storageConfigDeleted => 'Storage configuration deleted';
+
+  @override
+  String get storageConfigHasFiles =>
+      'This storage configuration has files and cannot be deleted';
+
+  @override
+  String get storageConfigNotFound => 'Storage configuration not found';
+
+  @override
+  String get storageConfigSetAsDefault => 'Configuration set as default';
+
+  @override
+  String get storageConfigSetDefaultFailed => 'Failed to set as default';
+
+  @override
+  String get passwordChangeError => 'Error changing password';
+
+  @override
+  String get banking => 'Banking';
+
+  @override
+  String get bankAccounts => 'Bank Accounts';
+
+  @override
+  String get cash => 'Cash';
+
+  @override
+  String get pettyCash => 'Petty Cash';
+
+  @override
+  String get checks => 'Checks';
+
+  @override
+  String get wallet => 'Wallet';
+
+  @override
+  String get transfers => 'Transfers';
+
+  @override
+  String get invoices => 'Invoices';
+
+  @override
+  String get expensesIncome => 'Expenses & Income';
+
+  @override
+  String get accountingDocuments => 'Accounting Documents';
+
+  @override
+  String get chartOfAccounts => 'Chart of Accounts';
+
+  @override
+  String get openingBalance => 'Opening Balance';
+
+  @override
+  String get warehouse => 'Warehouse';
+
+  @override
+  String get warehouses => 'Warehouse Management';
+
+  @override
+  String get warehouseTransfers => 'Warehouse Transfers';
+
+  @override
+  String get productAttributes => 'Product Attributes';
+
+  @override
+  String get addAttribute => 'Add Attribute';
+
+  @override
+  String get viewAttributes => 'View Attributes';
+
+  @override
+  String get editAttributes => 'Edit Attributes';
+
+  @override
+  String get deleteAttributes => 'Delete Attributes';
+
+  @override
+  String get addBankAccount => 'Add Bank Account';
+
+  @override
+  String get viewBankAccounts => 'View Bank Accounts';
+
+  @override
+  String get editBankAccounts => 'Edit Bank Accounts';
+
+  @override
+  String get deleteBankAccounts => 'Delete Bank Accounts';
+
+  @override
+  String get addCash => 'Add Cash';
+
+  @override
+  String get viewCash => 'View Cash';
+
+  @override
+  String get editCash => 'Edit Cash';
+
+  @override
+  String get deleteCash => 'Delete Cash';
+
+  @override
+  String get addPettyCash => 'Add Petty Cash';
+
+  @override
+  String get viewPettyCash => 'View Petty Cash';
+
+  @override
+  String get editPettyCash => 'Edit Petty Cash';
+
+  @override
+  String get deletePettyCash => 'Delete Petty Cash';
+
+  @override
+  String get addCheck => 'Add Check';
+
+  @override
+  String get viewChecks => 'View Checks';
+
+  @override
+  String get editChecks => 'Edit Checks';
+
+  @override
+  String get deleteChecks => 'Delete Checks';
+
+  @override
+  String get collectChecks => 'Collect Checks';
+
+  @override
+  String get transferChecks => 'Transfer Checks';
+
+  @override
+  String get returnChecks => 'Return Checks';
+
+  @override
+  String get viewWallet => 'View Wallet';
+
+  @override
+  String get chargeWallet => 'Charge Wallet';
+
+  @override
+  String get addTransfer => 'Add Transfer';
+
+  @override
+  String get viewTransfers => 'View Transfers';
+
+  @override
+  String get editTransfers => 'Edit Transfers';
+
+  @override
+  String get deleteTransfers => 'Delete Transfers';
+
+  @override
+  String get manageTransferDrafts => 'Manage Transfer Drafts';
+
+  @override
+  String get addInvoice => 'Add Invoice';
+
+  @override
+  String get viewInvoices => 'View Invoices';
+
+  @override
+  String get editInvoices => 'Edit Invoices';
+
+  @override
+  String get deleteInvoices => 'Delete Invoices';
+
+  @override
+  String get manageInvoiceDrafts => 'Manage Invoice Drafts';
+
+  @override
+  String get addExpenseIncome => 'Add Expense/Income';
+
+  @override
+  String get viewExpensesIncome => 'View Expenses & Income';
+
+  @override
+  String get editExpensesIncome => 'Edit Expenses & Income';
+
+  @override
+  String get deleteExpensesIncome => 'Delete Expenses & Income';
+
+  @override
+  String get manageExpenseIncomeDrafts => 'Manage Expense/Income Drafts';
+
+  @override
+  String get addAccountingDocument => 'Add Accounting Document';
+
+  @override
+  String get viewAccountingDocuments => 'View Accounting Documents';
+
+  @override
+  String get editAccountingDocuments => 'Edit Accounting Documents';
+
+  @override
+  String get deleteAccountingDocuments => 'Delete Accounting Documents';
+
+  @override
+  String get manageAccountingDocumentDrafts =>
+      'Manage Accounting Document Drafts';
+
+  @override
+  String get addAccount => 'Add Account';
+
+  @override
+  String get viewChartOfAccounts => 'View Chart of Accounts';
+
+  @override
+  String get editChartOfAccounts => 'Edit Chart of Accounts';
+
+  @override
+  String get deleteAccounts => 'Delete Accounts';
+
+  @override
+  String get viewOpeningBalance => 'View Opening Balance';
+
+  @override
+  String get editOpeningBalance => 'Edit Opening Balance';
+
+  @override
+  String get addWarehouse => 'Add Warehouse';
+
+  @override
+  String get viewWarehouses => 'View Warehouses';
+
+  @override
+  String get editWarehouses => 'Edit Warehouses';
+
+  @override
+  String get deleteWarehouses => 'Delete Warehouses';
+
+  @override
+  String get addWarehouseTransfer => 'Add Warehouse Transfer';
+
+  @override
+  String get viewWarehouseTransfers => 'View Warehouse Transfers';
+
+  @override
+  String get editWarehouseTransfers => 'Edit Warehouse Transfers';
+
+  @override
+  String get deleteWarehouseTransfers => 'Delete Warehouse Transfers';
+
+  @override
+  String get manageWarehouseTransferDrafts =>
+      'Manage Warehouse Transfer Drafts';
+
+  @override
+  String get printSettings => 'Print Settings';
+
+  @override
+  String get eventHistory => 'Event History';
+
+  @override
+  String get storageSpace => 'Storage Space';
+
+  @override
+  String get viewStorage => 'View Storage';
+
+  @override
+  String get deleteFiles => 'Delete Files';
+
+  @override
+  String get smsPanel => 'SMS Panel';
+
+  @override
+  String get viewSmsHistory => 'View SMS History';
+
+  @override
+  String get manageSmsTemplates => 'Manage SMS Templates';
+
+  @override
+  String get marketplace => 'Marketplace';
+
+  @override
+  String get viewMarketplace => 'View Marketplace';
+
+  @override
+  String get buyPlugins => 'Buy Plugins';
 }

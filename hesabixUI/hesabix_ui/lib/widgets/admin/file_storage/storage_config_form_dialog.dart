@@ -130,8 +130,8 @@ class _StorageConfigFormDialogState extends State<StorageConfigFormDialog> {
             SnackBar(
               content: Text(
                 widget.config != null 
-                    ? 'تنظیمات ذخیره‌سازی به‌روزرسانی شد'
-                    : 'تنظیمات ذخیره‌سازی ایجاد شد',
+                    ? AppLocalizations.of(context).emailConfigUpdatedSuccessfully
+                    : AppLocalizations.of(context).emailConfigSavedSuccessfully,
               ),
               backgroundColor: Colors.green,
             ),
@@ -144,7 +144,7 @@ class _StorageConfigFormDialogState extends State<StorageConfigFormDialog> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('خطا در ذخیره تنظیمات: $e'),
+            content: Text('${AppLocalizations.of(context).error}: $e'),
             backgroundColor: Colors.red,
           ),
         );

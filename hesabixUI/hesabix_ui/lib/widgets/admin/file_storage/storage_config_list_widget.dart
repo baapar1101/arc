@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:hesabix_ui/widgets/admin/file_storage/storage_config_form_dialog.dart';
 import 'package:hesabix_ui/widgets/admin/file_storage/storage_config_card.dart';
 import '../../../core/api_client.dart';
+import '../../../l10n/app_localizations.dart';
 
 class StorageConfigListWidget extends StatefulWidget {
   final VoidCallback? onRefresh;
@@ -132,15 +133,15 @@ class StorageConfigListWidgetState extends State<StorageConfigListWidget> {
           throw Exception(errorMessage);
         }
       } catch (e) {
-        String errorMessage = 'خطا در حذف تنظیمات';
+        String errorMessage = AppLocalizations.of(context).error;
         
         // بررسی نوع خطا
         if (e.toString().contains('STORAGE_CONFIG_HAS_FILES')) {
-          errorMessage = 'این تنظیمات ذخیره‌سازی دارای فایل است و قابل حذف نیست';
+          errorMessage = AppLocalizations.of(context).cannotDeleteDefault;
         } else if (e.toString().contains('STORAGE_CONFIG_NOT_FOUND')) {
-          errorMessage = 'تنظیمات ذخیره‌سازی یافت نشد';
+          errorMessage = AppLocalizations.of(context).noEmailConfigurations;
         } else if (e.toString().contains('FORBIDDEN')) {
-          errorMessage = 'دسترسی غیرمجاز';
+          errorMessage = AppLocalizations.of(context).accessDenied;
         } else {
           errorMessage = e.toString().replaceFirst('Exception: ', '');
         }
@@ -166,7 +167,7 @@ class StorageConfigListWidgetState extends State<StorageConfigListWidget> {
       if (response.data != null && response.data['success'] == true) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('تنظیمات به عنوان پیش‌فرض تنظیم شد'),
+              content: Text(AppLocalizations.of(context).defaultSetSuccessfully),
               backgroundColor: Colors.green,
             ),
           );
@@ -174,13 +175,13 @@ class StorageConfigListWidgetState extends State<StorageConfigListWidget> {
         // Refresh the list
         loadStorageConfigs();
       } else {
-        throw Exception(response.data?['message'] ?? 'خطا در تنظیم به عنوان پیش‌فرض');
+        throw Exception(response.data?['message'] ?? AppLocalizations.of(context).defaultSetFailed);
       }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('خطا در تنظیم به عنوان پیش‌فرض: $e'),
+          content: Text('${AppLocalizations.of(context).defaultSetFailed}: $e'),
           backgroundColor: Colors.red,
         ),
       );

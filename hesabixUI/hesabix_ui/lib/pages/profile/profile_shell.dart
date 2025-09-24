@@ -105,7 +105,7 @@ class _ProfileShellState extends State<ProfileShell> {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
-        ..showSnackBar(const SnackBar(content: Text('خروج انجام شد')));
+        ..showSnackBar(SnackBar(content: Text(t.logoutDone)));
       context.go('/login');
     }
 

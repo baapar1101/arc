@@ -3109,6 +3109,864 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Existing User'**
   String get alreadyAddedWarningTitle;
+
+  /// No description provided for @version.
+  ///
+  /// In en, this message translates to:
+  /// **'Version 1.0.0'**
+  String get version;
+
+  /// No description provided for @motto.
+  ///
+  /// In en, this message translates to:
+  /// **'The world becomes beautiful through cooperation'**
+  String get motto;
+
+  /// No description provided for @add.
+  ///
+  /// In en, this message translates to:
+  /// **'Add'**
+  String get add;
+
+  /// No description provided for @view.
+  ///
+  /// In en, this message translates to:
+  /// **'View'**
+  String get view;
+
+  /// No description provided for @draft.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage Drafts'**
+  String get draft;
+
+  /// No description provided for @addPerson.
+  ///
+  /// In en, this message translates to:
+  /// **'Add New Person'**
+  String get addPerson;
+
+  /// No description provided for @viewPeople.
+  ///
+  /// In en, this message translates to:
+  /// **'View People List'**
+  String get viewPeople;
+
+  /// No description provided for @editPeople.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit People Information'**
+  String get editPeople;
+
+  /// No description provided for @deletePeople.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete People'**
+  String get deletePeople;
+
+  /// No description provided for @addReceipt.
+  ///
+  /// In en, this message translates to:
+  /// **'Add New Receipt'**
+  String get addReceipt;
+
+  /// No description provided for @viewReceipts.
+  ///
+  /// In en, this message translates to:
+  /// **'View Receipts'**
+  String get viewReceipts;
+
+  /// No description provided for @editReceipts.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Receipts'**
+  String get editReceipts;
+
+  /// No description provided for @deleteReceipts.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Receipts'**
+  String get deleteReceipts;
+
+  /// No description provided for @manageReceiptDrafts.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage Receipt Drafts'**
+  String get manageReceiptDrafts;
+
+  /// No description provided for @addPayment.
+  ///
+  /// In en, this message translates to:
+  /// **'Add New Payment'**
+  String get addPayment;
+
+  /// No description provided for @viewPayments.
+  ///
+  /// In en, this message translates to:
+  /// **'View Payments'**
+  String get viewPayments;
+
+  /// No description provided for @editPayments.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Payments'**
+  String get editPayments;
+
+  /// No description provided for @deletePayments.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Payments'**
+  String get deletePayments;
+
+  /// No description provided for @managePaymentDrafts.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage Payment Drafts'**
+  String get managePaymentDrafts;
+
+  /// No description provided for @products.
+  ///
+  /// In en, this message translates to:
+  /// **'Products and Services'**
+  String get products;
+
+  /// No description provided for @addProduct.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Product or Service'**
+  String get addProduct;
+
+  /// No description provided for @viewProducts.
+  ///
+  /// In en, this message translates to:
+  /// **'View Products and Services'**
+  String get viewProducts;
+
+  /// No description provided for @editProducts.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Products and Services'**
+  String get editProducts;
+
+  /// No description provided for @deleteProducts.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Products and Services'**
+  String get deleteProducts;
+
+  /// No description provided for @priceLists.
+  ///
+  /// In en, this message translates to:
+  /// **'Price Lists'**
+  String get priceLists;
+
+  /// No description provided for @addPriceList.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Price List'**
+  String get addPriceList;
+
+  /// No description provided for @viewPriceLists.
+  ///
+  /// In en, this message translates to:
+  /// **'View Price Lists'**
+  String get viewPriceLists;
+
+  /// No description provided for @editPriceLists.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Price Lists'**
+  String get editPriceLists;
+
+  /// No description provided for @deletePriceLists.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Price Lists'**
+  String get deletePriceLists;
+
+  /// No description provided for @categories.
+  ///
+  /// In en, this message translates to:
+  /// **'Categories'**
+  String get categories;
+
+  /// No description provided for @addCategory.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Category'**
+  String get addCategory;
+
+  /// No description provided for @viewCategories.
+  ///
+  /// In en, this message translates to:
+  /// **'View Categories'**
+  String get viewCategories;
+
+  /// No description provided for @editCategories.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Categories'**
+  String get editCategories;
+
+  /// No description provided for @deleteCategories.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Categories'**
+  String get deleteCategories;
+
+  /// No description provided for @addInventory.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Inventory'**
+  String get addInventory;
+
+  /// No description provided for @viewInventory.
+  ///
+  /// In en, this message translates to:
+  /// **'View Inventory'**
+  String get viewInventory;
+
+  /// No description provided for @editInventory.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Inventory'**
+  String get editInventory;
+
+  /// No description provided for @deleteInventory.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Inventory'**
+  String get deleteInventory;
+
+  /// No description provided for @viewReports.
+  ///
+  /// In en, this message translates to:
+  /// **'View Reports'**
+  String get viewReports;
+
+  /// No description provided for @generateReports.
+  ///
+  /// In en, this message translates to:
+  /// **'Generate Reports'**
+  String get generateReports;
+
+  /// No description provided for @exportReports.
+  ///
+  /// In en, this message translates to:
+  /// **'Export Reports'**
+  String get exportReports;
+
+  /// No description provided for @viewSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'View Settings'**
+  String get viewSettings;
+
+  /// No description provided for @editSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Settings'**
+  String get editSettings;
+
+  /// No description provided for @users.
+  ///
+  /// In en, this message translates to:
+  /// **'Users'**
+  String get users;
+
+  /// No description provided for @manageUsers.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage Users'**
+  String get manageUsers;
+
+  /// No description provided for @print.
+  ///
+  /// In en, this message translates to:
+  /// **'Print Documents'**
+  String get print;
+
+  /// No description provided for @peopleReceipts.
+  ///
+  /// In en, this message translates to:
+  /// **'Receipts from People'**
+  String get peopleReceipts;
+
+  /// No description provided for @peoplePayments.
+  ///
+  /// In en, this message translates to:
+  /// **'Payments to People'**
+  String get peoplePayments;
+
+  /// No description provided for @storageConfigUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'Storage configuration updated'**
+  String get storageConfigUpdated;
+
+  /// No description provided for @storageConfigCreated.
+  ///
+  /// In en, this message translates to:
+  /// **'Storage configuration created'**
+  String get storageConfigCreated;
+
+  /// No description provided for @storageConfigDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Storage configuration deleted'**
+  String get storageConfigDeleted;
+
+  /// No description provided for @storageConfigHasFiles.
+  ///
+  /// In en, this message translates to:
+  /// **'This storage configuration has files and cannot be deleted'**
+  String get storageConfigHasFiles;
+
+  /// No description provided for @storageConfigNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'Storage configuration not found'**
+  String get storageConfigNotFound;
+
+  /// No description provided for @storageConfigSetAsDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Configuration set as default'**
+  String get storageConfigSetAsDefault;
+
+  /// No description provided for @storageConfigSetDefaultFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to set as default'**
+  String get storageConfigSetDefaultFailed;
+
+  /// No description provided for @passwordChangeError.
+  ///
+  /// In en, this message translates to:
+  /// **'Error changing password'**
+  String get passwordChangeError;
+
+  /// No description provided for @banking.
+  ///
+  /// In en, this message translates to:
+  /// **'Banking'**
+  String get banking;
+
+  /// No description provided for @bankAccounts.
+  ///
+  /// In en, this message translates to:
+  /// **'Bank Accounts'**
+  String get bankAccounts;
+
+  /// No description provided for @cash.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash'**
+  String get cash;
+
+  /// No description provided for @pettyCash.
+  ///
+  /// In en, this message translates to:
+  /// **'Petty Cash'**
+  String get pettyCash;
+
+  /// No description provided for @checks.
+  ///
+  /// In en, this message translates to:
+  /// **'Checks'**
+  String get checks;
+
+  /// No description provided for @wallet.
+  ///
+  /// In en, this message translates to:
+  /// **'Wallet'**
+  String get wallet;
+
+  /// No description provided for @transfers.
+  ///
+  /// In en, this message translates to:
+  /// **'Transfers'**
+  String get transfers;
+
+  /// No description provided for @invoices.
+  ///
+  /// In en, this message translates to:
+  /// **'Invoices'**
+  String get invoices;
+
+  /// No description provided for @expensesIncome.
+  ///
+  /// In en, this message translates to:
+  /// **'Expenses & Income'**
+  String get expensesIncome;
+
+  /// No description provided for @accountingDocuments.
+  ///
+  /// In en, this message translates to:
+  /// **'Accounting Documents'**
+  String get accountingDocuments;
+
+  /// No description provided for @chartOfAccounts.
+  ///
+  /// In en, this message translates to:
+  /// **'Chart of Accounts'**
+  String get chartOfAccounts;
+
+  /// No description provided for @openingBalance.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening Balance'**
+  String get openingBalance;
+
+  /// No description provided for @warehouse.
+  ///
+  /// In en, this message translates to:
+  /// **'Warehouse'**
+  String get warehouse;
+
+  /// No description provided for @warehouses.
+  ///
+  /// In en, this message translates to:
+  /// **'Warehouse Management'**
+  String get warehouses;
+
+  /// No description provided for @warehouseTransfers.
+  ///
+  /// In en, this message translates to:
+  /// **'Warehouse Transfers'**
+  String get warehouseTransfers;
+
+  /// No description provided for @productAttributes.
+  ///
+  /// In en, this message translates to:
+  /// **'Product Attributes'**
+  String get productAttributes;
+
+  /// No description provided for @addAttribute.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Attribute'**
+  String get addAttribute;
+
+  /// No description provided for @viewAttributes.
+  ///
+  /// In en, this message translates to:
+  /// **'View Attributes'**
+  String get viewAttributes;
+
+  /// No description provided for @editAttributes.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Attributes'**
+  String get editAttributes;
+
+  /// No description provided for @deleteAttributes.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Attributes'**
+  String get deleteAttributes;
+
+  /// No description provided for @addBankAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Bank Account'**
+  String get addBankAccount;
+
+  /// No description provided for @viewBankAccounts.
+  ///
+  /// In en, this message translates to:
+  /// **'View Bank Accounts'**
+  String get viewBankAccounts;
+
+  /// No description provided for @editBankAccounts.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Bank Accounts'**
+  String get editBankAccounts;
+
+  /// No description provided for @deleteBankAccounts.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Bank Accounts'**
+  String get deleteBankAccounts;
+
+  /// No description provided for @addCash.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Cash'**
+  String get addCash;
+
+  /// No description provided for @viewCash.
+  ///
+  /// In en, this message translates to:
+  /// **'View Cash'**
+  String get viewCash;
+
+  /// No description provided for @editCash.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Cash'**
+  String get editCash;
+
+  /// No description provided for @deleteCash.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Cash'**
+  String get deleteCash;
+
+  /// No description provided for @addPettyCash.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Petty Cash'**
+  String get addPettyCash;
+
+  /// No description provided for @viewPettyCash.
+  ///
+  /// In en, this message translates to:
+  /// **'View Petty Cash'**
+  String get viewPettyCash;
+
+  /// No description provided for @editPettyCash.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Petty Cash'**
+  String get editPettyCash;
+
+  /// No description provided for @deletePettyCash.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Petty Cash'**
+  String get deletePettyCash;
+
+  /// No description provided for @addCheck.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Check'**
+  String get addCheck;
+
+  /// No description provided for @viewChecks.
+  ///
+  /// In en, this message translates to:
+  /// **'View Checks'**
+  String get viewChecks;
+
+  /// No description provided for @editChecks.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Checks'**
+  String get editChecks;
+
+  /// No description provided for @deleteChecks.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Checks'**
+  String get deleteChecks;
+
+  /// No description provided for @collectChecks.
+  ///
+  /// In en, this message translates to:
+  /// **'Collect Checks'**
+  String get collectChecks;
+
+  /// No description provided for @transferChecks.
+  ///
+  /// In en, this message translates to:
+  /// **'Transfer Checks'**
+  String get transferChecks;
+
+  /// No description provided for @returnChecks.
+  ///
+  /// In en, this message translates to:
+  /// **'Return Checks'**
+  String get returnChecks;
+
+  /// No description provided for @viewWallet.
+  ///
+  /// In en, this message translates to:
+  /// **'View Wallet'**
+  String get viewWallet;
+
+  /// No description provided for @chargeWallet.
+  ///
+  /// In en, this message translates to:
+  /// **'Charge Wallet'**
+  String get chargeWallet;
+
+  /// No description provided for @addTransfer.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Transfer'**
+  String get addTransfer;
+
+  /// No description provided for @viewTransfers.
+  ///
+  /// In en, this message translates to:
+  /// **'View Transfers'**
+  String get viewTransfers;
+
+  /// No description provided for @editTransfers.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Transfers'**
+  String get editTransfers;
+
+  /// No description provided for @deleteTransfers.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Transfers'**
+  String get deleteTransfers;
+
+  /// No description provided for @manageTransferDrafts.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage Transfer Drafts'**
+  String get manageTransferDrafts;
+
+  /// No description provided for @addInvoice.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Invoice'**
+  String get addInvoice;
+
+  /// No description provided for @viewInvoices.
+  ///
+  /// In en, this message translates to:
+  /// **'View Invoices'**
+  String get viewInvoices;
+
+  /// No description provided for @editInvoices.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Invoices'**
+  String get editInvoices;
+
+  /// No description provided for @deleteInvoices.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Invoices'**
+  String get deleteInvoices;
+
+  /// No description provided for @manageInvoiceDrafts.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage Invoice Drafts'**
+  String get manageInvoiceDrafts;
+
+  /// No description provided for @addExpenseIncome.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Expense/Income'**
+  String get addExpenseIncome;
+
+  /// No description provided for @viewExpensesIncome.
+  ///
+  /// In en, this message translates to:
+  /// **'View Expenses & Income'**
+  String get viewExpensesIncome;
+
+  /// No description provided for @editExpensesIncome.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Expenses & Income'**
+  String get editExpensesIncome;
+
+  /// No description provided for @deleteExpensesIncome.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Expenses & Income'**
+  String get deleteExpensesIncome;
+
+  /// No description provided for @manageExpenseIncomeDrafts.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage Expense/Income Drafts'**
+  String get manageExpenseIncomeDrafts;
+
+  /// No description provided for @addAccountingDocument.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Accounting Document'**
+  String get addAccountingDocument;
+
+  /// No description provided for @viewAccountingDocuments.
+  ///
+  /// In en, this message translates to:
+  /// **'View Accounting Documents'**
+  String get viewAccountingDocuments;
+
+  /// No description provided for @editAccountingDocuments.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Accounting Documents'**
+  String get editAccountingDocuments;
+
+  /// No description provided for @deleteAccountingDocuments.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Accounting Documents'**
+  String get deleteAccountingDocuments;
+
+  /// No description provided for @manageAccountingDocumentDrafts.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage Accounting Document Drafts'**
+  String get manageAccountingDocumentDrafts;
+
+  /// No description provided for @addAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Account'**
+  String get addAccount;
+
+  /// No description provided for @viewChartOfAccounts.
+  ///
+  /// In en, this message translates to:
+  /// **'View Chart of Accounts'**
+  String get viewChartOfAccounts;
+
+  /// No description provided for @editChartOfAccounts.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Chart of Accounts'**
+  String get editChartOfAccounts;
+
+  /// No description provided for @deleteAccounts.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Accounts'**
+  String get deleteAccounts;
+
+  /// No description provided for @viewOpeningBalance.
+  ///
+  /// In en, this message translates to:
+  /// **'View Opening Balance'**
+  String get viewOpeningBalance;
+
+  /// No description provided for @editOpeningBalance.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Opening Balance'**
+  String get editOpeningBalance;
+
+  /// No description provided for @addWarehouse.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Warehouse'**
+  String get addWarehouse;
+
+  /// No description provided for @viewWarehouses.
+  ///
+  /// In en, this message translates to:
+  /// **'View Warehouses'**
+  String get viewWarehouses;
+
+  /// No description provided for @editWarehouses.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Warehouses'**
+  String get editWarehouses;
+
+  /// No description provided for @deleteWarehouses.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Warehouses'**
+  String get deleteWarehouses;
+
+  /// No description provided for @addWarehouseTransfer.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Warehouse Transfer'**
+  String get addWarehouseTransfer;
+
+  /// No description provided for @viewWarehouseTransfers.
+  ///
+  /// In en, this message translates to:
+  /// **'View Warehouse Transfers'**
+  String get viewWarehouseTransfers;
+
+  /// No description provided for @editWarehouseTransfers.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Warehouse Transfers'**
+  String get editWarehouseTransfers;
+
+  /// No description provided for @deleteWarehouseTransfers.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Warehouse Transfers'**
+  String get deleteWarehouseTransfers;
+
+  /// No description provided for @manageWarehouseTransferDrafts.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage Warehouse Transfer Drafts'**
+  String get manageWarehouseTransferDrafts;
+
+  /// No description provided for @printSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Print Settings'**
+  String get printSettings;
+
+  /// No description provided for @eventHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'Event History'**
+  String get eventHistory;
+
+  /// No description provided for @storageSpace.
+  ///
+  /// In en, this message translates to:
+  /// **'Storage Space'**
+  String get storageSpace;
+
+  /// No description provided for @viewStorage.
+  ///
+  /// In en, this message translates to:
+  /// **'View Storage'**
+  String get viewStorage;
+
+  /// No description provided for @deleteFiles.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Files'**
+  String get deleteFiles;
+
+  /// No description provided for @smsPanel.
+  ///
+  /// In en, this message translates to:
+  /// **'SMS Panel'**
+  String get smsPanel;
+
+  /// No description provided for @viewSmsHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'View SMS History'**
+  String get viewSmsHistory;
+
+  /// No description provided for @manageSmsTemplates.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage SMS Templates'**
+  String get manageSmsTemplates;
+
+  /// No description provided for @marketplace.
+  ///
+  /// In en, this message translates to:
+  /// **'Marketplace'**
+  String get marketplace;
+
+  /// No description provided for @viewMarketplace.
+  ///
+  /// In en, this message translates to:
+  /// **'View Marketplace'**
+  String get viewMarketplace;
+
+  /// No description provided for @buyPlugins.
+  ///
+  /// In en, this message translates to:
+  /// **'Buy Plugins'**
+  String get buyPlugins;
 }
 
 class _AppLocalizationsDelegate
