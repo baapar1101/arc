@@ -1379,6 +1379,93 @@ class AppLocalizationsEn extends AppLocalizations {
   String get payments => 'Payments';
 
   @override
+  String get productsAndServices => 'Products and Services';
+
+  @override
+  String get products => 'Products and Services';
+
+  @override
+  String get services => 'Services';
+
+  @override
+  String get priceLists => 'Price Lists';
+
+  @override
+  String get categories => 'Categories';
+
+  @override
+  String get productAttributes => 'Product Attributes';
+
+  @override
+  String get banking => 'Banking';
+
+  @override
+  String get accounts => 'Accounts';
+
+  @override
+  String get pettyCash => 'Petty Cash';
+
+  @override
+  String get cashBox => 'Cash Box';
+
+  @override
+  String get wallet => 'Wallet';
+
+  @override
+  String get checks => 'Checks';
+
+  @override
+  String get transfers => 'Transfers';
+
+  @override
+  String get invoice => 'Invoice';
+
+  @override
+  String get expenseAndIncome => 'Expense and Income';
+
+  @override
+  String get accountingMenu => 'Accounting';
+
+  @override
+  String get documents => 'Documents';
+
+  @override
+  String get chartOfAccounts => 'Chart of Accounts';
+
+  @override
+  String get openingBalance => 'Opening Balance';
+
+  @override
+  String get yearEndClosing => 'Year End Closing';
+
+  @override
+  String get accountingSettings => 'Settings';
+
+  @override
+  String get servicesAndPlugins => 'Services and Plugins';
+
+  @override
+  String get warehouseManagement => 'Warehouse Management';
+
+  @override
+  String get warehouses => 'Warehouse Management';
+
+  @override
+  String get shipments => 'Shipments';
+
+  @override
+  String get inquiries => 'Inquiries';
+
+  @override
+  String get storageSpace => 'Storage Space';
+
+  @override
+  String get taxpayers => 'Taxpayers';
+
+  @override
+  String get others => 'Others';
+
+  @override
   String get practicalTools => 'Practical Tools';
 
   @override
@@ -1616,9 +1703,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get managePaymentDrafts => 'Manage Payment Drafts';
 
   @override
-  String get products => 'Products and Services';
-
-  @override
   String get addProduct => 'Add Product or Service';
 
   @override
@@ -1631,9 +1715,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get deleteProducts => 'Delete Products and Services';
 
   @override
-  String get priceLists => 'Price Lists';
-
-  @override
   String get addPriceList => 'Add Price List';
 
   @override
@@ -1644,9 +1725,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get deletePriceLists => 'Delete Price Lists';
-
-  @override
-  String get categories => 'Categories';
 
   @override
   String get addCategory => 'Add Category';
@@ -1728,25 +1806,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get passwordChangeError => 'Error changing password';
 
   @override
-  String get banking => 'Banking';
-
-  @override
   String get bankAccounts => 'Bank Accounts';
 
   @override
   String get cash => 'Cash';
-
-  @override
-  String get pettyCash => 'Petty Cash';
-
-  @override
-  String get checks => 'Checks';
-
-  @override
-  String get wallet => 'Wallet';
-
-  @override
-  String get transfers => 'Transfers';
 
   @override
   String get invoices => 'Invoices';
@@ -1758,22 +1821,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get accountingDocuments => 'Accounting Documents';
 
   @override
-  String get chartOfAccounts => 'Chart of Accounts';
-
-  @override
-  String get openingBalance => 'Opening Balance';
-
-  @override
   String get warehouse => 'Warehouse';
 
   @override
-  String get warehouses => 'Warehouse Management';
-
-  @override
   String get warehouseTransfers => 'Warehouse Transfers';
-
-  @override
-  String get productAttributes => 'Product Attributes';
 
   @override
   String get addAttribute => 'Add Attribute';
@@ -1962,9 +2013,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get eventHistory => 'Event History';
-
-  @override
-  String get storageSpace => 'Storage Space';
 
   @override
   String get viewStorage => 'View Storage';

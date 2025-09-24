@@ -34,6 +34,10 @@ class _BusinessShellState extends State<BusinessShell> {
   int _hoverIndex = -1;
   bool _isBasicToolsExpanded = false;
   bool _isPeopleExpanded = false;
+  bool _isProductsAndServicesExpanded = false;
+  bool _isBankingExpanded = false;
+  bool _isAccountingMenuExpanded = false;
+  bool _isWarehouseManagementExpanded = false;
 
   @override
   void initState() {
@@ -114,6 +118,247 @@ class _BusinessShellState extends State<BusinessShell> {
         ],
       ),
       _MenuItem(
+        label: t.productsAndServices,
+        icon: Icons.inventory_2,
+        selectedIcon: Icons.inventory_2,
+        path: null, // برای منوی بازشونده
+        type: _MenuItemType.expandable,
+        children: [
+          _MenuItem(
+            label: t.products,
+            icon: Icons.shopping_cart,
+            selectedIcon: Icons.shopping_cart,
+            path: '/business/${widget.businessId}/products',
+            type: _MenuItemType.simple,
+            hasAddButton: true,
+          ),
+          _MenuItem(
+            label: t.priceLists,
+            icon: Icons.list_alt,
+            selectedIcon: Icons.list_alt,
+            path: '/business/${widget.businessId}/price-lists',
+            type: _MenuItemType.simple,
+            hasAddButton: false,
+          ),
+          _MenuItem(
+            label: t.categories,
+            icon: Icons.category,
+            selectedIcon: Icons.category,
+            path: '/business/${widget.businessId}/categories',
+            type: _MenuItemType.simple,
+            hasAddButton: false,
+          ),
+          _MenuItem(
+            label: t.productAttributes,
+            icon: Icons.tune,
+            selectedIcon: Icons.tune,
+            path: '/business/${widget.businessId}/product-attributes',
+            type: _MenuItemType.simple,
+            hasAddButton: false,
+          ),
+        ],
+      ),
+      _MenuItem(
+        label: t.banking,
+        icon: Icons.account_balance,
+        selectedIcon: Icons.account_balance,
+        path: null, // برای منوی بازشونده
+        type: _MenuItemType.expandable,
+        children: [
+          _MenuItem(
+            label: t.accounts,
+            icon: Icons.account_balance_wallet,
+            selectedIcon: Icons.account_balance_wallet,
+            path: '/business/${widget.businessId}/accounts',
+            type: _MenuItemType.simple,
+            hasAddButton: true,
+          ),
+          _MenuItem(
+            label: t.pettyCash,
+            icon: Icons.money,
+            selectedIcon: Icons.money,
+            path: '/business/${widget.businessId}/petty-cash',
+            type: _MenuItemType.simple,
+            hasAddButton: true,
+          ),
+          _MenuItem(
+            label: t.cashBox,
+            icon: Icons.savings,
+            selectedIcon: Icons.savings,
+            path: '/business/${widget.businessId}/cash-box',
+            type: _MenuItemType.simple,
+            hasAddButton: true,
+          ),
+          _MenuItem(
+            label: t.wallet,
+            icon: Icons.wallet,
+            selectedIcon: Icons.wallet,
+            path: '/business/${widget.businessId}/wallet',
+            type: _MenuItemType.simple,
+            hasAddButton: true,
+          ),
+          _MenuItem(
+            label: t.checks,
+            icon: Icons.receipt_long,
+            selectedIcon: Icons.receipt_long,
+            path: '/business/${widget.businessId}/checks',
+            type: _MenuItemType.simple,
+            hasAddButton: true,
+          ),
+          _MenuItem(
+            label: t.transfers,
+            icon: Icons.swap_horiz,
+            selectedIcon: Icons.swap_horiz,
+            path: '/business/${widget.businessId}/transfers',
+            type: _MenuItemType.simple,
+            hasAddButton: true,
+          ),
+        ],
+      ),
+      _MenuItem(
+        label: t.accounting,
+        icon: Icons.calculate,
+        selectedIcon: Icons.calculate,
+        path: null, // آیتم جداکننده
+        type: _MenuItemType.separator,
+      ),
+      _MenuItem(
+        label: t.invoice,
+        icon: Icons.receipt,
+        selectedIcon: Icons.receipt,
+        path: '/business/${widget.businessId}/invoice',
+        type: _MenuItemType.simple,
+        hasAddButton: true,
+      ),
+      _MenuItem(
+        label: t.expenseAndIncome,
+        icon: Icons.account_balance_wallet,
+        selectedIcon: Icons.account_balance_wallet,
+        path: '/business/${widget.businessId}/expense-income',
+        type: _MenuItemType.simple,
+        hasAddButton: true,
+      ),
+      _MenuItem(
+        label: t.accountingMenu,
+        icon: Icons.calculate,
+        selectedIcon: Icons.calculate,
+        path: null, // برای منوی بازشونده
+        type: _MenuItemType.expandable,
+        children: [
+          _MenuItem(
+            label: t.documents,
+            icon: Icons.description,
+            selectedIcon: Icons.description,
+            path: '/business/${widget.businessId}/documents',
+            type: _MenuItemType.simple,
+            hasAddButton: true,
+          ),
+          _MenuItem(
+            label: t.chartOfAccounts,
+            icon: Icons.table_chart,
+            selectedIcon: Icons.table_chart,
+            path: '/business/${widget.businessId}/chart-of-accounts',
+            type: _MenuItemType.simple,
+            hasAddButton: false,
+          ),
+          _MenuItem(
+            label: t.openingBalance,
+            icon: Icons.play_arrow,
+            selectedIcon: Icons.play_arrow,
+            path: '/business/${widget.businessId}/opening-balance',
+            type: _MenuItemType.simple,
+            hasAddButton: false,
+          ),
+          _MenuItem(
+            label: t.yearEndClosing,
+            icon: Icons.stop,
+            selectedIcon: Icons.stop,
+            path: '/business/${widget.businessId}/year-end-closing',
+            type: _MenuItemType.simple,
+            hasAddButton: false,
+          ),
+          _MenuItem(
+            label: t.accountingSettings,
+            icon: Icons.settings,
+            selectedIcon: Icons.settings,
+            path: '/business/${widget.businessId}/accounting-settings',
+            type: _MenuItemType.simple,
+            hasAddButton: false,
+          ),
+        ],
+      ),
+      _MenuItem(
+        label: t.reports,
+        icon: Icons.assessment,
+        selectedIcon: Icons.assessment,
+        path: '/business/${widget.businessId}/reports',
+        type: _MenuItemType.simple,
+        hasAddButton: false,
+      ),
+      _MenuItem(
+        label: t.servicesAndPlugins,
+        icon: Icons.extension,
+        selectedIcon: Icons.extension,
+        path: null, // آیتم جداکننده
+        type: _MenuItemType.separator,
+      ),
+      _MenuItem(
+        label: t.warehouseManagement,
+        icon: Icons.warehouse,
+        selectedIcon: Icons.warehouse,
+        path: null, // برای منوی بازشونده
+        type: _MenuItemType.expandable,
+        children: [
+          _MenuItem(
+            label: t.warehouses,
+            icon: Icons.store,
+            selectedIcon: Icons.store,
+            path: '/business/${widget.businessId}/warehouses',
+            type: _MenuItemType.simple,
+            hasAddButton: true,
+          ),
+          _MenuItem(
+            label: t.shipments,
+            icon: Icons.local_shipping,
+            selectedIcon: Icons.local_shipping,
+            path: '/business/${widget.businessId}/shipments',
+            type: _MenuItemType.simple,
+            hasAddButton: true,
+          ),
+        ],
+      ),
+      _MenuItem(
+        label: t.inquiries,
+        icon: Icons.search,
+        selectedIcon: Icons.search,
+        path: '/business/${widget.businessId}/inquiries',
+        type: _MenuItemType.simple,
+        hasAddButton: false,
+      ),
+      _MenuItem(
+        label: t.storageSpace,
+        icon: Icons.storage,
+        selectedIcon: Icons.storage,
+        path: '/business/${widget.businessId}/storage-space',
+        type: _MenuItemType.simple,
+        hasAddButton: false,
+      ),
+      _MenuItem(
+        label: t.taxpayers,
+        icon: Icons.account_balance,
+        selectedIcon: Icons.account_balance,
+        path: '/business/${widget.businessId}/taxpayers',
+        type: _MenuItemType.simple,
+        hasAddButton: false,
+      ),
+      _MenuItem(
+        label: t.others,
+        icon: Icons.more_horiz,
+        selectedIcon: Icons.more_horiz,
+        path: null, // آیتم جداکننده
+        type: _MenuItemType.separator,
+      ),
+      _MenuItem(
         label: t.settings,
         icon: Icons.settings,
         selectedIcon: Icons.settings,
@@ -160,7 +405,11 @@ class _BusinessShellState extends State<BusinessShell> {
             selectedIndex = i;
             // تنظیم وضعیت باز بودن منو
             if (i == 2) _isPeopleExpanded = true; // اشخاص در ایندکس 2
-            if (i == 3) _isBasicToolsExpanded = true; // تنظیمات در ایندکس 3
+            if (i == 3) _isProductsAndServicesExpanded = true; // کالا و خدمات در ایندکس 3
+            if (i == 4) _isBankingExpanded = true; // بانکداری در ایندکس 4
+            if (i == 6) _isAccountingMenuExpanded = true; // حسابداری در ایندکس 6
+            if (i == 8) _isWarehouseManagementExpanded = true; // انبارداری در ایندکس 8
+            if (i == 9) _isBasicToolsExpanded = true; // تنظیمات در ایندکس 9
             break;
           }
         }
@@ -183,6 +432,10 @@ class _BusinessShellState extends State<BusinessShell> {
       } else if (item.type == _MenuItemType.expandable) {
         // تغییر وضعیت باز/بسته بودن منو
         if (item.label == t.people) _isPeopleExpanded = !_isPeopleExpanded;
+        if (item.label == t.productsAndServices) _isProductsAndServicesExpanded = !_isProductsAndServicesExpanded;
+        if (item.label == t.banking) _isBankingExpanded = !_isBankingExpanded;
+        if (item.label == t.accountingMenu) _isAccountingMenuExpanded = !_isAccountingMenuExpanded;
+        if (item.label == t.warehouseManagement) _isWarehouseManagementExpanded = !_isWarehouseManagementExpanded;
         if (item.label == t.settings) _isBasicToolsExpanded = !_isBasicToolsExpanded;
         setState(() {});
       }
@@ -217,6 +470,10 @@ class _BusinessShellState extends State<BusinessShell> {
 
     bool isExpanded(_MenuItem item) {
       if (item.label == t.people) return _isPeopleExpanded;
+      if (item.label == t.productsAndServices) return _isProductsAndServicesExpanded;
+      if (item.label == t.banking) return _isBankingExpanded;
+      if (item.label == t.accountingMenu) return _isAccountingMenuExpanded;
+      if (item.label == t.warehouseManagement) return _isWarehouseManagementExpanded;
       if (item.label == t.settings) return _isBasicToolsExpanded;
       return false;
     }
@@ -348,6 +605,10 @@ class _BusinessShellState extends State<BusinessShell> {
                           onTap: () {
                             setState(() {
                               if (item.label == t.people) _isPeopleExpanded = !_isPeopleExpanded;
+                              if (item.label == t.productsAndServices) _isProductsAndServicesExpanded = !_isProductsAndServicesExpanded;
+                              if (item.label == t.banking) _isBankingExpanded = !_isBankingExpanded;
+                              if (item.label == t.accountingMenu) _isAccountingMenuExpanded = !_isAccountingMenuExpanded;
+                              if (item.label == t.warehouseManagement) _isWarehouseManagementExpanded = !_isWarehouseManagementExpanded;
                               if (item.label == t.settings) _isBasicToolsExpanded = !_isBasicToolsExpanded;
                             });
                           },
@@ -433,11 +694,41 @@ class _BusinessShellState extends State<BusinessShell> {
                                       IconButton(
                                         icon: const Icon(Icons.add, size: 16),
                                         onPressed: () {
-                                          // Navigate to add new receipt/payment
+                                          // Navigate to add new item
                                           if (child.label == t.receipts) {
                                             // Navigate to add receipt
                                           } else if (child.label == t.payments) {
                                             // Navigate to add payment
+                                          } else if (child.label == t.products) {
+                                            // Navigate to add product
+                                          } else if (child.label == t.priceLists) {
+                                            // Navigate to add price list
+                                          } else if (child.label == t.categories) {
+                                            // Navigate to add category
+                                          } else if (child.label == t.productAttributes) {
+                                            // Navigate to add product attribute
+                                          } else if (child.label == t.accounts) {
+                                            // Navigate to add account
+                                          } else if (child.label == t.pettyCash) {
+                                            // Navigate to add petty cash
+                                          } else if (child.label == t.cashBox) {
+                                            // Navigate to add cash box
+                                          } else if (child.label == t.wallet) {
+                                            // Navigate to add wallet
+                                          } else if (child.label == t.checks) {
+                                            // Navigate to add check
+                                          } else if (child.label == t.transfers) {
+                                            // Navigate to add transfer
+                                          } else if (child.label == t.invoice) {
+                                            // Navigate to add invoice
+                                          } else if (child.label == t.expenseAndIncome) {
+                                            // Navigate to add expense/income
+                                          } else if (child.label == t.documents) {
+                                            // Navigate to add document
+                                          } else if (child.label == t.warehouses) {
+                                            // Navigate to add warehouse
+                                          } else if (child.label == t.shipments) {
+                                            // Navigate to add shipment
                                           }
                                         },
                                       ),
@@ -505,6 +796,10 @@ class _BusinessShellState extends State<BusinessShell> {
                             if (item.type == _MenuItemType.expandable) {
                               setState(() {
                                 if (item.label == t.people) _isPeopleExpanded = !_isPeopleExpanded;
+                                if (item.label == t.productsAndServices) _isProductsAndServicesExpanded = !_isProductsAndServicesExpanded;
+                                if (item.label == t.banking) _isBankingExpanded = !_isBankingExpanded;
+                                if (item.label == t.accountingMenu) _isAccountingMenuExpanded = !_isAccountingMenuExpanded;
+                                if (item.label == t.warehouseManagement) _isWarehouseManagementExpanded = !_isWarehouseManagementExpanded;
                                 if (item.label == t.settings) _isBasicToolsExpanded = !_isBasicToolsExpanded;
                               });
                             } else {
@@ -628,6 +923,10 @@ class _BusinessShellState extends State<BusinessShell> {
                       onExpansionChanged: (expanded) {
                         setState(() {
                           if (item.label == t.people) _isPeopleExpanded = expanded;
+                          if (item.label == t.productsAndServices) _isProductsAndServicesExpanded = expanded;
+                          if (item.label == t.banking) _isBankingExpanded = expanded;
+                          if (item.label == t.accountingMenu) _isAccountingMenuExpanded = expanded;
+                          if (item.label == t.warehouseManagement) _isWarehouseManagementExpanded = expanded;
                           if (item.label == t.settings) _isBasicToolsExpanded = expanded;
                         });
                       },
@@ -638,11 +937,41 @@ class _BusinessShellState extends State<BusinessShell> {
                           icon: const Icon(Icons.add, size: 20),
                           onPressed: () {
                             context.pop();
-                            // Navigate to add new receipt/payment
+                            // Navigate to add new item
                             if (child.label == t.receipts) {
                               // Navigate to add receipt
                             } else if (child.label == t.payments) {
                               // Navigate to add payment
+                            } else if (child.label == t.products) {
+                              // Navigate to add product
+                            } else if (child.label == t.priceLists) {
+                              // Navigate to add price list
+                            } else if (child.label == t.categories) {
+                              // Navigate to add category
+                            } else if (child.label == t.productAttributes) {
+                              // Navigate to add product attribute
+                            } else if (child.label == t.accounts) {
+                              // Navigate to add account
+                            } else if (child.label == t.pettyCash) {
+                              // Navigate to add petty cash
+                            } else if (child.label == t.cashBox) {
+                              // Navigate to add cash box
+                            } else if (child.label == t.wallet) {
+                              // Navigate to add wallet
+                            } else if (child.label == t.checks) {
+                              // Navigate to add check
+                            } else if (child.label == t.transfers) {
+                              // Navigate to add transfer
+                            } else if (child.label == t.invoice) {
+                              // Navigate to add invoice
+                            } else if (child.label == t.expenseAndIncome) {
+                              // Navigate to add expense/income
+                            } else if (child.label == t.documents) {
+                              // Navigate to add document
+                            } else if (child.label == t.warehouses) {
+                              // Navigate to add warehouse
+                            } else if (child.label == t.shipments) {
+                              // Navigate to add shipment
                             }
                           },
                         ) : null,

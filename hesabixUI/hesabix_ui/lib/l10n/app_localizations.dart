@@ -2756,6 +2756,180 @@ abstract class AppLocalizations {
   /// **'Payments'**
   String get payments;
 
+  /// No description provided for @productsAndServices.
+  ///
+  /// In en, this message translates to:
+  /// **'Products and Services'**
+  String get productsAndServices;
+
+  /// No description provided for @products.
+  ///
+  /// In en, this message translates to:
+  /// **'Products and Services'**
+  String get products;
+
+  /// No description provided for @services.
+  ///
+  /// In en, this message translates to:
+  /// **'Services'**
+  String get services;
+
+  /// No description provided for @priceLists.
+  ///
+  /// In en, this message translates to:
+  /// **'Price Lists'**
+  String get priceLists;
+
+  /// No description provided for @categories.
+  ///
+  /// In en, this message translates to:
+  /// **'Categories'**
+  String get categories;
+
+  /// No description provided for @productAttributes.
+  ///
+  /// In en, this message translates to:
+  /// **'Product Attributes'**
+  String get productAttributes;
+
+  /// No description provided for @banking.
+  ///
+  /// In en, this message translates to:
+  /// **'Banking'**
+  String get banking;
+
+  /// No description provided for @accounts.
+  ///
+  /// In en, this message translates to:
+  /// **'Accounts'**
+  String get accounts;
+
+  /// No description provided for @pettyCash.
+  ///
+  /// In en, this message translates to:
+  /// **'Petty Cash'**
+  String get pettyCash;
+
+  /// No description provided for @cashBox.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash Box'**
+  String get cashBox;
+
+  /// No description provided for @wallet.
+  ///
+  /// In en, this message translates to:
+  /// **'Wallet'**
+  String get wallet;
+
+  /// No description provided for @checks.
+  ///
+  /// In en, this message translates to:
+  /// **'Checks'**
+  String get checks;
+
+  /// No description provided for @transfers.
+  ///
+  /// In en, this message translates to:
+  /// **'Transfers'**
+  String get transfers;
+
+  /// No description provided for @invoice.
+  ///
+  /// In en, this message translates to:
+  /// **'Invoice'**
+  String get invoice;
+
+  /// No description provided for @expenseAndIncome.
+  ///
+  /// In en, this message translates to:
+  /// **'Expense and Income'**
+  String get expenseAndIncome;
+
+  /// No description provided for @accountingMenu.
+  ///
+  /// In en, this message translates to:
+  /// **'Accounting'**
+  String get accountingMenu;
+
+  /// No description provided for @documents.
+  ///
+  /// In en, this message translates to:
+  /// **'Documents'**
+  String get documents;
+
+  /// No description provided for @chartOfAccounts.
+  ///
+  /// In en, this message translates to:
+  /// **'Chart of Accounts'**
+  String get chartOfAccounts;
+
+  /// No description provided for @openingBalance.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening Balance'**
+  String get openingBalance;
+
+  /// No description provided for @yearEndClosing.
+  ///
+  /// In en, this message translates to:
+  /// **'Year End Closing'**
+  String get yearEndClosing;
+
+  /// No description provided for @accountingSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get accountingSettings;
+
+  /// No description provided for @servicesAndPlugins.
+  ///
+  /// In en, this message translates to:
+  /// **'Services and Plugins'**
+  String get servicesAndPlugins;
+
+  /// No description provided for @warehouseManagement.
+  ///
+  /// In en, this message translates to:
+  /// **'Warehouse Management'**
+  String get warehouseManagement;
+
+  /// No description provided for @warehouses.
+  ///
+  /// In en, this message translates to:
+  /// **'Warehouse Management'**
+  String get warehouses;
+
+  /// No description provided for @shipments.
+  ///
+  /// In en, this message translates to:
+  /// **'Shipments'**
+  String get shipments;
+
+  /// No description provided for @inquiries.
+  ///
+  /// In en, this message translates to:
+  /// **'Inquiries'**
+  String get inquiries;
+
+  /// No description provided for @storageSpace.
+  ///
+  /// In en, this message translates to:
+  /// **'Storage Space'**
+  String get storageSpace;
+
+  /// No description provided for @taxpayers.
+  ///
+  /// In en, this message translates to:
+  /// **'Taxpayers'**
+  String get taxpayers;
+
+  /// No description provided for @others.
+  ///
+  /// In en, this message translates to:
+  /// **'Others'**
+  String get others;
+
   /// No description provided for @practicalTools.
   ///
   /// In en, this message translates to:
@@ -3224,12 +3398,6 @@ abstract class AppLocalizations {
   /// **'Manage Payment Drafts'**
   String get managePaymentDrafts;
 
-  /// No description provided for @products.
-  ///
-  /// In en, this message translates to:
-  /// **'Products and Services'**
-  String get products;
-
   /// No description provided for @addProduct.
   ///
   /// In en, this message translates to:
@@ -3254,12 +3422,6 @@ abstract class AppLocalizations {
   /// **'Delete Products and Services'**
   String get deleteProducts;
 
-  /// No description provided for @priceLists.
-  ///
-  /// In en, this message translates to:
-  /// **'Price Lists'**
-  String get priceLists;
-
   /// No description provided for @addPriceList.
   ///
   /// In en, this message translates to:
@@ -3283,12 +3445,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Delete Price Lists'**
   String get deletePriceLists;
-
-  /// No description provided for @categories.
-  ///
-  /// In en, this message translates to:
-  /// **'Categories'**
-  String get categories;
 
   /// No description provided for @addCategory.
   ///
@@ -3446,12 +3602,6 @@ abstract class AppLocalizations {
   /// **'Error changing password'**
   String get passwordChangeError;
 
-  /// No description provided for @banking.
-  ///
-  /// In en, this message translates to:
-  /// **'Banking'**
-  String get banking;
-
   /// No description provided for @bankAccounts.
   ///
   /// In en, this message translates to:
@@ -3463,30 +3613,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Cash'**
   String get cash;
-
-  /// No description provided for @pettyCash.
-  ///
-  /// In en, this message translates to:
-  /// **'Petty Cash'**
-  String get pettyCash;
-
-  /// No description provided for @checks.
-  ///
-  /// In en, this message translates to:
-  /// **'Checks'**
-  String get checks;
-
-  /// No description provided for @wallet.
-  ///
-  /// In en, this message translates to:
-  /// **'Wallet'**
-  String get wallet;
-
-  /// No description provided for @transfers.
-  ///
-  /// In en, this message translates to:
-  /// **'Transfers'**
-  String get transfers;
 
   /// No description provided for @invoices.
   ///
@@ -3506,41 +3632,17 @@ abstract class AppLocalizations {
   /// **'Accounting Documents'**
   String get accountingDocuments;
 
-  /// No description provided for @chartOfAccounts.
-  ///
-  /// In en, this message translates to:
-  /// **'Chart of Accounts'**
-  String get chartOfAccounts;
-
-  /// No description provided for @openingBalance.
-  ///
-  /// In en, this message translates to:
-  /// **'Opening Balance'**
-  String get openingBalance;
-
   /// No description provided for @warehouse.
   ///
   /// In en, this message translates to:
   /// **'Warehouse'**
   String get warehouse;
 
-  /// No description provided for @warehouses.
-  ///
-  /// In en, this message translates to:
-  /// **'Warehouse Management'**
-  String get warehouses;
-
   /// No description provided for @warehouseTransfers.
   ///
   /// In en, this message translates to:
   /// **'Warehouse Transfers'**
   String get warehouseTransfers;
-
-  /// No description provided for @productAttributes.
-  ///
-  /// In en, this message translates to:
-  /// **'Product Attributes'**
-  String get productAttributes;
 
   /// No description provided for @addAttribute.
   ///
@@ -3913,12 +4015,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Event History'**
   String get eventHistory;
-
-  /// No description provided for @storageSpace.
-  ///
-  /// In en, this message translates to:
-  /// **'Storage Space'**
-  String get storageSpace;
 
   /// No description provided for @viewStorage.
   ///

@@ -1369,6 +1369,93 @@ class AppLocalizationsFa extends AppLocalizations {
   String get payments => 'پرداخت‌ها';
 
   @override
+  String get productsAndServices => 'کالا و خدمات';
+
+  @override
+  String get products => 'کالا‌ها و خدمات';
+
+  @override
+  String get services => 'خدمات';
+
+  @override
+  String get priceLists => 'لیست‌های قیمت';
+
+  @override
+  String get categories => 'دسته‌بندی‌ها';
+
+  @override
+  String get productAttributes => 'ویژگی‌های کالا و خدمات';
+
+  @override
+  String get banking => 'بانکداری';
+
+  @override
+  String get accounts => 'حساب‌ها';
+
+  @override
+  String get pettyCash => 'تنخواه گردان';
+
+  @override
+  String get cashBox => 'صندوق';
+
+  @override
+  String get wallet => 'کیف پول';
+
+  @override
+  String get checks => 'چک';
+
+  @override
+  String get transfers => 'انتقال';
+
+  @override
+  String get invoice => 'فاکتور';
+
+  @override
+  String get expenseAndIncome => 'هزینه و درآمد';
+
+  @override
+  String get accountingMenu => 'حسابداری';
+
+  @override
+  String get documents => 'اسناد';
+
+  @override
+  String get chartOfAccounts => 'جدول حساب‌ها';
+
+  @override
+  String get openingBalance => 'تراز افتتاحیه';
+
+  @override
+  String get yearEndClosing => 'بستن سال مالی';
+
+  @override
+  String get accountingSettings => 'تنظیمات';
+
+  @override
+  String get servicesAndPlugins => 'سرویس‌ها و افزونه‌ها';
+
+  @override
+  String get warehouseManagement => 'انبارداری';
+
+  @override
+  String get warehouses => 'مدیریت انبارها';
+
+  @override
+  String get shipments => 'حواله‌ها';
+
+  @override
+  String get inquiries => 'استعلامات';
+
+  @override
+  String get storageSpace => 'فضای ذخیره‌سازی';
+
+  @override
+  String get taxpayers => 'مودیان مالیاتی';
+
+  @override
+  String get others => 'سایر';
+
+  @override
   String get practicalTools => 'ابزارهای کاربردی';
 
   @override
@@ -1607,9 +1694,6 @@ class AppLocalizationsFa extends AppLocalizations {
   String get managePaymentDrafts => 'مدیریت پیش‌نویس‌های پرداخت';
 
   @override
-  String get products => 'کالا‌ها و خدمات';
-
-  @override
   String get addProduct => 'افزودن کالا یا خدمت';
 
   @override
@@ -1622,9 +1706,6 @@ class AppLocalizationsFa extends AppLocalizations {
   String get deleteProducts => 'حذف کالاها و خدمات';
 
   @override
-  String get priceLists => 'لیست‌های قیمت';
-
-  @override
   String get addPriceList => 'افزودن لیست قیمت';
 
   @override
@@ -1635,9 +1716,6 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get deletePriceLists => 'حذف لیست‌های قیمت';
-
-  @override
-  String get categories => 'دسته‌بندی‌ها';
 
   @override
   String get addCategory => 'افزودن دسته‌بندی';
@@ -1719,25 +1797,10 @@ class AppLocalizationsFa extends AppLocalizations {
   String get passwordChangeError => 'خطا در تغییر کلمه عبور';
 
   @override
-  String get banking => 'بانکداری';
-
-  @override
   String get bankAccounts => 'حساب‌های بانکی';
 
   @override
   String get cash => 'صندوق';
-
-  @override
-  String get pettyCash => 'تنخواه گردان';
-
-  @override
-  String get checks => 'چک';
-
-  @override
-  String get wallet => 'کیف پول';
-
-  @override
-  String get transfers => 'انتقال';
 
   @override
   String get invoices => 'فاکتورها';
@@ -1749,22 +1812,10 @@ class AppLocalizationsFa extends AppLocalizations {
   String get accountingDocuments => 'اسناد حسابداری';
 
   @override
-  String get chartOfAccounts => 'جدول حساب‌ها';
-
-  @override
-  String get openingBalance => 'تراز افتتاحیه';
-
-  @override
   String get warehouse => 'انبارداری';
 
   @override
-  String get warehouses => 'مدیریت انبارها';
-
-  @override
   String get warehouseTransfers => 'صدور حواله';
-
-  @override
-  String get productAttributes => 'ویژگی‌های کالا و خدمات';
 
   @override
   String get addAttribute => 'افزودن ویژگی';
@@ -1951,9 +2002,6 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get eventHistory => 'تاریخچه رویدادها';
-
-  @override
-  String get storageSpace => 'فضای ذخیره‌سازی';
 
   @override
   String get viewStorage => 'مشاهده فضای ذخیره‌سازی';
