@@ -7,8 +7,16 @@ from fastapi import HTTPException, status, Request
 from .calendar import CalendarConverter, CalendarType
 
 
-def success_response(data: Any, request: Request = None) -> dict[str, Any]:
-	response = {"success": True, "data": data}
+def success_response(data: Any, request: Request = None, message: str = None) -> dict[str, Any]:
+	response = {"success": True}
+	
+	# Add data if provided
+	if data is not None:
+		response["data"] = data
+	
+	# Add message if provided
+	if message is not None:
+		response["message"] = message
 	
 	# Add calendar type information if request is available
 	if request and hasattr(request.state, 'calendar_type'):
@@ -27,8 +35,17 @@ def format_datetime_fields(data: Any, request: Request) -> Any:
 	if isinstance(data, dict):
 		formatted_data = {}
 		for key, value in data.items():
-			if isinstance(value, datetime):
-				formatted_data[key] = CalendarConverter.format_datetime(value, calendar_type)
+			if value is None:
+				formatted_data[key] = None
+			elif isinstance(value, datetime):
+				# Format the main date field based on calendar type
+				if calendar_type == "jalali":
+					formatted_data[key] = CalendarConverter.to_jalali(value)["formatted"]
+				else:
+					formatted_data[key] = value.isoformat()
+				
+				# Add formatted date as additional field
+				formatted_data[f"{key}_formatted"] = CalendarConverter.format_datetime(value, calendar_type)
 				# Convert raw date to the same calendar type as the formatted date
 				if calendar_type == "jalali":
 					formatted_data[f"{key}_raw"] = CalendarConverter.to_jalali(value)["formatted"]

@@ -42,7 +42,12 @@ class _ProfileShellState extends State<ProfileShell> {
     final bool useRail = width >= 700;
     final bool railExtended = width >= 1100;
     final ColorScheme scheme = Theme.of(context).colorScheme;
-    final String location = GoRouterState.of(context).uri.toString();
+    String location = '/user/profile/dashboard'; // default location
+    try {
+      location = GoRouterState.of(context).uri.toString();
+    } catch (e) {
+      // اگر GoRouterState در دسترس نیست، از default استفاده کن
+    }
     final bool isDark = Theme.of(context).brightness == Brightness.dark;
     final String logoAsset = isDark
         ? 'assets/images/logo-light.png'
@@ -85,7 +90,12 @@ class _ProfileShellState extends State<ProfileShell> {
 
     Future<void> onSelect(int index) async {
       final path = allDestinations[index].path;
-      if (GoRouterState.of(context).uri.toString() != path) {
+      try {
+        if (GoRouterState.of(context).uri.toString() != path) {
+          context.go(path);
+        }
+      } catch (e) {
+        // اگر GoRouterState در دسترس نیست، مستقیماً به مسیر برود
         context.go(path);
       }
     }
@@ -251,7 +261,7 @@ class _ProfileShellState extends State<ProfileShell> {
                     selected: active,
                     selectedTileColor: activeBg,
                     onTap: () {
-                      Navigator.of(context).pop();
+                      context.pop();
                       onSelect(i);
                     },
                   );

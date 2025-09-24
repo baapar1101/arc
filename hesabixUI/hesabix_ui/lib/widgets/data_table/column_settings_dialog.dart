@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'data_table_config.dart';
 import 'helpers/column_settings_service.dart';
@@ -65,7 +66,7 @@ class _ColumnSettingsDialogState extends State<ColumnSettingsDialog> {
                 ),
                 const Spacer(),
                 IconButton(
-                  onPressed: () => Navigator.of(context).pop(),
+                  onPressed: () => context.pop(),
                   icon: const Icon(Icons.close),
                 ),
               ],
@@ -96,7 +97,7 @@ class _ColumnSettingsDialogState extends State<ColumnSettingsDialog> {
                 ),
                 const SizedBox(width: 12),
                 OutlinedButton(
-                  onPressed: () => Navigator.of(context).pop(),
+                  onPressed: () => context.pop(),
                   child: Text(t.cancel),
                 ),
                 const SizedBox(width: 12),

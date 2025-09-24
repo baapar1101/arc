@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../models/business_models.dart';
 import '../../services/business_api_service.dart';
@@ -121,7 +122,7 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
             duration: const Duration(seconds: 2),
           ),
         );
-        Navigator.of(context).pop();
+        context.pop();
       }
     } catch (e) {
       if (mounted) {

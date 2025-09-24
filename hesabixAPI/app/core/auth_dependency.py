@@ -121,14 +121,21 @@ class AuthContext:
 		"""بررسی دسترسی به پنل اپراتور پشتیبانی"""
 		return self.has_app_permission("support_operator")
 	
-	def is_business_owner(self) -> bool:
+	def is_business_owner(self, business_id: int = None) -> bool:
 		"""بررسی اینکه آیا کاربر مالک کسب و کار است یا نه"""
-		if not self.business_id or not self.db:
+		import logging
+		logger = logging.getLogger(__name__)
+		
+		target_business_id = business_id or self.business_id
+		if not target_business_id or not self.db:
+			logger.info(f"is_business_owner: no business_id ({target_business_id}) or db ({self.db is not None})")
 			return False
 		
 		from adapters.db.models.business import Business
-		business = self.db.get(Business, self.business_id)
-		return business and business.owner_id == self.user.id
+		business = self.db.get(Business, target_business_id)
+		is_owner = business and business.owner_id == self.user.id
+		logger.info(f"is_business_owner: business_id={target_business_id}, business={business}, owner_id={business.owner_id if business else None}, user_id={self.user.id}, is_owner={is_owner}")
+		return is_owner
 	
 	# بررسی دسترسی‌های کسب و کار
 	def has_business_permission(self, section: str, action: str) -> bool:
@@ -188,9 +195,25 @@ class AuthContext:
 		"""بررسی دسترسی صادرات در بخش"""
 		return self.has_business_permission(section, "export")
 	
-	def can_manage_business_users(self) -> bool:
+	def can_manage_business_users(self, business_id: int = None) -> bool:
 		"""بررسی دسترسی مدیریت کاربران کسب و کار"""
-		return self.has_business_permission("settings", "manage_users")
+		import logging
+		logger = logging.getLogger(__name__)
+		
+		# SuperAdmin دسترسی کامل دارد
+		if self.is_superadmin():
+			logger.info(f"can_manage_business_users: user {self.user.id} is superadmin")
+			return True
+		
+		# مالک کسب و کار دسترسی کامل دارد
+		if self.is_business_owner(business_id):
+			logger.info(f"can_manage_business_users: user {self.user.id} is business owner")
+			return True
+		
+		# بررسی دسترسی در سطح کسب و کار
+		has_permission = self.has_business_permission("settings", "manage_users")
+		logger.info(f"can_manage_business_users: user {self.user.id} has permission: {has_permission}")
+		return has_permission
 	
 	# ترکیب دسترسی‌ها
 	def has_any_permission(self, section: str, action: str) -> bool:
@@ -204,16 +227,25 @@ class AuthContext:
 	
 	def can_access_business(self, business_id: int) -> bool:
 		"""بررسی دسترسی به کسب و کار خاص"""
+		import logging
+		logger = logging.getLogger(__name__)
+		
+		logger.info(f"Checking business access: user {self.user.id}, business {business_id}, context business_id {self.business_id}")
+		
 		# SuperAdmin دسترسی به همه کسب و کارها دارد
 		if self.is_superadmin():
+			logger.info(f"User {self.user.id} is superadmin, granting access to business {business_id}")
 			return True
 		
 		# اگر مالک کسب و کار است، دسترسی دارد
 		if self.is_business_owner() and business_id == self.business_id:
+			logger.info(f"User {self.user.id} is business owner of {business_id}, granting access")
 			return True
 		
 		# بررسی دسترسی‌های کسب و کار
-		return business_id == self.business_id
+		has_access = business_id == self.business_id
+		logger.info(f"Business access check: {business_id} == {self.business_id} = {has_access}")
+		return has_access
 	
 	def to_dict(self) -> dict:
 		"""تبدیل به dictionary برای استفاده در API"""
@@ -252,10 +284,15 @@ def get_current_user(
 	db: Session = Depends(get_db)
 ) -> AuthContext:
 	"""دریافت اطلاعات کامل کاربر کنونی و تنظیمات از درخواست"""
+	import logging
+	logger = logging.getLogger(__name__)
+	
 	# Get authorization from request headers
 	auth_header = request.headers.get("Authorization")
+	logger.info(f"Auth header: {auth_header}")
 	
 	if not auth_header or not auth_header.startswith("ApiKey "):
+		logger.warning(f"Invalid auth header: {auth_header}")
 		raise ApiError("UNAUTHORIZED", "Missing or invalid API key", http_status=401)
 
 	api_key = auth_header[len("ApiKey ") :].strip()

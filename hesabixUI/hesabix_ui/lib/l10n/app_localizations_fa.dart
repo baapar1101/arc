@@ -1346,4 +1346,206 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get accessDenied => 'دسترسی غیرمجاز';
+
+  @override
+  String get basicTools => 'ابزارهای پایه';
+
+  @override
+  String get businessSettings => 'تنظیمات کسب و کار';
+
+  @override
+  String get printDocuments => 'چاپ اسناد';
+
+  @override
+  String get people => 'اشخاص';
+
+  @override
+  String get peopleList => 'لیست اشخاص';
+
+  @override
+  String get receipts => 'دریافت‌ها';
+
+  @override
+  String get payments => 'پرداخت‌ها';
+
+  @override
+  String get practicalTools => 'ابزارهای کاربردی';
+
+  @override
+  String get usersAndPermissions => 'کاربران و دسترسی‌ها';
+
+  @override
+  String get businessUsers => 'کاربران کسب و کار';
+
+  @override
+  String get addNewUser => 'افزودن کاربر جدید';
+
+  @override
+  String get userEmailOrPhone => 'ایمیل یا شماره تلفن';
+
+  @override
+  String get userEmailOrPhoneHint => 'ایمیل یا شماره تلفن کاربر را وارد کنید';
+
+  @override
+  String get addUser => 'افزودن کاربر';
+
+  @override
+  String get userAddedSuccessfully => 'کاربر با موفقیت اضافه شد';
+
+  @override
+  String get userAddFailed => 'خطا در افزودن کاربر';
+
+  @override
+  String get userRemovedSuccessfully => 'کاربر با موفقیت حذف شد';
+
+  @override
+  String get userRemoveFailed => 'خطا در حذف کاربر';
+
+  @override
+  String get permissionsUpdatedSuccessfully =>
+      'دسترسی‌ها با موفقیت به‌روزرسانی شد';
+
+  @override
+  String get permissionsUpdateFailed => 'خطا در به‌روزرسانی دسترسی‌ها';
+
+  @override
+  String get userNotFound => 'کاربر یافت نشد';
+
+  @override
+  String get invalidEmailOrPhone => 'ایمیل یا شماره تلفن نامعتبر است';
+
+  @override
+  String get userAlreadyExists => 'کاربر قبلاً اضافه شده است';
+
+  @override
+  String get removeUser => 'حذف کاربر';
+
+  @override
+  String get removeUserConfirm =>
+      'آیا مطمئن هستید که می‌خواهید این کاربر را حذف کنید؟';
+
+  @override
+  String get userPermissions => 'دسترسی‌های کاربر';
+
+  @override
+  String get permissions => 'دسترسی‌ها';
+
+  @override
+  String get permission => 'دسترسی';
+
+  @override
+  String get hasPermission => 'دارای دسترسی';
+
+  @override
+  String get noPermission => 'بدون دسترسی';
+
+  @override
+  String get viewUsers => 'مشاهده کاربران';
+
+  @override
+  String get managePermissions => 'مدیریت دسترسی‌ها';
+
+  @override
+  String get totalUsers => 'کل کاربران';
+
+  @override
+  String get activeUsers => 'کاربران فعال';
+
+  @override
+  String get pendingUsers => 'کاربران در انتظار';
+
+  @override
+  String get userName => 'نام کاربر';
+
+  @override
+  String get userEmail => 'ایمیل';
+
+  @override
+  String get userPhone => 'تلفن';
+
+  @override
+  String get userStatus => 'وضعیت';
+
+  @override
+  String get userRole => 'نقش';
+
+  @override
+  String get userAddedAt => 'تاریخ افزودن';
+
+  @override
+  String get lastActive => 'آخرین فعالیت';
+
+  @override
+  String get inactive => 'غیرفعال';
+
+  @override
+  String get pending => 'در انتظار';
+
+  @override
+  String get admin => 'مدیر';
+
+  @override
+  String get viewer => 'مشاهده‌گر';
+
+  @override
+  String get editPermissions => 'ویرایش دسترسی‌ها';
+
+  @override
+  String get savePermissions => 'ذخیره دسترسی‌ها';
+
+  @override
+  String get noUsersFound => 'هیچ کاربری یافت نشد';
+
+  @override
+  String get searchUsers => 'جستجوی کاربران...';
+
+  @override
+  String get filterByStatus => 'فیلتر بر اساس وضعیت';
+
+  @override
+  String get filterByRole => 'فیلتر بر اساس نقش';
+
+  @override
+  String get allStatuses => 'همه وضعیت‌ها';
+
+  @override
+  String get allRoles => 'همه نقش‌ها';
+
+  @override
+  String get permissionDashboard => 'دسترسی به داشبورد';
+
+  @override
+  String get permissionPeople => 'دسترسی به اشخاص';
+
+  @override
+  String get permissionReceipts => 'دسترسی به دریافت‌ها';
+
+  @override
+  String get permissionPayments => 'دسترسی به پرداخت‌ها';
+
+  @override
+  String get permissionReports => 'دسترسی به گزارش‌ها';
+
+  @override
+  String get permissionSettings => 'دسترسی به تنظیمات';
+
+  @override
+  String get permissionUsers => 'دسترسی به کاربران';
+
+  @override
+  String get permissionPrint => 'دسترسی به چاپ اسناد';
+
+  @override
+  String get ownerWarning =>
+      'هشدار: کاربر مالک کسب و کار نیازی به افزودن ندارد و همیشه دسترسی کامل به همه بخش‌ها دارد';
+
+  @override
+  String get ownerWarningTitle => 'کاربر مالک';
+
+  @override
+  String get alreadyAddedWarning =>
+      'این کاربر قبلاً به کسب و کار اضافه شده است';
+
+  @override
+  String get alreadyAddedWarningTitle => 'کاربر موجود';
 }

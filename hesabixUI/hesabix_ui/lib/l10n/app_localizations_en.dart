@@ -1356,4 +1356,205 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get accessDenied => 'Access denied';
+
+  @override
+  String get basicTools => 'Basic Tools';
+
+  @override
+  String get businessSettings => 'Business Settings';
+
+  @override
+  String get printDocuments => 'Print Documents';
+
+  @override
+  String get people => 'People';
+
+  @override
+  String get peopleList => 'People List';
+
+  @override
+  String get receipts => 'Receipts';
+
+  @override
+  String get payments => 'Payments';
+
+  @override
+  String get practicalTools => 'Practical Tools';
+
+  @override
+  String get usersAndPermissions => 'Users and Permissions';
+
+  @override
+  String get businessUsers => 'Business Users';
+
+  @override
+  String get addNewUser => 'Add New User';
+
+  @override
+  String get userEmailOrPhone => 'Email or Phone';
+
+  @override
+  String get userEmailOrPhoneHint => 'Enter user email or phone number';
+
+  @override
+  String get addUser => 'Add User';
+
+  @override
+  String get userAddedSuccessfully => 'User added successfully';
+
+  @override
+  String get userAddFailed => 'Failed to add user';
+
+  @override
+  String get userRemovedSuccessfully => 'User removed successfully';
+
+  @override
+  String get userRemoveFailed => 'Failed to remove user';
+
+  @override
+  String get permissionsUpdatedSuccessfully =>
+      'Permissions updated successfully';
+
+  @override
+  String get permissionsUpdateFailed => 'Failed to update permissions';
+
+  @override
+  String get userNotFound => 'User not found';
+
+  @override
+  String get invalidEmailOrPhone => 'Invalid email or phone number';
+
+  @override
+  String get userAlreadyExists => 'User already exists';
+
+  @override
+  String get removeUser => 'Remove User';
+
+  @override
+  String get removeUserConfirm => 'Are you sure you want to remove this user?';
+
+  @override
+  String get userPermissions => 'User Permissions';
+
+  @override
+  String get permissions => 'Permissions';
+
+  @override
+  String get permission => 'Permission';
+
+  @override
+  String get hasPermission => 'Has Permission';
+
+  @override
+  String get noPermission => 'No Permission';
+
+  @override
+  String get viewUsers => 'View Users';
+
+  @override
+  String get managePermissions => 'Manage Permissions';
+
+  @override
+  String get totalUsers => 'Total Users';
+
+  @override
+  String get activeUsers => 'Active Users';
+
+  @override
+  String get pendingUsers => 'Pending Users';
+
+  @override
+  String get userName => 'User Name';
+
+  @override
+  String get userEmail => 'Email';
+
+  @override
+  String get userPhone => 'Phone';
+
+  @override
+  String get userStatus => 'Status';
+
+  @override
+  String get userRole => 'Role';
+
+  @override
+  String get userAddedAt => 'Added At';
+
+  @override
+  String get lastActive => 'Last Active';
+
+  @override
+  String get inactive => 'Inactive';
+
+  @override
+  String get pending => 'Pending';
+
+  @override
+  String get admin => 'Admin';
+
+  @override
+  String get viewer => 'Viewer';
+
+  @override
+  String get editPermissions => 'Edit Permissions';
+
+  @override
+  String get savePermissions => 'Save Permissions';
+
+  @override
+  String get noUsersFound => 'No users found';
+
+  @override
+  String get searchUsers => 'Search users...';
+
+  @override
+  String get filterByStatus => 'Filter by Status';
+
+  @override
+  String get filterByRole => 'Filter by Role';
+
+  @override
+  String get allStatuses => 'All Statuses';
+
+  @override
+  String get allRoles => 'All Roles';
+
+  @override
+  String get permissionDashboard => 'Dashboard Access';
+
+  @override
+  String get permissionPeople => 'People Access';
+
+  @override
+  String get permissionReceipts => 'Receipts Access';
+
+  @override
+  String get permissionPayments => 'Payments Access';
+
+  @override
+  String get permissionReports => 'Reports Access';
+
+  @override
+  String get permissionSettings => 'Settings Access';
+
+  @override
+  String get permissionUsers => 'Users Access';
+
+  @override
+  String get permissionPrint => 'Print Access';
+
+  @override
+  String get ownerWarning =>
+      'Warning: Business owner does not need to be added and always has full access to all sections';
+
+  @override
+  String get ownerWarningTitle => 'Business Owner';
+
+  @override
+  String get alreadyAddedWarning =>
+      'This user has already been added to the business';
+
+  @override
+  String get alreadyAddedWarningTitle => 'Existing User';
 }

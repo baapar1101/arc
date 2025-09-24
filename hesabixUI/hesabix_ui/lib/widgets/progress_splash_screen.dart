@@ -134,11 +134,11 @@ class _ProgressSplashScreenState extends State<ProgressSplashScreen>
             colors: isDark 
               ? [
                   bgColor,
-                  bgColor.withOpacity(0.95),
+                  bgColor.withValues(alpha: 0.95),
                 ]
               : [
                   bgColor,
-                  bgColor.withOpacity(0.98),
+                  bgColor.withValues(alpha: 0.98),
                 ],
           ),
         ),
@@ -161,7 +161,7 @@ class _ProgressSplashScreenState extends State<ProgressSplashScreen>
                           borderRadius: BorderRadius.circular(20),
                           boxShadow: [
                             BoxShadow(
-                              color: primary.withOpacity(0.2),
+                              color: primary.withValues(alpha: 0.2),
                               blurRadius: 20,
                               spreadRadius: 2,
                             ),
@@ -204,7 +204,7 @@ class _ProgressSplashScreenState extends State<ProgressSplashScreen>
                     
                     // Subtitle
                     Text(
-                      AppLocalizations.of(context)?.businessManagementPlatform ?? 'Business Management Platform',
+                      AppLocalizations.of(context).businessManagementPlatform,
                       style: theme.textTheme.bodyLarge?.copyWith(
                         color: colorScheme.onSurfaceVariant,
                         fontWeight: FontWeight.w400,
@@ -243,7 +243,7 @@ class _ProgressSplashScreenState extends State<ProgressSplashScreen>
                                   decoration: BoxDecoration(
                                     borderRadius: BorderRadius.circular(2),
                                     gradient: LinearGradient(
-                                      colors: [primary, primary.withOpacity(0.8)],
+                                      colors: [primary, primary.withValues(alpha: 0.8)],
                                     ),
                                   ),
                                 ),
@@ -255,7 +255,7 @@ class _ProgressSplashScreenState extends State<ProgressSplashScreen>
                         
                         // Loading Message
                         Text(
-                          widget.message ?? AppLocalizations.of(context)?.loading ?? 'Loading...',
+                          widget.message ?? AppLocalizations.of(context).loading,
                           style: theme.textTheme.bodyMedium?.copyWith(
                             color: colorScheme.onSurfaceVariant,
                             fontWeight: FontWeight.w500,
@@ -268,7 +268,7 @@ class _ProgressSplashScreenState extends State<ProgressSplashScreen>
                           Text(
                             '${_remainingSeconds}s',
                             style: theme.textTheme.bodySmall?.copyWith(
-                              color: colorScheme.onSurfaceVariant.withOpacity(0.7),
+                              color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
                               fontWeight: FontWeight.w400,
                             ),
                           ),
@@ -281,7 +281,7 @@ class _ProgressSplashScreenState extends State<ProgressSplashScreen>
                     Text(
                       'Version 1.0.0',
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: colorScheme.onSurfaceVariant.withOpacity(0.6),
+                        color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
                       ),
                     ),
                   ],

@@ -36,11 +36,11 @@ class SplashScreen extends StatelessWidget {
             colors: isDark 
               ? [
                   bgColor,
-                  bgColor.withOpacity(0.95),
+                  bgColor.withValues(alpha: 0.95),
                 ]
               : [
                   bgColor,
-                  bgColor.withOpacity(0.98),
+                  bgColor.withValues(alpha: 0.98),
                 ],
           ),
         ),
@@ -56,7 +56,7 @@ class SplashScreen extends StatelessWidget {
                   borderRadius: BorderRadius.circular(20),
                   boxShadow: [
                     BoxShadow(
-                      color: primary.withOpacity(0.2),
+                      color: primary.withValues(alpha: 0.2),
                       blurRadius: 20,
                       spreadRadius: 2,
                     ),
@@ -99,7 +99,7 @@ class SplashScreen extends StatelessWidget {
             
             // Subtitle
             Text(
-              AppLocalizations.of(context)?.businessManagementPlatform ?? 'Business Management Platform',
+              AppLocalizations.of(context).businessManagementPlatform,
               style: theme.textTheme.bodyLarge?.copyWith(
                 color: colorScheme.onSurfaceVariant,
                 fontWeight: FontWeight.w400,
@@ -122,7 +122,7 @@ class SplashScreen extends StatelessWidget {
                 
                 // Loading Message
                 Text(
-                  message ?? AppLocalizations.of(context)?.loading ?? 'Loading...',
+                  message ?? AppLocalizations.of(context).loading,
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: colorScheme.onSurfaceVariant,
                     fontWeight: FontWeight.w500,
@@ -137,7 +137,7 @@ class SplashScreen extends StatelessWidget {
             Text(
               'Version 1.0.0',
               style: theme.textTheme.bodySmall?.copyWith(
-                color: colorScheme.onSurfaceVariant.withOpacity(0.6),
+                color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
               ),
             ),
           ],

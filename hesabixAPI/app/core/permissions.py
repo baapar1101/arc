@@ -74,6 +74,9 @@ def require_business_access(business_id_param: str = "business_id"):
     def decorator(func: Callable) -> Callable:
         @wraps(func)
         def wrapper(*args, **kwargs) -> Any:
+            import logging
+            logger = logging.getLogger(__name__)
+            
             # Find request in args or kwargs
             request = None
             for arg in args:
@@ -85,6 +88,7 @@ def require_business_access(business_id_param: str = "business_id"):
                 request = kwargs['request']
             
             if not request:
+                logger.error("Request not found in function arguments")
                 raise ApiError("INTERNAL_ERROR", "Request not found", http_status=500)
             
             # Get database session
@@ -92,8 +96,17 @@ def require_business_access(business_id_param: str = "business_id"):
             db = next(get_db())
             ctx = get_current_user(request, db)
             business_id = kwargs.get(business_id_param)
+            
+            logger.info(f"Checking business access for user {ctx.get_user_id()} to business {business_id}")
+            logger.info(f"User business_id from context: {ctx.business_id}")
+            logger.info(f"User is superadmin: {ctx.is_superadmin()}")
+            logger.info(f"User is business owner: {ctx.is_business_owner()}")
+            
             if business_id and not ctx.can_access_business(business_id):
+                logger.warning(f"User {ctx.get_user_id()} does not have access to business {business_id}")
                 raise ApiError("FORBIDDEN", f"No access to business {business_id}", http_status=403)
+            
+            logger.info(f"User {ctx.get_user_id()} has access to business {business_id}")
             return func(*args, **kwargs)
         return wrapper
     return decorator

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'data_table_config.dart';
@@ -234,7 +235,7 @@ class _DataTableSearchDialogState extends State<DataTableSearchDialog> {
     return [
       TextButton(
         onPressed: () {
-          Navigator.of(context).pop();
+          context.pop();
         },
         child: Text(t.cancel),
       ),
@@ -242,7 +243,7 @@ class _DataTableSearchDialogState extends State<DataTableSearchDialog> {
         TextButton(
           onPressed: () {
             widget.onClear();
-            Navigator.of(context).pop();
+            context.pop();
           },
           child: Text(t.clear),
         ),
@@ -302,7 +303,7 @@ class _DataTableSearchDialogState extends State<DataTableSearchDialog> {
         widget.onApply(_controller.text.trim(), _selectedType);
         break;
     }
-    Navigator.of(context).pop();
+            context.pop();
   }
 
   Future<void> _selectFromDate(AppLocalizations t, bool isJalali) async {
@@ -449,7 +450,7 @@ class _DataTableDateRangeDialogState extends State<DataTableDateRangeDialog> {
       actions: [
         TextButton(
           onPressed: () {
-            Navigator.of(context).pop();
+            context.pop();
           },
           child: Text(t.cancel),
         ),
@@ -457,7 +458,7 @@ class _DataTableDateRangeDialogState extends State<DataTableDateRangeDialog> {
           TextButton(
             onPressed: () {
               widget.onClear();
-              Navigator.of(context).pop();
+              context.pop();
             },
             child: Text(t.clear),
           ),
@@ -465,7 +466,7 @@ class _DataTableDateRangeDialogState extends State<DataTableDateRangeDialog> {
           onPressed: _fromDate != null && _toDate != null
               ? () {
                   widget.onApply(_fromDate, _toDate);
-                  Navigator.of(context).pop();
+                  context.pop();
                 }
               : null,
           child: Text(t.applyFilter),

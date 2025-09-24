@@ -341,11 +341,11 @@ class _UserManagementPageState extends State<UserManagementPage> {
         content: const Text('User creation form would go here'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: () => context.pop(),
             child: Text(AppLocalizations.of(context).cancel),
           ),
           ElevatedButton(
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: () => context.pop(),
             child: Text(AppLocalizations.of(context).save),
           ),
         ],
@@ -361,11 +361,11 @@ class _UserManagementPageState extends State<UserManagementPage> {
         content: const Text('User edit form would go here'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: () => context.pop(),
             child: Text(AppLocalizations.of(context).cancel),
           ),
           ElevatedButton(
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: () => context.pop(),
             child: Text(AppLocalizations.of(context).save),
           ),
         ],
@@ -381,11 +381,11 @@ class _UserManagementPageState extends State<UserManagementPage> {
         content: const Text('Permissions management would go here'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: () => context.pop(),
             child: Text(AppLocalizations.of(context).cancel),
           ),
           ElevatedButton(
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: () => context.pop(),
             child: Text(AppLocalizations.of(context).save),
           ),
         ],
@@ -401,12 +401,12 @@ class _UserManagementPageState extends State<UserManagementPage> {
         content: Text('Are you sure you want to delete ${user['name']}?'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: () => context.pop(),
             child: Text(AppLocalizations.of(context).cancel),
           ),
           ElevatedButton(
             onPressed: () {
-              Navigator.of(context).pop();
+              context.pop();
               // Delete user logic here
             },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:shamsi_date/shamsi_date.dart';
 
 /// DatePicker سفارشی برای تقویم شمسی
@@ -100,7 +101,7 @@ class _JalaliDatePickerState extends State<JalaliDatePicker> {
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
                 TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
+                  onPressed: () => context.pop(),
                   child: Text(
                     'انصراف',
                     style: TextStyle(color: theme.textTheme.bodyMedium?.color),

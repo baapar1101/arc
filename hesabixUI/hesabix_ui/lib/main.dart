@@ -20,6 +20,7 @@ import 'pages/admin/system_logs_page.dart';
 import 'pages/admin/email_settings_page.dart';
 import 'pages/business/business_shell.dart';
 import 'pages/business/dashboard/business_dashboard_page.dart';
+import 'pages/business/users_permissions_page.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'core/locale_controller.dart';
 import 'core/calendar_controller.dart';
@@ -29,6 +30,7 @@ import 'theme/app_theme.dart';
 import 'core/auth_store.dart';
 import 'core/permission_guard.dart';
 import 'widgets/simple_splash_screen.dart';
+import 'widgets/url_tracker.dart';
 
 void main() {
   // Use path-based routing instead of hash routing
@@ -98,15 +100,34 @@ class _MyAppState extends State<MyApp> {
     ApiClient.bindCalendarController(_calendarController!);
     ApiClient.bindAuthStore(_authStore!);
     
-    // اطمینان از حداقل 4 ثانیه نمایش splash screen
+    // اطمینان از حداقل 1 ثانیه نمایش splash screen
     final elapsed = DateTime.now().difference(_loadStartTime!);
-    const minimumDuration = Duration(seconds: 4);
+    const minimumDuration = Duration(seconds: 1);
     if (elapsed < minimumDuration) {
       await Future.delayed(minimumDuration - elapsed);
     }
     
+    // ذخیره URL فعلی قبل از اتمام loading
+    if (_authStore != null) {
+      try {
+        final currentUrl = Uri.base.path;
+        print('🔍 LOADING DEBUG: Current URL before finishing loading: $currentUrl');
+        
+        if (currentUrl.isNotEmpty && 
+            currentUrl != '/' && 
+            currentUrl != '/login' &&
+            (currentUrl.startsWith('/user/profile/') || currentUrl.startsWith('/business/'))) {
+          print('🔍 LOADING DEBUG: Saving current URL: $currentUrl');
+          await _authStore!.saveLastUrl(currentUrl);
+        }
+      } catch (e) {
+        print('🔍 LOADING DEBUG: Error saving current URL: $e');
+      }
+    }
+    
     // اتمام loading
     if (mounted) {
+      print('🔍 LOADING DEBUG: Finishing loading, setting _isLoading to false');
       setState(() {
         _isLoading = false;
       });
@@ -116,12 +137,16 @@ class _MyAppState extends State<MyApp> {
   // Root of application with GoRouter
   @override
   Widget build(BuildContext context) {
+    print('🔍 BUILD DEBUG: Building app, _isLoading: $_isLoading');
+    print('🔍 BUILD DEBUG: Controllers - locale: ${_controller != null}, calendar: ${_calendarController != null}, theme: ${_themeController != null}, auth: ${_authStore != null}');
+    
     // اگر هنوز loading است، splash screen نمایش بده
     if (_isLoading || 
         _controller == null || 
         _calendarController == null || 
         _themeController == null || 
         _authStore == null) {
+      print('🔍 BUILD DEBUG: Still loading, showing splash screen');
       final loadingRouter = GoRouter(
         redirect: (context, state) {
           // در حین loading، هیچ redirect نکن - URL را حفظ کن
@@ -165,11 +190,13 @@ class _MyAppState extends State<MyApp> {
               return SimpleSplashScreen(
                 message: loadingMessage,
                 showLogo: true,
-                displayDuration: const Duration(seconds: 4),
+                displayDuration: const Duration(seconds: 1),
                 locale: _controller?.locale,
+                authStore: _authStore,
                 onComplete: () {
                   // این callback زمانی فراخوانی می‌شود که splash screen تمام شود
                   // اما ما از splash controller استفاده می‌کنیم
+                  print('🔍 SPLASH DEBUG: Splash screen completed');
                 },
               );
             },
@@ -194,41 +221,69 @@ class _MyAppState extends State<MyApp> {
     final controller = _controller!;
     final themeController = _themeController!;
 
+    print('🔍 BUILD DEBUG: All controllers loaded, creating main router');
     final router = GoRouter(
       initialLocation: '/',
-      redirect: (context, state) {
+      redirect: (context, state) async {
         final currentPath = state.uri.path;
+        final fullUri = state.uri.toString();
+        print('🔍 REDIRECT DEBUG: Current path: $currentPath');
+        print('🔍 REDIRECT DEBUG: Full URI: $fullUri');
         
         // اگر authStore هنوز load نشده، منتظر بمان
         if (_authStore == null) {
+          print('🔍 REDIRECT DEBUG: AuthStore is null, staying on current path');
           return null;
         }
         
         final hasKey = _authStore!.apiKey != null && _authStore!.apiKey!.isNotEmpty;
+        print('🔍 REDIRECT DEBUG: Has API key: $hasKey');
         
         // اگر API key ندارد
         if (!hasKey) {
+          print('🔍 REDIRECT DEBUG: No API key');
           // اگر در login نیست، به login برود
           if (currentPath != '/login') {
+            print('🔍 REDIRECT DEBUG: Redirecting to login from $currentPath');
             return '/login';
           }
           // اگر در login است، بماند
+          print('🔍 REDIRECT DEBUG: Already on login, staying');
           return null;
         }
         
         // اگر API key دارد
+        print('🔍 REDIRECT DEBUG: Has API key, checking current path');
+        
         // اگر در login است، به dashboard برود
         if (currentPath == '/login') {
+          print('🔍 REDIRECT DEBUG: On login page, redirecting to dashboard');
           return '/user/profile/dashboard';
         }
         
-        // اگر در root است، به dashboard برود
+        // اگر در root است، آخرین URL را بررسی کن
         if (currentPath == '/') {
+          print('🔍 REDIRECT DEBUG: On root path, checking last URL');
+          // اگر آخرین URL موجود است و معتبر است، به آن برود
+          final lastUrl = await _authStore!.getLastUrl();
+          print('🔍 REDIRECT DEBUG: Last URL: $lastUrl');
+          
+          if (lastUrl != null && 
+              lastUrl.isNotEmpty && 
+              lastUrl != '/' && 
+              lastUrl != '/login' &&
+              (lastUrl.startsWith('/user/profile/') || lastUrl.startsWith('/business/'))) {
+            print('🔍 REDIRECT DEBUG: Redirecting to last URL: $lastUrl');
+            return lastUrl;
+          }
+          // وگرنه به dashboard برود (فقط اگر در root باشیم)
+          print('🔍 REDIRECT DEBUG: No valid last URL, redirecting to dashboard');
           return '/user/profile/dashboard';
         }
         
-        // برای سایر صفحات (شامل صفحات profile)، redirect نکن (بماند)
-        // این مهم است: اگر کاربر در صفحات profile است، بماند
+        // برای سایر صفحات (شامل صفحات profile و business)، redirect نکن (بماند)
+        // این مهم است: اگر کاربر در صفحات profile یا business است، بماند
+        print('🔍 REDIRECT DEBUG: On other page ($currentPath), staying on current path');
         return null;
       },
       routes: <RouteBase>[
@@ -373,7 +428,9 @@ class _MyAppState extends State<MyApp> {
             return BusinessShell(
               businessId: businessId,
               authStore: _authStore!,
+              localeController: controller,
               calendarController: _calendarController!,
+              themeController: themeController,
               child: const SizedBox.shrink(), // Will be replaced by child routes
             );
           },
@@ -386,8 +443,29 @@ class _MyAppState extends State<MyApp> {
                 return BusinessShell(
                   businessId: businessId,
                   authStore: _authStore!,
+                  localeController: controller,
                   calendarController: _calendarController!,
+                  themeController: themeController,
                   child: BusinessDashboardPage(businessId: businessId),
+                );
+              },
+            ),
+            GoRoute(
+              path: 'users-permissions',
+              name: 'business_users_permissions',
+              builder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return BusinessShell(
+                  businessId: businessId,
+                  authStore: _authStore!,
+                  localeController: controller,
+                  calendarController: _calendarController!,
+                  themeController: themeController,
+                  child: UsersPermissionsPage(
+                    businessId: businessId.toString(),
+                    authStore: _authStore!,
+                    calendarController: _calendarController!,
+                  ),
                 );
               },
             ),
@@ -400,28 +478,31 @@ class _MyAppState extends State<MyApp> {
     return AnimatedBuilder(
       animation: Listenable.merge([controller, themeController]),
       builder: (context, _) {
-        return MaterialApp.router(
-          title: 'Hesabix',
-          theme: AppTheme.build(
-            isDark: false,
+        return UrlTracker(
+          authStore: _authStore!,
+          child: MaterialApp.router(
+            title: 'Hesabix',
+            theme: AppTheme.build(
+              isDark: false,
+              locale: controller.locale,
+              seed: themeController.seedColor,
+            ),
+            darkTheme: AppTheme.build(
+              isDark: true,
+              locale: controller.locale,
+              seed: themeController.seedColor,
+            ),
+            themeMode: themeController.mode,
+            routerConfig: router,
             locale: controller.locale,
-            seed: themeController.seedColor,
+            supportedLocales: AppLocalizations.supportedLocales,
+            localizationsDelegates: const [
+              AppLocalizations.delegate,
+              GlobalMaterialLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+            ],
           ),
-          darkTheme: AppTheme.build(
-            isDark: true,
-            locale: controller.locale,
-            seed: themeController.seedColor,
-          ),
-          themeMode: themeController.mode,
-          routerConfig: router,
-          locale: controller.locale,
-          supportedLocales: AppLocalizations.supportedLocales,
-          localizationsDelegates: const [
-            AppLocalizations.delegate,
-            GlobalMaterialLocalizations.delegate,
-            GlobalCupertinoLocalizations.delegate,
-            GlobalWidgetsLocalizations.delegate,
-          ],
         );
       },
     );

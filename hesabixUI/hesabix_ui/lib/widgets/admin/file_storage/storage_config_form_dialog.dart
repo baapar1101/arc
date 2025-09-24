@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../../core/api_client.dart';
 
@@ -121,7 +122,7 @@ class _StorageConfigFormDialogState extends State<StorageConfigFormDialog> {
       }
 
       if (mounted) {
-        Navigator.of(context).pop();
+        context.pop();
         
         // Only show SnackBar if there's no onSaved callback (parent will handle notification)
         if (widget.onSaved == null) {
@@ -202,7 +203,7 @@ class _StorageConfigFormDialogState extends State<StorageConfigFormDialog> {
                     ),
                   ),
                     IconButton(
-                      onPressed: () => Navigator.of(context).pop(),
+                      onPressed: () => context.pop(),
                       icon: const Icon(Icons.close),
                     color: theme.colorScheme.onPrimary,
                     ),
@@ -344,7 +345,7 @@ class _StorageConfigFormDialogState extends State<StorageConfigFormDialog> {
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
                     TextButton(
-                      onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
+                      onPressed: _isLoading ? null : () => context.pop(),
                       child: Text(l10n.cancel),
                     ),
                   const SizedBox(width: 12),

@@ -4,7 +4,7 @@ from datetime import datetime
 from enum import Enum
 
 from sqlalchemy import String, DateTime, Integer, ForeignKey, Enum as SQLEnum, Text
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from adapters.db.session import Base
 
@@ -53,3 +53,6 @@ class Business(Base):
     
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    
+    # Relationships - using business_permissions instead
+    # users = relationship("BusinessUser", back_populates="business", cascade="all, delete-orphan")

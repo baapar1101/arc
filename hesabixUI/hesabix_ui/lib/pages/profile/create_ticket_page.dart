@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/services/support_service.dart';
@@ -235,7 +236,7 @@ class _CreateTicketPageState extends State<CreateTicketPage> {
                     ),
                   ),
                   IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
+                    onPressed: () => context.pop(),
                     icon: const Icon(Icons.close),
                     style: IconButton.styleFrom(
                       backgroundColor: theme.colorScheme.surface,
@@ -645,7 +646,7 @@ class _CreateTicketPageState extends State<CreateTicketPage> {
           ),
           const SizedBox(width: 12),
           OutlinedButton(
-            onPressed: _isSubmitting ? null : () => Navigator.of(context).pop(),
+            onPressed: _isSubmitting ? null : () => context.pop(),
             style: OutlinedButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
               shape: RoundedRectangleBorder(

@@ -2713,6 +2713,402 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Access denied'**
   String get accessDenied;
+
+  /// No description provided for @basicTools.
+  ///
+  /// In en, this message translates to:
+  /// **'Basic Tools'**
+  String get basicTools;
+
+  /// No description provided for @businessSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Business Settings'**
+  String get businessSettings;
+
+  /// No description provided for @printDocuments.
+  ///
+  /// In en, this message translates to:
+  /// **'Print Documents'**
+  String get printDocuments;
+
+  /// No description provided for @people.
+  ///
+  /// In en, this message translates to:
+  /// **'People'**
+  String get people;
+
+  /// No description provided for @peopleList.
+  ///
+  /// In en, this message translates to:
+  /// **'People List'**
+  String get peopleList;
+
+  /// No description provided for @receipts.
+  ///
+  /// In en, this message translates to:
+  /// **'Receipts'**
+  String get receipts;
+
+  /// No description provided for @payments.
+  ///
+  /// In en, this message translates to:
+  /// **'Payments'**
+  String get payments;
+
+  /// No description provided for @practicalTools.
+  ///
+  /// In en, this message translates to:
+  /// **'Practical Tools'**
+  String get practicalTools;
+
+  /// No description provided for @usersAndPermissions.
+  ///
+  /// In en, this message translates to:
+  /// **'Users and Permissions'**
+  String get usersAndPermissions;
+
+  /// No description provided for @businessUsers.
+  ///
+  /// In en, this message translates to:
+  /// **'Business Users'**
+  String get businessUsers;
+
+  /// No description provided for @addNewUser.
+  ///
+  /// In en, this message translates to:
+  /// **'Add New User'**
+  String get addNewUser;
+
+  /// No description provided for @userEmailOrPhone.
+  ///
+  /// In en, this message translates to:
+  /// **'Email or Phone'**
+  String get userEmailOrPhone;
+
+  /// No description provided for @userEmailOrPhoneHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter user email or phone number'**
+  String get userEmailOrPhoneHint;
+
+  /// No description provided for @addUser.
+  ///
+  /// In en, this message translates to:
+  /// **'Add User'**
+  String get addUser;
+
+  /// No description provided for @userAddedSuccessfully.
+  ///
+  /// In en, this message translates to:
+  /// **'User added successfully'**
+  String get userAddedSuccessfully;
+
+  /// No description provided for @userAddFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to add user'**
+  String get userAddFailed;
+
+  /// No description provided for @userRemovedSuccessfully.
+  ///
+  /// In en, this message translates to:
+  /// **'User removed successfully'**
+  String get userRemovedSuccessfully;
+
+  /// No description provided for @userRemoveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to remove user'**
+  String get userRemoveFailed;
+
+  /// No description provided for @permissionsUpdatedSuccessfully.
+  ///
+  /// In en, this message translates to:
+  /// **'Permissions updated successfully'**
+  String get permissionsUpdatedSuccessfully;
+
+  /// No description provided for @permissionsUpdateFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to update permissions'**
+  String get permissionsUpdateFailed;
+
+  /// No description provided for @userNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'User not found'**
+  String get userNotFound;
+
+  /// No description provided for @invalidEmailOrPhone.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid email or phone number'**
+  String get invalidEmailOrPhone;
+
+  /// No description provided for @userAlreadyExists.
+  ///
+  /// In en, this message translates to:
+  /// **'User already exists'**
+  String get userAlreadyExists;
+
+  /// No description provided for @removeUser.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove User'**
+  String get removeUser;
+
+  /// No description provided for @removeUserConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to remove this user?'**
+  String get removeUserConfirm;
+
+  /// No description provided for @userPermissions.
+  ///
+  /// In en, this message translates to:
+  /// **'User Permissions'**
+  String get userPermissions;
+
+  /// No description provided for @permissions.
+  ///
+  /// In en, this message translates to:
+  /// **'Permissions'**
+  String get permissions;
+
+  /// No description provided for @permission.
+  ///
+  /// In en, this message translates to:
+  /// **'Permission'**
+  String get permission;
+
+  /// No description provided for @hasPermission.
+  ///
+  /// In en, this message translates to:
+  /// **'Has Permission'**
+  String get hasPermission;
+
+  /// No description provided for @noPermission.
+  ///
+  /// In en, this message translates to:
+  /// **'No Permission'**
+  String get noPermission;
+
+  /// No description provided for @viewUsers.
+  ///
+  /// In en, this message translates to:
+  /// **'View Users'**
+  String get viewUsers;
+
+  /// No description provided for @managePermissions.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage Permissions'**
+  String get managePermissions;
+
+  /// No description provided for @totalUsers.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Users'**
+  String get totalUsers;
+
+  /// No description provided for @activeUsers.
+  ///
+  /// In en, this message translates to:
+  /// **'Active Users'**
+  String get activeUsers;
+
+  /// No description provided for @pendingUsers.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending Users'**
+  String get pendingUsers;
+
+  /// No description provided for @userName.
+  ///
+  /// In en, this message translates to:
+  /// **'User Name'**
+  String get userName;
+
+  /// No description provided for @userEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'Email'**
+  String get userEmail;
+
+  /// No description provided for @userPhone.
+  ///
+  /// In en, this message translates to:
+  /// **'Phone'**
+  String get userPhone;
+
+  /// No description provided for @userStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Status'**
+  String get userStatus;
+
+  /// No description provided for @userRole.
+  ///
+  /// In en, this message translates to:
+  /// **'Role'**
+  String get userRole;
+
+  /// No description provided for @userAddedAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Added At'**
+  String get userAddedAt;
+
+  /// No description provided for @lastActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Last Active'**
+  String get lastActive;
+
+  /// No description provided for @inactive.
+  ///
+  /// In en, this message translates to:
+  /// **'Inactive'**
+  String get inactive;
+
+  /// No description provided for @pending.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending'**
+  String get pending;
+
+  /// No description provided for @admin.
+  ///
+  /// In en, this message translates to:
+  /// **'Admin'**
+  String get admin;
+
+  /// No description provided for @viewer.
+  ///
+  /// In en, this message translates to:
+  /// **'Viewer'**
+  String get viewer;
+
+  /// No description provided for @editPermissions.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Permissions'**
+  String get editPermissions;
+
+  /// No description provided for @savePermissions.
+  ///
+  /// In en, this message translates to:
+  /// **'Save Permissions'**
+  String get savePermissions;
+
+  /// No description provided for @noUsersFound.
+  ///
+  /// In en, this message translates to:
+  /// **'No users found'**
+  String get noUsersFound;
+
+  /// No description provided for @searchUsers.
+  ///
+  /// In en, this message translates to:
+  /// **'Search users...'**
+  String get searchUsers;
+
+  /// No description provided for @filterByStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Filter by Status'**
+  String get filterByStatus;
+
+  /// No description provided for @filterByRole.
+  ///
+  /// In en, this message translates to:
+  /// **'Filter by Role'**
+  String get filterByRole;
+
+  /// No description provided for @allStatuses.
+  ///
+  /// In en, this message translates to:
+  /// **'All Statuses'**
+  String get allStatuses;
+
+  /// No description provided for @allRoles.
+  ///
+  /// In en, this message translates to:
+  /// **'All Roles'**
+  String get allRoles;
+
+  /// No description provided for @permissionDashboard.
+  ///
+  /// In en, this message translates to:
+  /// **'Dashboard Access'**
+  String get permissionDashboard;
+
+  /// No description provided for @permissionPeople.
+  ///
+  /// In en, this message translates to:
+  /// **'People Access'**
+  String get permissionPeople;
+
+  /// No description provided for @permissionReceipts.
+  ///
+  /// In en, this message translates to:
+  /// **'Receipts Access'**
+  String get permissionReceipts;
+
+  /// No description provided for @permissionPayments.
+  ///
+  /// In en, this message translates to:
+  /// **'Payments Access'**
+  String get permissionPayments;
+
+  /// No description provided for @permissionReports.
+  ///
+  /// In en, this message translates to:
+  /// **'Reports Access'**
+  String get permissionReports;
+
+  /// No description provided for @permissionSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings Access'**
+  String get permissionSettings;
+
+  /// No description provided for @permissionUsers.
+  ///
+  /// In en, this message translates to:
+  /// **'Users Access'**
+  String get permissionUsers;
+
+  /// No description provided for @permissionPrint.
+  ///
+  /// In en, this message translates to:
+  /// **'Print Access'**
+  String get permissionPrint;
+
+  /// No description provided for @ownerWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'Warning: Business owner does not need to be added and always has full access to all sections'**
+  String get ownerWarning;
+
+  /// No description provided for @ownerWarningTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Business Owner'**
+  String get ownerWarningTitle;
+
+  /// No description provided for @alreadyAddedWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'This user has already been added to the business'**
+  String get alreadyAddedWarning;
+
+  /// No description provided for @alreadyAddedWarningTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Existing User'**
+  String get alreadyAddedWarningTitle;
 }
 
 class _AppLocalizationsDelegate

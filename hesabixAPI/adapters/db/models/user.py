@@ -28,5 +28,8 @@ class User(Base):
 	
 	# Support relationships
 	tickets = relationship("Ticket", foreign_keys="Ticket.user_id", back_populates="user")
+	
+	# Business relationships - using business_permissions instead
+	# businesses = relationship("BusinessUser", back_populates="user", cascade="all, delete-orphan")
 
 

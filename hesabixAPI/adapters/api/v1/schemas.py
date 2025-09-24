@@ -1,6 +1,7 @@
 from typing import Any, List, Optional, Union, Generic, TypeVar
 from pydantic import BaseModel, EmailStr, Field
 from enum import Enum
+from datetime import datetime
 
 T = TypeVar('T')
 
@@ -245,5 +246,81 @@ class PaginatedResponse(BaseModel, Generic[T]):
 			limit=limit,
 			total_pages=total_pages
 		)
+
+
+# Business User Schemas
+class BusinessUserSchema(BaseModel):
+    id: int
+    business_id: int
+    user_id: int
+    user_name: str
+    user_email: str
+    user_phone: Optional[str] = None
+    role: str
+    status: str
+    added_at: datetime
+    last_active: Optional[datetime] = None
+    permissions: dict
+
+    class Config:
+        from_attributes = True
+
+
+class AddUserRequest(BaseModel):
+    email_or_phone: str
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "email_or_phone": "user@example.com"
+            }
+        }
+
+
+class AddUserResponse(BaseModel):
+    success: bool
+    message: str
+    user: Optional[BusinessUserSchema] = None
+
+
+class UpdatePermissionsRequest(BaseModel):
+    permissions: dict
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "permissions": {
+                    "sales": {
+                        "read": True,
+                        "write": True,
+                        "delete": False
+                    },
+                    "reports": {
+                        "read": True,
+                        "export": True
+                    },
+                    "settings": {
+                        "manage_users": True
+                    }
+                }
+            }
+        }
+
+
+class UpdatePermissionsResponse(BaseModel):
+    success: bool
+    message: str
+
+
+class RemoveUserResponse(BaseModel):
+    success: bool
+    message: str
+
+
+class BusinessUsersListResponse(BaseModel):
+    success: bool
+    message: str
+    data: dict
+    calendar_type: Optional[str] = None
 
 

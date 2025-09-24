@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/models/support_models.dart';
 import 'package:hesabix_ui/services/support_service.dart';
@@ -312,7 +313,7 @@ class _TicketDetailsDialogState extends State<TicketDetailsDialog> {
                     ),
                   ),
                   IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
+                    onPressed: () => context.pop(),
                     icon: const Icon(Icons.close),
                     style: IconButton.styleFrom(
                       backgroundColor: Colors.grey[200],

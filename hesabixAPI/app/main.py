@@ -8,6 +8,7 @@ from adapters.api.v1.auth import router as auth_router
 from adapters.api.v1.users import router as users_router
 from adapters.api.v1.businesses import router as businesses_router
 from adapters.api.v1.business_dashboard import router as business_dashboard_router
+from adapters.api.v1.business_users import router as business_users_router
 from adapters.api.v1.support.tickets import router as support_tickets_router
 from adapters.api.v1.support.operator import router as support_operator_router
 from adapters.api.v1.support.categories import router as support_categories_router
@@ -271,6 +272,7 @@ def create_app() -> FastAPI:
     application.include_router(users_router, prefix=settings.api_v1_prefix)
     application.include_router(businesses_router, prefix=settings.api_v1_prefix)
     application.include_router(business_dashboard_router, prefix=settings.api_v1_prefix)
+    application.include_router(business_users_router, prefix=settings.api_v1_prefix)
     
     # Support endpoints
     application.include_router(support_tickets_router, prefix=f"{settings.api_v1_prefix}/support")
@@ -292,7 +294,7 @@ def create_app() -> FastAPI:
     )
     def read_root() -> dict[str, str]:
         return {"service": settings.app_name, "version": settings.app_version}
-
+    
     # اضافه کردن security schemes
     from fastapi.openapi.utils import get_openapi
     

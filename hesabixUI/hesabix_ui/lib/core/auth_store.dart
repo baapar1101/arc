@@ -10,6 +10,7 @@ class AuthStore with ChangeNotifier {
   static const _kDeviceId = 'device_id';
   static const _kAppPermissions = 'app_permissions';
   static const _kIsSuperAdmin = 'is_superadmin';
+  static const _kLastUrl = 'last_url';
 
   final FlutterSecureStorage _secure = const FlutterSecureStorage();
   String? _apiKey;
@@ -21,6 +22,8 @@ class AuthStore with ChangeNotifier {
   String get deviceId => _deviceId ?? '';
   Map<String, dynamic>? get appPermissions => _appPermissions;
   bool get isSuperAdmin => _isSuperAdmin;
+  int? _currentUserId;
+  int? get currentUserId => _currentUserId;
 
   Future<void> load() async {
     final prefs = await SharedPreferences.getInstance();
@@ -98,8 +101,9 @@ class AuthStore with ChangeNotifier {
         } catch (_) {}
         await prefs.remove(_kApiKey);
       }
-      // پاک کردن دسترسی‌ها هنگام خروج
+      // پاک کردن دسترسی‌ها و آخرین URL هنگام خروج
       await _clearAppPermissions();
+      await clearLastUrl();
     } else {
       if (kIsWeb) {
         await prefs.setString(_kApiKey, key);
@@ -113,10 +117,13 @@ class AuthStore with ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> saveAppPermissions(Map<String, dynamic>? permissions, bool isSuperAdmin) async {
+  Future<void> saveAppPermissions(Map<String, dynamic>? permissions, bool isSuperAdmin, {int? userId}) async {
     final prefs = await SharedPreferences.getInstance();
     _appPermissions = permissions;
     _isSuperAdmin = isSuperAdmin;
+    if (userId != null) {
+      _currentUserId = userId;
+    }
 
     if (permissions == null) {
       await _clearAppPermissions();
@@ -174,9 +181,15 @@ class AuthStore with ChangeNotifier {
           if (user != null) {
             final appPermissions = user['app_permissions'] as Map<String, dynamic>?;
             final isSuperAdmin = appPermissions?['superadmin'] == true;
+            final userId = user['id'] as int?;
             
             if (appPermissions != null) {
               await saveAppPermissions(appPermissions, isSuperAdmin);
+            }
+            
+            if (userId != null) {
+              _currentUserId = userId;
+              notifyListeners();
             }
           }
         }
@@ -195,6 +208,32 @@ class AuthStore with ChangeNotifier {
   }
 
   bool get canAccessSupportOperator => hasAppPermission('support_operator');
+
+  // ذخیره آخرین URL برای بازیابی بعد از refresh
+  Future<void> saveLastUrl(String url) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_kLastUrl, url);
+    } catch (_) {}
+  }
+
+  // بازیابی آخرین URL
+  Future<String?> getLastUrl() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getString(_kLastUrl);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  // پاک کردن آخرین URL
+  Future<void> clearLastUrl() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_kLastUrl);
+    } catch (_) {}
+  }
 }
 
 

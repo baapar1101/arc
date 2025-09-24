@@ -248,20 +248,26 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
       // ذخیره دسترسی‌های اپلیکیشن
       final appPermissions = user?['app_permissions'] as Map<String, dynamic>?;
       final isSuperAdmin = appPermissions?['superadmin'] == true;
+      final userId = user?['id'] as int?;
       
       if (appPermissions != null) {
-        await widget.authStore.saveAppPermissions(appPermissions, isSuperAdmin);
+        await widget.authStore.saveAppPermissions(appPermissions, isSuperAdmin, userId: userId);
       }
 
       if (!mounted) return;
       _showSnack(t.homeWelcome);
       // بعد از login موفق، به صفحه قبلی یا dashboard برود
-      final currentPath = GoRouterState.of(context).uri.path;
-      if (currentPath.startsWith('/user/profile/') || currentPath.startsWith('/acc/')) {
-        // اگر در صفحه محافظت شده بود، همان صفحه را refresh کند
-        context.go(currentPath);
-      } else {
-        // وگرنه به dashboard برود
+      try {
+        final currentPath = GoRouterState.of(context).uri.path;
+        if (currentPath.startsWith('/user/profile/') || currentPath.startsWith('/acc/') || currentPath.startsWith('/business/')) {
+          // اگر در صفحه محافظت شده بود، همان صفحه را refresh کند
+          context.go(currentPath);
+        } else {
+          // وگرنه به dashboard برود
+          context.go('/user/profile/dashboard');
+        }
+      } catch (e) {
+        // اگر GoRouterState در دسترس نیست، به dashboard برود
         context.go('/user/profile/dashboard');
       }
     } catch (e) {
@@ -344,9 +350,10 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
       // ذخیره دسترسی‌های اپلیکیشن
       final appPermissions = user?['app_permissions'] as Map<String, dynamic>?;
       final isSuperAdmin = appPermissions?['superadmin'] == true;
+      final userId = user?['id'] as int?;
       
       if (appPermissions != null) {
-        await widget.authStore.saveAppPermissions(appPermissions, isSuperAdmin);
+        await widget.authStore.saveAppPermissions(appPermissions, isSuperAdmin, userId: userId);
       }
       _showSnack(t.registerSuccess);
       // پاکسازی کد معرف پس از ثبت‌نام موفق

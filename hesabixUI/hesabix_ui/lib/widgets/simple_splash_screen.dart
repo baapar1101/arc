@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
+import '../core/auth_store.dart';
 
 class SimpleSplashScreen extends StatefulWidget {
   final String? message;
@@ -9,6 +10,7 @@ class SimpleSplashScreen extends StatefulWidget {
   final Duration displayDuration;
   final VoidCallback? onComplete;
   final Locale? locale;
+  final AuthStore? authStore;
 
   const SimpleSplashScreen({
     super.key,
@@ -16,9 +18,10 @@ class SimpleSplashScreen extends StatefulWidget {
     this.showLogo = true,
     this.backgroundColor,
     this.primaryColor,
-    this.displayDuration = const Duration(seconds: 4),
+    this.displayDuration = const Duration(seconds: 1),
     this.onComplete,
     this.locale,
+    this.authStore,
   });
 
   @override
@@ -68,10 +71,49 @@ class _SimpleSplashScreenState extends State<SimpleSplashScreen>
     _fadeController.forward();
     _scaleController.forward();
     
-    // Start display timer
+    // Start display timer with authentication check
     _displayTimer = Timer(widget.displayDuration, () {
-      widget.onComplete?.call();
+      _checkAuthenticationAndComplete();
     });
+  }
+
+  void _checkAuthenticationAndComplete() {
+    print('🔍 SPLASH DEBUG: Checking authentication and completing splash screen');
+    
+    // اگر authStore موجود است، وضعیت احراز هویت را بررسی کن
+    if (widget.authStore != null) {
+      final hasApiKey = widget.authStore!.apiKey != null && widget.authStore!.apiKey!.isNotEmpty;
+      print('🔍 SPLASH DEBUG: AuthStore available, has API key: $hasApiKey');
+      
+      // اگر کاربر وارد شده، URL فعلی را ذخیره کن
+      if (hasApiKey) {
+        // URL فعلی را از window.location بگیر
+        try {
+          // در web، URL فعلی را از window.location می‌گیریم
+          final currentUrl = Uri.base.path;
+          print('🔍 SPLASH DEBUG: Current URL from Uri.base: $currentUrl');
+          
+          if (currentUrl.isNotEmpty && 
+              currentUrl != '/' && 
+              currentUrl != '/login' &&
+              (currentUrl.startsWith('/user/profile/') || currentUrl.startsWith('/business/'))) {
+            print('🔍 SPLASH DEBUG: Saving current URL: $currentUrl');
+            widget.authStore!.saveLastUrl(currentUrl);
+          }
+        } catch (e) {
+          print('🔍 SPLASH DEBUG: Error getting current URL: $e');
+        }
+      }
+      
+      // اگر کاربر وارد نشده، به صفحه لاگین هدایت می‌شود
+      // اگر کاربر وارد شده، در صفحه کنونی می‌ماند
+      // این منطق در main.dart در GoRouter redirect مدیریت می‌شود
+    } else {
+      print('🔍 SPLASH DEBUG: AuthStore is null');
+    }
+    
+    print('🔍 SPLASH DEBUG: Calling onComplete callback');
+    widget.onComplete?.call();
   }
 
   @override
