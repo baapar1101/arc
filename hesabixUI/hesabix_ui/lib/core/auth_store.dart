@@ -4,6 +4,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import 'api_client.dart';
+import '../models/business_dashboard_models.dart';
 
 class AuthStore with ChangeNotifier {
   static const _kApiKey = 'auth_api_key';
@@ -11,12 +12,15 @@ class AuthStore with ChangeNotifier {
   static const _kAppPermissions = 'app_permissions';
   static const _kIsSuperAdmin = 'is_superadmin';
   static const _kLastUrl = 'last_url';
+  static const _kCurrentBusiness = 'current_business';
 
   final FlutterSecureStorage _secure = const FlutterSecureStorage();
   String? _apiKey;
   String? _deviceId;
   Map<String, dynamic>? _appPermissions;
   bool _isSuperAdmin = false;
+  BusinessWithPermission? _currentBusiness;
+  Map<String, dynamic>? _businessPermissions;
 
   String? get apiKey => _apiKey;
   String get deviceId => _deviceId ?? '';
@@ -24,6 +28,8 @@ class AuthStore with ChangeNotifier {
   bool get isSuperAdmin => _isSuperAdmin;
   int? _currentUserId;
   int? get currentUserId => _currentUserId;
+  BusinessWithPermission? get currentBusiness => _currentBusiness;
+  Map<String, dynamic>? get businessPermissions => _businessPermissions;
 
   Future<void> load() async {
     final prefs = await SharedPreferences.getInstance();
@@ -233,6 +239,147 @@ class AuthStore with ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(_kLastUrl);
     } catch (_) {}
+  }
+
+  // مدیریت کسب و کار فعلی
+  Future<void> setCurrentBusiness(BusinessWithPermission business) async {
+    _currentBusiness = business;
+    _businessPermissions = business.permissions;
+    notifyListeners();
+    
+    // ذخیره در حافظه محلی
+    await _saveCurrentBusiness();
+  }
+
+  Future<void> clearCurrentBusiness() async {
+    _currentBusiness = null;
+    _businessPermissions = null;
+    notifyListeners();
+    
+    // پاک کردن از حافظه محلی
+    await _clearCurrentBusiness();
+  }
+
+  Future<void> _saveCurrentBusiness() async {
+    if (_currentBusiness == null) return;
+    
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final businessJson = const JsonEncoder().convert({
+        'id': _currentBusiness!.id,
+        'name': _currentBusiness!.name,
+        'business_type': _currentBusiness!.businessType,
+        'business_field': _currentBusiness!.businessField,
+        'owner_id': _currentBusiness!.ownerId,
+        'address': _currentBusiness!.address,
+        'phone': _currentBusiness!.phone,
+        'mobile': _currentBusiness!.mobile,
+        'created_at': _currentBusiness!.createdAt,
+        'is_owner': _currentBusiness!.isOwner,
+        'role': _currentBusiness!.role,
+        'permissions': _currentBusiness!.permissions,
+      });
+      
+      if (kIsWeb) {
+        await prefs.setString(_kCurrentBusiness, businessJson);
+      } else {
+        try {
+          await _secure.write(key: _kCurrentBusiness, value: businessJson);
+        } catch (_) {
+          await prefs.setString(_kCurrentBusiness, businessJson);
+        }
+      }
+    } catch (e) {
+      // Silent fail
+    }
+  }
+
+  Future<void> _clearCurrentBusiness() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      
+      if (kIsWeb) {
+        await prefs.remove(_kCurrentBusiness);
+      } else {
+        try {
+          await _secure.delete(key: _kCurrentBusiness);
+        } catch (_) {}
+        await prefs.remove(_kCurrentBusiness);
+      }
+    } catch (e) {
+      // Silent fail
+    }
+  }
+
+  // بررسی دسترسی‌های کسب و کار
+  bool hasBusinessPermission(String section, String action) {
+    if (_currentBusiness?.isOwner == true) return true;
+    if (_businessPermissions == null) return false;
+    
+    final sectionPerms = _businessPermissions![section] as Map<String, dynamic>?;
+    if (sectionPerms == null) return action == 'view'; // دسترسی خواندن پیش‌فرض
+    
+    return sectionPerms[action] == true;
+  }
+
+  // دسترسی‌های کلی
+  bool canReadSection(String section) {
+    return hasBusinessPermission(section, 'view') || 
+           _businessPermissions?.containsKey(section) == true;
+  }
+
+  bool canWriteSection(String section) {
+    return hasBusinessPermission(section, 'add') || 
+           hasBusinessPermission(section, 'edit');
+  }
+
+  bool canDeleteSection(String section) {
+    return hasBusinessPermission(section, 'delete');
+  }
+
+  // دسترسی‌های خاص
+  bool canManageDrafts(String section) {
+    return hasBusinessPermission(section, 'draft');
+  }
+
+  bool canCollectChecks() {
+    return hasBusinessPermission('checks', 'collect');
+  }
+
+  bool canTransferChecks() {
+    return hasBusinessPermission('checks', 'transfer');
+  }
+
+  bool canReturnChecks() {
+    return hasBusinessPermission('checks', 'return');
+  }
+
+  bool canChargeWallet() {
+    return hasBusinessPermission('wallet', 'charge');
+  }
+
+  bool canManageUsers() {
+    return hasBusinessPermission('settings', 'users');
+  }
+
+  // بررسی دسترسی به کسب و کار
+  bool canAccessBusiness(int businessId) {
+    if (_currentBusiness == null) return false;
+    return _currentBusiness!.id == businessId;
+  }
+
+  // دریافت دسترسی‌های موجود برای یک بخش
+  List<String> getAvailableActions(String section) {
+    if (_currentBusiness?.isOwner == true) {
+      return ['add', 'view', 'edit', 'delete', 'draft', 'collect', 'transfer', 'return', 'charge'];
+    }
+    
+    if (_businessPermissions == null) return ['view'];
+    
+    final sectionPerms = _businessPermissions![section] as Map<String, dynamic>?;
+    if (sectionPerms == null) return ['view'];
+    
+    return sectionPerms.keys.where((key) => sectionPerms[key] == true).toList();
   }
 }
 

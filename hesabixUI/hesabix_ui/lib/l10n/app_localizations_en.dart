@@ -1380,6 +1380,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get payments => 'Payments';
 
   @override
+  String get receiptsAndPayments => 'Receipts and Payments';
+
+  @override
   String get productsAndServices => 'Products and Services';
 
   @override
@@ -1665,7 +1668,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get draft => 'Manage Drafts';
 
   @override
-  String get addPerson => 'Add New Person';
+  String get addPerson => 'Add Person';
 
   @override
   String get viewPeople => 'View People List';
@@ -2126,4 +2129,177 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get accountManagement => 'Account Management';
+
+  @override
+  String get persons => 'Persons';
+
+  @override
+  String get personsList => 'Persons List';
+
+  @override
+  String get editPerson => 'Edit Person';
+
+  @override
+  String get personDetails => 'Person Details';
+
+  @override
+  String get deletePerson => 'Delete Person';
+
+  @override
+  String get personAliasName => 'Alias Name';
+
+  @override
+  String get personFirstName => 'First Name';
+
+  @override
+  String get personLastName => 'Last Name';
+
+  @override
+  String get personType => 'Person Type';
+
+  @override
+  String get personCompanyName => 'Company Name';
+
+  @override
+  String get personPaymentId => 'Payment ID';
+
+  @override
+  String get personNationalId => 'National ID';
+
+  @override
+  String get personRegistrationNumber => 'Registration Number';
+
+  @override
+  String get personEconomicId => 'Economic ID';
+
+  @override
+  String get personCountry => 'Country';
+
+  @override
+  String get personProvince => 'Province';
+
+  @override
+  String get personCity => 'City';
+
+  @override
+  String get personAddress => 'Address';
+
+  @override
+  String get personPostalCode => 'Postal Code';
+
+  @override
+  String get personPhone => 'Phone';
+
+  @override
+  String get personMobile => 'Mobile';
+
+  @override
+  String get personFax => 'Fax';
+
+  @override
+  String get personEmail => 'Email';
+
+  @override
+  String get personWebsite => 'Website';
+
+  @override
+  String get personBankAccounts => 'Bank Accounts';
+
+  @override
+  String get editBankAccount => 'Edit Bank Account';
+
+  @override
+  String get deleteBankAccount => 'Delete Bank Account';
+
+  @override
+  String get bankName => 'Bank Name';
+
+  @override
+  String get accountNumber => 'Account Number';
+
+  @override
+  String get cardNumber => 'Card Number';
+
+  @override
+  String get shebaNumber => 'Sheba Number';
+
+  @override
+  String get personTypeCustomer => 'Customer';
+
+  @override
+  String get personTypeMarketer => 'Marketer';
+
+  @override
+  String get personTypeEmployee => 'Employee';
+
+  @override
+  String get personTypeSupplier => 'Supplier';
+
+  @override
+  String get personTypePartner => 'Partner';
+
+  @override
+  String get personTypeSeller => 'Seller';
+
+  @override
+  String get personCreatedSuccessfully => 'Person created successfully';
+
+  @override
+  String get personUpdatedSuccessfully => 'Person updated successfully';
+
+  @override
+  String get personDeletedSuccessfully => 'Person deleted successfully';
+
+  @override
+  String get personNotFound => 'Person not found';
+
+  @override
+  String get personAliasNameRequired => 'Alias name is required';
+
+  @override
+  String get personTypeRequired => 'Person type is required';
+
+  @override
+  String get bankAccountAddedSuccessfully => 'Bank account added successfully';
+
+  @override
+  String get bankAccountUpdatedSuccessfully =>
+      'Bank account updated successfully';
+
+  @override
+  String get bankAccountDeletedSuccessfully =>
+      'Bank account deleted successfully';
+
+  @override
+  String get bankNameRequired => 'Bank name is required';
+
+  @override
+  String get personBasicInfo => 'Basic Information';
+
+  @override
+  String get personEconomicInfo => 'Economic Information';
+
+  @override
+  String get personContactInfo => 'Contact Information';
+
+  @override
+  String get personBankInfo => 'Bank Accounts';
+
+  @override
+  String get personSummary => 'Persons Summary';
+
+  @override
+  String get totalPersons => 'Total Persons';
+
+  @override
+  String get activePersons => 'Active Persons';
+
+  @override
+  String get inactivePersons => 'Inactive Persons';
+
+  @override
+  String get personsByType => 'Persons by Type';
+
+  @override
+  String get update => 'Update';
 }

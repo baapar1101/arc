@@ -12,7 +12,7 @@ from app.core.responses import success_response, format_datetime_fields
 from app.core.auth_dependency import get_current_user, AuthContext
 from app.core.permissions import require_business_management
 from app.services.business_service import (
-    create_business, get_business_by_id, get_businesses_by_owner,
+    create_business, get_business_by_id, get_businesses_by_owner, get_user_businesses,
     update_business, delete_business, get_business_summary
 )
 
@@ -116,8 +116,8 @@ def list_user_businesses(
     sort_desc: bool = True,
     search: str = None
 ) -> dict:
-    """لیست کسب و کارهای کاربر"""
-    owner_id = ctx.get_user_id()
+    """لیست کسب و کارهای کاربر (مالک + عضو)"""
+    user_id = ctx.get_user_id()
     query_dict = {
         "take": take,
         "skip": skip,
@@ -125,34 +125,10 @@ def list_user_businesses(
         "sort_desc": sort_desc,
         "search": search
     }
-    businesses = get_businesses_by_owner(db, owner_id, query_dict)
+    businesses = get_user_businesses(db, user_id, query_dict)
     formatted_data = format_datetime_fields(businesses, request)
     
-    # اگر formatted_data یک dict با کلید items است، آن را استخراج کنیم
-    if isinstance(formatted_data, dict) and 'items' in formatted_data:
-        items = formatted_data['items']
-    else:
-        items = formatted_data
-    
-    # برای حالا total را برابر با تعداد items قرار می‌دهیم
-    # در آینده می‌توان total را از service دریافت کرد
-    total = len(items)
-    page = (skip // take) + 1
-    total_pages = (total + take - 1) // take
-    
-    response_data = {
-        "items": items,
-        "pagination": {
-            "total": total,
-            "page": page,
-            "per_page": take,
-            "total_pages": total_pages,
-            "has_next": page < total_pages,
-            "has_prev": page > 1,
-        },
-        "query_info": query_dict
-    }
-    return success_response(response_data, request)
+    return success_response(formatted_data, request)
 
 
 @router.post("/{business_id}/details", 

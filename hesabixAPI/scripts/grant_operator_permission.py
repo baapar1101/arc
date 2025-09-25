@@ -8,6 +8,7 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 from adapters.db.session import get_db
 from adapters.db.models.user import User
 
@@ -82,7 +83,7 @@ def list_operators():
     
     try:
         operators = db.query(User).filter(
-            User.app_permissions['support_operator'].astext == 'true'
+            text("app_permissions->>'support_operator' = 'true'")
         ).all()
         
         if not operators:

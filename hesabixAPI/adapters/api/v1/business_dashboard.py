@@ -192,3 +192,101 @@ def get_business_statistics(
     stats_data = get_business_statistics(db, business_id, ctx)
     formatted_data = format_datetime_fields(stats_data, request)
     return success_response(formatted_data, request)
+
+
+@router.post("/{business_id}/info-with-permissions", 
+    summary="دریافت اطلاعات کسب و کار و دسترسی‌ها", 
+    description="دریافت اطلاعات کسب و کار همراه با دسترسی‌های کاربر",
+    response_model=SuccessResponse,
+    responses={
+        200: {
+            "description": "اطلاعات کسب و کار و دسترسی‌ها با موفقیت دریافت شد",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "success": True,
+                        "message": "اطلاعات کسب و کار و دسترسی‌ها دریافت شد",
+                        "data": {
+                            "business_info": {
+                                "id": 1,
+                                "name": "شرکت نمونه",
+                                "business_type": "شرکت",
+                                "business_field": "تولیدی",
+                                "owner_id": 1,
+                                "address": "تهران، خیابان ولیعصر",
+                                "phone": "02112345678",
+                                "mobile": "09123456789",
+                                "created_at": "1403/01/01 00:00:00"
+                            },
+                            "user_permissions": {
+                                "people": {"add": True, "view": True, "edit": True, "delete": False},
+                                "products": {"add": True, "view": True, "edit": False, "delete": False},
+                                "invoices": {"add": True, "view": True, "edit": True, "delete": True}
+                            },
+                            "is_owner": False,
+                            "role": "عضو",
+                            "has_access": True
+                        }
+                    }
+                }
+            }
+        },
+        401: {
+            "description": "کاربر احراز هویت نشده است"
+        },
+        403: {
+            "description": "دسترسی غیرمجاز به کسب و کار"
+        },
+        404: {
+            "description": "کسب و کار یافت نشد"
+        }
+    }
+)
+@require_business_access("business_id")
+def get_business_info_with_permissions(
+    request: Request,
+    business_id: int,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db)
+) -> dict:
+    """دریافت اطلاعات کسب و کار همراه با دسترسی‌های کاربر"""
+    from adapters.db.models.business import Business
+    from adapters.db.repositories.business_permission_repo import BusinessPermissionRepository
+    
+    # دریافت اطلاعات کسب و کار
+    business = db.get(Business, business_id)
+    if not business:
+        from app.core.responses import ApiError
+        raise ApiError("NOT_FOUND", "Business not found", http_status=404)
+    
+    # دریافت دسترسی‌های کاربر
+    permissions = {}
+    if not ctx.is_superadmin() and not ctx.is_business_owner(business_id):
+        # دریافت دسترسی‌های کسب و کار از business_permissions
+        permission_repo = BusinessPermissionRepository(db)
+        business_permission = permission_repo.get_by_business_and_user(business_id, ctx.get_user_id())
+        if business_permission:
+            permissions = business_permission.business_permissions or {}
+    
+    business_info = {
+        "id": business.id,
+        "name": business.name,
+        "business_type": business.business_type.value,
+        "business_field": business.business_field.value,
+        "owner_id": business.owner_id,
+        "address": business.address,
+        "phone": business.phone,
+        "mobile": business.mobile,
+        "created_at": business.created_at.isoformat(),
+    }
+    
+    response_data = {
+        "business_info": business_info,
+        "user_permissions": permissions,
+        "is_owner": ctx.is_business_owner(business_id),
+        "role": "مالک" if ctx.is_business_owner(business_id) else "عضو",
+        "has_access": ctx.can_access_business(business_id)
+    }
+    
+    formatted_data = format_datetime_fields(response_data, request)
+    return success_response(formatted_data, request)

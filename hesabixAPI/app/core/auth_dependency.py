@@ -247,6 +247,42 @@ class AuthContext:
 		logger.info(f"Business access check: {business_id} == {self.business_id} = {has_access}")
 		return has_access
 	
+	def is_business_member(self, business_id: int) -> bool:
+		"""بررسی اینکه آیا کاربر عضو کسب و کار است یا نه (دسترسی join)"""
+		import logging
+		logger = logging.getLogger(__name__)
+		
+		logger.info(f"Checking business membership: user {self.user.id}, business {business_id}")
+		
+		# SuperAdmin عضو همه کسب و کارها محسوب می‌شود
+		if self.is_superadmin():
+			logger.info(f"User {self.user.id} is superadmin, is member of all businesses")
+			return True
+		
+		# اگر مالک کسب و کار است، عضو محسوب می‌شود
+		if self.is_business_owner() and business_id == self.business_id:
+			logger.info(f"User {self.user.id} is business owner of {business_id}, is member")
+			return True
+		
+		# بررسی دسترسی join در business_permissions
+		if not self.db:
+			logger.info(f"No database session available")
+			return False
+		
+		from adapters.db.repositories.business_permission_repo import BusinessPermissionRepository
+		repo = BusinessPermissionRepository(self.db)
+		permission_obj = repo.get_by_user_and_business(self.user.id, business_id)
+		
+		if not permission_obj:
+			logger.info(f"No business permission found for user {self.user.id} and business {business_id}")
+			return False
+		
+		# بررسی دسترسی join
+		business_perms = permission_obj.business_permissions or {}
+		has_join_access = business_perms.get('join', False)
+		logger.info(f"Business membership check: user {self.user.id} join access to business {business_id}: {has_join_access}")
+		return has_join_access
+	
 	def to_dict(self) -> dict:
 		"""تبدیل به dictionary برای استفاده در API"""
 		return {

@@ -1369,6 +1369,9 @@ class AppLocalizationsFa extends AppLocalizations {
   String get payments => 'پرداخت‌ها';
 
   @override
+  String get receiptsAndPayments => 'دریافت و پرداخت';
+
+  @override
   String get productsAndServices => 'کالا و خدمات';
 
   @override
@@ -1655,7 +1658,7 @@ class AppLocalizationsFa extends AppLocalizations {
   String get draft => 'مدیریت پیش‌نویس‌ها';
 
   @override
-  String get addPerson => 'افزودن شخص جدید';
+  String get addPerson => 'افزودن شخص';
 
   @override
   String get viewPeople => 'مشاهده لیست اشخاص';
@@ -2112,4 +2115,175 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get accountManagement => 'مدیریت حساب کاربری';
+
+  @override
+  String get persons => 'اشخاص';
+
+  @override
+  String get personsList => 'لیست اشخاص';
+
+  @override
+  String get editPerson => 'ویرایش شخص';
+
+  @override
+  String get personDetails => 'جزئیات شخص';
+
+  @override
+  String get deletePerson => 'حذف شخص';
+
+  @override
+  String get personAliasName => 'نام مستعار';
+
+  @override
+  String get personFirstName => 'نام';
+
+  @override
+  String get personLastName => 'نام خانوادگی';
+
+  @override
+  String get personType => 'نوع شخص';
+
+  @override
+  String get personCompanyName => 'نام شرکت';
+
+  @override
+  String get personPaymentId => 'شناسه پرداخت';
+
+  @override
+  String get personNationalId => 'شناسه ملی';
+
+  @override
+  String get personRegistrationNumber => 'شماره ثبت';
+
+  @override
+  String get personEconomicId => 'شناسه اقتصادی';
+
+  @override
+  String get personCountry => 'کشور';
+
+  @override
+  String get personProvince => 'استان';
+
+  @override
+  String get personCity => 'شهرستان';
+
+  @override
+  String get personAddress => 'آدرس';
+
+  @override
+  String get personPostalCode => 'کد پستی';
+
+  @override
+  String get personPhone => 'تلفن';
+
+  @override
+  String get personMobile => 'موبایل';
+
+  @override
+  String get personFax => 'فکس';
+
+  @override
+  String get personEmail => 'پست الکترونیکی';
+
+  @override
+  String get personWebsite => 'وب‌سایت';
+
+  @override
+  String get personBankAccounts => 'حساب‌های بانکی';
+
+  @override
+  String get editBankAccount => 'ویرایش حساب بانکی';
+
+  @override
+  String get deleteBankAccount => 'حذف حساب بانکی';
+
+  @override
+  String get bankName => 'نام بانک';
+
+  @override
+  String get accountNumber => 'شماره حساب';
+
+  @override
+  String get cardNumber => 'شماره کارت';
+
+  @override
+  String get shebaNumber => 'شماره شبا';
+
+  @override
+  String get personTypeCustomer => 'مشتری';
+
+  @override
+  String get personTypeMarketer => 'بازاریاب';
+
+  @override
+  String get personTypeEmployee => 'کارمند';
+
+  @override
+  String get personTypeSupplier => 'تامین‌کننده';
+
+  @override
+  String get personTypePartner => 'همکار';
+
+  @override
+  String get personTypeSeller => 'فروشنده';
+
+  @override
+  String get personCreatedSuccessfully => 'شخص با موفقیت ایجاد شد';
+
+  @override
+  String get personUpdatedSuccessfully => 'شخص با موفقیت ویرایش شد';
+
+  @override
+  String get personDeletedSuccessfully => 'شخص با موفقیت حذف شد';
+
+  @override
+  String get personNotFound => 'شخص یافت نشد';
+
+  @override
+  String get personAliasNameRequired => 'نام مستعار الزامی است';
+
+  @override
+  String get personTypeRequired => 'نوع شخص الزامی است';
+
+  @override
+  String get bankAccountAddedSuccessfully => 'حساب بانکی با موفقیت اضافه شد';
+
+  @override
+  String get bankAccountUpdatedSuccessfully => 'حساب بانکی با موفقیت ویرایش شد';
+
+  @override
+  String get bankAccountDeletedSuccessfully => 'حساب بانکی با موفقیت حذف شد';
+
+  @override
+  String get bankNameRequired => 'نام بانک الزامی است';
+
+  @override
+  String get personBasicInfo => 'اطلاعات پایه';
+
+  @override
+  String get personEconomicInfo => 'اطلاعات اقتصادی';
+
+  @override
+  String get personContactInfo => 'اطلاعات تماس';
+
+  @override
+  String get personBankInfo => 'حساب‌های بانکی';
+
+  @override
+  String get personSummary => 'خلاصه اشخاص';
+
+  @override
+  String get totalPersons => 'تعداد کل اشخاص';
+
+  @override
+  String get activePersons => 'اشخاص فعال';
+
+  @override
+  String get inactivePersons => 'اشخاص غیرفعال';
+
+  @override
+  String get personsByType => 'اشخاص بر اساس نوع';
+
+  @override
+  String get update => 'ویرایش';
 }

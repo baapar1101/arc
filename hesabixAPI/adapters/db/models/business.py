@@ -54,5 +54,5 @@ class Business(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     
-    # Relationships - using business_permissions instead
-    # users = relationship("BusinessUser", back_populates="business", cascade="all, delete-orphan")
+    # Relationships
+    persons: Mapped[list["Person"]] = relationship("Person", back_populates="business", cascade="all, delete-orphan")

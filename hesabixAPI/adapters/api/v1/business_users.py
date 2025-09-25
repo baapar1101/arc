@@ -270,7 +270,7 @@ def add_user(
     permission_obj = permission_repo.create_or_update(
         user_id=user.id,
         business_id=business_id,
-        permissions={}  # Default empty permissions
+        permissions={'join': True}  # Default permissions with join access
     )
     
     logger.info(f"Created permission object: {permission_obj.id}")

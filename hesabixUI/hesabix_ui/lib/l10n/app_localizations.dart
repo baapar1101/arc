@@ -2756,6 +2756,12 @@ abstract class AppLocalizations {
   /// **'Payments'**
   String get payments;
 
+  /// No description provided for @receiptsAndPayments.
+  ///
+  /// In en, this message translates to:
+  /// **'Receipts and Payments'**
+  String get receiptsAndPayments;
+
   /// No description provided for @productsAndServices.
   ///
   /// In en, this message translates to:
@@ -3323,7 +3329,7 @@ abstract class AppLocalizations {
   /// No description provided for @addPerson.
   ///
   /// In en, this message translates to:
-  /// **'Add New Person'**
+  /// **'Add Person'**
   String get addPerson;
 
   /// No description provided for @viewPeople.
@@ -4219,6 +4225,348 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Account Management'**
   String get accountManagement;
+
+  /// No description provided for @persons.
+  ///
+  /// In en, this message translates to:
+  /// **'Persons'**
+  String get persons;
+
+  /// No description provided for @personsList.
+  ///
+  /// In en, this message translates to:
+  /// **'Persons List'**
+  String get personsList;
+
+  /// No description provided for @editPerson.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Person'**
+  String get editPerson;
+
+  /// No description provided for @personDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Person Details'**
+  String get personDetails;
+
+  /// No description provided for @deletePerson.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Person'**
+  String get deletePerson;
+
+  /// No description provided for @personAliasName.
+  ///
+  /// In en, this message translates to:
+  /// **'Alias Name'**
+  String get personAliasName;
+
+  /// No description provided for @personFirstName.
+  ///
+  /// In en, this message translates to:
+  /// **'First Name'**
+  String get personFirstName;
+
+  /// No description provided for @personLastName.
+  ///
+  /// In en, this message translates to:
+  /// **'Last Name'**
+  String get personLastName;
+
+  /// No description provided for @personType.
+  ///
+  /// In en, this message translates to:
+  /// **'Person Type'**
+  String get personType;
+
+  /// No description provided for @personCompanyName.
+  ///
+  /// In en, this message translates to:
+  /// **'Company Name'**
+  String get personCompanyName;
+
+  /// No description provided for @personPaymentId.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment ID'**
+  String get personPaymentId;
+
+  /// No description provided for @personNationalId.
+  ///
+  /// In en, this message translates to:
+  /// **'National ID'**
+  String get personNationalId;
+
+  /// No description provided for @personRegistrationNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Registration Number'**
+  String get personRegistrationNumber;
+
+  /// No description provided for @personEconomicId.
+  ///
+  /// In en, this message translates to:
+  /// **'Economic ID'**
+  String get personEconomicId;
+
+  /// No description provided for @personCountry.
+  ///
+  /// In en, this message translates to:
+  /// **'Country'**
+  String get personCountry;
+
+  /// No description provided for @personProvince.
+  ///
+  /// In en, this message translates to:
+  /// **'Province'**
+  String get personProvince;
+
+  /// No description provided for @personCity.
+  ///
+  /// In en, this message translates to:
+  /// **'City'**
+  String get personCity;
+
+  /// No description provided for @personAddress.
+  ///
+  /// In en, this message translates to:
+  /// **'Address'**
+  String get personAddress;
+
+  /// No description provided for @personPostalCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Postal Code'**
+  String get personPostalCode;
+
+  /// No description provided for @personPhone.
+  ///
+  /// In en, this message translates to:
+  /// **'Phone'**
+  String get personPhone;
+
+  /// No description provided for @personMobile.
+  ///
+  /// In en, this message translates to:
+  /// **'Mobile'**
+  String get personMobile;
+
+  /// No description provided for @personFax.
+  ///
+  /// In en, this message translates to:
+  /// **'Fax'**
+  String get personFax;
+
+  /// No description provided for @personEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'Email'**
+  String get personEmail;
+
+  /// No description provided for @personWebsite.
+  ///
+  /// In en, this message translates to:
+  /// **'Website'**
+  String get personWebsite;
+
+  /// No description provided for @personBankAccounts.
+  ///
+  /// In en, this message translates to:
+  /// **'Bank Accounts'**
+  String get personBankAccounts;
+
+  /// No description provided for @editBankAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Bank Account'**
+  String get editBankAccount;
+
+  /// No description provided for @deleteBankAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Bank Account'**
+  String get deleteBankAccount;
+
+  /// No description provided for @bankName.
+  ///
+  /// In en, this message translates to:
+  /// **'Bank Name'**
+  String get bankName;
+
+  /// No description provided for @accountNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Account Number'**
+  String get accountNumber;
+
+  /// No description provided for @cardNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Card Number'**
+  String get cardNumber;
+
+  /// No description provided for @shebaNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Sheba Number'**
+  String get shebaNumber;
+
+  /// No description provided for @personTypeCustomer.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer'**
+  String get personTypeCustomer;
+
+  /// No description provided for @personTypeMarketer.
+  ///
+  /// In en, this message translates to:
+  /// **'Marketer'**
+  String get personTypeMarketer;
+
+  /// No description provided for @personTypeEmployee.
+  ///
+  /// In en, this message translates to:
+  /// **'Employee'**
+  String get personTypeEmployee;
+
+  /// No description provided for @personTypeSupplier.
+  ///
+  /// In en, this message translates to:
+  /// **'Supplier'**
+  String get personTypeSupplier;
+
+  /// No description provided for @personTypePartner.
+  ///
+  /// In en, this message translates to:
+  /// **'Partner'**
+  String get personTypePartner;
+
+  /// No description provided for @personTypeSeller.
+  ///
+  /// In en, this message translates to:
+  /// **'Seller'**
+  String get personTypeSeller;
+
+  /// No description provided for @personCreatedSuccessfully.
+  ///
+  /// In en, this message translates to:
+  /// **'Person created successfully'**
+  String get personCreatedSuccessfully;
+
+  /// No description provided for @personUpdatedSuccessfully.
+  ///
+  /// In en, this message translates to:
+  /// **'Person updated successfully'**
+  String get personUpdatedSuccessfully;
+
+  /// No description provided for @personDeletedSuccessfully.
+  ///
+  /// In en, this message translates to:
+  /// **'Person deleted successfully'**
+  String get personDeletedSuccessfully;
+
+  /// No description provided for @personNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'Person not found'**
+  String get personNotFound;
+
+  /// No description provided for @personAliasNameRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Alias name is required'**
+  String get personAliasNameRequired;
+
+  /// No description provided for @personTypeRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Person type is required'**
+  String get personTypeRequired;
+
+  /// No description provided for @bankAccountAddedSuccessfully.
+  ///
+  /// In en, this message translates to:
+  /// **'Bank account added successfully'**
+  String get bankAccountAddedSuccessfully;
+
+  /// No description provided for @bankAccountUpdatedSuccessfully.
+  ///
+  /// In en, this message translates to:
+  /// **'Bank account updated successfully'**
+  String get bankAccountUpdatedSuccessfully;
+
+  /// No description provided for @bankAccountDeletedSuccessfully.
+  ///
+  /// In en, this message translates to:
+  /// **'Bank account deleted successfully'**
+  String get bankAccountDeletedSuccessfully;
+
+  /// No description provided for @bankNameRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Bank name is required'**
+  String get bankNameRequired;
+
+  /// No description provided for @personBasicInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Basic Information'**
+  String get personBasicInfo;
+
+  /// No description provided for @personEconomicInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Economic Information'**
+  String get personEconomicInfo;
+
+  /// No description provided for @personContactInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Contact Information'**
+  String get personContactInfo;
+
+  /// No description provided for @personBankInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Bank Accounts'**
+  String get personBankInfo;
+
+  /// No description provided for @personSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'Persons Summary'**
+  String get personSummary;
+
+  /// No description provided for @totalPersons.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Persons'**
+  String get totalPersons;
+
+  /// No description provided for @activePersons.
+  ///
+  /// In en, this message translates to:
+  /// **'Active Persons'**
+  String get activePersons;
+
+  /// No description provided for @inactivePersons.
+  ///
+  /// In en, this message translates to:
+  /// **'Inactive Persons'**
+  String get inactivePersons;
+
+  /// No description provided for @personsByType.
+  ///
+  /// In en, this message translates to:
+  /// **'Persons by Type'**
+  String get personsByType;
+
+  /// No description provided for @update.
+  ///
+  /// In en, this message translates to:
+  /// **'Update'**
+  String get update;
 }
 
 class _AppLocalizationsDelegate

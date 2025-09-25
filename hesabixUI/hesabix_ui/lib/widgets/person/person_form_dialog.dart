@@ -1,0 +1,742 @@
+import 'package:flutter/material.dart';
+import 'package:hesabix_ui/l10n/app_localizations.dart';
+import '../../models/person_model.dart';
+import '../../services/person_service.dart';
+
+class PersonFormDialog extends StatefulWidget {
+  final int businessId;
+  final Person? person; // null برای افزودن، مقدار برای ویرایش
+  final VoidCallback? onSuccess;
+
+  const PersonFormDialog({
+    super.key,
+    required this.businessId,
+    this.person,
+    this.onSuccess,
+  });
+
+  @override
+  State<PersonFormDialog> createState() => _PersonFormDialogState();
+}
+
+class _PersonFormDialogState extends State<PersonFormDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _personService = PersonService();
+  bool _isLoading = false;
+
+  // Controllers for basic info
+  final _aliasNameController = TextEditingController();
+  final _firstNameController = TextEditingController();
+  final _lastNameController = TextEditingController();
+  final _companyNameController = TextEditingController();
+  final _paymentIdController = TextEditingController();
+
+  // Controllers for economic info
+  final _nationalIdController = TextEditingController();
+  final _registrationNumberController = TextEditingController();
+  final _economicIdController = TextEditingController();
+
+  // Controllers for contact info
+  final _countryController = TextEditingController();
+  final _provinceController = TextEditingController();
+  final _cityController = TextEditingController();
+  final _addressController = TextEditingController();
+  final _postalCodeController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _mobileController = TextEditingController();
+  final _faxController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _websiteController = TextEditingController();
+
+  PersonType _selectedPersonType = PersonType.customer;
+  bool _isActive = true;
+
+  // Bank accounts
+  List<PersonBankAccount> _bankAccounts = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeForm();
+  }
+
+  void _initializeForm() {
+    if (widget.person != null) {
+      final person = widget.person!;
+      _aliasNameController.text = person.aliasName;
+      _firstNameController.text = person.firstName ?? '';
+      _lastNameController.text = person.lastName ?? '';
+      _companyNameController.text = person.companyName ?? '';
+      _paymentIdController.text = person.paymentId ?? '';
+      _nationalIdController.text = person.nationalId ?? '';
+      _registrationNumberController.text = person.registrationNumber ?? '';
+      _economicIdController.text = person.economicId ?? '';
+      _countryController.text = person.country ?? '';
+      _provinceController.text = person.province ?? '';
+      _cityController.text = person.city ?? '';
+      _addressController.text = person.address ?? '';
+      _postalCodeController.text = person.postalCode ?? '';
+      _phoneController.text = person.phone ?? '';
+      _mobileController.text = person.mobile ?? '';
+      _faxController.text = person.fax ?? '';
+      _emailController.text = person.email ?? '';
+      _websiteController.text = person.website ?? '';
+      _selectedPersonType = person.personType;
+      _isActive = person.isActive;
+      _bankAccounts = List.from(person.bankAccounts);
+    }
+  }
+
+  @override
+  void dispose() {
+    _aliasNameController.dispose();
+    _firstNameController.dispose();
+    _lastNameController.dispose();
+    _companyNameController.dispose();
+    _paymentIdController.dispose();
+    _nationalIdController.dispose();
+    _registrationNumberController.dispose();
+    _economicIdController.dispose();
+    _countryController.dispose();
+    _provinceController.dispose();
+    _cityController.dispose();
+    _addressController.dispose();
+    _postalCodeController.dispose();
+    _phoneController.dispose();
+    _mobileController.dispose();
+    _faxController.dispose();
+    _emailController.dispose();
+    _websiteController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _savePerson() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      if (widget.person == null) {
+        // Create new person
+        final personData = PersonCreateRequest(
+          aliasName: _aliasNameController.text.trim(),
+          firstName: _firstNameController.text.trim().isEmpty ? null : _firstNameController.text.trim(),
+          lastName: _lastNameController.text.trim().isEmpty ? null : _lastNameController.text.trim(),
+          personType: _selectedPersonType,
+          companyName: _companyNameController.text.trim().isEmpty ? null : _companyNameController.text.trim(),
+          paymentId: _paymentIdController.text.trim().isEmpty ? null : _paymentIdController.text.trim(),
+          nationalId: _nationalIdController.text.trim().isEmpty ? null : _nationalIdController.text.trim(),
+          registrationNumber: _registrationNumberController.text.trim().isEmpty ? null : _registrationNumberController.text.trim(),
+          economicId: _economicIdController.text.trim().isEmpty ? null : _economicIdController.text.trim(),
+          country: _countryController.text.trim().isEmpty ? null : _countryController.text.trim(),
+          province: _provinceController.text.trim().isEmpty ? null : _provinceController.text.trim(),
+          city: _cityController.text.trim().isEmpty ? null : _cityController.text.trim(),
+          address: _addressController.text.trim().isEmpty ? null : _addressController.text.trim(),
+          postalCode: _postalCodeController.text.trim().isEmpty ? null : _postalCodeController.text.trim(),
+          phone: _phoneController.text.trim().isEmpty ? null : _phoneController.text.trim(),
+          mobile: _mobileController.text.trim().isEmpty ? null : _mobileController.text.trim(),
+          fax: _faxController.text.trim().isEmpty ? null : _faxController.text.trim(),
+          email: _emailController.text.trim().isEmpty ? null : _emailController.text.trim(),
+          website: _websiteController.text.trim().isEmpty ? null : _websiteController.text.trim(),
+          bankAccounts: _bankAccounts,
+        );
+
+        await _personService.createPerson(
+          businessId: widget.businessId,
+          personData: personData,
+        );
+      } else {
+        // Update existing person
+        final personData = PersonUpdateRequest(
+          aliasName: _aliasNameController.text.trim(),
+          firstName: _firstNameController.text.trim().isEmpty ? null : _firstNameController.text.trim(),
+          lastName: _lastNameController.text.trim().isEmpty ? null : _lastNameController.text.trim(),
+          personType: _selectedPersonType,
+          companyName: _companyNameController.text.trim().isEmpty ? null : _companyNameController.text.trim(),
+          paymentId: _paymentIdController.text.trim().isEmpty ? null : _paymentIdController.text.trim(),
+          nationalId: _nationalIdController.text.trim().isEmpty ? null : _nationalIdController.text.trim(),
+          registrationNumber: _registrationNumberController.text.trim().isEmpty ? null : _registrationNumberController.text.trim(),
+          economicId: _economicIdController.text.trim().isEmpty ? null : _economicIdController.text.trim(),
+          country: _countryController.text.trim().isEmpty ? null : _countryController.text.trim(),
+          province: _provinceController.text.trim().isEmpty ? null : _provinceController.text.trim(),
+          city: _cityController.text.trim().isEmpty ? null : _cityController.text.trim(),
+          address: _addressController.text.trim().isEmpty ? null : _addressController.text.trim(),
+          postalCode: _postalCodeController.text.trim().isEmpty ? null : _postalCodeController.text.trim(),
+          phone: _phoneController.text.trim().isEmpty ? null : _phoneController.text.trim(),
+          mobile: _mobileController.text.trim().isEmpty ? null : _mobileController.text.trim(),
+          fax: _faxController.text.trim().isEmpty ? null : _faxController.text.trim(),
+          email: _emailController.text.trim().isEmpty ? null : _emailController.text.trim(),
+          website: _websiteController.text.trim().isEmpty ? null : _websiteController.text.trim(),
+          isActive: _isActive,
+        );
+
+        await _personService.updatePerson(
+          personId: widget.person!.id!,
+          personData: personData,
+        );
+      }
+
+      if (mounted) {
+        Navigator.of(context).pop();
+        widget.onSuccess?.call();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(widget.person == null 
+              ? AppLocalizations.of(context).personCreatedSuccessfully
+              : AppLocalizations.of(context).personUpdatedSuccessfully),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('خطا: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  void _addBankAccount() {
+    setState(() {
+      _bankAccounts.add(PersonBankAccount(
+        personId: 0, // Will be set when person is created
+        bankName: '',
+        isActive: true,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      ));
+    });
+  }
+
+  void _removeBankAccount(int index) {
+    setState(() {
+      _bankAccounts.removeAt(index);
+    });
+  }
+
+  void _updateBankAccount(int index, PersonBankAccount bankAccount) {
+    setState(() {
+      _bankAccounts[index] = bankAccount;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
+    final isEditing = widget.person != null;
+
+    return Dialog(
+      child: Container(
+        width: MediaQuery.of(context).size.width * 0.9,
+        height: MediaQuery.of(context).size.height * 0.9,
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          children: [
+            // Header
+            Row(
+              children: [
+                Icon(
+                  isEditing ? Icons.edit : Icons.add,
+                  color: Theme.of(context).primaryColor,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  isEditing ? t.editPerson : t.addPerson,
+                  style: Theme.of(context).textTheme.headlineSmall,
+                ),
+                const Spacer(),
+                IconButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: const Icon(Icons.close),
+                ),
+              ],
+            ),
+            const Divider(),
+            const SizedBox(height: 16),
+
+            // Form
+            Expanded(
+              child: Form(
+                key: _formKey,
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Basic Information
+                      _buildSectionHeader(t.personBasicInfo),
+                      const SizedBox(height: 16),
+                      _buildBasicInfoFields(t),
+                      const SizedBox(height: 24),
+
+                      // Economic Information
+                      _buildSectionHeader(t.personEconomicInfo),
+                      const SizedBox(height: 16),
+                      _buildEconomicInfoFields(t),
+                      const SizedBox(height: 24),
+
+                      // Contact Information
+                      _buildSectionHeader(t.personContactInfo),
+                      const SizedBox(height: 16),
+                      _buildContactInfoFields(t),
+                      const SizedBox(height: 24),
+
+                      // Bank Accounts
+                      _buildSectionHeader(t.personBankInfo),
+                      const SizedBox(height: 16),
+                      _buildBankAccountsSection(t),
+                      const SizedBox(height: 24),
+
+                      // Status (only for editing)
+                      if (isEditing) ...[
+                        _buildSectionHeader('وضعیت'),
+                        const SizedBox(height: 16),
+                        SwitchListTile(
+                          title: Text('فعال'),
+                          value: _isActive,
+                          onChanged: (value) {
+                            setState(() {
+                              _isActive = value;
+                            });
+                          },
+                        ),
+                        const SizedBox(height: 24),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+            // Actions
+            const Divider(),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
+                  child: Text(t.cancel),
+                ),
+                const SizedBox(width: 8),
+                ElevatedButton(
+                  onPressed: _isLoading ? null : _savePerson,
+                  child: _isLoading
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Text(isEditing ? t.update : t.add),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSectionHeader(String title) {
+    return Text(
+      title,
+      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+        fontWeight: FontWeight.bold,
+        color: Theme.of(context).primaryColor,
+      ),
+    );
+  }
+
+  Widget _buildBasicInfoFields(AppLocalizations t) {
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: TextFormField(
+                controller: _aliasNameController,
+                decoration: InputDecoration(
+                  labelText: t.personAliasName,
+                  hintText: t.personAliasName,
+                ),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return t.personAliasNameRequired;
+                  }
+                  return null;
+                },
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: DropdownButtonFormField<PersonType>(
+                value: _selectedPersonType,
+                decoration: InputDecoration(
+                  labelText: t.personType,
+                ),
+                items: PersonType.values.map((type) {
+                  return DropdownMenuItem(
+                    value: type,
+                    child: Text(type.persianName),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  if (value != null) {
+                    setState(() {
+                      _selectedPersonType = value;
+                    });
+                  }
+                },
+                validator: (value) {
+                  if (value == null) {
+                    return t.personTypeRequired;
+                  }
+                  return null;
+                },
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(
+              child: TextFormField(
+                controller: _firstNameController,
+                decoration: InputDecoration(
+                  labelText: t.personFirstName,
+                  hintText: t.personFirstName,
+                ),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: TextFormField(
+                controller: _lastNameController,
+                decoration: InputDecoration(
+                  labelText: t.personLastName,
+                  hintText: t.personLastName,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(
+              child: TextFormField(
+                controller: _companyNameController,
+                decoration: InputDecoration(
+                  labelText: t.personCompanyName,
+                  hintText: t.personCompanyName,
+                ),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: TextFormField(
+                controller: _paymentIdController,
+                decoration: InputDecoration(
+                  labelText: t.personPaymentId,
+                  hintText: t.personPaymentId,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildEconomicInfoFields(AppLocalizations t) {
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: TextFormField(
+                controller: _nationalIdController,
+                decoration: InputDecoration(
+                  labelText: t.personNationalId,
+                  hintText: t.personNationalId,
+                ),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: TextFormField(
+                controller: _registrationNumberController,
+                decoration: InputDecoration(
+                  labelText: t.personRegistrationNumber,
+                  hintText: t.personRegistrationNumber,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        TextFormField(
+          controller: _economicIdController,
+          decoration: InputDecoration(
+            labelText: t.personEconomicId,
+            hintText: t.personEconomicId,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildContactInfoFields(AppLocalizations t) {
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: TextFormField(
+                controller: _countryController,
+                decoration: InputDecoration(
+                  labelText: t.personCountry,
+                  hintText: t.personCountry,
+                ),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: TextFormField(
+                controller: _provinceController,
+                decoration: InputDecoration(
+                  labelText: t.personProvince,
+                  hintText: t.personProvince,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(
+              child: TextFormField(
+                controller: _cityController,
+                decoration: InputDecoration(
+                  labelText: t.personCity,
+                  hintText: t.personCity,
+                ),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: TextFormField(
+                controller: _postalCodeController,
+                decoration: InputDecoration(
+                  labelText: t.personPostalCode,
+                  hintText: t.personPostalCode,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        TextFormField(
+          controller: _addressController,
+          decoration: InputDecoration(
+            labelText: t.personAddress,
+            hintText: t.personAddress,
+          ),
+          maxLines: 3,
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(
+              child: TextFormField(
+                controller: _phoneController,
+                decoration: InputDecoration(
+                  labelText: t.personPhone,
+                  hintText: t.personPhone,
+                ),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: TextFormField(
+                controller: _mobileController,
+                decoration: InputDecoration(
+                  labelText: t.personMobile,
+                  hintText: t.personMobile,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(
+              child: TextFormField(
+                controller: _faxController,
+                decoration: InputDecoration(
+                  labelText: t.personFax,
+                  hintText: t.personFax,
+                ),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: TextFormField(
+                controller: _emailController,
+                decoration: InputDecoration(
+                  labelText: t.personEmail,
+                  hintText: t.personEmail,
+                ),
+                keyboardType: TextInputType.emailAddress,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        TextFormField(
+          controller: _websiteController,
+          decoration: InputDecoration(
+            labelText: t.personWebsite,
+            hintText: t.personWebsite,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBankAccountsSection(AppLocalizations t) {
+    return Column(
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              t.personBankAccounts,
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+            ElevatedButton.icon(
+              onPressed: _addBankAccount,
+              icon: const Icon(Icons.add),
+              label: Text(t.addBankAccount),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        if (_bankAccounts.isEmpty)
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.grey.shade300),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Center(
+              child: Text(
+                'هیچ حساب بانکی اضافه نشده است',
+                style: TextStyle(color: Colors.grey.shade600),
+              ),
+            ),
+          )
+        else
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: _bankAccounts.length,
+            itemBuilder: (context, index) {
+              return _buildBankAccountCard(t, index);
+            },
+          ),
+      ],
+    );
+  }
+
+  Widget _buildBankAccountCard(AppLocalizations t, int index) {
+    final bankAccount = _bankAccounts[index];
+    
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    initialValue: bankAccount.bankName,
+                    decoration: InputDecoration(
+                      labelText: t.bankName,
+                      hintText: t.bankName,
+                    ),
+                    onChanged: (value) {
+                      _updateBankAccount(index, bankAccount.copyWith(bankName: value));
+                    },
+                  ),
+                ),
+                const SizedBox(width: 16),
+                IconButton(
+                  onPressed: () => _removeBankAccount(index),
+                  icon: const Icon(Icons.delete, color: Colors.red),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    initialValue: bankAccount.accountNumber ?? '',
+                    decoration: InputDecoration(
+                      labelText: t.accountNumber,
+                      hintText: t.accountNumber,
+                    ),
+                    onChanged: (value) {
+                      _updateBankAccount(index, bankAccount.copyWith(accountNumber: value.isEmpty ? null : value));
+                    },
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: TextFormField(
+                    initialValue: bankAccount.cardNumber ?? '',
+                    decoration: InputDecoration(
+                      labelText: t.cardNumber,
+                      hintText: t.cardNumber,
+                    ),
+                    onChanged: (value) {
+                      _updateBankAccount(index, bankAccount.copyWith(cardNumber: value.isEmpty ? null : value));
+                    },
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              initialValue: bankAccount.shebaNumber ?? '',
+              decoration: InputDecoration(
+                labelText: t.shebaNumber,
+                hintText: t.shebaNumber,
+              ),
+              onChanged: (value) {
+                _updateBankAccount(index, bankAccount.copyWith(shebaNumber: value.isEmpty ? null : value));
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

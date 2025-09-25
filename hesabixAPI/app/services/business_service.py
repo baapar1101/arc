@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import select, and_, func
 
 from adapters.db.repositories.business_repo import BusinessRepository
+from adapters.db.repositories.business_permission_repo import BusinessPermissionRepository
 from adapters.db.models.business import Business, BusinessType, BusinessField
 from adapters.api.v1.schemas import (
     BusinessCreateRequest, BusinessUpdateRequest, BusinessResponse,
@@ -105,6 +106,91 @@ def get_businesses_by_owner(db: Session, owner_id: int, query_info: Dict[str, An
     
     return {
         "items": items,
+        "pagination": pagination.dict(),
+        "query_info": query_info
+    }
+
+
+def get_user_businesses(db: Session, user_id: int, query_info: Dict[str, Any]) -> Dict[str, Any]:
+    """دریافت لیست کسب و کارهای کاربر (مالک + عضو)"""
+    business_repo = BusinessRepository(db)
+    permission_repo = BusinessPermissionRepository(db)
+    
+    # دریافت کسب و کارهای مالک
+    owned_businesses = business_repo.get_by_owner_id(user_id)
+    
+    # دریافت کسب و کارهای عضو
+    member_permissions = permission_repo.get_user_member_businesses(user_id)
+    member_business_ids = [perm.business_id for perm in member_permissions]
+    member_businesses = []
+    for business_id in member_business_ids:
+        business = business_repo.get_by_id(business_id)
+        if business:
+            member_businesses.append(business)
+    
+    # ترکیب لیست‌ها
+    all_businesses = []
+    
+    # اضافه کردن کسب و کارهای مالک با نقش owner
+    for business in owned_businesses:
+        business_dict = _business_to_dict(business)
+        business_dict['is_owner'] = True
+        business_dict['role'] = 'مالک'
+        business_dict['permissions'] = {}
+        all_businesses.append(business_dict)
+    
+    # اضافه کردن کسب و کارهای عضو با نقش member
+    for business in member_businesses:
+        # اگر قبلاً به عنوان مالک اضافه شده، نادیده بگیر
+        if business.id not in [b['id'] for b in all_businesses]:
+            business_dict = _business_to_dict(business)
+            business_dict['is_owner'] = False
+            business_dict['role'] = 'عضو'
+            # دریافت دسترسی‌های کاربر برای این کسب و کار
+            permission_obj = permission_repo.get_by_user_and_business(user_id, business.id)
+            business_dict['permissions'] = permission_obj.business_permissions if permission_obj else {}
+            all_businesses.append(business_dict)
+    
+    # اعمال فیلترها
+    if query_info.get('search'):
+        search_term = query_info['search']
+        all_businesses = [b for b in all_businesses if search_term.lower() in b['name'].lower()]
+    
+    # اعمال مرتب‌سازی
+    sort_by = query_info.get('sort_by', 'created_at')
+    sort_desc = query_info.get('sort_desc', True)
+    
+    if sort_by == 'name':
+        all_businesses.sort(key=lambda x: x['name'], reverse=sort_desc)
+    elif sort_by == 'business_type':
+        all_businesses.sort(key=lambda x: x['business_type'], reverse=sort_desc)
+    elif sort_by == 'created_at':
+        all_businesses.sort(key=lambda x: x['created_at'], reverse=sort_desc)
+    
+    # صفحه‌بندی
+    total = len(all_businesses)
+    skip = query_info.get('skip', 0)
+    take = query_info.get('take', 10)
+    
+    start_idx = skip
+    end_idx = skip + take
+    paginated_businesses = all_businesses[start_idx:end_idx]
+    
+    # محاسبه اطلاعات صفحه‌بندی
+    total_pages = (total + take - 1) // take
+    current_page = (skip // take) + 1
+    
+    pagination = PaginationInfo(
+        total=total,
+        page=current_page,
+        per_page=take,
+        total_pages=total_pages,
+        has_next=current_page < total_pages,
+        has_prev=current_page > 1
+    )
+    
+    return {
+        "items": paginated_businesses,
         "pagination": pagination.dict(),
         "query_info": query_info
     }

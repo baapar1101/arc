@@ -23,6 +23,8 @@ import 'pages/business/business_shell.dart';
 import 'pages/business/dashboard/business_dashboard_page.dart';
 import 'pages/business/users_permissions_page.dart';
 import 'pages/business/settings_page.dart';
+import 'pages/business/persons_page.dart';
+import 'pages/error_404_page.dart';
 import 'core/locale_controller.dart';
 import 'core/calendar_controller.dart';
 import 'core/api_client.dart';
@@ -516,10 +518,35 @@ class _MyAppState extends State<MyApp> {
                 );
               },
             ),
+            GoRoute(
+              path: 'persons',
+              name: 'business_persons',
+              builder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return BusinessShell(
+                  businessId: businessId,
+                  authStore: _authStore!,
+                  localeController: controller,
+                  calendarController: _calendarController!,
+                  themeController: themeController,
+                  child: PersonsPage(
+                    businessId: businessId,
+                    authStore: _authStore!,
+                  ),
+                );
+              },
+            ),
             // TODO: Add other business routes (sales, accounting, etc.)
           ],
         ),
+        // صفحه 404 برای مسیرهای نامعتبر
+        GoRoute(
+          path: '/404',
+          name: 'error_404',
+          builder: (context, state) => const Error404Page(),
+        ),
       ],
+      errorBuilder: (context, state) => const Error404Page(),
     );
 
     return AnimatedBuilder(
