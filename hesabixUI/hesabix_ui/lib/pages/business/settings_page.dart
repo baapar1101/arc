@@ -61,7 +61,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   title: t.usersAndPermissions,
                   subtitle: t.usersAndPermissionsDescription,
                   icon: Icons.people_outline,
-                  onTap: () => _showUsersPermissionsDialog(context),
+                  onTap: () => context.go('/business/${widget.businessId}/users-permissions'),
                 ),
                 _buildSettingItem(
                   context,
@@ -240,30 +240,6 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
-  void _showUsersPermissionsDialog(BuildContext context) {
-    final t = AppLocalizations.of(context);
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(t.usersAndPermissions),
-        content: Text(t.usersAndPermissionsDialogContent),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(t.close),
-          ),
-          FilledButton(
-            onPressed: () {
-              Navigator.pop(context);
-              // Navigate to users permissions page
-              context.go('/business/${widget.businessId}/users-permissions');
-            },
-            child: Text(t.manage),
-          ),
-        ],
-      ),
-    );
-  }
 
   void _showPrintDocumentsDialog(BuildContext context) {
     final t = AppLocalizations.of(context);

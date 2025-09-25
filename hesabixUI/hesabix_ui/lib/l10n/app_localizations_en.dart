@@ -2025,7 +2025,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get viewStorage => 'View Storage';
 
   @override
-  String get deleteFiles => 'Delete Files';
+  String get deleteFiles => 'Files';
 
   @override
   String get smsPanel => 'SMS Panel';
@@ -2302,4 +2302,34 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get update => 'Update';
+
+  @override
+  String get collect => 'Collect';
+
+  @override
+  String get transfer => 'Transfer';
+
+  @override
+  String get charge => 'Charge';
+
+  @override
+  String get saving => 'Saving...';
+
+  @override
+  String get userPermissionsTitle => 'User Permissions';
+
+  @override
+  String get dialogClose => 'Close';
+
+  @override
+  String get buy => 'Buy';
+
+  @override
+  String get templates => 'Templates';
+
+  @override
+  String get history => 'History';
+
+  @override
+  String get business => 'Business';
 }

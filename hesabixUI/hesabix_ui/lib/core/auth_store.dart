@@ -317,15 +317,16 @@ class AuthStore with ChangeNotifier {
     if (_businessPermissions == null) return false;
     
     final sectionPerms = _businessPermissions![section] as Map<String, dynamic>?;
-    if (sectionPerms == null) return action == 'view'; // دسترسی خواندن پیش‌فرض
+    // اگر سکشن در دسترسی‌ها موجود نیست، هیچ دسترسی‌ای وجود ندارد
+    if (sectionPerms == null) return false;
     
     return sectionPerms[action] == true;
   }
 
   // دسترسی‌های کلی
   bool canReadSection(String section) {
-    return hasBusinessPermission(section, 'view') || 
-           _businessPermissions?.containsKey(section) == true;
+    // خواندن فقط زمانی مجاز است که به‌صراحت در سکشن اجازه داده شده باشد
+    return hasBusinessPermission(section, 'view');
   }
 
   bool canWriteSection(String section) {

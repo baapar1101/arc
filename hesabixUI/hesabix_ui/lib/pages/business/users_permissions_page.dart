@@ -107,26 +107,6 @@ class _UsersPermissionsPageState extends State<UsersPermissionsPage> {
     }
   }
 
-  Future<void> _updatePermissions(BusinessUser user, Map<String, dynamic> newPermissions) async {
-    try {
-      final request = UpdatePermissionsRequest(
-        businessId: int.parse(widget.businessId),
-        userId: user.userId,
-        permissions: newPermissions,
-      );
-
-      final response = await _userService.updatePermissions(request);
-      
-      if (response.success) {
-        _showSuccessSnackBar(response.message);
-        _loadUsers(); // Refresh the list
-      } else {
-        _showErrorSnackBar(response.message);
-      }
-    } catch (e) {
-      _showErrorSnackBar('${AppLocalizations.of(context).permissionsUpdateFailed}: $e');
-    }
-  }
 
   Future<void> _removeUser(BusinessUser user) async {
     final t = AppLocalizations.of(context);
@@ -720,482 +700,652 @@ class _UsersPermissionsPageState extends State<UsersPermissionsPage> {
     );
   }
 
-  void _showPermissionsDialog(BusinessUser user) {
+  void _showPermissionsDialog(BusinessUser user) async {
+    
+    // Load fresh user data with permissions
+    try {
+      final freshUser = await _userService.getUserDetails(int.parse(widget.businessId), user.userId);
+      
+      if (mounted) {
+    showDialog(
+      context: context,
+          builder: (context) => _PermissionsDialog(
+            user: freshUser,
+            businessId: widget.businessId,
+            userService: _userService,
+            onPermissionsUpdated: () {
+              // Refresh the users list after permissions are updated
+              _loadUsers();
+            },
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        _showErrorSnackBar('خطا در بارگذاری دسترسی‌ها: $e');
+      }
+    }
+  }
+
+}
+
+/// دیالوگ مدیریت دسترسی‌ها
+class _PermissionsDialog extends StatefulWidget {
+  final BusinessUser user;
+  final String businessId;
+  final BusinessUserService userService;
+  final VoidCallback onPermissionsUpdated;
+
+  const _PermissionsDialog({
+    required this.user,
+    required this.businessId,
+    required this.userService,
+    required this.onPermissionsUpdated,
+  });
+
+  @override
+  State<_PermissionsDialog> createState() => _PermissionsDialogState();
+}
+
+class _PermissionsDialogState extends State<_PermissionsDialog> {
+  late Map<String, dynamic> _currentPermissions;
+  bool _isUpdating = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentPermissions = _mergePermissions(widget.user.permissions);
+  }
+
+  /// ساختار کامل دسترسی‌های سیستم
+  Map<String, Map<String, String>> _getAllPermissions(AppLocalizations t) {
+    return {
+      'people': {
+        'add': '${t.add} ${t.people}',
+        'view': '${t.view} ${t.people}',
+        'edit': '${t.edit} ${t.people}',
+        'delete': '${t.delete} ${t.people}',
+      },
+      // Combined: receipts + payments of people as a single unit
+      'people_transactions': {
+        'add': '${t.add} ${t.receiptsAndPayments} ${t.people}',
+        'view': '${t.view} ${t.receiptsAndPayments} ${t.people}',
+        'edit': '${t.edit} ${t.receiptsAndPayments} ${t.people}',
+        'delete': '${t.delete} ${t.receiptsAndPayments} ${t.people}',
+        'draft': '${t.draft} ${t.receiptsAndPayments} ${t.people}',
+      },
+      'products': {
+        'add': '${t.add} ${t.products}',
+        'view': '${t.view} ${t.products}',
+        'edit': '${t.edit} ${t.products}',
+        'delete': '${t.delete} ${t.products}',
+      },
+      'price_lists': {
+        'add': '${t.add} ${t.priceLists}',
+        'view': '${t.view} ${t.priceLists}',
+        'edit': '${t.edit} ${t.priceLists}',
+        'delete': '${t.delete} ${t.priceLists}',
+      },
+      'categories': {
+        'add': '${t.add} ${t.categories}',
+        'view': '${t.view} ${t.categories}',
+        'edit': '${t.edit} ${t.categories}',
+        'delete': '${t.delete} ${t.categories}',
+      },
+      'product_attributes': {
+        'add': '${t.add} ${t.productAttributes}',
+        'view': '${t.view} ${t.productAttributes}',
+        'edit': '${t.edit} ${t.productAttributes}',
+        'delete': '${t.delete} ${t.productAttributes}',
+      },
+      'bank_accounts': {
+        'add': '${t.add} ${t.bankAccounts}',
+        'view': '${t.view} ${t.bankAccounts}',
+        'edit': '${t.edit} ${t.bankAccounts}',
+        'delete': '${t.delete} ${t.bankAccounts}',
+      },
+      'cash': {
+        'add': '${t.add} ${t.cash}',
+        'view': '${t.view} ${t.cash}',
+        'edit': '${t.edit} ${t.cash}',
+        'delete': '${t.delete} ${t.cash}',
+      },
+      'petty_cash': {
+        'add': '${t.add} ${t.pettyCash}',
+        'view': '${t.view} ${t.pettyCash}',
+        'edit': '${t.edit} ${t.pettyCash}',
+        'delete': '${t.delete} ${t.pettyCash}',
+      },
+      'checks': {
+        'add': '${t.add} ${t.checks}',
+        'view': '${t.view} ${t.checks}',
+        'edit': '${t.edit} ${t.checks}',
+        'delete': '${t.delete} ${t.checks}',
+        'collect': '${t.collect} ${t.checks}',
+        'transfer': '${t.transfer} ${t.checks}',
+        'return': 'برگشت ${t.checks}',
+      },
+      'wallet': {
+        'view': '${t.view} ${t.wallet}',
+        'charge': '${t.charge} ${t.wallet}',
+      },
+      'transfers': {
+        'add': '${t.add} ${t.transfers}',
+        'view': '${t.view} ${t.transfers}',
+        'edit': '${t.edit} ${t.transfers}',
+        'delete': '${t.delete} ${t.transfers}',
+        'draft': '${t.draft} ${t.transfers}',
+      },
+      'invoices': {
+        'add': '${t.add} ${t.invoices}',
+        'view': '${t.view} ${t.invoices}',
+        'edit': '${t.edit} ${t.invoices}',
+        'delete': '${t.delete} ${t.invoices}',
+        'draft': '${t.draft} ${t.invoices}',
+      },
+      'expenses_income': {
+        'add': '${t.add} ${t.expensesIncome}',
+        'view': '${t.view} ${t.expensesIncome}',
+        'edit': '${t.edit} ${t.expensesIncome}',
+        'delete': '${t.delete} ${t.expensesIncome}',
+        'draft': '${t.draft} ${t.expensesIncome}',
+      },
+      'accounting_documents': {
+        'add': '${t.add} ${t.accountingDocuments}',
+        'view': '${t.view} ${t.accountingDocuments}',
+        'edit': '${t.edit} ${t.accountingDocuments}',
+        'delete': '${t.delete} ${t.accountingDocuments}',
+        'draft': '${t.draft} ${t.accountingDocuments}',
+      },
+      'chart_of_accounts': {
+        'add': '${t.add} ${t.chartOfAccounts}',
+        'view': '${t.view} ${t.chartOfAccounts}',
+        'edit': '${t.edit} ${t.chartOfAccounts}',
+        'delete': '${t.delete} ${t.chartOfAccounts}',
+      },
+      'opening_balance': {
+        'view': '${t.view} ${t.openingBalance}',
+        'edit': '${t.edit} ${t.openingBalance}',
+      },
+      'warehouses': {
+        'add': '${t.add} ${t.warehouses}',
+        'view': '${t.view} ${t.warehouses}',
+        'edit': '${t.edit} ${t.warehouses}',
+        'delete': '${t.delete} ${t.warehouses}',
+      },
+      'warehouse_transfers': {
+        'add': '${t.add} ${t.warehouseTransfers}',
+        'view': '${t.view} ${t.warehouseTransfers}',
+        'edit': '${t.edit} ${t.warehouseTransfers}',
+        'delete': '${t.delete} ${t.warehouseTransfers}',
+        'draft': '${t.draft} ${t.warehouseTransfers}',
+      },
+      'settings': {
+        'business': '${t.businessSettings}',
+        'print': '${t.printSettings}',
+        'history': '${t.eventHistory}',
+        'users': '${t.usersAndPermissions}',
+      },
+      'storage': {
+        'view': '${t.view} ${t.storageSpace}',
+        'delete': '${t.delete} ${t.deleteFiles}',
+      },
+      'sms': {
+        'history': '${t.viewSmsHistory}',
+        'templates': '${t.manageSmsTemplates}',
+      },
+      'marketplace': {
+        'view': '${t.viewMarketplace}',
+        'buy': '${t.buyPlugins}',
+        'invoices': '${t.viewInvoices}',
+      },
+    };
+  }
+
+  /// ادغام دسترسی‌های دیتابیس با ساختار کامل
+  Map<String, dynamic> _mergePermissions(Map<String, dynamic> dbPermissions) {
+    final t = AppLocalizations.of(context);
+    final allPermissions = _getAllPermissions(t);
+    final mergedPermissions = <String, dynamic>{};
+    
+    for (final section in allPermissions.keys) {
+      final sectionPermissions = <String, bool>{};
+      
+      for (final action in allPermissions[section]!.keys) {
+        // فقط از سکشن جدید استفاده می‌کنیم؛ بدون OR با کلیدهای قدیمی
+        if (dbPermissions.containsKey(section) &&
+            dbPermissions[section] is Map<String, dynamic> &&
+            (dbPermissions[section] as Map<String, dynamic>).containsKey(action)) {
+          sectionPermissions[action] = dbPermissions[section][action] == true;
+        } else {
+          sectionPermissions[action] = false;
+        }
+      }
+      
+      mergedPermissions[section] = sectionPermissions;
+    }
+    
+    return mergedPermissions;
+  }
+
+  /// دریافت دسترسی
+  bool _getPermission(Map<String, dynamic> permissions, String section, String action) {
+    if (!permissions.containsKey(section)) return false;
+    final sectionPerms = permissions[section] as Map<String, dynamic>?;
+    if (sectionPerms == null) return false;
+    return sectionPerms[action] == true;
+  }
+
+  /// تنظیم دسترسی
+  void _setPermission(Map<String, dynamic> permissions, String section, String action, bool value) {
+    if (!permissions.containsKey(section)) {
+      permissions[section] = {};
+    }
+    // Enforce dependency: view is prerequisite for other actions
+    if (action != 'view' && value == true) {
+      permissions[section]['view'] = true;
+    }
+
+    // Prevent disabling view while dependent actions are enabled
+    if (action == 'view' && value == false) {
+      final sectionPerms = (permissions[section] as Map<String, dynamic>?) ?? {};
+      final hasAnyOtherEnabled = sectionPerms.entries.any((e) => e.key != 'view' && e.value == true);
+      if (hasAnyOtherEnabled) {
+        // Keep view enabled; do not change
+        permissions[section]['view'] = true;
+        return;
+      }
+    }
+
+    permissions[section][action] = value;
+
+    // دیگر mirroring به کلیدهای قدیمی انجام نمی‌شود
+    if (section == 'people_transactions') {
+      // no-op: فقط روی people_transactions ذخیره می‌کنیم
+    }
+  }
+
+  bool _hasAnyNonViewEnabled(String sectionKey) {
+    final sectionPerms = (_currentPermissions[sectionKey] as Map<String, dynamic>?) ?? {};
+    for (final entry in sectionPerms.entries) {
+      if (entry.key != 'view' && entry.value == true) return true;
+    }
+    return false;
+  }
+
+  /// به‌روزرسانی دسترسی‌ها
+  Future<void> _updatePermissions() async {
+    if (_isUpdating) return;
+    
+    setState(() {
+      _isUpdating = true;
+    });
+
+    try {
+      final request = UpdatePermissionsRequest(
+        businessId: int.parse(widget.businessId),
+        userId: widget.user.userId,
+        permissions: _currentPermissions,
+      );
+
+      final response = await widget.userService.updatePermissions(request);
+      
+      if (mounted) {
+        if (response.success) {
+          _showSuccessSnackBar(response.message);
+          widget.onPermissionsUpdated();
+          Navigator.of(context).pop();
+        } else {
+          _showErrorSnackBar(response.message);
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        _showErrorSnackBar('خطا در به‌روزرسانی دسترسی‌ها: $e');
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUpdating = false;
+        });
+      }
+    }
+  }
+
+  void _showErrorSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+      ),
+    );
+  }
+
+  void _showSuccessSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.green,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    
-    showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) {
-          Map<String, dynamic> currentPermissions = Map.from(user.permissions);
           
           return Dialog(
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(20),
             ),
-            child: Container(
-              width: 800,
-              height: 700,
+      child: SizedBox(
+        width: 800,
+        height: 700,
               child: Column(
                 children: [
                   // Header
-                  Container(
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      color: colorScheme.primaryContainer,
-                      borderRadius: const BorderRadius.only(
-                        topLeft: Radius.circular(20),
-                        topRight: Radius.circular(20),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: Row(
+                children: [
+                  Icon(Icons.security, color: colorScheme.primary, size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '${t.userPermissions} - ${widget.user.userName}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: colorScheme.onSurface,
                       ),
                     ),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: colorScheme.primary,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Icon(
-                            Icons.security,
-                            color: colorScheme.onPrimary,
-                            size: 24,
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                '${t.userPermissions} - ${user.userName}',
-                                style: theme.textTheme.titleLarge?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                  color: colorScheme.onPrimaryContainer,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                t.userPermissions,
-                                style: theme.textTheme.bodyMedium?.copyWith(
-                                  color: colorScheme.onPrimaryContainer.withValues(alpha: 0.8),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        IconButton(
-                          onPressed: () => context.pop(),
-                          icon: Icon(
-                            Icons.close,
-                            color: colorScheme.onPrimaryContainer,
-                          ),
-                        ),
-                      ],
+                  ),
+                  Tooltip(
+                    message: t.dialogClose,
+                    child: IconButton(
+                      visualDensity: VisualDensity.compact,
+                      padding: const EdgeInsets.all(6),
+                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: Icon(Icons.close, color: colorScheme.onSurfaceVariant, size: 18),
                     ),
                   ),
+                ],
+              ),
+            ),
 
                   // Content
                   Expanded(
                     child: SingleChildScrollView(
                       padding: const EdgeInsets.all(24),
                       child: Column(
-                        children: [
-                          // اشخاص
-                          _buildPermissionSection(
-                            t.people,
-                            Icons.people,
-                            [
-                              _buildPermissionGroup(
-                                t.people,
-                                [
-                                  _buildPermissionItem(t.add, t.addPerson, _getPermission(currentPermissions, 'people', 'add'), (value) => _setPermission(currentPermissions, 'people', 'add', value), theme, colorScheme),
-                                  _buildPermissionItem(t.view, t.viewPeople, _getPermission(currentPermissions, 'people', 'view'), (value) => _setPermission(currentPermissions, 'people', 'view', value), theme, colorScheme),
-                                  _buildPermissionItem(t.edit, t.editPeople, _getPermission(currentPermissions, 'people', 'edit'), (value) => _setPermission(currentPermissions, 'people', 'edit', value), theme, colorScheme),
-                                  _buildPermissionItem(t.delete, t.deletePeople, _getPermission(currentPermissions, 'people', 'delete'), (value) => _setPermission(currentPermissions, 'people', 'delete', value), theme, colorScheme),
-                                ],
-                                theme,
-                                colorScheme,
-                              ),
-                              _buildPermissionGroup(
-                                t.peopleReceipts,
-                                [
-                                  _buildPermissionItem(t.add, t.addReceipt, _getPermission(currentPermissions, 'people_receipts', 'add'), (value) => _setPermission(currentPermissions, 'people_receipts', 'add', value), theme, colorScheme),
-                                  _buildPermissionItem(t.view, t.viewReceipts, _getPermission(currentPermissions, 'people_receipts', 'view'), (value) => _setPermission(currentPermissions, 'people_receipts', 'view', value), theme, colorScheme),
-                                  _buildPermissionItem(t.edit, t.editReceipts, _getPermission(currentPermissions, 'people_receipts', 'edit'), (value) => _setPermission(currentPermissions, 'people_receipts', 'edit', value), theme, colorScheme),
-                                  _buildPermissionItem(t.delete, t.deleteReceipts, _getPermission(currentPermissions, 'people_receipts', 'delete'), (value) => _setPermission(currentPermissions, 'people_receipts', 'delete', value), theme, colorScheme),
-                                  _buildPermissionItem(t.draft, t.manageReceiptDrafts, _getPermission(currentPermissions, 'people_receipts', 'draft'), (value) => _setPermission(currentPermissions, 'people_receipts', 'draft', value), theme, colorScheme),
-                                ],
-                                theme,
-                                colorScheme,
-                              ),
-                              _buildPermissionGroup(
-                                t.peoplePayments,
-                                [
-                                  _buildPermissionItem(t.add, t.addPayment, _getPermission(currentPermissions, 'people_payments', 'add'), (value) => _setPermission(currentPermissions, 'people_payments', 'add', value), theme, colorScheme),
-                                  _buildPermissionItem(t.view, t.viewPayments, _getPermission(currentPermissions, 'people_payments', 'view'), (value) => _setPermission(currentPermissions, 'people_payments', 'view', value), theme, colorScheme),
-                                  _buildPermissionItem(t.edit, t.editPayments, _getPermission(currentPermissions, 'people_payments', 'edit'), (value) => _setPermission(currentPermissions, 'people_payments', 'edit', value), theme, colorScheme),
-                                  _buildPermissionItem(t.delete, t.deletePayments, _getPermission(currentPermissions, 'people_payments', 'delete'), (value) => _setPermission(currentPermissions, 'people_payments', 'delete', value), theme, colorScheme),
-                                  _buildPermissionItem(t.draft, t.managePaymentDrafts, _getPermission(currentPermissions, 'people_payments', 'draft'), (value) => _setPermission(currentPermissions, 'people_payments', 'draft', value), theme, colorScheme),
-                                ],
-                                theme,
-                                colorScheme,
-                              ),
-                            ],
-                            theme,
-                            colorScheme,
-                          ),
-
-                          const SizedBox(height: 20),
-
-                          // کالا و خدمات
-                          _buildPermissionSection(
-                            t.products,
-                            Icons.inventory,
-                            [
-                              _buildPermissionGroup(
-                                t.products,
-                                [
-                                  _buildPermissionItem(t.add, t.addProduct, _getPermission(currentPermissions, 'products', 'add'), (value) => _setPermission(currentPermissions, 'products', 'add', value), theme, colorScheme),
-                                  _buildPermissionItem(t.view, t.viewProducts, _getPermission(currentPermissions, 'products', 'view'), (value) => _setPermission(currentPermissions, 'products', 'view', value), theme, colorScheme),
-                                  _buildPermissionItem(t.edit, t.editProducts, _getPermission(currentPermissions, 'products', 'edit'), (value) => _setPermission(currentPermissions, 'products', 'edit', value), theme, colorScheme),
-                                  _buildPermissionItem(t.delete, t.deleteProducts, _getPermission(currentPermissions, 'products', 'delete'), (value) => _setPermission(currentPermissions, 'products', 'delete', value), theme, colorScheme),
-                                ],
-                                theme,
-                                colorScheme,
-                              ),
-                              _buildPermissionGroup(
-                                'لیست‌های قیمت',
-                                [
-                                  _buildPermissionItem('افزودن', 'افزودن لیست قیمت', _getPermission(currentPermissions, 'price_lists', 'add'), (value) => _setPermission(currentPermissions, 'price_lists', 'add', value), theme, colorScheme),
-                                  _buildPermissionItem('مشاهده', 'مشاهده لیست‌های قیمت', _getPermission(currentPermissions, 'price_lists', 'view'), (value) => _setPermission(currentPermissions, 'price_lists', 'view', value), theme, colorScheme),
-                                  _buildPermissionItem('ویرایش', 'ویرایش لیست‌های قیمت', _getPermission(currentPermissions, 'price_lists', 'edit'), (value) => _setPermission(currentPermissions, 'price_lists', 'edit', value), theme, colorScheme),
-                                  _buildPermissionItem('حذف', 'حذف لیست‌های قیمت', _getPermission(currentPermissions, 'price_lists', 'delete'), (value) => _setPermission(currentPermissions, 'price_lists', 'delete', value), theme, colorScheme),
-                                ],
-                                theme,
-                                colorScheme,
-                              ),
-                              _buildPermissionGroup(
-                                'دسته‌بندی‌ها',
-                                [
-                                  _buildPermissionItem('افزودن', 'افزودن دسته‌بندی', _getPermission(currentPermissions, 'categories', 'add'), (value) => _setPermission(currentPermissions, 'categories', 'add', value), theme, colorScheme),
-                                  _buildPermissionItem('مشاهده', 'مشاهده دسته‌بندی‌ها', _getPermission(currentPermissions, 'categories', 'view'), (value) => _setPermission(currentPermissions, 'categories', 'view', value), theme, colorScheme),
-                                  _buildPermissionItem('ویرایش', 'ویرایش دسته‌بندی‌ها', _getPermission(currentPermissions, 'categories', 'edit'), (value) => _setPermission(currentPermissions, 'categories', 'edit', value), theme, colorScheme),
-                                  _buildPermissionItem('حذف', 'حذف دسته‌بندی‌ها', _getPermission(currentPermissions, 'categories', 'delete'), (value) => _setPermission(currentPermissions, 'categories', 'delete', value), theme, colorScheme),
-                                ],
-                                theme,
-                                colorScheme,
-                              ),
-                              _buildPermissionGroup(
-                                'ویژگی‌های کالا و خدمات',
-                                [
-                                  _buildPermissionItem('افزودن', 'افزودن ویژگی', _getPermission(currentPermissions, 'product_attributes', 'add'), (value) => _setPermission(currentPermissions, 'product_attributes', 'add', value), theme, colorScheme),
-                                  _buildPermissionItem('مشاهده', 'مشاهده ویژگی‌ها', _getPermission(currentPermissions, 'product_attributes', 'view'), (value) => _setPermission(currentPermissions, 'product_attributes', 'view', value), theme, colorScheme),
-                                  _buildPermissionItem('ویرایش', 'ویرایش ویژگی‌ها', _getPermission(currentPermissions, 'product_attributes', 'edit'), (value) => _setPermission(currentPermissions, 'product_attributes', 'edit', value), theme, colorScheme),
-                                  _buildPermissionItem('حذف', 'حذف ویژگی‌ها', _getPermission(currentPermissions, 'product_attributes', 'delete'), (value) => _setPermission(currentPermissions, 'product_attributes', 'delete', value), theme, colorScheme),
-                                ],
-                                theme,
-                                colorScheme,
-                              ),
-                            ],
-                            theme,
-                            colorScheme,
-                          ),
-
-                          const SizedBox(height: 20),
-
-                          // بانکداری
-                          _buildPermissionSection(
-                            'بانکداری',
-                            Icons.account_balance,
-                            [
-                              _buildPermissionGroup(
-                                'حساب‌های بانکی',
-                                [
-                                  _buildPermissionItem('افزودن', 'افزودن حساب بانکی', _getPermission(currentPermissions, 'bank_accounts', 'add'), (value) => _setPermission(currentPermissions, 'bank_accounts', 'add', value), theme, colorScheme),
-                                  _buildPermissionItem('مشاهده', 'مشاهده حساب‌های بانکی', _getPermission(currentPermissions, 'bank_accounts', 'view'), (value) => _setPermission(currentPermissions, 'bank_accounts', 'view', value), theme, colorScheme),
-                                  _buildPermissionItem('ویرایش', 'ویرایش حساب‌های بانکی', _getPermission(currentPermissions, 'bank_accounts', 'edit'), (value) => _setPermission(currentPermissions, 'bank_accounts', 'edit', value), theme, colorScheme),
-                                  _buildPermissionItem('حذف', 'حذف حساب‌های بانکی', _getPermission(currentPermissions, 'bank_accounts', 'delete'), (value) => _setPermission(currentPermissions, 'bank_accounts', 'delete', value), theme, colorScheme),
-                                ],
-                                theme,
-                                colorScheme,
-                              ),
-                              _buildPermissionGroup(
-                                'صندوق',
-                                [
-                                  _buildPermissionItem('افزودن', 'افزودن صندوق', _getPermission(currentPermissions, 'cash', 'add'), (value) => _setPermission(currentPermissions, 'cash', 'add', value), theme, colorScheme),
-                                  _buildPermissionItem('مشاهده', 'مشاهده صندوق‌ها', _getPermission(currentPermissions, 'cash', 'view'), (value) => _setPermission(currentPermissions, 'cash', 'view', value), theme, colorScheme),
-                                  _buildPermissionItem('ویرایش', 'ویرایش صندوق‌ها', _getPermission(currentPermissions, 'cash', 'edit'), (value) => _setPermission(currentPermissions, 'cash', 'edit', value), theme, colorScheme),
-                                  _buildPermissionItem('حذف', 'حذف صندوق‌ها', _getPermission(currentPermissions, 'cash', 'delete'), (value) => _setPermission(currentPermissions, 'cash', 'delete', value), theme, colorScheme),
-                                ],
-                                theme,
-                                colorScheme,
-                              ),
-                              _buildPermissionGroup(
-                                'تنخواه گردان',
-                                [
-                                  _buildPermissionItem('افزودن', 'افزودن تنخواه', _getPermission(currentPermissions, 'petty_cash', 'add'), (value) => _setPermission(currentPermissions, 'petty_cash', 'add', value), theme, colorScheme),
-                                  _buildPermissionItem('مشاهده', 'مشاهده تنخواه‌ها', _getPermission(currentPermissions, 'petty_cash', 'view'), (value) => _setPermission(currentPermissions, 'petty_cash', 'view', value), theme, colorScheme),
-                                  _buildPermissionItem('ویرایش', 'ویرایش تنخواه‌ها', _getPermission(currentPermissions, 'petty_cash', 'edit'), (value) => _setPermission(currentPermissions, 'petty_cash', 'edit', value), theme, colorScheme),
-                                  _buildPermissionItem('حذف', 'حذف تنخواه‌ها', _getPermission(currentPermissions, 'petty_cash', 'delete'), (value) => _setPermission(currentPermissions, 'petty_cash', 'delete', value), theme, colorScheme),
-                                ],
-                                theme,
-                                colorScheme,
-                              ),
-                              _buildPermissionGroup(
-                                'چک',
-                                [
-                                  _buildPermissionItem('افزودن', 'افزودن چک', _getPermission(currentPermissions, 'checks', 'add'), (value) => _setPermission(currentPermissions, 'checks', 'add', value), theme, colorScheme),
-                                  _buildPermissionItem('مشاهده', 'مشاهده چک‌ها', _getPermission(currentPermissions, 'checks', 'view'), (value) => _setPermission(currentPermissions, 'checks', 'view', value), theme, colorScheme),
-                                  _buildPermissionItem('ویرایش', 'ویرایش چک‌ها', _getPermission(currentPermissions, 'checks', 'edit'), (value) => _setPermission(currentPermissions, 'checks', 'edit', value), theme, colorScheme),
-                                  _buildPermissionItem('حذف', 'حذف چک‌ها', _getPermission(currentPermissions, 'checks', 'delete'), (value) => _setPermission(currentPermissions, 'checks', 'delete', value), theme, colorScheme),
-                                  _buildPermissionItem('وصول', 'وصول چک‌ها', _getPermission(currentPermissions, 'checks', 'collect'), (value) => _setPermission(currentPermissions, 'checks', 'collect', value), theme, colorScheme),
-                                  _buildPermissionItem('انتقال', 'انتقال چک‌ها', _getPermission(currentPermissions, 'checks', 'transfer'), (value) => _setPermission(currentPermissions, 'checks', 'transfer', value), theme, colorScheme),
-                                  _buildPermissionItem('برگشت', 'برگشت چک‌ها', _getPermission(currentPermissions, 'checks', 'return'), (value) => _setPermission(currentPermissions, 'checks', 'return', value), theme, colorScheme),
-                                ],
-                                theme,
-                                colorScheme,
-                              ),
-                              _buildPermissionGroup(
-                                'کیف پول',
-                                [
-                                  _buildPermissionItem('مشاهده', 'مشاهده کیف پول', _getPermission(currentPermissions, 'wallet', 'view'), (value) => _setPermission(currentPermissions, 'wallet', 'view', value), theme, colorScheme),
-                                  _buildPermissionItem('شارژ', 'شارژ کیف پول', _getPermission(currentPermissions, 'wallet', 'charge'), (value) => _setPermission(currentPermissions, 'wallet', 'charge', value), theme, colorScheme),
-                                ],
-                                theme,
-                                colorScheme,
-                              ),
-                              _buildPermissionGroup(
-                                'انتقال',
-                                [
-                                  _buildPermissionItem('افزودن', 'افزودن انتقال', _getPermission(currentPermissions, 'transfers', 'add'), (value) => _setPermission(currentPermissions, 'transfers', 'add', value), theme, colorScheme),
-                                  _buildPermissionItem('مشاهده', 'مشاهده انتقال‌ها', _getPermission(currentPermissions, 'transfers', 'view'), (value) => _setPermission(currentPermissions, 'transfers', 'view', value), theme, colorScheme),
-                                  _buildPermissionItem('ویرایش', 'ویرایش انتقال‌ها', _getPermission(currentPermissions, 'transfers', 'edit'), (value) => _setPermission(currentPermissions, 'transfers', 'edit', value), theme, colorScheme),
-                                  _buildPermissionItem('حذف', 'حذف انتقال‌ها', _getPermission(currentPermissions, 'transfers', 'delete'), (value) => _setPermission(currentPermissions, 'transfers', 'delete', value), theme, colorScheme),
-                                  _buildPermissionItem('مدیریت پیش‌نویس‌ها', 'مدیریت پیش‌نویس‌های انتقال', _getPermission(currentPermissions, 'transfers', 'draft'), (value) => _setPermission(currentPermissions, 'transfers', 'draft', value), theme, colorScheme),
-                                ],
-                                theme,
-                                colorScheme,
-                              ),
-                            ],
-                            theme,
-                            colorScheme,
-                          ),
-
-                          const SizedBox(height: 20),
-
-                          // فاکتورها و هزینه‌ها
-                          _buildPermissionSection(
-                            'فاکتورها و هزینه‌ها',
-                            Icons.receipt,
-                            [
-                              _buildPermissionGroup(
-                                'فاکتورها',
-                                [
-                                  _buildPermissionItem('افزودن', 'افزودن فاکتور', _getPermission(currentPermissions, 'invoices', 'add'), (value) => _setPermission(currentPermissions, 'invoices', 'add', value), theme, colorScheme),
-                                  _buildPermissionItem('مشاهده', 'مشاهده فاکتورها', _getPermission(currentPermissions, 'invoices', 'view'), (value) => _setPermission(currentPermissions, 'invoices', 'view', value), theme, colorScheme),
-                                  _buildPermissionItem('ویرایش', 'ویرایش فاکتورها', _getPermission(currentPermissions, 'invoices', 'edit'), (value) => _setPermission(currentPermissions, 'invoices', 'edit', value), theme, colorScheme),
-                                  _buildPermissionItem('حذف', 'حذف فاکتورها', _getPermission(currentPermissions, 'invoices', 'delete'), (value) => _setPermission(currentPermissions, 'invoices', 'delete', value), theme, colorScheme),
-                                  _buildPermissionItem('مدیریت پیش‌نویس‌ها', 'مدیریت پیش‌نویس‌های فاکتور', _getPermission(currentPermissions, 'invoices', 'draft'), (value) => _setPermission(currentPermissions, 'invoices', 'draft', value), theme, colorScheme),
-                                ],
-                                theme,
-                                colorScheme,
-                              ),
-                              _buildPermissionGroup(
-                                'هزینه و درآمد',
-                                [
-                                  _buildPermissionItem('افزودن', 'افزودن هزینه یا درآمد', _getPermission(currentPermissions, 'expenses_income', 'add'), (value) => _setPermission(currentPermissions, 'expenses_income', 'add', value), theme, colorScheme),
-                                  _buildPermissionItem('مشاهده', 'مشاهده هزینه‌ها و درآمدها', _getPermission(currentPermissions, 'expenses_income', 'view'), (value) => _setPermission(currentPermissions, 'expenses_income', 'view', value), theme, colorScheme),
-                                  _buildPermissionItem('ویرایش', 'ویرایش هزینه‌ها و درآمدها', _getPermission(currentPermissions, 'expenses_income', 'edit'), (value) => _setPermission(currentPermissions, 'expenses_income', 'edit', value), theme, colorScheme),
-                                  _buildPermissionItem('حذف', 'حذف هزینه‌ها و درآمدها', _getPermission(currentPermissions, 'expenses_income', 'delete'), (value) => _setPermission(currentPermissions, 'expenses_income', 'delete', value), theme, colorScheme),
-                                  _buildPermissionItem('مدیریت پیش‌نویس‌ها', 'مدیریت پیش‌نویس‌های هزینه و درآمد', _getPermission(currentPermissions, 'expenses_income', 'draft'), (value) => _setPermission(currentPermissions, 'expenses_income', 'draft', value), theme, colorScheme),
-                                ],
-                                theme,
-                                colorScheme,
-                              ),
-                            ],
-                            theme,
-                            colorScheme,
-                          ),
-
-                          const SizedBox(height: 20),
-
-                          // حسابداری
-                          _buildPermissionSection(
-                            'حسابداری',
-                            Icons.calculate,
-                            [
-                              _buildPermissionGroup(
-                                'اسناد حسابداری',
-                                [
-                                  _buildPermissionItem('افزودن', 'افزودن سند حسابداری', _getPermission(currentPermissions, 'accounting_documents', 'add'), (value) => _setPermission(currentPermissions, 'accounting_documents', 'add', value), theme, colorScheme),
-                                  _buildPermissionItem('مشاهده', 'مشاهده اسناد حسابداری', _getPermission(currentPermissions, 'accounting_documents', 'view'), (value) => _setPermission(currentPermissions, 'accounting_documents', 'view', value), theme, colorScheme),
-                                  _buildPermissionItem('ویرایش', 'ویرایش اسناد حسابداری', _getPermission(currentPermissions, 'accounting_documents', 'edit'), (value) => _setPermission(currentPermissions, 'accounting_documents', 'edit', value), theme, colorScheme),
-                                  _buildPermissionItem('حذف', 'حذف اسناد حسابداری', _getPermission(currentPermissions, 'accounting_documents', 'delete'), (value) => _setPermission(currentPermissions, 'accounting_documents', 'delete', value), theme, colorScheme),
-                                  _buildPermissionItem('مدیریت پیش‌نویس‌ها', 'مدیریت پیش‌نویس‌های اسناد', _getPermission(currentPermissions, 'accounting_documents', 'draft'), (value) => _setPermission(currentPermissions, 'accounting_documents', 'draft', value), theme, colorScheme),
-                                ],
-                                theme,
-                                colorScheme,
-                              ),
-                              _buildPermissionGroup(
-                                'جدول حساب‌ها',
-                                [
-                                  _buildPermissionItem('افزودن', 'افزودن حساب', _getPermission(currentPermissions, 'chart_of_accounts', 'add'), (value) => _setPermission(currentPermissions, 'chart_of_accounts', 'add', value), theme, colorScheme),
-                                  _buildPermissionItem('مشاهده', 'مشاهده جدول حساب‌ها', _getPermission(currentPermissions, 'chart_of_accounts', 'view'), (value) => _setPermission(currentPermissions, 'chart_of_accounts', 'view', value), theme, colorScheme),
-                                  _buildPermissionItem('ویرایش', 'ویرایش جدول حساب‌ها', _getPermission(currentPermissions, 'chart_of_accounts', 'edit'), (value) => _setPermission(currentPermissions, 'chart_of_accounts', 'edit', value), theme, colorScheme),
-                                  _buildPermissionItem('حذف', 'حذف حساب‌ها', _getPermission(currentPermissions, 'chart_of_accounts', 'delete'), (value) => _setPermission(currentPermissions, 'chart_of_accounts', 'delete', value), theme, colorScheme),
-                                ],
-                                theme,
-                                colorScheme,
-                              ),
-                              _buildPermissionGroup(
-                                'تراز افتتاحیه',
-                                [
-                                  _buildPermissionItem('مشاهده', 'مشاهده تراز افتتاحیه', _getPermission(currentPermissions, 'opening_balance', 'view'), (value) => _setPermission(currentPermissions, 'opening_balance', 'view', value), theme, colorScheme),
-                                  _buildPermissionItem('ویرایش', 'ویرایش تراز افتتاحیه', _getPermission(currentPermissions, 'opening_balance', 'edit'), (value) => _setPermission(currentPermissions, 'opening_balance', 'edit', value), theme, colorScheme),
-                                ],
-                                theme,
-                                colorScheme,
-                              ),
-                            ],
-                            theme,
-                            colorScheme,
-                          ),
-
-                          const SizedBox(height: 20),
-
-                          // انبارداری
-                          _buildPermissionSection(
-                            'انبارداری',
-                            Icons.warehouse,
-                            [
-                              _buildPermissionGroup(
-                                'مدیریت انبارها',
-                                [
-                                  _buildPermissionItem('افزودن', 'افزودن انبار', _getPermission(currentPermissions, 'warehouses', 'add'), (value) => _setPermission(currentPermissions, 'warehouses', 'add', value), theme, colorScheme),
-                                  _buildPermissionItem('مشاهده', 'مشاهده انبارها', _getPermission(currentPermissions, 'warehouses', 'view'), (value) => _setPermission(currentPermissions, 'warehouses', 'view', value), theme, colorScheme),
-                                  _buildPermissionItem('ویرایش', 'ویرایش انبارها', _getPermission(currentPermissions, 'warehouses', 'edit'), (value) => _setPermission(currentPermissions, 'warehouses', 'edit', value), theme, colorScheme),
-                                  _buildPermissionItem('حذف', 'حذف انبارها', _getPermission(currentPermissions, 'warehouses', 'delete'), (value) => _setPermission(currentPermissions, 'warehouses', 'delete', value), theme, colorScheme),
-                                ],
-                                theme,
-                                colorScheme,
-                              ),
-                              _buildPermissionGroup(
-                                'صدور حواله',
-                                [
-                                  _buildPermissionItem('افزودن', 'افزودن حواله', _getPermission(currentPermissions, 'warehouse_transfers', 'add'), (value) => _setPermission(currentPermissions, 'warehouse_transfers', 'add', value), theme, colorScheme),
-                                  _buildPermissionItem('مشاهده', 'مشاهده حواله‌ها', _getPermission(currentPermissions, 'warehouse_transfers', 'view'), (value) => _setPermission(currentPermissions, 'warehouse_transfers', 'view', value), theme, colorScheme),
-                                  _buildPermissionItem('ویرایش', 'ویرایش حواله‌ها', _getPermission(currentPermissions, 'warehouse_transfers', 'edit'), (value) => _setPermission(currentPermissions, 'warehouse_transfers', 'edit', value), theme, colorScheme),
-                                  _buildPermissionItem('حذف', 'حذف حواله‌ها', _getPermission(currentPermissions, 'warehouse_transfers', 'delete'), (value) => _setPermission(currentPermissions, 'warehouse_transfers', 'delete', value), theme, colorScheme),
-                                  _buildPermissionItem('مدیریت پیش‌نویس‌ها', 'مدیریت پیش‌نویس‌های حواله', _getPermission(currentPermissions, 'warehouse_transfers', 'draft'), (value) => _setPermission(currentPermissions, 'warehouse_transfers', 'draft', value), theme, colorScheme),
-                                ],
-                                theme,
-                                colorScheme,
-                              ),
-                            ],
-                            theme,
-                            colorScheme,
-                          ),
-
-                          const SizedBox(height: 20),
-
-                          // تنظیمات
-                          _buildPermissionSection(
-                            'تنظیمات',
-                            Icons.settings,
-                            [
-                              _buildPermissionGroup(
-                                'تنظیمات',
-                                [
-                                  _buildPermissionItem('تنظیمات کسب و کار', 'مدیریت تنظیمات کسب و کار', _getPermission(currentPermissions, 'settings', 'business'), (value) => _setPermission(currentPermissions, 'settings', 'business', value), theme, colorScheme),
-                                  _buildPermissionItem('تنظیمات چاپ اسناد', 'مدیریت تنظیمات چاپ', _getPermission(currentPermissions, 'settings', 'print'), (value) => _setPermission(currentPermissions, 'settings', 'print', value), theme, colorScheme),
-                                  _buildPermissionItem('تاریخچه رویدادها', 'مشاهده تاریخچه رویدادها', _getPermission(currentPermissions, 'settings', 'history'), (value) => _setPermission(currentPermissions, 'settings', 'history', value), theme, colorScheme),
-                                  _buildPermissionItem('کاربران و دسترسی‌ها', 'مدیریت کاربران و دسترسی‌ها', _getPermission(currentPermissions, 'settings', 'users'), (value) => _setPermission(currentPermissions, 'settings', 'users', value), theme, colorScheme),
-                                ],
-                                theme,
-                                colorScheme,
-                              ),
-                              _buildPermissionGroup(
-                                'فضای ذخیره‌سازی',
-                                [
-                                  _buildPermissionItem('مشاهده', 'مشاهده فضای ذخیره‌سازی', _getPermission(currentPermissions, 'storage', 'view'), (value) => _setPermission(currentPermissions, 'storage', 'view', value), theme, colorScheme),
-                                  _buildPermissionItem('حذف', 'حذف فایل‌ها', _getPermission(currentPermissions, 'storage', 'delete'), (value) => _setPermission(currentPermissions, 'storage', 'delete', value), theme, colorScheme),
-                                ],
-                                theme,
-                                colorScheme,
-                              ),
-                              _buildPermissionGroup(
-                                'پنل پیامک',
-                                [
-                                  _buildPermissionItem('مشاهده تاریخچه', 'مشاهده تاریخچه پیامک‌ها', _getPermission(currentPermissions, 'sms', 'history'), (value) => _setPermission(currentPermissions, 'sms', 'history', value), theme, colorScheme),
-                                  _buildPermissionItem('مدیریت قالب‌ها', 'مدیریت قالب‌های پیامک', _getPermission(currentPermissions, 'sms', 'templates'), (value) => _setPermission(currentPermissions, 'sms', 'templates', value), theme, colorScheme),
-                                ],
-                                theme,
-                                colorScheme,
-                              ),
-                              _buildPermissionGroup(
-                                'بازار افزونه‌ها',
-                                [
-                                  _buildPermissionItem('مشاهده', 'مشاهده افزونه‌ها', _getPermission(currentPermissions, 'marketplace', 'view'), (value) => _setPermission(currentPermissions, 'marketplace', 'view', value), theme, colorScheme),
-                                  _buildPermissionItem('خرید', 'خرید افزونه‌ها', _getPermission(currentPermissions, 'marketplace', 'buy'), (value) => _setPermission(currentPermissions, 'marketplace', 'buy', value), theme, colorScheme),
-                                  _buildPermissionItem('صورت حساب‌ها', 'مشاهده صورت حساب‌ها', _getPermission(currentPermissions, 'marketplace', 'invoices'), (value) => _setPermission(currentPermissions, 'marketplace', 'invoices', value), theme, colorScheme),
-                                ],
-                                theme,
-                                colorScheme,
-                              ),
-                            ],
-                            theme,
-                            colorScheme,
-                          ),
-                        ],
-                      ),
+                  children: _buildAllPermissionSections(t, theme, colorScheme),
+                ),
                     ),
                   ),
 
                   // Actions
-                  Container(
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      color: colorScheme.surfaceContainerHighest,
-                      borderRadius: const BorderRadius.only(
-                        bottomLeft: Radius.circular(20),
-                        bottomRight: Radius.circular(20),
-                      ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      visualDensity: VisualDensity.compact,
                     ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        TextButton(
-                          onPressed: () => context.pop(),
-                          child: Text(t.cancel),
-                        ),
-                        const SizedBox(width: 12),
-                        ElevatedButton.icon(
-                          onPressed: () {
-                            _updatePermissions(user, currentPermissions);
-                            context.pop();
-                          },
-                          icon: const Icon(Icons.save, size: 18),
-                          label: Text(t.savePermissions),
-                          style: ElevatedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                        ),
-                      ],
+                    onPressed: _isUpdating ? null : () => Navigator.of(context).pop(),
+                    child: Text(t.cancel),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      visualDensity: VisualDensity.compact,
+                      minimumSize: const Size(0, 36),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    onPressed: _isUpdating ? null : _updatePermissions,
+                    icon: _isUpdating
+                        ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                        : const Icon(Icons.save, size: 16),
+                    label: Text(
+                      _isUpdating ? t.saving : t.savePermissions,
+                      style: theme.textTheme.labelLarge,
                     ),
                   ),
                 ],
               ),
             ),
+                ],
+              ),
+            ),
           );
-        },
-      ),
-    );
+  }
+
+  /// ساخت تمام بخش‌های دسترسی به صورت پویا
+  List<Widget> _buildAllPermissionSections(
+    AppLocalizations t,
+    ThemeData theme,
+    ColorScheme colorScheme,
+  ) {
+    final sections = <Widget>[];
+    
+    // تعریف بخش‌ها و آیکون‌هایشان
+    final sectionConfigs = [
+      {
+        'title': t.people,
+        'icon': Icons.people,
+        'sections': ['people', 'people_transactions'],
+      },
+      {
+        'title': t.products,
+        'icon': Icons.inventory,
+        'sections': ['products', 'price_lists', 'categories', 'product_attributes'],
+      },
+      {
+        'title': 'بانکداری',
+        'icon': Icons.account_balance,
+        'sections': ['bank_accounts', 'cash', 'petty_cash', 'checks', 'wallet', 'transfers'],
+      },
+      {
+        'title': 'فاکتورها و هزینه‌ها',
+        'icon': Icons.receipt,
+        'sections': ['invoices', 'expenses_income'],
+      },
+      {
+        'title': 'حسابداری',
+        'icon': Icons.calculate,
+        'sections': ['accounting_documents', 'chart_of_accounts', 'opening_balance'],
+      },
+      {
+        'title': 'انبارداری',
+        'icon': Icons.warehouse,
+        'sections': ['warehouses', 'warehouse_transfers'],
+      },
+      {
+        'title': 'تنظیمات',
+        'icon': Icons.settings,
+        'sections': ['settings', 'storage', 'sms', 'marketplace'],
+      },
+    ];
+    
+    for (int i = 0; i < sectionConfigs.length; i++) {
+      final config = sectionConfigs[i];
+      final sectionWidgets = <Widget>[];
+      
+      // ساخت گروه‌های دسترسی برای هر بخش
+      for (final sectionKey in config['sections'] as List<String>) {
+        final allPermissions = _getAllPermissions(t);
+        if (allPermissions.containsKey(sectionKey)) {
+          final sectionPermissions = allPermissions[sectionKey]!;
+          final permissionItems = <Widget>[];
+          
+          for (final action in sectionPermissions.keys) {
+            permissionItems.add(
+              _buildPermissionItem(
+                _localizeAction(action),
+                sectionPermissions[action]!,
+                _getPermission(_currentPermissions, sectionKey, action),
+                (value) {
+                  _setPermission(_currentPermissions, sectionKey, action, value);
+                  setState(() {});
+                },
+                theme,
+                colorScheme,
+              ),
+            );
+          }
+          
+          sectionWidgets.add(
+            _buildPermissionGroup(
+              _getSectionTitle(sectionKey),
+              permissionItems,
+              theme,
+              colorScheme,
+            ),
+          );
+        }
+      }
+      
+      sections.add(
+        _buildPermissionSection(
+          config['title'] as String,
+          config['icon'] as IconData,
+          sectionWidgets,
+          theme,
+          colorScheme,
+        ),
+      );
+      
+      // اضافه کردن فاصله بین بخش‌ها
+      if (i < sectionConfigs.length - 1) {
+        sections.add(const SizedBox(height: 20));
+      }
+    }
+    
+    return sections;
+  }
+
+  // سعی می‌کند کلید بخش فعلی را برای آیتم تعیین کند (تقریبی)
+  String _inferCurrentSectionKey(String title, String description) {
+    // جستجو بر اساس کلمات کلیدی ساده
+    final pairs = <String, List<String>>{
+      'people': ['${AppLocalizations.of(context).people}'],
+      'people_transactions': [
+        '${AppLocalizations.of(context).receiptsAndPayments}',
+        '${AppLocalizations.of(context).receipts}',
+        '${AppLocalizations.of(context).payments}',
+      ],
+      'products': ['${AppLocalizations.of(context).products}'],
+      'price_lists': ['${AppLocalizations.of(context).priceLists}'],
+      'categories': ['${AppLocalizations.of(context).categories}'],
+      'product_attributes': ['${AppLocalizations.of(context).productAttributes}'],
+      'bank_accounts': ['${AppLocalizations.of(context).bankAccounts}'],
+      'cash': ['${AppLocalizations.of(context).cash}'],
+      'petty_cash': ['${AppLocalizations.of(context).pettyCash}'],
+      'checks': ['${AppLocalizations.of(context).checks}'],
+      'wallet': ['${AppLocalizations.of(context).wallet}'],
+      'transfers': ['${AppLocalizations.of(context).transfers}'],
+      'invoices': ['${AppLocalizations.of(context).invoices}'],
+      'expenses_income': ['${AppLocalizations.of(context).expensesIncome}'],
+      'accounting_documents': ['${AppLocalizations.of(context).accountingDocuments}'],
+      'chart_of_accounts': ['${AppLocalizations.of(context).chartOfAccounts}'],
+      'opening_balance': ['${AppLocalizations.of(context).openingBalance}'],
+      'warehouses': ['${AppLocalizations.of(context).warehouses}'],
+      'warehouse_transfers': ['${AppLocalizations.of(context).warehouseTransfers}'],
+      'settings': ['${AppLocalizations.of(context).businessSettings}'],
+      'storage': ['${AppLocalizations.of(context).storageSpace}'],
+      'sms': ['${AppLocalizations.of(context).smsPanel}'],
+      'marketplace': ['${AppLocalizations.of(context).marketplace}'],
+    };
+
+    final hay = (title + ' ' + description).toLowerCase();
+    for (final entry in pairs.entries) {
+      for (final token in entry.value) {
+        if (hay.contains(token.toLowerCase())) {
+          return entry.key;
+        }
+      }
+    }
+    return 'people';
+  }
+
+  /// دریافت عنوان بخش بر اساس کلید
+  String _getSectionTitle(String sectionKey) {
+    final titles = {
+      'people': 'اشخاص',
+      'people_receipts': 'دریافت از اشخاص',
+      'people_payments': 'پرداخت‌های اشخاص',
+      'people_transactions': '${AppLocalizations.of(context).receiptsAndPayments} ${AppLocalizations.of(context).people}',
+      'products': 'کالا و خدمات',
+      'price_lists': 'لیست‌های قیمت',
+      'categories': 'دسته‌بندی‌ها',
+      'product_attributes': 'ویژگی‌های کالا و خدمات',
+      'bank_accounts': 'حساب‌های بانکی',
+      'cash': 'صندوق',
+      'petty_cash': 'تنخواه گردان',
+      'checks': 'چک',
+      'wallet': 'کیف پول',
+      'transfers': 'انتقال',
+      'invoices': 'فاکتورها',
+      'expenses_income': 'هزینه و درآمد',
+      'accounting_documents': 'اسناد حسابداری',
+      'chart_of_accounts': 'جدول حساب‌ها',
+      'opening_balance': 'تراز افتتاحیه',
+      'warehouses': 'مدیریت انبارها',
+      'warehouse_transfers': 'صدور حواله',
+      'settings': 'تنظیمات',
+      'storage': 'فضای ذخیره‌سازی',
+      'sms': 'پنل پیامک',
+      'marketplace': 'بازار افزونه‌ها',
+    };
+    
+    return titles[sectionKey] ?? sectionKey;
+  }
+
+  String _localizeAction(String action) {
+    final t = AppLocalizations.of(context);
+    switch (action) {
+      case 'add':
+        return t.add;
+      case 'view':
+        return t.view;
+      case 'edit':
+        return t.edit;
+      case 'delete':
+        return t.delete;
+      case 'draft':
+        return t.draft;
+      case 'buy':
+        return t.buy;
+      case 'invoices':
+        return t.invoices;
+      case 'templates':
+        return t.templates;
+      case 'history':
+        return t.history;
+      case 'print':
+        return t.print;
+      case 'users':
+        return t.users;
+      case 'business':
+        return t.business;
+      case 'collect':
+        return t.collect;
+      case 'transfer':
+        return t.transfer;
+      case 'charge':
+        return t.charge;
+      case 'return':
+        return 'برگشت';
+      default:
+        return action;
+    }
   }
 
   Widget _buildPermissionSection(
@@ -1297,14 +1447,17 @@ class _UsersPermissionsPageState extends State<UsersPermissionsPage> {
     ThemeData theme,
     ColorScheme colorScheme,
   ) {
+    final isViewItem = title == 'view' || description.contains('مشاهده') || description.toLowerCase().contains('view');
+    final sectionKey = _inferCurrentSectionKey(title, description);
+    final mustKeepViewEnabled = isViewItem && _hasAnyNonViewEnabled(sectionKey);
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       child: Row(
         children: [
           Switch(
             value: value,
-            onChanged: onChanged,
-            activeColor: colorScheme.primary,
+            onChanged: mustKeepViewEnabled ? null : onChanged,
+            activeThumbColor: colorScheme.primary,
             materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
           ),
           const SizedBox(width: 12),
@@ -1334,20 +1487,4 @@ class _UsersPermissionsPageState extends State<UsersPermissionsPage> {
       ),
     );
   }
-
-
-  bool _getPermission(Map<String, dynamic> permissions, String section, String action) {
-    if (!permissions.containsKey(section)) return false;
-    final sectionPerms = permissions[section] as Map<String, dynamic>?;
-    if (sectionPerms == null) return false;
-    return sectionPerms[action] == true;
-  }
-
-  void _setPermission(Map<String, dynamic> permissions, String section, String action, bool value) {
-    if (!permissions.containsKey(section)) {
-      permissions[section] = {};
-    }
-    permissions[section][action] = value;
-  }
-
 }

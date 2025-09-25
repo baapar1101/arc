@@ -18,6 +18,127 @@ from adapters.db.models.business import Business
 router = APIRouter(prefix="/business", tags=["business-users"])
 
 
+@router.get("/{business_id}/users/{user_id}", 
+    summary="دریافت جزئیات کاربر", 
+    description="دریافت جزئیات کاربر و دسترسی‌هایش در کسب و کار",
+    responses={
+        200: {
+            "description": "جزئیات کاربر با موفقیت دریافت شد",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "success": True,
+                        "message": "جزئیات کاربر دریافت شد",
+                        "user": {
+                            "id": 1,
+                            "business_id": 1,
+                            "user_id": 2,
+                            "user_name": "علی احمدی",
+                            "user_email": "ali@example.com",
+                            "user_phone": "09123456789",
+                            "role": "member",
+                            "status": "active",
+                            "added_at": "2024-01-01T00:00:00Z",
+                            "last_active": "2024-01-01T12:00:00Z",
+                            "permissions": {
+                                "people": {
+                                    "add": True,
+                                    "view": True,
+                                    "edit": False,
+                                    "delete": False
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        401: {
+            "description": "کاربر احراز هویت نشده است"
+        },
+        403: {
+            "description": "دسترسی غیرمجاز به کسب و کار"
+        },
+        404: {
+            "description": "کاربر یافت نشد"
+        }
+    }
+)
+@require_business_access("business_id")
+def get_user_details(
+    request: Request,
+    business_id: int,
+    user_id: int,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db)
+) -> dict:
+    """دریافت جزئیات کاربر و دسترسی‌هایش"""
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    current_user_id = ctx.get_user_id()
+    logger.info(f"Getting user details for user {user_id} in business {business_id}, current user: {current_user_id}")
+    
+    # Check if user is business owner or has permission to manage users
+    business = db.get(Business, business_id)
+    if not business:
+        logger.error(f"Business {business_id} not found")
+        raise HTTPException(status_code=404, detail="کسب و کار یافت نشد")
+    
+    is_owner = business.owner_id == current_user_id
+    can_manage = ctx.can_manage_business_users()
+    
+    logger.info(f"Business owner: {business.owner_id}, is_owner: {is_owner}, can_manage: {can_manage}")
+    
+    if not is_owner and not can_manage:
+        logger.warning(f"User {current_user_id} does not have permission to view user details for business {business_id}")
+        raise HTTPException(status_code=403, detail="شما مجوز مشاهده جزئیات کاربران ندارید")
+    
+    # Get user details
+    user = db.get(User, user_id)
+    if not user:
+        logger.warning(f"User {user_id} not found")
+        raise HTTPException(status_code=404, detail="کاربر یافت نشد")
+    
+    # Get user permissions for this business
+    permission_repo = BusinessPermissionRepository(db)
+    permission_obj = permission_repo.get_by_user_and_business(user_id, business_id)
+    
+    # Determine role and permissions
+    if business.owner_id == user_id:
+        role = "owner"
+        permissions = {}  # Owner has all permissions
+    else:
+        role = "member"
+        permissions = permission_obj.business_permissions if permission_obj else {}
+    
+    # Format user data
+    user_data = {
+        "id": permission_obj.id if permission_obj else user_id,
+        "business_id": business_id,
+        "user_id": user_id,
+        "user_name": f"{user.first_name or ''} {user.last_name or ''}".strip(),
+        "user_email": user.email or "",
+        "user_phone": user.mobile,
+        "role": role,
+        "status": "active",
+        "added_at": permission_obj.created_at if permission_obj else business.created_at,
+        "last_active": permission_obj.updated_at if permission_obj else business.updated_at,
+        "permissions": permissions,
+    }
+    
+    logger.info(f"Returning user data: {user_data}")
+    
+    # Format datetime fields based on calendar type
+    formatted_user_data = format_datetime_fields(user_data, request)
+    
+    return success_response(
+        data={"user": formatted_user_data},
+        request=request,
+        message="جزئیات کاربر دریافت شد"
+    )
+
+
 @router.get("/{business_id}/users", 
     summary="لیست کاربران کسب و کار", 
     description="دریافت لیست کاربران یک کسب و کار",

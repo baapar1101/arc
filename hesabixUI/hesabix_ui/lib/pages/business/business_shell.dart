@@ -795,48 +795,32 @@ class _BusinessShellState extends State<BusinessShell> {
                                       size: 20,
                                     )
                                   else if (item.hasAddButton)
-                                    GestureDetector(
-                                      onTap: () {
-                                        // Navigate to add new item
-                                        if (item.label == t.people) {
-                                          // Navigate to add person
-                                          _showAddPersonDialog();
-                                        } else if (item.label == t.invoice) {
-                                          // Navigate to add invoice
-                                        } else if (item.label == t.receiptsAndPayments) {
-                                          // Navigate to add receipt/payment
-                                        } else if (item.label == t.transfers) {
-                                          // Navigate to add transfer
-                                        } else if (item.label == t.documents) {
-                                          // Navigate to add document
-                                        } else if (item.label == t.expenseAndIncome) {
-                                          // Navigate to add expense/income
-                                        } else if (item.label == t.reports) {
-                                          // Navigate to add report
-                                        } else if (item.label == t.inquiries) {
-                                          // Navigate to add inquiry
-                                        } else if (item.label == t.storageSpace) {
-                                          // Navigate to add storage space
-                                        } else if (item.label == t.taxpayers) {
-                                          // Navigate to add taxpayer
-                                        } else if (item.label == t.pluginMarketplace) {
-                                          // Navigate to add plugin
-                                        }
-                                      },
-                                      child: Container(
-                                        width: 24,
-                                        height: 24,
-                                        decoration: BoxDecoration(
-                                          color: sideFg.withValues(alpha: 0.1),
-                                          borderRadius: BorderRadius.circular(4),
+                                    Builder(builder: (ctx) {
+                                      final section = _sectionForLabel(item.label, t);
+                                      final canAdd = section != null && (widget.authStore.hasBusinessPermission(section, 'add'));
+                                      if (!canAdd) return const SizedBox.shrink();
+                                      return GestureDetector(
+                                        onTap: () {
+                                          if (item.label == t.people) {
+                                            _showAddPersonDialog();
+                                          }
+                                          // سایر مسیرهای افزودن در آینده متصل می‌شوند
+                                        },
+                                        child: Container(
+                                          width: 24,
+                                          height: 24,
+                                          decoration: BoxDecoration(
+                                            color: sideFg.withValues(alpha: 0.1),
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                          child: Icon(
+                                            Icons.add,
+                                            size: 16,
+                                            color: sideFg,
+                                          ),
                                         ),
-                                        child: Icon(
-                                          Icons.add,
-                                          size: 16,
-                                          color: sideFg,
-                                        ),
-                                      ),
-                                    ),
+                                      );
+                                    }),
                                 ],
                               ],
                             ),
@@ -901,17 +885,41 @@ class _BusinessShellState extends State<BusinessShell> {
                       ),
                     );
                   } else if (item.type == _MenuItemType.simple) {
+                    final section = _sectionForLabel(item.label, t);
+                    final canAdd = section != null && (widget.authStore.hasBusinessPermission(section, 'add'));
                     return ListTile(
                       leading: Icon(item.selectedIcon, color: active ? activeFg : sideFg),
                       title: Text(item.label, style: TextStyle(color: active ? activeFg : sideFg, fontWeight: active ? FontWeight.w600 : FontWeight.w400)),
                       selected: active,
                       selectedTileColor: activeBg,
+                      trailing: (item.hasAddButton && canAdd)
+                          ? GestureDetector(
+                              onTap: () {
+                                context.pop();
+                                // در حال حاضر فقط اشخاص پشتیبانی می‌شود
+                                if (item.label == t.people) {
+                                  _showAddPersonDialog();
+                                }
+                              },
+                              child: Container(
+                                width: 24,
+                                height: 24,
+                                decoration: BoxDecoration(
+                                  color: sideFg.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Icon(Icons.add, size: 16, color: sideFg),
+                              ),
+                            )
+                          : null,
                       onTap: () {
                         context.pop();
                         onSelect(i);
                       },
                     );
                   } else if (item.type == _MenuItemType.expandable) {
+                    // فیلتر کردن زیرآیتم‌ها بر اساس دسترسی
+                    final visibleChildren = (item.children ?? []).where((child) => _hasAccessToMenuItem(child)).toList();
                     return ExpansionTile(
                       leading: Icon(item.icon, color: sideFg),
                       title: Text(item.label, style: TextStyle(color: sideFg)),
@@ -924,10 +932,13 @@ class _BusinessShellState extends State<BusinessShell> {
                           if (item.label == t.warehouseManagement) _isWarehouseManagementExpanded = expanded;
                         });
                       },
-                      children: item.children?.map((child) => ListTile(
+                      children: visibleChildren.map((child) {
+                        final childSection = _sectionForLabel(child.label, t);
+                        final childCanAdd = child.hasAddButton && (childSection != null && widget.authStore.hasBusinessPermission(childSection, 'add'));
+                        return ListTile(
                         leading: const SizedBox(width: 24),
                         title: Text(child.label),
-                        trailing: child.hasAddButton ? GestureDetector(
+                        trailing: childCanAdd ? GestureDetector(
                           onTap: () {
                             context.pop();
                             // Navigate to add new item
@@ -977,7 +988,7 @@ class _BusinessShellState extends State<BusinessShell> {
                           context.pop();
                           onSelectChild(i, item.children!.indexOf(child));
                         },
-                      )).toList() ?? [],
+                      }).toList(),
                     );
                   }
                   return const SizedBox.shrink();
@@ -1016,39 +1027,12 @@ class _BusinessShellState extends State<BusinessShell> {
   }
 
   bool _hasAccessToMenuItem(_MenuItem item) {
-    final sectionMap = {
-      'people': 'people',
-      'products': 'products',
-      'priceLists': 'price_lists',
-      'categories': 'categories',
-      'productAttributes': 'product_attributes',
-      'accounts': 'bank_accounts',
-      'pettyCash': 'petty_cash',
-      'cashBox': 'cash',
-      'wallet': 'wallet',
-      'checks': 'checks',
-      'invoice': 'invoices',
-      'receiptsAndPayments': 'accounting_documents',
-      'expenseAndIncome': 'expenses_income',
-      'transfers': 'transfers',
-      'documents': 'accounting_documents',
-      'chartOfAccounts': 'chart_of_accounts',
-      'openingBalance': 'opening_balance',
-      'yearEndClosing': 'opening_balance',
-      'accountingSettings': 'settings',
-      'reports': 'reports',
-      'warehouses': 'warehouses',
-      'shipments': 'warehouse_transfers',
-      'inquiries': 'reports',
-      'storageSpace': 'storage',
-      'taxpayers': 'settings',
-      'settings': 'settings',
-      'pluginMarketplace': 'marketplace',
-    };
-    
-    final section = sectionMap[item.label];
-    if (section == null) return true; // اگر بخشی تعریف نشده، نمایش داده شود
-    
+    final section = _sectionForLabel(item.label, AppLocalizations.of(context));
+    // داشبورد همیشه قابل مشاهده است
+    if (item.path != null && item.path!.endsWith('/dashboard')) return true;
+    // اگر سکشن تعریف نشده، نمایش داده نشود
+    if (section == null) return false;
+    // فقط وقتی اجازه خواندن دارد نمایش بده
     return widget.authStore.canReadSection(section);
   }
 
@@ -1057,6 +1041,35 @@ class _BusinessShellState extends State<BusinessShell> {
     
     // اگر حداقل یکی از زیرآیتم‌ها قابل دسترسی باشد، منو نمایش داده شود
     return item.children!.any((child) => _hasAccessToMenuItem(child));
+  }
+
+  // تبدیل برچسب محلی‌شده منو به کلید سکشن دسترسی
+  String? _sectionForLabel(String label, AppLocalizations t) {
+    if (label == t.people) return 'people';
+    if (label == t.products) return 'products';
+    if (label == t.priceLists) return 'price_lists';
+    if (label == t.categories) return 'categories';
+    if (label == t.productAttributes) return 'product_attributes';
+    if (label == t.accounts) return 'bank_accounts';
+    if (label == t.pettyCash) return 'petty_cash';
+    if (label == t.cashBox) return 'cash';
+    if (label == t.wallet) return 'wallet';
+    if (label == t.checks) return 'checks';
+    if (label == t.invoice) return 'invoices';
+    if (label == t.receiptsAndPayments) return 'people_transactions';
+    if (label == t.expenseAndIncome) return 'expenses_income';
+    if (label == t.transfers) return 'transfers';
+    if (label == t.documents) return 'accounting_documents';
+    if (label == t.chartOfAccounts) return 'chart_of_accounts';
+    if (label == t.openingBalance) return 'opening_balance';
+    if (label == t.warehouses) return 'warehouses';
+    if (label == t.shipments) return 'warehouse_transfers';
+    if (label == t.inquiries) return 'reports';
+    if (label == t.storageSpace) return 'storage';
+    if (label == t.taxpayers) return 'settings';
+    if (label == t.settings) return 'settings';
+    if (label == t.pluginMarketplace) return 'marketplace';
+    return null;
   }
 }
 

@@ -71,6 +71,29 @@ class ApiClient {
           if (calendarType != null && calendarType.isNotEmpty) {
             options.headers['X-Calendar-Type'] = calendarType;
           }
+          // Inject X-Business-ID header when path targets a specific business
+          try {
+            final uri = options.uri;
+            final path = uri.path;
+            // If current business exists, prefer it
+            final currentBusinessId = _authStore?.currentBusiness?.id;
+            int? resolvedBusinessId = currentBusinessId;
+            // Fallback: detect business_id from URL like /api/v1/business/{id}/...
+            if (resolvedBusinessId == null) {
+              final match = RegExp(r"/api/v1/business/(\d+)/").firstMatch(path);
+              if (match != null) {
+                final idStr = match.group(1);
+                if (idStr != null) {
+                  resolvedBusinessId = int.tryParse(idStr);
+                }
+              }
+            }
+            if (resolvedBusinessId != null) {
+              options.headers['X-Business-ID'] = resolvedBusinessId.toString();
+            }
+          } catch (_) {
+            // ignore header injection failures
+          }
           if (kDebugMode) {
             // ignore: avoid_print
             print('[API][REQ] ${options.method} ${options.uri}');

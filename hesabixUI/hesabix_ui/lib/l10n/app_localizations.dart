@@ -4037,7 +4037,7 @@ abstract class AppLocalizations {
   /// No description provided for @deleteFiles.
   ///
   /// In en, this message translates to:
-  /// **'Delete Files'**
+  /// **'Files'**
   String get deleteFiles;
 
   /// No description provided for @smsPanel.
@@ -4567,6 +4567,66 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Update'**
   String get update;
+
+  /// No description provided for @collect.
+  ///
+  /// In en, this message translates to:
+  /// **'Collect'**
+  String get collect;
+
+  /// No description provided for @transfer.
+  ///
+  /// In en, this message translates to:
+  /// **'Transfer'**
+  String get transfer;
+
+  /// No description provided for @charge.
+  ///
+  /// In en, this message translates to:
+  /// **'Charge'**
+  String get charge;
+
+  /// No description provided for @saving.
+  ///
+  /// In en, this message translates to:
+  /// **'Saving...'**
+  String get saving;
+
+  /// No description provided for @userPermissionsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'User Permissions'**
+  String get userPermissionsTitle;
+
+  /// No description provided for @dialogClose.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get dialogClose;
+
+  /// No description provided for @buy.
+  ///
+  /// In en, this message translates to:
+  /// **'Buy'**
+  String get buy;
+
+  /// No description provided for @templates.
+  ///
+  /// In en, this message translates to:
+  /// **'Templates'**
+  String get templates;
+
+  /// No description provided for @history.
+  ///
+  /// In en, this message translates to:
+  /// **'History'**
+  String get history;
+
+  /// No description provided for @business.
+  ///
+  /// In en, this message translates to:
+  /// **'Business'**
+  String get business;
 }
 
 class _AppLocalizationsDelegate

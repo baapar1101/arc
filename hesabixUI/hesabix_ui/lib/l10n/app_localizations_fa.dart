@@ -2013,7 +2013,7 @@ class AppLocalizationsFa extends AppLocalizations {
   String get viewStorage => 'مشاهده فضای ذخیره‌سازی';
 
   @override
-  String get deleteFiles => 'حذف فایل‌ها';
+  String get deleteFiles => 'فایل‌ها';
 
   @override
   String get smsPanel => 'پنل پیامک';
@@ -2286,4 +2286,34 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get update => 'ویرایش';
+
+  @override
+  String get collect => 'وصول';
+
+  @override
+  String get transfer => 'انتقال';
+
+  @override
+  String get charge => 'شارژ';
+
+  @override
+  String get saving => 'در حال ذخیره...';
+
+  @override
+  String get userPermissionsTitle => 'دسترسی‌های کاربر';
+
+  @override
+  String get dialogClose => 'بستن';
+
+  @override
+  String get buy => 'خرید';
+
+  @override
+  String get templates => 'قالب‌ها';
+
+  @override
+  String get history => 'تاریخچه';
+
+  @override
+  String get business => 'کسب و کار';
 }

@@ -837,6 +837,27 @@
   "activePersons": "Active Persons",
   "inactivePersons": "Inactive Persons",
   "personsByType": "Persons by Type",
-  "update": "Update"
+  "update": "Update",
+  "collect": "Collect",
+  "transfer": "Transfer",
+  "charge": "Charge",
+  "businessSettings": "Business Settings",
+  "printSettings": "Print Settings",
+  "eventHistory": "Event History",
+  "usersAndPermissions": "Users and Permissions",
+  "storageSpace": "Storage Space",
+  "deleteFiles": "Files",
+  "viewSmsHistory": "View SMS History",
+  "manageSmsTemplates": "Manage SMS Templates",
+  "viewMarketplace": "View Marketplace",
+  "buyPlugins": "Buy Plugins",
+  "viewInvoices": "View Invoices",
+  "saving": "Saving...",
+  "userPermissionsTitle": "User Permissions",
+  "dialogClose": "Close",
+  "buy": "Buy",
+  "templates": "Templates",
+  "history": "History",
+  "business": "Business"
 }
 

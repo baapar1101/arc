@@ -836,6 +836,27 @@
   "activePersons": "اشخاص فعال",
   "inactivePersons": "اشخاص غیرفعال",
   "personsByType": "اشخاص بر اساس نوع",
-  "update": "ویرایش"
+  "update": "ویرایش",
+  "collect": "وصول",
+  "transfer": "انتقال",
+  "charge": "شارژ",
+  "businessSettings": "تنظیمات کسب و کار",
+  "printSettings": "تنظیمات چاپ اسناد",
+  "eventHistory": "تاریخچه رویدادها",
+  "usersAndPermissions": "کاربران و دسترسی‌ها",
+  "storageSpace": "فضای ذخیره‌سازی",
+  "deleteFiles": "فایل‌ها",
+  "viewSmsHistory": "مشاهده تاریخچه پیامک‌ها",
+  "manageSmsTemplates": "مدیریت قالب‌های پیامک",
+  "viewMarketplace": "مشاهده افزونه‌ها",
+  "buyPlugins": "خرید افزونه‌ها",
+  "viewInvoices": "صورت حساب‌ها",
+  "saving": "در حال ذخیره...",
+  "userPermissionsTitle": "دسترسی‌های کاربر",
+  "dialogClose": "بستن",
+  "buy": "خرید",
+  "templates": "قالب‌ها",
+  "history": "تاریخچه",
+  "business": "کسب و کار"
 }
 

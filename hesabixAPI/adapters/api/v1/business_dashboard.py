@@ -264,7 +264,8 @@ def get_business_info_with_permissions(
     if not ctx.is_superadmin() and not ctx.is_business_owner(business_id):
         # دریافت دسترسی‌های کسب و کار از business_permissions
         permission_repo = BusinessPermissionRepository(db)
-        business_permission = permission_repo.get_by_business_and_user(business_id, ctx.get_user_id())
+        # ترتیب آرگومان‌ها: (user_id, business_id)
+        business_permission = permission_repo.get_by_user_and_business(ctx.get_user_id(), business_id)
         if business_permission:
             permissions = business_permission.business_permissions or {}
     
