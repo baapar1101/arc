@@ -70,6 +70,8 @@ class _MyAppState extends State<MyApp> {
     final themeController = ThemeController();
     await themeController.load();
     final authStore = AuthStore();
+    // بایند کردن AuthStore قبل از load برای ارسال هدر Authorization در درخواست‌های اولیه
+    ApiClient.bindAuthStore(authStore);
     await authStore.load();
     
     // تنظیم کنترلرها
@@ -251,8 +253,17 @@ class _MyAppState extends State<MyApp> {
     final themeController = _themeController!;
 
     print('🔍 BUILD DEBUG: All controllers loaded, creating main router');
+    // حفظ URL فعلی مرورگر هنگام سوئیچ از لودینگ به روتر اصلی
+    final currentInitialLocation = () {
+      final base = Uri.base;
+      final path = base.path.isNotEmpty ? base.path : '/';
+      final query = base.hasQuery ? '?${base.query}' : '';
+      final fragment = base.fragment.isNotEmpty ? '#${base.fragment}' : '';
+      return '$path$query$fragment';
+    }();
+
     final router = GoRouter(
-      initialLocation: '/',
+      initialLocation: currentInitialLocation,
       redirect: (context, state) async {
         final currentPath = state.uri.path;
         final fullUri = state.uri.toString();

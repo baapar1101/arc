@@ -988,6 +988,7 @@ class _BusinessShellState extends State<BusinessShell> {
                           context.pop();
                           onSelectChild(i, item.children!.indexOf(child));
                         },
+                        );
                       }).toList(),
                     );
                   }
