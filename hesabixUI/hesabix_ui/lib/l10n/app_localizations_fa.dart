@@ -1267,10 +1267,10 @@ class AppLocalizationsFa extends AppLocalizations {
   String get userManagementDescription => 'مدیریت کاربران، نقش‌ها و مجوزها';
 
   @override
-  String get systemLogs => 'لاگ‌های سیستم';
+  String get systemLogs => 'گزارش‌های سیستم';
 
   @override
-  String get systemLogsDescription => 'مشاهده لاگ‌های سیستم و نظارت';
+  String get systemLogsDescription => 'مشاهده گزارش‌ها و لاگ‌های سیستم';
 
   @override
   String get backToSettings => 'بازگشت به تنظیمات';
@@ -2029,4 +2029,87 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get buyPlugins => 'خرید افزونه‌ها';
+
+  @override
+  String get appearanceSettings => 'تنظیمات ظاهری';
+
+  @override
+  String get advancedSettings => 'تنظیمات پیشرفته';
+
+  @override
+  String get businessSettingsDescription =>
+      'مدیریت اطلاعات کسب و کار و تنظیمات اصلی';
+
+  @override
+  String get usersAndPermissionsDescription =>
+      'مدیریت کاربران و تعیین سطح دسترسی';
+
+  @override
+  String get printDocumentsDescription => 'تنظیمات چاپ و قالب‌بندی اسناد';
+
+  @override
+  String get languageDescription => 'انتخاب زبان رابط کاربری';
+
+  @override
+  String get themeDescription => 'انتخاب تم روشن، تاریک یا سیستمی';
+
+  @override
+  String get calendarDescription => 'انتخاب نوع تقویم (جلالی یا میلادی)';
+
+  @override
+  String get dataBackup => 'پشتیبان‌گیری';
+
+  @override
+  String get dataBackupDescription => 'ایجاد نسخه پشتیبان از اطلاعات';
+
+  @override
+  String get dataRestore => 'بازیابی اطلاعات';
+
+  @override
+  String get dataRestoreDescription => 'بازیابی اطلاعات از نسخه پشتیبان';
+
+  @override
+  String get manage => 'مدیریت';
+
+  @override
+  String get configure => 'پیکربندی';
+
+  @override
+  String get set => 'تنظیم';
+
+  @override
+  String get execute => 'اجرا';
+
+  @override
+  String get backup => 'پشتیبان‌گیری';
+
+  @override
+  String get restore => 'بازیابی';
+
+  @override
+  String get businessSettingsDialogContent =>
+      'در این بخش می‌توانید اطلاعات کسب و کار، آدرس، شماره تماس و سایر جزئیات را مدیریت کنید.';
+
+  @override
+  String get usersAndPermissionsDialogContent =>
+      'در این بخش می‌توانید کاربران جدید اضافه کنید، دسترسی‌ها را تعیین کنید و نقش‌ها را مدیریت کنید.';
+
+  @override
+  String get printDocumentsDialogContent =>
+      'در این بخش می‌توانید قالب‌های چاپ، سربرگ‌ها و تنظیمات چاپگر را پیکربندی کنید.';
+
+  @override
+  String get dataBackupDialogContent =>
+      'در این بخش می‌توانید از تمام اطلاعات کسب و کار نسخه پشتیبان تهیه کنید.';
+
+  @override
+  String get dataRestoreDialogContent =>
+      'در این بخش می‌توانید اطلاعات را از نسخه پشتیبان قبلی بازیابی کنید.';
+
+  @override
+  String get systemLogsDialogContent =>
+      'در این بخش می‌توانید گزارش‌های سیستم، خطاها و فعالیت‌های کاربران را مشاهده کنید.';
+
+  @override
+  String get accountManagement => 'مدیریت حساب کاربری';
 }

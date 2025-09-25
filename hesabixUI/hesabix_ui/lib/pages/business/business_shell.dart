@@ -4,8 +4,7 @@ import '../../core/auth_store.dart';
 import '../../core/locale_controller.dart';
 import '../../core/calendar_controller.dart';
 import '../../theme/theme_controller.dart';
-import '../../widgets/settings_menu_button.dart';
-import '../../widgets/user_account_menu_button.dart';
+import '../../widgets/combined_user_menu_button.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 
 class BusinessShell extends StatefulWidget {
@@ -32,7 +31,6 @@ class BusinessShell extends StatefulWidget {
 
 class _BusinessShellState extends State<BusinessShell> {
   int _hoverIndex = -1;
-  bool _isBasicToolsExpanded = false;
   bool _isPeopleExpanded = false;
   bool _isProductsAndServicesExpanded = false;
   bool _isBankingExpanded = false;
@@ -362,31 +360,8 @@ class _BusinessShellState extends State<BusinessShell> {
         label: t.settings,
         icon: Icons.settings,
         selectedIcon: Icons.settings,
-        path: null, // برای منوی بازشونده
-        type: _MenuItemType.expandable,
-        children: [
-          _MenuItem(
-            label: t.businessSettings,
-            icon: Icons.business,
-            selectedIcon: Icons.business,
-            path: '/business/${widget.businessId}/business-settings',
-            type: _MenuItemType.simple,
-          ),
-          _MenuItem(
-            label: t.printDocuments,
-            icon: Icons.print,
-            selectedIcon: Icons.print,
-            path: '/business/${widget.businessId}/print-documents',
-            type: _MenuItemType.simple,
-          ),
-          _MenuItem(
-            label: t.usersAndPermissions,
-            icon: Icons.people_outline,
-            selectedIcon: Icons.people,
-            path: '/business/${widget.businessId}/users-permissions',
-            type: _MenuItemType.simple,
-          ),
-        ],
+        path: '/business/${widget.businessId}/settings',
+        type: _MenuItemType.simple,
       ),
       _MenuItem(
         label: t.pluginMarketplace,
@@ -417,7 +392,6 @@ class _BusinessShellState extends State<BusinessShell> {
             if (i == 4) _isBankingExpanded = true; // بانکداری در ایندکس 4
             if (i == 6) _isAccountingMenuExpanded = true; // حسابداری در ایندکس 6
             if (i == 8) _isWarehouseManagementExpanded = true; // انبارداری در ایندکس 8
-            if (i == 9) _isBasicToolsExpanded = true; // تنظیمات در ایندکس 9
             break;
           }
         }
@@ -444,7 +418,6 @@ class _BusinessShellState extends State<BusinessShell> {
         if (item.label == t.banking) _isBankingExpanded = !_isBankingExpanded;
         if (item.label == t.accountingMenu) _isAccountingMenuExpanded = !_isAccountingMenuExpanded;
         if (item.label == t.warehouseManagement) _isWarehouseManagementExpanded = !_isWarehouseManagementExpanded;
-        if (item.label == t.settings) _isBasicToolsExpanded = !_isBasicToolsExpanded;
         setState(() {});
       }
     }
@@ -482,7 +455,6 @@ class _BusinessShellState extends State<BusinessShell> {
       if (item.label == t.banking) return _isBankingExpanded;
       if (item.label == t.accountingMenu) return _isAccountingMenuExpanded;
       if (item.label == t.warehouseManagement) return _isWarehouseManagementExpanded;
-      if (item.label == t.settings) return _isBasicToolsExpanded;
       return false;
     }
 
@@ -533,14 +505,13 @@ class _BusinessShellState extends State<BusinessShell> {
               ),
       ),
       actions: [
-        SettingsMenuButton(
+        CombinedUserMenuButton(
+          authStore: widget.authStore,
           localeController: widget.localeController,
           calendarController: widget.calendarController,
           themeController: widget.themeController,
         ),
-        const SizedBox(width: 8),
-        UserAccountMenuButton(authStore: widget.authStore),
-        const SizedBox(width: 8),
+        const SizedBox(width: 4),
       ],
     );
 
@@ -767,7 +738,6 @@ class _BusinessShellState extends State<BusinessShell> {
                                 if (item.label == t.banking) _isBankingExpanded = !_isBankingExpanded;
                                 if (item.label == t.accountingMenu) _isAccountingMenuExpanded = !_isAccountingMenuExpanded;
                                 if (item.label == t.warehouseManagement) _isWarehouseManagementExpanded = !_isWarehouseManagementExpanded;
-                                if (item.label == t.settings) _isBasicToolsExpanded = !_isBasicToolsExpanded;
                               });
                             } else {
                               onSelect(menuIndex);
@@ -927,7 +897,6 @@ class _BusinessShellState extends State<BusinessShell> {
                           if (item.label == t.banking) _isBankingExpanded = expanded;
                           if (item.label == t.accountingMenu) _isAccountingMenuExpanded = expanded;
                           if (item.label == t.warehouseManagement) _isWarehouseManagementExpanded = expanded;
-                          if (item.label == t.settings) _isBasicToolsExpanded = expanded;
                         });
                       },
                       children: item.children?.map((child) => ListTile(

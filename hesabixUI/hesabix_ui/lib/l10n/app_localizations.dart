@@ -2561,7 +2561,7 @@ abstract class AppLocalizations {
   /// No description provided for @systemLogsDescription.
   ///
   /// In en, this message translates to:
-  /// **'View system logs and monitoring'**
+  /// **'View system reports and user activity logs'**
   String get systemLogsDescription;
 
   /// No description provided for @backToSettings.
@@ -4069,6 +4069,156 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Buy Plugins'**
   String get buyPlugins;
+
+  /// No description provided for @appearanceSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Appearance Settings'**
+  String get appearanceSettings;
+
+  /// No description provided for @advancedSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Advanced Settings'**
+  String get advancedSettings;
+
+  /// No description provided for @businessSettingsDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage business information and main settings'**
+  String get businessSettingsDescription;
+
+  /// No description provided for @usersAndPermissionsDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage users and set access levels'**
+  String get usersAndPermissionsDescription;
+
+  /// No description provided for @printDocumentsDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Configure print templates and formatting'**
+  String get printDocumentsDescription;
+
+  /// No description provided for @languageDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Select user interface language'**
+  String get languageDescription;
+
+  /// No description provided for @themeDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose light, dark or system theme'**
+  String get themeDescription;
+
+  /// No description provided for @calendarDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Select calendar type (Jalali or Gregorian)'**
+  String get calendarDescription;
+
+  /// No description provided for @dataBackup.
+  ///
+  /// In en, this message translates to:
+  /// **'Data Backup'**
+  String get dataBackup;
+
+  /// No description provided for @dataBackupDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Create backup of all business data'**
+  String get dataBackupDescription;
+
+  /// No description provided for @dataRestore.
+  ///
+  /// In en, this message translates to:
+  /// **'Data Restore'**
+  String get dataRestore;
+
+  /// No description provided for @dataRestoreDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore data from previous backup'**
+  String get dataRestoreDescription;
+
+  /// No description provided for @manage.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage'**
+  String get manage;
+
+  /// No description provided for @configure.
+  ///
+  /// In en, this message translates to:
+  /// **'Configure'**
+  String get configure;
+
+  /// No description provided for @set.
+  ///
+  /// In en, this message translates to:
+  /// **'Set'**
+  String get set;
+
+  /// No description provided for @execute.
+  ///
+  /// In en, this message translates to:
+  /// **'Execute'**
+  String get execute;
+
+  /// No description provided for @backup.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup'**
+  String get backup;
+
+  /// No description provided for @restore.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore'**
+  String get restore;
+
+  /// No description provided for @businessSettingsDialogContent.
+  ///
+  /// In en, this message translates to:
+  /// **'In this section you can manage business information, address, contact numbers and other details.'**
+  String get businessSettingsDialogContent;
+
+  /// No description provided for @usersAndPermissionsDialogContent.
+  ///
+  /// In en, this message translates to:
+  /// **'In this section you can add new users, set permissions and manage roles.'**
+  String get usersAndPermissionsDialogContent;
+
+  /// No description provided for @printDocumentsDialogContent.
+  ///
+  /// In en, this message translates to:
+  /// **'In this section you can configure print templates, letterheads and printer settings.'**
+  String get printDocumentsDialogContent;
+
+  /// No description provided for @dataBackupDialogContent.
+  ///
+  /// In en, this message translates to:
+  /// **'In this section you can create a backup of all business data.'**
+  String get dataBackupDialogContent;
+
+  /// No description provided for @dataRestoreDialogContent.
+  ///
+  /// In en, this message translates to:
+  /// **'In this section you can restore data from a previous backup.'**
+  String get dataRestoreDialogContent;
+
+  /// No description provided for @systemLogsDialogContent.
+  ///
+  /// In en, this message translates to:
+  /// **'In this section you can view system reports, errors and user activities.'**
+  String get systemLogsDialogContent;
+
+  /// No description provided for @accountManagement.
+  ///
+  /// In en, this message translates to:
+  /// **'Account Management'**
+  String get accountManagement;
 }
 
 class _AppLocalizationsDelegate

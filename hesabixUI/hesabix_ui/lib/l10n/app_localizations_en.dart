@@ -1280,7 +1280,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get systemLogs => 'System Logs';
 
   @override
-  String get systemLogsDescription => 'View system logs and monitoring';
+  String get systemLogsDescription =>
+      'View system reports and user activity logs';
 
   @override
   String get backToSettings => 'Back to Settings';
@@ -2040,4 +2041,89 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get buyPlugins => 'Buy Plugins';
+
+  @override
+  String get appearanceSettings => 'Appearance Settings';
+
+  @override
+  String get advancedSettings => 'Advanced Settings';
+
+  @override
+  String get businessSettingsDescription =>
+      'Manage business information and main settings';
+
+  @override
+  String get usersAndPermissionsDescription =>
+      'Manage users and set access levels';
+
+  @override
+  String get printDocumentsDescription =>
+      'Configure print templates and formatting';
+
+  @override
+  String get languageDescription => 'Select user interface language';
+
+  @override
+  String get themeDescription => 'Choose light, dark or system theme';
+
+  @override
+  String get calendarDescription =>
+      'Select calendar type (Jalali or Gregorian)';
+
+  @override
+  String get dataBackup => 'Data Backup';
+
+  @override
+  String get dataBackupDescription => 'Create backup of all business data';
+
+  @override
+  String get dataRestore => 'Data Restore';
+
+  @override
+  String get dataRestoreDescription => 'Restore data from previous backup';
+
+  @override
+  String get manage => 'Manage';
+
+  @override
+  String get configure => 'Configure';
+
+  @override
+  String get set => 'Set';
+
+  @override
+  String get execute => 'Execute';
+
+  @override
+  String get backup => 'Backup';
+
+  @override
+  String get restore => 'Restore';
+
+  @override
+  String get businessSettingsDialogContent =>
+      'In this section you can manage business information, address, contact numbers and other details.';
+
+  @override
+  String get usersAndPermissionsDialogContent =>
+      'In this section you can add new users, set permissions and manage roles.';
+
+  @override
+  String get printDocumentsDialogContent =>
+      'In this section you can configure print templates, letterheads and printer settings.';
+
+  @override
+  String get dataBackupDialogContent =>
+      'In this section you can create a backup of all business data.';
+
+  @override
+  String get dataRestoreDialogContent =>
+      'In this section you can restore data from a previous backup.';
+
+  @override
+  String get systemLogsDialogContent =>
+      'In this section you can view system reports, errors and user activities.';
+
+  @override
+  String get accountManagement => 'Account Management';
 }
