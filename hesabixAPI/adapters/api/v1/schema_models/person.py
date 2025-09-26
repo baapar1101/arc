@@ -50,10 +50,12 @@ class PersonBankAccountResponse(BaseModel):
 class PersonCreateRequest(BaseModel):
     """درخواست ایجاد شخص جدید"""
     # اطلاعات پایه
+    code: Optional[int] = Field(default=None, ge=1, description="کد یکتا در هر کسب و کار (در صورت عدم ارسال، خودکار تولید می‌شود)")
     alias_name: str = Field(..., min_length=1, max_length=255, description="نام مستعار (الزامی)")
     first_name: Optional[str] = Field(default=None, max_length=100, description="نام")
     last_name: Optional[str] = Field(default=None, max_length=100, description="نام خانوادگی")
-    person_type: PersonType = Field(..., description="نوع شخص")
+    person_type: Optional[PersonType] = Field(default=None, description="نوع شخص (سازگاری قدیمی)")
+    person_types: Optional[List[PersonType]] = Field(default=None, description="انواع شخص (چندانتخابی)")
     company_name: Optional[str] = Field(default=None, max_length=255, description="نام شرکت")
     payment_id: Optional[str] = Field(default=None, max_length=100, description="شناسه پرداخت")
     
@@ -81,10 +83,12 @@ class PersonCreateRequest(BaseModel):
 class PersonUpdateRequest(BaseModel):
     """درخواست ویرایش شخص"""
     # اطلاعات پایه
+    code: Optional[int] = Field(default=None, ge=1, description="کد یکتا در هر کسب و کار")
     alias_name: Optional[str] = Field(default=None, min_length=1, max_length=255, description="نام مستعار")
     first_name: Optional[str] = Field(default=None, max_length=100, description="نام")
     last_name: Optional[str] = Field(default=None, max_length=100, description="نام خانوادگی")
-    person_type: Optional[PersonType] = Field(default=None, description="نوع شخص")
+    person_type: Optional[PersonType] = Field(default=None, description="نوع شخص (سازگاری قدیمی)")
+    person_types: Optional[List[PersonType]] = Field(default=None, description="انواع شخص (چندانتخابی)")
     company_name: Optional[str] = Field(default=None, max_length=255, description="نام شرکت")
     payment_id: Optional[str] = Field(default=None, max_length=100, description="شناسه پرداخت")
     
@@ -115,10 +119,12 @@ class PersonResponse(BaseModel):
     business_id: int = Field(..., description="شناسه کسب و کار")
     
     # اطلاعات پایه
+    code: Optional[int] = Field(default=None, description="کد یکتا")
     alias_name: str = Field(..., description="نام مستعار")
     first_name: Optional[str] = Field(default=None, description="نام")
     last_name: Optional[str] = Field(default=None, description="نام خانوادگی")
     person_type: str = Field(..., description="نوع شخص")
+    person_types: List[str] = Field(default_factory=list, description="انواع شخص")
     company_name: Optional[str] = Field(default=None, description="نام شرکت")
     payment_id: Optional[str] = Field(default=None, description="شناسه پرداخت")
     

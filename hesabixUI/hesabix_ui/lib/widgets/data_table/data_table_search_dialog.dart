@@ -53,6 +53,10 @@ class _DataTableSearchDialogState extends State<DataTableSearchDialog> {
     super.initState();
     _controller = TextEditingController(text: widget.searchValue);
     _selectedType = widget.searchType;
+    // Enable/disable Apply button reactively on text changes
+    _controller.addListener(() {
+      if (mounted) setState(() {});
+    });
   }
 
   @override

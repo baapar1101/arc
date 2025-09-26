@@ -24,6 +24,10 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
   final _personService = PersonService();
   bool _isLoading = false;
 
+  // Code (unique) controls
+  final _codeController = TextEditingController();
+  bool _autoGenerateCode = true;
+
   // Controllers for basic info
   final _aliasNameController = TextEditingController();
   final _firstNameController = TextEditingController();
@@ -48,7 +52,8 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
   final _emailController = TextEditingController();
   final _websiteController = TextEditingController();
 
-  PersonType _selectedPersonType = PersonType.customer;
+  PersonType _selectedPersonType = PersonType.customer; // legacy single select (for compatibility)
+  final Set<PersonType> _selectedPersonTypes = <PersonType>{};
   bool _isActive = true;
 
   // Bank accounts
@@ -63,6 +68,10 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
   void _initializeForm() {
     if (widget.person != null) {
       final person = widget.person!;
+      if (person.code != null) {
+        _codeController.text = person.code!.toString();
+        _autoGenerateCode = false;
+      }
       _aliasNameController.text = person.aliasName;
       _firstNameController.text = person.firstName ?? '';
       _lastNameController.text = person.lastName ?? '';
@@ -82,6 +91,9 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
       _emailController.text = person.email ?? '';
       _websiteController.text = person.website ?? '';
       _selectedPersonType = person.personType;
+      _selectedPersonTypes
+        ..clear()
+        ..addAll(person.personTypes.isNotEmpty ? person.personTypes : [person.personType]);
       _isActive = person.isActive;
       _bankAccounts = List.from(person.bankAccounts);
     }
@@ -89,6 +101,7 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
 
   @override
   void dispose() {
+    _codeController.dispose();
     _aliasNameController.dispose();
     _firstNameController.dispose();
     _lastNameController.dispose();
@@ -121,10 +134,13 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
       if (widget.person == null) {
         // Create new person
         final personData = PersonCreateRequest(
+          code: _autoGenerateCode
+              ? null
+              : (int.tryParse(_codeController.text.trim()) ?? null),
           aliasName: _aliasNameController.text.trim(),
           firstName: _firstNameController.text.trim().isEmpty ? null : _firstNameController.text.trim(),
           lastName: _lastNameController.text.trim().isEmpty ? null : _lastNameController.text.trim(),
-          personType: _selectedPersonType,
+          personTypes: _selectedPersonTypes.toList(),
           companyName: _companyNameController.text.trim().isEmpty ? null : _companyNameController.text.trim(),
           paymentId: _paymentIdController.text.trim().isEmpty ? null : _paymentIdController.text.trim(),
           nationalId: _nationalIdController.text.trim().isEmpty ? null : _nationalIdController.text.trim(),
@@ -150,10 +166,12 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
       } else {
         // Update existing person
         final personData = PersonUpdateRequest(
+          code: (int.tryParse(_codeController.text.trim()) ?? null),
           aliasName: _aliasNameController.text.trim(),
           firstName: _firstNameController.text.trim().isEmpty ? null : _firstNameController.text.trim(),
           lastName: _lastNameController.text.trim().isEmpty ? null : _lastNameController.text.trim(),
-          personType: _selectedPersonType,
+          personType: null,
+          personTypes: _selectedPersonTypes.isNotEmpty ? _selectedPersonTypes.toList() : null,
           companyName: _companyNameController.text.trim().isEmpty ? null : _companyNameController.text.trim(),
           paymentId: _paymentIdController.text.trim().isEmpty ? null : _paymentIdController.text.trim(),
           nationalId: _nationalIdController.text.trim().isEmpty ? null : _nationalIdController.text.trim(),
@@ -266,53 +284,54 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
             const Divider(),
             const SizedBox(height: 16),
 
-            // Form
+            // Form with tabs
             Expanded(
               child: Form(
                 key: _formKey,
-                child: SingleChildScrollView(
+                child: DefaultTabController(
+                  length: 4,
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Basic Information
-                      _buildSectionHeader(t.personBasicInfo),
-                      const SizedBox(height: 16),
-                      _buildBasicInfoFields(t),
-                      const SizedBox(height: 24),
-
-                      // Economic Information
-                      _buildSectionHeader(t.personEconomicInfo),
-                      const SizedBox(height: 16),
-                      _buildEconomicInfoFields(t),
-                      const SizedBox(height: 24),
-
-                      // Contact Information
-                      _buildSectionHeader(t.personContactInfo),
-                      const SizedBox(height: 16),
-                      _buildContactInfoFields(t),
-                      const SizedBox(height: 24),
-
-                      // Bank Accounts
-                      _buildSectionHeader(t.personBankInfo),
-                      const SizedBox(height: 16),
-                      _buildBankAccountsSection(t),
-                      const SizedBox(height: 24),
-
-                      // Status (only for editing)
-                      if (isEditing) ...[
-                        _buildSectionHeader('وضعیت'),
-                        const SizedBox(height: 16),
-                        SwitchListTile(
-                          title: Text('فعال'),
-                          value: _isActive,
-                          onChanged: (value) {
-                            setState(() {
-                              _isActive = value;
-                            });
-                          },
+                      TabBar(
+                        isScrollable: true,
+                        tabs: [
+                          Tab(text: t.personBasicInfo),
+                          Tab(text: t.personEconomicInfo),
+                          Tab(text: t.personContactInfo),
+                          Tab(text: t.personBankInfo),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Expanded(
+                        child: TabBarView(
+                          children: [
+                            SingleChildScrollView(
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                child: _buildBasicInfoFields(t),
+                              ),
+                            ),
+                            SingleChildScrollView(
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                child: _buildEconomicInfoFields(t),
+                              ),
+                            ),
+                            SingleChildScrollView(
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                child: _buildContactInfoFields(t),
+                              ),
+                            ),
+                            SingleChildScrollView(
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                child: _buildBankAccountsSection(t),
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 24),
-                      ],
+                      ),
                     ],
                   ),
                 ),
@@ -365,6 +384,61 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
           children: [
             Expanded(
               child: TextFormField(
+                controller: _codeController,
+                readOnly: _autoGenerateCode,
+                decoration: InputDecoration(
+                  labelText: 'کد شخص (اختیاری)',
+                  hintText: 'کد یکتا (عددی)',
+                  suffixIcon: Container(
+                    margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 6),
+                    padding: const EdgeInsets.all(2),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(8),
+                      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                    ),
+                    child: ToggleButtons(
+                      isSelected: [_autoGenerateCode, !_autoGenerateCode],
+                      borderRadius: BorderRadius.circular(6),
+                      constraints: const BoxConstraints(minHeight: 32, minWidth: 64),
+                      onPressed: (index) {
+                        setState(() {
+                          _autoGenerateCode = (index == 0);
+                        });
+                      },
+                      children: const [
+                        Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 6),
+                          child: Text('اتوماتیک'),
+                        ),
+                        Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 6),
+                          child: Text('دستی'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                keyboardType: TextInputType.number,
+                validator: (value) {
+                  if (!_autoGenerateCode) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'کد شخص الزامی است';
+                    }
+                    if (int.tryParse(value.trim()) == null) {
+                      return 'کد باید عددی باشد';
+                    }
+                  }
+                  return null;
+                },
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: TextFormField(
                 controller: _aliasNameController,
                 decoration: InputDecoration(
                   labelText: t.personAliasName,
@@ -379,36 +453,10 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
               ),
             ),
             const SizedBox(width: 16),
-            Expanded(
-              child: DropdownButtonFormField<PersonType>(
-                value: _selectedPersonType,
-                decoration: InputDecoration(
-                  labelText: t.personType,
-                ),
-                items: PersonType.values.map((type) {
-                  return DropdownMenuItem(
-                    value: type,
-                    child: Text(type.persianName),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  if (value != null) {
-                    setState(() {
-                      _selectedPersonType = value;
-                    });
-                  }
-                },
-                validator: (value) {
-                  if (value == null) {
-                    return t.personTypeRequired;
-                  }
-                  return null;
-                },
-              ),
-            ),
+            Expanded(child: _buildPersonTypesMultiSelect(t)),
           ],
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 8),
         Row(
           children: [
             Expanded(
@@ -432,7 +480,7 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
             ),
           ],
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 8),
         Row(
           children: [
             Expanded(
@@ -455,6 +503,39 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
               ),
             ),
           ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPersonTypesMultiSelect(AppLocalizations t) {
+    final types = PersonType.values;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8.0),
+          child: Text(t.personType),
+        ),
+        Wrap(
+          spacing: 8,
+          runSpacing: 4,
+          children: types.map((type) {
+            final selected = _selectedPersonTypes.contains(type);
+            return FilterChip(
+              label: Text(type.persianName),
+              selected: selected,
+              onSelected: (v) {
+                setState(() {
+                  if (v) {
+                    _selectedPersonTypes.add(type);
+                  } else {
+                    _selectedPersonTypes.remove(type);
+                  }
+                });
+              },
+            );
+          }).toList(),
         ),
       ],
     );

@@ -1232,12 +1232,38 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
       ));
     }
     
-    // Add data columns (use visible columns if column settings are enabled)
+    // Resolve action column (if defined in config)
+    ActionColumn? actionColumn;
+    for (final c in widget.config.columns) {
+      if (c is ActionColumn) {
+        actionColumn = c;
+        break;
+      }
+    }
+
+    // Fixed action column immediately after selection and row number columns
+    if (actionColumn != null) {
+      columns.add(DataColumn2(
+        label: Text(
+          actionColumn.label,
+          style: theme.textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.w600,
+            color: theme.colorScheme.onSurface,
+          ),
+          overflow: TextOverflow.ellipsis,
+        ),
+        size: ColumnSize.S,
+        fixedWidth: 80.0,
+      ));
+    }
+
+    // Add data columns (use visible columns if column settings are enabled), excluding ActionColumn
     final columnsToShow = widget.config.enableColumnSettings && _visibleColumns.isNotEmpty
         ? _visibleColumns
         : widget.config.columns;
+    final dataColumnsToShow = columnsToShow.where((c) => c is! ActionColumn).toList();
     
-    columns.addAll(columnsToShow.map((column) {
+    columns.addAll(dataColumnsToShow.map((column) {
       return DataColumn2(
         label: _ColumnHeaderWithSearch(
           text: column.label,
@@ -1295,7 +1321,22 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
           ));
         }
         
-        // Add data cells
+        // 3) Fixed action cell (immediately after selection and row number)
+        // Resolve action column once (same logic as header)
+        ActionColumn? actionColumn;
+        for (final c in widget.config.columns) {
+          if (c is ActionColumn) {
+            actionColumn = c;
+            break;
+          }
+        }
+        if (actionColumn != null) {
+          cells.add(DataCell(
+            _buildActionButtons(item, actionColumn),
+          ));
+        }
+
+        // 4) Add data cells
         if (widget.config.customRowBuilder != null) {
           cells.add(DataCell(
             widget.config.customRowBuilder!(item) ?? const SizedBox.shrink(),
@@ -1304,8 +1345,9 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
           final columnsToShow = widget.config.enableColumnSettings && _visibleColumns.isNotEmpty
               ? _visibleColumns
               : widget.config.columns;
+          final dataColumnsToShow = columnsToShow.where((c) => c is! ActionColumn).toList();
               
-          cells.addAll(columnsToShow.map((column) {
+          cells.addAll(dataColumnsToShow.map((column) {
             return DataCell(
               _buildCellContent(item, column, index),
             );
@@ -1328,18 +1370,49 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
   }
 
   Widget _buildCellContent(dynamic item, DataTableColumn column, int index) {
-    final value = DataTableUtils.getCellValue(item, column.key);
-    
+    // 1) Custom widget builder takes precedence
     if (column is CustomColumn && column.builder != null) {
       return column.builder!(item, index);
     }
     
+    // 2) Action column
     if (column is ActionColumn) {
       return _buildActionButtons(item, column);
     }
-    
+
+    // 3) If a formatter is provided on the column, call it with the full item
+    // This allows working with strongly-typed objects (not just Map)
+    if (column is TextColumn && column.formatter != null) {
+      final text = column.formatter!(item) ?? '';
+      return Text(
+        text,
+        textAlign: _getTextAlign(column),
+        maxLines: _getMaxLines(column),
+        overflow: _getOverflow(column),
+      );
+    }
+    if (column is NumberColumn && column.formatter != null) {
+      final text = column.formatter!(item) ?? '';
+      return Text(
+        text,
+        textAlign: _getTextAlign(column),
+        maxLines: _getMaxLines(column),
+        overflow: _getOverflow(column),
+      );
+    }
+    if (column is DateColumn && column.formatter != null) {
+      final text = column.formatter!(item) ?? '';
+      return Text(
+        text,
+        textAlign: _getTextAlign(column),
+        maxLines: _getMaxLines(column),
+        overflow: _getOverflow(column),
+      );
+    }
+
+    // 4) Fallback: get property value from Map items by key
+    final value = DataTableUtils.getCellValue(item, column.key);
     final formattedValue = DataTableUtils.formatCellValue(value, column);
-    
     return Text(
       formattedValue,
       textAlign: _getTextAlign(column),
@@ -1351,24 +1424,35 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
   Widget _buildActionButtons(dynamic item, ActionColumn column) {
     if (column.actions.isEmpty) return const SizedBox.shrink();
     
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: column.actions.map((action) {
-        return IconButton(
-          onPressed: action.enabled ? () => action.onTap(item) : null,
-          icon: Icon(
-            action.icon,
-            color: action.color,
-            size: 20,
-          ),
-          tooltip: action.label,
-          style: IconButton.styleFrom(
-            foregroundColor: action.isDestructive 
-                ? Theme.of(context).colorScheme.error
-                : action.color,
-          ),
-        );
-      }).toList(),
+    return PopupMenuButton<int>(
+      tooltip: column.label,
+      icon: const Icon(Icons.more_vert, size: 20),
+      onSelected: (index) {
+        final action = column.actions[index];
+        if (action.enabled) action.onTap(item);
+      },
+      itemBuilder: (context) {
+        return List.generate(column.actions.length, (index) {
+          final action = column.actions[index];
+          return PopupMenuItem<int>(
+            value: index,
+            enabled: action.enabled,
+            child: Row(
+              children: [
+                Icon(
+                  action.icon,
+                  color: action.isDestructive 
+                      ? Theme.of(context).colorScheme.error
+                      : (action.color ?? Theme.of(context).iconTheme.color),
+                  size: 18,
+                ),
+                const SizedBox(width: 8),
+                Text(action.label),
+              ],
+            ),
+          );
+        });
+      },
     );
   }
 

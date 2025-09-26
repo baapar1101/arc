@@ -102,6 +102,8 @@ migrations/versions/20250120_000001_add_persons_tables.py
 migrations/versions/20250120_000002_add_join_permission.py
 migrations/versions/20250915_000001_init_auth_tables.py
 migrations/versions/20250916_000002_add_referral_fields.py
+migrations/versions/20250926_000010_add_person_code_and_types.py
+migrations/versions/20250926_000011_drop_person_is_active.py
 migrations/versions/5553f8745c6e_add_support_tables.py
 tests/__init__.py
 tests/test_health.py

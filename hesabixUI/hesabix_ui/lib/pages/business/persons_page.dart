@@ -24,6 +24,7 @@ class PersonsPage extends StatefulWidget {
 
 class _PersonsPageState extends State<PersonsPage> {
   final _personService = PersonService();
+  final GlobalKey _personsTableKey = GlobalKey();
 
   @override
   Widget build(BuildContext context) {
@@ -54,6 +55,7 @@ class _PersonsPageState extends State<PersonsPage> {
         ],
       ),
       body: DataTableWidget<Person>(
+        key: _personsTableKey,
         config: _buildDataTableConfig(t),
         fromJson: Person.fromJson,
       ),
@@ -64,7 +66,16 @@ class _PersonsPageState extends State<PersonsPage> {
     return DataTableConfig<Person>(
       endpoint: '/api/v1/persons/businesses/${widget.businessId}/persons',
       title: t.personsList,
+      showRowNumbers: true,
+      enableRowSelection: true,
       columns: [
+        NumberColumn(
+          'code',
+          'کد شخص',
+          width: ColumnWidth.small,
+          formatter: (person) => (person.code?.toString() ?? '-'),
+          textAlign: TextAlign.center,
+        ),
         TextColumn(
           'alias_name',
           t.personAliasName,
@@ -87,7 +98,9 @@ class _PersonsPageState extends State<PersonsPage> {
           'person_type',
           t.personType,
           width: ColumnWidth.medium,
-          formatter: (person) => person.personType.persianName,
+          formatter: (person) => (person.personTypes.isNotEmpty
+              ? person.personTypes.map((e) => e.persianName).join('، ')
+              : person.personType.persianName),
         ),
         TextColumn(
           'company_name',
@@ -108,10 +121,10 @@ class _PersonsPageState extends State<PersonsPage> {
           formatter: (person) => person.email ?? '-',
         ),
         TextColumn(
-          'is_active',
-          'وضعیت',
-          width: ColumnWidth.small,
-          formatter: (person) => person.isActive ? 'فعال' : 'غیرفعال',
+          'national_id',
+          t.personNationalId,
+          width: ColumnWidth.medium,
+          formatter: (person) => person.nationalId ?? '-',
         ),
         DateColumn(
           'created_at',
@@ -137,6 +150,7 @@ class _PersonsPageState extends State<PersonsPage> {
         ),
       ],
       searchFields: [
+        'code',
         'alias_name',
         'first_name',
         'last_name',
@@ -147,6 +161,7 @@ class _PersonsPageState extends State<PersonsPage> {
       ],
       filterFields: [
         'person_type',
+        'person_types',
         'is_active',
         'country',
         'province',
@@ -162,7 +177,12 @@ class _PersonsPageState extends State<PersonsPage> {
       builder: (context) => PersonFormDialog(
         businessId: widget.businessId,
         onSuccess: () {
-          // DataTableWidget will automatically refresh
+          final state = _personsTableKey.currentState;
+          try {
+            // Call public refresh() via dynamic to avoid private state typing
+            // ignore: avoid_dynamic_calls
+            (state as dynamic)?.refresh();
+          } catch (_) {}
         },
       ),
     );
@@ -175,7 +195,11 @@ class _PersonsPageState extends State<PersonsPage> {
         businessId: widget.businessId,
         person: person,
         onSuccess: () {
-          // DataTableWidget will automatically refresh
+          final state = _personsTableKey.currentState;
+          try {
+            // ignore: avoid_dynamic_calls
+            (state as dynamic)?.refresh();
+          } catch (_) {}
         },
       ),
     );

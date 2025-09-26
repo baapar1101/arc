@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from enum import Enum
 
-from sqlalchemy import String, DateTime, Integer, ForeignKey, Enum as SQLEnum, Text, Boolean
+from sqlalchemy import String, DateTime, Integer, ForeignKey, Enum as SQLEnum, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from adapters.db.session import Base
@@ -21,15 +21,20 @@ class PersonType(str, Enum):
 
 class Person(Base):
     __tablename__ = "persons"
+    __table_args__ = (
+        UniqueConstraint('business_id', 'code', name='uq_persons_business_code'),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     business_id: Mapped[int] = mapped_column(Integer, ForeignKey("businesses.id", ondelete="CASCADE"), nullable=False, index=True)
     
     # اطلاعات پایه
+    code: Mapped[int | None] = mapped_column(Integer, nullable=True, comment="کد یکتا در هر کسب و کار")
     alias_name: Mapped[str] = mapped_column(String(255), nullable=False, index=True, comment="نام مستعار (الزامی)")
     first_name: Mapped[str | None] = mapped_column(String(100), nullable=True, comment="نام")
     last_name: Mapped[str | None] = mapped_column(String(100), nullable=True, comment="نام خانوادگی")
     person_type: Mapped[PersonType] = mapped_column(SQLEnum(PersonType), nullable=False, comment="نوع شخص")
+    person_types: Mapped[str | None] = mapped_column(Text, nullable=True, comment="لیست انواع شخص به صورت JSON")
     company_name: Mapped[str | None] = mapped_column(String(255), nullable=True, comment="نام شرکت")
     payment_id: Mapped[str | None] = mapped_column(String(100), nullable=True, comment="شناسه پرداخت")
     
@@ -49,9 +54,6 @@ class Person(Base):
     fax: Mapped[str | None] = mapped_column(String(20), nullable=True, comment="فکس")
     email: Mapped[str | None] = mapped_column(String(255), nullable=True, comment="پست الکترونیکی")
     website: Mapped[str | None] = mapped_column(String(255), nullable=True, comment="وب‌سایت")
-    
-    # وضعیت
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, comment="وضعیت فعال بودن")
     
     # زمان‌بندی
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
@@ -73,9 +75,6 @@ class PersonBankAccount(Base):
     account_number: Mapped[str | None] = mapped_column(String(50), nullable=True, comment="شماره حساب")
     card_number: Mapped[str | None] = mapped_column(String(20), nullable=True, comment="شماره کارت")
     sheba_number: Mapped[str | None] = mapped_column(String(30), nullable=True, comment="شماره شبا")
-    
-    # وضعیت
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, comment="وضعیت فعال بودن")
     
     # زمان‌بندی
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)

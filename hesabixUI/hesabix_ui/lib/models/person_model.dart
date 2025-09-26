@@ -97,10 +97,12 @@ enum PersonType {
 class Person {
   final int? id;
   final int businessId;
+  final int? code;
   final String aliasName;
   final String? firstName;
   final String? lastName;
   final PersonType personType;
+  final List<PersonType> personTypes;
   final String? companyName;
   final String? paymentId;
   final String? nationalId;
@@ -124,10 +126,12 @@ class Person {
   Person({
     this.id,
     required this.businessId,
+    this.code,
     required this.aliasName,
     this.firstName,
     this.lastName,
     required this.personType,
+    this.personTypes = const [],
     this.companyName,
     this.paymentId,
     this.nationalId,
@@ -150,13 +154,22 @@ class Person {
   });
 
   factory Person.fromJson(Map<String, dynamic> json) {
+    final List<PersonType> types = (json['person_types'] as List?)
+            ?.map((e) => PersonType.fromString(e.toString()))
+            .toList() ??
+        [];
+    final PersonType primaryType = types.isNotEmpty
+        ? types.first
+        : PersonType.fromString(json['person_type']);
     return Person(
       id: json['id'],
       businessId: json['business_id'],
+      code: json['code'],
       aliasName: json['alias_name'],
       firstName: json['first_name'],
       lastName: json['last_name'],
-      personType: PersonType.fromString(json['person_type']),
+      personType: primaryType,
+      personTypes: types,
       companyName: json['company_name'],
       paymentId: json['payment_id'],
       nationalId: json['national_id'],
@@ -185,10 +198,12 @@ class Person {
     return {
       'id': id,
       'business_id': businessId,
+      'code': code,
       'alias_name': aliasName,
       'first_name': firstName,
       'last_name': lastName,
       'person_type': personType.persianName,
+      'person_types': personTypes.map((t) => t.persianName).toList(),
       'company_name': companyName,
       'payment_id': paymentId,
       'national_id': nationalId,
@@ -285,9 +300,10 @@ class Person {
 
 class PersonCreateRequest {
   final String aliasName;
+  final int? code;
   final String? firstName;
   final String? lastName;
-  final PersonType personType;
+  final List<PersonType> personTypes;
   final String? companyName;
   final String? paymentId;
   final String? nationalId;
@@ -307,9 +323,10 @@ class PersonCreateRequest {
 
   PersonCreateRequest({
     required this.aliasName,
+    this.code,
     this.firstName,
     this.lastName,
-    required this.personType,
+    this.personTypes = const [],
     this.companyName,
     this.paymentId,
     this.nationalId,
@@ -331,9 +348,10 @@ class PersonCreateRequest {
   Map<String, dynamic> toJson() {
     return {
       'alias_name': aliasName,
+      if (code != null) 'code': code,
       'first_name': firstName,
       'last_name': lastName,
-      'person_type': personType.persianName,
+      if (personTypes.isNotEmpty) 'person_types': personTypes.map((t) => t.persianName).toList(),
       'company_name': companyName,
       'payment_id': paymentId,
       'national_id': nationalId,
@@ -349,16 +367,27 @@ class PersonCreateRequest {
       'fax': fax,
       'email': email,
       'website': website,
-      'bank_accounts': bankAccounts.map((ba) => ba.toJson()).toList(),
+      // Only send fields expected by backend for create
+      'bank_accounts': bankAccounts
+          .where((ba) => (ba.bankName).trim().isNotEmpty)
+          .map((ba) => {
+                'bank_name': ba.bankName,
+                'account_number': ba.accountNumber,
+                'card_number': ba.cardNumber,
+                'sheba_number': ba.shebaNumber,
+              })
+          .toList(),
     };
   }
 }
 
 class PersonUpdateRequest {
+  final int? code;
   final String? aliasName;
   final String? firstName;
   final String? lastName;
   final PersonType? personType;
+  final List<PersonType>? personTypes;
   final String? companyName;
   final String? paymentId;
   final String? nationalId;
@@ -377,10 +406,12 @@ class PersonUpdateRequest {
   final bool? isActive;
 
   PersonUpdateRequest({
+    this.code,
     this.aliasName,
     this.firstName,
     this.lastName,
     this.personType,
+    this.personTypes,
     this.companyName,
     this.paymentId,
     this.nationalId,
@@ -402,10 +433,12 @@ class PersonUpdateRequest {
   Map<String, dynamic> toJson() {
     final Map<String, dynamic> json = {};
     
+    if (code != null) json['code'] = code;
     if (aliasName != null) json['alias_name'] = aliasName;
     if (firstName != null) json['first_name'] = firstName;
     if (lastName != null) json['last_name'] = lastName;
     if (personType != null) json['person_type'] = personType!.persianName;
+    if (personTypes != null) json['person_types'] = personTypes!.map((t) => t.persianName).toList();
     if (companyName != null) json['company_name'] = companyName;
     if (paymentId != null) json['payment_id'] = paymentId;
     if (nationalId != null) json['national_id'] = nationalId;

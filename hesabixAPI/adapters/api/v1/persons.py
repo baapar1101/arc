@@ -10,7 +10,7 @@ from adapters.api.v1.schema_models.person import (
 from adapters.api.v1.schemas import QueryInfo, SuccessResponse
 from app.core.responses import success_response, format_datetime_fields
 from app.core.auth_dependency import get_current_user, AuthContext
-from app.core.permissions import require_business_management
+from app.core.permissions import require_business_management_dep
 from app.services.person_service import (
     create_person, get_person_by_id, get_persons_by_business,
     update_person, delete_person, get_person_summary
@@ -59,13 +59,15 @@ async def create_person_endpoint(
     person_data: PersonCreateRequest,
     db: Session = Depends(get_db),
     auth_context: AuthContext = Depends(get_current_user),
-    _: None = Depends(require_business_management())
+    _: None = Depends(require_business_management_dep),
+    request: Request = None,
 ):
     """ایجاد شخص جدید برای کسب و کار"""
     result = create_person(db, business_id, person_data)
     return success_response(
+        data=format_datetime_fields(result['data'], request),
+        request=request,
         message=result['message'],
-        data=format_datetime_fields(result['data'])
     )
 
 
@@ -103,7 +105,8 @@ async def get_persons_endpoint(
     business_id: int,
     query_info: QueryInfo,
     db: Session = Depends(get_db),
-    auth_context: AuthContext = Depends(get_current_user)
+    auth_context: AuthContext = Depends(get_current_user),
+    request: Request = None,
 ):
     """دریافت لیست اشخاص کسب و کار"""
     query_dict = {
@@ -111,17 +114,21 @@ async def get_persons_endpoint(
         "skip": query_info.skip,
         "sort_by": query_info.sort_by,
         "sort_desc": query_info.sort_desc,
-        "search": query_info.search
+        "search": query_info.search,
+        "search_fields": query_info.search_fields,
+        "filters": query_info.filters,
     }
     result = get_persons_by_business(db, business_id, query_dict)
     
     # فرمت کردن تاریخ‌ها
-    for item in result['items']:
-        item = format_datetime_fields(item)
+    result['items'] = [
+        format_datetime_fields(item, request) for item in result['items']
+    ]
     
     return success_response(
+        data=result,
+        request=request,
         message="لیست اشخاص با موفقیت دریافت شد",
-        data=result
     )
 
 
@@ -142,7 +149,8 @@ async def get_person_endpoint(
     person_id: int,
     db: Session = Depends(get_db),
     auth_context: AuthContext = Depends(get_current_user),
-    _: None = Depends(require_business_management())
+    _: None = Depends(require_business_management_dep),
+    request: Request = None,
 ):
     """دریافت جزئیات شخص"""
     # ابتدا باید business_id را از person دریافت کنیم
@@ -155,8 +163,9 @@ async def get_person_endpoint(
         raise HTTPException(status_code=404, detail="شخص یافت نشد")
     
     return success_response(
+        data=format_datetime_fields(result, request),
+        request=request,
         message="جزئیات شخص با موفقیت دریافت شد",
-        data=format_datetime_fields(result)
     )
 
 
@@ -178,7 +187,8 @@ async def update_person_endpoint(
     person_data: PersonUpdateRequest,
     db: Session = Depends(get_db),
     auth_context: AuthContext = Depends(get_current_user),
-    _: None = Depends(require_business_management())
+    _: None = Depends(require_business_management_dep),
+    request: Request = None,
 ):
     """ویرایش شخص"""
     # ابتدا باید business_id را از person دریافت کنیم
@@ -191,8 +201,9 @@ async def update_person_endpoint(
         raise HTTPException(status_code=404, detail="شخص یافت نشد")
     
     return success_response(
+        data=format_datetime_fields(result['data'], request),
+        request=request,
         message=result['message'],
-        data=format_datetime_fields(result['data'])
     )
 
 
@@ -213,7 +224,8 @@ async def delete_person_endpoint(
     person_id: int,
     db: Session = Depends(get_db),
     auth_context: AuthContext = Depends(get_current_user),
-    _: None = Depends(require_business_management())
+    _: None = Depends(require_business_management_dep),
+    request: Request = None,
 ):
     """حذف شخص"""
     # ابتدا باید business_id را از person دریافت کنیم
@@ -225,7 +237,7 @@ async def delete_person_endpoint(
     if not success:
         raise HTTPException(status_code=404, detail="شخص یافت نشد")
     
-    return success_response(message="شخص با موفقیت حذف شد")
+    return success_response(message="شخص با موفقیت حذف شد", request=request)
 
 
 @router.get("/businesses/{business_id}/persons/summary",
@@ -242,12 +254,14 @@ async def get_persons_summary_endpoint(
     business_id: int,
     db: Session = Depends(get_db),
     auth_context: AuthContext = Depends(get_current_user),
-    _: None = Depends(require_business_management())
+    _: None = Depends(require_business_management_dep),
+    request: Request = None,
 ):
     """دریافت خلاصه اشخاص کسب و کار"""
     result = get_person_summary(db, business_id)
     
     return success_response(
+        data=result,
+        request=request,
         message="خلاصه اشخاص با موفقیت دریافت شد",
-        data=result
     )

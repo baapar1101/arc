@@ -171,3 +171,24 @@ def require_system_settings():
 def require_permission(permission: str):
     """Decorator عمومی برای بررسی دسترسی - wrapper برای require_app_permission"""
     return require_app_permission(permission)
+
+
+# =========================
+# FastAPI Dependencies (for Depends)
+# =========================
+def require_app_permission_dep(permission: str):
+    """FastAPI dependency جهت بررسی دسترسی در سطح اپلیکیشن.
+
+    استفاده:
+        _: None = Depends(require_app_permission_dep("business_management"))
+    """
+    def _dependency(auth_context: AuthContext = Depends(get_current_user)) -> None:
+        if not auth_context.has_app_permission(permission):
+            raise ApiError("FORBIDDEN", f"Missing app permission: {permission}", http_status=403)
+    return _dependency
+
+
+def require_business_management_dep(auth_context: AuthContext = Depends(get_current_user)) -> None:
+    """FastAPI dependency برای بررسی مجوز مدیریت کسب و کارها."""
+    if not auth_context.has_app_permission("business_management"):
+        raise ApiError("FORBIDDEN", "Missing app permission: business_management", http_status=403)
