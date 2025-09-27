@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
+import 'package:shamsi_date/shamsi_date.dart';
 import '../../models/business_models.dart';
 import '../../services/business_api_service.dart';
+import '../../core/calendar_controller.dart';
+import '../../widgets/date_input_field.dart';
+import '../../core/date_utils.dart';
 
 class NewBusinessPage extends StatefulWidget {
-  const NewBusinessPage({super.key});
+  final CalendarController calendarController;
+  const NewBusinessPage({super.key, required this.calendarController});
 
   @override
   State<NewBusinessPage> createState() => _NewBusinessPageState();
@@ -16,15 +21,162 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
   final BusinessData _businessData = BusinessData();
   int _currentStep = 0;
   bool _isLoading = false;
+  int _fiscalTabIndex = 0;
+  late TextEditingController _fiscalTitleController;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.calendarController.addListener(_onCalendarChanged);
+    _fiscalTitleController = TextEditingController();
+    // Set default selections for business type and field
+    _businessData.businessType ??= BusinessType.shop;
+    _businessData.businessField ??= BusinessField.commercial;
+  }
 
   @override
   void dispose() {
+    widget.calendarController.removeListener(_onCalendarChanged);
     _pageController.dispose();
+    _fiscalTitleController.dispose();
     super.dispose();
   }
 
+  void _onCalendarChanged() {
+    if (_businessData.fiscalYears.isEmpty) return;
+    final fiscal = _businessData.fiscalYears[_fiscalTabIndex];
+    if (fiscal.endDate != null) {
+      const autoPrefix = 'سال مالی منتهی به';
+      if (fiscal.title.trim().isEmpty || fiscal.title.trim().startsWith(autoPrefix)) {
+        setState(() {
+          final isJalali = widget.calendarController.isJalali;
+          final endStr = HesabixDateUtils.formatForDisplay(fiscal.endDate, isJalali);
+          fiscal.title = '$autoPrefix $endStr';
+          _fiscalTitleController.text = fiscal.title;
+        });
+      }
+    }
+  }
+
+  Widget _buildFiscalStep() {
+    if (_businessData.fiscalYears.isEmpty) {
+      _businessData.fiscalYears.add(FiscalYearData(isLast: true));
+    }
+    final fiscal = _businessData.fiscalYears[_fiscalTabIndex];
+
+    String _autoTitle() {
+      final isJalali = widget.calendarController.isJalali;
+      final end = fiscal.endDate;
+      if (end == null) return fiscal.title;
+      final endStr = HesabixDateUtils.formatForDisplay(end, isJalali);
+      return 'سال مالی منتهی به $endStr';
+    }
+
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 800),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'سال مالی',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surface,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: Theme.of(context).dividerColor.withValues(alpha: 0.3),
+                  ),
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: DateInputField(
+                            value: fiscal.startDate,
+                            labelText: 'تاریخ شروع *',
+                            lastDate: fiscal.endDate,
+                            calendarController: widget.calendarController,
+                            onChanged: (d) {
+                              setState(() {
+                                fiscal.startDate = d;
+                                if (fiscal.startDate != null) {
+                                  if (widget.calendarController.isJalali) {
+                                    final j = Jalali.fromDateTime(fiscal.startDate!);
+                                    final jNext = Jalali(j.year + 1, j.month, j.day);
+                                    fiscal.endDate = jNext.toDateTime();
+                                  } else {
+                                    final s = fiscal.startDate!;
+                                    fiscal.endDate = DateTime(s.year + 1, s.month, s.day);
+                                  }
+                                  fiscal.title = _autoTitle();
+                                  _fiscalTitleController.text = fiscal.title;
+                                }
+                              });
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: DateInputField(
+                            value: fiscal.endDate,
+                            labelText: 'تاریخ پایان *',
+                            firstDate: fiscal.startDate,
+                            calendarController: widget.calendarController,
+                            onChanged: (d) {
+                              setState(() {
+                                fiscal.endDate = d;
+                                if (fiscal.title.trim().isEmpty || fiscal.title.startsWith('سال مالی منتهی به')) {
+                                  fiscal.title = _autoTitle();
+                                  _fiscalTitleController.text = fiscal.title;
+                                }
+                              });
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: _fiscalTitleController,
+                      decoration: const InputDecoration(
+                        labelText: 'عنوان سال مالی *',
+                        border: OutlineInputBorder(),
+                      ),
+                      onChanged: (v) {
+                        setState(() {
+                          fiscal.title = v;
+                        });
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerRight,
+                child: Text(
+                  'پرکردن عنوان، تاریخ شروع و پایان الزامی است.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                      ),
+                ),
+              )
+            ],
+          ),
+        ),
+      ),
+    );
+  }
   void _nextStep() {
-    if (_currentStep < 3) {
+    if (_currentStep < 4) {
       setState(() {
         _currentStep++;
       });
@@ -66,6 +218,8 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
         return _businessData.isStep2Valid();
       case 2:
         return _businessData.isStep3Valid();
+      case 3:
+        return _businessData.isFiscalStepValid();
       default:
         return false;
     }
@@ -84,6 +238,8 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
       case 2:
         return t.businessLegalInfo;
       case 3:
+        return 'سال مالی';
+      case 4:
         return t.businessConfirmation;
       default:
         return '';
@@ -122,7 +278,7 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
             duration: const Duration(seconds: 2),
           ),
         );
-        context.pop();
+        context.goNamed('profile_businesses');
       }
     } catch (e) {
       if (mounted) {
@@ -170,7 +326,7 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
               children: [
                 // Progress bar
                 Row(
-                  children: List.generate(4, (index) {
+                  children: List.generate(5, (index) {
                     final isActive = index <= _currentStep;
                     final isCurrent = index == _currentStep;
                     
@@ -203,7 +359,7 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
                 const SizedBox(height: 8),
                 // Progress text
                 Text(
-                  '${t.step} ${_currentStep + 1} ${t.ofText} 4',
+                  '${t.step} ${_currentStep + 1} ${t.ofText} 5',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: Theme.of(context).colorScheme.onSurface,
                     fontWeight: FontWeight.w600,
@@ -223,7 +379,8 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
                   _buildStepIndicator(0, t.businessBasicInfo),
                   _buildStepIndicator(1, t.businessContactInfo),
                   _buildStepIndicator(2, t.businessLegalInfo),
-                  _buildStepIndicator(3, t.businessConfirmation),
+                  _buildStepIndicator(3, 'سال مالی'),
+                  _buildStepIndicator(4, t.businessConfirmation),
                 ],
               ),
             ),
@@ -293,6 +450,7 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
                     _buildStep1(),
                     _buildStep2(),
                     _buildStep3(),
+                    _buildFiscalStep(),
                     _buildStep4(),
                   ],
                 ),
@@ -326,9 +484,9 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
                       SizedBox(
                         width: double.infinity,
                         child: _buildNavigationButton(
-                          text: _currentStep < 3 ? t.next : t.createBusiness,
-                          icon: _currentStep < 3 ? Icons.arrow_forward_ios : Icons.check,
-                          onPressed: _currentStep < 3 
+                          text: _currentStep < 4 ? t.next : t.createBusiness,
+                          icon: _currentStep < 4 ? Icons.arrow_forward_ios : Icons.check,
+                          onPressed: _currentStep < 4 
                               ? (_canGoToNextStep() ? _nextStep : null)
                               : (_isLoading ? null : _submitBusiness),
                           isPrimary: true,
@@ -361,7 +519,7 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
                       ),
                       Row(
                         children: [
-                          if (_currentStep < 3) ...[
+                          if (_currentStep < 4) ...[
                             _buildNavigationButton(
                               text: t.next,
                               icon: Icons.arrow_forward_ios,
@@ -1381,6 +1539,8 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
                         _buildSummaryItem(t.city, _businessData.city!),
                       if (_businessData.postalCode?.isNotEmpty == true)
                         _buildSummaryItem(t.postalCode, _businessData.postalCode!),
+                      if (_businessData.fiscalYears.isNotEmpty)
+                        _buildSummaryItem('سال مالی', _businessData.fiscalYears.first.title),
                     ],
                   ),
                 ),

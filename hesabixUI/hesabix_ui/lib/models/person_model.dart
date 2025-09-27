@@ -80,7 +80,8 @@ enum PersonType {
   employee('کارمند', 'Employee'),
   supplier('تامین‌کننده', 'Supplier'),
   partner('همکار', 'Partner'),
-  seller('فروشنده', 'Seller');
+  seller('فروشنده', 'Seller'),
+  shareholder('سهامدار', 'Shareholder');
 
   const PersonType(this.persianName, this.englishName);
   final String persianName;
@@ -122,6 +123,15 @@ class Person {
   final DateTime createdAt;
   final DateTime updatedAt;
   final List<PersonBankAccount> bankAccounts;
+  final int? shareCount;
+  // پورسانت
+  final double? commissionSalePercent;
+  final double? commissionSalesReturnPercent;
+  final double? commissionSalesAmount;
+  final double? commissionSalesReturnAmount;
+  final bool commissionExcludeDiscounts;
+  final bool commissionExcludeAdditionsDeductions;
+  final bool commissionPostInInvoiceDocument;
 
   Person({
     this.id,
@@ -151,6 +161,14 @@ class Person {
     required this.createdAt,
     required this.updatedAt,
     this.bankAccounts = const [],
+    this.shareCount,
+    this.commissionSalePercent,
+    this.commissionSalesReturnPercent,
+    this.commissionSalesAmount,
+    this.commissionSalesReturnAmount,
+    this.commissionExcludeDiscounts = false,
+    this.commissionExcludeAdditionsDeductions = false,
+    this.commissionPostInInvoiceDocument = false,
   });
 
   factory Person.fromJson(Map<String, dynamic> json) {
@@ -191,6 +209,14 @@ class Person {
       bankAccounts: (json['bank_accounts'] as List<dynamic>?)
           ?.map((ba) => PersonBankAccount.fromJson(ba))
           .toList() ?? [],
+      shareCount: json['share_count'],
+      commissionSalePercent: (json['commission_sale_percent'] as num?)?.toDouble(),
+      commissionSalesReturnPercent: (json['commission_sales_return_percent'] as num?)?.toDouble(),
+      commissionSalesAmount: (json['commission_sales_amount'] as num?)?.toDouble(),
+      commissionSalesReturnAmount: (json['commission_sales_return_amount'] as num?)?.toDouble(),
+      commissionExcludeDiscounts: json['commission_exclude_discounts'] ?? false,
+      commissionExcludeAdditionsDeductions: json['commission_exclude_additions_deductions'] ?? false,
+      commissionPostInInvoiceDocument: json['commission_post_in_invoice_document'] ?? false,
     );
   }
 
@@ -223,6 +249,14 @@ class Person {
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
       'bank_accounts': bankAccounts.map((ba) => ba.toJson()).toList(),
+      'share_count': shareCount,
+      'commission_sale_percent': commissionSalePercent,
+      'commission_sales_return_percent': commissionSalesReturnPercent,
+      'commission_sales_amount': commissionSalesAmount,
+      'commission_sales_return_amount': commissionSalesReturnAmount,
+      'commission_exclude_discounts': commissionExcludeDiscounts,
+      'commission_exclude_additions_deductions': commissionExcludeAdditionsDeductions,
+      'commission_post_in_invoice_document': commissionPostInInvoiceDocument,
     };
   }
 
@@ -320,6 +354,14 @@ class PersonCreateRequest {
   final String? email;
   final String? website;
   final List<PersonBankAccount> bankAccounts;
+  final int? shareCount;
+  final double? commissionSalePercent;
+  final double? commissionSalesReturnPercent;
+  final double? commissionSalesAmount;
+  final double? commissionSalesReturnAmount;
+  final bool? commissionExcludeDiscounts;
+  final bool? commissionExcludeAdditionsDeductions;
+  final bool? commissionPostInInvoiceDocument;
 
   PersonCreateRequest({
     required this.aliasName,
@@ -343,6 +385,14 @@ class PersonCreateRequest {
     this.email,
     this.website,
     this.bankAccounts = const [],
+    this.shareCount,
+    this.commissionSalePercent,
+    this.commissionSalesReturnPercent,
+    this.commissionSalesAmount,
+    this.commissionSalesReturnAmount,
+    this.commissionExcludeDiscounts,
+    this.commissionExcludeAdditionsDeductions,
+    this.commissionPostInInvoiceDocument,
   });
 
   Map<String, dynamic> toJson() {
@@ -377,6 +427,14 @@ class PersonCreateRequest {
                 'sheba_number': ba.shebaNumber,
               })
           .toList(),
+      if (shareCount != null) 'share_count': shareCount,
+      if (commissionSalePercent != null) 'commission_sale_percent': commissionSalePercent,
+      if (commissionSalesReturnPercent != null) 'commission_sales_return_percent': commissionSalesReturnPercent,
+      if (commissionSalesAmount != null) 'commission_sales_amount': commissionSalesAmount,
+      if (commissionSalesReturnAmount != null) 'commission_sales_return_amount': commissionSalesReturnAmount,
+      if (commissionExcludeDiscounts != null) 'commission_exclude_discounts': commissionExcludeDiscounts,
+      if (commissionExcludeAdditionsDeductions != null) 'commission_exclude_additions_deductions': commissionExcludeAdditionsDeductions,
+      if (commissionPostInInvoiceDocument != null) 'commission_post_in_invoice_document': commissionPostInInvoiceDocument,
     };
   }
 }
@@ -404,6 +462,14 @@ class PersonUpdateRequest {
   final String? email;
   final String? website;
   final bool? isActive;
+  final int? shareCount;
+  final double? commissionSalePercent;
+  final double? commissionSalesReturnPercent;
+  final double? commissionSalesAmount;
+  final double? commissionSalesReturnAmount;
+  final bool? commissionExcludeDiscounts;
+  final bool? commissionExcludeAdditionsDeductions;
+  final bool? commissionPostInInvoiceDocument;
 
   PersonUpdateRequest({
     this.code,
@@ -428,6 +494,14 @@ class PersonUpdateRequest {
     this.email,
     this.website,
     this.isActive,
+    this.shareCount,
+    this.commissionSalePercent,
+    this.commissionSalesReturnPercent,
+    this.commissionSalesAmount,
+    this.commissionSalesReturnAmount,
+    this.commissionExcludeDiscounts,
+    this.commissionExcludeAdditionsDeductions,
+    this.commissionPostInInvoiceDocument,
   });
 
   Map<String, dynamic> toJson() {
@@ -455,6 +529,14 @@ class PersonUpdateRequest {
     if (email != null) json['email'] = email;
     if (website != null) json['website'] = website;
     if (isActive != null) json['is_active'] = isActive;
+    if (shareCount != null) json['share_count'] = shareCount;
+    if (commissionSalePercent != null) json['commission_sale_percent'] = commissionSalePercent;
+    if (commissionSalesReturnPercent != null) json['commission_sales_return_percent'] = commissionSalesReturnPercent;
+    if (commissionSalesAmount != null) json['commission_sales_amount'] = commissionSalesAmount;
+    if (commissionSalesReturnAmount != null) json['commission_sales_return_amount'] = commissionSalesReturnAmount;
+    if (commissionExcludeDiscounts != null) json['commission_exclude_discounts'] = commissionExcludeDiscounts;
+    if (commissionExcludeAdditionsDeductions != null) json['commission_exclude_additions_deductions'] = commissionExcludeAdditionsDeductions;
+    if (commissionPostInInvoiceDocument != null) json['commission_post_in_invoice_document'] = commissionPostInInvoiceDocument;
     
     return json;
   }

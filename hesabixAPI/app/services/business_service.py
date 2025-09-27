@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import select, and_, func
 
 from adapters.db.repositories.business_repo import BusinessRepository
+from adapters.db.repositories.fiscal_year_repo import FiscalYearRepository
 from adapters.db.repositories.business_permission_repo import BusinessPermissionRepository
 from adapters.db.models.business import Business, BusinessType, BusinessField
 from adapters.api.v1.schemas import (
@@ -17,6 +18,7 @@ from app.core.responses import format_datetime_fields
 def create_business(db: Session, business_data: BusinessCreateRequest, owner_id: int) -> Dict[str, Any]:
     """ایجاد کسب و کار جدید"""
     business_repo = BusinessRepository(db)
+    fiscal_repo = FiscalYearRepository(db)
     
     # تبدیل enum values به مقادیر فارسی
     # business_data.business_type و business_data.business_field قبلاً مقادیر فارسی هستند
@@ -41,6 +43,22 @@ def create_business(db: Session, business_data: BusinessCreateRequest, owner_id:
         postal_code=business_data.postal_code
     )
     
+    # ایجاد سال‌های مالی اولیه (در صورت ارسال)
+    if getattr(business_data, "fiscal_years", None):
+        # فقط یک سال با is_last=True نگه داریم (آخرین مورد True باشد)
+        last_true_index = None
+        for idx, fy in enumerate(business_data.fiscal_years or []):
+            if fy.is_last:
+                last_true_index = idx
+        for idx, fy in enumerate(business_data.fiscal_years or []):
+            fiscal_repo.create_fiscal_year(
+                business_id=created_business.id,
+                title=fy.title,
+                start_date=fy.start_date,
+                end_date=fy.end_date,
+                is_last=(idx == last_true_index) if last_true_index is not None else (idx == len(business_data.fiscal_years) - 1)
+            )
+
     # تبدیل به response format
     return _business_to_dict(created_business)
 

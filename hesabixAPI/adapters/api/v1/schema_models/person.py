@@ -12,6 +12,7 @@ class PersonType(str, Enum):
     SUPPLIER = "تامین‌کننده"
     PARTNER = "همکار"
     SELLER = "فروشنده"
+    SHAREHOLDER = "سهامدار"
 
 
 class PersonBankAccountCreateRequest(BaseModel):
@@ -78,6 +79,38 @@ class PersonCreateRequest(BaseModel):
     
     # حساب‌های بانکی
     bank_accounts: Optional[List[PersonBankAccountCreateRequest]] = Field(default=[], description="حساب‌های بانکی")
+    # سهام
+    share_count: Optional[int] = Field(default=None, ge=1, description="تعداد سهام (برای سهامدار، اجباری و حداقل 1)")
+    # پورسانت (برای بازاریاب/فروشنده)
+    commission_sale_percent: Optional[float] = Field(default=None, ge=0, le=100, description="درصد پورسانت از فروش")
+    commission_sales_return_percent: Optional[float] = Field(default=None, ge=0, le=100, description="درصد پورسانت از برگشت از فروش")
+    commission_sales_amount: Optional[float] = Field(default=None, ge=0, description="مبلغ فروش مبنا")
+    commission_sales_return_amount: Optional[float] = Field(default=None, ge=0, description="مبلغ برگشت از فروش مبنا")
+    commission_exclude_discounts: Optional[bool] = Field(default=False, description="عدم محاسبه تخفیف")
+    commission_exclude_additions_deductions: Optional[bool] = Field(default=False, description="عدم محاسبه اضافات و کسورات")
+    commission_post_in_invoice_document: Optional[bool] = Field(default=False, description="ثبت پورسانت در سند فاکتور")
+
+    @classmethod
+    def __get_validators__(cls):
+        yield from super().__get_validators__()
+
+    @staticmethod
+    def _has_shareholder(person_type: Optional[PersonType], person_types: Optional[List[PersonType]]) -> bool:
+        if person_type == PersonType.SHAREHOLDER:
+            return True
+        if person_types:
+            return PersonType.SHAREHOLDER in person_types
+        return False
+
+    @classmethod
+    def validate(cls, value):  # type: ignore[override]
+        obj = super().validate(value)
+        # اعتبارسنجی شرطی سهامدار
+        if cls._has_shareholder(getattr(obj, 'person_type', None), getattr(obj, 'person_types', None)):
+            sc = getattr(obj, 'share_count', None)
+            if sc is None or (isinstance(sc, int) and sc <= 0):
+                raise ValueError("برای سهامدار، مقدار تعداد سهام الزامی و باید بزرگتر از صفر باشد")
+        return obj
 
 
 class PersonUpdateRequest(BaseModel):
@@ -111,6 +144,38 @@ class PersonUpdateRequest(BaseModel):
     
     # وضعیت
     is_active: Optional[bool] = Field(default=None, description="وضعیت فعال بودن")
+    # سهام
+    share_count: Optional[int] = Field(default=None, ge=1, description="تعداد سهام (برای سهامدار)")
+    # پورسانت
+    commission_sale_percent: Optional[float] = Field(default=None, ge=0, le=100, description="درصد پورسانت از فروش")
+    commission_sales_return_percent: Optional[float] = Field(default=None, ge=0, le=100, description="درصد پورسانت از برگشت از فروش")
+    commission_sales_amount: Optional[float] = Field(default=None, ge=0, description="مبلغ فروش مبنا")
+    commission_sales_return_amount: Optional[float] = Field(default=None, ge=0, description="مبلغ برگشت از فروش مبنا")
+    commission_exclude_discounts: Optional[bool] = Field(default=None, description="عدم محاسبه تخفیف")
+    commission_exclude_additions_deductions: Optional[bool] = Field(default=None, description="عدم محاسبه اضافات و کسورات")
+    commission_post_in_invoice_document: Optional[bool] = Field(default=None, description="ثبت پورسانت در سند فاکتور")
+
+    @classmethod
+    def __get_validators__(cls):
+        yield from super().__get_validators__()
+
+    @staticmethod
+    def _has_shareholder(person_type: Optional[PersonType], person_types: Optional[List[PersonType]]) -> bool:
+        if person_type == PersonType.SHAREHOLDER:
+            return True
+        if person_types:
+            return PersonType.SHAREHOLDER in person_types
+        return False
+
+    @classmethod
+    def validate(cls, value):  # type: ignore[override]
+        obj = super().validate(value)
+        # اگر ورودی‌ها مشخصاً به سهامدار اشاره دارند، share_count باید معتبر باشد
+        if cls._has_shareholder(getattr(obj, 'person_type', None), getattr(obj, 'person_types', None)):
+            sc = getattr(obj, 'share_count', None)
+            if sc is None or (isinstance(sc, int) and sc <= 0):
+                raise ValueError("برای سهامدار، مقدار تعداد سهام الزامی و باید بزرگتر از صفر باشد")
+        return obj
 
 
 class PersonResponse(BaseModel):
@@ -154,6 +219,16 @@ class PersonResponse(BaseModel):
     
     # حساب‌های بانکی
     bank_accounts: List[PersonBankAccountResponse] = Field(default=[], description="حساب‌های بانکی")
+    # سهام
+    share_count: Optional[int] = Field(default=None, description="تعداد سهام")
+    # پورسانت
+    commission_sale_percent: Optional[float] = Field(default=None, description="درصد پورسانت از فروش")
+    commission_sales_return_percent: Optional[float] = Field(default=None, description="درصد پورسانت از برگشت از فروش")
+    commission_sales_amount: Optional[float] = Field(default=None, description="مبلغ فروش مبنا")
+    commission_sales_return_amount: Optional[float] = Field(default=None, description="مبلغ برگشت از فروش مبنا")
+    commission_exclude_discounts: Optional[bool] = Field(default=False, description="عدم محاسبه تخفیف")
+    commission_exclude_additions_deductions: Optional[bool] = Field(default=False, description="عدم محاسبه اضافات و کسورات")
+    commission_post_in_invoice_document: Optional[bool] = Field(default=False, description="ثبت پورسانت در سند فاکتور")
 
     class Config:
         from_attributes = True

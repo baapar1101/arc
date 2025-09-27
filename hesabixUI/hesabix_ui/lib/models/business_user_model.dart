@@ -54,7 +54,7 @@ class BusinessUser {
         try {
           // Parse Jalali date format: YYYY/MM/DD HH:MM:SS
           final parts = dateValue.split(' ');
-          if (parts.length >= 1) {
+          if (parts.isNotEmpty) {
             final dateParts = parts[0].split('/');
             if (dateParts.length == 3) {
               final year = int.parse(dateParts[0]);

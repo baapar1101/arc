@@ -56,3 +56,7 @@ class Business(Base):
     
     # Relationships
     persons: Mapped[list["Person"]] = relationship("Person", back_populates="business", cascade="all, delete-orphan")
+    fiscal_years = relationship("FiscalYear", back_populates="business", cascade="all, delete-orphan")
+    currencies = relationship("Currency", secondary="business_currencies", back_populates="businesses")
+    documents = relationship("Document", back_populates="business", cascade="all, delete-orphan")
+    accounts = relationship("Account", back_populates="business", cascade="all, delete-orphan")

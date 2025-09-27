@@ -1,7 +1,7 @@
 from typing import Any, List, Optional, Union, Generic, TypeVar
 from pydantic import BaseModel, EmailStr, Field
 from enum import Enum
-from datetime import datetime
+from datetime import datetime, date
 
 T = TypeVar('T')
 
@@ -177,6 +177,7 @@ class BusinessCreateRequest(BaseModel):
 	province: Optional[str] = Field(default=None, max_length=100, description="استان")
 	city: Optional[str] = Field(default=None, max_length=100, description="شهر")
 	postal_code: Optional[str] = Field(default=None, max_length=20, description="کد پستی")
+	fiscal_years: Optional[List["FiscalYearCreate"]] = Field(default=None, description="آرایه سال‌های مالی برای ایجاد اولیه")
 
 
 class BusinessUpdateRequest(BaseModel):
@@ -246,6 +247,14 @@ class PaginatedResponse(BaseModel, Generic[T]):
 			limit=limit,
 			total_pages=total_pages
 		)
+
+
+# Fiscal Year Schemas
+class FiscalYearCreate(BaseModel):
+    title: str = Field(..., min_length=1, max_length=255, description="عنوان سال مالی")
+    start_date: date = Field(..., description="تاریخ شروع سال مالی")
+    end_date: date = Field(..., description="تاریخ پایان سال مالی")
+    is_last: bool = Field(default=True, description="آیا آخرین سال مالی فعال است؟")
 
 
 # Business User Schemas

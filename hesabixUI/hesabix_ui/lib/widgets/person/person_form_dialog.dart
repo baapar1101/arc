@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
+import 'package:flutter/services.dart';
 import '../../models/person_model.dart';
 import '../../services/person_service.dart';
 
@@ -51,6 +52,15 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
   final _faxController = TextEditingController();
   final _emailController = TextEditingController();
   final _websiteController = TextEditingController();
+  final _shareCountController = TextEditingController();
+  // Commission controllers & state
+  final _commissionSalePercentController = TextEditingController();
+  final _commissionSalesReturnPercentController = TextEditingController();
+  final _commissionSalesAmountController = TextEditingController();
+  final _commissionSalesReturnAmountController = TextEditingController();
+  bool _commissionExcludeDiscounts = false;
+  bool _commissionExcludeAdditionsDeductions = false;
+  bool _commissionPostInInvoiceDocument = false;
 
   PersonType _selectedPersonType = PersonType.customer; // legacy single select (for compatibility)
   final Set<PersonType> _selectedPersonTypes = <PersonType>{};
@@ -96,6 +106,26 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
         ..addAll(person.personTypes.isNotEmpty ? person.personTypes : [person.personType]);
       _isActive = person.isActive;
       _bankAccounts = List.from(person.bankAccounts);
+      // مقدار اولیه سهام
+      if (person.personTypes.contains(PersonType.shareholder) && person.shareCount != null) {
+        _shareCountController.text = person.shareCount!.toString();
+      }
+      // مقدار اولیه پورسانت
+      if (person.commissionSalePercent != null) {
+        _commissionSalePercentController.text = person.commissionSalePercent!.toString();
+      }
+      if (person.commissionSalesReturnPercent != null) {
+        _commissionSalesReturnPercentController.text = person.commissionSalesReturnPercent!.toString();
+      }
+      if (person.commissionSalesAmount != null) {
+        _commissionSalesAmountController.text = person.commissionSalesAmount!.toString();
+      }
+      if (person.commissionSalesReturnAmount != null) {
+        _commissionSalesReturnAmountController.text = person.commissionSalesReturnAmount!.toString();
+      }
+      _commissionExcludeDiscounts = person.commissionExcludeDiscounts;
+      _commissionExcludeAdditionsDeductions = person.commissionExcludeAdditionsDeductions;
+      _commissionPostInInvoiceDocument = person.commissionPostInInvoiceDocument;
     }
   }
 
@@ -120,6 +150,11 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
     _faxController.dispose();
     _emailController.dispose();
     _websiteController.dispose();
+    _shareCountController.dispose();
+    _commissionSalePercentController.dispose();
+    _commissionSalesReturnPercentController.dispose();
+    _commissionSalesAmountController.dispose();
+    _commissionSalesReturnAmountController.dispose();
     super.dispose();
   }
 
@@ -136,7 +171,7 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
         final personData = PersonCreateRequest(
           code: _autoGenerateCode
               ? null
-              : (int.tryParse(_codeController.text.trim()) ?? null),
+              : (int.tryParse(_codeController.text.trim())),
           aliasName: _aliasNameController.text.trim(),
           firstName: _firstNameController.text.trim().isEmpty ? null : _firstNameController.text.trim(),
           lastName: _lastNameController.text.trim().isEmpty ? null : _lastNameController.text.trim(),
@@ -157,6 +192,31 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
           email: _emailController.text.trim().isEmpty ? null : _emailController.text.trim(),
           website: _websiteController.text.trim().isEmpty ? null : _websiteController.text.trim(),
           bankAccounts: _bankAccounts,
+          shareCount: _selectedPersonTypes.contains(PersonType.shareholder)
+              ? int.tryParse(_shareCountController.text.trim())
+              : null,
+          // commission fields only if marketer or seller
+          commissionSalePercent: (_selectedPersonTypes.contains(PersonType.marketer) || _selectedPersonTypes.contains(PersonType.seller))
+              ? double.tryParse(_commissionSalePercentController.text.trim())
+              : null,
+          commissionSalesReturnPercent: (_selectedPersonTypes.contains(PersonType.marketer) || _selectedPersonTypes.contains(PersonType.seller))
+              ? double.tryParse(_commissionSalesReturnPercentController.text.trim())
+              : null,
+          commissionSalesAmount: (_selectedPersonTypes.contains(PersonType.marketer) || _selectedPersonTypes.contains(PersonType.seller))
+              ? double.tryParse(_commissionSalesAmountController.text.trim())
+              : null,
+          commissionSalesReturnAmount: (_selectedPersonTypes.contains(PersonType.marketer) || _selectedPersonTypes.contains(PersonType.seller))
+              ? double.tryParse(_commissionSalesReturnAmountController.text.trim())
+              : null,
+          commissionExcludeDiscounts: (_selectedPersonTypes.contains(PersonType.marketer) || _selectedPersonTypes.contains(PersonType.seller))
+              ? _commissionExcludeDiscounts
+              : null,
+          commissionExcludeAdditionsDeductions: (_selectedPersonTypes.contains(PersonType.marketer) || _selectedPersonTypes.contains(PersonType.seller))
+              ? _commissionExcludeAdditionsDeductions
+              : null,
+          commissionPostInInvoiceDocument: (_selectedPersonTypes.contains(PersonType.marketer) || _selectedPersonTypes.contains(PersonType.seller))
+              ? _commissionPostInInvoiceDocument
+              : null,
         );
 
         await _personService.createPerson(
@@ -166,7 +226,7 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
       } else {
         // Update existing person
         final personData = PersonUpdateRequest(
-          code: (int.tryParse(_codeController.text.trim()) ?? null),
+          code: (int.tryParse(_codeController.text.trim())),
           aliasName: _aliasNameController.text.trim(),
           firstName: _firstNameController.text.trim().isEmpty ? null : _firstNameController.text.trim(),
           lastName: _lastNameController.text.trim().isEmpty ? null : _lastNameController.text.trim(),
@@ -188,6 +248,30 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
           email: _emailController.text.trim().isEmpty ? null : _emailController.text.trim(),
           website: _websiteController.text.trim().isEmpty ? null : _websiteController.text.trim(),
           isActive: _isActive,
+          shareCount: _selectedPersonTypes.contains(PersonType.shareholder)
+              ? int.tryParse(_shareCountController.text.trim())
+              : null,
+          commissionSalePercent: (_selectedPersonTypes.contains(PersonType.marketer) || _selectedPersonTypes.contains(PersonType.seller))
+              ? double.tryParse(_commissionSalePercentController.text.trim())
+              : null,
+          commissionSalesReturnPercent: (_selectedPersonTypes.contains(PersonType.marketer) || _selectedPersonTypes.contains(PersonType.seller))
+              ? double.tryParse(_commissionSalesReturnPercentController.text.trim())
+              : null,
+          commissionSalesAmount: (_selectedPersonTypes.contains(PersonType.marketer) || _selectedPersonTypes.contains(PersonType.seller))
+              ? double.tryParse(_commissionSalesAmountController.text.trim())
+              : null,
+          commissionSalesReturnAmount: (_selectedPersonTypes.contains(PersonType.marketer) || _selectedPersonTypes.contains(PersonType.seller))
+              ? double.tryParse(_commissionSalesReturnAmountController.text.trim())
+              : null,
+          commissionExcludeDiscounts: (_selectedPersonTypes.contains(PersonType.marketer) || _selectedPersonTypes.contains(PersonType.seller))
+              ? _commissionExcludeDiscounts
+              : null,
+          commissionExcludeAdditionsDeductions: (_selectedPersonTypes.contains(PersonType.marketer) || _selectedPersonTypes.contains(PersonType.seller))
+              ? _commissionExcludeAdditionsDeductions
+              : null,
+          commissionPostInInvoiceDocument: (_selectedPersonTypes.contains(PersonType.marketer) || _selectedPersonTypes.contains(PersonType.seller))
+              ? _commissionPostInInvoiceDocument
+              : null,
         );
 
         await _personService.updatePerson(
@@ -288,53 +372,68 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
             Expanded(
               child: Form(
                 key: _formKey,
-                child: DefaultTabController(
-                  length: 4,
-                  child: Column(
-                    children: [
-                      TabBar(
-                        isScrollable: true,
-                        tabs: [
-                          Tab(text: t.personBasicInfo),
-                          Tab(text: t.personEconomicInfo),
-                          Tab(text: t.personContactInfo),
-                          Tab(text: t.personBankInfo),
-                        ],
+                child: Builder(builder: (context) {
+                  final hasCommissionTab = _selectedPersonTypes.contains(PersonType.marketer) || _selectedPersonTypes.contains(PersonType.seller);
+                  final tabs = <Tab>[
+                    Tab(text: t.personBasicInfo),
+                    Tab(text: t.personEconomicInfo),
+                    Tab(text: t.personContactInfo),
+                    Tab(text: t.personBankInfo),
+                  ];
+                  final views = <Widget>[
+                    SingleChildScrollView(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                        child: _buildBasicInfoFields(t),
                       ),
-                      const SizedBox(height: 12),
-                      Expanded(
-                        child: TabBarView(
-                          children: [
-                            SingleChildScrollView(
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                                child: _buildBasicInfoFields(t),
-                              ),
-                            ),
-                            SingleChildScrollView(
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                                child: _buildEconomicInfoFields(t),
-                              ),
-                            ),
-                            SingleChildScrollView(
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                                child: _buildContactInfoFields(t),
-                              ),
-                            ),
-                            SingleChildScrollView(
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                                child: _buildBankAccountsSection(t),
-                              ),
-                            ),
-                          ],
+                    ),
+                    SingleChildScrollView(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                        child: _buildEconomicInfoFields(t),
+                      ),
+                    ),
+                    SingleChildScrollView(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                        child: _buildContactInfoFields(t),
+                      ),
+                    ),
+                    SingleChildScrollView(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                        child: _buildBankAccountsSection(t),
+                      ),
+                    ),
+                  ];
+                  if (hasCommissionTab) {
+                    tabs.add(const Tab(text: 'پورسانت'));
+                    views.add(
+                      SingleChildScrollView(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                          child: _buildCommissionTab(),
                         ),
                       ),
-                    ],
-                  ),
-                ),
+                    );
+                  }
+                  return DefaultTabController(
+                    key: ValueKey(tabs.length),
+                    length: tabs.length,
+                    child: Column(
+                      children: [
+                        TabBar(
+                          isScrollable: true,
+                          tabs: tabs,
+                        ),
+                        const SizedBox(height: 12),
+                        Expanded(
+                          child: TabBarView(children: views),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
               ),
             ),
 
@@ -364,6 +463,128 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildCommissionTab() {
+    final isMarketer = _selectedPersonTypes.contains(PersonType.marketer);
+    final isSeller = _selectedPersonTypes.contains(PersonType.seller);
+    if (!isMarketer && !isSeller) {
+      return Center(
+        child: Text('این بخش فقط برای بازاریاب/فروشنده نمایش داده می‌شود'),
+      );
+    }
+
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: TextFormField(
+                controller: _commissionSalePercentController,
+                decoration: const InputDecoration(
+                  labelText: 'درصد از فروش',
+                  suffixText: '%',
+                ),
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
+                validator: (v) {
+                  if ((isMarketer || isSeller) && (v != null && v.isNotEmpty)) {
+                    final num? val = num.tryParse(v);
+                    if (val == null || val < 0 || val > 100) return 'باید بین 0 تا 100 باشد';
+                  }
+                  return null;
+                },
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: TextFormField(
+                controller: _commissionSalesReturnPercentController,
+                decoration: const InputDecoration(
+                  labelText: 'درصد از برگشت از فروش',
+                  suffixText: '%',
+                ),
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
+                validator: (v) {
+                  if ((isMarketer || isSeller) && (v != null && v.isNotEmpty)) {
+                    final num? val = num.tryParse(v);
+                    if (val == null || val < 0 || val > 100) return 'باید بین 0 تا 100 باشد';
+                  }
+                  return null;
+                },
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: TextFormField(
+                controller: _commissionSalesAmountController,
+                decoration: const InputDecoration(
+                  labelText: 'مبلغ فروش',
+                ),
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
+                validator: (v) {
+                  if (v != null && v.isNotEmpty) {
+                    final num? val = num.tryParse(v);
+                    if (val == null || val < 0) return 'باید عدد مثبت باشد';
+                  }
+                  return null;
+                },
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: TextFormField(
+                controller: _commissionSalesReturnAmountController,
+                decoration: const InputDecoration(
+                  labelText: 'مبلغ برگشت از فروش',
+                ),
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
+                validator: (v) {
+                  if (v != null && v.isNotEmpty) {
+                    final num? val = num.tryParse(v);
+                    if (val == null || val < 0) return 'باید عدد مثبت باشد';
+                  }
+                  return null;
+                },
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: SwitchListTile(
+                title: const Text('عدم محاسبه تخفیف'),
+                value: _commissionExcludeDiscounts,
+                onChanged: (v) { setState(() { _commissionExcludeDiscounts = v; }); },
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: SwitchListTile(
+                title: const Text('عدم محاسبه اضافات و کسورات فاکتور'),
+                value: _commissionExcludeAdditionsDeductions,
+                onChanged: (v) { setState(() { _commissionExcludeAdditionsDeductions = v; }); },
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        SwitchListTile(
+          title: const Text('ثبت پورسانت در سند حسابداری فاکتور'),
+          value: _commissionPostInInvoiceDocument,
+          onChanged: (v) { setState(() { _commissionPostInInvoiceDocument = v; }); },
+        ),
+      ],
     );
   }
 
@@ -456,6 +677,34 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
             Expanded(child: _buildPersonTypesMultiSelect(t)),
           ],
         ),
+        const SizedBox(height: 8),
+        if (_selectedPersonTypes.contains(PersonType.shareholder))
+          Row(
+            children: [
+              Expanded(
+                child: TextFormField(
+                  controller: _shareCountController,
+                  decoration: const InputDecoration(
+                    labelText: 'تعداد سهام',
+                    hintText: 'عدد صحیح بدون اعشار',
+                  ),
+                  keyboardType: TextInputType.number,
+                  validator: (value) {
+                    if (_selectedPersonTypes.contains(PersonType.shareholder)) {
+                      if (value == null || value.trim().isEmpty) {
+                        return 'برای سهامدار، تعداد سهام الزامی است';
+                      }
+                      final parsed = int.tryParse(value.trim());
+                      if (parsed == null || parsed <= 0) {
+                        return 'تعداد سهام باید عدد صحیح بزرگتر از صفر باشد';
+                      }
+                    }
+                    return null;
+                  },
+                ),
+              ),
+            ],
+          ),
         const SizedBox(height: 8),
         Row(
           children: [

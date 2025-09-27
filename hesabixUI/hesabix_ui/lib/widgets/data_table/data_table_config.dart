@@ -193,6 +193,10 @@ class DataTableConfig<T> {
   final String? dateRangeField;
   final String? title;
   final String? subtitle;
+  // Header controls
+  final bool showBackButton;
+  final VoidCallback? onBack;
+  final bool showTableIcon;
   final bool showSearch;
   final bool showFilters;
   final bool showPagination;
@@ -267,6 +271,9 @@ class DataTableConfig<T> {
     this.dateRangeField,
     this.title,
     this.subtitle,
+    this.showBackButton = false,
+    this.onBack,
+    this.showTableIcon = true,
     this.showSearch = true,
     this.showFilters = false,
     this.showPagination = true,
@@ -395,13 +402,27 @@ class DataTableResponse<T> {
   ) {
     final data = json['data'] as Map<String, dynamic>;
     final itemsList = data['items'] as List? ?? [];
+    // Support both old and new pagination shapes
+    final pagination = data['pagination'] as Map<String, dynamic>?;
+    final total = pagination != null
+        ? (pagination['total'] as num?)?.toInt() ?? 0
+        : (data['total'] as num?)?.toInt() ?? 0;
+    final page = pagination != null
+        ? (pagination['page'] as num?)?.toInt() ?? 1
+        : (data['page'] as num?)?.toInt() ?? 1;
+    final limit = pagination != null
+        ? (pagination['per_page'] as num?)?.toInt() ?? 20
+        : (data['limit'] as num?)?.toInt() ?? 20;
+    final totalPages = pagination != null
+        ? (pagination['total_pages'] as num?)?.toInt() ?? 0
+        : (data['total_pages'] as num?)?.toInt() ?? 0;
     
     return DataTableResponse<T>(
       items: itemsList.map((item) => fromJsonT(item as Map<String, dynamic>)).toList(),
-      total: (data['total'] as num?)?.toInt() ?? 0,
-      page: (data['page'] as num?)?.toInt() ?? 1,
-      limit: (data['limit'] as num?)?.toInt() ?? 20,
-      totalPages: (data['total_pages'] as num?)?.toInt() ?? 0,
+      total: total,
+      page: page,
+      limit: limit,
+      totalPages: totalPages,
     );
   }
 }

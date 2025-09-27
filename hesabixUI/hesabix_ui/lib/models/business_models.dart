@@ -1,3 +1,4 @@
+import 'package:shamsi_date/shamsi_date.dart';
 enum BusinessType {
   company('شرکت'),
   shop('مغازه'),
@@ -43,6 +44,9 @@ class BusinessData {
   String? province;
   String? city;
 
+  // مرحله 5: سال(های) مالی
+  List<FiscalYearData> fiscalYears;
+
   BusinessData({
     this.name = '',
     this.businessType,
@@ -57,14 +61,16 @@ class BusinessData {
     this.country,
     this.province,
     this.city,
-  });
+    List<FiscalYearData>? fiscalYears,
+  }) : fiscalYears = fiscalYears ?? <FiscalYearData>[];
 
   // تبدیل به Map برای ارسال به API
   Map<String, dynamic> toJson() {
     return {
       'name': name,
-      'business_type': businessType?.name,
-      'business_field': businessField?.name,
+      // بک‌اند انتظار مقادیر فارسی enum را دارد
+      'business_type': businessType?.displayName,
+      'business_field': businessField?.displayName,
       'address': address,
       'phone': phone,
       'mobile': mobile,
@@ -75,6 +81,7 @@ class BusinessData {
       'country': country,
       'province': province,
       'city': city,
+      'fiscal_years': fiscalYears.map((e) => e.toJson()).toList(),
     };
   }
 
@@ -93,6 +100,7 @@ class BusinessData {
     String? country,
     String? province,
     String? city,
+    List<FiscalYearData>? fiscalYears,
   }) {
     return BusinessData(
       name: name ?? this.name,
@@ -108,6 +116,7 @@ class BusinessData {
       country: country ?? this.country,
       province: province ?? this.province,
       city: city ?? this.city,
+      fiscalYears: fiscalYears ?? this.fiscalYears,
     );
   }
 
@@ -147,14 +156,23 @@ class BusinessData {
     return true;
   }
 
-  // بررسی اعتبار مرحله 4 (اختیاری)
+  // بررسی اعتبار مرحله 4 (اطلاعات جغرافیایی - اختیاری)
   bool isStep4Valid() {
-    return true; // همه فیلدها اختیاری هستند
+    return true;
+  }
+
+  // بررسی اعتبار مرحله 5 (سال مالی - اجباری)
+  bool isFiscalStepValid() {
+    if (fiscalYears.isEmpty) return false;
+    final fy = fiscalYears.first;
+    if (fy.title.trim().isEmpty || fy.startDate == null || fy.endDate == null) return false;
+    if (fy.startDate!.isAfter(fy.endDate!)) return false;
+    return true;
   }
 
   // بررسی اعتبار کل فرم
   bool isFormValid() {
-    return isStep1Valid() && isStep2Valid() && isStep3Valid() && isStep4Valid();
+    return isStep1Valid() && isStep2Valid() && isStep3Valid() && isStep4Valid() && isFiscalStepValid();
   }
 
   // اعتبارسنجی شماره موبایل ایرانی
@@ -251,6 +269,29 @@ class BusinessData {
   }
 }
 
+class FiscalYearData {
+  String title;
+  DateTime? startDate;
+  DateTime? endDate;
+  bool isLast;
+
+  FiscalYearData({
+    this.title = '',
+    this.startDate,
+    this.endDate,
+    this.isLast = true,
+  });
+
+  Map<String, dynamic> toJson() {
+    return {
+      'title': title,
+      'start_date': startDate?.toIso8601String().split('T').first,
+      'end_date': endDate?.toIso8601String().split('T').first,
+      'is_last': isLast,
+    };
+  }
+}
+
 class BusinessResponse {
   final int id;
   final String name;
@@ -307,8 +348,54 @@ class BusinessResponse {
       province: json['province'],
       city: json['city'],
       postalCode: json['postal_code'],
-      createdAt: DateTime.parse(json['created_at']),
-      updatedAt: DateTime.parse(json['updated_at']),
+      createdAt: _parseDateTime(json['created_at'] ?? json['created_at_raw']),
+      updatedAt: _parseDateTime(json['updated_at'] ?? json['updated_at_raw']),
     );
+  }
+
+  static DateTime _parseDateTime(dynamic value) {
+    if (value == null) return DateTime.now();
+    if (value is DateTime) return value;
+    if (value is int) {
+      // epoch ms
+      return DateTime.fromMillisecondsSinceEpoch(value);
+    }
+    if (value is String) {
+      // Jalali format: YYYY/MM/DD [HH:MM:SS]
+      if (value.contains('/') && !value.contains('-')) {
+        try {
+          final parts = value.split(' ');
+          final dateParts = parts[0].split('/');
+          if (dateParts.length == 3) {
+            final year = int.parse(dateParts[0]);
+            final month = int.parse(dateParts[1]);
+            final day = int.parse(dateParts[2]);
+            int hour = 0, minute = 0, second = 0;
+            if (parts.length > 1) {
+              final timeParts = parts[1].split(':');
+              if (timeParts.length >= 2) {
+                hour = int.parse(timeParts[0]);
+                minute = int.parse(timeParts[1]);
+                if (timeParts.length >= 3) {
+                  second = int.parse(timeParts[2]);
+                }
+              }
+            }
+            final j = Jalali(year, month, day);
+            final dt = j.toDateTime();
+            return DateTime(dt.year, dt.month, dt.day, hour, minute, second);
+          }
+        } catch (_) {
+          // fallthrough
+        }
+      }
+      // ISO or other parseable formats
+      try {
+        return DateTime.parse(value);
+      } catch (_) {
+        return DateTime.now();
+      }
+    }
+    return DateTime.now();
   }
 }

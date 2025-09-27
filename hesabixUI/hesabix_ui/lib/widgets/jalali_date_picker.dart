@@ -31,6 +31,13 @@ class _JalaliDatePickerState extends State<JalaliDatePicker> {
   void initState() {
     super.initState();
     _selectedDate = widget.initialDate ?? DateTime.now();
+    // Clamp initial within range if provided
+    if (widget.firstDate != null && _selectedDate.isBefore(widget.firstDate!)) {
+      _selectedDate = widget.firstDate!;
+    }
+    if (widget.lastDate != null && _selectedDate.isAfter(widget.lastDate!)) {
+      _selectedDate = widget.lastDate!;
+    }
     _selectedJalali = Jalali.fromDateTime(_selectedDate);
   }
 
@@ -218,6 +225,10 @@ class _CustomPersianCalendarState extends State<_CustomPersianCalendar> {
   }
 
   void _selectDate(Jalali date) {
+    // Enforce range limits
+    if (date.compareTo(widget.firstDate) < 0 || date.compareTo(widget.lastDate) > 0) {
+      return;
+    }
     setState(() {
       _selectedDate = date;
     });
@@ -305,18 +316,23 @@ class _CustomPersianCalendarState extends State<_CustomPersianCalendar> {
                              date.month == Jalali.now().month &&
                              date.day == Jalali.now().day;
               
+              final isDisabled = date.compareTo(widget.firstDate) < 0 || date.compareTo(widget.lastDate) > 0;
               return GestureDetector(
-                onTap: () => _selectDate(date),
+                onTap: isDisabled ? null : () => _selectDate(date),
                 child: Container(
                   margin: const EdgeInsets.all(2),
                   decoration: BoxDecoration(
-                    color: isSelected 
+                    color: isDisabled
+                        ? theme.disabledColor.withValues(alpha: 0.1)
+                        : isSelected 
                         ? theme.colorScheme.primary
                         : isToday 
                             ? theme.colorScheme.primary.withValues(alpha: 0.1)
                             : Colors.transparent,
                     borderRadius: BorderRadius.circular(8),
-                    border: isToday && !isSelected
+                    border: isDisabled
+                        ? Border.all(color: theme.disabledColor.withValues(alpha: 0.3), width: 1)
+                        : isToday && !isSelected
                         ? Border.all(color: theme.colorScheme.primary, width: 1)
                         : null,
                   ),
@@ -324,7 +340,9 @@ class _CustomPersianCalendarState extends State<_CustomPersianCalendar> {
                     child: Text(
                       day.toString(),
                       style: theme.textTheme.bodyMedium?.copyWith(
-                        color: isSelected 
+                        color: isDisabled
+                            ? theme.disabledColor
+                            : isSelected 
                             ? theme.colorScheme.onPrimary
                             : isToday
                                 ? theme.colorScheme.primary

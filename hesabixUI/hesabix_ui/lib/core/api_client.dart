@@ -71,7 +71,7 @@ class ApiClient {
           if (calendarType != null && calendarType.isNotEmpty) {
             options.headers['X-Calendar-Type'] = calendarType;
           }
-          // Inject X-Business-ID header when path targets a specific business
+          // Inject X-Business-ID header when request targets a specific business
           try {
             final uri = options.uri;
             final path = uri.path;
@@ -80,12 +80,21 @@ class ApiClient {
             int? resolvedBusinessId = currentBusinessId;
             // Fallback: detect business_id from URL like /api/v1/business/{id}/...
             if (resolvedBusinessId == null) {
-              final match = RegExp(r"/api/v1/business/(\d+)/").firstMatch(path);
+              // Match any occurrence of /business/{id} in the path
+              final match = RegExp(r"/business/(\d+)(/|$)").firstMatch(path);
               if (match != null) {
                 final idStr = match.group(1);
                 if (idStr != null) {
                   resolvedBusinessId = int.tryParse(idStr);
                 }
+              }
+            }
+            // Fallback: query parameter business_id or businessId
+            if (resolvedBusinessId == null && uri.queryParameters.isNotEmpty) {
+              final qp = uri.queryParameters;
+              final idStr = qp['business_id'] ?? qp['businessId'];
+              if (idStr != null && idStr.isNotEmpty) {
+                resolvedBusinessId = int.tryParse(idStr);
               }
             }
             if (resolvedBusinessId != null) {
@@ -121,6 +130,7 @@ class ApiClient {
   }
 
   Future<Response<T>> get<T>(String path, {Map<String, dynamic>? query, Options? options, CancelToken? cancelToken, ResponseType? responseType}) {
+    path = _resolveApiPath(path);
     final requestOptions = options ?? Options();
     if (responseType != null) {
       requestOptions.responseType = responseType;
@@ -129,6 +139,7 @@ class ApiClient {
   }
 
   Future<Response<T>> post<T>(String path, {Object? data, Map<String, dynamic>? query, Options? options, CancelToken? cancelToken, ResponseType? responseType}) {
+    path = _resolveApiPath(path);
     final requestOptions = options ?? Options();
     if (responseType != null) {
       requestOptions.responseType = responseType;
@@ -137,14 +148,17 @@ class ApiClient {
   }
 
   Future<Response<T>> put<T>(String path, {Object? data, Map<String, dynamic>? query, Options? options, CancelToken? cancelToken}) {
+    path = _resolveApiPath(path);
     return _dio.put<T>(path, data: data, queryParameters: query, options: options, cancelToken: cancelToken);
   }
 
   Future<Response<T>> patch<T>(String path, {Object? data, Map<String, dynamic>? query, Options? options, CancelToken? cancelToken}) {
+    path = _resolveApiPath(path);
     return _dio.patch<T>(path, data: data, queryParameters: query, options: options, cancelToken: cancelToken);
   }
 
   Future<Response<T>> delete<T>(String path, {Object? data, Map<String, dynamic>? query, Options? options, CancelToken? cancelToken}) {
+    path = _resolveApiPath(path);
     return _dio.delete<T>(path, data: data, queryParameters: query, options: options, cancelToken: cancelToken);
   }
 
@@ -165,4 +179,19 @@ class ApiClient {
   }
 }
 
+// Utilities
+String _resolveApiPath(String path) {
+  // Absolute URL → leave as is
+  if (path.startsWith('http://') || path.startsWith('https://')) {
+    return path;
+  }
+  // Ensure leading slash
+  final p = path.startsWith('/') ? path : '/$path';
+  // If already versioned, keep
+  if (p.startsWith('/api/')) {
+    return p;
+  }
+  // Auto-prefix with api version
+  return '/api/v1$p'.replaceAll(RegExp(r'//+'), '/');
+}
 

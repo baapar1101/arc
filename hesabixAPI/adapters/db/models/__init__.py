@@ -20,3 +20,13 @@ from .file_storage import *
 from .email_config import EmailConfig  # noqa: F401, F403
 
 
+# Accounting / Fiscal models
+from .fiscal_year import FiscalYear  # noqa: F401
+
+# Currency models
+from .currency import Currency, BusinessCurrency  # noqa: F401
+
+# Documents
+from .document import Document  # noqa: F401
+from .document_line import DocumentLine  # noqa: F401
+from .account import Account  # noqa: F401

@@ -38,22 +38,6 @@ class _PersonsPageState extends State<PersonsPage> {
     }
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(t.personsList),
-        actions: [
-          // دکمه اضافه کردن فقط در صورت داشتن دسترسی
-          PermissionButton(
-            section: 'people',
-            action: 'add',
-            authStore: widget.authStore,
-            child: IconButton(
-              onPressed: _addPerson,
-              icon: const Icon(Icons.add),
-              tooltip: t.addPerson,
-            ),
-          ),
-        ],
-      ),
       body: DataTableWidget<Person>(
         key: _personsTableKey,
         config: _buildDataTableConfig(t),
@@ -66,6 +50,14 @@ class _PersonsPageState extends State<PersonsPage> {
     return DataTableConfig<Person>(
       endpoint: '/api/v1/persons/businesses/${widget.businessId}/persons',
       title: t.personsList,
+      excelEndpoint: '/api/v1/persons/businesses/${widget.businessId}/persons/export/excel',
+      pdfEndpoint: '/api/v1/persons/businesses/${widget.businessId}/persons/export/pdf',
+      getExportParams: () => {
+        'business_id': widget.businessId,
+      },
+      showBackButton: true,
+      onBack: () => Navigator.of(context).maybePop(),
+      showTableIcon: false,
       showRowNumbers: true,
       enableRowSelection: true,
       columns: [
@@ -131,6 +123,105 @@ class _PersonsPageState extends State<PersonsPage> {
           'تاریخ ایجاد',
           width: ColumnWidth.medium,
         ),
+        NumberColumn(
+          'share_count',
+          'تعداد سهام',
+          width: ColumnWidth.small,
+          textAlign: TextAlign.center,
+          decimalPlaces: 0,
+        ),
+        NumberColumn(
+          'commission_sale_percent',
+          'درصد پورسانت فروش',
+          width: ColumnWidth.medium,
+          decimalPlaces: 2,
+          suffix: '٪',
+        ),
+        NumberColumn(
+          'commission_sales_return_percent',
+          'درصد پورسانت برگشت از فروش',
+          width: ColumnWidth.medium,
+          decimalPlaces: 2,
+          suffix: '٪',
+        ),
+        NumberColumn(
+          'commission_sales_amount',
+          'مبلغ پورسانت فروش',
+          width: ColumnWidth.large,
+          decimalPlaces: 0,
+        ),
+        NumberColumn(
+          'commission_sales_return_amount',
+          'مبلغ پورسانت برگشت از فروش',
+          width: ColumnWidth.large,
+          decimalPlaces: 0,
+        ),
+        TextColumn(
+          'payment_id',
+          t.personPaymentId,
+          width: ColumnWidth.medium,
+          formatter: (person) => person.paymentId ?? '-',
+        ),
+        TextColumn(
+          'registration_number',
+          t.personRegistrationNumber,
+          width: ColumnWidth.medium,
+          formatter: (person) => person.registrationNumber ?? '-',
+        ),
+        TextColumn(
+          'economic_id',
+          t.personEconomicId,
+          width: ColumnWidth.medium,
+          formatter: (person) => person.economicId ?? '-',
+        ),
+        TextColumn(
+          'country',
+          t.personCountry,
+          width: ColumnWidth.medium,
+          formatter: (person) => person.country ?? '-',
+        ),
+        TextColumn(
+          'province',
+          t.personProvince,
+          width: ColumnWidth.medium,
+          formatter: (person) => person.province ?? '-',
+        ),
+        TextColumn(
+          'city',
+          t.personCity,
+          width: ColumnWidth.medium,
+          formatter: (person) => person.city ?? '-',
+        ),
+        TextColumn(
+          'address',
+          t.personAddress,
+          width: ColumnWidth.extraLarge,
+          formatter: (person) => person.address ?? '-',
+        ),
+        TextColumn(
+          'postal_code',
+          t.personPostalCode,
+          width: ColumnWidth.medium,
+          formatter: (person) => person.postalCode ?? '-',
+        ),
+        TextColumn(
+          'phone',
+          t.personPhone,
+          width: ColumnWidth.medium,
+          formatter: (person) => person.phone ?? '-',
+        ),
+        TextColumn(
+          'fax',
+          t.personFax,
+          width: ColumnWidth.medium,
+          formatter: (person) => person.fax ?? '-',
+        ),
+        TextColumn(
+          'website',
+          t.personWebsite,
+          width: ColumnWidth.large,
+          formatter: (person) => person.website ?? '-',
+        ),
         ActionColumn(
           'actions',
           'عملیات',
@@ -167,6 +258,21 @@ class _PersonsPageState extends State<PersonsPage> {
         'province',
       ],
       defaultPageSize: 20,
+      // انتقال دکمه افزودن به اکشن‌های هدر جدول با کنترل دسترسی
+      customHeaderActions: [
+        PermissionButton(
+          section: 'people',
+          action: 'add',
+          authStore: widget.authStore,
+          child: Tooltip(
+            message: t.addPerson,
+            child: IconButton(
+              onPressed: _addPerson,
+              icon: const Icon(Icons.add),
+            ),
+          ),
+        ),
+      ],
     );
   }
 

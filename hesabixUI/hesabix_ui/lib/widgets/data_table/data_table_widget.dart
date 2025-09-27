@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
+import 'helpers/file_saver.dart';
 // import 'dart:html' as html; // Not available on Linux
 import 'package:flutter/material.dart';
 import 'package:data_table_2/data_table_2.dart';
@@ -561,6 +563,16 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
         params['selected_indices'] = _selectedRows.toList();
       }
 
+      // Add export columns in current visible order (excluding ActionColumn)
+      final columnsToShow = widget.config.enableColumnSettings && _visibleColumns.isNotEmpty
+          ? _visibleColumns
+          : widget.config.columns;
+      final dataColumnsToShow = columnsToShow.where((c) => c is! ActionColumn).toList();
+      params['export_columns'] = dataColumnsToShow.map((c) => {
+        'key': c.key,
+        'label': c.label,
+      }).toList();
+
       // Add custom export parameters if provided
       if (widget.config.getExportParams != null) {
         final customParams = widget.config.getExportParams!();
@@ -620,17 +632,25 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     }
   }
 
-  // Platform-specific download functions for Linux
+  // Cross-platform save using conditional FileSaver
+  Future<void> _saveBytesToDownloads(dynamic data, String filename) async {
+    List<int> bytes;
+    if (data is List<int>) {
+      bytes = data;
+    } else if (data is Uint8List) {
+      bytes = data.toList();
+    } else {
+      throw Exception('Unsupported binary data type: ${data.runtimeType}');
+    }
+    await FileSaver.saveBytes(bytes, filename);
+  }
+
   Future<void> _downloadPdf(dynamic data, String filename) async {
-    // For Linux desktop, we'll save to Downloads folder
-    debugPrint('Download PDF: $filename (Linux desktop - save to Downloads folder)');
-    // TODO: Implement proper file saving for Linux
+    await _saveBytesToDownloads(data, filename);
   }
 
   Future<void> _downloadExcel(dynamic data, String filename) async {
-    // For Linux desktop, we'll save to Downloads folder
-    debugPrint('Download Excel: $filename (Linux desktop - save to Downloads folder)');
-    // TODO: Implement proper file saving for Linux
+    await _saveBytesToDownloads(data, filename);
   }
 
 
@@ -641,15 +661,16 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
 
     return Card(
       elevation: widget.config.boxShadow != null ? 2 : 0,
-      shape: widget.config.borderRadius != null 
-          ? RoundedRectangleBorder(borderRadius: widget.config.borderRadius!)
-          : null,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: widget.config.borderRadius ?? BorderRadius.circular(12),
+      ),
       child: Container(
         padding: widget.config.padding ?? const EdgeInsets.all(16),
         margin: widget.config.margin,
         decoration: BoxDecoration(
           color: widget.config.backgroundColor,
-          borderRadius: widget.config.borderRadius,
+          borderRadius: widget.config.borderRadius ?? BorderRadius.circular(12),
           border: widget.config.showBorder 
               ? Border.all(
                   color: widget.config.borderColor ?? theme.dividerColor,
@@ -719,19 +740,35 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
   Widget _buildHeader(AppLocalizations t, ThemeData theme) {
     return Row(
       children: [
-        Container(
-          padding: const EdgeInsets.all(6),
-          decoration: BoxDecoration(
-            color: theme.colorScheme.primaryContainer,
-            borderRadius: BorderRadius.circular(6),
+        if (widget.config.showBackButton) ...[
+          Tooltip(
+            message: MaterialLocalizations.of(context).backButtonTooltip,
+            child: IconButton(
+              onPressed: widget.config.onBack ?? () {
+                if (Navigator.of(context).canPop()) {
+                  Navigator.of(context).pop();
+                }
+              },
+              icon: const Icon(Icons.arrow_back),
+            ),
           ),
-          child: Icon(
-            Icons.table_chart, 
-            color: theme.colorScheme.onPrimaryContainer, 
-            size: 18,
+          const SizedBox(width: 8),
+        ],
+        if (widget.config.showTableIcon) ...[
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.primaryContainer,
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Icon(
+              Icons.table_chart, 
+              color: theme.colorScheme.onPrimaryContainer, 
+              size: 18,
+            ),
           ),
-        ),
-        const SizedBox(width: 12),
+          const SizedBox(width: 12),
+        ],
         Text(
           widget.config.title!,
           style: theme.textTheme.titleMedium?.copyWith(

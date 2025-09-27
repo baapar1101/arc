@@ -34,14 +34,39 @@ def create_person(db: Session, business_id: int, person_data: PersonCreateReques
         t = person_data.person_type
         types_list = [t.value if hasattr(t, 'value') else str(t)]
 
+    # اعتبارسنجی سهام برای سهامدار
+    is_shareholder = False
+    if types_list:
+        is_shareholder = 'سهامدار' in types_list
+    if not is_shareholder and incoming_single_type is not None:
+        try:
+            is_shareholder = (getattr(incoming_single_type, 'value', str(incoming_single_type)) == 'سهامدار')
+        except Exception:
+            is_shareholder = False
+    if is_shareholder:
+        sc_val = getattr(person_data, 'share_count', None)
+        if sc_val is None or not isinstance(sc_val, int) or sc_val <= 0:
+            raise ApiError("INVALID_SHARE_COUNT", "برای سهامدار، تعداد سهام الزامی و باید بزرگتر از صفر باشد", http_status=400)
+
     # ایجاد شخص
+    # نگاشت person_type دریافتی از اسکیما به Enum مدل
+    incoming_single_type = getattr(person_data, 'person_type', None)
+    mapped_single_type = None
+    if incoming_single_type is not None:
+        try:
+            # incoming_single_type.value مقدار فارسی مانند "سهامدار"
+            mapped_single_type = PersonType(getattr(incoming_single_type, 'value', str(incoming_single_type)))
+        except Exception:
+            mapped_single_type = None
+
     person = Person(
         business_id=business_id,
         code=code,
         alias_name=person_data.alias_name,
         first_name=person_data.first_name,
         last_name=person_data.last_name,
-        person_type=person_data.person_type or (PersonType(types_list[0]) if types_list else PersonType.CUSTOMER),
+        # ذخیره مقدار Enum با مقدار فارسی (values_callable در مدل مقادیر فارسی را می‌نویسد)
+        person_type=(mapped_single_type or (PersonType(types_list[0]) if types_list else PersonType.CUSTOMER)),
         person_types=json.dumps(types_list, ensure_ascii=False) if types_list else None,
         company_name=person_data.company_name,
         payment_id=person_data.payment_id,
@@ -58,6 +83,14 @@ def create_person(db: Session, business_id: int, person_data: PersonCreateReques
         fax=person_data.fax,
         email=person_data.email,
         website=person_data.website,
+        share_count=getattr(person_data, 'share_count', None),
+        commission_sale_percent=getattr(person_data, 'commission_sale_percent', None),
+        commission_sales_return_percent=getattr(person_data, 'commission_sales_return_percent', None),
+        commission_sales_amount=getattr(person_data, 'commission_sales_amount', None),
+        commission_sales_return_amount=getattr(person_data, 'commission_sales_return_amount', None),
+        commission_exclude_discounts=bool(getattr(person_data, 'commission_exclude_discounts', False)),
+        commission_exclude_additions_deductions=bool(getattr(person_data, 'commission_exclude_additions_deductions', False)),
+        commission_post_in_invoice_document=bool(getattr(person_data, 'commission_post_in_invoice_document', False)),
     )
     
     db.add(person)
@@ -333,10 +366,36 @@ def update_person(
         person.person_types = json.dumps(types_list, ensure_ascii=False) if types_list else None
         # همگام کردن person_type تکی برای سازگاری
         if types_list:
+            # مقدار Enum را با مقدار فارسی ست می‌کنیم
             try:
                 person.person_type = PersonType(types_list[0])
             except Exception:
                 pass
+
+    # مدیریت person_type تکی از اسکیما
+    if 'person_type' in update_data and update_data['person_type'] is not None:
+        single_type = update_data['person_type']
+        # نگاشت به Enum (مقدار فارسی)
+        try:
+            person.person_type = PersonType(getattr(single_type, 'value', str(single_type)))
+        except Exception:
+            pass
+        # پس از ست کردن مستقیم، از دیکشنری حذف شود تا در حلقه عمومی دوباره اعمال نشود
+        update_data.pop('person_type', None)
+
+    # اگر شخص سهامدار شد، share_count معتبر باشد
+    resulting_types: List[str] = []
+    if person.person_types:
+        try:
+            tmp = json.loads(person.person_types)
+            if isinstance(tmp, list):
+                resulting_types = [str(x) for x in tmp]
+        except Exception:
+            resulting_types = []
+    if (person.person_type == 'سهامدار') or ('سهامدار' in resulting_types):
+        sc_val2 = update_data.get('share_count', person.share_count)
+        if sc_val2 is None or (isinstance(sc_val2, int) and sc_val2 <= 0):
+            raise ApiError("INVALID_SHARE_COUNT", "برای سهامدار، تعداد سهام الزامی و باید بزرگتر از صفر باشد", http_status=400)
 
     # سایر فیلدها
     for field in list(update_data.keys()):
@@ -416,6 +475,14 @@ def _person_to_dict(person: Person) -> Dict[str, Any]:
         'person_types': types_list,
         'company_name': person.company_name,
         'payment_id': person.payment_id,
+        'share_count': person.share_count,
+        'commission_sale_percent': float(person.commission_sale_percent) if getattr(person, 'commission_sale_percent', None) is not None else None,
+        'commission_sales_return_percent': float(person.commission_sales_return_percent) if getattr(person, 'commission_sales_return_percent', None) is not None else None,
+        'commission_sales_amount': float(person.commission_sales_amount) if getattr(person, 'commission_sales_amount', None) is not None else None,
+        'commission_sales_return_amount': float(person.commission_sales_return_amount) if getattr(person, 'commission_sales_return_amount', None) is not None else None,
+        'commission_exclude_discounts': bool(person.commission_exclude_discounts),
+        'commission_exclude_additions_deductions': bool(person.commission_exclude_additions_deductions),
+        'commission_post_in_invoice_document': bool(person.commission_post_in_invoice_document),
         'national_id': person.national_id,
         'registration_number': person.registration_number,
         'economic_id': person.economic_id,

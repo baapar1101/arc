@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import '../core/auth_store.dart';
 
 class UrlTracker extends StatefulWidget {
@@ -29,7 +28,7 @@ class _UrlTrackerState extends State<UrlTracker> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         try {
-          final currentUrl = GoRouterState.of(context).uri.path;
+          final currentUrl = Uri.base.path;
           if (currentUrl != _lastTrackedUrl && 
               currentUrl.isNotEmpty && 
               currentUrl != '/' && 

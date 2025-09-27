@@ -416,7 +416,7 @@ class _UsersPermissionsPageState extends State<UsersPermissionsPage> {
 
   Widget _buildUsersList(AppLocalizations t, ThemeData theme, ColorScheme colorScheme) {
     if (_loading) {
-      return Container(
+      return SizedBox(
         height: 200,
         child: Center(
           child: Column(
@@ -439,7 +439,7 @@ class _UsersPermissionsPageState extends State<UsersPermissionsPage> {
     }
 
     if (_error != null) {
-      return Container(
+      return SizedBox(
         height: 200,
         child: Center(
           child: Column(
@@ -475,7 +475,7 @@ class _UsersPermissionsPageState extends State<UsersPermissionsPage> {
     }
 
     if (_filteredUsers.isEmpty) {
-      return Container(
+      return SizedBox(
         height: 200,
         child: Center(
           child: Column(
@@ -881,23 +881,23 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         'draft': '${t.draft} ${t.warehouseTransfers}',
       },
       'settings': {
-        'business': '${t.businessSettings}',
-        'print': '${t.printSettings}',
-        'history': '${t.eventHistory}',
-        'users': '${t.usersAndPermissions}',
+        'business': t.businessSettings,
+        'print': t.printSettings,
+        'history': t.eventHistory,
+        'users': t.usersAndPermissions,
       },
       'storage': {
         'view': '${t.view} ${t.storageSpace}',
         'delete': '${t.delete} ${t.deleteFiles}',
       },
       'sms': {
-        'history': '${t.viewSmsHistory}',
-        'templates': '${t.manageSmsTemplates}',
+        'history': t.viewSmsHistory,
+        'templates': t.manageSmsTemplates,
       },
       'marketplace': {
-        'view': '${t.viewMarketplace}',
-        'buy': '${t.buyPlugins}',
-        'invoices': '${t.viewInvoices}',
+        'view': t.viewMarketplace,
+        'buy': t.buyPlugins,
+        'invoices': t.viewInvoices,
       },
     };
   }
@@ -1235,36 +1235,36 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
   String _inferCurrentSectionKey(String title, String description) {
     // جستجو بر اساس کلمات کلیدی ساده
     final pairs = <String, List<String>>{
-      'people': ['${AppLocalizations.of(context).people}'],
+      'people': [(AppLocalizations.of(context).people)],
       'people_transactions': [
-        '${AppLocalizations.of(context).receiptsAndPayments}',
-        '${AppLocalizations.of(context).receipts}',
-        '${AppLocalizations.of(context).payments}',
+        (AppLocalizations.of(context).receiptsAndPayments),
+        (AppLocalizations.of(context).receipts),
+        (AppLocalizations.of(context).payments),
       ],
-      'products': ['${AppLocalizations.of(context).products}'],
-      'price_lists': ['${AppLocalizations.of(context).priceLists}'],
-      'categories': ['${AppLocalizations.of(context).categories}'],
-      'product_attributes': ['${AppLocalizations.of(context).productAttributes}'],
-      'bank_accounts': ['${AppLocalizations.of(context).bankAccounts}'],
-      'cash': ['${AppLocalizations.of(context).cash}'],
-      'petty_cash': ['${AppLocalizations.of(context).pettyCash}'],
-      'checks': ['${AppLocalizations.of(context).checks}'],
-      'wallet': ['${AppLocalizations.of(context).wallet}'],
-      'transfers': ['${AppLocalizations.of(context).transfers}'],
-      'invoices': ['${AppLocalizations.of(context).invoices}'],
-      'expenses_income': ['${AppLocalizations.of(context).expensesIncome}'],
-      'accounting_documents': ['${AppLocalizations.of(context).accountingDocuments}'],
-      'chart_of_accounts': ['${AppLocalizations.of(context).chartOfAccounts}'],
-      'opening_balance': ['${AppLocalizations.of(context).openingBalance}'],
-      'warehouses': ['${AppLocalizations.of(context).warehouses}'],
-      'warehouse_transfers': ['${AppLocalizations.of(context).warehouseTransfers}'],
-      'settings': ['${AppLocalizations.of(context).businessSettings}'],
-      'storage': ['${AppLocalizations.of(context).storageSpace}'],
-      'sms': ['${AppLocalizations.of(context).smsPanel}'],
-      'marketplace': ['${AppLocalizations.of(context).marketplace}'],
+      'products': [(AppLocalizations.of(context).products)],
+      'price_lists': [(AppLocalizations.of(context).priceLists)],
+      'categories': [(AppLocalizations.of(context).categories)],
+      'product_attributes': [(AppLocalizations.of(context).productAttributes)],
+      'bank_accounts': [(AppLocalizations.of(context).bankAccounts)],
+      'cash': [(AppLocalizations.of(context).cash)],
+      'petty_cash': [(AppLocalizations.of(context).pettyCash)],
+      'checks': [(AppLocalizations.of(context).checks)],
+      'wallet': [(AppLocalizations.of(context).wallet)],
+      'transfers': [(AppLocalizations.of(context).transfers)],
+      'invoices': [(AppLocalizations.of(context).invoices)],
+      'expenses_income': [(AppLocalizations.of(context).expensesIncome)],
+      'accounting_documents': [(AppLocalizations.of(context).accountingDocuments)],
+      'chart_of_accounts': [(AppLocalizations.of(context).chartOfAccounts)],
+      'opening_balance': [(AppLocalizations.of(context).openingBalance)],
+      'warehouses': [(AppLocalizations.of(context).warehouses)],
+      'warehouse_transfers': [(AppLocalizations.of(context).warehouseTransfers)],
+      'settings': [(AppLocalizations.of(context).businessSettings)],
+      'storage': [(AppLocalizations.of(context).storageSpace)],
+      'sms': [(AppLocalizations.of(context).smsPanel)],
+      'marketplace': [(AppLocalizations.of(context).marketplace)],
     };
 
-    final hay = (title + ' ' + description).toLowerCase();
+    final hay = ('$title $description').toLowerCase();
     for (final entry in pairs.entries) {
       for (final token in entry.value) {
         if (hay.contains(token.toLowerCase())) {

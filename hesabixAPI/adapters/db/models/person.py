@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from enum import Enum
 
-from sqlalchemy import String, DateTime, Integer, ForeignKey, Enum as SQLEnum, Text, UniqueConstraint
+from sqlalchemy import String, DateTime, Integer, ForeignKey, Enum as SQLEnum, Text, UniqueConstraint, Numeric, Boolean
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from adapters.db.session import Base
@@ -17,6 +17,7 @@ class PersonType(str, Enum):
     SUPPLIER = "تامین‌کننده"  # تامین‌کننده
     PARTNER = "همکار"  # همکار
     SELLER = "فروشنده"  # فروشنده
+    SHAREHOLDER = "سهامدار"  # سهامدار
 
 
 class Person(Base):
@@ -33,10 +34,25 @@ class Person(Base):
     alias_name: Mapped[str] = mapped_column(String(255), nullable=False, index=True, comment="نام مستعار (الزامی)")
     first_name: Mapped[str | None] = mapped_column(String(100), nullable=True, comment="نام")
     last_name: Mapped[str | None] = mapped_column(String(100), nullable=True, comment="نام خانوادگی")
-    person_type: Mapped[PersonType] = mapped_column(SQLEnum(PersonType), nullable=False, comment="نوع شخص")
+    person_type: Mapped[PersonType] = mapped_column(
+        SQLEnum(PersonType, values_callable=lambda obj: [e.value for e in obj], name="person_type_enum"),
+        nullable=False,
+        comment="نوع شخص"
+    )
     person_types: Mapped[str | None] = mapped_column(Text, nullable=True, comment="لیست انواع شخص به صورت JSON")
     company_name: Mapped[str | None] = mapped_column(String(255), nullable=True, comment="نام شرکت")
     payment_id: Mapped[str | None] = mapped_column(String(100), nullable=True, comment="شناسه پرداخت")
+    # سهام
+    share_count: Mapped[int | None] = mapped_column(Integer, nullable=True, comment="تعداد سهام (فقط برای سهامدار)")
+
+    # تنظیمات پورسانت برای بازاریاب/فروشنده
+    commission_sale_percent: Mapped[float | None] = mapped_column(Numeric(5, 2), nullable=True, comment="درصد پورسانت از فروش")
+    commission_sales_return_percent: Mapped[float | None] = mapped_column(Numeric(5, 2), nullable=True, comment="درصد پورسانت از برگشت از فروش")
+    commission_sales_amount: Mapped[float | None] = mapped_column(Numeric(12, 2), nullable=True, comment="مبلغ فروش مبنا برای پورسانت")
+    commission_sales_return_amount: Mapped[float | None] = mapped_column(Numeric(12, 2), nullable=True, comment="مبلغ برگشت از فروش مبنا برای پورسانت")
+    commission_exclude_discounts: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="0", comment="عدم محاسبه تخفیف در پورسانت")
+    commission_exclude_additions_deductions: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="0", comment="عدم محاسبه اضافات و کسورات فاکتور در پورسانت")
+    commission_post_in_invoice_document: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="0", comment="ثبت پورسانت در سند حسابداری فاکتور")
     
     # اطلاعات اقتصادی
     national_id: Mapped[str | None] = mapped_column(String(20), nullable=True, index=True, comment="شناسه ملی")

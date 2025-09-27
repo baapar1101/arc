@@ -22,6 +22,7 @@ import 'pages/admin/email_settings_page.dart';
 import 'pages/business/business_shell.dart';
 import 'pages/business/dashboard/business_dashboard_page.dart';
 import 'pages/business/users_permissions_page.dart';
+import 'pages/business/accounts_page.dart';
 import 'pages/business/settings_page.dart';
 import 'pages/business/persons_page.dart';
 import 'pages/error_404_page.dart';
@@ -324,6 +325,19 @@ class _MyAppState extends State<MyApp> {
         // برای سایر صفحات (شامل صفحات profile و business)، redirect نکن (بماند)
         // این مهم است: اگر کاربر در صفحات profile یا business است، بماند
         print('🔍 REDIRECT DEBUG: On other page ($currentPath), staying on current path');
+        // ذخیره مسیر فعلی به عنوان آخرین URL معتبر
+        if (currentPath.isNotEmpty &&
+            currentPath != '/' &&
+            currentPath != '/login' &&
+            (currentPath.startsWith('/user/profile/') || currentPath.startsWith('/business/'))) {
+          try {
+            await _authStore!.saveLastUrl(currentPath);
+            print('🔍 REDIRECT DEBUG: Saved last URL: $currentPath');
+          } catch (e) {
+            // صرفاً لاگ برای خطای غیر بحرانی ذخیره آدرس
+            print('🔍 REDIRECT DEBUG: Error saving last URL: $e');
+          }
+        }
         return null;
       },
       routes: <RouteBase>[
@@ -354,7 +368,7 @@ class _MyAppState extends State<MyApp> {
             GoRoute(
               path: '/user/profile/new-business',
               name: 'profile_new_business',
-              builder: (context, state) => const NewBusinessPage(),
+              builder: (context, state) => NewBusinessPage(calendarController: _calendarController!),
             ),
             GoRoute(
               path: '/user/profile/businesses',
@@ -506,6 +520,36 @@ class _MyAppState extends State<MyApp> {
                     authStore: _authStore!,
                     calendarController: _calendarController!,
                   ),
+                );
+              },
+            ),
+            GoRoute(
+              path: 'chart-of-accounts',
+              name: 'business_chart_of_accounts',
+              builder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return BusinessShell(
+                  businessId: businessId,
+                  authStore: _authStore!,
+                  localeController: controller,
+                  calendarController: _calendarController!,
+                  themeController: themeController,
+                  child: AccountsPage(businessId: businessId),
+                );
+              },
+            ),
+            GoRoute(
+              path: 'accounts',
+              name: 'business_accounts',
+              builder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return BusinessShell(
+                  businessId: businessId,
+                  authStore: _authStore!,
+                  localeController: controller,
+                  calendarController: _calendarController!,
+                  themeController: themeController,
+                  child: AccountsPage(businessId: businessId),
                 );
               },
             ),

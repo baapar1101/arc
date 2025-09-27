@@ -105,9 +105,14 @@ class ColumnSettingsService {
     }
     
     // Ensure all default columns are present in visible columns
+    // If new columns are added (not in user settings), include them by default
     final visibleColumns = <String>[];
+    final userVisible = Set<String>.from(userSettings.visibleColumns);
     for (final key in defaultColumnKeys) {
-      if (userSettings.visibleColumns.contains(key)) {
+      if (userVisible.contains(key)) {
+        visibleColumns.add(key);
+      } else {
+        // New column introduced → show by default
         visibleColumns.add(key);
       }
     }
@@ -117,15 +122,13 @@ class ColumnSettingsService {
       visibleColumns.add(defaultColumnKeys.first);
     }
     
-    // Ensure all visible columns are in the correct order
+    // Build columnOrder: keep user's order for known columns, append new ones at the end
     final columnOrder = <String>[];
     for (final key in userSettings.columnOrder) {
       if (visibleColumns.contains(key)) {
         columnOrder.add(key);
       }
     }
-    
-    // Add any missing visible columns to the end
     for (final key in visibleColumns) {
       if (!columnOrder.contains(key)) {
         columnOrder.add(key);

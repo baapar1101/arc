@@ -460,7 +460,7 @@ class _BusinessShellState extends State<BusinessShell> {
       context.go('/login');
     }
 
-    Future<void> _showAddPersonDialog() async {
+    Future<void> showAddPersonDialog() async {
       final result = await showDialog<bool>(
         context: context,
         builder: (context) => PersonFormDialog(
@@ -647,7 +647,7 @@ class _BusinessShellState extends State<BusinessShell> {
                                       // Navigate to add new item
                                       if (child.label == t.personsList) {
                                         // Navigate to add person
-                                        _showAddPersonDialog();
+                                        showAddPersonDialog();
                                       } else if (child.label == t.products) {
                                         // Navigate to add product
                                       } else if (child.label == t.priceLists) {
@@ -802,7 +802,7 @@ class _BusinessShellState extends State<BusinessShell> {
                                       return GestureDetector(
                                         onTap: () {
                                           if (item.label == t.people) {
-                                            _showAddPersonDialog();
+                                            showAddPersonDialog();
                                           }
                                           // سایر مسیرهای افزودن در آینده متصل می‌شوند
                                         },
@@ -898,7 +898,7 @@ class _BusinessShellState extends State<BusinessShell> {
                                 context.pop();
                                 // در حال حاضر فقط اشخاص پشتیبانی می‌شود
                                 if (item.label == t.people) {
-                                  _showAddPersonDialog();
+                                  showAddPersonDialog();
                                 }
                               },
                               child: Container(
