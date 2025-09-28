@@ -6,6 +6,7 @@ from sqlalchemy import select, and_, func
 
 from adapters.db.repositories.business_repo import BusinessRepository
 from adapters.db.repositories.fiscal_year_repo import FiscalYearRepository
+from adapters.db.models.currency import Currency, BusinessCurrency
 from adapters.db.repositories.business_permission_repo import BusinessPermissionRepository
 from adapters.db.models.business import Business, BusinessType, BusinessField
 from adapters.api.v1.schemas import (
@@ -31,6 +32,7 @@ def create_business(db: Session, business_data: BusinessCreateRequest, owner_id:
         business_type=business_type_enum,
         business_field=business_field_enum,
         owner_id=owner_id,
+        default_currency_id=getattr(business_data, "default_currency_id", None),
         address=business_data.address,
         phone=business_data.phone,
         mobile=business_data.mobile,
@@ -58,6 +60,30 @@ def create_business(db: Session, business_data: BusinessCreateRequest, owner_id:
                 end_date=fy.end_date,
                 is_last=(idx == last_true_index) if last_true_index is not None else (idx == len(business_data.fiscal_years) - 1)
             )
+
+    # مدیریت ارزها
+    currency_ids: list[int] = []
+    if getattr(business_data, "currency_ids", None):
+        currency_ids = list(dict.fromkeys(business_data.currency_ids))  # unique
+    default_currency_id = getattr(business_data, "default_currency_id", None)
+    if default_currency_id:
+        if default_currency_id not in currency_ids:
+            currency_ids.insert(0, default_currency_id)
+
+    # اعتبارسنجی وجود ارزها
+    if currency_ids:
+        existing_ids = [cid for (cid,) in db.query(Currency.id).filter(Currency.id.in_(currency_ids)).all()]
+        if set(existing_ids) != set(currency_ids):
+            missing = set(currency_ids) - set(existing_ids)
+            raise ValueError(f"Invalid currency ids: {sorted(list(missing))}")
+
+        # درج ارتباطات در business_currencies
+        for cid in currency_ids:
+            bc = BusinessCurrency(business_id=created_business.id, currency_id=cid)
+            db.add(bc)
+        db.commit()
+
+    db.refresh(created_business)
 
     # تبدیل به response format
     return _business_to_dict(created_business)
@@ -269,7 +295,7 @@ def get_business_summary(db: Session, owner_id: int) -> Dict[str, Any]:
 
 def _business_to_dict(business: Business) -> Dict[str, Any]:
     """تبدیل مدل کسب و کار به dictionary"""
-    return {
+    data = {
         "id": business.id,
         "name": business.name,
         "business_type": business.business_type.value,
@@ -288,3 +314,26 @@ def _business_to_dict(business: Business) -> Dict[str, Any]:
         "created_at": business.created_at,  # datetime object بماند
         "updated_at": business.updated_at   # datetime object بماند
     }
+
+    # ارز پیشفرض
+    if getattr(business, "default_currency", None):
+        c = business.default_currency
+        data["default_currency"] = {
+            "id": c.id,
+            "code": c.code,
+            "title": c.title,
+            "symbol": c.symbol,
+        }
+    else:
+        data["default_currency"] = None
+
+    # ارزهای فعال کسب‌وکار
+    if getattr(business, "currencies", None):
+        data["currencies"] = [
+            {"id": c.id, "code": c.code, "title": c.title, "symbol": c.symbol}
+            for c in business.currencies
+        ]
+    else:
+        data["currencies"] = []
+
+    return data

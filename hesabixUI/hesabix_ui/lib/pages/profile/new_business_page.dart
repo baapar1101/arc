@@ -23,6 +23,7 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
   bool _isLoading = false;
   int _fiscalTabIndex = 0;
   late TextEditingController _fiscalTitleController;
+  List<Map<String, dynamic>> _currencies = [];
 
   @override
   void initState() {
@@ -32,6 +33,7 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
     // Set default selections for business type and field
     _businessData.businessType ??= BusinessType.shop;
     _businessData.businessField ??= BusinessField.commercial;
+    _loadCurrencies();
   }
 
   @override
@@ -56,6 +58,27 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
         });
       }
     }
+  }
+
+  Future<void> _loadCurrencies() async {
+    try {
+      final list = await BusinessApiService.getCurrencies();
+      if (mounted) {
+        setState(() {
+          _currencies = list;
+          final irr = _currencies.firstWhere(
+            (e) => (e['code'] as String?) == 'IRR',
+            orElse: () => {} as Map<String, dynamic>,
+          );
+          if (irr.isNotEmpty) {
+            _businessData.defaultCurrencyId ??= irr['id'] as int?;
+            if (_businessData.defaultCurrencyId != null && !_businessData.currencyIds.contains(_businessData.defaultCurrencyId)) {
+              _businessData.currencyIds.add(_businessData.defaultCurrencyId!);
+            }
+          }
+        });
+      }
+    } catch (_) {}
   }
 
   Widget _buildFiscalStep() {
@@ -238,7 +261,7 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
       case 2:
         return t.businessLegalInfo;
       case 3:
-        return 'سال مالی';
+        return 'ارز و سال مالی';
       case 4:
         return t.businessConfirmation;
       default:
@@ -379,7 +402,7 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
                   _buildStepIndicator(0, t.businessBasicInfo),
                   _buildStepIndicator(1, t.businessContactInfo),
                   _buildStepIndicator(2, t.businessLegalInfo),
-                  _buildStepIndicator(3, 'سال مالی'),
+                  _buildStepIndicator(3, 'ارز و سال مالی'),
                   _buildStepIndicator(4, t.businessConfirmation),
                 ],
               ),
@@ -435,26 +458,21 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
           
           // Form content
           Expanded(
-            child: SingleChildScrollView(
-              child: SizedBox(
-                height: MediaQuery.of(context).size.height - 200, // ارتفاع مناسب برای اسکرول
-                child: PageView(
-                  controller: _pageController,
-                  physics: const NeverScrollableScrollPhysics(),
-                  onPageChanged: (index) {
-                    setState(() {
-                      _currentStep = index;
-                    });
-                  },
-                  children: [
-                    _buildStep1(),
-                    _buildStep2(),
-                    _buildStep3(),
-                    _buildFiscalStep(),
-                    _buildStep4(),
-                  ],
-                ),
-              ),
+            child: PageView(
+              controller: _pageController,
+              physics: const NeverScrollableScrollPhysics(),
+              onPageChanged: (index) {
+                setState(() {
+                  _currentStep = index;
+                });
+              },
+              children: [
+                SingleChildScrollView(child: _buildStep1()),
+                SingleChildScrollView(child: _buildStep2()),
+                SingleChildScrollView(child: _buildStep3()),
+                SingleChildScrollView(child: _buildCurrencyAndFiscalStep()),
+                SingleChildScrollView(child: _buildStep4()),
+              ],
             ),
           ),
           
@@ -1479,6 +1497,79 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
     );
   }
 
+  Widget _buildCurrencyAndFiscalStep() {
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 800),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'ارز و سال مالی',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surface,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: Theme.of(context).dividerColor.withValues(alpha: 0.3),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    DropdownButtonFormField<int>(
+                      value: _businessData.defaultCurrencyId,
+                      items: _currencies.map((c) {
+                        return DropdownMenuItem<int>(
+                          value: c['id'] as int,
+                          child: Text('${c['title']} (${c['code']})'),
+                        );
+                      }).toList(),
+                      decoration: const InputDecoration(
+                        labelText: 'ارز پیشفرض *',
+                        border: OutlineInputBorder(),
+                      ),
+                      onChanged: (v) {
+                        setState(() {
+                          _businessData.defaultCurrencyId = v;
+                          if (v != null && !_businessData.currencyIds.contains(v)) {
+                            _businessData.currencyIds.add(v);
+                          }
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    _CurrencyMultiSelect(
+                      currencies: _currencies,
+                      selectedIds: _businessData.currencyIds,
+                      defaultId: _businessData.defaultCurrencyId,
+                      onChanged: (ids) {
+                        setState(() {
+                          _businessData.currencyIds = ids;
+                          final d = _businessData.defaultCurrencyId;
+                          if (d != null && !_businessData.currencyIds.contains(d)) {
+                            _businessData.currencyIds.add(d);
+                          }
+                        });
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+              _buildFiscalStep(),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
   Widget _buildStep4() {
     final t = Localizations.of<AppLocalizations>(context, AppLocalizations)!;
@@ -1601,6 +1692,162 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _CurrencyMultiSelect extends StatefulWidget {
+  final List<Map<String, dynamic>> currencies;
+  final List<int> selectedIds;
+  final int? defaultId;
+  final ValueChanged<List<int>> onChanged;
+
+  const _CurrencyMultiSelect({
+    required this.currencies,
+    required this.selectedIds,
+    required this.defaultId,
+    required this.onChanged,
+  });
+
+  @override
+  State<_CurrencyMultiSelect> createState() => _CurrencyMultiSelectState();
+}
+
+class _CurrencyMultiSelectState extends State<_CurrencyMultiSelect> {
+  late List<int> _selected;
+  final TextEditingController _searchCtrl = TextEditingController();
+  bool _panelOpen = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _selected = List<int>.from(widget.selectedIds);
+  }
+
+  @override
+  void didUpdateWidget(covariant _CurrencyMultiSelect oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.selectedIds != widget.selectedIds) {
+      _selected = List<int>.from(widget.selectedIds);
+    }
+  }
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  void _toggle(int id) {
+    setState(() {
+      if (_selected.contains(id)) {
+        if (widget.defaultId != id) {
+          _selected.remove(id);
+        }
+      } else {
+        _selected.add(id);
+      }
+      widget.onChanged(List<int>.from(_selected));
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final filtered = widget.currencies.where((c) {
+      final q = _searchCtrl.text.trim();
+      if (q.isEmpty) return true;
+      final title = (c['title'] ?? '').toString();
+      final code = (c['code'] ?? '').toString();
+      return title.contains(q) || code.toLowerCase().contains(q.toLowerCase());
+    }).toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('ارزهای جانبی', style: theme.textTheme.titleSmall),
+        const SizedBox(height: 8),
+        GestureDetector(
+          onTap: () => setState(() => _panelOpen = !_panelOpen),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              border: Border.all(color: theme.colorScheme.outline.withValues(alpha: 0.4)),
+              borderRadius: BorderRadius.circular(8),
+              color: theme.colorScheme.surface,
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: _selected.isEmpty
+                        ? [
+                            Text(
+                              'انتخاب کنید...',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: theme.hintColor,
+                              ),
+                            )
+                          ]
+                        : _selected.map((id) {
+                            final c = widget.currencies.firstWhere((e) => e['id'] == id, orElse: () => {});
+                            final isDefault = widget.defaultId == id;
+                            return Chip(
+                              label: Text('${c['title']} (${c['code']})'),
+                              avatar: isDefault ? const Icon(Icons.star, size: 16) : null,
+                              onDeleted: isDefault ? null : () => _toggle(id),
+                              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              visualDensity: VisualDensity.compact,
+                            );
+                          }).toList(),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Icon(_panelOpen ? Icons.expand_less : Icons.expand_more),
+              ],
+            ),
+          ),
+        ),
+        if (_panelOpen) ...[
+          const SizedBox(height: 8),
+          TextField(
+            controller: _searchCtrl,
+            decoration: const InputDecoration(
+              prefixIcon: Icon(Icons.search),
+              hintText: 'جستجو بر اساس نام یا کد...',
+              border: OutlineInputBorder(),
+              isDense: true,
+            ),
+            onChanged: (_) => setState(() {}),
+          ),
+          const SizedBox(height: 8),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 240),
+            child: Scrollbar(
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: filtered.length,
+                itemBuilder: (context, index) {
+                  final c = filtered[index];
+                  final id = c['id'] as int;
+                  final selected = _selected.contains(id);
+                  final isDefault = widget.defaultId == id;
+                  return CheckboxListTile(
+                    value: selected,
+                    onChanged: (val) => _toggle(id),
+                    dense: true,
+                    title: Text('${c['title']} (${c['code']})'),
+                    secondary: isDefault ? const Icon(Icons.star, size: 18) : null,
+                    controlAffinity: ListTileControlAffinity.leading,
+                  );
+                },
+              ),
+            ),
+          ),
+        ],
+      ],
     );
   }
 }

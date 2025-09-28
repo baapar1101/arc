@@ -178,6 +178,8 @@ class BusinessCreateRequest(BaseModel):
 	city: Optional[str] = Field(default=None, max_length=100, description="شهر")
 	postal_code: Optional[str] = Field(default=None, max_length=20, description="کد پستی")
 	fiscal_years: Optional[List["FiscalYearCreate"]] = Field(default=None, description="آرایه سال‌های مالی برای ایجاد اولیه")
+	default_currency_id: Optional[int] = Field(default=None, description="شناسه ارز پیشفرض")
+	currency_ids: Optional[List[int]] = Field(default=None, description="لیست شناسه ارزهای قابل استفاده")
 
 
 class BusinessUpdateRequest(BaseModel):
@@ -214,6 +216,8 @@ class BusinessResponse(BaseModel):
 	postal_code: Optional[str] = Field(default=None, description="کد پستی")
 	created_at: str = Field(..., description="تاریخ ایجاد")
 	updated_at: str = Field(..., description="تاریخ آخرین بروزرسانی")
+	default_currency: Optional[dict] = Field(default=None, description="ارز پیشفرض")
+	currencies: Optional[List[dict]] = Field(default=None, description="ارزهای فعال کسب‌وکار")
 
 
 class BusinessListResponse(BaseModel):

@@ -12,7 +12,10 @@ depends_on = None
 def upgrade() -> None:
 	bind = op.get_bind()
 	inspector = inspect(bind)
-	cols = {c['name'] for c in inspector.get_columns('persons')} if 'persons' in inspector.get_table_names() else set()
+	# اگر جدول persons وجود ندارد، این مایگریشن را نادیده بگیر
+	if 'persons' not in inspector.get_table_names():
+		return
+	cols = {c['name'] for c in inspector.get_columns('persons')}
 	with op.batch_alter_table('persons') as batch_op:
 		if 'code' not in cols:
 			batch_op.add_column(sa.Column('code', sa.Integer(), nullable=True))
@@ -25,7 +28,20 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+	bind = op.get_bind()
+	inspector = inspect(bind)
+	if 'persons' not in inspector.get_table_names():
+		return
 	with op.batch_alter_table('persons') as batch_op:
-		batch_op.drop_constraint('uq_persons_business_code', type_='unique')
-		batch_op.drop_column('person_types')
-		batch_op.drop_column('code')
+		try:
+			batch_op.drop_constraint('uq_persons_business_code', type_='unique')
+		except Exception:
+			pass
+		try:
+			batch_op.drop_column('person_types')
+		except Exception:
+			pass
+		try:
+			batch_op.drop_column('code')
+		except Exception:
+			pass

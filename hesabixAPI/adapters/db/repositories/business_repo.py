@@ -50,6 +50,7 @@ class BusinessRepository(BaseRepository[Business]):
         business_type: BusinessType, 
         business_field: BusinessField, 
         owner_id: int,
+        default_currency_id: int | None = None,
         address: str | None = None,
         phone: str | None = None,
         mobile: str | None = None,
@@ -60,13 +61,14 @@ class BusinessRepository(BaseRepository[Business]):
         province: str | None = None,
         city: str | None = None,
         postal_code: str | None = None
-    ) -> Business:
+        ) -> Business:
         """ایجاد کسب و کار جدید"""
         business = Business(
             name=name,
             business_type=business_type,
             business_field=business_field,
             owner_id=owner_id,
+            default_currency_id=default_currency_id,
             address=address,
             phone=phone,
             mobile=mobile,

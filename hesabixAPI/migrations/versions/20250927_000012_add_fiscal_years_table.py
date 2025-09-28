@@ -9,7 +9,7 @@ from sqlalchemy import inspect
 revision = '20250927_000012_add_fiscal_years_table'
 down_revision = '20250926_000011_drop_person_is_active'
 branch_labels = None
-depends_on = None
+depends_on = ('20250117_000003',)
 
 
 def upgrade() -> None:

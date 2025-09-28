@@ -51,6 +51,22 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
+        # Ensure alembic_version.version_num can hold long revision strings
+        try:
+            res = connection.exec_driver_sql(
+                "SELECT CHARACTER_MAXIMUM_LENGTH FROM information_schema.columns "
+                "WHERE table_name='alembic_version' AND column_name='version_num';"
+            )
+            row = res.fetchone()
+            if row is not None:
+                length = row[0] or 0
+                if length < 255:
+                    connection.exec_driver_sql(
+                        "ALTER TABLE alembic_version MODIFY COLUMN version_num VARCHAR(255) NOT NULL;"
+                    )
+        except Exception:
+            # Best-effort; ignore if table doesn't exist yet
+            pass
         context.configure(
             connection=connection,
             target_metadata=target_metadata,

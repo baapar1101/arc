@@ -36,6 +36,7 @@ class Business(Base):
     business_type: Mapped[BusinessType] = mapped_column(SQLEnum(BusinessType), nullable=False)
     business_field: Mapped[BusinessField] = mapped_column(SQLEnum(BusinessField), nullable=False)
     owner_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    default_currency_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("currencies.id", ondelete="RESTRICT"), nullable=True, index=True)
     
     # فیلدهای جدید
     address: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -58,5 +59,6 @@ class Business(Base):
     persons: Mapped[list["Person"]] = relationship("Person", back_populates="business", cascade="all, delete-orphan")
     fiscal_years = relationship("FiscalYear", back_populates="business", cascade="all, delete-orphan")
     currencies = relationship("Currency", secondary="business_currencies", back_populates="businesses")
+    default_currency = relationship("Currency", foreign_keys="[Business.default_currency_id]", uselist=False)
     documents = relationship("Document", back_populates="business", cascade="all, delete-orphan")
     accounts = relationship("Account", back_populates="business", cascade="all, delete-orphan")

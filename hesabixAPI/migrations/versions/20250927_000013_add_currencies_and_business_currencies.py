@@ -43,6 +43,17 @@ def upgrade() -> None:
 		sa.PrimaryKeyConstraint('id'),
 		mysql_charset='utf8mb4'
 	)
+
+	# Add default_currency_id to businesses if not exists
+	bind = op.get_bind()
+	inspector = sa.inspect(bind)
+	if 'businesses' in inspector.get_table_names():
+		cols = {c['name'] for c in inspector.get_columns('businesses')}
+		if 'default_currency_id' not in cols:
+			with op.batch_alter_table('businesses') as batch_op:
+				batch_op.add_column(sa.Column('default_currency_id', sa.Integer(), nullable=True))
+				batch_op.create_foreign_key('fk_businesses_default_currency', 'currencies', ['default_currency_id'], ['id'], ondelete='RESTRICT')
+				batch_op.create_index('ix_businesses_default_currency_id', ['default_currency_id'])
 	# Unique and indexes for association
 	op.create_unique_constraint('uq_business_currencies_business_currency', 'business_currencies', ['business_id', 'currency_id'])
 	op.create_index('ix_business_currencies_business_id', 'business_currencies', ['business_id'])
@@ -50,6 +61,20 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+	# Drop index/foreign key/column default_currency_id if exists
+	with op.batch_alter_table('businesses') as batch_op:
+		try:
+			batch_op.drop_index('ix_businesses_default_currency_id')
+		except Exception:
+			pass
+		try:
+			batch_op.drop_constraint('fk_businesses_default_currency', type_='foreignkey')
+		except Exception:
+			pass
+		try:
+			batch_op.drop_column('default_currency_id')
+		except Exception:
+			pass
 	op.drop_index('ix_business_currencies_currency_id', table_name='business_currencies')
 	op.drop_index('ix_business_currencies_business_id', table_name='business_currencies')
 	op.drop_constraint('uq_business_currencies_business_currency', 'business_currencies', type_='unique')

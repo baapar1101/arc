@@ -7,6 +7,7 @@ from adapters.api.v1.health import router as health_router
 from adapters.api.v1.auth import router as auth_router
 from adapters.api.v1.users import router as users_router
 from adapters.api.v1.businesses import router as businesses_router
+from adapters.api.v1.currencies import router as currencies_router
 from adapters.api.v1.business_dashboard import router as business_dashboard_router
 from adapters.api.v1.business_users import router as business_users_router
 from adapters.api.v1.accounts import router as accounts_router
@@ -273,6 +274,7 @@ def create_app() -> FastAPI:
     application.include_router(auth_router, prefix=settings.api_v1_prefix)
     application.include_router(users_router, prefix=settings.api_v1_prefix)
     application.include_router(businesses_router, prefix=settings.api_v1_prefix)
+    application.include_router(currencies_router, prefix=settings.api_v1_prefix)
     application.include_router(business_dashboard_router, prefix=settings.api_v1_prefix)
     application.include_router(business_users_router, prefix=settings.api_v1_prefix)
     application.include_router(accounts_router, prefix=settings.api_v1_prefix)

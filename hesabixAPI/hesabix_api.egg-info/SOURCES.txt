@@ -8,6 +8,7 @@ adapters/api/v1/auth.py
 adapters/api/v1/business_dashboard.py
 adapters/api/v1/business_users.py
 adapters/api/v1/businesses.py
+adapters/api/v1/currencies.py
 adapters/api/v1/health.py
 adapters/api/v1/persons.py
 adapters/api/v1/schemas.py
@@ -123,6 +124,7 @@ migrations/versions/20250927_000019_seed_accounts_chart.py
 migrations/versions/20250927_000020_add_share_count_and_shareholder_type.py
 migrations/versions/20250927_000021_update_person_type_enum_to_persian.py
 migrations/versions/20250927_000022_add_person_commission_fields.py
+migrations/versions/4b2ea782bcb3_merge_heads.py
 migrations/versions/5553f8745c6e_add_support_tables.py
 migrations/versions/d3e84892c1c2_sync_person_type_enum_values_callable_.py
 migrations/versions/f876bfa36805_merge_multiple_heads.py

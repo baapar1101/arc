@@ -4,6 +4,7 @@ import '../models/business_models.dart';
 class BusinessApiService {
   static const String _basePath = '/api/v1/businesses';
   static final ApiClient _apiClient = ApiClient();
+  static const String _currencyPath = '/api/v1/currencies';
 
   // ایجاد کسب و کار جدید
   static Future<BusinessResponse> createBusiness(BusinessData businessData) async {
@@ -16,6 +17,17 @@ class BusinessApiService {
       return BusinessResponse.fromJson(response.data['data']);
     } else {
       throw Exception(response.data['message'] ?? 'خطا در ایجاد کسب و کار');
+    }
+  }
+
+  // دریافت فهرست ارزها
+  static Future<List<Map<String, dynamic>>> getCurrencies() async {
+    final response = await _apiClient.get(_currencyPath);
+    if (response.data['success'] == true) {
+      final List<dynamic> items = response.data['data'];
+      return items.cast<Map<String, dynamic>>();
+    } else {
+      throw Exception(response.data['message'] ?? 'خطا در دریافت فهرست ارزها');
     }
   }
 
