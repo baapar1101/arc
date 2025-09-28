@@ -3,6 +3,7 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../widgets/data_table/data_table_widget.dart';
 import '../../widgets/data_table/data_table_config.dart';
 import '../../widgets/person/person_form_dialog.dart';
+import '../../widgets/person/person_import_dialog.dart';
 import '../../widgets/permission/permission_widgets.dart';
 import '../../models/person_model.dart';
 import '../../services/person_service.dart';
@@ -271,6 +272,25 @@ class _PersonsPageState extends State<PersonsPage> {
               onPressed: _addPerson,
               icon: const Icon(Icons.add),
             ),
+          ),
+        ),
+        Tooltip(
+          message: 'ایمپورت اشخاص از اکسل',
+          child: IconButton(
+            onPressed: () async {
+              final ok = await showDialog<bool>(
+                context: context,
+                builder: (context) => PersonImportDialog(businessId: widget.businessId),
+              );
+              if (ok == true) {
+                final state = _personsTableKey.currentState;
+                try {
+                  // ignore: avoid_dynamic_calls
+                  (state as dynamic)?.refresh();
+                } catch (_) {}
+              }
+            },
+            icon: const Icon(Icons.upload_file),
           ),
         ),
       ],

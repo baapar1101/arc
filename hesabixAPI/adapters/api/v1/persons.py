@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Body
+from fastapi import UploadFile, File
 from sqlalchemy.orm import Session
 from typing import Dict, Any, List, Optional
 
@@ -493,6 +494,70 @@ async def export_persons_pdf(
     )
 
 
+@router.post("/businesses/{business_id}/persons/import/template",
+    summary="دانلود تمپلیت ایمپورت اشخاص",
+    description="فایل Excel تمپلیت برای ایمپورت اشخاص را برمی‌گرداند",
+)
+async def download_persons_import_template(
+    business_id: int,
+    request: Request,
+    auth_context: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    import io
+    import datetime
+    from fastapi.responses import Response
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, Alignment
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Template"
+
+    headers = [
+        'code','alias_name','first_name','last_name','person_type','person_types','company_name','payment_id',
+        'national_id','registration_number','economic_id','country','province','city','address','postal_code',
+        'phone','mobile','fax','email','website','share_count','commission_sale_percent','commission_sales_return_percent',
+        'commission_sales_amount','commission_sales_return_amount'
+    ]
+    for col, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col, value=header)
+        cell.font = Font(bold=True)
+        cell.alignment = Alignment(horizontal="center")
+
+    # Sample row
+    sample = [
+        '', 'نمونه نام مستعار', 'علی', 'احمدی', 'مشتری', 'مشتری, فروشنده', 'نمونه شرکت', 'PID123',
+        '0012345678', '12345', 'ECO-1', 'ایران', 'تهران', 'تهران', 'خیابان مثال ۱', '1234567890',
+        '02112345678', '09120000000', '', 'test@example.com', 'example.com', '', '5', '0', '0', '0'
+    ]
+    for col, val in enumerate(sample, 1):
+        ws.cell(row=2, column=col, value=val)
+
+    # Auto width
+    for column in ws.columns:
+        try:
+            letter = column[0].column_letter
+            max_len = max(len(str(c.value)) if c.value is not None else 0 for c in column)
+            ws.column_dimensions[letter].width = min(max_len + 2, 50)
+        except Exception:
+            pass
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+
+    filename = f"persons_import_template_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    return Response(
+        content=buf.getvalue(),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": f"attachment; filename={filename}",
+            "Access-Control-Expose-Headers": "Content-Disposition",
+        },
+    )
+
+
 @router.get("/persons/{person_id}",
     summary="جزئیات شخص",
     description="دریافت جزئیات یک شخص",
@@ -625,4 +690,159 @@ async def get_persons_summary_endpoint(
         data=result,
         request=request,
         message="خلاصه اشخاص با موفقیت دریافت شد",
+    )
+
+
+@router.post("/businesses/{business_id}/persons/import/excel",
+    summary="ایمپورت اشخاص از فایل Excel",
+    description="فایل اکسل را دریافت می‌کند و به‌صورت dry-run یا واقعی پردازش می‌کند",
+)
+async def import_persons_excel(
+    business_id: int,
+    request: Request,
+    file: UploadFile = File(...),
+    dry_run: bool = Body(default=True),
+    match_by: str = Body(default="code"),
+    conflict_policy: str = Body(default="upsert"),
+    auth_context: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    import io
+    import json
+    import re
+    from openpyxl import load_workbook
+    from fastapi import HTTPException
+
+    if not file.filename or not file.filename.lower().endswith('.xlsx'):
+        raise HTTPException(status_code=400, detail="فرمت فایل معتبر نیست. تنها xlsx پشتیبانی می‌شود")
+
+    content = await file.read()
+    try:
+        wb = load_workbook(filename=io.BytesIO(content), data_only=True)
+    except Exception:
+        raise HTTPException(status_code=400, detail="امکان خواندن فایل وجود ندارد")
+
+    ws = wb.active
+    rows = list(ws.iter_rows(values_only=True))
+    if not rows:
+        return success_response(data={"summary": {"total": 0}}, request=request, message="فایل خالی است")
+
+    headers = [str(h).strip() if h is not None else "" for h in rows[0]]
+    data_rows = rows[1:]
+
+    # helper to map enum strings (fa/en) to internal value
+    def normalize_person_type(value: str) -> Optional[str]:
+        if not value:
+            return None
+        value = str(value).strip()
+        mapping = {
+            'customer': 'مشتری', 'marketer': 'بازاریاب', 'employee': 'کارمند', 'supplier': 'تامین‌کننده',
+            'partner': 'همکار', 'seller': 'فروشنده', 'shareholder': 'سهامدار'
+        }
+        for en, fa in mapping.items():
+            if value.lower() == en or value == fa:
+                return fa
+        return value  # assume already fa
+
+    errors: list[dict] = []
+    valid_items: list[dict] = []
+
+    for idx, row in enumerate(data_rows, start=2):
+        item: dict[str, Any] = {}
+        row_errors: list[str] = []
+        for ci, key in enumerate(headers):
+            if not key:
+                continue
+            val = row[ci] if ci < len(row) else None
+            if isinstance(val, str):
+                val = val.strip()
+            item[key] = val
+        # normalize types
+        if 'person_type' in item and item['person_type']:
+            item['person_type'] = normalize_person_type(item['person_type'])
+        if 'person_types' in item and item['person_types']:
+            # split by comma
+            parts = [normalize_person_type(p.strip()) for p in str(item['person_types']).split(',') if str(p).strip()]
+            item['person_types'] = parts
+
+        # alias_name required
+        if not item.get('alias_name'):
+            row_errors.append('alias_name الزامی است')
+
+        # shareholder rule
+        if (item.get('person_type') == 'سهامدار') or (isinstance(item.get('person_types'), list) and 'سهامدار' in item.get('person_types', [])):
+            sc = item.get('share_count')
+            try:
+                sc_val = int(sc) if sc is not None and str(sc).strip() != '' else None
+            except Exception:
+                sc_val = None
+            if sc_val is None or sc_val <= 0:
+                row_errors.append('برای سهامدار share_count باید > 0 باشد')
+            else:
+                item['share_count'] = sc_val
+
+        if row_errors:
+            errors.append({"row": idx, "errors": row_errors})
+            continue
+
+        valid_items.append(item)
+
+    inserted = 0
+    updated = 0
+    skipped = 0
+
+    if not dry_run and valid_items:
+        # apply import with conflict policy
+        from adapters.db.models.person import Person
+        from sqlalchemy import and_
+
+        def find_existing(session: Session, data: dict) -> Optional[Person]:
+            if match_by == 'national_id' and data.get('national_id'):
+                return session.query(Person).filter(and_(Person.business_id == business_id, Person.national_id == data['national_id'])).first()
+            if match_by == 'email' and data.get('email'):
+                return session.query(Person).filter(and_(Person.business_id == business_id, Person.email == data['email'])).first()
+            if match_by == 'code' and data.get('code'):
+                try:
+                    code_int = int(data['code'])
+                    return session.query(Person).filter(and_(Person.business_id == business_id, Person.code == code_int)).first()
+                except Exception:
+                    return None
+            return None
+
+        for data in valid_items:
+            existing = find_existing(db, data)
+            if existing is None:
+                # create
+                try:
+                    create_person(db, business_id, PersonCreateRequest(**data))
+                    inserted += 1
+                except Exception:
+                    skipped += 1
+            else:
+                if conflict_policy == 'insert':
+                    skipped += 1
+                elif conflict_policy in ('update', 'upsert'):
+                    try:
+                        update_person(db, existing.id, business_id, PersonUpdateRequest(**data))
+                        updated += 1
+                    except Exception:
+                        skipped += 1
+
+    summary = {
+        "total": len(data_rows),
+        "valid": len(valid_items),
+        "invalid": len(errors),
+        "inserted": inserted,
+        "updated": updated,
+        "skipped": skipped,
+        "dry_run": dry_run,
+    }
+
+    return success_response(
+        data={
+            "summary": summary,
+            "errors": errors,
+        },
+        request=request,
+        message="نتیجه ایمپورت اشخاص",
     )

@@ -47,6 +47,8 @@ dependencies:
   shamsi_date: ^1.1.1
   intl: ^0.20.0
   data_table_2: ^2.5.12
+  file_picker: ^10.3.3
+  file_selector: ^1.0.4
 
 dev_dependencies:
   flutter_test:

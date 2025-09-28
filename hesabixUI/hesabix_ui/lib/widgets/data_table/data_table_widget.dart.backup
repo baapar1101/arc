@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'helpers/file_saver.dart';
-// // import 'dart:html' as html; // Not available on Linux // Not available on Linux
+// import 'dart:html' as html; // Not available on Linux
 import 'package:flutter/material.dart';
 import 'package:data_table_2/data_table_2.dart';
 import 'package:dio/dio.dart';
@@ -670,17 +670,12 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     await FileSaver.saveBytes(bytes, filename);
   }
 
-  // Platform-specific download functions for Linux
   Future<void> _downloadPdf(dynamic data, String filename) async {
-    // For Linux desktop, we'll save to Downloads folder
-    print('Download PDF: $filename (Linux desktop - save to Downloads folder)');
-    // TODO: Implement proper file saving for Linux
+    await _saveBytesToDownloads(data, filename);
   }
 
   Future<void> _downloadExcel(dynamic data, String filename) async {
-    // For Linux desktop, we'll save to Downloads folder
-    print('Download Excel: $filename (Linux desktop - save to Downloads folder)');
-    // TODO: Implement proper file saving for Linux
+    await _saveBytesToDownloads(data, filename);
   }
 
 
