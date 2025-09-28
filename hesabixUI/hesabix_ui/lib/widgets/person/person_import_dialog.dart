@@ -127,7 +127,7 @@ class _PersonImportDialogState extends State<PersonImportDialog> {
       });
       final form = FormData.fromMap({
         'file': MultipartFile.fromBytes(bytes, filename: filename),
-        'dry_run': dryRun,
+        'dry_run': dryRun.toString(),
         'match_by': _matchBy,
         'conflict_policy': _conflictPolicy,
       });
