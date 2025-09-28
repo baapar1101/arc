@@ -595,12 +595,37 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
       );
 
       if (response.data != null) {
+        // Determine filename from Content-Disposition header if present
+        String? contentDisposition = response.headers.value('content-disposition');
+        String filename = 'export_${DateTime.now().millisecondsSinceEpoch}.${format == 'pdf' ? 'pdf' : 'xlsx'}';
+        if (contentDisposition != null) {
+          try {
+            final parts = contentDisposition.split(';').map((s) => s.trim());
+            for (final p in parts) {
+              if (p.toLowerCase().startsWith('filename=')) {
+                var name = p.substring('filename='.length).trim();
+                if (name.startsWith('"') && name.endsWith('"') && name.length >= 2) {
+                  name = name.substring(1, name.length - 1);
+                }
+                if (name.isNotEmpty) {
+                  filename = name;
+                }
+                break;
+              }
+            }
+          } catch (_) {
+            // Fallback to default filename
+          }
+        }
+        final expectedExt = format == 'pdf' ? '.pdf' : '.xlsx';
+        if (!filename.toLowerCase().endsWith(expectedExt)) {
+          filename = '$filename$expectedExt';
+        }
+
         if (format == 'pdf') {
-          // Handle PDF download
-          await _downloadPdf(response.data, 'referrals_export_${DateTime.now().millisecondsSinceEpoch}.pdf');
+          await _downloadPdf(response.data, filename);
         } else if (format == 'excel') {
-          // Handle Excel download
-          await _downloadExcel(response.data, 'referrals_export_${DateTime.now().millisecondsSinceEpoch}.xlsx');
+          await _downloadExcel(response.data, filename);
         }
         
         if (mounted) {

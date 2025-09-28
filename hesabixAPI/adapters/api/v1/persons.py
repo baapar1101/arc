@@ -147,6 +147,7 @@ async def export_persons_excel(
     import io
     import json
     import datetime
+    import re
     from openpyxl import Workbook
     from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
     from fastapi.responses import Response
@@ -243,7 +244,22 @@ async def export_persons_excel(
     wb.save(buffer)
     buffer.seek(0)
 
-    filename = f"persons_export_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    # Build meaningful filename
+    biz_name = ""
+    try:
+        b = db.query(Business).filter(Business.id == business_id).first()
+        if b is not None:
+            biz_name = b.name or ""
+    except Exception:
+        biz_name = ""
+    def slugify(text: str) -> str:
+        return re.sub(r"[^A-Za-z0-9_-]+", "_", text).strip("_")
+    base = "persons"
+    if biz_name:
+        base += f"_{slugify(biz_name)}"
+    if selected_only:
+        base += "_selected"
+    filename = f"{base}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
     content = buffer.getvalue()
     return Response(
         content=content,
@@ -251,6 +267,7 @@ async def export_persons_excel(
         headers={
             "Content-Disposition": f"attachment; filename={filename}",
             "Content-Length": str(len(content)),
+            "Access-Control-Expose-Headers": "Content-Disposition",
         },
     )
 
@@ -268,6 +285,7 @@ async def export_persons_pdf(
 ):
     import json
     import datetime
+    import re
     from fastapi.responses import Response
     from weasyprint import HTML, CSS
     from weasyprint.text.fonts import FontConfiguration
@@ -448,13 +466,29 @@ async def export_persons_pdf(
     font_config = FontConfiguration()
     pdf_bytes = HTML(string=table_html).write_pdf(font_config=font_config)
 
-    filename = f"persons_export_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+    # Build meaningful filename
+    biz_name = ""
+    try:
+        b = db.query(Business).filter(Business.id == business_id).first()
+        if b is not None:
+            biz_name = b.name or ""
+    except Exception:
+        biz_name = ""
+    def slugify(text: str) -> str:
+        return re.sub(r"[^A-Za-z0-9_-]+", "_", text).strip("_")
+    base = "persons"
+    if biz_name:
+        base += f"_{slugify(biz_name)}"
+    if selected_only:
+        base += "_selected"
+    filename = f"{base}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
         headers={
             "Content-Disposition": f"attachment; filename={filename}",
             "Content-Length": str(len(pdf_bytes)),
+            "Access-Control-Expose-Headers": "Content-Disposition",
         },
     )
 

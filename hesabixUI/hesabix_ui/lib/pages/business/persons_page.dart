@@ -60,6 +60,7 @@ class _PersonsPageState extends State<PersonsPage> {
       showTableIcon: false,
       showRowNumbers: true,
       enableRowSelection: true,
+      enableMultiRowSelection: true,
       columns: [
         NumberColumn(
           'code',
