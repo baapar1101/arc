@@ -34,6 +34,9 @@ def create_person(db: Session, business_id: int, person_data: PersonCreateReques
         t = person_data.person_type
         types_list = [t.value if hasattr(t, 'value') else str(t)]
 
+    # نوع تکی برای استفاده‌های بعدی (قبل از هر استفاده تعریف شود)
+    incoming_single_type = getattr(person_data, 'person_type', None)
+
     # اعتبارسنجی سهام برای سهامدار
     is_shareholder = False
     if types_list:
@@ -50,7 +53,6 @@ def create_person(db: Session, business_id: int, person_data: PersonCreateReques
 
     # ایجاد شخص
     # نگاشت person_type دریافتی از اسکیما به Enum مدل
-    incoming_single_type = getattr(person_data, 'person_type', None)
     mapped_single_type = None
     if incoming_single_type is not None:
         try:

@@ -29,7 +29,6 @@ class PersonBankAccountUpdateRequest(BaseModel):
     account_number: Optional[str] = Field(default=None, max_length=50, description="شماره حساب")
     card_number: Optional[str] = Field(default=None, max_length=20, description="شماره کارت")
     sheba_number: Optional[str] = Field(default=None, max_length=30, description="شماره شبا")
-    is_active: Optional[bool] = Field(default=None, description="وضعیت فعال بودن")
 
 
 class PersonBankAccountResponse(BaseModel):
@@ -40,7 +39,6 @@ class PersonBankAccountResponse(BaseModel):
     account_number: Optional[str] = Field(default=None, description="شماره حساب")
     card_number: Optional[str] = Field(default=None, description="شماره کارت")
     sheba_number: Optional[str] = Field(default=None, description="شماره شبا")
-    is_active: bool = Field(..., description="وضعیت فعال بودن")
     created_at: str = Field(..., description="تاریخ ایجاد")
     updated_at: str = Field(..., description="تاریخ آخرین بروزرسانی")
 
@@ -142,8 +140,6 @@ class PersonUpdateRequest(BaseModel):
     email: Optional[str] = Field(default=None, max_length=255, description="پست الکترونیکی")
     website: Optional[str] = Field(default=None, max_length=255, description="وب‌سایت")
     
-    # وضعیت
-    is_active: Optional[bool] = Field(default=None, description="وضعیت فعال بودن")
     # سهام
     share_count: Optional[int] = Field(default=None, ge=1, description="تعداد سهام (برای سهامدار)")
     # پورسانت
@@ -209,9 +205,6 @@ class PersonResponse(BaseModel):
     fax: Optional[str] = Field(default=None, description="فکس")
     email: Optional[str] = Field(default=None, description="پست الکترونیکی")
     website: Optional[str] = Field(default=None, description="وب‌سایت")
-    
-    # وضعیت
-    is_active: bool = Field(..., description="وضعیت فعال بودن")
     
     # زمان‌بندی
     created_at: str = Field(..., description="تاریخ ایجاد")

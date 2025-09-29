@@ -362,7 +362,7 @@ class AppLocalizationsFa extends AppLocalizations {
   String get clear => 'پاک کردن';
 
   @override
-  String get searchInNameEmail => 'جستجو در نام، نام خانوادگی و ایمیل...';
+  String get searchInNameEmail => 'جستجو';
 
   @override
   String get recordsPerPage => 'سطر در هر صفحه';
@@ -483,6 +483,9 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get export => 'خروجی';
+
+  @override
+  String get importFromExcel => 'ایمپورت از اکسل';
 
   @override
   String get rowNumber => 'ردیف';
@@ -1363,6 +1366,9 @@ class AppLocalizationsFa extends AppLocalizations {
   String get peopleList => 'لیست اشخاص';
 
   @override
+  String get personCode => 'کد شخص';
+
+  @override
   String get receipts => 'دریافت‌ها';
 
   @override
@@ -2010,7 +2016,7 @@ class AppLocalizationsFa extends AppLocalizations {
   String get eventHistory => 'تاریخچه رویدادها';
 
   @override
-  String get viewStorage => 'مشاهده فضای ذخیره‌سازی';
+  String get viewStorage => 'View Storage';
 
   @override
   String get deleteFiles => 'فایل‌ها';
@@ -2316,4 +2322,167 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get business => 'کسب و کار';
+
+  @override
+  String get shareCount => 'تعداد سهام';
+
+  @override
+  String get commissionSalePercentLabel => 'درصد پورسانت فروش';
+
+  @override
+  String get commissionSalesReturnPercentLabel => 'درصد پورسانت برگشت از فروش';
+
+  @override
+  String get commissionSalesAmountLabel => 'مبلغ پورسانت فروش';
+
+  @override
+  String get commissionSalesReturnAmountLabel => 'مبلغ پورسانت برگشت از فروش';
+
+  @override
+  String get importPersonsFromExcel => 'ایمپورت اشخاص از اکسل';
+
+  @override
+  String get selectedFile => 'فایل انتخاب‌شده';
+
+  @override
+  String get noFileSelected => 'هیچ فایلی انتخاب نشده';
+
+  @override
+  String get chooseFile => 'انتخاب فایل';
+
+  @override
+  String get matchBy => 'معیار تطبیق';
+
+  @override
+  String get code => 'کد';
+
+  @override
+  String get conflictPolicy => 'سیاست تداخل';
+
+  @override
+  String get policyInsertOnly => 'فقط ایجاد';
+
+  @override
+  String get policyUpdateExisting => 'به‌روزرسانی موجود';
+
+  @override
+  String get policyUpsert => 'آپسرت';
+
+  @override
+  String get dryRun => 'اجرای آزمایشی';
+
+  @override
+  String get dryRunValidateOnly => 'اجرای آزمایشی (فقط اعتبارسنجی)';
+
+  @override
+  String get downloadTemplate => 'دانلود تمپلیت';
+
+  @override
+  String get reviewDryRun => 'بررسی (اجرای آزمایشی)';
+
+  @override
+  String get import => 'ایمپورت';
+
+  @override
+  String get importReal => 'ایمپورت واقعی';
+
+  @override
+  String get templateDownloaded => 'تمپلیت دانلود شد';
+
+  @override
+  String get pickFileError => 'خطا در انتخاب فایل';
+
+  @override
+  String get templateDownloadError => 'خطا در دانلود تمپلیت';
+
+  @override
+  String get importError => 'خطا در ایمپورت';
+
+  @override
+  String get result => 'نتیجه';
+
+  @override
+  String get valid => 'معتبر';
+
+  @override
+  String get invalid => 'نامعتبر';
+
+  @override
+  String get inserted => 'ایجاد شده';
+
+  @override
+  String get updated => 'به‌روزرسانی';
+
+  @override
+  String get skipped => 'رد شده';
+
+  @override
+  String get yes => 'بله';
+
+  @override
+  String get no => 'خیر';
+
+  @override
+  String get row => 'ردیف';
+
+  @override
+  String get onlyForMarketerSeller =>
+      'این بخش فقط برای بازاریاب/فروشنده نمایش داده می‌شود';
+
+  @override
+  String get percentFromSales => 'درصد از فروش';
+
+  @override
+  String get percentFromSalesReturn => 'درصد از برگشت از فروش';
+
+  @override
+  String get salesAmount => 'مبلغ فروش';
+
+  @override
+  String get salesReturnAmount => 'مبلغ برگشت از فروش';
+
+  @override
+  String get mustBeBetweenZeroAndHundred => 'باید بین 0 تا 100 باشد';
+
+  @override
+  String get mustBePositiveNumber => 'باید عدد مثبت باشد';
+
+  @override
+  String get personCodeOptional => 'کد شخص (اختیاری)';
+
+  @override
+  String get uniqueCodeNumeric => 'کد یکتا (عددی)';
+
+  @override
+  String get automatic => 'اتوماتیک';
+
+  @override
+  String get manual => 'دستی';
+
+  @override
+  String get personCodeRequired => 'کد شخص الزامی است';
+
+  @override
+  String get codeMustBeNumeric => 'کد باید عددی باشد';
+
+  @override
+  String get integerNoDecimal => 'عدد صحیح بدون اعشار';
+
+  @override
+  String get shareholderShareCountRequired =>
+      'برای سهامدار، تعداد سهام الزامی است';
+
+  @override
+  String get noBankAccountsAdded => 'هیچ حساب بانکی اضافه نشده است';
+
+  @override
+  String get commissionExcludeDiscounts => 'عدم محاسبه تخفیف';
+
+  @override
+  String get commissionExcludeAdditionsDeductions =>
+      'عدم محاسبه اضافات و کسورات فاکتور';
+
+  @override
+  String get commissionPostInInvoiceDocument =>
+      'ثبت پورسانت در سند حسابداری فاکتور';
 }

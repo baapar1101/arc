@@ -486,6 +486,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get export => 'Export';
 
   @override
+  String get importFromExcel => 'Import from Excel';
+
+  @override
   String get rowNumber => 'Row';
 
   @override
@@ -1372,6 +1375,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get peopleList => 'People List';
+
+  @override
+  String get personCode => 'Person Code';
 
   @override
   String get receipts => 'Receipts';
@@ -2332,4 +2338,169 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get business => 'Business';
+
+  @override
+  String get shareCount => 'Share Count';
+
+  @override
+  String get commissionSalePercentLabel => 'Commission Sale Percent';
+
+  @override
+  String get commissionSalesReturnPercentLabel =>
+      'Commission Sales Return Percent';
+
+  @override
+  String get commissionSalesAmountLabel => 'Commission Sales Amount';
+
+  @override
+  String get commissionSalesReturnAmountLabel =>
+      'Commission Sales Return Amount';
+
+  @override
+  String get importPersonsFromExcel => 'Import Persons from Excel';
+
+  @override
+  String get selectedFile => 'Selected file';
+
+  @override
+  String get noFileSelected => 'No file selected';
+
+  @override
+  String get chooseFile => 'Choose file';
+
+  @override
+  String get matchBy => 'Match by';
+
+  @override
+  String get code => 'code';
+
+  @override
+  String get conflictPolicy => 'Conflict policy';
+
+  @override
+  String get policyInsertOnly => 'Insert-only';
+
+  @override
+  String get policyUpdateExisting => 'Update existing';
+
+  @override
+  String get policyUpsert => 'Upsert';
+
+  @override
+  String get dryRun => 'Dry run';
+
+  @override
+  String get dryRunValidateOnly => 'Dry run (validate only)';
+
+  @override
+  String get downloadTemplate => 'Download template';
+
+  @override
+  String get reviewDryRun => 'Review (Dry run)';
+
+  @override
+  String get import => 'Import';
+
+  @override
+  String get importReal => 'Import (real)';
+
+  @override
+  String get templateDownloaded => 'Template downloaded';
+
+  @override
+  String get pickFileError => 'Error picking file';
+
+  @override
+  String get templateDownloadError => 'Error downloading template';
+
+  @override
+  String get importError => 'Import error';
+
+  @override
+  String get result => 'Result';
+
+  @override
+  String get valid => 'Valid';
+
+  @override
+  String get invalid => 'Invalid';
+
+  @override
+  String get inserted => 'Inserted';
+
+  @override
+  String get updated => 'Updated';
+
+  @override
+  String get skipped => 'Skipped';
+
+  @override
+  String get yes => 'Yes';
+
+  @override
+  String get no => 'No';
+
+  @override
+  String get row => 'Row';
+
+  @override
+  String get onlyForMarketerSeller =>
+      'This section is shown only for marketer/seller';
+
+  @override
+  String get percentFromSales => 'Percent from sales';
+
+  @override
+  String get percentFromSalesReturn => 'Percent from sales return';
+
+  @override
+  String get salesAmount => 'Sales amount';
+
+  @override
+  String get salesReturnAmount => 'Sales return amount';
+
+  @override
+  String get mustBeBetweenZeroAndHundred => 'Must be between 0 and 100';
+
+  @override
+  String get mustBePositiveNumber => 'Must be a positive number';
+
+  @override
+  String get personCodeOptional => 'Person code (optional)';
+
+  @override
+  String get uniqueCodeNumeric => 'Unique code (numeric)';
+
+  @override
+  String get automatic => 'Automatic';
+
+  @override
+  String get manual => 'Manual';
+
+  @override
+  String get personCodeRequired => 'Person code is required';
+
+  @override
+  String get codeMustBeNumeric => 'Code must be numeric';
+
+  @override
+  String get integerNoDecimal => 'Integer number (no decimals)';
+
+  @override
+  String get shareholderShareCountRequired =>
+      'For shareholder, share count is required';
+
+  @override
+  String get noBankAccountsAdded => 'No bank accounts added';
+
+  @override
+  String get commissionExcludeDiscounts => 'Exclude discounts from commission';
+
+  @override
+  String get commissionExcludeAdditionsDeductions =>
+      'Exclude additions/deductions from commission';
+
+  @override
+  String get commissionPostInInvoiceDocument =>
+      'Post commission in invoice accounting document';
 }

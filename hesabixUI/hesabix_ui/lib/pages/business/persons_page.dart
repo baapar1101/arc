@@ -65,7 +65,7 @@ class _PersonsPageState extends State<PersonsPage> {
       columns: [
         NumberColumn(
           'code',
-          'کد شخص',
+          t.personCode,
           width: ColumnWidth.small,
           formatter: (person) => (person.code?.toString() ?? '-'),
           textAlign: TextAlign.center,
@@ -92,6 +92,16 @@ class _PersonsPageState extends State<PersonsPage> {
           'person_type',
           t.personType,
           width: ColumnWidth.medium,
+          filterType: ColumnFilterType.multiSelect,
+          filterOptions: [
+            FilterOption(value: 'مشتری', label: t.personTypeCustomer),
+            FilterOption(value: 'بازاریاب', label: t.personTypeMarketer),
+            FilterOption(value: 'کارمند', label: t.personTypeEmployee),
+            FilterOption(value: 'تامین‌کننده', label: t.personTypeSupplier),
+            FilterOption(value: 'همکار', label: t.personTypePartner),
+            FilterOption(value: 'فروشنده', label: t.personTypeSeller),
+            FilterOption(value: 'سهامدار', label: 'سهامدار'),
+          ],
           formatter: (person) => (person.personTypes.isNotEmpty
               ? person.personTypes.map((e) => e.persianName).join('، ')
               : person.personType.persianName),
@@ -122,39 +132,39 @@ class _PersonsPageState extends State<PersonsPage> {
         ),
         DateColumn(
           'created_at',
-          'تاریخ ایجاد',
+          t.createdAt,
           width: ColumnWidth.medium,
         ),
         NumberColumn(
           'share_count',
-          'تعداد سهام',
+          t.shareCount,
           width: ColumnWidth.small,
           textAlign: TextAlign.center,
           decimalPlaces: 0,
         ),
         NumberColumn(
           'commission_sale_percent',
-          'درصد پورسانت فروش',
+          t.commissionSalePercentLabel,
           width: ColumnWidth.medium,
           decimalPlaces: 2,
           suffix: '٪',
         ),
         NumberColumn(
           'commission_sales_return_percent',
-          'درصد پورسانت برگشت از فروش',
+          t.commissionSalesReturnPercentLabel,
           width: ColumnWidth.medium,
           decimalPlaces: 2,
           suffix: '٪',
         ),
         NumberColumn(
           'commission_sales_amount',
-          'مبلغ پورسانت فروش',
+          t.commissionSalesAmountLabel,
           width: ColumnWidth.large,
           decimalPlaces: 0,
         ),
         NumberColumn(
           'commission_sales_return_amount',
-          'مبلغ پورسانت برگشت از فروش',
+          t.commissionSalesReturnAmountLabel,
           width: ColumnWidth.large,
           decimalPlaces: 0,
         ),
@@ -226,7 +236,7 @@ class _PersonsPageState extends State<PersonsPage> {
         ),
         ActionColumn(
           'actions',
-          'عملیات',
+          t.actions,
           actions: [
             DataTableAction(
               icon: Icons.edit,
@@ -255,7 +265,6 @@ class _PersonsPageState extends State<PersonsPage> {
       filterFields: [
         'person_type',
         'person_types',
-        'is_active',
         'country',
         'province',
       ],
@@ -274,25 +283,42 @@ class _PersonsPageState extends State<PersonsPage> {
             ),
           ),
         ),
-        Tooltip(
-          message: 'ایمپورت اشخاص از اکسل',
-          child: IconButton(
-            onPressed: () async {
-              final ok = await showDialog<bool>(
-                context: context,
-                builder: (context) => PersonImportDialog(businessId: widget.businessId),
-              );
-              if (ok == true) {
-                final state = _personsTableKey.currentState;
-                try {
-                  // ignore: avoid_dynamic_calls
-                  (state as dynamic)?.refresh();
-                } catch (_) {}
-              }
-            },
-            icon: const Icon(Icons.upload_file),
-          ),
-        ),
+        Builder(builder: (context) {
+          final theme = Theme.of(context);
+          return Tooltip(
+            message: t.importFromExcel,
+            child: GestureDetector(
+              onTap: () async {
+                final ok = await showDialog<bool>(
+                  context: context,
+                  builder: (context) => PersonImportDialog(businessId: widget.businessId),
+                );
+                if (ok == true) {
+                  final state = _personsTableKey.currentState;
+                  try {
+                    // ignore: avoid_dynamic_calls
+                    (state as dynamic)?.refresh();
+                  } catch (_) {}
+                }
+              },
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: theme.colorScheme.outline.withValues(alpha: 0.3),
+                  ),
+                ),
+                child: Icon(
+                  Icons.upload_file,
+                  size: 16,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          );
+        }),
       ],
     );
   }

@@ -407,7 +407,7 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
                     ),
                   ];
                   if (hasCommissionTab) {
-                    tabs.add(const Tab(text: 'پورسانت'));
+                    tabs.add(Tab(text: t.commissionSalePercentLabel));
                     views.add(
                       SingleChildScrollView(
                         child: Padding(
@@ -467,11 +467,12 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
   }
 
   Widget _buildCommissionTab() {
+    final t = AppLocalizations.of(context);
     final isMarketer = _selectedPersonTypes.contains(PersonType.marketer);
     final isSeller = _selectedPersonTypes.contains(PersonType.seller);
     if (!isMarketer && !isSeller) {
       return Center(
-        child: Text('این بخش فقط برای بازاریاب/فروشنده نمایش داده می‌شود'),
+        child: Text(t.onlyForMarketerSeller),
       );
     }
 
@@ -482,8 +483,8 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
             Expanded(
               child: TextFormField(
                 controller: _commissionSalePercentController,
-                decoration: const InputDecoration(
-                  labelText: 'درصد از فروش',
+                decoration: InputDecoration(
+                  labelText: t.percentFromSales,
                   suffixText: '%',
                 ),
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -491,7 +492,7 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
                 validator: (v) {
                   if ((isMarketer || isSeller) && (v != null && v.isNotEmpty)) {
                     final num? val = num.tryParse(v);
-                    if (val == null || val < 0 || val > 100) return 'باید بین 0 تا 100 باشد';
+                    if (val == null || val < 0 || val > 100) return t.mustBeBetweenZeroAndHundred;
                   }
                   return null;
                 },
@@ -501,8 +502,8 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
             Expanded(
               child: TextFormField(
                 controller: _commissionSalesReturnPercentController,
-                decoration: const InputDecoration(
-                  labelText: 'درصد از برگشت از فروش',
+                decoration: InputDecoration(
+                  labelText: t.percentFromSalesReturn,
                   suffixText: '%',
                 ),
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -510,7 +511,7 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
                 validator: (v) {
                   if ((isMarketer || isSeller) && (v != null && v.isNotEmpty)) {
                     final num? val = num.tryParse(v);
-                    if (val == null || val < 0 || val > 100) return 'باید بین 0 تا 100 باشد';
+                    if (val == null || val < 0 || val > 100) return t.mustBeBetweenZeroAndHundred;
                   }
                   return null;
                 },
@@ -524,15 +525,15 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
             Expanded(
               child: TextFormField(
                 controller: _commissionSalesAmountController,
-                decoration: const InputDecoration(
-                  labelText: 'مبلغ فروش',
+                decoration: InputDecoration(
+                  labelText: t.salesAmount,
                 ),
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
                 inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
                 validator: (v) {
                   if (v != null && v.isNotEmpty) {
                     final num? val = num.tryParse(v);
-                    if (val == null || val < 0) return 'باید عدد مثبت باشد';
+                    if (val == null || val < 0) return t.mustBePositiveNumber;
                   }
                   return null;
                 },
@@ -542,15 +543,15 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
             Expanded(
               child: TextFormField(
                 controller: _commissionSalesReturnAmountController,
-                decoration: const InputDecoration(
-                  labelText: 'مبلغ برگشت از فروش',
+                decoration: InputDecoration(
+                  labelText: t.salesReturnAmount,
                 ),
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
                 inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
                 validator: (v) {
                   if (v != null && v.isNotEmpty) {
                     final num? val = num.tryParse(v);
-                    if (val == null || val < 0) return 'باید عدد مثبت باشد';
+                    if (val == null || val < 0) return t.mustBePositiveNumber;
                   }
                   return null;
                 },
@@ -563,7 +564,7 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
           children: [
             Expanded(
               child: SwitchListTile(
-                title: const Text('عدم محاسبه تخفیف'),
+                title: Text(t.commissionExcludeDiscounts),
                 value: _commissionExcludeDiscounts,
                 onChanged: (v) { setState(() { _commissionExcludeDiscounts = v; }); },
               ),
@@ -571,7 +572,7 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
             const SizedBox(width: 16),
             Expanded(
               child: SwitchListTile(
-                title: const Text('عدم محاسبه اضافات و کسورات فاکتور'),
+                title: Text(t.commissionExcludeAdditionsDeductions),
                 value: _commissionExcludeAdditionsDeductions,
                 onChanged: (v) { setState(() { _commissionExcludeAdditionsDeductions = v; }); },
               ),
@@ -580,7 +581,7 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
         ),
         const SizedBox(height: 12),
         SwitchListTile(
-          title: const Text('ثبت پورسانت در سند حسابداری فاکتور'),
+          title: Text(t.commissionPostInInvoiceDocument),
           value: _commissionPostInInvoiceDocument,
           onChanged: (v) { setState(() { _commissionPostInInvoiceDocument = v; }); },
         ),
@@ -608,8 +609,8 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
                 controller: _codeController,
                 readOnly: _autoGenerateCode,
                 decoration: InputDecoration(
-                  labelText: 'کد شخص (اختیاری)',
-                  hintText: 'کد یکتا (عددی)',
+                  labelText: t.personCodeOptional,
+                  hintText: t.uniqueCodeNumeric,
                   suffixIcon: Container(
                     margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 6),
                     padding: const EdgeInsets.all(2),
@@ -626,14 +627,14 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
                           _autoGenerateCode = (index == 0);
                         });
                       },
-                      children: const [
+                      children: [
                         Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 6),
-                          child: Text('اتوماتیک'),
+                          padding: const EdgeInsets.symmetric(horizontal: 6),
+                          child: Text(t.automatic),
                         ),
                         Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 6),
-                          child: Text('دستی'),
+                          padding: const EdgeInsets.symmetric(horizontal: 6),
+                          child: Text(t.manual),
                         ),
                       ],
                     ),
@@ -643,10 +644,10 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
                 validator: (value) {
                   if (!_autoGenerateCode) {
                     if (value == null || value.trim().isEmpty) {
-                      return 'کد شخص الزامی است';
+                      return t.personCodeRequired;
                     }
                     if (int.tryParse(value.trim()) == null) {
-                      return 'کد باید عددی باشد';
+                      return t.codeMustBeNumeric;
                     }
                   }
                   return null;
@@ -684,15 +685,15 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
               Expanded(
                 child: TextFormField(
                   controller: _shareCountController,
-                  decoration: const InputDecoration(
-                    labelText: 'تعداد سهام',
-                    hintText: 'عدد صحیح بدون اعشار',
+                  decoration: InputDecoration(
+                    labelText: t.shareCount,
+                    hintText: t.integerNoDecimal,
                   ),
                   keyboardType: TextInputType.number,
                   validator: (value) {
                     if (_selectedPersonTypes.contains(PersonType.shareholder)) {
                       if (value == null || value.trim().isEmpty) {
-                        return 'برای سهامدار، تعداد سهام الزامی است';
+                        return t.shareholderShareCountRequired;
                       }
                       final parsed = int.tryParse(value.trim());
                       if (parsed == null || parsed <= 0) {
@@ -974,10 +975,7 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
               borderRadius: BorderRadius.circular(8),
             ),
             child: Center(
-              child: Text(
-                'هیچ حساب بانکی اضافه نشده است',
-                style: TextStyle(color: Colors.grey.shade600),
-              ),
+              child: Text(t.noBankAccountsAdded, style: TextStyle(color: Colors.grey.shade600)),
             ),
           )
         else
@@ -1007,10 +1005,7 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
                 Expanded(
                   child: TextFormField(
                     initialValue: bankAccount.bankName,
-                    decoration: InputDecoration(
-                      labelText: t.bankName,
-                      hintText: t.bankName,
-                    ),
+                    decoration: InputDecoration(labelText: t.bankName, hintText: t.bankName),
                     onChanged: (value) {
                       _updateBankAccount(index, bankAccount.copyWith(bankName: value));
                     },
@@ -1029,10 +1024,7 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
                 Expanded(
                   child: TextFormField(
                     initialValue: bankAccount.accountNumber ?? '',
-                    decoration: InputDecoration(
-                      labelText: t.accountNumber,
-                      hintText: t.accountNumber,
-                    ),
+                    decoration: InputDecoration(labelText: t.accountNumber, hintText: t.accountNumber),
                     onChanged: (value) {
                       _updateBankAccount(index, bankAccount.copyWith(accountNumber: value.isEmpty ? null : value));
                     },
@@ -1042,10 +1034,7 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
                 Expanded(
                   child: TextFormField(
                     initialValue: bankAccount.cardNumber ?? '',
-                    decoration: InputDecoration(
-                      labelText: t.cardNumber,
-                      hintText: t.cardNumber,
-                    ),
+                    decoration: InputDecoration(labelText: t.cardNumber, hintText: t.cardNumber),
                     onChanged: (value) {
                       _updateBankAccount(index, bankAccount.copyWith(cardNumber: value.isEmpty ? null : value));
                     },
@@ -1056,10 +1045,7 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
             const SizedBox(height: 16),
             TextFormField(
               initialValue: bankAccount.shebaNumber ?? '',
-              decoration: InputDecoration(
-                labelText: t.shebaNumber,
-                hintText: t.shebaNumber,
-              ),
+              decoration: InputDecoration(labelText: t.shebaNumber, hintText: t.shebaNumber),
               onChanged: (value) {
                 _updateBankAccount(index, bankAccount.copyWith(shebaNumber: value.isEmpty ? null : value));
               },

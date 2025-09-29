@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'file_picker_bridge.dart';
+import 'package:hesabix_ui/l10n/app_localizations.dart';
 
 import '../../core/api_client.dart';
 import '../data_table/helpers/file_saver.dart';
@@ -45,8 +46,9 @@ class _PersonImportDialogState extends State<PersonImportDialog> {
   Future<void> _pickFile() async {
     if (!_isInitialized) {
       if (mounted) {
+        final t = AppLocalizations.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('لطفاً صبر کنید تا دیالوگ کاملاً بارگذاری شود')),
+          SnackBar(content: Text(t.loading)),
         );
       }
       return;
@@ -62,8 +64,9 @@ class _PersonImportDialogState extends State<PersonImportDialog> {
       }
     } catch (e) {
       if (mounted) {
+        final t = AppLocalizations.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطا در انتخاب فایل: $e')),
+          SnackBar(content: Text('${t.pickFileError}: $e')),
         );
       }
     }
@@ -96,14 +99,16 @@ class _PersonImportDialogState extends State<PersonImportDialog> {
       }
       await FileSaver.saveBytes((res.data as List<int>), filename);
       if (mounted) {
+        final t = AppLocalizations.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('تمپلیت دانلود شد: $filename')),
+          SnackBar(content: Text('${t.templateDownloaded}: $filename')),
         );
       }
     } catch (e) {
       if (mounted) {
+        final t = AppLocalizations.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطا در دانلود تمپلیت: $e')),
+          SnackBar(content: Text('${t.templateDownloadError}: $e')),
         );
       }
     } finally {
@@ -145,8 +150,9 @@ class _PersonImportDialogState extends State<PersonImportDialog> {
       }
     } catch (e) {
       if (mounted) {
+        final t = AppLocalizations.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطا در ایمپورت: $e')),
+          SnackBar(content: Text('${t.importError}: $e')),
         );
       }
     } finally {
@@ -156,8 +162,9 @@ class _PersonImportDialogState extends State<PersonImportDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
     return AlertDialog(
-      title: const Text('ایمپورت اشخاص از اکسل'),
+      title: Text(t.importPersonsFromExcel),
       content: SizedBox(
         width: 560,
         child: Column(
@@ -168,9 +175,9 @@ class _PersonImportDialogState extends State<PersonImportDialog> {
                 child: TextField(
                   controller: _pathCtrl,
                   readOnly: true,
-                  decoration: const InputDecoration(
-                    labelText: 'فایل انتخاب‌شده',
-                    hintText: 'هیچ فایلی انتخاب نشده',
+                  decoration: InputDecoration(
+                    labelText: t.selectedFile,
+                    hintText: t.noFileSelected,
                     isDense: true,
                   ),
                 ),
@@ -179,7 +186,7 @@ class _PersonImportDialogState extends State<PersonImportDialog> {
               OutlinedButton.icon(
                 onPressed: (_loading || !_isInitialized) ? null : _pickFile,
                 icon: const Icon(Icons.attach_file),
-                label: const Text('انتخاب فایل'),
+                label: Text(t.chooseFile),
               ),
             ]),
             const SizedBox(height: 8),
@@ -189,10 +196,10 @@ class _PersonImportDialogState extends State<PersonImportDialog> {
                   child: DropdownButtonFormField<String>(
                     value: _matchBy,
                     isDense: true,
-                    items: const [
-                      DropdownMenuItem(value: 'code', child: Text('match by: code')),
-                      DropdownMenuItem(value: 'national_id', child: Text('match by: national_id')),
-                      DropdownMenuItem(value: 'email', child: Text('match by: email')),
+                    items: [
+                      DropdownMenuItem(value: 'code', child: Text('${t.matchBy}: ${t.code}')),
+                      DropdownMenuItem(value: 'national_id', child: Text('${t.matchBy}: ${t.personNationalId}')),
+                      DropdownMenuItem(value: 'email', child: Text('${t.matchBy}: ${t.personEmail}')),
                     ],
                     onChanged: (v) => setState(() => _matchBy = v ?? 'code'),
                     decoration: const InputDecoration(isDense: true),
@@ -203,10 +210,10 @@ class _PersonImportDialogState extends State<PersonImportDialog> {
                   child: DropdownButtonFormField<String>(
                     value: _conflictPolicy,
                     isDense: true,
-                    items: const [
-                      DropdownMenuItem(value: 'insert', child: Text('policy: insert-only')),
-                      DropdownMenuItem(value: 'update', child: Text('policy: update-existing')),
-                      DropdownMenuItem(value: 'upsert', child: Text('policy: upsert')), 
+                    items: [
+                      DropdownMenuItem(value: 'insert', child: Text('${t.conflictPolicy}: ${t.policyInsertOnly}')),
+                      DropdownMenuItem(value: 'update', child: Text('${t.conflictPolicy}: ${t.policyUpdateExisting}')),
+                      DropdownMenuItem(value: 'upsert', child: Text('${t.conflictPolicy}: ${t.policyUpsert}')), 
                     ],
                     onChanged: (v) => setState(() => _conflictPolicy = v ?? 'upsert'),
                     decoration: const InputDecoration(isDense: true),
@@ -221,7 +228,7 @@ class _PersonImportDialogState extends State<PersonImportDialog> {
                   value: _dryRun,
                   onChanged: (v) => setState(() => _dryRun = v ?? true),
                 ),
-                const Text('Dry run (فقط اعتبارسنجی)')
+                Text(t.dryRunValidateOnly)
               ],
             ),
             const SizedBox(height: 8),
@@ -230,13 +237,13 @@ class _PersonImportDialogState extends State<PersonImportDialog> {
                 OutlinedButton.icon(
                   onPressed: _loading ? null : _downloadTemplate,
                   icon: const Icon(Icons.download),
-                  label: const Text('دانلود تمپلیت'),
+                  label: Text(t.downloadTemplate),
                 ),
                 const SizedBox(width: 8),
                 FilledButton.icon(
                   onPressed: _loading ? null : () => _runImport(dryRun: _dryRun),
                   icon: _loading ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.play_arrow),
-                  label: Text(_dryRun ? 'بررسی (Dry run)' : 'ایمپورت'),
+                  label: Text(_dryRun ? t.reviewDryRun : t.import),
                 ),
                 const SizedBox(width: 8),
                 if (_dryRun)
@@ -247,7 +254,7 @@ class _PersonImportDialogState extends State<PersonImportDialog> {
                       await _runImport(dryRun: false);
                     },
                     icon: const Icon(Icons.cloud_upload),
-                    label: const Text('ایمپورت واقعی'),
+                    label: Text(t.importReal),
                   )
               ],
             ),
@@ -255,7 +262,7 @@ class _PersonImportDialogState extends State<PersonImportDialog> {
               const SizedBox(height: 12),
               Align(
                 alignment: Alignment.centerRight,
-                child: Text('نتیجه:', style: Theme.of(context).textTheme.titleSmall),
+                child: Text('${t.result}:', style: Theme.of(context).textTheme.titleSmall),
               ),
               const SizedBox(height: 8),
               _ResultSummary(result: _result!),
@@ -266,7 +273,7 @@ class _PersonImportDialogState extends State<PersonImportDialog> {
       actions: [
         TextButton(
           onPressed: _loading ? null : () => Navigator.of(context).pop(false),
-          child: const Text('بستن'),
+          child: Text(t.close),
         ),
       ],
     );
@@ -279,6 +286,7 @@ class _ResultSummary extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
     final data = result['data'] as Map<String, dynamic>?;
     final summary = (data?['summary'] as Map<String, dynamic>?) ?? {};
     final errors = (data?['errors'] as List?)?.cast<Map<String, dynamic>>() ?? const [];
@@ -290,13 +298,13 @@ class _ResultSummary extends StatelessWidget {
           spacing: 12,
           runSpacing: 4,
           children: [
-            _chip('کل', summary['total']),
-            _chip('معتبر', summary['valid']),
-            _chip('نامعتبر', summary['invalid']),
-            _chip('ایجاد شده', summary['inserted']),
-            _chip('به‌روزرسانی', summary['updated']),
-            _chip('رد شده', summary['skipped']),
-            _chip('Dry run', summary['dry_run'] == true ? 'بله' : 'خیر'),
+            _chip(t.total, summary['total']),
+            _chip(t.valid, summary['valid']),
+            _chip(t.invalid, summary['invalid']),
+            _chip(t.inserted, summary['inserted']),
+            _chip(t.updated, summary['updated']),
+            _chip(t.skipped, summary['skipped']),
+            _chip(t.dryRun, summary['dry_run'] == true ? t.yes : t.no),
           ],
         ),
         const SizedBox(height: 8),
@@ -310,8 +318,8 @@ class _ResultSummary extends StatelessWidget {
                 return ListTile(
                   dense: true,
                   leading: const Icon(Icons.error_outline, color: Colors.red),
-                  title: Text('ردیف ${e['row']}'),
-                  subtitle: Text(((e['errors'] as List?)?.join('، ')) ?? ''),
+                  title: Text('${t.row} ${e['row']}'),
+                  subtitle: Text(((e['errors'] as List?)?.join(', ')) ?? ''),
                 );
               },
             ),

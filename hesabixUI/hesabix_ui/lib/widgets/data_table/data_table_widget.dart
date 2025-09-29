@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'helpers/file_saver.dart';
 // // import 'dart:html' as html; // Not available on Linux // Not available on Linux
@@ -672,17 +673,23 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
 
   // Platform-specific download functions for Linux
   Future<void> _downloadPdf(dynamic data, String filename) async {
-    // For Linux desktop, we'll save to Downloads folder
-    print('Download PDF: $filename (Linux desktop - save to Downloads folder)');
-    // TODO: Implement proper file saving for Linux
+    await _saveBytesToDownloads(data, filename);
   }
 
   Future<void> _downloadExcel(dynamic data, String filename) async {
-    // For Linux desktop, we'll save to Downloads folder
-    print('Download Excel: $filename (Linux desktop - save to Downloads folder)');
-    // TODO: Implement proper file saving for Linux
+    await _saveBytesToDownloads(data, filename);
   }
 
+
+  double _measureTextWidth(String text, TextStyle style) {
+    final painter = TextPainter(
+      text: TextSpan(text: text, style: style),
+      textDirection: TextDirection.ltr,
+      maxLines: 1,
+    )
+      ..layout(minWidth: 0, maxWidth: double.infinity);
+    return painter.width;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1331,6 +1338,15 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     final dataColumnsToShow = columnsToShow.where((c) => c is! ActionColumn).toList();
     
     columns.addAll(dataColumnsToShow.map((column) {
+      final headerTextStyle = theme.textTheme.titleSmall?.copyWith(
+        fontWeight: FontWeight.w600,
+        color: theme.colorScheme.onSurface,
+      ) ?? const TextStyle(fontSize: 14, fontWeight: FontWeight.w600);
+      final double baseWidth = DataTableUtils.getColumnWidth(column.width);
+      final double affordancePadding = 48.0;
+      final double headerTextWidth = _measureTextWidth(column.label, headerTextStyle) + affordancePadding;
+      final double computedWidth = math.max(baseWidth, headerTextWidth);
+
       return DataColumn2(
         label: _ColumnHeaderWithSearch(
           text: column.label,
@@ -1345,19 +1361,31 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
           enabled: widget.config.enableSorting && column.sortable,
         ),
         size: DataTableUtils.getColumnSize(column.width),
-        fixedWidth: DataTableUtils.getColumnWidth(column.width),
+        fixedWidth: computedWidth,
       );
     }));
 
     return Scrollbar(
       controller: _horizontalScrollController,
       thumbVisibility: true,
-      child: DataTable2(
-        columnSpacing: 8,
-        horizontalMargin: 8,
-        minWidth: widget.config.minTableWidth ?? 600,
-        horizontalScrollController: _horizontalScrollController,
-        columns: columns,
+      child: DataTableTheme(
+        data: DataTableThemeData(
+          headingRowColor: MaterialStatePropertyAll(
+            theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
+          ),
+          headingTextStyle: theme.textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.w700,
+            color: theme.colorScheme.onSurface,
+          ),
+          dividerThickness: 0.6,
+        ),
+        child: DataTable2(
+          columnSpacing: 8,
+          horizontalMargin: 8,
+          minWidth: widget.config.minTableWidth ?? 600,
+          horizontalScrollController: _horizontalScrollController,
+          headingRowHeight: 44,
+          columns: columns,
       rows: _items.asMap().entries.map((entry) {
         final index = entry.key;
         final item = entry.value;
@@ -1432,6 +1460,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
           cells: cells,
         );
       }).toList(),
+      ),
       ),
     );
   }

@@ -713,8 +713,36 @@ async def import_persons_excel(
     from openpyxl import load_workbook
     from fastapi import HTTPException
     import logging
+    import zipfile
 
     logger = logging.getLogger(__name__)
+    
+    def validate_excel_file(content: bytes) -> bool:
+        """
+        Validate if the content is a valid Excel file
+        """
+        try:
+            # Check if it starts with PK signature (zip file)
+            if not content.startswith(b'PK'):
+                return False
+            
+            # Try to open as zip file
+            with zipfile.ZipFile(io.BytesIO(content), 'r') as zip_file:
+                file_list = zip_file.namelist()
+                # Check for Excel structure (xl/ folder for .xlsx files)
+                excel_structure = any(f.startswith('xl/') for f in file_list)
+                if excel_structure:
+                    return True
+                
+                # Check for older Excel format (.xls) - this would be a different structure
+                # But since we only support .xlsx, we'll return False for .xls
+                return False
+        except zipfile.BadZipFile:
+            logger.error("File is not a valid zip file")
+            return False
+        except Exception as e:
+            logger.error(f"Error validating Excel file: {str(e)}")
+            return False
     
     try:
         # Convert dry_run string to boolean
@@ -730,18 +758,27 @@ async def import_persons_excel(
         content = await file.read()
         logger.info(f"File content size: {len(content)} bytes")
         
+        # Log first few bytes for debugging
+        logger.info(f"File header (first 20 bytes): {content[:20].hex()}")
+        logger.info(f"File header (first 20 bytes as text): {content[:20]}")
+        
         # Check if content is empty or too small
         if len(content) < 100:
             logger.error(f"File too small: {len(content)} bytes")
             raise HTTPException(status_code=400, detail="فایل خیلی کوچک است یا خالی است")
         
-        # Check if it's a valid Excel file by looking at the first few bytes
-        if not content.startswith(b'PK'):
-            logger.error("File does not start with PK signature (not a valid Excel file)")
+        # Validate Excel file format
+        if not validate_excel_file(content):
+            logger.error("File is not a valid Excel file")
             raise HTTPException(status_code=400, detail="فرمت فایل معتبر نیست. فایل Excel معتبر نیست")
         
         try:
+            # Try to load the workbook with additional error handling
             wb = load_workbook(filename=io.BytesIO(content), data_only=True)
+            logger.info(f"Successfully loaded workbook with {len(wb.worksheets)} worksheets")
+        except zipfile.BadZipFile as e:
+            logger.error(f"Bad zip file error: {str(e)}")
+            raise HTTPException(status_code=400, detail="فایل Excel خراب است یا فرمت آن معتبر نیست")
         except Exception as e:
             logger.error(f"Error loading workbook: {str(e)}")
             raise HTTPException(status_code=400, detail=f"امکان خواندن فایل وجود ندارد: {str(e)}")
@@ -835,21 +872,29 @@ async def import_persons_excel(
 
             for data in valid_items:
                 existing = find_existing(db, data)
+                match_value = None
+                try:
+                    match_value = data.get(match_by)
+                except Exception:
+                    match_value = None
                 if existing is None:
                     # create
                     try:
                         create_person(db, business_id, PersonCreateRequest(**data))
                         inserted += 1
-                    except Exception:
+                    except Exception as e:
+                        logger.error(f"Create person failed for data={data}: {str(e)}")
                         skipped += 1
                 else:
                     if conflict_policy == 'insert':
+                        logger.info(f"Skipping existing person (match_by={match_by}, value={match_value}) due to conflict_policy=insert")
                         skipped += 1
                     elif conflict_policy in ('update', 'upsert'):
                         try:
                             update_person(db, existing.id, business_id, PersonUpdateRequest(**data))
                             updated += 1
-                        except Exception:
+                        except Exception as e:
+                            logger.error(f"Update person failed for id={existing.id}, data={data}: {str(e)}")
                             skipped += 1
 
         summary = {

@@ -1022,6 +1022,12 @@ abstract class AppLocalizations {
   /// **'Export'**
   String get export;
 
+  /// No description provided for @importFromExcel.
+  ///
+  /// In en, this message translates to:
+  /// **'Import from Excel'**
+  String get importFromExcel;
+
   /// No description provided for @rowNumber.
   ///
   /// In en, this message translates to:
@@ -2743,6 +2749,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'People List'**
   String get peopleList;
+
+  /// No description provided for @personCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Person Code'**
+  String get personCode;
 
   /// No description provided for @receipts.
   ///
@@ -4627,6 +4639,324 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Business'**
   String get business;
+
+  /// No description provided for @shareCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Share Count'**
+  String get shareCount;
+
+  /// No description provided for @commissionSalePercentLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Commission Sale Percent'**
+  String get commissionSalePercentLabel;
+
+  /// No description provided for @commissionSalesReturnPercentLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Commission Sales Return Percent'**
+  String get commissionSalesReturnPercentLabel;
+
+  /// No description provided for @commissionSalesAmountLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Commission Sales Amount'**
+  String get commissionSalesAmountLabel;
+
+  /// No description provided for @commissionSalesReturnAmountLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Commission Sales Return Amount'**
+  String get commissionSalesReturnAmountLabel;
+
+  /// No description provided for @importPersonsFromExcel.
+  ///
+  /// In en, this message translates to:
+  /// **'Import Persons from Excel'**
+  String get importPersonsFromExcel;
+
+  /// No description provided for @selectedFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Selected file'**
+  String get selectedFile;
+
+  /// No description provided for @noFileSelected.
+  ///
+  /// In en, this message translates to:
+  /// **'No file selected'**
+  String get noFileSelected;
+
+  /// No description provided for @chooseFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose file'**
+  String get chooseFile;
+
+  /// No description provided for @matchBy.
+  ///
+  /// In en, this message translates to:
+  /// **'Match by'**
+  String get matchBy;
+
+  /// No description provided for @code.
+  ///
+  /// In en, this message translates to:
+  /// **'code'**
+  String get code;
+
+  /// No description provided for @conflictPolicy.
+  ///
+  /// In en, this message translates to:
+  /// **'Conflict policy'**
+  String get conflictPolicy;
+
+  /// No description provided for @policyInsertOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Insert-only'**
+  String get policyInsertOnly;
+
+  /// No description provided for @policyUpdateExisting.
+  ///
+  /// In en, this message translates to:
+  /// **'Update existing'**
+  String get policyUpdateExisting;
+
+  /// No description provided for @policyUpsert.
+  ///
+  /// In en, this message translates to:
+  /// **'Upsert'**
+  String get policyUpsert;
+
+  /// No description provided for @dryRun.
+  ///
+  /// In en, this message translates to:
+  /// **'Dry run'**
+  String get dryRun;
+
+  /// No description provided for @dryRunValidateOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Dry run (validate only)'**
+  String get dryRunValidateOnly;
+
+  /// No description provided for @downloadTemplate.
+  ///
+  /// In en, this message translates to:
+  /// **'Download template'**
+  String get downloadTemplate;
+
+  /// No description provided for @reviewDryRun.
+  ///
+  /// In en, this message translates to:
+  /// **'Review (Dry run)'**
+  String get reviewDryRun;
+
+  /// No description provided for @import.
+  ///
+  /// In en, this message translates to:
+  /// **'Import'**
+  String get import;
+
+  /// No description provided for @importReal.
+  ///
+  /// In en, this message translates to:
+  /// **'Import (real)'**
+  String get importReal;
+
+  /// No description provided for @templateDownloaded.
+  ///
+  /// In en, this message translates to:
+  /// **'Template downloaded'**
+  String get templateDownloaded;
+
+  /// No description provided for @pickFileError.
+  ///
+  /// In en, this message translates to:
+  /// **'Error picking file'**
+  String get pickFileError;
+
+  /// No description provided for @templateDownloadError.
+  ///
+  /// In en, this message translates to:
+  /// **'Error downloading template'**
+  String get templateDownloadError;
+
+  /// No description provided for @importError.
+  ///
+  /// In en, this message translates to:
+  /// **'Import error'**
+  String get importError;
+
+  /// No description provided for @result.
+  ///
+  /// In en, this message translates to:
+  /// **'Result'**
+  String get result;
+
+  /// No description provided for @valid.
+  ///
+  /// In en, this message translates to:
+  /// **'Valid'**
+  String get valid;
+
+  /// No description provided for @invalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid'**
+  String get invalid;
+
+  /// No description provided for @inserted.
+  ///
+  /// In en, this message translates to:
+  /// **'Inserted'**
+  String get inserted;
+
+  /// No description provided for @updated.
+  ///
+  /// In en, this message translates to:
+  /// **'Updated'**
+  String get updated;
+
+  /// No description provided for @skipped.
+  ///
+  /// In en, this message translates to:
+  /// **'Skipped'**
+  String get skipped;
+
+  /// No description provided for @yes.
+  ///
+  /// In en, this message translates to:
+  /// **'Yes'**
+  String get yes;
+
+  /// No description provided for @no.
+  ///
+  /// In en, this message translates to:
+  /// **'No'**
+  String get no;
+
+  /// No description provided for @row.
+  ///
+  /// In en, this message translates to:
+  /// **'Row'**
+  String get row;
+
+  /// No description provided for @onlyForMarketerSeller.
+  ///
+  /// In en, this message translates to:
+  /// **'This section is shown only for marketer/seller'**
+  String get onlyForMarketerSeller;
+
+  /// No description provided for @percentFromSales.
+  ///
+  /// In en, this message translates to:
+  /// **'Percent from sales'**
+  String get percentFromSales;
+
+  /// No description provided for @percentFromSalesReturn.
+  ///
+  /// In en, this message translates to:
+  /// **'Percent from sales return'**
+  String get percentFromSalesReturn;
+
+  /// No description provided for @salesAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Sales amount'**
+  String get salesAmount;
+
+  /// No description provided for @salesReturnAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Sales return amount'**
+  String get salesReturnAmount;
+
+  /// No description provided for @mustBeBetweenZeroAndHundred.
+  ///
+  /// In en, this message translates to:
+  /// **'Must be between 0 and 100'**
+  String get mustBeBetweenZeroAndHundred;
+
+  /// No description provided for @mustBePositiveNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Must be a positive number'**
+  String get mustBePositiveNumber;
+
+  /// No description provided for @personCodeOptional.
+  ///
+  /// In en, this message translates to:
+  /// **'Person code (optional)'**
+  String get personCodeOptional;
+
+  /// No description provided for @uniqueCodeNumeric.
+  ///
+  /// In en, this message translates to:
+  /// **'Unique code (numeric)'**
+  String get uniqueCodeNumeric;
+
+  /// No description provided for @automatic.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic'**
+  String get automatic;
+
+  /// No description provided for @manual.
+  ///
+  /// In en, this message translates to:
+  /// **'Manual'**
+  String get manual;
+
+  /// No description provided for @personCodeRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Person code is required'**
+  String get personCodeRequired;
+
+  /// No description provided for @codeMustBeNumeric.
+  ///
+  /// In en, this message translates to:
+  /// **'Code must be numeric'**
+  String get codeMustBeNumeric;
+
+  /// No description provided for @integerNoDecimal.
+  ///
+  /// In en, this message translates to:
+  /// **'Integer number (no decimals)'**
+  String get integerNoDecimal;
+
+  /// No description provided for @shareholderShareCountRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'For shareholder, share count is required'**
+  String get shareholderShareCountRequired;
+
+  /// No description provided for @noBankAccountsAdded.
+  ///
+  /// In en, this message translates to:
+  /// **'No bank accounts added'**
+  String get noBankAccountsAdded;
+
+  /// No description provided for @commissionExcludeDiscounts.
+  ///
+  /// In en, this message translates to:
+  /// **'Exclude discounts from commission'**
+  String get commissionExcludeDiscounts;
+
+  /// No description provided for @commissionExcludeAdditionsDeductions.
+  ///
+  /// In en, this message translates to:
+  /// **'Exclude additions/deductions from commission'**
+  String get commissionExcludeAdditionsDeductions;
+
+  /// No description provided for @commissionPostInInvoiceDocument.
+  ///
+  /// In en, this message translates to:
+  /// **'Post commission in invoice accounting document'**
+  String get commissionPostInInvoiceDocument;
 }
 
 class _AppLocalizationsDelegate

@@ -245,15 +245,17 @@ def create_app() -> FastAPI:
     async def smart_number_normalizer(request: Request, call_next):
         """Middleware هوشمند برای تبدیل اعداد فارسی/عربی به انگلیسی"""
         if SmartNormalizerConfig.ENABLED and request.method in ["POST", "PUT", "PATCH"]:
-            # خواندن body درخواست
-            body = await request.body()
-            
-            if body:
-                # تبدیل اعداد در JSON
-                normalized_body = smart_normalize_json(body)
-                if normalized_body != body:
-                    # ایجاد request جدید با body تبدیل شده
-                    request._body = normalized_body
+            # فقط برای درخواست‌های JSON اعمال شود تا فایل‌های باینری/چندبخشی خراب نشوند
+            content_type = request.headers.get("Content-Type", "").lower()
+            if content_type.startswith("application/json"):
+                # خواندن body درخواست
+                body = await request.body()
+                if body:
+                    # تبدیل اعداد در JSON
+                    normalized_body = smart_normalize_json(body)
+                    if normalized_body != body:
+                        # ایجاد request جدید با body تبدیل شده
+                        request._body = normalized_body
         
         response = await call_next(request)
         return response
