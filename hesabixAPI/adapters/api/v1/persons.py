@@ -57,12 +57,12 @@ router = APIRouter(prefix="/persons", tags=["persons"])
     }
 )
 async def create_person_endpoint(
+    request: Request,
     business_id: int,
     person_data: PersonCreateRequest,
     db: Session = Depends(get_db),
     auth_context: AuthContext = Depends(get_current_user),
     _: None = Depends(require_business_management_dep),
-    request: Request = None,
 ):
     """ایجاد شخص جدید برای کسب و کار"""
     result = create_person(db, business_id, person_data)
@@ -104,11 +104,11 @@ async def create_person_endpoint(
     }
 )
 async def get_persons_endpoint(
+    request: Request,
     business_id: int,
     query_info: QueryInfo,
     db: Session = Depends(get_db),
     auth_context: AuthContext = Depends(get_current_user),
-    request: Request = None,
 ):
     """دریافت لیست اشخاص کسب و کار"""
     query_dict = {
@@ -572,11 +572,11 @@ async def download_persons_import_template(
     }
 )
 async def get_person_endpoint(
+    request: Request,
     person_id: int,
     db: Session = Depends(get_db),
     auth_context: AuthContext = Depends(get_current_user),
     _: None = Depends(require_business_management_dep),
-    request: Request = None,
 ):
     """دریافت جزئیات شخص"""
     # ابتدا باید business_id را از person دریافت کنیم
@@ -609,12 +609,12 @@ async def get_person_endpoint(
     }
 )
 async def update_person_endpoint(
+    request: Request,
     person_id: int,
     person_data: PersonUpdateRequest,
     db: Session = Depends(get_db),
     auth_context: AuthContext = Depends(get_current_user),
     _: None = Depends(require_business_management_dep),
-    request: Request = None,
 ):
     """ویرایش شخص"""
     # ابتدا باید business_id را از person دریافت کنیم
@@ -647,11 +647,11 @@ async def update_person_endpoint(
     }
 )
 async def delete_person_endpoint(
+    request: Request,
     person_id: int,
     db: Session = Depends(get_db),
     auth_context: AuthContext = Depends(get_current_user),
     _: None = Depends(require_business_management_dep),
-    request: Request = None,
 ):
     """حذف شخص"""
     # ابتدا باید business_id را از person دریافت کنیم
@@ -677,11 +677,11 @@ async def delete_person_endpoint(
     }
 )
 async def get_persons_summary_endpoint(
+    request: Request,
     business_id: int,
     db: Session = Depends(get_db),
     auth_context: AuthContext = Depends(get_current_user),
     _: None = Depends(require_business_management_dep),
-    request: Request = None,
 ):
     """دریافت خلاصه اشخاص کسب و کار"""
     result = get_person_summary(db, business_id)

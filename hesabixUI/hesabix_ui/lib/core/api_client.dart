@@ -100,6 +100,11 @@ class ApiClient {
             if (resolvedBusinessId != null) {
               options.headers['X-Business-ID'] = resolvedBusinessId.toString();
             }
+            // Inject X-Currency header from authStore selection (code preferred)
+            final currencyCode = _authStore?.selectedCurrencyCode;
+            if (currencyCode != null && currencyCode.isNotEmpty) {
+              options.headers['X-Currency'] = currencyCode;
+            }
           } catch (_) {
             // ignore header injection failures
           }

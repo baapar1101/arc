@@ -214,6 +214,14 @@ packages:
     description: flutter
     source: sdk
     version: "0.0.0"
+  flutter_fancy_tree_view:
+    dependency: "direct main"
+    description:
+      name: flutter_fancy_tree_view
+      sha256: e8ef261170be1d63fe56843baa2b501fc353196eadef51d848e882d8cbe10c31
+      url: "https://pub.flutter-io.cn"
+    source: hosted
+    version: "1.6.0"
   flutter_lints:
     dependency: "direct dev"
     description:
@@ -283,6 +291,14 @@ packages:
       url: "https://pub.flutter-io.cn"
     source: hosted
     version: "3.1.2"
+  flutter_simple_treeview:
+    dependency: "direct main"
+    description:
+      name: flutter_simple_treeview
+      sha256: ad4978d2668dd078d3a09966832da111bef9102dd636e572c50c80133b7ff4d9
+      url: "https://pub.flutter-io.cn"
+    source: hosted
+    version: "3.0.2"
   flutter_test:
     dependency: "direct dev"
     description: flutter

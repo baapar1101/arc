@@ -4,6 +4,7 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../services/business_dashboard_service.dart';
 import '../../core/api_client.dart';
 import '../../models/business_dashboard_models.dart';
+import '../../core/auth_store.dart';
 
 class BusinessesPage extends StatefulWidget {
   const BusinessesPage({super.key});
@@ -17,11 +18,19 @@ class _BusinessesPageState extends State<BusinessesPage> {
   List<BusinessWithPermission> _businesses = [];
   bool _loading = true;
   String? _error;
+  final AuthStore _authStore = AuthStore();
 
   @override
   void initState() {
     super.initState();
-    _loadBusinesses();
+    _init();
+  }
+
+  Future<void> _init() async {
+    // اطمینان از bind بودن AuthStore برای ApiClient
+    ApiClient.bindAuthStore(_authStore);
+    await _authStore.load();
+    await _loadBusinesses();
   }
 
   Future<void> _loadBusinesses() async {
@@ -141,6 +150,7 @@ class _BusinessesPageState extends State<BusinessesPage> {
                       return _BusinessCard(
                         business: business,
                         onTap: () => _navigateToBusiness(business.id),
+                        authStore: _authStore,
                         isCompact: crossAxisCount > 1,
                       );
                     },
@@ -154,20 +164,42 @@ class _BusinessesPageState extends State<BusinessesPage> {
   }
 }
 
-class _BusinessCard extends StatelessWidget {
+class _BusinessCard extends StatefulWidget {
   final BusinessWithPermission business;
   final VoidCallback onTap;
   final bool isCompact;
+  final AuthStore authStore;
 
   const _BusinessCard({
     required this.business,
     required this.onTap,
+    required this.authStore,
     this.isCompact = true,
   });
 
   @override
+  State<_BusinessCard> createState() => _BusinessCardState();
+}
+
+class _BusinessCardState extends State<_BusinessCard> {
+  String? _localCurrencyCode;
+
+  @override
+  void initState() {
+    super.initState();
+    _localCurrencyCode = _resolveInitialCurrency();
+  }
+
+  String? _resolveInitialCurrency() {
+    final codes = widget.business.currencies.map((c) => c.code).toSet();
+    final authCode = widget.authStore.selectedCurrencyCode;
+    if (authCode != null && codes.contains(authCode)) return authCode;
+    return widget.business.defaultCurrency?.code ?? (widget.business.currencies.isNotEmpty ? widget.business.currencies.first.code : null);
+  }
+
+  @override
   Widget build(BuildContext context) {
-    if (isCompact) {
+    if (widget.isCompact) {
       return _buildCompactCard(context);
     } else {
       return _buildWideCard(context);
@@ -179,7 +211,7 @@ class _BusinessCard extends StatelessWidget {
       elevation: 1,
       margin: EdgeInsets.zero,
       child: InkWell(
-        onTap: onTap,
+        onTap: widget.onTap,
         borderRadius: BorderRadius.circular(8),
         child: Container(
           padding: const EdgeInsets.all(8.0),
@@ -193,14 +225,14 @@ class _BusinessCard extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: business.isOwner 
+                      color: widget.business.isOwner 
                           ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.1)
                           : Theme.of(context).colorScheme.secondary.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Icon(
-                      business.isOwner ? Icons.business : Icons.business_outlined,
-                      color: business.isOwner 
+                      widget.business.isOwner ? Icons.business : Icons.business_outlined,
+                      color: widget.business.isOwner 
                           ? Theme.of(context).colorScheme.primary 
                           : Theme.of(context).colorScheme.secondary,
                       size: 20,
@@ -211,15 +243,15 @@ class _BusinessCard extends StatelessWidget {
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
-                        color: business.isOwner 
+                        color: widget.business.isOwner 
                             ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.1)
                             : Theme.of(context).colorScheme.secondary.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Text(
-                        business.isOwner ? AppLocalizations.of(context).owner : AppLocalizations.of(context).member,
+                        widget.business.isOwner ? AppLocalizations.of(context).owner : AppLocalizations.of(context).member,
                         style: TextStyle(
-                          color: business.isOwner 
+                          color: widget.business.isOwner 
                               ? Theme.of(context).colorScheme.primary
                               : Theme.of(context).colorScheme.secondary,
                           fontSize: 10,
@@ -235,7 +267,7 @@ class _BusinessCard extends StatelessWidget {
               
               // Business name
               Text(
-                business.name,
+                widget.business.name,
                 style: Theme.of(context).textTheme.titleSmall?.copyWith(
                   fontWeight: FontWeight.w600,
                   fontSize: 14,
@@ -248,7 +280,7 @@ class _BusinessCard extends StatelessWidget {
               
               // Business type and field
               Text(
-                '${_translateBusinessType(business.businessType, context)} • ${_translateBusinessField(business.businessField, context)}',
+                '${_translateBusinessType(widget.business.businessType, context)} • ${_translateBusinessField(widget.business.businessField, context)}',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                   fontSize: 11,
@@ -259,20 +291,11 @@ class _BusinessCard extends StatelessWidget {
               
               const SizedBox(height: 6),
               
-              // Footer with date and arrow
+              // Footer with currency selector and arrow
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Expanded(
-                    child: Text(
-                      _formatDate(business.createdAt),
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        fontSize: 10,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
+                    child: _buildCurrencyDropdown(context),
                   ),
                   Icon(
                     Icons.arrow_forward_ios,
@@ -287,13 +310,13 @@ class _BusinessCard extends StatelessWidget {
       ),
     );
   }
-
+ 
   Widget _buildWideCard(BuildContext context) {
     return Card(
       elevation: 1,
       margin: EdgeInsets.zero,
       child: InkWell(
-        onTap: onTap,
+        onTap: widget.onTap,
         borderRadius: BorderRadius.circular(8),
         child: Container(
           padding: const EdgeInsets.all(16.0),
@@ -303,14 +326,14 @@ class _BusinessCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: business.isOwner 
+                  color: widget.business.isOwner 
                       ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.1)
                       : Theme.of(context).colorScheme.secondary.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(
-                  business.isOwner ? Icons.business : Icons.business_outlined,
-                  color: business.isOwner 
+                  widget.business.isOwner ? Icons.business : Icons.business_outlined,
+                  color: widget.business.isOwner 
                       ? Theme.of(context).colorScheme.primary 
                       : Theme.of(context).colorScheme.secondary,
                   size: 24,
@@ -328,7 +351,7 @@ class _BusinessCard extends StatelessWidget {
                       children: [
                         Expanded(
                           child: Text(
-                            business.name,
+                            widget.business.name,
                             style: Theme.of(context).textTheme.titleMedium?.copyWith(
                               fontWeight: FontWeight.w600,
                             ),
@@ -339,15 +362,15 @@ class _BusinessCard extends StatelessWidget {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
-                            color: business.isOwner 
+                            color: widget.business.isOwner 
                                 ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.1)
                                 : Theme.of(context).colorScheme.secondary.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(12),
                           ),
                                   child: Text(
-                                    business.isOwner ? AppLocalizations.of(context).owner : AppLocalizations.of(context).member,
+                                    widget.business.isOwner ? AppLocalizations.of(context).owner : AppLocalizations.of(context).member,
                             style: TextStyle(
-                              color: business.isOwner 
+                              color: widget.business.isOwner 
                                   ? Theme.of(context).colorScheme.primary
                                   : Theme.of(context).colorScheme.secondary,
                               fontSize: 12,
@@ -361,7 +384,7 @@ class _BusinessCard extends StatelessWidget {
                     const SizedBox(height: 4),
                     
                             Text(
-                              '${_translateBusinessType(business.businessType, context)} • ${_translateBusinessField(business.businessField, context)}',
+                              '${_translateBusinessType(widget.business.businessType, context)} • ${_translateBusinessField(widget.business.businessField, context)}',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
@@ -372,7 +395,7 @@ class _BusinessCard extends StatelessWidget {
                     const SizedBox(height: 8),
                     
                     Text(
-                      'تأسیس: ${_formatDate(business.createdAt)}',
+                      'تأسیس: ${_formatDate(widget.business.createdAt)}',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
@@ -383,12 +406,13 @@ class _BusinessCard extends StatelessWidget {
               
               const SizedBox(width: 16),
               
-              // Arrow
-              Icon(
-                Icons.arrow_forward_ios,
-                size: 16,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              // Currency selector and Arrow
+              SizedBox(
+                width: 220,
+                child: _buildCurrencyDropdown(context),
               ),
+              const SizedBox(width: 8),
+              Icon(Icons.arrow_forward_ios, size: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
             ],
           ),
         ),
@@ -396,51 +420,77 @@ class _BusinessCard extends StatelessWidget {
     );
   }
 
-  String _formatDate(String dateString) {
-    try {
-      final date = DateTime.parse(dateString);
-      return '${date.year}/${date.month}/${date.day}';
-    } catch (e) {
-      return dateString;
-    }
+  Widget _buildCurrencyDropdown(BuildContext context) {
+    final items = widget.business.currencies;
+    final value = _localCurrencyCode ?? _resolveInitialCurrency();
+    return DropdownButtonHideUnderline(
+      child: DropdownButton<String>(
+        value: value,
+        isExpanded: true,
+        hint: const Text('انتخاب ارز'),
+        items: items
+            .map((c) => DropdownMenuItem<String>(
+                  value: c.code,
+                  child: Text('${c.title} (${c.code})'),
+                ))
+            .toList(),
+        onChanged: (val) async {
+          if (val == null) return;
+          setState(() {
+            _localCurrencyCode = val;
+          });
+          final selected = items.firstWhere((c) => c.code == val, orElse: () => items.first);
+          await widget.authStore.setSelectedCurrency(code: selected.code, id: selected.id);
+        },
+      ),
+    );
   }
+}
 
-  String _translateBusinessType(String type, BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    switch (type) {
-      case 'شرکت':
-        return l10n.company;
-      case 'مغازه':
-        return l10n.shop;
-      case 'فروشگاه':
-        return l10n.store;
-      case 'اتحادیه':
-        return l10n.union;
-      case 'باشگاه':
-        return l10n.club;
-      case 'موسسه':
-        return l10n.institute;
-      case 'شخصی':
-        return l10n.individual;
-      default:
-        return type;
-    }
+String _formatDate(String dateString) {
+  try {
+    final date = DateTime.parse(dateString);
+    return '${date.year}/${date.month}/${date.day}';
+  } catch (e) {
+    return dateString;
   }
+}
 
-  String _translateBusinessField(String field, BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    switch (field) {
-      case 'تولیدی':
-        return l10n.manufacturing;
-      case 'بازرگانی':
-        return l10n.trading;
-      case 'خدماتی':
-        return l10n.service;
-      case 'سایر':
-        return l10n.other;
-      default:
-        return field;
-    }
+String _translateBusinessType(String type, BuildContext context) {
+  final l10n = AppLocalizations.of(context);
+  switch (type) {
+    case 'شرکت':
+      return l10n.company;
+    case 'مغازه':
+      return l10n.shop;
+    case 'فروشگاه':
+      return l10n.store;
+    case 'اتحادیه':
+      return l10n.union;
+    case 'باشگاه':
+      return l10n.club;
+    case 'موسسه':
+      return l10n.institute;
+    case 'شخصی':
+      return l10n.individual;
+    default:
+      return type;
+  }
+}
+
+String _translateBusinessField(String field, BuildContext context) {
+  final l10n = AppLocalizations.of(context);
+  switch (field) {
+    case 'تولیدی':
+      return l10n.manufacturing;
+    case 'بازرگانی':
+      return l10n.trading;
+    case 'خدماتی':
+      return l10n.service;
+    case 'سایر':
+      return l10n.other;
+    default:
+      return field;
   }
 }
 

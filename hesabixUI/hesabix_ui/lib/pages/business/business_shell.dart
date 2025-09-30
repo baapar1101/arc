@@ -6,6 +6,7 @@ import '../../core/calendar_controller.dart';
 import '../../theme/theme_controller.dart';
 import '../../widgets/combined_user_menu_button.dart';
 import '../../widgets/person/person_form_dialog.dart';
+import '../../widgets/category/category_tree_dialog.dart';
 import '../../services/business_dashboard_service.dart';
 import '../../core/api_client.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
@@ -131,14 +132,6 @@ class _BusinessShellState extends State<BusinessShell> {
             path: '/business/${widget.businessId}/products',
             type: _MenuItemType.simple,
             hasAddButton: true,
-          ),
-          _MenuItem(
-            label: t.priceLists,
-            icon: Icons.list_alt,
-            selectedIcon: Icons.list_alt,
-            path: '/business/${widget.businessId}/price-lists',
-            type: _MenuItemType.simple,
-            hasAddButton: false,
           ),
           _MenuItem(
             label: t.categories,
@@ -399,11 +392,11 @@ class _BusinessShellState extends State<BusinessShell> {
           final child = item.children![j];
           if (child.path != null && location.startsWith(child.path!)) {
             selectedIndex = i;
-            // تنظیم وضعیت باز بودن منو
-            if (i == 2) _isProductsAndServicesExpanded = true; // کالا و خدمات در ایندکس 2
-            if (i == 3) _isBankingExpanded = true; // بانکداری در ایندکس 3
-            if (i == 5) _isAccountingMenuExpanded = true; // حسابداری در ایندکس 5
-            if (i == 7) _isWarehouseManagementExpanded = true; // انبارداری در ایندکس 7
+            // تنظیم وضعیت باز بودن منو بر اساس برچسب آیتم
+            if (item.label == t.productsAndServices) _isProductsAndServicesExpanded = true;
+            if (item.label == t.banking) _isBankingExpanded = true;
+            if (item.label == t.accountingMenu) _isAccountingMenuExpanded = true;
+            if (item.label == t.warehouseManagement) _isWarehouseManagementExpanded = true;
             break;
           }
         }
@@ -414,22 +407,48 @@ class _BusinessShellState extends State<BusinessShell> {
       final item = menuItems[index];
       if (item.type == _MenuItemType.separator) return; // آیتم جداکننده قابل کلیک نیست
       
-      if (item.type == _MenuItemType.simple && item.path != null) {
+          if (item.type == _MenuItemType.simple && item.path != null) {
         try {
           if (GoRouterState.of(context).uri.toString() != item.path!) {
-            context.go(item.path!);
+            if (item.label == t.categories) {
+              // باز کردن دیالوگ دسته‌بندی‌ها به جای ناوبری
+              if (widget.authStore.canReadSection('categories')) {
+                await showDialog<bool>(
+                  context: context,
+                  builder: (ctx) => CategoryTreeDialog(
+                    businessId: widget.businessId,
+                    authStore: widget.authStore,
+                  ),
+                );
+              }
+            } else {
+              context.go(item.path!);
+            }
           }
         } catch (e) {
           // اگر GoRouterState در دسترس نیست، مستقیماً به مسیر برود
-          context.go(item.path!);
+            if (item.label == t.categories) {
+              if (widget.authStore.canReadSection('categories')) {
+                await showDialog<bool>(
+                  context: context,
+                  builder: (ctx) => CategoryTreeDialog(
+                    businessId: widget.businessId,
+                    authStore: widget.authStore,
+                  ),
+                );
+              }
+            } else {
+              context.go(item.path!);
+            }
         }
       } else if (item.type == _MenuItemType.expandable) {
         // تغییر وضعیت باز/بسته بودن منو
-        if (item.label == t.productsAndServices) _isProductsAndServicesExpanded = !_isProductsAndServicesExpanded;
-        if (item.label == t.banking) _isBankingExpanded = !_isBankingExpanded;
-        if (item.label == t.accountingMenu) _isAccountingMenuExpanded = !_isAccountingMenuExpanded;
-        if (item.label == t.warehouseManagement) _isWarehouseManagementExpanded = !_isWarehouseManagementExpanded;
-        setState(() {});
+        setState(() {
+          if (item.label == t.productsAndServices) _isProductsAndServicesExpanded = !_isProductsAndServicesExpanded;
+          if (item.label == t.banking) _isBankingExpanded = !_isBankingExpanded;
+          if (item.label == t.accountingMenu) _isAccountingMenuExpanded = !_isAccountingMenuExpanded;
+          if (item.label == t.warehouseManagement) _isWarehouseManagementExpanded = !_isWarehouseManagementExpanded;
+        });
       }
     }
 
@@ -437,6 +456,18 @@ class _BusinessShellState extends State<BusinessShell> {
       final parent = menuItems[parentIndex];
       if (parent.type == _MenuItemType.expandable && parent.children != null) {
         final child = parent.children![childIndex];
+        if (child.label == t.categories) {
+          if (widget.authStore.canReadSection('categories')) {
+            await showDialog<bool>(
+              context: context,
+              builder: (ctx) => CategoryTreeDialog(
+                businessId: widget.businessId,
+                authStore: widget.authStore,
+              ),
+            );
+          }
+          return;
+        }
         if (child.path != null) {
           try {
             if (GoRouterState.of(context).uri.toString() != child.path!) {
@@ -650,8 +681,6 @@ class _BusinessShellState extends State<BusinessShell> {
                                         showAddPersonDialog();
                                       } else if (child.label == t.products) {
                                         // Navigate to add product
-                                      } else if (child.label == t.priceLists) {
-                                        // Navigate to add price list
                                       } else if (child.label == t.categories) {
                                         // Navigate to add category
                                       } else if (child.label == t.productAttributes) {
@@ -944,8 +973,6 @@ class _BusinessShellState extends State<BusinessShell> {
                             // Navigate to add new item
                             if (child.label == t.products) {
                               // Navigate to add product
-                            } else if (child.label == t.priceLists) {
-                              // Navigate to add price list
                             } else if (child.label == t.categories) {
                               // Navigate to add category
                             } else if (child.label == t.productAttributes) {
@@ -1048,7 +1075,6 @@ class _BusinessShellState extends State<BusinessShell> {
   String? _sectionForLabel(String label, AppLocalizations t) {
     if (label == t.people) return 'people';
     if (label == t.products) return 'products';
-    if (label == t.priceLists) return 'price_lists';
     if (label == t.categories) return 'categories';
     if (label == t.productAttributes) return 'product_attributes';
     if (label == t.accounts) return 'bank_accounts';

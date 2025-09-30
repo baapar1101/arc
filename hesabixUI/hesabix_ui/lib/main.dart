@@ -25,6 +25,10 @@ import 'pages/business/users_permissions_page.dart';
 import 'pages/business/accounts_page.dart';
 import 'pages/business/settings_page.dart';
 import 'pages/business/persons_page.dart';
+import 'pages/business/product_attributes_page.dart';
+import 'pages/business/products_page.dart';
+import 'pages/business/price_lists_page.dart';
+import 'pages/business/price_list_items_page.dart';
 import 'pages/error_404_page.dart';
 import 'core/locale_controller.dart';
 import 'core/calendar_controller.dart';
@@ -569,6 +573,80 @@ class _MyAppState extends State<MyApp> {
                     localeController: controller,
                     calendarController: _calendarController!,
                     themeController: themeController,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: 'product-attributes',
+              name: 'business_product_attributes',
+              builder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return BusinessShell(
+                  businessId: businessId,
+                  authStore: _authStore!,
+                  localeController: controller,
+                  calendarController: _calendarController!,
+                  themeController: themeController,
+                  child: ProductAttributesPage(
+                    businessId: businessId,
+                    authStore: _authStore!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: 'products',
+              name: 'business_products',
+              builder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return BusinessShell(
+                  businessId: businessId,
+                  authStore: _authStore!,
+                  localeController: controller,
+                  calendarController: _calendarController!,
+                  themeController: themeController,
+                  child: ProductsPage(
+                    businessId: businessId,
+                    authStore: _authStore!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: 'price-lists',
+              name: 'business_price_lists',
+              builder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return BusinessShell(
+                  businessId: businessId,
+                  authStore: _authStore!,
+                  localeController: controller,
+                  calendarController: _calendarController!,
+                  themeController: themeController,
+                  child: PriceListsPage(
+                    businessId: businessId,
+                    authStore: _authStore!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: 'price-lists/:price_list_id/items',
+              name: 'business_price_list_items',
+              builder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                final priceListId = int.parse(state.pathParameters['price_list_id']!);
+                return BusinessShell(
+                  businessId: businessId,
+                  authStore: _authStore!,
+                  localeController: controller,
+                  calendarController: _calendarController!,
+                  themeController: themeController,
+                  child: PriceListItemsPage(
+                    businessId: businessId,
+                    priceListId: priceListId,
+                    authStore: _authStore!,
                   ),
                 );
               },

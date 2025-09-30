@@ -13,6 +13,8 @@ class AuthStore with ChangeNotifier {
   static const _kIsSuperAdmin = 'is_superadmin';
   static const _kLastUrl = 'last_url';
   static const _kCurrentBusiness = 'current_business';
+  static const _kSelectedCurrencyCode = 'selected_currency_code';
+  static const _kSelectedCurrencyId = 'selected_currency_id';
 
   final FlutterSecureStorage _secure = const FlutterSecureStorage();
   String? _apiKey;
@@ -21,6 +23,8 @@ class AuthStore with ChangeNotifier {
   bool _isSuperAdmin = false;
   BusinessWithPermission? _currentBusiness;
   Map<String, dynamic>? _businessPermissions;
+  String? _selectedCurrencyCode; // مثل USD/EUR/IRR
+  int? _selectedCurrencyId; // شناسه ارز در دیتابیس
 
   String? get apiKey => _apiKey;
   String get deviceId => _deviceId ?? '';
@@ -30,6 +34,8 @@ class AuthStore with ChangeNotifier {
   int? get currentUserId => _currentUserId;
   BusinessWithPermission? get currentBusiness => _currentBusiness;
   Map<String, dynamic>? get businessPermissions => _businessPermissions;
+  String? get selectedCurrencyCode => _selectedCurrencyCode;
+  int? get selectedCurrencyId => _selectedCurrencyId;
 
   Future<void> load() async {
     final prefs = await SharedPreferences.getInstance();
@@ -48,6 +54,8 @@ class AuthStore with ChangeNotifier {
 
     // بارگذاری دسترسی‌های اپلیکیشن
     await _loadAppPermissions();
+    // بارگذاری ارز انتخاب‌شده (در سطح اپ/کسب‌وکار)
+    await _loadSelectedCurrency();
     
     // اگر API key موجود است اما دسترسی‌ها نیست، از سرور دریافت کن
     if (_apiKey != null && _apiKey!.isNotEmpty && (_appPermissions == null || _appPermissions!.isEmpty)) {
@@ -249,6 +257,9 @@ class AuthStore with ChangeNotifier {
     
     // ذخیره در حافظه محلی
     await _saveCurrentBusiness();
+
+    // اگر ارز انتخاب نشده یا ارز انتخابی با کسب‌وکار ناسازگار است، ارز پیشفرض کسب‌وکار را ست کن
+    await _ensureCurrencyForBusiness();
   }
 
   Future<void> clearCurrentBusiness() async {
@@ -278,6 +289,22 @@ class AuthStore with ChangeNotifier {
         'is_owner': _currentBusiness!.isOwner,
         'role': _currentBusiness!.role,
         'permissions': _currentBusiness!.permissions,
+        'default_currency': _currentBusiness!.defaultCurrency != null
+            ? {
+                'id': _currentBusiness!.defaultCurrency!.id,
+                'code': _currentBusiness!.defaultCurrency!.code,
+                'title': _currentBusiness!.defaultCurrency!.title,
+                'symbol': _currentBusiness!.defaultCurrency!.symbol,
+              }
+            : null,
+        'currencies': _currentBusiness!.currencies
+            .map((c) => {
+                  'id': c.id,
+                  'code': c.code,
+                  'title': c.title,
+                  'symbol': c.symbol,
+                })
+            .toList(),
       });
       
       if (kIsWeb) {
@@ -381,6 +408,64 @@ class AuthStore with ChangeNotifier {
     if (sectionPerms == null) return ['view'];
     
     return sectionPerms.keys.where((key) => sectionPerms[key] == true).toList();
+  }
+
+  // مدیریت ارز انتخاب‌شده
+  Future<void> _loadSelectedCurrency() async {
+    final prefs = await SharedPreferences.getInstance();
+    final code = prefs.getString(_kSelectedCurrencyCode);
+    final id = prefs.getInt(_kSelectedCurrencyId);
+    _selectedCurrencyCode = code;
+    _selectedCurrencyId = id;
+  }
+
+  Future<void> setSelectedCurrency({required String code, int? id}) async {
+    final prefs = await SharedPreferences.getInstance();
+    _selectedCurrencyCode = code;
+    _selectedCurrencyId = id;
+    await prefs.setString(_kSelectedCurrencyCode, code);
+    if (id != null) {
+      await prefs.setInt(_kSelectedCurrencyId, id);
+    } else {
+      await prefs.remove(_kSelectedCurrencyId);
+    }
+    notifyListeners();
+  }
+
+  Future<void> clearSelectedCurrency() async {
+    final prefs = await SharedPreferences.getInstance();
+    _selectedCurrencyCode = null;
+    _selectedCurrencyId = null;
+    await prefs.remove(_kSelectedCurrencyCode);
+    await prefs.remove(_kSelectedCurrencyId);
+    notifyListeners();
+  }
+
+  Future<void> _ensureCurrencyForBusiness() async {
+    final business = _currentBusiness;
+    if (business == null) return;
+    // اگر ارزی انتخاب نشده، یا کد/شناسه فعلی جزو ارزهای کسب‌وکار نیست
+    final allowedCodes = business.currencies.map((c) => c.code).toSet();
+    final allowedIds = business.currencies.map((c) => c.id).toSet();
+
+    final hasValidCode = _selectedCurrencyCode != null && allowedCodes.contains(_selectedCurrencyCode);
+    final hasValidId = _selectedCurrencyId != null && allowedIds.contains(_selectedCurrencyId);
+
+    if (hasValidCode || hasValidId) {
+      return; // همان را نگه داریم
+    }
+
+    // در غیر اینصورت ارز پیشفرض کسب‌وکار را ست کن اگر موجود است
+    if (business.defaultCurrency != null) {
+      await setSelectedCurrency(code: business.defaultCurrency!.code, id: business.defaultCurrency!.id);
+      return;
+    }
+
+    // یا اگر لیست ارزها خالی نیست، اولین ارز را ست کن
+    if (business.currencies.isNotEmpty) {
+      final c = business.currencies.first;
+      await setSelectedCurrency(code: c.code, id: c.id);
+    }
   }
 }
 

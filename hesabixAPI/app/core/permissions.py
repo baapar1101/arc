@@ -1,7 +1,6 @@
-from __future__ import annotations
-
 from functools import wraps
 from typing import Callable, Any
+import inspect
 
 from fastapi import Depends
 from app.core.auth_dependency import get_current_user, AuthContext
@@ -70,44 +69,48 @@ def require_superadmin():
 
 
 def require_business_access(business_id_param: str = "business_id"):
-    """Decorator برای بررسی دسترسی به کسب و کار خاص"""
+    """Decorator برای بررسی دسترسی به کسب و کار خاص.
+    امضای اصلی endpoint حفظ می‌شود و Request از آرگومان‌ها استخراج می‌گردد.
+    """
     def decorator(func: Callable) -> Callable:
         @wraps(func)
         def wrapper(*args, **kwargs) -> Any:
             import logging
+            from fastapi import Request
             logger = logging.getLogger(__name__)
-            
-            # Find request in args or kwargs
+
+            # یافتن Request در args/kwargs
             request = None
             for arg in args:
-                if hasattr(arg, 'headers'):  # Check if it's a Request object
+                if isinstance(arg, Request):
                     request = arg
                     break
-            
-            if not request and 'request' in kwargs:
-                request = kwargs['request']
-            
-            if not request:
+            if request is None:
+                request = kwargs.get('request')
+            if request is None:
                 logger.error("Request not found in function arguments")
                 raise ApiError("INTERNAL_ERROR", "Request not found", http_status=500)
-            
-            # Get database session
+
+            # دسترسی به DB و کاربر
             from adapters.db.session import get_db
             db = next(get_db())
             ctx = get_current_user(request, db)
+
+            # استخراج business_id از kwargs یا path params
             business_id = kwargs.get(business_id_param)
-            
-            logger.info(f"Checking business access for user {ctx.get_user_id()} to business {business_id}")
-            logger.info(f"User business_id from context: {ctx.business_id}")
-            logger.info(f"User is superadmin: {ctx.is_superadmin()}")
-            logger.info(f"User is business owner: {ctx.is_business_owner()}")
-            
-            if business_id and not ctx.can_access_business(business_id):
+            if business_id is None:
+                try:
+                    business_id = request.path_params.get(business_id_param)
+                except Exception:
+                    business_id = None
+
+            if business_id and not ctx.can_access_business(int(business_id)):
                 logger.warning(f"User {ctx.get_user_id()} does not have access to business {business_id}")
                 raise ApiError("FORBIDDEN", f"No access to business {business_id}", http_status=403)
-            
-            logger.info(f"User {ctx.get_user_id()} has access to business {business_id}")
+
             return func(*args, **kwargs)
+        # Preserve original signature so FastAPI sees correct parameters (including Request)
+        wrapper.__signature__ = inspect.signature(func)  # type: ignore[attr-defined]
         return wrapper
     return decorator
 

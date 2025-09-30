@@ -1,4 +1,4 @@
-from __future__ import annotations
+# Removed __future__ annotations to fix OpenAPI schema generation
 
 from datetime import datetime
 from typing import Optional, List

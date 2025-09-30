@@ -2339,8 +2339,8 @@ abstract class AppLocalizations {
   /// No description provided for @deleteConfirm.
   ///
   /// In en, this message translates to:
-  /// **'Confirm Delete'**
-  String get deleteConfirm;
+  /// **'Are you sure to delete \"{name}\"?'**
+  String deleteConfirm(Object name);
 
   /// No description provided for @deleteConfirmMessage.
   ///
@@ -2809,6 +2809,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Product Attributes'**
   String get productAttributes;
+
+  /// No description provided for @addAttribute.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Attribute'**
+  String get addAttribute;
+
+  /// No description provided for @viewAttributes.
+  ///
+  /// In en, this message translates to:
+  /// **'View Attributes'**
+  String get viewAttributes;
+
+  /// No description provided for @editAttributes.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Attributes'**
+  String get editAttributes;
+
+  /// No description provided for @deleteAttributes.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Attributes'**
+  String get deleteAttributes;
+
+  /// No description provided for @title.
+  ///
+  /// In en, this message translates to:
+  /// **'Title'**
+  String get title;
+
+  /// No description provided for @description.
+  ///
+  /// In en, this message translates to:
+  /// **'Description'**
+  String get description;
+
+  /// No description provided for @add.
+  ///
+  /// In en, this message translates to:
+  /// **'Add'**
+  String get add;
 
   /// No description provided for @banking.
   ///
@@ -3320,12 +3362,6 @@ abstract class AppLocalizations {
   /// **'The world becomes beautiful through cooperation'**
   String get motto;
 
-  /// No description provided for @add.
-  ///
-  /// In en, this message translates to:
-  /// **'Add'**
-  String get add;
-
   /// No description provided for @view.
   ///
   /// In en, this message translates to:
@@ -3667,30 +3703,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Warehouse Transfers'**
   String get warehouseTransfers;
-
-  /// No description provided for @addAttribute.
-  ///
-  /// In en, this message translates to:
-  /// **'Add Attribute'**
-  String get addAttribute;
-
-  /// No description provided for @viewAttributes.
-  ///
-  /// In en, this message translates to:
-  /// **'View Attributes'**
-  String get viewAttributes;
-
-  /// No description provided for @editAttributes.
-  ///
-  /// In en, this message translates to:
-  /// **'Edit Attributes'**
-  String get editAttributes;
-
-  /// No description provided for @deleteAttributes.
-  ///
-  /// In en, this message translates to:
-  /// **'Delete Attributes'**
-  String get deleteAttributes;
 
   /// No description provided for @addBankAccount.
   ///
@@ -4957,6 +4969,108 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Post commission in invoice accounting document'**
   String get commissionPostInInvoiceDocument;
+
+  /// No description provided for @manageCategories.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage Categories'**
+  String get manageCategories;
+
+  /// No description provided for @categoriesDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage Categories'**
+  String get categoriesDialogTitle;
+
+  /// No description provided for @addRootCategory.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Root'**
+  String get addRootCategory;
+
+  /// No description provided for @addChildCategory.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Child'**
+  String get addChildCategory;
+
+  /// No description provided for @renameCategory.
+  ///
+  /// In en, this message translates to:
+  /// **'Rename'**
+  String get renameCategory;
+
+  /// No description provided for @deleteCategory.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Category'**
+  String get deleteCategory;
+
+  /// No description provided for @deleteCategoryConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to delete this category?'**
+  String get deleteCategoryConfirm;
+
+  /// No description provided for @categoryNameFa.
+  ///
+  /// In en, this message translates to:
+  /// **'Name (Persian)'**
+  String get categoryNameFa;
+
+  /// No description provided for @categoryNameEn.
+  ///
+  /// In en, this message translates to:
+  /// **'Name (English)'**
+  String get categoryNameEn;
+
+  /// No description provided for @categoryType.
+  ///
+  /// In en, this message translates to:
+  /// **'Type'**
+  String get categoryType;
+
+  /// No description provided for @productType.
+  ///
+  /// In en, this message translates to:
+  /// **'Product'**
+  String get productType;
+
+  /// No description provided for @serviceType.
+  ///
+  /// In en, this message translates to:
+  /// **'Service'**
+  String get serviceType;
+
+  /// No description provided for @loadingCategories.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading categories...'**
+  String get loadingCategories;
+
+  /// No description provided for @createCategory.
+  ///
+  /// In en, this message translates to:
+  /// **'Create Category'**
+  String get createCategory;
+
+  /// No description provided for @updateCategory.
+  ///
+  /// In en, this message translates to:
+  /// **'Update Category'**
+  String get updateCategory;
+
+  /// No description provided for @deleteCategorySuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Category deleted'**
+  String get deleteCategorySuccess;
+
+  /// No description provided for @operationFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Operation failed'**
+  String get operationFailed;
 }
 
 class _AppLocalizationsDelegate

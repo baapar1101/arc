@@ -1,4 +1,4 @@
-from __future__ import annotations
+# Removed __future__ annotations to fix OpenAPI schema generation
 
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status, Request
@@ -22,10 +22,10 @@ router = APIRouter()
 
 @router.post("/search", response_model=SuccessResponse)
 async def search_user_tickets(
+    request: Request,
     query_info: QueryInfo,
     current_user: AuthContext = Depends(get_current_user),
-    db: Session = Depends(get_db),
-    request: Request = None
+    db: Session = Depends(get_db)
 ):
     """جستجو در تیکت‌های کاربر"""
     ticket_repo = TicketRepository(db)
@@ -96,10 +96,10 @@ async def search_user_tickets(
 
 @router.post("", response_model=SuccessResponse)
 async def create_ticket(
+    request: Request,
     ticket_request: CreateTicketRequest,
     current_user: AuthContext = Depends(get_current_user),
-    db: Session = Depends(get_db),
-    request: Request = None
+    db: Session = Depends(get_db)
 ):
     """ایجاد تیکت جدید"""
     ticket_repo = TicketRepository(db)
@@ -139,10 +139,10 @@ async def create_ticket(
 
 @router.get("/{ticket_id}", response_model=SuccessResponse)
 async def get_ticket(
+    request: Request,
     ticket_id: int,
     current_user: AuthContext = Depends(get_current_user),
-    db: Session = Depends(get_db),
-    request: Request = None
+    db: Session = Depends(get_db)
 ):
     """مشاهده تیکت"""
     ticket_repo = TicketRepository(db)
@@ -163,11 +163,11 @@ async def get_ticket(
 
 @router.post("/{ticket_id}/messages", response_model=SuccessResponse)
 async def send_message(
+    request: Request,
     ticket_id: int,
     message_request: CreateMessageRequest,
     current_user: AuthContext = Depends(get_current_user),
-    db: Session = Depends(get_db),
-    request: Request = None
+    db: Session = Depends(get_db)
 ):
     """ارسال پیام به تیکت"""
     ticket_repo = TicketRepository(db)
@@ -199,11 +199,11 @@ async def send_message(
 
 @router.post("/{ticket_id}/messages/search", response_model=SuccessResponse)
 async def search_ticket_messages(
+    request: Request,
     ticket_id: int,
     query_info: QueryInfo,
     current_user: AuthContext = Depends(get_current_user),
-    db: Session = Depends(get_db),
-    request: Request = None
+    db: Session = Depends(get_db)
 ):
     """جستجو در پیام‌های تیکت"""
     ticket_repo = TicketRepository(db)

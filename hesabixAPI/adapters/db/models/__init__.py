@@ -30,3 +30,9 @@ from .currency import Currency, BusinessCurrency  # noqa: F401
 from .document import Document  # noqa: F401
 from .document_line import DocumentLine  # noqa: F401
 from .account import Account  # noqa: F401
+from .category import BusinessCategory  # noqa: F401
+from .product_attribute import ProductAttribute  # noqa: F401
+from .product import Product  # noqa: F401
+from .price_list import PriceList, PriceItem  # noqa: F401
+from .product_attribute_link import ProductAttributeLink  # noqa: F401
+from .tax_unit import TaxUnit  # noqa: F401

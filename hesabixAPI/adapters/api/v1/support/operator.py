@@ -23,10 +23,10 @@ router = APIRouter()
 @router.post("/tickets/search", response_model=SuccessResponse)
 @require_app_permission("support_operator")
 async def search_operator_tickets(
+    request: Request,
     query_info: QueryInfo = Body(...),
     current_user: AuthContext = Depends(get_current_user),
-    db: Session = Depends(get_db),
-    request: Request = None
+    db: Session = Depends(get_db)
 ):
     """جستجو در تمام تیکت‌ها برای اپراتور"""
     ticket_repo = TicketRepository(db)
@@ -110,10 +110,10 @@ async def search_operator_tickets(
 @router.get("/tickets/{ticket_id}", response_model=SuccessResponse)
 @require_app_permission("support_operator")
 async def get_operator_ticket(
+    request: Request,
     ticket_id: int,
     current_user: AuthContext = Depends(get_current_user),
-    db: Session = Depends(get_db),
-    request: Request = None
+    db: Session = Depends(get_db)
 ):
     """مشاهده تیکت برای اپراتور"""
     ticket_repo = TicketRepository(db)
@@ -135,11 +135,11 @@ async def get_operator_ticket(
 @router.put("/tickets/{ticket_id}/status", response_model=SuccessResponse)
 @require_app_permission("support_operator")
 async def update_ticket_status(
+    request: Request,
     ticket_id: int,
     status_request: UpdateStatusRequest,
     current_user: AuthContext = Depends(get_current_user),
-    db: Session = Depends(get_db),
-    request: Request = None
+    db: Session = Depends(get_db)
 ):
     """تغییر وضعیت تیکت"""
     ticket_repo = TicketRepository(db)
@@ -169,11 +169,11 @@ async def update_ticket_status(
 @router.post("/tickets/{ticket_id}/assign", response_model=SuccessResponse)
 @require_app_permission("support_operator")
 async def assign_ticket(
+    request: Request,
     ticket_id: int,
     assign_request: AssignTicketRequest,
     current_user: AuthContext = Depends(get_current_user),
-    db: Session = Depends(get_db),
-    request: Request = None
+    db: Session = Depends(get_db)
 ):
     """تخصیص تیکت به اپراتور"""
     ticket_repo = TicketRepository(db)
@@ -198,11 +198,11 @@ async def assign_ticket(
 @router.post("/tickets/{ticket_id}/messages", response_model=SuccessResponse)
 @require_app_permission("support_operator")
 async def send_operator_message(
+    request: Request,
     ticket_id: int,
     message_request: CreateMessageRequest,
     current_user: AuthContext = Depends(get_current_user),
-    db: Session = Depends(get_db),
-    request: Request = None
+    db: Session = Depends(get_db)
 ):
     """ارسال پیام اپراتور به تیکت"""
     ticket_repo = TicketRepository(db)
@@ -239,11 +239,11 @@ async def send_operator_message(
 @router.post("/tickets/{ticket_id}/messages/search", response_model=SuccessResponse)
 @require_app_permission("support_operator")
 async def search_operator_ticket_messages(
+    request: Request,
     ticket_id: int,
     query_info: QueryInfo = Body(...),
     current_user: AuthContext = Depends(get_current_user),
-    db: Session = Depends(get_db),
-    request: Request = None
+    db: Session = Depends(get_db)
 ):
     """جستجو در پیام‌های تیکت برای اپراتور"""
     ticket_repo = TicketRepository(db)

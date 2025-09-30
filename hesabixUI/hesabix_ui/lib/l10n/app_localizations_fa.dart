@@ -1158,7 +1158,9 @@ class AppLocalizationsFa extends AppLocalizations {
   String get restoreFile => 'بازیابی فایل';
 
   @override
-  String get deleteConfirm => 'تایید حذف';
+  String deleteConfirm(Object name) {
+    return 'آیا از حذف \"$name\" مطمئن هستید؟';
+  }
 
   @override
   String get deleteConfirmMessage => 'آیا از حذف این فایل مطمئن هستید؟';
@@ -1394,6 +1396,27 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get productAttributes => 'ویژگی‌های کالا و خدمات';
+
+  @override
+  String get addAttribute => 'افزودن ویژگی';
+
+  @override
+  String get viewAttributes => 'مشاهده ویژگی‌ها';
+
+  @override
+  String get editAttributes => 'ویرایش ویژگی‌ها';
+
+  @override
+  String get deleteAttributes => 'حذف ویژگی‌ها';
+
+  @override
+  String get title => 'عنوان';
+
+  @override
+  String get description => 'توضیحات';
+
+  @override
+  String get add => 'افزودن';
 
   @override
   String get banking => 'بانکداری';
@@ -1655,9 +1678,6 @@ class AppLocalizationsFa extends AppLocalizations {
   String get motto => 'جهان با تعاون زیبا می‌شود';
 
   @override
-  String get add => 'افزودن';
-
-  @override
   String get view => 'مشاهده';
 
   @override
@@ -1828,18 +1848,6 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get warehouseTransfers => 'صدور حواله';
-
-  @override
-  String get addAttribute => 'افزودن ویژگی';
-
-  @override
-  String get viewAttributes => 'مشاهده ویژگی‌ها';
-
-  @override
-  String get editAttributes => 'ویرایش ویژگی‌ها';
-
-  @override
-  String get deleteAttributes => 'حذف ویژگی‌ها';
 
   @override
   String get addBankAccount => 'افزودن حساب بانکی';
@@ -2485,4 +2493,55 @@ class AppLocalizationsFa extends AppLocalizations {
   @override
   String get commissionPostInInvoiceDocument =>
       'ثبت پورسانت در سند حسابداری فاکتور';
+
+  @override
+  String get manageCategories => 'مدیریت دسته‌بندی‌ها';
+
+  @override
+  String get categoriesDialogTitle => 'مدیریت دسته‌بندی‌ها';
+
+  @override
+  String get addRootCategory => 'افزودن ریشه';
+
+  @override
+  String get addChildCategory => 'افزودن زیرشاخه';
+
+  @override
+  String get renameCategory => 'تغییر نام';
+
+  @override
+  String get deleteCategory => 'حذف دسته‌بندی';
+
+  @override
+  String get deleteCategoryConfirm => 'آیا از حذف این دسته‌بندی مطمئن هستید؟';
+
+  @override
+  String get categoryNameFa => 'نام (فارسی)';
+
+  @override
+  String get categoryNameEn => 'نام (انگلیسی)';
+
+  @override
+  String get categoryType => 'نوع';
+
+  @override
+  String get productType => 'کالا';
+
+  @override
+  String get serviceType => 'خدمت';
+
+  @override
+  String get loadingCategories => 'در حال بارگذاری دسته‌بندی‌ها...';
+
+  @override
+  String get createCategory => 'ایجاد دسته‌بندی';
+
+  @override
+  String get updateCategory => 'به‌روزرسانی دسته‌بندی';
+
+  @override
+  String get deleteCategorySuccess => 'دسته‌بندی حذف شد';
+
+  @override
+  String get operationFailed => 'عملیات ناموفق بود';
 }

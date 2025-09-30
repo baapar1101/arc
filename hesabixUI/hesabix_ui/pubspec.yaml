@@ -28,6 +28,8 @@ environment:
 # the latest version available on pub.dev. To see which dependencies have newer
 # versions available, run `flutter pub outdated`.
 dependencies:
+  flutter_simple_treeview: ^3.0.2
+  flutter_fancy_tree_view: ^1.6.0
   flutter:
     sdk: flutter
   flutter_localizations:

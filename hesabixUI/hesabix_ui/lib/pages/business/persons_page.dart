@@ -130,11 +130,6 @@ class _PersonsPageState extends State<PersonsPage> {
           width: ColumnWidth.medium,
           formatter: (person) => person.nationalId ?? '-',
         ),
-        DateColumn(
-          'created_at',
-          t.createdAt,
-          width: ColumnWidth.medium,
-        ),
         NumberColumn(
           'share_count',
           t.shareCount,

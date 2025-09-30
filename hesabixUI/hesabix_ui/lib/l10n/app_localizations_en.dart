@@ -1164,7 +1164,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get restoreFile => 'Restore File';
 
   @override
-  String get deleteConfirm => 'Confirm Delete';
+  String deleteConfirm(Object name) {
+    return 'Are you sure to delete \"$name\"?';
+  }
 
   @override
   String get deleteConfirmMessage =>
@@ -1405,6 +1407,27 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get productAttributes => 'Product Attributes';
+
+  @override
+  String get addAttribute => 'Add Attribute';
+
+  @override
+  String get viewAttributes => 'View Attributes';
+
+  @override
+  String get editAttributes => 'Edit Attributes';
+
+  @override
+  String get deleteAttributes => 'Delete Attributes';
+
+  @override
+  String get title => 'Title';
+
+  @override
+  String get description => 'Description';
+
+  @override
+  String get add => 'Add';
 
   @override
   String get banking => 'Banking';
@@ -1665,9 +1688,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get motto => 'The world becomes beautiful through cooperation';
 
   @override
-  String get add => 'Add';
-
-  @override
   String get view => 'View';
 
   @override
@@ -1838,18 +1858,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get warehouseTransfers => 'Warehouse Transfers';
-
-  @override
-  String get addAttribute => 'Add Attribute';
-
-  @override
-  String get viewAttributes => 'View Attributes';
-
-  @override
-  String get editAttributes => 'Edit Attributes';
-
-  @override
-  String get deleteAttributes => 'Delete Attributes';
 
   @override
   String get addBankAccount => 'Add Bank Account';
@@ -2503,4 +2511,56 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get commissionPostInInvoiceDocument =>
       'Post commission in invoice accounting document';
+
+  @override
+  String get manageCategories => 'Manage Categories';
+
+  @override
+  String get categoriesDialogTitle => 'Manage Categories';
+
+  @override
+  String get addRootCategory => 'Add Root';
+
+  @override
+  String get addChildCategory => 'Add Child';
+
+  @override
+  String get renameCategory => 'Rename';
+
+  @override
+  String get deleteCategory => 'Delete Category';
+
+  @override
+  String get deleteCategoryConfirm =>
+      'Are you sure you want to delete this category?';
+
+  @override
+  String get categoryNameFa => 'Name (Persian)';
+
+  @override
+  String get categoryNameEn => 'Name (English)';
+
+  @override
+  String get categoryType => 'Type';
+
+  @override
+  String get productType => 'Product';
+
+  @override
+  String get serviceType => 'Service';
+
+  @override
+  String get loadingCategories => 'Loading categories...';
+
+  @override
+  String get createCategory => 'Create Category';
+
+  @override
+  String get updateCategory => 'Update Category';
+
+  @override
+  String get deleteCategorySuccess => 'Category deleted';
+
+  @override
+  String get operationFailed => 'Operation failed';
 }

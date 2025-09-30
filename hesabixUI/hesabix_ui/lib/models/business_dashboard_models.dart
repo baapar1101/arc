@@ -187,6 +187,29 @@ class BusinessMembersResponse {
   }
 }
 
+class CurrencyLite {
+  final int id;
+  final String code;
+  final String title;
+  final String symbol;
+
+  CurrencyLite({
+    required this.id,
+    required this.code,
+    required this.title,
+    required this.symbol,
+  });
+
+  factory CurrencyLite.fromJson(Map<String, dynamic> json) {
+    return CurrencyLite(
+      id: json['id'] as int,
+      code: json['code'] as String? ?? '',
+      title: json['title'] as String? ?? '',
+      symbol: json['symbol'] as String? ?? '',
+    );
+  }
+}
+
 class BusinessWithPermission {
   final int id;
   final String name;
@@ -200,6 +223,8 @@ class BusinessWithPermission {
   final bool isOwner;
   final String role;
   final Map<String, dynamic> permissions;
+  final CurrencyLite? defaultCurrency;
+  final List<CurrencyLite> currencies;
 
   BusinessWithPermission({
     required this.id,
@@ -214,6 +239,8 @@ class BusinessWithPermission {
     required this.isOwner,
     required this.role,
     required this.permissions,
+    this.defaultCurrency,
+    this.currencies = const <CurrencyLite>[],
   });
 
   factory BusinessWithPermission.fromJson(Map<String, dynamic> json) {
@@ -240,6 +267,12 @@ class BusinessWithPermission {
       isOwner: json['is_owner'] ?? false,
       role: json['role'] ?? 'عضو',
       permissions: Map<String, dynamic>.from(json['permissions'] ?? {}),
+      defaultCurrency: json['default_currency'] != null
+          ? CurrencyLite.fromJson(Map<String, dynamic>.from(json['default_currency']))
+          : null,
+      currencies: (json['currencies'] as List<dynamic>? ?? const [])
+          .map((c) => CurrencyLite.fromJson(Map<String, dynamic>.from(c)))
+          .toList(),
     );
   }
 }

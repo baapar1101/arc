@@ -1,0 +1,240 @@
+import 'package:flutter/material.dart';
+import 'package:hesabix_ui/l10n/app_localizations.dart';
+import '../../core/auth_store.dart';
+import '../../controllers/product_form_controller.dart';
+import 'sections/product_basic_info_section.dart';
+import 'sections/product_pricing_inventory_section.dart';
+import 'sections/product_tax_section.dart';
+
+class ProductFormDialog extends StatefulWidget {
+  final int businessId;
+  final Map<String, dynamic>? product;
+  final VoidCallback? onSuccess;
+  final AuthStore authStore;
+
+  const ProductFormDialog({
+    super.key,
+    required this.businessId,
+    required this.authStore,
+    this.product,
+    this.onSuccess,
+  });
+
+  @override
+  State<ProductFormDialog> createState() => _ProductFormDialogState();
+}
+
+class _ProductFormDialogState extends State<ProductFormDialog> {
+  final _formKey = GlobalKey<FormState>();
+  late final ProductFormController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = ProductFormController(businessId: widget.businessId);
+    _initializeForm();
+  }
+
+  Future<void> _initializeForm() async {
+    await _controller.initializeWithProduct(widget.product);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
+    
+    return ListenableBuilder(
+      listenable: _controller,
+      builder: (context, child) {
+        return AlertDialog(
+          title: Row(
+            children: [
+              Icon(widget.product == null ? Icons.add : Icons.edit),
+              const SizedBox(width: 8),
+              Text(widget.product == null ? t.addProduct : t.edit),
+            ],
+          ),
+          content: SizedBox(
+            width: MediaQuery.of(context).size.width > 1200 ? 1000 : 800,
+            child: _controller.isLoading
+                ? _buildLoadingWidget()
+                : _buildFormContent(),
+          ),
+          actions: _buildActions(t),
+        );
+      },
+    );
+  }
+
+  Widget _buildLoadingWidget() {
+    return const SizedBox(
+      height: 300,
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 16),
+            Text('در حال بارگذاری...'),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFormContent() {
+    return DefaultTabController(
+      length: 3,
+      child: SizedBox(
+        height: MediaQuery.of(context).size.height > 800 ? 700 : 600,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _buildTabBar(),
+            const SizedBox(height: 12),
+            Expanded(
+              child: Form(
+                key: _formKey,
+                child: TabBarView(
+                  children: [
+                    _buildBasicInfoTab(),
+                    _buildPricingInventoryTab(),
+                    _buildTaxTab(),
+                  ],
+                ),
+              ),
+            ),
+            if (_controller.errorMessage != null) _buildErrorMessage(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTabBar() {
+    return TabBar(
+      isScrollable: true,
+      tabs: const [
+        Tab(text: 'اطلاعات کلی'),
+        Tab(text: 'قیمت و موجودی'),
+        Tab(text: 'مالیات'),
+      ],
+    );
+  }
+
+  Widget _buildBasicInfoTab() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      child: ProductBasicInfoSection(
+        formData: _controller.formData,
+        onChanged: _controller.updateFormData,
+        categories: _controller.categories,
+        attributes: _controller.attributes,
+        units: _controller.units,
+      ),
+    );
+  }
+
+  Widget _buildPricingInventoryTab() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      child: ProductPricingInventorySection(
+        formData: _controller.formData,
+        onChanged: _controller.updateFormData,
+        units: const [],
+      ),
+    );
+  }
+
+  Widget _buildTaxTab() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      child: ProductTaxSection(
+        formData: _controller.formData,
+        onChanged: _controller.updateFormData,
+        taxTypes: _controller.taxTypes,
+        taxUnits: _controller.taxUnits,
+      ),
+    );
+  }
+
+  Widget _buildErrorMessage() {
+    return Container(
+      margin: const EdgeInsets.only(top: 16),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.red.shade50,
+        border: Border.all(color: Colors.red.shade200),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.error_outline, color: Colors.red.shade600),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              _controller.errorMessage!,
+              style: TextStyle(color: Colors.red.shade700),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<Widget> _buildActions(AppLocalizations t) {
+    return [
+      TextButton(
+        onPressed: _controller.isLoading ? null : () => Navigator.of(context).pop(),
+        child: Text(t.cancel),
+      ),
+      FilledButton(
+        onPressed: _controller.isLoading ? null : _handleSubmit,
+        child: _controller.isLoading
+            ? const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : Text(t.save),
+      ),
+    ];
+  }
+
+  Future<void> _handleSubmit() async {
+    if (!_controller.validateForm(_formKey)) {
+      return;
+    }
+
+    bool success;
+    if (widget.product != null) {
+      final productId = widget.product!['id'] as int;
+      success = await _controller.updateProduct(productId);
+    } else {
+      success = await _controller.submitForm();
+    }
+
+    if (success && mounted) {
+      widget.onSuccess?.call();
+      Navigator.of(context).pop(true);
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_controller.errorMessage ?? 'خطای نامشخص'),
+          backgroundColor: Colors.red,
+          action: SnackBarAction(
+            label: 'تلاش مجدد',
+            textColor: Colors.white,
+            onPressed: _handleSubmit,
+          ),
+        ),
+      );
+    }
+  }
+}

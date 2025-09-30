@@ -23,7 +23,7 @@ def upgrade() -> None:
 
     # Fetch all user ids
     res = bind.execute(sa.text("SELECT id FROM users"))
-    user_ids = [row[0] for row in res]
+    user_ids = [row[0] for row in res] if res else []
 
     # Helper to generate unique codes
     import secrets
