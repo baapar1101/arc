@@ -49,7 +49,7 @@ class ProductService {
     int? excludeProductId,
   }) async {
     final body = {
-      'take': 1,
+      'take': 5, // fetch a few matches to reliably detect duplicates beyond the current record
       'skip': 0,
       'filters': [
         {
@@ -66,12 +66,15 @@ class ProductService {
     final data = res.data?['data'];
     final items = (data is Map<String, dynamic>) ? data['items'] : null;
     if (items is List && items.isNotEmpty) {
-      final first = Map<String, dynamic>.from(items.first);
-      final foundId = first['id'] as int?;
-      if (excludeProductId != null && foundId == excludeProductId) {
-        return false;
+      for (final it in items) {
+        final m = Map<String, dynamic>.from(it as Map);
+        final foundId = m['id'] as int?;
+        if (excludeProductId == null || foundId != excludeProductId) {
+          return true;
+        }
       }
-      return true;
+      // only the same product found
+      return false;
     }
     return false;
   }

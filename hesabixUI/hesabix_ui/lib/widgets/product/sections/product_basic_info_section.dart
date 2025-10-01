@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:flutter/services.dart';
+import '../../category/category_picker_field.dart';
 import '../../../models/product_form_data.dart';
 import '../../../utils/product_form_validator.dart';
 
 class ProductBasicInfoSection extends StatelessWidget {
+  final int businessId;
   final ProductFormData formData;
   final ValueChanged<ProductFormData> onChanged;
   final List<Map<String, dynamic>> categories;
@@ -13,6 +15,7 @@ class ProductBasicInfoSection extends StatelessWidget {
 
   const ProductBasicInfoSection({
     super.key,
+    required this.businessId,
     required this.formData,
     required this.onChanged,
     required this.categories,
@@ -41,7 +44,7 @@ class ProductBasicInfoSection extends StatelessWidget {
                     
                     TextFormField(
                       initialValue: formData.code,
-                      decoration: InputDecoration(labelText: t.code + ' (اختیاری)'),
+                      decoration: InputDecoration(labelText: '${t.code} (اختیاری)'),
                       validator: ProductFormValidator.validateCode,
                       onChanged: (value) => _updateFormData(formData.copyWith(code: value.trim().isEmpty ? null : value.trim())),
                     ),
@@ -70,16 +73,12 @@ class ProductBasicInfoSection extends StatelessWidget {
                     ),
                     const SizedBox(height: 20),
                     
-                    DropdownButtonFormField<int>(
-                      value: formData.categoryId,
-                      items: categories
-                          .map((category) => DropdownMenuItem<int>(
-                                value: category['id'] as int,
-                                child: Text((category['label'] ?? '').toString()),
-                              ))
-                          .toList(),
+                    CategoryPickerField(
+                      businessId: businessId,
+                      categoriesTree: categories,
+                      initialValue: formData.categoryId,
+                      label: t.categories,
                       onChanged: (value) => _updateFormData(formData.copyWith(categoryId: value)),
-                      decoration: InputDecoration(labelText: t.categories),
                     ),
                   ],
                 ),
@@ -93,7 +92,7 @@ class ProductBasicInfoSection extends StatelessWidget {
           
           TextFormField(
             initialValue: formData.code,
-            decoration: InputDecoration(labelText: t.code + ' (اختیاری)'),
+            decoration: InputDecoration(labelText: '${t.code} (اختیاری)'),
             validator: ProductFormValidator.validateCode,
             onChanged: (value) => _updateFormData(formData.copyWith(code: value.trim().isEmpty ? null : value.trim())),
           ),
@@ -115,16 +114,12 @@ class ProductBasicInfoSection extends StatelessWidget {
           ),
           const SizedBox(height: 20),
           
-          DropdownButtonFormField<int>(
-            value: formData.categoryId,
-            items: categories
-                .map((category) => DropdownMenuItem<int>(
-                      value: category['id'] as int,
-                      child: Text((category['label'] ?? '').toString()),
-                    ))
-                .toList(),
+          CategoryPickerField(
+            businessId: businessId,
+            categoriesTree: categories,
+            initialValue: formData.categoryId,
+            label: t.categories,
             onChanged: (value) => _updateFormData(formData.copyWith(categoryId: value)),
-            decoration: InputDecoration(labelText: t.categories),
           ),
           const SizedBox(height: 20),
           _buildUnitsSection(context),
@@ -132,7 +127,7 @@ class ProductBasicInfoSection extends StatelessWidget {
         
         if (attributes.isNotEmpty) ...[
           const SizedBox(height: 32),
-          Text('ویژگی‌ها', style: Theme.of(context).textTheme.titleSmall),
+          Text(t.productAttributes, style: Theme.of(context).textTheme.titleSmall),
           const SizedBox(height: 12),
           Wrap(
             spacing: 8,
@@ -169,12 +164,13 @@ class ProductBasicInfoSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('واحدها', style: Theme.of(context).textTheme.titleSmall),
+        Text(AppLocalizations.of(context).unitsTitle, style: Theme.of(context).textTheme.titleSmall),
         const SizedBox(height: 8),
         Row(
           children: [
             Expanded(child: _buildUnitTextField(
-              label: 'واحد اصلی',
+              context: context,
+              label: AppLocalizations.of(context).mainUnit,
               isRequired: true,
               initialText: _unitNameById(formData.mainUnitId) ?? 'عدد',
               onChanged: (text) {
@@ -184,7 +180,8 @@ class ProductBasicInfoSection extends StatelessWidget {
             )),
             const SizedBox(width: 12),
             Expanded(child: _buildUnitTextField(
-              label: 'واحد فرعی',
+              context: context,
+              label: AppLocalizations.of(context).secondaryUnit,
               isRequired: false,
               initialText: _unitNameById(formData.secondaryUnitId) ?? '',
               onChanged: (text) {
@@ -195,8 +192,8 @@ class ProductBasicInfoSection extends StatelessWidget {
             const SizedBox(width: 12),
             Expanded(
               child: TextFormField(
-                initialValue: formData.unitConversionFactor?.toString(),
-                decoration: const InputDecoration(labelText: 'ضریب تبدیل واحد'),
+                initialValue: formData.unitConversionFactor.toString(),
+                decoration: InputDecoration(labelText: AppLocalizations.of(context).unitConversionFactor),
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
                 inputFormatters: [
                   FilteringTextInputFormatter.allow(RegExp(r'^\\d*\\.?\\d{0,2}$')),
@@ -212,6 +209,7 @@ class ProductBasicInfoSection extends StatelessWidget {
   }
 
   Widget _buildUnitTextField({
+    required BuildContext context,
     required String label,
     required bool isRequired,
     required String initialText,
@@ -221,7 +219,7 @@ class ProductBasicInfoSection extends StatelessWidget {
       initialValue: initialText,
       decoration: InputDecoration(labelText: label),
       keyboardType: TextInputType.text,
-      validator: isRequired ? (v) => (v == null || v.trim().isEmpty) ? '$label الزامی است' : null : null,
+      validator: isRequired ? (v) => (v == null || v.trim().isEmpty) ? '${AppLocalizations.of(context).required}' : null : null,
       onChanged: onChanged,
     );
   }
@@ -250,11 +248,12 @@ class ProductBasicInfoSection extends StatelessWidget {
   }
 
   Widget _buildItemTypeSelector(BuildContext context) {
+    final t = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'نوع',
+          t.itemType,
           style: Theme.of(context).textTheme.titleSmall?.copyWith(
             fontWeight: FontWeight.w600,
           ),
@@ -265,8 +264,8 @@ class ProductBasicInfoSection extends StatelessWidget {
             Expanded(
               child: _buildItemTypeCard(
                 context: context,
-                title: 'کالا',
-                subtitle: 'محصولات فیزیکی',
+                title: t.products,
+                subtitle: t.productPhysicalDesc,
                 icon: Icons.inventory_2_outlined,
                 value: 'کالا',
                 isSelected: formData.itemType == 'کالا',
@@ -276,8 +275,8 @@ class ProductBasicInfoSection extends StatelessWidget {
             Expanded(
               child: _buildItemTypeCard(
                 context: context,
-                title: 'خدمت',
-                subtitle: 'خدمات و سرویس‌ها',
+                title: t.services,
+                subtitle: t.serviceDesc,
                 icon: Icons.handyman_outlined,
                 value: 'خدمت',
                 isSelected: formData.itemType == 'خدمت',

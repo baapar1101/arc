@@ -17,9 +17,25 @@ class DataTableUtils {
     if (value == null) return '';
     
     final number = value is num ? value : double.tryParse(value.toString()) ?? 0;
+    // Determine effective decimal digits:
+    // - If decimalPlaces provided and fractional part is effectively zero -> hide decimals
+    // - Otherwise use provided decimalPlaces (or 0 by default)
+    int effectiveDecimalDigits = decimalPlaces ?? 0;
+    if (decimalPlaces != null && decimalPlaces > 0) {
+      final fixed = number.toStringAsFixed(decimalPlaces);
+      final parts = fixed.split('.');
+      if (parts.length == 2) {
+        final fractional = parts[1];
+        final isAllZeros = fractional.replaceAll('0', '').isEmpty;
+        if (isAllZeros) {
+          effectiveDecimalDigits = 0;
+        }
+      }
+    }
+
     final formatter = NumberFormat.currency(
       symbol: '',
-      decimalDigits: decimalPlaces ?? 0,
+      decimalDigits: effectiveDecimalDigits,
     );
     
     final formatted = formatter.format(number);

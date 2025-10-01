@@ -588,8 +588,19 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
         },
         options: Options(
           headers: {
-            'X-Calendar-Type': 'jalali', // Send Jalali calendar type
-            'Accept-Language': Localizations.localeOf(context).languageCode, // Send locale
+            // Calendar type based on current locale
+            'X-Calendar-Type': (() {
+              final loc = Localizations.localeOf(context);
+              final lang = (loc.languageCode).toLowerCase();
+              return (lang == 'fa') ? 'jalali' : 'gregorian';
+            })(),
+            // Send full locale code if available (e.g., fa-IR)
+            'Accept-Language': (() {
+              final loc = Localizations.localeOf(context);
+              final lang = loc.languageCode;
+              final country = loc.countryCode;
+              return (country != null && country.isNotEmpty) ? '$lang-$country' : lang;
+            })(),
           },
         ),
         responseType: ResponseType.bytes, // Both PDF and Excel now return binary data

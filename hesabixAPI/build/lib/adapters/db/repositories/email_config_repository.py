@@ -1,0 +1,85 @@
+from typing import Optional, List
+from sqlalchemy.orm import Session
+from sqlalchemy import and_
+
+from adapters.db.models.email_config import EmailConfig
+from adapters.db.repositories.base_repo import BaseRepository
+
+
+class EmailConfigRepository(BaseRepository[EmailConfig]):
+    def __init__(self, db: Session):
+        super().__init__(db, EmailConfig)
+
+    def get_active_config(self) -> Optional[EmailConfig]:
+        """Get the currently active email configuration"""
+        return self.db.query(self.model_class).filter(self.model_class.is_active == True).first()
+    
+    def get_default_config(self) -> Optional[EmailConfig]:
+        """Get the default email configuration"""
+        return self.db.query(self.model_class).filter(self.model_class.is_default == True).first()
+    
+    def set_default_config(self, config_id: int) -> bool:
+        """Set a configuration as default (removes default from others)"""
+        try:
+            # First check if the config exists
+            config = self.get_by_id(config_id)
+            if not config:
+                return False
+            
+            # Remove default from all configs
+            self.db.query(self.model_class).update({self.model_class.is_default: False})
+            
+            # Set the specified config as default
+            config.is_default = True
+            self.db.commit()
+            return True
+        except Exception as e:
+            self.db.rollback()
+            print(f"Error in set_default_config: {e}")  # Debug log
+            return False
+
+    def get_by_name(self, name: str) -> Optional[EmailConfig]:
+        """Get email configuration by name"""
+        return self.db.query(self.model_class).filter(self.model_class.name == name).first()
+
+    def get_all_configs(self) -> List[EmailConfig]:
+        """Get all email configurations"""
+        return self.db.query(self.model_class).order_by(self.model_class.created_at.desc()).all()
+
+    def set_active_config(self, config_id: int) -> bool:
+        """Set a specific configuration as active and deactivate others"""
+        try:
+            # Deactivate all configs
+            self.db.query(self.model_class).update({self.model_class.is_active: False})
+            
+            # Activate the specified config
+            config = self.get_by_id(config_id)
+            if config:
+                config.is_active = True
+                self.db.commit()
+                return True
+            return False
+        except Exception:
+            self.db.rollback()
+            return False
+
+    def test_connection(self, config: EmailConfig) -> bool:
+        """Test SMTP connection for a configuration"""
+        try:
+            import smtplib
+            from email.mime.text import MIMEText
+            
+            # Create SMTP connection
+            if config.use_ssl:
+                server = smtplib.SMTP_SSL(config.smtp_host, config.smtp_port)
+            else:
+                server = smtplib.SMTP(config.smtp_host, config.smtp_port)
+                if config.use_tls:
+                    server.starttls()
+            
+            # Login
+            server.login(config.smtp_username, config.smtp_password)
+            server.quit()
+            return True
+        except Exception:
+            return False

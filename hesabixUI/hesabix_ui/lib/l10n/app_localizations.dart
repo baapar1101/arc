@@ -5071,6 +5071,498 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Operation failed'**
   String get operationFailed;
+
+  /// No description provided for @productGeneralInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'General Information'**
+  String get productGeneralInfo;
+
+  /// No description provided for @pricingAndInventory.
+  ///
+  /// In en, this message translates to:
+  /// **'Pricing & Inventory'**
+  String get pricingAndInventory;
+
+  /// No description provided for @tax.
+  ///
+  /// In en, this message translates to:
+  /// **'Tax'**
+  String get tax;
+
+  /// No description provided for @inventoryControl.
+  ///
+  /// In en, this message translates to:
+  /// **'Inventory control'**
+  String get inventoryControl;
+
+  /// No description provided for @reorderPoint.
+  ///
+  /// In en, this message translates to:
+  /// **'Reorder point'**
+  String get reorderPoint;
+
+  /// No description provided for @reorderPointRepeat.
+  ///
+  /// In en, this message translates to:
+  /// **'Reorder point'**
+  String get reorderPointRepeat;
+
+  /// No description provided for @minOrderQty.
+  ///
+  /// In en, this message translates to:
+  /// **'Minimum order quantity'**
+  String get minOrderQty;
+
+  /// No description provided for @leadTimeDays.
+  ///
+  /// In en, this message translates to:
+  /// **'Lead time (days)'**
+  String get leadTimeDays;
+
+  /// No description provided for @pricing.
+  ///
+  /// In en, this message translates to:
+  /// **'Pricing'**
+  String get pricing;
+
+  /// No description provided for @salesPrice.
+  ///
+  /// In en, this message translates to:
+  /// **'Sales price'**
+  String get salesPrice;
+
+  /// No description provided for @salesPriceNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Sales price note'**
+  String get salesPriceNote;
+
+  /// No description provided for @purchasePrice.
+  ///
+  /// In en, this message translates to:
+  /// **'Purchase price'**
+  String get purchasePrice;
+
+  /// No description provided for @purchasePriceNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Purchase price note'**
+  String get purchasePriceNote;
+
+  /// No description provided for @pricesInPriceLists.
+  ///
+  /// In en, this message translates to:
+  /// **'Prices in price lists'**
+  String get pricesInPriceLists;
+
+  /// No description provided for @addPrice.
+  ///
+  /// In en, this message translates to:
+  /// **'Add price'**
+  String get addPrice;
+
+  /// No description provided for @price.
+  ///
+  /// In en, this message translates to:
+  /// **'Price'**
+  String get price;
+
+  /// No description provided for @currency.
+  ///
+  /// In en, this message translates to:
+  /// **'Currency'**
+  String get currency;
+
+  /// No description provided for @noPriceListsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'No price list'**
+  String get noPriceListsTitle;
+
+  /// No description provided for @noPriceListsMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'To add a price, first create a price list.'**
+  String get noPriceListsMessage;
+
+  /// No description provided for @noPriceListsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Use \"Manage price lists\" button in Products page to create one.'**
+  String get noPriceListsHint;
+
+  /// No description provided for @gotIt.
+  ///
+  /// In en, this message translates to:
+  /// **'Got it'**
+  String get gotIt;
+
+  /// No description provided for @unitsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Units'**
+  String get unitsTitle;
+
+  /// No description provided for @mainUnit.
+  ///
+  /// In en, this message translates to:
+  /// **'Main unit'**
+  String get mainUnit;
+
+  /// No description provided for @secondaryUnit.
+  ///
+  /// In en, this message translates to:
+  /// **'Secondary unit'**
+  String get secondaryUnit;
+
+  /// No description provided for @unitConversionFactor.
+  ///
+  /// In en, this message translates to:
+  /// **'Unit conversion factor'**
+  String get unitConversionFactor;
+
+  /// No description provided for @itemType.
+  ///
+  /// In en, this message translates to:
+  /// **'Type'**
+  String get itemType;
+
+  /// No description provided for @type.
+  ///
+  /// In en, this message translates to:
+  /// **'Type'**
+  String get type;
+
+  /// No description provided for @productPhysicalDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Physical products'**
+  String get productPhysicalDesc;
+
+  /// No description provided for @serviceDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Services'**
+  String get serviceDesc;
+
+  /// No description provided for @taxTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Tax'**
+  String get taxTitle;
+
+  /// No description provided for @taxCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Tax code'**
+  String get taxCode;
+
+  /// No description provided for @isSalesTaxable.
+  ///
+  /// In en, this message translates to:
+  /// **'Sales taxable'**
+  String get isSalesTaxable;
+
+  /// No description provided for @salesTaxRate.
+  ///
+  /// In en, this message translates to:
+  /// **'Sales tax rate (%)'**
+  String get salesTaxRate;
+
+  /// No description provided for @isPurchaseTaxable.
+  ///
+  /// In en, this message translates to:
+  /// **'Purchase taxable'**
+  String get isPurchaseTaxable;
+
+  /// No description provided for @purchaseTaxRate.
+  ///
+  /// In en, this message translates to:
+  /// **'Purchase tax rate (%)'**
+  String get purchaseTaxRate;
+
+  /// No description provided for @taxType.
+  ///
+  /// In en, this message translates to:
+  /// **'Tax type'**
+  String get taxType;
+
+  /// No description provided for @taxTypeId.
+  ///
+  /// In en, this message translates to:
+  /// **'Tax type id'**
+  String get taxTypeId;
+
+  /// No description provided for @taxUnit.
+  ///
+  /// In en, this message translates to:
+  /// **'Tax unit'**
+  String get taxUnit;
+
+  /// No description provided for @taxUnitId.
+  ///
+  /// In en, this message translates to:
+  /// **'Tax unit id'**
+  String get taxUnitId;
+
+  /// No description provided for @bulkPriceUpdateTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Bulk price update'**
+  String get bulkPriceUpdateTitle;
+
+  /// No description provided for @bulkPriceUpdateSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Increase or decrease prices with advanced filters'**
+  String get bulkPriceUpdateSubtitle;
+
+  /// No description provided for @preview.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview'**
+  String get preview;
+
+  /// No description provided for @applyChanges.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply changes'**
+  String get applyChanges;
+
+  /// No description provided for @changeTypeAndDirection.
+  ///
+  /// In en, this message translates to:
+  /// **'Change type & direction'**
+  String get changeTypeAndDirection;
+
+  /// No description provided for @changeTarget.
+  ///
+  /// In en, this message translates to:
+  /// **'Target'**
+  String get changeTarget;
+
+  /// No description provided for @changeAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Change amount'**
+  String get changeAmount;
+
+  /// No description provided for @filters.
+  ///
+  /// In en, this message translates to:
+  /// **'Filters'**
+  String get filters;
+
+  /// No description provided for @previewChanges.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview changes'**
+  String get previewChanges;
+
+  /// No description provided for @percentage.
+  ///
+  /// In en, this message translates to:
+  /// **'Percentage'**
+  String get percentage;
+
+  /// No description provided for @amount.
+  ///
+  /// In en, this message translates to:
+  /// **'Amount'**
+  String get amount;
+
+  /// No description provided for @samplePercent.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. 10%'**
+  String get samplePercent;
+
+  /// No description provided for @sampleAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. 1,000,000'**
+  String get sampleAmount;
+
+  /// No description provided for @increase.
+  ///
+  /// In en, this message translates to:
+  /// **'Increase'**
+  String get increase;
+
+  /// No description provided for @decrease.
+  ///
+  /// In en, this message translates to:
+  /// **'Decrease'**
+  String get decrease;
+
+  /// No description provided for @both.
+  ///
+  /// In en, this message translates to:
+  /// **'Both'**
+  String get both;
+
+  /// No description provided for @allCurrencies.
+  ///
+  /// In en, this message translates to:
+  /// **'All currencies'**
+  String get allCurrencies;
+
+  /// No description provided for @priceList.
+  ///
+  /// In en, this message translates to:
+  /// **'Price list'**
+  String get priceList;
+
+  /// No description provided for @allPriceLists.
+  ///
+  /// In en, this message translates to:
+  /// **'All lists'**
+  String get allPriceLists;
+
+  /// No description provided for @itemTypeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Item type'**
+  String get itemTypeLabel;
+
+  /// No description provided for @allTypes.
+  ///
+  /// In en, this message translates to:
+  /// **'All types'**
+  String get allTypes;
+
+  /// No description provided for @productsWithInventoryOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Only products with inventory'**
+  String get productsWithInventoryOnly;
+
+  /// No description provided for @productsWithInventoryOnlySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Only products with inventory control'**
+  String get productsWithInventoryOnlySubtitle;
+
+  /// No description provided for @productsWithBasePriceOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Only products with base price'**
+  String get productsWithBasePriceOnly;
+
+  /// No description provided for @productsWithBasePriceOnlySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Only products that have a base price'**
+  String get productsWithBasePriceOnlySubtitle;
+
+  /// No description provided for @confirmChangesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm changes'**
+  String get confirmChangesTitle;
+
+  /// No description provided for @confirmApplyChangesForNProducts.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply changes to {count} products?'**
+  String confirmApplyChangesForNProducts(Object count);
+
+  /// No description provided for @irreversibleWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'This action is irreversible.'**
+  String get irreversibleWarning;
+
+  /// No description provided for @summary.
+  ///
+  /// In en, this message translates to:
+  /// **'Summary'**
+  String get summary;
+
+  /// No description provided for @totalProducts.
+  ///
+  /// In en, this message translates to:
+  /// **'Total products'**
+  String get totalProducts;
+
+  /// No description provided for @affectedProducts.
+  ///
+  /// In en, this message translates to:
+  /// **'Affected products'**
+  String get affectedProducts;
+
+  /// No description provided for @salesPriceChanges.
+  ///
+  /// In en, this message translates to:
+  /// **'Sales price changes'**
+  String get salesPriceChanges;
+
+  /// No description provided for @purchasePriceChanges.
+  ///
+  /// In en, this message translates to:
+  /// **'Purchase price changes'**
+  String get purchasePriceChanges;
+
+  /// No description provided for @codeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Code'**
+  String get codeLabel;
+
+  /// No description provided for @salesLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Sales'**
+  String get salesLabel;
+
+  /// No description provided for @purchaseLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Purchase'**
+  String get purchaseLabel;
+
+  /// No description provided for @managePriceLists.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage price lists'**
+  String get managePriceLists;
+
+  /// No description provided for @noProductsReadAccess.
+  ///
+  /// In en, this message translates to:
+  /// **'You do not have permission to view products & services'**
+  String get noProductsReadAccess;
+
+  /// No description provided for @productId.
+  ///
+  /// In en, this message translates to:
+  /// **'Product ID'**
+  String get productId;
+
+  /// No description provided for @unit.
+  ///
+  /// In en, this message translates to:
+  /// **'Unit'**
+  String get unit;
+
+  /// No description provided for @minQty.
+  ///
+  /// In en, this message translates to:
+  /// **'Minimum quantity'**
+  String get minQty;
+
+  /// No description provided for @addPriceTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Add price'**
+  String get addPriceTitle;
+
+  /// No description provided for @editPriceTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit price'**
+  String get editPriceTitle;
 }
 
 class _AppLocalizationsDelegate

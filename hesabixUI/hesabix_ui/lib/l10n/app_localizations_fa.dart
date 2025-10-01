@@ -2544,4 +2544,257 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get operationFailed => 'عملیات ناموفق بود';
+
+  @override
+  String get productGeneralInfo => 'اطلاعات کلی';
+
+  @override
+  String get pricingAndInventory => 'قیمت و موجودی';
+
+  @override
+  String get tax => 'مالیات';
+
+  @override
+  String get inventoryControl => 'کنترل موجودی';
+
+  @override
+  String get reorderPoint => 'نقطه سفارش';
+
+  @override
+  String get reorderPointRepeat => 'نقطه سفارش مجدد';
+
+  @override
+  String get minOrderQty => 'کمینه مقدار سفارش';
+
+  @override
+  String get leadTimeDays => 'زمان تحویل (روز)';
+
+  @override
+  String get pricing => 'قیمت‌گذاری';
+
+  @override
+  String get salesPrice => 'قیمت فروش';
+
+  @override
+  String get salesPriceNote => 'توضیح قیمت فروش';
+
+  @override
+  String get purchasePrice => 'قیمت خرید';
+
+  @override
+  String get purchasePriceNote => 'توضیح قیمت خرید';
+
+  @override
+  String get pricesInPriceLists => 'قیمت در لیست‌های قیمت';
+
+  @override
+  String get addPrice => 'افزودن قیمت';
+
+  @override
+  String get price => 'قیمت';
+
+  @override
+  String get currency => 'ارز';
+
+  @override
+  String get noPriceListsTitle => 'لیست قیمت موجود نیست';
+
+  @override
+  String get noPriceListsMessage =>
+      'برای افزودن قیمت، ابتدا باید یک لیست قیمت ایجاد کنید.';
+
+  @override
+  String get noPriceListsHint =>
+      'برای ایجاد لیست قیمت، از دکمه \"مدیریت لیست‌های قیمت\" در صفحه محصولات استفاده کنید.';
+
+  @override
+  String get gotIt => 'متوجه شدم';
+
+  @override
+  String get unitsTitle => 'واحدها';
+
+  @override
+  String get mainUnit => 'واحد اصلی';
+
+  @override
+  String get secondaryUnit => 'واحد فرعی';
+
+  @override
+  String get unitConversionFactor => 'ضریب تبدیل واحد';
+
+  @override
+  String get itemType => 'نوع';
+
+  @override
+  String get type => 'نوع';
+
+  @override
+  String get productPhysicalDesc => 'محصولات فیزیکی';
+
+  @override
+  String get serviceDesc => 'خدمات و سرویس‌ها';
+
+  @override
+  String get taxTitle => 'مالیات';
+
+  @override
+  String get taxCode => 'کُد مالیاتی';
+
+  @override
+  String get isSalesTaxable => 'مشمول مالیات فروش';
+
+  @override
+  String get salesTaxRate => 'نرخ مالیات فروش (%)';
+
+  @override
+  String get isPurchaseTaxable => 'مشمول مالیات خرید';
+
+  @override
+  String get purchaseTaxRate => 'نرخ مالیات خرید (%)';
+
+  @override
+  String get taxType => 'نوع مالیات';
+
+  @override
+  String get taxTypeId => 'شناسه نوع مالیات';
+
+  @override
+  String get taxUnit => 'واحد مالیاتی';
+
+  @override
+  String get taxUnitId => 'شناسه واحد مالیاتی';
+
+  @override
+  String get bulkPriceUpdateTitle => 'تغییر قیمت‌های گروهی';
+
+  @override
+  String get bulkPriceUpdateSubtitle =>
+      'اعمال افزایش یا کاهش قیمت با فیلترهای پیشرفته';
+
+  @override
+  String get preview => 'پیش‌نمایش';
+
+  @override
+  String get applyChanges => 'اعمال تغییرات';
+
+  @override
+  String get changeTypeAndDirection => 'نوع و جهت تغییر';
+
+  @override
+  String get changeTarget => 'هدف تغییر';
+
+  @override
+  String get changeAmount => 'مقدار تغییر';
+
+  @override
+  String get filters => 'فیلترها';
+
+  @override
+  String get previewChanges => 'پیش‌نمایش تغییرات';
+
+  @override
+  String get percentage => 'درصدی';
+
+  @override
+  String get amount => 'مقداری';
+
+  @override
+  String get samplePercent => 'مثلاً 10٪';
+
+  @override
+  String get sampleAmount => 'مثلاً 1,000,000';
+
+  @override
+  String get increase => 'افزایش';
+
+  @override
+  String get decrease => 'کاهش';
+
+  @override
+  String get both => 'هر دو';
+
+  @override
+  String get allCurrencies => 'همه ارزها';
+
+  @override
+  String get priceList => 'لیست قیمت';
+
+  @override
+  String get allPriceLists => 'همه لیست‌ها';
+
+  @override
+  String get itemTypeLabel => 'نوع آیتم';
+
+  @override
+  String get allTypes => 'همه انواع';
+
+  @override
+  String get productsWithInventoryOnly => 'فقط کالاهای با موجودی';
+
+  @override
+  String get productsWithInventoryOnlySubtitle =>
+      'فقط کالاهایی که موجودی آن‌ها کنترل می‌شود';
+
+  @override
+  String get productsWithBasePriceOnly => 'فقط کالاهای با قیمت پایه';
+
+  @override
+  String get productsWithBasePriceOnlySubtitle =>
+      'فقط کالاهایی که قیمت پایه دارند';
+
+  @override
+  String get confirmChangesTitle => 'تأیید تغییرات';
+
+  @override
+  String confirmApplyChangesForNProducts(Object count) {
+    return 'آیا از اعمال تغییرات بر روی $count کالا اطمینان دارید؟';
+  }
+
+  @override
+  String get irreversibleWarning => 'این عمل قابل بازگشت نیست.';
+
+  @override
+  String get summary => 'خلاصه تغییرات';
+
+  @override
+  String get totalProducts => 'کل کالاها';
+
+  @override
+  String get affectedProducts => 'کالاهای تأثیرپذیر';
+
+  @override
+  String get salesPriceChanges => 'تغییرات قیمت فروش';
+
+  @override
+  String get purchasePriceChanges => 'تغییرات قیمت خرید';
+
+  @override
+  String get codeLabel => 'کُد';
+
+  @override
+  String get salesLabel => 'فروش';
+
+  @override
+  String get purchaseLabel => 'خرید';
+
+  @override
+  String get managePriceLists => 'مدیریت لیست‌های قیمت';
+
+  @override
+  String get noProductsReadAccess => 'دسترسی مشاهده کالا و خدمات را ندارید';
+
+  @override
+  String get productId => 'شناسه کالا';
+
+  @override
+  String get unit => 'واحد';
+
+  @override
+  String get minQty => 'حداقل تعداد';
+
+  @override
+  String get addPriceTitle => 'افزودن قیمت';
+
+  @override
+  String get editPriceTitle => 'ویرایش قیمت';
 }

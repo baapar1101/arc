@@ -63,7 +63,7 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
           content: SizedBox(
             width: MediaQuery.of(context).size.width > 1200 ? 1000 : 800,
             child: _controller.isLoading
-                ? _buildLoadingWidget()
+                ? _buildLoadingWidget(t)
                 : _buildFormContent(),
           ),
           actions: _buildActions(t),
@@ -72,18 +72,11 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
     );
   }
 
-  Widget _buildLoadingWidget() {
-    return const SizedBox(
+  Widget _buildLoadingWidget(AppLocalizations t) {
+    return SizedBox(
       height: 300,
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 16),
-            Text('در حال بارگذاری...'),
-          ],
-        ),
+      child: const Center(
+        child: CircularProgressIndicator(),
       ),
     );
   }
@@ -118,12 +111,13 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
   }
 
   Widget _buildTabBar() {
+    final t = AppLocalizations.of(context);
     return TabBar(
       isScrollable: true,
-      tabs: const [
-        Tab(text: 'اطلاعات کلی'),
-        Tab(text: 'قیمت و موجودی'),
-        Tab(text: 'مالیات'),
+      tabs: [
+        Tab(text: t.productGeneralInfo),
+        Tab(text: t.pricingAndInventory),
+        Tab(text: t.tax),
       ],
     );
   }
@@ -132,6 +126,7 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       child: ProductBasicInfoSection(
+        businessId: widget.businessId,
         formData: _controller.formData,
         onChanged: _controller.updateFormData,
         categories: _controller.categories,
@@ -147,7 +142,18 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
       child: ProductPricingInventorySection(
         formData: _controller.formData,
         onChanged: _controller.updateFormData,
-        units: const [],
+        units: _controller.units,
+        priceLists: _controller.priceLists,
+        currencies: _controller.currencies,
+        draftPriceItems: _controller.draftPriceItems,
+        onAddOrUpdatePriceItem: (item) {
+          _controller.addOrUpdateDraftPriceItem(item);
+          _controller.updateFormData(_controller.formData);
+        },
+        onDeletePriceItem: (item) {
+          _controller.removeDraftPriceItem(item);
+          _controller.updateFormData(_controller.formData);
+        },
       ),
     );
   }
@@ -208,6 +214,7 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
   }
 
   Future<void> _handleSubmit() async {
+    final t = AppLocalizations.of(context);
     if (!_controller.validateForm(_formKey)) {
       return;
     }
@@ -226,10 +233,10 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
     } else if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(_controller.errorMessage ?? 'خطای نامشخص'),
+          content: Text(_controller.errorMessage ?? t.error),
           backgroundColor: Colors.red,
           action: SnackBarAction(
-            label: 'تلاش مجدد',
+            label: t.retry,
             textColor: Colors.white,
             onPressed: _handleSubmit,
           ),

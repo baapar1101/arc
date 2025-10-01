@@ -6,6 +6,7 @@ import '../../core/calendar_controller.dart';
 import '../../theme/theme_controller.dart';
 import '../../widgets/combined_user_menu_button.dart';
 import '../../widgets/person/person_form_dialog.dart';
+import '../../widgets/product/product_form_dialog.dart';
 import '../../widgets/category/category_tree_dialog.dart';
 import '../../services/business_dashboard_service.dart';
 import '../../core/api_client.dart';
@@ -504,6 +505,23 @@ class _BusinessShellState extends State<BusinessShell> {
       }
     }
 
+    Future<void> showAddProductDialog() async {
+      final result = await showDialog<bool>(
+        context: context,
+        builder: (context) => ProductFormDialog(
+          businessId: widget.businessId,
+          authStore: widget.authStore,
+          onSuccess: () {
+            // Refresh the products page if it's currently open
+            // This will be handled by the ProductsPage itself
+          },
+        ),
+      );
+      if (result == true) {
+        // Product was successfully added
+      }
+    }
+
     bool isExpanded(_MenuItem item) {
       if (item.label == t.productsAndServices) return _isProductsAndServicesExpanded;
       if (item.label == t.banking) return _isBankingExpanded;
@@ -680,7 +698,8 @@ class _BusinessShellState extends State<BusinessShell> {
                                         // Navigate to add person
                                         showAddPersonDialog();
                                       } else if (child.label == t.products) {
-                                        // Navigate to add product
+                                        // Show add product dialog
+                                        showAddProductDialog();
                                       } else if (child.label == t.categories) {
                                         // Navigate to add category
                                       } else if (child.label == t.productAttributes) {
@@ -972,7 +991,8 @@ class _BusinessShellState extends State<BusinessShell> {
                             context.pop();
                             // Navigate to add new item
                             if (child.label == t.products) {
-                              // Navigate to add product
+                              // Show add product dialog
+                              showAddProductDialog();
                             } else if (child.label == t.categories) {
                               // Navigate to add category
                             } else if (child.label == t.productAttributes) {

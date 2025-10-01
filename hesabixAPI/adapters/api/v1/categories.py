@@ -146,3 +146,39 @@ def delete_category(
     return success_response({"deleted": ok}, request)
 
 
+# Server-side search categories with breadcrumb path
+@router.post("/business/{business_id}/search")
+@require_business_access("business_id")
+def search_categories(
+    request: Request,
+    business_id: int,
+    body: Dict[str, Any] | None = None,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    if not ctx.can_read_section("categories"):
+        raise ApiError("FORBIDDEN", "Missing business permission: categories.view", http_status=403)
+    q = (body or {}).get("query") if isinstance(body, dict) else None
+    limit = (body or {}).get("limit") if isinstance(body, dict) else None
+    if not isinstance(q, str) or not q.strip():
+        return success_response({"items": []}, request)
+    try:
+        limit_int = int(limit) if isinstance(limit, int) or (isinstance(limit, str) and str(limit).isdigit()) else 50
+        limit_int = max(1, min(limit_int, 200))
+    except Exception:
+        limit_int = 50
+    repo = CategoryRepository(db)
+    items = repo.search_with_paths(business_id=business_id, query=q.strip(), limit=limit_int)
+    # map label consistently
+    mapped = [
+        {
+            "id": it.get("id"),
+            "parent_id": it.get("parent_id"),
+            "label": it.get("title") or "",
+            "translations": it.get("translations") or {},
+            "path": it.get("path") or [],
+        }
+        for it in items
+    ]
+    return success_response({"items": mapped}, request)
+

@@ -1,0 +1,564 @@
+# Removed __future__ annotations to fix OpenAPI schema generation
+
+from fastapi import APIRouter, Depends, Request, HTTPException
+from sqlalchemy.orm import Session
+
+from adapters.db.session import get_db
+from adapters.api.v1.schemas import (
+    BusinessUsersListResponse, AddUserRequest, AddUserResponse,
+    UpdatePermissionsRequest, UpdatePermissionsResponse, RemoveUserResponse
+)
+from app.core.responses import success_response, format_datetime_fields
+from app.core.auth_dependency import get_current_user, AuthContext
+from app.core.permissions import require_business_access
+from adapters.db.repositories.business_permission_repo import BusinessPermissionRepository
+from adapters.db.models.user import User
+from adapters.db.models.business import Business
+
+router = APIRouter(prefix="/business", tags=["business-users"])
+
+
+@router.get("/{business_id}/users/{user_id}", 
+    summary="دریافت جزئیات کاربر", 
+    description="دریافت جزئیات کاربر و دسترسی‌هایش در کسب و کار",
+    responses={
+        200: {
+            "description": "جزئیات کاربر با موفقیت دریافت شد",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "success": True,
+                        "message": "جزئیات کاربر دریافت شد",
+                        "user": {
+                            "id": 1,
+                            "business_id": 1,
+                            "user_id": 2,
+                            "user_name": "علی احمدی",
+                            "user_email": "ali@example.com",
+                            "user_phone": "09123456789",
+                            "role": "member",
+                            "status": "active",
+                            "added_at": "2024-01-01T00:00:00Z",
+                            "last_active": "2024-01-01T12:00:00Z",
+                            "permissions": {
+                                "people": {
+                                    "add": True,
+                                    "view": True,
+                                    "edit": False,
+                                    "delete": False
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        401: {
+            "description": "کاربر احراز هویت نشده است"
+        },
+        403: {
+            "description": "دسترسی غیرمجاز به کسب و کار"
+        },
+        404: {
+            "description": "کاربر یافت نشد"
+        }
+    }
+)
+@require_business_access("business_id")
+def get_user_details(
+    request: Request,
+    business_id: int,
+    user_id: int,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db)
+) -> dict:
+    """دریافت جزئیات کاربر و دسترسی‌هایش"""
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    current_user_id = ctx.get_user_id()
+    logger.info(f"Getting user details for user {user_id} in business {business_id}, current user: {current_user_id}")
+    
+    # Check if user is business owner or has permission to manage users
+    business = db.get(Business, business_id)
+    if not business:
+        logger.error(f"Business {business_id} not found")
+        raise HTTPException(status_code=404, detail="کسب و کار یافت نشد")
+    
+    is_owner = business.owner_id == current_user_id
+    can_manage = ctx.can_manage_business_users()
+    
+    logger.info(f"Business owner: {business.owner_id}, is_owner: {is_owner}, can_manage: {can_manage}")
+    
+    if not is_owner and not can_manage:
+        logger.warning(f"User {current_user_id} does not have permission to view user details for business {business_id}")
+        raise HTTPException(status_code=403, detail="شما مجوز مشاهده جزئیات کاربران ندارید")
+    
+    # Get user details
+    user = db.get(User, user_id)
+    if not user:
+        logger.warning(f"User {user_id} not found")
+        raise HTTPException(status_code=404, detail="کاربر یافت نشد")
+    
+    # Get user permissions for this business
+    permission_repo = BusinessPermissionRepository(db)
+    permission_obj = permission_repo.get_by_user_and_business(user_id, business_id)
+    
+    # Determine role and permissions
+    if business.owner_id == user_id:
+        role = "owner"
+        permissions = {}  # Owner has all permissions
+    else:
+        role = "member"
+        permissions = permission_obj.business_permissions if permission_obj else {}
+    
+    # Format user data
+    user_data = {
+        "id": permission_obj.id if permission_obj else user_id,
+        "business_id": business_id,
+        "user_id": user_id,
+        "user_name": f"{user.first_name or ''} {user.last_name or ''}".strip(),
+        "user_email": user.email or "",
+        "user_phone": user.mobile,
+        "role": role,
+        "status": "active",
+        "added_at": permission_obj.created_at if permission_obj else business.created_at,
+        "last_active": permission_obj.updated_at if permission_obj else business.updated_at,
+        "permissions": permissions,
+    }
+    
+    logger.info(f"Returning user data: {user_data}")
+    
+    # Format datetime fields based on calendar type
+    formatted_user_data = format_datetime_fields(user_data, request)
+    
+    return success_response(
+        data={"user": formatted_user_data},
+        request=request,
+        message="جزئیات کاربر دریافت شد"
+    )
+
+
+@router.get("/{business_id}/users", 
+    summary="لیست کاربران کسب و کار", 
+    description="دریافت لیست کاربران یک کسب و کار",
+    response_model=BusinessUsersListResponse,
+    responses={
+        200: {
+            "description": "لیست کاربران با موفقیت دریافت شد",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "success": True,
+                        "message": "لیست کاربران دریافت شد",
+                        "users": [
+                            {
+                                "id": 1,
+                                "business_id": 1,
+                                "user_id": 2,
+                                "user_name": "علی احمدی",
+                                "user_email": "ali@example.com",
+                                "user_phone": "09123456789",
+                                "role": "member",
+                                "status": "active",
+                                "added_at": "2024-01-01T00:00:00Z",
+                                "last_active": "2024-01-01T12:00:00Z",
+                                "permissions": {
+                                    "sales": {
+                                        "read": True,
+                                        "write": True,
+                                        "delete": False
+                                    },
+                                    "reports": {
+                                        "read": True,
+                                        "export": True
+                                    }
+                                }
+                            }
+                        ],
+                        "total_count": 1
+                    }
+                }
+            }
+        },
+        401: {
+            "description": "کاربر احراز هویت نشده است"
+        },
+        403: {
+            "description": "دسترسی غیرمجاز به کسب و کار"
+        }
+    }
+)
+@require_business_access("business_id")
+def get_users(
+    request: Request,
+    business_id: int,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db)
+) -> dict:
+    """دریافت لیست کاربران کسب و کار"""
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    current_user_id = ctx.get_user_id()
+    logger.info(f"Getting users for business {business_id}, current user: {current_user_id}")
+    
+    # Check if user is business owner or has permission to manage users
+    business = db.get(Business, business_id)
+    if not business:
+        logger.error(f"Business {business_id} not found")
+        raise HTTPException(status_code=404, detail="کسب و کار یافت نشد")
+    
+    is_owner = business.owner_id == current_user_id
+    can_manage = ctx.can_manage_business_users()
+    
+    logger.info(f"Business owner: {business.owner_id}, is_owner: {is_owner}, can_manage: {can_manage}")
+    
+    if not is_owner and not can_manage:
+        logger.warning(f"User {current_user_id} does not have permission to manage users for business {business_id}")
+        raise HTTPException(status_code=403, detail="شما مجوز مدیریت کاربران ندارید")
+    
+    # Get business permissions for this business
+    permission_repo = BusinessPermissionRepository(db)
+    business_permissions = permission_repo.get_business_users(business_id)
+    logger.info(f"Found {len(business_permissions)} business permissions for business {business_id}")
+    
+    # Format users data
+    formatted_users = []
+    
+    # Add business owner first
+    owner = db.get(User, business.owner_id)
+    if owner:
+        logger.info(f"Adding business owner: {owner.id} - {owner.email}")
+        owner_data = {
+            "id": business.owner_id,  # Use owner_id as id
+            "business_id": business_id,
+            "user_id": business.owner_id,
+            "user_name": f"{owner.first_name or ''} {owner.last_name or ''}".strip(),
+            "user_email": owner.email or "",
+            "user_phone": owner.mobile,
+            "role": "owner",
+            "status": "active",
+            "added_at": business.created_at,
+            "last_active": business.updated_at,
+            "permissions": {},  # Owner has all permissions
+        }
+        formatted_users.append(owner_data)
+    else:
+        logger.warning(f"Business owner {business.owner_id} not found in users table")
+    
+    # Add other users with permissions
+    for perm in business_permissions:
+        # Skip if this is the owner (already added)
+        if perm.user_id == business.owner_id:
+            logger.info(f"Skipping owner user {perm.user_id} as already added")
+            continue
+            
+        user = db.get(User, perm.user_id)
+        if user:
+            logger.info(f"Adding user with permissions: {user.id} - {user.email}")
+            user_data = {
+                "id": perm.id,
+                "business_id": perm.business_id,
+                "user_id": perm.user_id,
+                "user_name": f"{user.first_name or ''} {user.last_name or ''}".strip(),
+                "user_email": user.email or "",
+                "user_phone": user.mobile,
+                "role": "member",
+                "status": "active",
+                "added_at": perm.created_at,
+                "last_active": perm.updated_at,
+                "permissions": perm.business_permissions or {},
+            }
+            formatted_users.append(user_data)
+        else:
+            logger.warning(f"User {perm.user_id} not found in users table")
+    
+    logger.info(f"Returning {len(formatted_users)} users for business {business_id}")
+    
+    # Format datetime fields based on calendar type
+    formatted_users = format_datetime_fields(formatted_users, request)
+    
+    return success_response(
+        data={
+            "users": formatted_users,
+            "total_count": len(formatted_users)
+        },
+        request=request,
+        message="لیست کاربران دریافت شد"
+    )
+
+
+@router.post("/{business_id}/users", 
+    summary="افزودن کاربر به کسب و کار", 
+    description="افزودن کاربر جدید به کسب و کار با ایمیل یا شماره تلفن",
+    response_model=AddUserResponse,
+    responses={
+        200: {
+            "description": "کاربر با موفقیت اضافه شد",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "success": True,
+                        "message": "کاربر با موفقیت اضافه شد",
+                        "user": {
+                            "id": 1,
+                            "business_id": 1,
+                            "user_id": 2,
+                            "user_name": "علی احمدی",
+                            "user_email": "ali@example.com",
+                            "user_phone": "09123456789",
+                            "role": "member",
+                            "status": "active",
+                            "added_at": "2024-01-01T00:00:00Z",
+                            "last_active": None,
+                            "permissions": {}
+                        }
+                    }
+                }
+            }
+        },
+        400: {
+            "description": "خطا در اعتبارسنجی داده‌ها"
+        },
+        401: {
+            "description": "کاربر احراز هویت نشده است"
+        },
+        403: {
+            "description": "دسترسی غیرمجاز یا مجوز کافی نیست"
+        },
+        404: {
+            "description": "کاربر یافت نشد"
+        }
+    }
+)
+@require_business_access("business_id")
+def add_user(
+    request: Request,
+    business_id: int,
+    add_request: AddUserRequest,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db)
+) -> dict:
+    """افزودن کاربر به کسب و کار"""
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    current_user_id = ctx.get_user_id()
+    logger.info(f"Adding user to business {business_id}, current user: {current_user_id}")
+    logger.info(f"Add request: {add_request.email_or_phone}")
+    
+    # Check if user is business owner or has permission to manage users
+    business = db.get(Business, business_id)
+    if not business:
+        logger.error(f"Business {business_id} not found")
+        raise HTTPException(status_code=404, detail="کسب و کار یافت نشد")
+    
+    is_owner = business.owner_id == current_user_id
+    can_manage = ctx.can_manage_business_users(business_id)
+    
+    logger.info(f"Business owner: {business.owner_id}, is_owner: {is_owner}, can_manage: {can_manage}")
+    logger.info(f"User {current_user_id} business_id from context: {ctx.business_id}")
+    logger.info(f"User {current_user_id} is superadmin: {ctx.is_superadmin()}")
+    
+    if not is_owner and not can_manage:
+        logger.warning(f"User {current_user_id} does not have permission to add users to business {business_id}")
+        raise HTTPException(status_code=403, detail="شما مجوز مدیریت کاربران ندارید")
+    
+    # Find user by email or phone
+    logger.info(f"Searching for user with email/phone: {add_request.email_or_phone}")
+    user = db.query(User).filter(
+        (User.email == add_request.email_or_phone) | 
+        (User.mobile == add_request.email_or_phone)
+    ).first()
+    
+    if not user:
+        logger.warning(f"User not found with email/phone: {add_request.email_or_phone}")
+        raise HTTPException(status_code=404, detail="کاربر یافت نشد")
+    
+    logger.info(f"Found user: {user.id} - {user.email}")
+    
+    # Check if user is already added to this business
+    permission_repo = BusinessPermissionRepository(db)
+    existing_permission = permission_repo.get_by_user_and_business(user.id, business_id)
+    
+    if existing_permission:
+        logger.warning(f"User {user.id} already exists in business {business_id}")
+        raise HTTPException(status_code=400, detail="کاربر قبلاً به این کسب و کار اضافه شده است")
+    
+    # Add user to business with default permissions
+    logger.info(f"Adding user {user.id} to business {business_id}")
+    permission_obj = permission_repo.create_or_update(
+        user_id=user.id,
+        business_id=business_id,
+        permissions={'join': True}  # Default permissions with join access
+    )
+    
+    logger.info(f"Created permission object: {permission_obj.id}")
+    
+    # Format user data
+    user_data = {
+        "id": permission_obj.id,
+        "business_id": permission_obj.business_id,
+        "user_id": permission_obj.user_id,
+        "user_name": f"{user.first_name or ''} {user.last_name or ''}".strip(),
+        "user_email": user.email or "",
+        "user_phone": user.mobile,
+        "role": "member",
+        "status": "active",
+        "added_at": permission_obj.created_at,
+        "last_active": None,
+        "permissions": permission_obj.business_permissions or {},
+    }
+    
+    logger.info(f"Returning user data: {user_data}")
+    
+    # Format datetime fields based on calendar type
+    formatted_user_data = format_datetime_fields(user_data, request)
+    
+    return success_response(
+        data={"user": formatted_user_data},
+        request=request,
+        message="کاربر با موفقیت اضافه شد"
+    )
+
+
+@router.put("/{business_id}/users/{user_id}/permissions", 
+    summary="به‌روزرسانی دسترسی‌های کاربر", 
+    description="به‌روزرسانی دسترسی‌های یک کاربر در کسب و کار",
+    response_model=UpdatePermissionsResponse,
+    responses={
+        200: {
+            "description": "دسترسی‌ها با موفقیت به‌روزرسانی شد",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "success": True,
+                        "message": "دسترسی‌ها با موفقیت به‌روزرسانی شد"
+                    }
+                }
+            }
+        },
+        400: {
+            "description": "خطا در اعتبارسنجی داده‌ها"
+        },
+        401: {
+            "description": "کاربر احراز هویت نشده است"
+        },
+        403: {
+            "description": "دسترسی غیرمجاز یا مجوز کافی نیست"
+        },
+        404: {
+            "description": "کاربر یافت نشد"
+        }
+    }
+)
+@require_business_access("business_id")
+def update_permissions(
+    request: Request,
+    business_id: int,
+    user_id: int,
+    update_request: UpdatePermissionsRequest,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db)
+) -> dict:
+    """به‌روزرسانی دسترسی‌های کاربر"""
+    current_user_id = ctx.get_user_id()
+    
+    # Check if user is business owner or has permission to manage users
+    business = db.get(Business, business_id)
+    if not business:
+        raise HTTPException(status_code=404, detail="کسب و کار یافت نشد")
+    
+    is_owner = business.owner_id == current_user_id
+    can_manage = ctx.can_manage_business_users()
+    
+    if not is_owner and not can_manage:
+        raise HTTPException(status_code=403, detail="شما مجوز مدیریت کاربران ندارید")
+    
+    # Check if target user exists
+    target_user = db.get(User, user_id)
+    if not target_user:
+        raise HTTPException(status_code=404, detail="کاربر یافت نشد")
+    
+    # Update permissions
+    permission_repo = BusinessPermissionRepository(db)
+    permission_obj = permission_repo.create_or_update(
+        user_id=user_id,
+        business_id=business_id,
+        permissions=update_request.permissions
+    )
+    
+    return success_response(
+        data={},
+        request=request,
+        message="دسترسی‌ها با موفقیت به‌روزرسانی شد"
+    )
+
+
+@router.delete("/{business_id}/users/{user_id}", 
+    summary="حذف کاربر از کسب و کار", 
+    description="حذف کاربر از کسب و کار",
+    response_model=RemoveUserResponse,
+    responses={
+        200: {
+            "description": "کاربر با موفقیت حذف شد",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "success": True,
+                        "message": "کاربر با موفقیت حذف شد"
+                    }
+                }
+            }
+        },
+        401: {
+            "description": "کاربر احراز هویت نشده است"
+        },
+        403: {
+            "description": "دسترسی غیرمجاز یا مجوز کافی نیست"
+        },
+        404: {
+            "description": "کاربر یافت نشد"
+        }
+    }
+)
+@require_business_access("business_id")
+def remove_user(
+    request: Request,
+    business_id: int,
+    user_id: int,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db)
+) -> dict:
+    """حذف کاربر از کسب و کار"""
+    current_user_id = ctx.get_user_id()
+    
+    # Check if user is business owner or has permission to manage users
+    business = db.get(Business, business_id)
+    if not business:
+        raise HTTPException(status_code=404, detail="کسب و کار یافت نشد")
+    
+    is_owner = business.owner_id == current_user_id
+    can_manage = ctx.can_manage_business_users()
+    
+    if not is_owner and not can_manage:
+        raise HTTPException(status_code=403, detail="شما مجوز مدیریت کاربران ندارید")
+    
+    # Check if target user is business owner
+    business = db.get(Business, business_id)
+    if business and business.owner_id == user_id:
+        raise HTTPException(status_code=400, detail="نمی‌توان مالک کسب و کار را حذف کرد")
+    
+    # Remove user permissions
+    permission_repo = BusinessPermissionRepository(db)
+    success = permission_repo.delete_by_user_and_business(user_id, business_id)
+    
+    if not success:
+        raise HTTPException(status_code=404, detail="کاربر یافت نشد")
+    
+    return success_response(
+        data={},
+        request=request,
+        message="کاربر با موفقیت حذف شد"
+    )

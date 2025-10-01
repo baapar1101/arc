@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:flutter/services.dart';
 import '../../../models/product_form_data.dart';
 import '../../../utils/product_form_validator.dart';
@@ -19,16 +20,17 @@ class ProductTaxSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text('مالیات', style: Theme.of(context).textTheme.titleSmall),
+        Text(t.taxTitle, style: Theme.of(context).textTheme.titleSmall),
         const SizedBox(height: 16),
         _buildTaxCodeTypeUnitRow(context),
         const SizedBox(height: 24),
-        _buildSalesTaxSection(),
+        _buildSalesTaxSection(context),
         const SizedBox(height: 24),
-        _buildPurchaseTaxSection(),
+        _buildPurchaseTaxSection(context),
       ],
     );
   }
@@ -40,56 +42,58 @@ class ProductTaxSection extends StatelessWidget {
         if (isDesktop) {
           return Row(
             children: [
-              Expanded(child: _buildTaxCodeField()),
+              Expanded(child: _buildTaxCodeField(context)),
               const SizedBox(width: 12),
-              Expanded(child: _buildTaxTypeDropdown()),
+              Expanded(child: _buildTaxTypeDropdown(context)),
               const SizedBox(width: 12),
-              Expanded(child: _buildTaxUnitDropdown()),
+              Expanded(child: _buildTaxUnitDropdown(context)),
             ],
           );
         }
         return Column(
           children: [
-            _buildTaxCodeField(),
+            _buildTaxCodeField(context),
             const SizedBox(height: 12),
-            _buildTaxTypeDropdown(),
+            _buildTaxTypeDropdown(context),
             const SizedBox(height: 12),
-            _buildTaxUnitDropdown(),
+            _buildTaxUnitDropdown(context),
           ],
         );
       },
     );
   }
 
-  Widget _buildTaxCodeField() {
+  Widget _buildTaxCodeField(BuildContext context) {
+    final t = AppLocalizations.of(context);
     return TextFormField(
       initialValue: formData.taxCode,
-      decoration: const InputDecoration(labelText: 'کُد مالیاتی'),
+      decoration: InputDecoration(labelText: t.taxCode),
       onChanged: (value) => _updateFormData(
         formData.copyWith(taxCode: value.trim().isEmpty ? null : value),
       ),
     );
   }
 
-  Widget _buildSalesTaxSection() {
+  Widget _buildSalesTaxSection(BuildContext context) {
+    final t = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SwitchListTile(
           value: formData.isSalesTaxable,
           onChanged: (value) => _updateFormData(formData.copyWith(isSalesTaxable: value)),
-          title: const Text('مشمول مالیات فروش'),
+          title: Text(t.isSalesTaxable),
         ),
         if (formData.isSalesTaxable) ...[
           const SizedBox(height: 16),
           TextFormField(
             initialValue: formData.salesTaxRate?.toString(),
-            decoration: const InputDecoration(labelText: 'نرخ مالیات فروش (%)'),
+            decoration: InputDecoration(labelText: t.salesTaxRate),
             keyboardType: TextInputType.number,
             inputFormatters: [
               FilteringTextInputFormatter.digitsOnly,
             ],
-            validator: (value) => ProductFormValidator.validateTaxRate(value, fieldName: 'نرخ مالیات فروش'),
+            validator: (value) => ProductFormValidator.validateTaxRate(value, fieldName: t.salesTaxRate),
             onChanged: (value) => _updateFormData(formData.copyWith(salesTaxRate: num.tryParse(value))),
           ),
         ],
@@ -97,25 +101,26 @@ class ProductTaxSection extends StatelessWidget {
     );
   }
 
-  Widget _buildPurchaseTaxSection() {
+  Widget _buildPurchaseTaxSection(BuildContext context) {
+    final t = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SwitchListTile(
           value: formData.isPurchaseTaxable,
           onChanged: (value) => _updateFormData(formData.copyWith(isPurchaseTaxable: value)),
-          title: const Text('مشمول مالیات خرید'),
+          title: Text(t.isPurchaseTaxable),
         ),
         if (formData.isPurchaseTaxable) ...[
           const SizedBox(height: 16),
           TextFormField(
             initialValue: formData.purchaseTaxRate?.toString(),
-            decoration: const InputDecoration(labelText: 'نرخ مالیات خرید (%)'),
+            decoration: InputDecoration(labelText: t.purchaseTaxRate),
             keyboardType: TextInputType.number,
             inputFormatters: [
               FilteringTextInputFormatter.digitsOnly,
             ],
-            validator: (value) => ProductFormValidator.validateTaxRate(value, fieldName: 'نرخ مالیات خرید'),
+            validator: (value) => ProductFormValidator.validateTaxRate(value, fieldName: t.purchaseTaxRate),
             onChanged: (value) => _updateFormData(formData.copyWith(purchaseTaxRate: num.tryParse(value))),
           ),
         ],
@@ -123,8 +128,9 @@ class ProductTaxSection extends StatelessWidget {
     );
   }
 
-  Widget _buildTaxTypeDropdown() {
+  Widget _buildTaxTypeDropdown(BuildContext context) {
     if (taxTypes.isNotEmpty) {
+      final t = AppLocalizations.of(context);
       return DropdownButtonFormField<int>(
         value: formData.taxTypeId,
         items: taxTypes
@@ -134,21 +140,23 @@ class ProductTaxSection extends StatelessWidget {
                 ))
             .toList(),
         onChanged: (value) => _updateFormData(formData.copyWith(taxTypeId: value)),
-        decoration: const InputDecoration(labelText: 'نوع مالیات'),
+        decoration: InputDecoration(labelText: t.taxType),
       );
     } else {
+      final t = AppLocalizations.of(context);
       return TextFormField(
         initialValue: formData.taxTypeId?.toString(),
-        decoration: const InputDecoration(labelText: 'شناسه نوع مالیات'),
+        decoration: InputDecoration(labelText: t.taxTypeId),
         keyboardType: TextInputType.number,
         onChanged: (value) => _updateFormData(formData.copyWith(taxTypeId: int.tryParse(value))),
       );
     }
   }
 
-  Widget _buildTaxUnitDropdown() {
+  Widget _buildTaxUnitDropdown(BuildContext context) {
     final List<Map<String, dynamic>> effectiveTaxUnits = taxUnits.isNotEmpty ? taxUnits : _fallbackTaxUnits();
     if (effectiveTaxUnits.isNotEmpty) {
+      final t = AppLocalizations.of(context);
       return DropdownButtonFormField<int>(
         value: formData.taxUnitId,
         items: effectiveTaxUnits
@@ -158,12 +166,13 @@ class ProductTaxSection extends StatelessWidget {
                 ))
             .toList(),
         onChanged: (value) => _updateFormData(formData.copyWith(taxUnitId: value)),
-        decoration: const InputDecoration(labelText: 'واحد مالیاتی'),
+        decoration: InputDecoration(labelText: t.taxUnit),
       );
     } else {
+      final t = AppLocalizations.of(context);
       return TextFormField(
         initialValue: formData.taxUnitId?.toString(),
-        decoration: const InputDecoration(labelText: 'شناسه واحد مالیاتی'),
+        decoration: InputDecoration(labelText: t.taxUnitId),
         keyboardType: TextInputType.number,
         onChanged: (value) => _updateFormData(formData.copyWith(taxUnitId: int.tryParse(value))),
       );

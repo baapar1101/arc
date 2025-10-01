@@ -2563,4 +2563,258 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get operationFailed => 'Operation failed';
+
+  @override
+  String get productGeneralInfo => 'General Information';
+
+  @override
+  String get pricingAndInventory => 'Pricing & Inventory';
+
+  @override
+  String get tax => 'Tax';
+
+  @override
+  String get inventoryControl => 'Inventory control';
+
+  @override
+  String get reorderPoint => 'Reorder point';
+
+  @override
+  String get reorderPointRepeat => 'Reorder point';
+
+  @override
+  String get minOrderQty => 'Minimum order quantity';
+
+  @override
+  String get leadTimeDays => 'Lead time (days)';
+
+  @override
+  String get pricing => 'Pricing';
+
+  @override
+  String get salesPrice => 'Sales price';
+
+  @override
+  String get salesPriceNote => 'Sales price note';
+
+  @override
+  String get purchasePrice => 'Purchase price';
+
+  @override
+  String get purchasePriceNote => 'Purchase price note';
+
+  @override
+  String get pricesInPriceLists => 'Prices in price lists';
+
+  @override
+  String get addPrice => 'Add price';
+
+  @override
+  String get price => 'Price';
+
+  @override
+  String get currency => 'Currency';
+
+  @override
+  String get noPriceListsTitle => 'No price list';
+
+  @override
+  String get noPriceListsMessage =>
+      'To add a price, first create a price list.';
+
+  @override
+  String get noPriceListsHint =>
+      'Use \"Manage price lists\" button in Products page to create one.';
+
+  @override
+  String get gotIt => 'Got it';
+
+  @override
+  String get unitsTitle => 'Units';
+
+  @override
+  String get mainUnit => 'Main unit';
+
+  @override
+  String get secondaryUnit => 'Secondary unit';
+
+  @override
+  String get unitConversionFactor => 'Unit conversion factor';
+
+  @override
+  String get itemType => 'Type';
+
+  @override
+  String get type => 'Type';
+
+  @override
+  String get productPhysicalDesc => 'Physical products';
+
+  @override
+  String get serviceDesc => 'Services';
+
+  @override
+  String get taxTitle => 'Tax';
+
+  @override
+  String get taxCode => 'Tax code';
+
+  @override
+  String get isSalesTaxable => 'Sales taxable';
+
+  @override
+  String get salesTaxRate => 'Sales tax rate (%)';
+
+  @override
+  String get isPurchaseTaxable => 'Purchase taxable';
+
+  @override
+  String get purchaseTaxRate => 'Purchase tax rate (%)';
+
+  @override
+  String get taxType => 'Tax type';
+
+  @override
+  String get taxTypeId => 'Tax type id';
+
+  @override
+  String get taxUnit => 'Tax unit';
+
+  @override
+  String get taxUnitId => 'Tax unit id';
+
+  @override
+  String get bulkPriceUpdateTitle => 'Bulk price update';
+
+  @override
+  String get bulkPriceUpdateSubtitle =>
+      'Increase or decrease prices with advanced filters';
+
+  @override
+  String get preview => 'Preview';
+
+  @override
+  String get applyChanges => 'Apply changes';
+
+  @override
+  String get changeTypeAndDirection => 'Change type & direction';
+
+  @override
+  String get changeTarget => 'Target';
+
+  @override
+  String get changeAmount => 'Change amount';
+
+  @override
+  String get filters => 'Filters';
+
+  @override
+  String get previewChanges => 'Preview changes';
+
+  @override
+  String get percentage => 'Percentage';
+
+  @override
+  String get amount => 'Amount';
+
+  @override
+  String get samplePercent => 'e.g. 10%';
+
+  @override
+  String get sampleAmount => 'e.g. 1,000,000';
+
+  @override
+  String get increase => 'Increase';
+
+  @override
+  String get decrease => 'Decrease';
+
+  @override
+  String get both => 'Both';
+
+  @override
+  String get allCurrencies => 'All currencies';
+
+  @override
+  String get priceList => 'Price list';
+
+  @override
+  String get allPriceLists => 'All lists';
+
+  @override
+  String get itemTypeLabel => 'Item type';
+
+  @override
+  String get allTypes => 'All types';
+
+  @override
+  String get productsWithInventoryOnly => 'Only products with inventory';
+
+  @override
+  String get productsWithInventoryOnlySubtitle =>
+      'Only products with inventory control';
+
+  @override
+  String get productsWithBasePriceOnly => 'Only products with base price';
+
+  @override
+  String get productsWithBasePriceOnlySubtitle =>
+      'Only products that have a base price';
+
+  @override
+  String get confirmChangesTitle => 'Confirm changes';
+
+  @override
+  String confirmApplyChangesForNProducts(Object count) {
+    return 'Apply changes to $count products?';
+  }
+
+  @override
+  String get irreversibleWarning => 'This action is irreversible.';
+
+  @override
+  String get summary => 'Summary';
+
+  @override
+  String get totalProducts => 'Total products';
+
+  @override
+  String get affectedProducts => 'Affected products';
+
+  @override
+  String get salesPriceChanges => 'Sales price changes';
+
+  @override
+  String get purchasePriceChanges => 'Purchase price changes';
+
+  @override
+  String get codeLabel => 'Code';
+
+  @override
+  String get salesLabel => 'Sales';
+
+  @override
+  String get purchaseLabel => 'Purchase';
+
+  @override
+  String get managePriceLists => 'Manage price lists';
+
+  @override
+  String get noProductsReadAccess =>
+      'You do not have permission to view products & services';
+
+  @override
+  String get productId => 'Product ID';
+
+  @override
+  String get unit => 'Unit';
+
+  @override
+  String get minQty => 'Minimum quantity';
+
+  @override
+  String get addPriceTitle => 'Add price';
+
+  @override
+  String get editPriceTitle => 'Edit price';
 }

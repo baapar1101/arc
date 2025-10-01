@@ -14,9 +14,15 @@ def success_response(data: Any, request: Request = None, message: str = None) ->
 	if data is not None:
 		response["data"] = data
 	
-	# Add message if provided
+	# Add message if provided (translate if translator exists)
 	if message is not None:
-		response["message"] = message
+		translated = message
+		try:
+			if request is not None and hasattr(request.state, 'translator') and request.state.translator is not None:
+				translated = request.state.translator.t(message, default=message)
+		except Exception:
+			translated = message
+		response["message"] = translated
 	
 	# Add calendar type information if request is available
 	if request and hasattr(request.state, 'calendar_type'):

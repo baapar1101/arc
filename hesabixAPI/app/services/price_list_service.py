@@ -20,11 +20,9 @@ def create_price_list(db: Session, business_id: int, payload: PriceListCreateReq
     obj = repo.create(
         business_id=business_id,
         name=payload.name.strip(),
-        currency_id=payload.currency_id,
-        default_unit_id=payload.default_unit_id,
         is_active=payload.is_active,
     )
-    return {"message": "لیست قیمت ایجاد شد", "data": _pl_to_dict(obj)}
+    return {"message": "PRICE_LIST_CREATED", "data": _pl_to_dict(obj)}
 
 
 def list_price_lists(db: Session, business_id: int, query: Dict[str, Any]) -> Dict[str, Any]:
@@ -53,10 +51,10 @@ def update_price_list(db: Session, business_id: int, id: int, payload: PriceList
         dup = db.query(PriceList).filter(and_(PriceList.business_id == business_id, PriceList.name == payload.name.strip(), PriceList.id != id)).first()
         if dup:
             raise ApiError("DUPLICATE_PRICE_LIST_NAME", "نام لیست قیمت تکراری است", http_status=400)
-    updated = repo.update(id, name=payload.name.strip() if isinstance(payload.name, str) else None, currency_id=payload.currency_id, default_unit_id=payload.default_unit_id, is_active=payload.is_active)
+    updated = repo.update(id, name=payload.name.strip() if isinstance(payload.name, str) else None, is_active=payload.is_active)
     if not updated:
         return None
-    return {"message": "لیست قیمت بروزرسانی شد", "data": _pl_to_dict(updated)}
+    return {"message": "PRICE_LIST_UPDATED", "data": _pl_to_dict(updated)}
 
 
 def delete_price_list(db: Session, business_id: int, id: int) -> bool:
@@ -67,13 +65,13 @@ def delete_price_list(db: Session, business_id: int, id: int) -> bool:
     return repo.delete(id)
 
 
-def list_price_items(db: Session, business_id: int, price_list_id: int, take: int = 50, skip: int = 0) -> Dict[str, Any]:
+def list_price_items(db: Session, business_id: int, price_list_id: int, take: int = 50, skip: int = 0, product_id: int | None = None, currency_id: int | None = None) -> Dict[str, Any]:
     # مالکیت را از روی price_list بررسی می‌کنیم
     pl = db.get(PriceList, price_list_id)
     if not pl or pl.business_id != business_id:
         raise ApiError("NOT_FOUND", "لیست قیمت یافت نشد", http_status=404)
     repo = PriceItemRepository(db)
-    return repo.list_for_price_list(price_list_id=price_list_id, take=take, skip=skip)
+    return repo.list_for_price_list(price_list_id=price_list_id, take=take, skip=skip, product_id=product_id, currency_id=currency_id)
 
 
 def upsert_price_item(db: Session, business_id: int, price_list_id: int, payload: PriceItemUpsertRequest) -> Dict[str, Any]:
@@ -93,12 +91,12 @@ def upsert_price_item(db: Session, business_id: int, price_list_id: int, payload
         price_list_id=price_list_id,
         product_id=payload.product_id,
         unit_id=payload.unit_id,
-        currency_id=payload.currency_id or pl.currency_id,
-        tier_name=payload.tier_name.strip(),
+        currency_id=payload.currency_id,
+        tier_name=(payload.tier_name.strip() if isinstance(payload.tier_name, str) and payload.tier_name.strip() else 'پیش‌فرض'),
         min_qty=payload.min_qty,
         price=payload.price,
     )
-    return {"message": "قیمت ثبت شد", "data": _pi_to_dict(obj)}
+    return {"message": "PRICE_ITEM_UPSERTED", "data": _pi_to_dict(obj)}
 
 
 def delete_price_item(db: Session, business_id: int, id: int) -> bool:
@@ -118,8 +116,6 @@ def _pl_to_dict(obj: PriceList) -> Dict[str, Any]:
         "id": obj.id,
         "business_id": obj.business_id,
         "name": obj.name,
-        "currency_id": obj.currency_id,
-        "default_unit_id": obj.default_unit_id,
         "is_active": obj.is_active,
         "created_at": obj.created_at,
         "updated_at": obj.updated_at,

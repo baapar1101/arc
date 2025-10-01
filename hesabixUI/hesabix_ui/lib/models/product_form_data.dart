@@ -21,7 +21,7 @@ class ProductFormData {
   // Units
   int? mainUnitId;
   int? secondaryUnitId;
-  num? unitConversionFactor;
+  num unitConversionFactor;
   
   // Taxes
   bool isSalesTaxable;
@@ -51,7 +51,7 @@ class ProductFormData {
     this.basePurchaseNote,
     this.mainUnitId,
     this.secondaryUnitId,
-    this.unitConversionFactor,
+    this.unitConversionFactor = 1,
     this.isSalesTaxable = false,
     this.isPurchaseTaxable = false,
     this.salesTaxRate,
@@ -117,32 +117,37 @@ class ProductFormData {
   }
 
   Map<String, dynamic> toPayload() {
-    return {
+    final payload = <String, dynamic>{
       'item_type': itemType,
       'code': code,
       'name': name,
       'description': description,
       'category_id': categoryId,
       'track_inventory': trackInventory,
-      'base_sales_price': baseSalesPrice,
-      'base_purchase_price': basePurchasePrice,
+      // Default numeric fields to zero when null
+      'base_sales_price': baseSalesPrice ?? 0,
+      'base_purchase_price': basePurchasePrice ?? 0,
+      'reorder_point': reorderPoint ?? 0,
+      'min_order_qty': minOrderQty ?? 0,
+      'lead_time_days': leadTimeDays ?? 0,
+      'is_sales_taxable': isSalesTaxable,
+      'is_purchase_taxable': isPurchaseTaxable,
+      'sales_tax_rate': salesTaxRate ?? 0,
+      'purchase_tax_rate': purchaseTaxRate ?? 0,
+      // Keep optional IDs and factor as-is (do not force zero)
       'main_unit_id': mainUnitId,
       'secondary_unit_id': secondaryUnitId,
       'unit_conversion_factor': unitConversionFactor,
       'base_sales_note': baseSalesNote,
       'base_purchase_note': basePurchaseNote,
-      'reorder_point': reorderPoint,
-      'min_order_qty': minOrderQty,
-      'lead_time_days': leadTimeDays,
-      'is_sales_taxable': isSalesTaxable,
-      'is_purchase_taxable': isPurchaseTaxable,
-      'sales_tax_rate': salesTaxRate,
-      'purchase_tax_rate': purchaseTaxRate,
       'tax_type_id': taxTypeId,
       'tax_code': taxCode,
       'tax_unit_id': taxUnitId,
       'attribute_ids': selectedAttributeIds.isEmpty ? null : selectedAttributeIds.toList(),
-    }..removeWhere((k, v) => v == null);
+    };
+    // Remove only nulls we intentionally kept nullable
+    payload.removeWhere((k, v) => v == null);
+    return payload;
   }
 
   factory ProductFormData.fromProduct(Map<String, dynamic> product) {
@@ -157,7 +162,7 @@ class ProductFormData {
       basePurchasePrice: _parseNumeric(product['base_purchase_price']),
       mainUnitId: product['main_unit_id'] as int?,
       secondaryUnitId: product['secondary_unit_id'] as int?,
-      unitConversionFactor: _parseNumeric(product['unit_conversion_factor']),
+      unitConversionFactor: _parseNumeric(product['unit_conversion_factor']) ?? 1,
       baseSalesNote: product['base_sales_note']?.toString(),
       basePurchaseNote: product['base_purchase_note']?.toString(),
       reorderPoint: _parseInt(product['reorder_point']),

@@ -5,6 +5,8 @@ import '../services/category_service.dart';
 import '../services/product_attribute_service.dart';
 import '../services/unit_service.dart';
 import '../services/tax_service.dart';
+import '../services/price_list_service.dart';
+import '../services/currency_service.dart';
 import '../core/api_client.dart';
 
 class ProductFormController extends ChangeNotifier {
@@ -16,6 +18,8 @@ class ProductFormController extends ChangeNotifier {
   late final ProductAttributeService _attributeService;
   late final UnitService _unitService;
   late final TaxService _taxService;
+  late final PriceListService _priceListService;
+  late final CurrencyService _currencyService;
 
   ProductFormData _formData = ProductFormData();
   bool _isLoading = false;
@@ -28,6 +32,11 @@ class ProductFormController extends ChangeNotifier {
   List<Map<String, dynamic>> _units = [];
   List<Map<String, dynamic>> _taxTypes = [];
   List<Map<String, dynamic>> _taxUnits = [];
+  List<Map<String, dynamic>> _priceLists = [];
+  List<Map<String, dynamic>> _currencies = [];
+
+  // Draft price items per price list (for multi-currency)
+  final List<Map<String, dynamic>> _draftPriceItems = [];
 
   ProductFormController({
     required this.businessId,
@@ -42,6 +51,8 @@ class ProductFormController extends ChangeNotifier {
     _attributeService = ProductAttributeService(apiClient: _apiClient);
     _unitService = UnitService(apiClient: _apiClient);
     _taxService = TaxService(apiClient: _apiClient);
+    _priceListService = PriceListService(apiClient: _apiClient);
+    _currencyService = CurrencyService(_apiClient);
   }
 
   // Getters
@@ -53,20 +64,66 @@ class ProductFormController extends ChangeNotifier {
   List<Map<String, dynamic>> get units => _units;
   List<Map<String, dynamic>> get taxTypes => _taxTypes;
   List<Map<String, dynamic>> get taxUnits => _taxUnits;
+  List<Map<String, dynamic>> get priceLists => _priceLists;
+  List<Map<String, dynamic>> get currencies => _currencies;
+  List<Map<String, dynamic>> get draftPriceItems => List.unmodifiable(_draftPriceItems);
+
+  void addOrUpdateDraftPriceItem(Map<String, dynamic> item) {
+    final String key = (
+      (item['price_list_id']?.toString() ?? '') + '|' +
+      (item['product_id']?.toString() ?? '') + '|' +
+      (item['unit_id']?.toString() ?? 'null') + '|' +
+      (item['currency_id']?.toString() ?? '') + '|' +
+      (item['tier_name']?.toString() ?? '') + '|' +
+      (item['min_qty']?.toString() ?? '0')
+    );
+    int existingIndex = -1;
+    for (int i = 0; i < _draftPriceItems.length; i++) {
+      final it = _draftPriceItems[i];
+      final itKey = (
+        (it['price_list_id']?.toString() ?? '') + '|' +
+        (it['product_id']?.toString() ?? '') + '|' +
+        (it['unit_id']?.toString() ?? 'null') + '|' +
+        (it['currency_id']?.toString() ?? '') + '|' +
+        (it['tier_name']?.toString() ?? '') + '|' +
+        (it['min_qty']?.toString() ?? '0')
+      );
+      if (itKey == key) {
+        existingIndex = i;
+        break;
+      }
+    }
+    if (existingIndex >= 0) {
+      _draftPriceItems[existingIndex] = item;
+    } else {
+      _draftPriceItems.add(item);
+    }
+    notifyListeners();
+  }
+
+  void removeDraftPriceItem(Map<String, dynamic> item) {
+    _draftPriceItems.remove(item);
+    notifyListeners();
+  }
 
   // Initialize form with existing product data
   Future<void> initializeWithProduct(Map<String, dynamic>? product) async {
     _setLoading(true);
     try {
       await _loadReferenceData();
+      await _loadPriceListsAndCurrencies();
       
       if (product != null) {
         _editingProductId = product['id'] as int?;
         _formData = ProductFormData.fromProduct(product);
+        if (_editingProductId != null) {
+          await _loadExistingPriceItems(productId: _editingProductId!);
+        }
       } else {
         _formData = ProductFormData(
           baseSalesPrice: 0,
           basePurchasePrice: 0,
+          unitConversionFactor: 1,
         );
         // پیش‌فرض انتخاب اولین نوع مالیات و واحد مالیاتی اگر موجود باشد
         if (_taxTypes.isNotEmpty && _formData.taxTypeId == null) {
@@ -146,6 +203,47 @@ class ProductFormController extends ChangeNotifier {
     }
   }
 
+  Future<void> _loadPriceListsAndCurrencies() async {
+    try {
+      // Price lists (first page only for selection)
+      try {
+        final res = await _priceListService.listPriceLists(businessId: businessId, page: 1, limit: 100);
+        _priceLists = List<Map<String, dynamic>>.from(res['items'] ?? const []);
+      } catch (_) {
+        _priceLists = [];
+      }
+      // Currencies: load only business default + active currencies
+      try {
+        _currencies = await _currencyService.listBusinessCurrencies(businessId: businessId);
+      } catch (_) {
+        _currencies = [];
+      }
+    } catch (e) {
+      // ignore; optional reference data
+    }
+  }
+
+  Future<void> _loadExistingPriceItems({required int productId}) async {
+    _draftPriceItems.clear();
+    // Iterate over price lists and collect items for this product
+    for (final pl in _priceLists) {
+      final plId = (pl['id'] as num?)?.toInt();
+      if (plId == null) continue;
+      try {
+        final items = await _priceListService.listItems(
+          businessId: businessId,
+          priceListId: plId,
+          productId: productId,
+        );
+        for (final it in items) {
+          _draftPriceItems.add(Map<String, dynamic>.from(it));
+        }
+      } catch (_) {
+        // skip this price list on error
+      }
+    }
+  }
+
   // Update form data
   void updateFormData(ProductFormData newData) {
     _formData = newData;
@@ -158,7 +256,7 @@ class ProductFormController extends ChangeNotifier {
     return formKey.currentState?.validate() ?? false;
   }
 
-  // Submit form
+  // Submit form (create new product only). For editing, call updateProduct.
   Future<bool> submitForm() async {
     if (!_formData.name.trim().isNotEmpty) {
       _setError('نام کالا الزامی است');
@@ -182,14 +280,11 @@ class ProductFormController extends ChangeNotifier {
         }
       }
       
-      // Check if this is an update or create
-      final isUpdate = _formData.code != null; // Assuming code indicates existing product
-      
-      if (isUpdate) {
-        // For update, we need the product ID - this should be passed from the calling widget
-        throw UnimplementedError('Update functionality needs product ID');
-      } else {
-        await _productService.createProduct(businessId: businessId, payload: payload);
+      // Always create in submitForm; editing handled by updateProduct
+      final created = await _productService.createProduct(businessId: businessId, payload: payload);
+      final newId = (created['id'] as num?)?.toInt();
+      if (newId != null) {
+        await _saveDraftPriceItems(productId: newId);
       }
       
       _clearError();
@@ -230,6 +325,7 @@ class ProductFormController extends ChangeNotifier {
         productId: productId,
         payload: payload,
       );
+      await _saveDraftPriceItems(productId: productId);
       
       _clearError();
       return true;
@@ -238,6 +334,31 @@ class ProductFormController extends ChangeNotifier {
       return false;
     } finally {
       _setLoading(false);
+    }
+  }
+
+  Future<void> _saveDraftPriceItems({required int productId}) async {
+    // Group by price_list_id and call upsert for each draft row
+    for (final it in _draftPriceItems) {
+      final plId = (it['price_list_id'] as num?)?.toInt();
+      if (plId == null) continue;
+      final payload = {
+        'product_id': productId,
+        'unit_id': it['unit_id'],
+        'currency_id': it['currency_id'],
+        'tier_name': it['tier_name'],
+        'min_qty': it['min_qty'],
+        'price': it['price'],
+      }..removeWhere((k, v) => v == null);
+      try {
+        await _priceListService.upsertItem(
+          businessId: businessId,
+          priceListId: plId,
+          payload: payload,
+        );
+      } catch (_) {
+        // keep going for other items; errors can be surfaced later
+      }
     }
   }
 

@@ -23,7 +23,7 @@ class ProductFormValidator {
 
   static String? validatePrice(String? value, {String fieldName = 'قیمت'}) {
     if (value != null && value.trim().isNotEmpty) {
-      final price = num.tryParse(value);
+      final price = num.tryParse(value.replaceAll(',', ''));
       if (price == null) {
         return '$fieldName باید عدد معتبر باشد';
       }

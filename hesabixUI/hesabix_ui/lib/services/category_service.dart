@@ -26,6 +26,30 @@ class CategoryService {
     }
   }
 
+  Future<List<Map<String, dynamic>>> search({
+    required int businessId,
+    required String query,
+    int limit = 50,
+  }) async {
+    try {
+      final res = await _apiClient.post<Map<String, dynamic>>(
+        '/api/v1/categories/business/$businessId/search',
+        data: {
+          'query': query,
+          'limit': limit,
+        },
+      );
+      final data = res.data?['data'];
+      final items = (data is Map<String, dynamic>) ? data['items'] : null;
+      if (items is List) {
+        return items.map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e)).toList();
+      }
+      return const <Map<String, dynamic>>[];
+    } on DioException catch (e) {
+      throw Exception(e.message);
+    }
+  }
+
   Future<Map<String, dynamic>> create({
     required int businessId,
     int? parentId,

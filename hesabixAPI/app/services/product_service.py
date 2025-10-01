@@ -103,7 +103,7 @@ def create_product(db: Session, business_id: int, payload: ProductCreateRequest)
 
     _upsert_attributes(db, obj.id, business_id, payload.attribute_ids)
 
-    return {"message": "آیتم با موفقیت ایجاد شد", "data": _to_dict(obj)}
+    return {"message": "PRODUCT_CREATED", "data": _to_dict(obj)}
 
 
 def list_products(db: Session, business_id: int, query: Dict[str, Any]) -> Dict[str, Any]:
@@ -178,7 +178,7 @@ def update_product(db: Session, product_id: int, business_id: int, payload: Prod
         return None
 
     _upsert_attributes(db, product_id, business_id, payload.attribute_ids)
-    return {"message": "آیتم با موفقیت ویرایش شد", "data": _to_dict(updated)}
+    return {"message": "PRODUCT_UPDATED", "data": _to_dict(updated)}
 
 
 def delete_product(db: Session, product_id: int, business_id: int) -> bool:
