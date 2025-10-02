@@ -2817,4 +2817,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get editPriceTitle => 'Edit price';
+
+  @override
+  String get productDeletedSuccessfully =>
+      'Product or service deleted successfully';
+
+  @override
+  String get productsDeletedSuccessfully =>
+      'Selected items deleted successfully';
+
+  @override
+  String get noRowsSelectedError => 'No rows selected';
 }

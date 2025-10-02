@@ -5,6 +5,7 @@ import '../../widgets/data_table/data_table_config.dart';
 import '../../widgets/product/product_form_dialog.dart';
 import '../../widgets/product/bulk_price_update_dialog.dart';
 import '../../widgets/product/product_import_dialog.dart';
+import '../../core/api_client.dart';
 import 'price_lists_page.dart';
 import '../../core/auth_store.dart';
 import '../../utils/number_formatters.dart';
@@ -129,12 +130,103 @@ class _ProductsPageState extends State<ProductsPage> {
                   );
                 },
               ),
+              DataTableAction(
+                icon: Icons.delete_outline,
+                label: AppLocalizations.of(context).delete,
+                isDestructive: true,
+                onTap: (row) async {
+                  final t = AppLocalizations.of(context);
+                  final confirm = await showDialog<bool>(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      title: Text(t.deleteProducts),
+                      content: Text(t.deleteConfirm('"${row['name'] ?? row['code'] ?? '#'}"')),
+                      actions: [
+                        TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(t.cancel)),
+                        FilledButton.tonal(onPressed: () => Navigator.of(ctx).pop(true), child: Text(t.delete)),
+                      ],
+                    ),
+                  );
+                  if (confirm != true) return;
+                  try {
+                    final api = ApiClient();
+                    await api.delete<Map<String, dynamic>>(
+                      '/products/business/${widget.businessId}/${row['id']}',
+                    );
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.productDeletedSuccessfully)));
+                      try { ( _tableKey.currentState as dynamic)?.refresh(); } catch (_) {}
+                    }
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${t.error}: $e')));
+                    }
+                  }
+                },
+              ),
             ]),
           ],
           searchFields: const ['code', 'name', 'description'],
           filterFields: const ['item_type', 'category_id'],
           defaultPageSize: 20,
           customHeaderActions: [
+            if (widget.authStore.canDeleteSection('products'))
+              Tooltip(
+                message: AppLocalizations.of(context).deleteProducts,
+                child: IconButton(
+                  onPressed: () async {
+                    final t = AppLocalizations.of(context);
+                    // Collect selected row IDs via DataTableWidget public API
+                    try {
+                      // Access current table state to read selected rows and items
+                      final state = _tableKey.currentState as dynamic;
+                      final selectedIndices = (state?.getSelectedRowIndices() as List<int>?) ?? const <int>[];
+                      final items = (state?.getSelectedItems() as List<dynamic>?) ?? const <dynamic>[];
+                      if (selectedIndices.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.noRowsSelectedError)));
+                        return;
+                      }
+                      final ids = <int>[];
+                      for (final i in selectedIndices) {
+                        if (i >= 0 && i < items.length) {
+                          final row = items[i] as Map<String, dynamic>;
+                          final id = row['id'];
+                          if (id is int) ids.add(id);
+                        }
+                      }
+                      if (ids.isEmpty) return;
+                      final confirm = await showDialog<bool>(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          title: Text(t.deleteProducts),
+                          content: Text(t.deleteConfirm('${ids.length}')),
+                          actions: [
+                            TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(t.cancel)),
+                            FilledButton.tonal(onPressed: () => Navigator.of(ctx).pop(true), child: Text(t.delete)),
+                          ],
+                        ),
+                      );
+                      if (confirm != true) return;
+
+                      final api = ApiClient();
+                      await api.post<Map<String, dynamic>>(
+                        '/products/business/${widget.businessId}/bulk-delete',
+                        data: { 'ids': ids },
+                      );
+                      try { ( _tableKey.currentState as dynamic)?.refresh(); } catch (_) {}
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.productsDeletedSuccessfully)));
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        final t = AppLocalizations.of(context);
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${t.error}: $e')));
+                      }
+                    }
+                  },
+                  icon: const Icon(Icons.delete_sweep_outlined),
+                ),
+              ),
             Tooltip(
               message: t.importFromExcel,
               child: IconButton(

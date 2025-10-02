@@ -2797,4 +2797,14 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get editPriceTitle => 'ویرایش قیمت';
+
+  @override
+  String get productDeletedSuccessfully => 'کالا/خدمت با موفقیت حذف شد';
+
+  @override
+  String get productsDeletedSuccessfully =>
+      'آیتم‌های انتخاب‌شده با موفقیت حذف شدند';
+
+  @override
+  String get noRowsSelectedError => 'هیچ سطری انتخاب نشده است';
 }

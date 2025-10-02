@@ -1035,6 +1035,9 @@
   "unit": "واحد",
   "minQty": "حداقل تعداد",
   "addPriceTitle": "افزودن قیمت",
-  "editPriceTitle": "ویرایش قیمت"
+  "editPriceTitle": "ویرایش قیمت",
+  "productDeletedSuccessfully": "کالا/خدمت با موفقیت حذف شد",
+  "productsDeletedSuccessfully": "آیتم‌های انتخاب‌شده با موفقیت حذف شدند",
+  "noRowsSelectedError": "هیچ سطری انتخاب نشده است"
 }
 

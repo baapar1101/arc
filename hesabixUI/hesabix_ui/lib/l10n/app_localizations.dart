@@ -5563,6 +5563,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Edit price'**
   String get editPriceTitle;
+
+  /// No description provided for @productDeletedSuccessfully.
+  ///
+  /// In en, this message translates to:
+  /// **'Product or service deleted successfully'**
+  String get productDeletedSuccessfully;
+
+  /// No description provided for @productsDeletedSuccessfully.
+  ///
+  /// In en, this message translates to:
+  /// **'Selected items deleted successfully'**
+  String get productsDeletedSuccessfully;
+
+  /// No description provided for @noRowsSelectedError.
+  ///
+  /// In en, this message translates to:
+  /// **'No rows selected'**
+  String get noRowsSelectedError;
 }
 
 class _AppLocalizationsDelegate

@@ -91,6 +91,22 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     _fetchData();
   }
 
+  // Public helpers for external widgets (via GlobalKey)
+  List<int> getSelectedRowIndices() {
+    return _selectedRows.toList();
+  }
+
+  List<T> getSelectedItems() {
+    if (_selectedRows.isEmpty) return const [];
+    final list = <T>[];
+    for (final i in _selectedRows) {
+      if (i >= 0 && i < _items.length) {
+        list.add(_items[i]);
+      }
+    }
+    return list;
+  }
+
   @override
   void dispose() {
     _searchCtrl.dispose();

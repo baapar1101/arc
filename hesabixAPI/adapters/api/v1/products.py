@@ -121,6 +121,64 @@ def delete_product_endpoint(
     return success_response({"deleted": ok}, request)
 
 
+@router.post("/business/{business_id}/bulk-delete",
+    summary="حذف گروهی محصولات",
+    description="حذف چندین آیتم بر اساس شناسه‌ها یا کدها",
+)
+@require_business_access("business_id")
+def bulk_delete_products_endpoint(
+    request: Request,
+    business_id: int,
+    body: Dict[str, Any],
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    if not ctx.has_business_permission("inventory", "delete"):
+        raise ApiError("FORBIDDEN", "Missing business permission: inventory.delete", http_status=403)
+
+    from sqlalchemy import and_ as _and
+    from adapters.db.models.product import Product
+
+    ids = body.get("ids")
+    codes = body.get("codes")
+    deleted = 0
+    skipped = 0
+
+    if not ids and not codes:
+        return success_response({"deleted": 0, "skipped": 0}, request)
+
+    # Normalize inputs
+    if isinstance(ids, list):
+        ids = [int(x) for x in ids if isinstance(x, (int, str)) and str(x).isdigit()]
+    else:
+        ids = []
+    if isinstance(codes, list):
+        codes = [str(x).strip() for x in codes if str(x).strip()]
+    else:
+        codes = []
+
+    # Delete by IDs first
+    if ids:
+        for pid in ids:
+            ok = delete_product(db, pid, business_id)
+            if ok:
+                deleted += 1
+            else:
+                skipped += 1
+
+    # Delete by codes
+    if codes:
+        items = db.query(Product).filter(_and(Product.business_id == business_id, Product.code.in_(codes))).all()
+        for obj in items:
+            try:
+                db.delete(obj)
+                deleted += 1
+            except Exception:
+                skipped += 1
+        db.commit()
+
+    return success_response({"deleted": deleted, "skipped": skipped}, request)
+
 @router.post("/business/{business_id}/export/excel",
     summary="خروجی Excel لیست محصولات",
     description="خروجی Excel لیست محصولات با قابلیت فیلتر، انتخاب ستون‌ها و ترتیب آن‌ها",

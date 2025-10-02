@@ -1051,6 +1051,9 @@
   "unit": "Unit",
   "minQty": "Minimum quantity",
   "addPriceTitle": "Add price",
-  "editPriceTitle": "Edit price"
+  "editPriceTitle": "Edit price",
+  "productDeletedSuccessfully": "Product or service deleted successfully",
+  "productsDeletedSuccessfully": "Selected items deleted successfully",
+  "noRowsSelectedError": "No rows selected"
 }
 
