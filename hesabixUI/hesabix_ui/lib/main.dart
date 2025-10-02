@@ -23,6 +23,7 @@ import 'pages/business/business_shell.dart';
 import 'pages/business/dashboard/business_dashboard_page.dart';
 import 'pages/business/users_permissions_page.dart';
 import 'pages/business/accounts_page.dart';
+import 'pages/business/bank_accounts_page.dart';
 import 'pages/business/settings_page.dart';
 import 'pages/business/persons_page.dart';
 import 'pages/business/product_attributes_page.dart';
@@ -553,7 +554,10 @@ class _MyAppState extends State<MyApp> {
                   localeController: controller,
                   calendarController: _calendarController!,
                   themeController: themeController,
-                  child: AccountsPage(businessId: businessId),
+                  child: BankAccountsPage(
+                    businessId: businessId,
+                    authStore: _authStore!,
+                  ),
                 );
               },
             ),

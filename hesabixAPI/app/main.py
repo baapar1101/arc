@@ -16,6 +16,7 @@ from adapters.api.v1.product_attributes import router as product_attributes_rout
 from adapters.api.v1.products import router as products_router
 from adapters.api.v1.price_lists import router as price_lists_router
 from adapters.api.v1.persons import router as persons_router
+from adapters.api.v1.bank_accounts import router as bank_accounts_router
 from adapters.api.v1.tax_units import router as tax_units_router
 from adapters.api.v1.tax_units import alias_router as units_alias_router
 from adapters.api.v1.tax_types import router as tax_types_router
@@ -292,6 +293,7 @@ def create_app() -> FastAPI:
     application.include_router(products_router, prefix=settings.api_v1_prefix)
     application.include_router(price_lists_router, prefix=settings.api_v1_prefix)
     application.include_router(persons_router, prefix=settings.api_v1_prefix)
+    application.include_router(bank_accounts_router, prefix=settings.api_v1_prefix)
     application.include_router(tax_units_router, prefix=settings.api_v1_prefix)
     application.include_router(units_alias_router, prefix=settings.api_v1_prefix)
     application.include_router(tax_types_router, prefix=settings.api_v1_prefix)
@@ -334,8 +336,9 @@ def create_app() -> FastAPI:
         # اضافه کردن security schemes
         openapi_schema["components"]["securitySchemes"] = {
             "ApiKeyAuth": {
-                "type": "http",
-                "scheme": "ApiKey",
+                "type": "apiKey",
+                "in": "header",
+                "name": "Authorization",
                 "description": "کلید API برای احراز هویت. فرمت: ApiKey sk_your_api_key_here"
             }
         }
@@ -344,8 +347,8 @@ def create_app() -> FastAPI:
         for path, methods in openapi_schema["paths"].items():
             for method, details in methods.items():
                 if method in ["get", "post", "put", "delete", "patch"]:
-                    # تمام endpoint های auth، users و support نیاز به احراز هویت دارند
-                    if "/auth/" in path or "/users" in path or "/support" in path:
+                    # تمام endpoint های auth، users، support و bank-accounts نیاز به احراز هویت دارند
+                    if "/auth/" in path or "/users" in path or "/support" in path or "/bank-accounts" in path:
                         details["security"] = [{"ApiKeyAuth": []}]
         
         application.openapi_schema = openapi_schema

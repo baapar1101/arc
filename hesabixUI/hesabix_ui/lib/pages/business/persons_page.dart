@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
+import 'package:hesabix_ui/core/api_client.dart';
 import '../../widgets/data_table/data_table_widget.dart';
 import '../../widgets/data_table/data_table_config.dart';
 import '../../widgets/person/person_form_dialog.dart';
@@ -278,6 +279,67 @@ class _PersonsPageState extends State<PersonsPage> {
             ),
           ),
         ),
+        if (widget.authStore.canDeleteSection('people'))
+          Tooltip(
+            message: AppLocalizations.of(context).deletePerson,
+            child: IconButton(
+              onPressed: () async {
+                final t = AppLocalizations.of(context);
+                try {
+                  final state = _personsTableKey.currentState as dynamic;
+                  final selectedIndices = (state?.getSelectedRowIndices() as List<int>?) ?? const <int>[];
+                  final items = (state?.getSelectedItems() as List<dynamic>?) ?? const <dynamic>[];
+                  if (selectedIndices.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.noRowsSelectedError)));
+                    return;
+                  }
+                  final ids = <int>[];
+                  for (final i in selectedIndices) {
+                    if (i >= 0 && i < items.length) {
+                      final row = items[i];
+                      if (row is Person && row.id != null) {
+                        ids.add(row.id!);
+                      } else if (row is Map<String, dynamic>) {
+                        final id = row['id'];
+                        if (id is int) ids.add(id);
+                      }
+                    }
+                  }
+                  if (ids.isEmpty) return;
+
+                  final confirm = await showDialog<bool>(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      title: Text(t.deletePerson),
+                      content: Text(t.deleteConfirm('${ids.length}')),
+                      actions: [
+                        TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(t.cancel)),
+                        FilledButton.tonal(onPressed: () => Navigator.of(ctx).pop(true), child: Text(t.delete)),
+                      ],
+                    ),
+                  );
+                  if (confirm != true) return;
+
+                  final client = ApiClient();
+                  await client.post<Map<String, dynamic>>(
+                    '/api/v1/persons/businesses/${widget.businessId}/persons/bulk-delete',
+                    data: { 'ids': ids },
+                  );
+                  try { ( _personsTableKey.currentState as dynamic)?.refresh(); } catch (_) {}
+                  if (mounted) {
+                    // Reuse generic success text available in l10n
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.productsDeletedSuccessfully)));
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    final t = AppLocalizations.of(context);
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${t.error}: $e')));
+                  }
+                }
+              },
+              icon: const Icon(Icons.delete_sweep_outlined),
+            ),
+          ),
         Builder(builder: (context) {
           final theme = Theme.of(context);
           return Tooltip(

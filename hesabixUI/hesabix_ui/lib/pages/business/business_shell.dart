@@ -6,6 +6,7 @@ import '../../core/calendar_controller.dart';
 import '../../theme/theme_controller.dart';
 import '../../widgets/combined_user_menu_button.dart';
 import '../../widgets/person/person_form_dialog.dart';
+import '../../widgets/banking/bank_account_form_dialog.dart';
 import '../../widgets/product/product_form_dialog.dart';
 import '../../widgets/category/category_tree_dialog.dart';
 import '../../services/business_dashboard_service.dart';
@@ -705,7 +706,13 @@ class _BusinessShellState extends State<BusinessShell> {
                                       } else if (child.label == t.productAttributes) {
                                         // Navigate to add product attribute
                                       } else if (child.label == t.accounts) {
-                                        // Navigate to add account
+                                        // Open add bank account dialog
+                                        showDialog(
+                                          context: context,
+                                          builder: (ctx) => BankAccountFormDialog(
+                                            businessId: widget.businessId,
+                                          ),
+                                        );
                                       } else if (child.label == t.pettyCash) {
                                         // Navigate to add petty cash
                                       } else if (child.label == t.cashBox) {
@@ -851,6 +858,13 @@ class _BusinessShellState extends State<BusinessShell> {
                                         onTap: () {
                                           if (item.label == t.people) {
                                             showAddPersonDialog();
+                                          } else if (item.label == t.accounts) {
+                                            showDialog(
+                                              context: context,
+                                              builder: (ctx) => BankAccountFormDialog(
+                                                businessId: widget.businessId,
+                                              ),
+                                            );
                                           }
                                           // سایر مسیرهای افزودن در آینده متصل می‌شوند
                                         },

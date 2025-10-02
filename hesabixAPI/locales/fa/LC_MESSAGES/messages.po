@@ -41,6 +41,39 @@ msgstr "درخواست ناموفق بود"
 
 msgid "VALIDATION_ERROR"
 msgstr "خطای اعتبارسنجی"
+# Banking / Bank Accounts
+msgid "BANK_ACCOUNTS_LIST_FETCHED"
+msgstr "لیست حساب‌های بانکی با موفقیت دریافت شد"
+
+msgid "BANK_ACCOUNT_CREATED"
+msgstr "حساب بانکی با موفقیت ایجاد شد"
+
+msgid "BANK_ACCOUNT_DETAILS"
+msgstr "جزئیات حساب بانکی"
+
+msgid "BANK_ACCOUNT_UPDATED"
+msgstr "حساب بانکی با موفقیت به‌روزرسانی شد"
+
+msgid "BANK_ACCOUNT_DELETED"
+msgstr "حساب بانکی با موفقیت حذف شد"
+
+msgid "BANK_ACCOUNT_NOT_FOUND"
+msgstr "حساب بانکی یافت نشد"
+
+msgid "NO_VALID_IDS_FOR_DELETE"
+msgstr "هیچ شناسه معتبری برای حذف ارسال نشده"
+
+msgid "BANK_ACCOUNTS_BULK_DELETE_DONE"
+msgstr "حذف گروهی حساب‌های بانکی انجام شد"
+
+msgid "INVALID_BANK_ACCOUNT_CODE"
+msgstr "کد حساب بانکی نامعتبر است"
+
+msgid "DUPLICATE_BANK_ACCOUNT_CODE"
+msgstr "کد حساب بانکی تکراری است"
+
+msgid "BULK_DELETE_FAILED"
+msgstr "خطا در حذف گروهی حساب‌های بانکی"
 
 msgid "STRING_TOO_SHORT"
 msgstr "رشته خیلی کوتاه است"

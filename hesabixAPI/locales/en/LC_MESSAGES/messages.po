@@ -20,6 +20,39 @@ msgstr "Request failed"
 
 msgid "VALIDATION_ERROR"
 msgstr "Validation error"
+# Banking / Bank Accounts
+msgid "BANK_ACCOUNTS_LIST_FETCHED"
+msgstr "Bank accounts list retrieved successfully"
+
+msgid "BANK_ACCOUNT_CREATED"
+msgstr "Bank account created successfully"
+
+msgid "BANK_ACCOUNT_DETAILS"
+msgstr "Bank account details"
+
+msgid "BANK_ACCOUNT_UPDATED"
+msgstr "Bank account updated successfully"
+
+msgid "BANK_ACCOUNT_DELETED"
+msgstr "Bank account deleted successfully"
+
+msgid "BANK_ACCOUNT_NOT_FOUND"
+msgstr "Bank account not found"
+
+msgid "NO_VALID_IDS_FOR_DELETE"
+msgstr "No valid IDs submitted for deletion"
+
+msgid "BANK_ACCOUNTS_BULK_DELETE_DONE"
+msgstr "Bulk delete completed for bank accounts"
+
+msgid "INVALID_BANK_ACCOUNT_CODE"
+msgstr "Invalid bank account code"
+
+msgid "DUPLICATE_BANK_ACCOUNT_CODE"
+msgstr "Duplicate bank account code"
+
+msgid "BULK_DELETE_FAILED"
+msgstr "Bulk delete failed for bank accounts"
 
 msgid "STRING_TOO_SHORT"
 msgstr "String is too short"

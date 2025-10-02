@@ -5,6 +5,7 @@ adapters/api/__init__.py
 adapters/api/v1/__init__.py
 adapters/api/v1/accounts.py
 adapters/api/v1/auth.py
+adapters/api/v1/bank_accounts.py
 adapters/api/v1/business_dashboard.py
 adapters/api/v1/business_users.py
 adapters/api/v1/businesses.py
@@ -23,6 +24,7 @@ adapters/api/v1/admin/email_config.py
 adapters/api/v1/admin/file_storage.py
 adapters/api/v1/schema_models/__init__.py
 adapters/api/v1/schema_models/account.py
+adapters/api/v1/schema_models/bank_account.py
 adapters/api/v1/schema_models/email.py
 adapters/api/v1/schema_models/file_storage.py
 adapters/api/v1/schema_models/person.py
@@ -41,6 +43,7 @@ adapters/db/session.py
 adapters/db/models/__init__.py
 adapters/db/models/account.py
 adapters/db/models/api_key.py
+adapters/db/models/bank_account.py
 adapters/db/models/business.py
 adapters/db/models/business_permission.py
 adapters/db/models/captcha.py
@@ -101,6 +104,8 @@ app/core/settings.py
 app/core/smart_normalizer.py
 app/services/api_key_service.py
 app/services/auth_service.py
+app/services/bank_account_service.py
+app/services/bulk_price_update_service.py
 app/services/business_dashboard_service.py
 app/services/business_service.py
 app/services/captcha_service.py
@@ -122,6 +127,7 @@ hesabix_api.egg-info/dependency_links.txt
 hesabix_api.egg-info/requires.txt
 hesabix_api.egg-info/top_level.txt
 migrations/env.py
+migrations/versions/20250102_000001_seed_support_data.py
 migrations/versions/20250117_000003_add_business_table.py
 migrations/versions/20250117_000004_add_business_contact_fields.py
 migrations/versions/20250117_000005_add_business_geographic_fields.py
@@ -155,6 +161,7 @@ migrations/versions/20250929_000501_add_products_and_pricing.py
 migrations/versions/20251001_000601_update_price_items_currency_unique_not_null.py
 migrations/versions/20251001_001101_drop_price_list_currency_default_unit.py
 migrations/versions/20251001_001201_merge_heads_drop_currency_tax_units.py
+migrations/versions/20251002_000101_add_bank_accounts_table.py
 migrations/versions/4b2ea782bcb3_merge_heads.py
 migrations/versions/5553f8745c6e_add_support_tables.py
 migrations/versions/9f9786ae7191_create_tax_units_table.py

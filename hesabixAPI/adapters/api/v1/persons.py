@@ -23,6 +23,84 @@ from adapters.db.models.business import Business
 router = APIRouter(prefix="/persons", tags=["persons"])
 
 
+@router.post("/businesses/{business_id}/persons/bulk-delete",
+    summary="حذف گروهی اشخاص",
+    description="حذف چندین شخص بر اساس شناسه‌ها یا کدها",
+)
+async def bulk_delete_persons_endpoint(
+    request: Request,
+    business_id: int,
+    body: Dict[str, Any] = Body(...),
+    db: Session = Depends(get_db),
+    auth_context: AuthContext = Depends(get_current_user),
+    _: None = Depends(require_business_management_dep),
+):
+    """حذف گروهی اشخاص برای یک کسب‌وکار مشخص
+
+    ورودی:
+      - ids: لیست شناسه‌های اشخاص
+      - codes: لیست کدهای اشخاص در همان کسب‌وکار
+    """
+    from sqlalchemy import and_ as _and
+    from adapters.db.models.person import Person
+
+    ids = body.get("ids")
+    codes = body.get("codes")
+    deleted = 0
+    skipped = 0
+
+    if not ids and not codes:
+        return success_response({"deleted": 0, "skipped": 0}, request)
+
+    # Normalize inputs
+    if isinstance(ids, list):
+        try:
+            ids = [int(x) for x in ids if isinstance(x, (int, str)) and str(x).isdigit()]
+        except Exception:
+            ids = []
+    else:
+        ids = []
+
+    if isinstance(codes, list):
+        try:
+            codes = [int(str(x).strip()) for x in codes if str(x).strip().isdigit()]
+        except Exception:
+            codes = []
+    else:
+        codes = []
+
+    # Delete by IDs first
+    if ids:
+        for pid in ids:
+            try:
+                person = db.query(Person).filter(_and(Person.id == pid, Person.business_id == business_id)).first()
+                if person is None:
+                    skipped += 1
+                    continue
+                db.delete(person)
+                deleted += 1
+            except Exception:
+                skipped += 1
+        db.commit()
+
+    # Delete by codes
+    if codes:
+        try:
+            items = db.query(Person).filter(_and(Person.business_id == business_id, Person.code.in_(codes))).all()
+            for obj in items:
+                try:
+                    db.delete(obj)
+                    deleted += 1
+                except Exception:
+                    skipped += 1
+            db.commit()
+        except Exception:
+            # In case of query issues, treat all as skipped
+            skipped += len(codes)
+
+    return success_response({"deleted": deleted, "skipped": skipped}, request)
+
+
 @router.post("/businesses/{business_id}/persons/create", 
     summary="ایجاد شخص جدید", 
     description="ایجاد شخص جدید برای کسب و کار مشخص",
