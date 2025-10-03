@@ -4715,7 +4715,7 @@ abstract class AppLocalizations {
   /// No description provided for @code.
   ///
   /// In en, this message translates to:
-  /// **'code'**
+  /// **'Code'**
   String get code;
 
   /// No description provided for @conflictPolicy.
@@ -5581,6 +5581,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No rows selected'**
   String get noRowsSelectedError;
+
+  /// No description provided for @deleteSelected.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Selected'**
+  String get deleteSelected;
+
+  /// No description provided for @deletedSuccessfully.
+  ///
+  /// In en, this message translates to:
+  /// **'Deleted successfully'**
+  String get deletedSuccessfully;
+
+  /// No description provided for @comingSoon.
+  ///
+  /// In en, this message translates to:
+  /// **'Coming soon'**
+  String get comingSoon;
 }
 
 class _AppLocalizationsDelegate

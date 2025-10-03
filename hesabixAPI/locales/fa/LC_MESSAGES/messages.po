@@ -75,6 +75,34 @@ msgstr "کد حساب بانکی تکراری است"
 msgid "BULK_DELETE_FAILED"
 msgstr "خطا در حذف گروهی حساب‌های بانکی"
 
+# Banking / Cash Registers
+msgid "CASH_REGISTERS_LIST_FETCHED"
+msgstr "لیست صندوق‌ها با موفقیت دریافت شد"
+
+msgid "CASH_REGISTER_CREATED"
+msgstr "صندوق با موفقیت ایجاد شد"
+
+msgid "CASH_REGISTER_DETAILS"
+msgstr "جزئیات صندوق"
+
+msgid "CASH_REGISTER_UPDATED"
+msgstr "صندوق با موفقیت به‌روزرسانی شد"
+
+msgid "CASH_REGISTER_DELETED"
+msgstr "صندوق با موفقیت حذف شد"
+
+msgid "CASH_REGISTER_NOT_FOUND"
+msgstr "صندوق یافت نشد"
+
+msgid "CASH_REGISTERS_BULK_DELETE_DONE"
+msgstr "حذف گروهی صندوق‌ها انجام شد"
+
+msgid "INVALID_CASH_CODE"
+msgstr "کد صندوق نامعتبر است"
+
+msgid "DUPLICATE_CASH_CODE"
+msgstr "کد صندوق تکراری است"
+
 msgid "STRING_TOO_SHORT"
 msgstr "رشته خیلی کوتاه است"
 

@@ -1223,7 +1223,7 @@ class AppLocalizationsFa extends AppLocalizations {
   String get edit => 'ویرایش';
 
   @override
-  String get actions => 'عملیات';
+  String get actions => 'اقدامات';
 
   @override
   String get search => 'جستجو';
@@ -2594,7 +2594,7 @@ class AppLocalizationsFa extends AppLocalizations {
   String get price => 'قیمت';
 
   @override
-  String get currency => 'ارز';
+  String get currency => 'واحد پول';
 
   @override
   String get noPriceListsTitle => 'لیست قیمت موجود نیست';
@@ -2807,4 +2807,13 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get noRowsSelectedError => 'هیچ سطری انتخاب نشده است';
+
+  @override
+  String get deleteSelected => 'حذف انتخاب‌شده‌ها';
+
+  @override
+  String get deletedSuccessfully => 'با موفقیت حذف شد';
+
+  @override
+  String get comingSoon => 'به‌زودی';
 }

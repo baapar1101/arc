@@ -250,24 +250,93 @@ def get_business_info_with_permissions(
     db: Session = Depends(get_db)
 ) -> dict:
     """دریافت اطلاعات کسب و کار همراه با دسترسی‌های کاربر"""
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    logger.info(f"=== get_business_info_with_permissions START ===")
+    logger.info(f"Business ID: {business_id}")
+    logger.info(f"User ID: {ctx.get_user_id()}")
+    logger.info(f"User context business_id: {ctx.business_id}")
+    logger.info(f"Is superadmin: {ctx.is_superadmin()}")
+    logger.info(f"Is business owner: {ctx.is_business_owner(business_id)}")
+    
     from adapters.db.models.business import Business
     from adapters.db.repositories.business_permission_repo import BusinessPermissionRepository
     
     # دریافت اطلاعات کسب و کار
     business = db.get(Business, business_id)
     if not business:
+        logger.error(f"Business {business_id} not found")
         from app.core.responses import ApiError
         raise ApiError("NOT_FOUND", "Business not found", http_status=404)
     
+    logger.info(f"Business found: {business.name} (Owner ID: {business.owner_id})")
+    
     # دریافت دسترسی‌های کاربر
     permissions = {}
-    if not ctx.is_superadmin() and not ctx.is_business_owner(business_id):
+    
+    # Debug logging
+    logger.info(f"Checking permissions for user {ctx.get_user_id()}")
+    logger.info(f"Is superadmin: {ctx.is_superadmin()}")
+    logger.info(f"Is business owner of {business_id}: {ctx.is_business_owner(business_id)}")
+    logger.info(f"Context business_id: {ctx.business_id}")
+    
+    if ctx.is_superadmin():
+        logger.info("User is superadmin, but superadmin permissions don't apply to business operations")
+        # SuperAdmin فقط برای مدیریت سیستم است، نه برای کسب و کارهای خاص
+        # باید دسترسی‌های کسب و کار را از جدول business_permissions دریافت کند
+        permission_repo = BusinessPermissionRepository(db)
+        business_permission = permission_repo.get_by_user_and_business(ctx.get_user_id(), business_id)
+        logger.info(f"Business permission object for superadmin: {business_permission}")
+        
+        if business_permission:
+            permissions = business_permission.business_permissions or {}
+            logger.info(f"Superadmin business permissions: {permissions}")
+        else:
+            logger.info("No business permission found for superadmin user")
+            permissions = {}
+    elif ctx.is_business_owner(business_id):
+        logger.info("User is business owner, granting full permissions")
+        # مالک کسب و کار تمام دسترسی‌ها را دارد
+        permissions = {
+            "people": {"add": True, "edit": True, "view": True, "delete": True},
+            "products": {"add": True, "edit": True, "view": True, "delete": True},
+            "bank_accounts": {"add": True, "edit": True, "view": True, "delete": True},
+            "invoices": {"add": True, "edit": True, "view": True, "draft": True, "delete": True},
+            "people_transactions": {"add": True, "edit": True, "view": True, "draft": True, "delete": True},
+            "expenses_income": {"add": True, "edit": True, "view": True, "draft": True, "delete": True},
+            "transfers": {"add": True, "edit": True, "view": True, "draft": True, "delete": True},
+            "checks": {"add": True, "edit": True, "view": True, "delete": True, "return": True, "collect": True, "transfer": True},
+            "accounting_documents": {"add": True, "edit": True, "view": True, "draft": True, "delete": True},
+            "chart_of_accounts": {"add": True, "edit": True, "view": True, "delete": True},
+            "opening_balance": {"edit": True, "view": True},
+            "settings": {"print": True, "users": True, "history": True, "business": True},
+            "categories": {"add": True, "edit": True, "view": True, "delete": True},
+            "product_attributes": {"add": True, "edit": True, "view": True, "delete": True},
+            "warehouses": {"add": True, "edit": True, "view": True, "delete": True},
+            "warehouse_transfers": {"add": True, "edit": True, "view": True, "draft": True, "delete": True},
+            "cash": {"add": True, "edit": True, "view": True, "delete": True},
+            "petty_cash": {"add": True, "edit": True, "view": True, "delete": True},
+            "wallet": {"view": True, "charge": True},
+            "storage": {"view": True, "delete": True},
+            "marketplace": {"buy": True, "view": True, "invoices": True},
+            "price_lists": {"add": True, "edit": True, "view": True, "delete": True},
+            "sms": {"history": True, "templates": True},
+            "join": True
+        }
+    else:
+        logger.info("User is not superadmin and not business owner, checking permissions")
         # دریافت دسترسی‌های کسب و کار از business_permissions
         permission_repo = BusinessPermissionRepository(db)
         # ترتیب آرگومان‌ها: (user_id, business_id)
         business_permission = permission_repo.get_by_user_and_business(ctx.get_user_id(), business_id)
+        logger.info(f"Business permission object: {business_permission}")
+        
         if business_permission:
             permissions = business_permission.business_permissions or {}
+            logger.info(f"User permissions: {permissions}")
+        else:
+            logger.info("No business permission found for user")
     
     business_info = {
         "id": business.id,
@@ -281,13 +350,19 @@ def get_business_info_with_permissions(
         "created_at": business.created_at.isoformat(),
     }
     
+    is_owner = ctx.is_business_owner(business_id)
+    has_access = ctx.can_access_business(business_id)
+    
     response_data = {
         "business_info": business_info,
         "user_permissions": permissions,
-        "is_owner": ctx.is_business_owner(business_id),
-        "role": "مالک" if ctx.is_business_owner(business_id) else "عضو",
-        "has_access": ctx.can_access_business(business_id)
+        "is_owner": is_owner,
+        "role": "مالک" if is_owner else "عضو",
+        "has_access": has_access
     }
+    
+    logger.info(f"Response data: {response_data}")
+    logger.info(f"=== get_business_info_with_permissions END ===")
     
     formatted_data = format_datetime_fields(response_data, request)
     return success_response(formatted_data, request)

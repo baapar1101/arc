@@ -2380,7 +2380,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get matchBy => 'Match by';
 
   @override
-  String get code => 'code';
+  String get code => 'Code';
 
   @override
   String get conflictPolicy => 'Conflict policy';
@@ -2828,4 +2828,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get noRowsSelectedError => 'No rows selected';
+
+  @override
+  String get deleteSelected => 'Delete Selected';
+
+  @override
+  String get deletedSuccessfully => 'Deleted successfully';
+
+  @override
+  String get comingSoon => 'Coming soon';
 }

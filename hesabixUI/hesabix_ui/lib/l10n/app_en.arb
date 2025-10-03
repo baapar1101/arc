@@ -1055,5 +1055,16 @@
   "productDeletedSuccessfully": "Product or service deleted successfully",
   "productsDeletedSuccessfully": "Selected items deleted successfully",
   "noRowsSelectedError": "No rows selected"
+  ,
+  "deleteSelected": "Delete Selected",
+  "deletedSuccessfully": "Deleted successfully",
+  "comingSoon": "Coming soon",
+  "code": "Code",
+  "currency": "Currency",
+  "isDefault": "Default",
+  "description": "Description",
+  "actions": "Actions",
+  "yes": "Yes",
+  "no": "No"
 }
 

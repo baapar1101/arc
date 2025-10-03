@@ -9,6 +9,7 @@ adapters/api/v1/bank_accounts.py
 adapters/api/v1/business_dashboard.py
 adapters/api/v1/business_users.py
 adapters/api/v1/businesses.py
+adapters/api/v1/cash_registers.py
 adapters/api/v1/categories.py
 adapters/api/v1/currencies.py
 adapters/api/v1/health.py
@@ -47,6 +48,7 @@ adapters/db/models/bank_account.py
 adapters/db/models/business.py
 adapters/db/models/business_permission.py
 adapters/db/models/captcha.py
+adapters/db/models/cash_register.py
 adapters/db/models/category.py
 adapters/db/models/currency.py
 adapters/db/models/document.py
@@ -72,6 +74,7 @@ adapters/db/repositories/api_key_repo.py
 adapters/db/repositories/base_repo.py
 adapters/db/repositories/business_permission_repo.py
 adapters/db/repositories/business_repo.py
+adapters/db/repositories/cash_register_repository.py
 adapters/db/repositories/category_repository.py
 adapters/db/repositories/email_config_repository.py
 adapters/db/repositories/file_storage_repository.py
@@ -109,6 +112,7 @@ app/services/bulk_price_update_service.py
 app/services/business_dashboard_service.py
 app/services/business_service.py
 app/services/captcha_service.py
+app/services/cash_register_service.py
 app/services/email_service.py
 app/services/file_storage_service.py
 app/services/person_service.py
@@ -162,9 +166,11 @@ migrations/versions/20251001_000601_update_price_items_currency_unique_not_null.
 migrations/versions/20251001_001101_drop_price_list_currency_default_unit.py
 migrations/versions/20251001_001201_merge_heads_drop_currency_tax_units.py
 migrations/versions/20251002_000101_add_bank_accounts_table.py
+migrations/versions/20251003_000201_add_cash_registers_table.py
 migrations/versions/4b2ea782bcb3_merge_heads.py
 migrations/versions/5553f8745c6e_add_support_tables.py
 migrations/versions/9f9786ae7191_create_tax_units_table.py
+migrations/versions/a1443c153b47_merge_heads.py
 migrations/versions/caf3f4ef4b76_add_tax_units_table.py
 migrations/versions/d3e84892c1c2_sync_person_type_enum_values_callable_.py
 migrations/versions/f876bfa36805_merge_multiple_heads.py

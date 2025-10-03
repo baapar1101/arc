@@ -30,6 +30,7 @@ import 'pages/business/product_attributes_page.dart';
 import 'pages/business/products_page.dart';
 import 'pages/business/price_lists_page.dart';
 import 'pages/business/price_list_items_page.dart';
+import 'pages/business/cash_registers_page.dart';
 import 'pages/error_404_page.dart';
 import 'core/locale_controller.dart';
 import 'core/calendar_controller.dart';
@@ -555,6 +556,24 @@ class _MyAppState extends State<MyApp> {
                   calendarController: _calendarController!,
                   themeController: themeController,
                   child: BankAccountsPage(
+                    businessId: businessId,
+                    authStore: _authStore!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: 'cash-box',
+              name: 'business_cash_box',
+              builder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return BusinessShell(
+                  businessId: businessId,
+                  authStore: _authStore!,
+                  localeController: controller,
+                  calendarController: _calendarController!,
+                  themeController: themeController,
+                  child: CashRegistersPage(
                     businessId: businessId,
                     authStore: _authStore!,
                   ),

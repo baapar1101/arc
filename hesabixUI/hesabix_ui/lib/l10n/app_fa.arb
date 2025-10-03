@@ -1038,6 +1038,16 @@
   "editPriceTitle": "ویرایش قیمت",
   "productDeletedSuccessfully": "کالا/خدمت با موفقیت حذف شد",
   "productsDeletedSuccessfully": "آیتم‌های انتخاب‌شده با موفقیت حذف شدند",
-  "noRowsSelectedError": "هیچ سطری انتخاب نشده است"
+  "noRowsSelectedError": "هیچ سطری انتخاب نشده است",
+  "deleteSelected": "حذف انتخاب‌شده‌ها",
+  "deletedSuccessfully": "با موفقیت حذف شد",
+  "comingSoon": "به‌زودی",
+  "code": "کد",
+  "currency": "واحد پول",
+  "isDefault": "پیش‌فرض",
+  "description": "توضیحات",
+  "actions": "اقدامات",
+  "yes": "بله",
+  "no": "خیر"
 }
 

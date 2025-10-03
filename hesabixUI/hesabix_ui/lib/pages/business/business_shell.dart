@@ -46,6 +46,10 @@ class _BusinessShellState extends State<BusinessShell> {
   @override
   void initState() {
     super.initState();
+    // اطمینان از bind بودن AuthStore برای ApiClient (جهت هدرها و تنظیمات)
+    try {
+      ApiClient.bindAuthStore(widget.authStore);
+    } catch (_) {}
     // اضافه کردن listener برای AuthStore
     widget.authStore.addListener(() {
       if (mounted) {
@@ -58,14 +62,30 @@ class _BusinessShellState extends State<BusinessShell> {
   }
 
   Future<void> _loadBusinessInfo() async {
+    print('=== _loadBusinessInfo START ===');
+    print('Current business ID: ${widget.businessId}');
+    print('AuthStore current business ID: ${widget.authStore.currentBusiness?.id}');
+    
     if (widget.authStore.currentBusiness?.id == widget.businessId) {
+      print('Business info already loaded, skipping...');
       return; // اطلاعات قبلاً بارگذاری شده
     }
 
     try {
+      print('Loading business info for business ID: ${widget.businessId}');
       final businessData = await _businessService.getBusinessWithPermissions(widget.businessId);
+      print('Business data loaded successfully:');
+      print('  - Name: ${businessData.name}');
+      print('  - ID: ${businessData.id}');
+      print('  - Is Owner: ${businessData.isOwner}');
+      print('  - Role: ${businessData.role}');
+      print('  - Permissions: ${businessData.permissions}');
+      
       await widget.authStore.setCurrentBusiness(businessData);
+      print('Business info set in authStore');
+      print('AuthStore business permissions: ${widget.authStore.businessPermissions}');
     } catch (e) {
+      print('Error loading business info: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -75,6 +95,7 @@ class _BusinessShellState extends State<BusinessShell> {
         );
       }
     }
+    print('=== _loadBusinessInfo END ===');
   }
 
   @override
@@ -716,7 +737,8 @@ class _BusinessShellState extends State<BusinessShell> {
                                       } else if (child.label == t.pettyCash) {
                                         // Navigate to add petty cash
                                       } else if (child.label == t.cashBox) {
-                                        // Navigate to add cash box
+                                        // For cash box, navigate to the page and use its add
+                                        context.go('/business/${widget.businessId}/cash-box');
                                       } else if (child.label == t.wallet) {
                                         // Navigate to add wallet
                                       } else if (child.label == t.checks) {
@@ -865,6 +887,8 @@ class _BusinessShellState extends State<BusinessShell> {
                                                 businessId: widget.businessId,
                                               ),
                                             );
+                                          } else if (item.label == t.cashBox) {
+                                            context.go('/business/${widget.businessId}/cash-box');
                                           }
                                           // سایر مسیرهای افزودن در آینده متصل می‌شوند
                                         },
@@ -1073,36 +1097,96 @@ class _BusinessShellState extends State<BusinessShell> {
 
   // فیلتر کردن منو بر اساس دسترسی‌ها
   List<_MenuItem> _getFilteredMenuItems(List<_MenuItem> allItems) {
-    return allItems.where((item) {
-      if (item.type == _MenuItemType.separator) return true;
+    print('=== _getFilteredMenuItems START ===');
+    print('Total menu items: ${allItems.length}');
+    print('Current business: ${widget.authStore.currentBusiness?.name} (ID: ${widget.authStore.currentBusiness?.id})');
+    print('Is owner: ${widget.authStore.currentBusiness?.isOwner}');
+    print('Business permissions: ${widget.authStore.businessPermissions}');
+    
+    final filteredItems = allItems.where((item) {
+      if (item.type == _MenuItemType.separator) {
+        print('Separator item: ${item.label} - KEEPING');
+        return true;
+      }
       
       if (item.type == _MenuItemType.simple) {
-        return _hasAccessToMenuItem(item);
+        final hasAccess = _hasAccessToMenuItem(item);
+        print('Simple item: ${item.label} - ${hasAccess ? 'KEEPING' : 'REMOVING'}');
+        return hasAccess;
       }
       
       if (item.type == _MenuItemType.expandable) {
-        return _hasAccessToExpandableMenuItem(item);
+        final hasAccess = _hasAccessToExpandableMenuItem(item);
+        print('Expandable item: ${item.label} - ${hasAccess ? 'KEEPING' : 'REMOVING'}');
+        return hasAccess;
       }
       
+      print('Unknown item type: ${item.label} - REMOVING');
       return false;
     }).toList();
+    
+    print('Filtered menu items: ${filteredItems.length}');
+    for (final item in filteredItems) {
+      print('  - ${item.label} (${item.type})');
+    }
+    print('=== _getFilteredMenuItems END ===');
+    
+    return filteredItems;
   }
 
   bool _hasAccessToMenuItem(_MenuItem item) {
     final section = _sectionForLabel(item.label, AppLocalizations.of(context));
+    print('  Checking access for: ${item.label} -> section: $section');
+    
     // داشبورد همیشه قابل مشاهده است
-    if (item.path != null && item.path!.endsWith('/dashboard')) return true;
+    if (item.path != null && item.path!.endsWith('/dashboard')) {
+      print('    Dashboard item - ALWAYS ACCESSIBLE');
+      return true;
+    }
+    
     // اگر سکشن تعریف نشده، نمایش داده نشود
-    if (section == null) return false;
-    // فقط وقتی اجازه خواندن دارد نمایش بده
-    return widget.authStore.canReadSection(section);
+    if (section == null) {
+      print('    No section mapping found - DENIED');
+      return false;
+    }
+    
+    // بررسی دسترسی‌های مختلف برای نمایش منو
+    // اگر کاربر مالک است، همه منوها قابل مشاهده هستند
+    if (widget.authStore.currentBusiness?.isOwner == true) {
+      print('    User is owner - GRANTED');
+      return true;
+    }
+    
+    // برای کاربران عضو، بررسی دسترسی view
+    final hasAccess = widget.authStore.canReadSection(section);
+    print('    Checking view permission for section "$section": $hasAccess');
+    
+    // Debug: بررسی دقیق‌تر دسترسی‌ها
+    if (widget.authStore.businessPermissions != null) {
+      final sectionPerms = widget.authStore.businessPermissions![section];
+      print('    Section permissions for "$section": $sectionPerms');
+      if (sectionPerms != null) {
+        final viewPerm = sectionPerms['view'];
+        print('    View permission: $viewPerm');
+      }
+    }
+    
+    return hasAccess;
   }
 
   bool _hasAccessToExpandableMenuItem(_MenuItem item) {
-    if (item.children == null) return false;
+    if (item.children == null) {
+      print('  Expandable item "${item.label}" has no children - DENIED');
+      return false;
+    }
+    
+    print('  Checking expandable item: ${item.label} with ${item.children!.length} children');
     
     // اگر حداقل یکی از زیرآیتم‌ها قابل دسترسی باشد، منو نمایش داده شود
-    return item.children!.any((child) => _hasAccessToMenuItem(child));
+    final hasAccess = item.children!.any((child) => _hasAccessToMenuItem(child));
+    print('  Expandable item "${item.label}" access: $hasAccess');
+    
+    return hasAccess;
   }
 
   // تبدیل برچسب محلی‌شده منو به کلید سکشن دسترسی

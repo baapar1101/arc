@@ -120,43 +120,101 @@ class BusinessDashboardService {
 
   /// دریافت اطلاعات کسب و کار همراه با دسترسی‌های کاربر
   Future<BusinessWithPermission> getBusinessWithPermissions(int businessId) async {
+    print('=== getBusinessWithPermissions START ===');
+    print('Business ID: $businessId');
+    
     try {
+      print('Calling API: /api/v1/business/$businessId/info-with-permissions');
       final response = await _apiClient.post<Map<String, dynamic>>(
         '/api/v1/business/$businessId/info-with-permissions',
       );
+
+      print('API Response received:');
+      print('  - Success: ${response.data?['success']}');
+      print('  - Message: ${response.data?['message']}');
+      print('  - Data: ${response.data?['data']}');
 
       if (response.data?['success'] == true) {
         final data = response.data!['data'] as Map<String, dynamic>;
         
         // تبدیل اطلاعات کسب و کار
         final businessInfo = data['business_info'] as Map<String, dynamic>;
-        final userPermissions = data['user_permissions'] as Map<String, dynamic>? ?? {};
+        // نرمال‌سازی دسترسی‌ها: هم Map پشتیبانی می‌شود و هم List<String> مثل 'inventory.read'
+        final dynamic userPermissionsRaw = data['user_permissions'];
+        final Map<String, dynamic> userPermissions = <String, dynamic>{};
+        if (userPermissionsRaw is Map<String, dynamic>) {
+          userPermissions.addAll(userPermissionsRaw);
+        } else if (userPermissionsRaw is List) {
+          for (final item in userPermissionsRaw) {
+            if (item is String) {
+              final parts = item.split('.');
+              if (parts.length >= 2) {
+                final String section = parts[0];
+                final String action = parts[1];
+                final Map<String, dynamic> sectionPerms =
+                    (userPermissions[section] as Map<String, dynamic>?) ?? <String, dynamic>{};
+                sectionPerms[action] = true;
+                userPermissions[section] = sectionPerms;
+              }
+            }
+          }
+        }
         final isOwner = data['is_owner'] as bool? ?? false;
         final role = data['role'] as String? ?? 'عضو';
         final hasAccess = data['has_access'] as bool? ?? false;
         
+        print('Parsed data:');
+        print('  - Business Info: $businessInfo');
+        print('  - User Permissions: $userPermissions');
+        print('  - Is Owner: $isOwner');
+        print('  - Role: $role');
+        print('  - Has Access: $hasAccess');
+        
         if (!hasAccess) {
+          print('Access denied by API');
           throw Exception('دسترسی غیرمجاز به این کسب و کار');
         }
         
-        return BusinessWithPermission(
-          id: businessInfo['id'] as int,
-          name: businessInfo['name'] as String,
-          businessType: businessInfo['business_type'] as String,
-          businessField: businessInfo['business_field'] as String,
-          ownerId: businessInfo['owner_id'] as int,
-          address: businessInfo['address'] as String?,
-          phone: businessInfo['phone'] as String?,
-          mobile: businessInfo['mobile'] as String?,
-          createdAt: businessInfo['created_at'] as String,
-          isOwner: isOwner,
-          role: role,
-          permissions: userPermissions,
+        // ساخت یک Map ترکیبی از اطلاعات کسب و کار + متادیتاهای دسترسی کاربر
+        final Map<String, dynamic> combined = <String, dynamic>{
+          ...businessInfo,
+          'is_owner': isOwner,
+          'role': role,
+          'permissions': userPermissions,
+        };
+
+        // اگر سرور ارز پیش‌فرض یا لیست ارزها را نیز ارسال کرد، اضافه کنیم
+        if (data.containsKey('default_currency')) {
+          combined['default_currency'] = data['default_currency'];
+        }
+        if (data.containsKey('currencies')) {
+          combined['currencies'] = data['currencies'];
+        }
+
+        // استفاده از fromJson برای مدیریت امن انواع (مثلاً created_at می‌تواند String یا Map باشد)
+        final businessWithPermission = BusinessWithPermission.fromJson(
+          Map<String, dynamic>.from(combined),
         );
+        
+        print('BusinessWithPermission created:');
+        print('  - Name: ${businessWithPermission.name}');
+        print('  - ID: ${businessWithPermission.id}');
+        print('  - Is Owner: ${businessWithPermission.isOwner}');
+        print('  - Role: ${businessWithPermission.role}');
+        print('  - Permissions: ${businessWithPermission.permissions}');
+        
+        print('=== getBusinessWithPermissions END ===');
+        return businessWithPermission;
       } else {
+        print('API returned error: ${response.data?['message']}');
         throw Exception('Failed to load business info: ${response.data?['message']}');
       }
     } on DioException catch (e) {
+      print('DioException occurred:');
+      print('  - Status Code: ${e.response?.statusCode}');
+      print('  - Response Data: ${e.response?.data}');
+      print('  - Message: ${e.message}');
+      
       if (e.response?.statusCode == 403) {
         throw Exception('دسترسی غیرمجاز به این کسب و کار');
       } else if (e.response?.statusCode == 404) {
@@ -165,6 +223,7 @@ class BusinessDashboardService {
         throw Exception('خطا در بارگذاری اطلاعات کسب و کار: ${e.message}');
       }
     } catch (e) {
+      print('General Exception: $e');
       throw Exception('خطا در بارگذاری اطلاعات کسب و کار: $e');
     }
   }

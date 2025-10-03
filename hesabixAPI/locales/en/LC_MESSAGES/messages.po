@@ -54,6 +54,34 @@ msgstr "Duplicate bank account code"
 msgid "BULK_DELETE_FAILED"
 msgstr "Bulk delete failed for bank accounts"
 
+# Banking / Cash Registers
+msgid "CASH_REGISTERS_LIST_FETCHED"
+msgstr "Cash registers list retrieved successfully"
+
+msgid "CASH_REGISTER_CREATED"
+msgstr "Cash register created successfully"
+
+msgid "CASH_REGISTER_DETAILS"
+msgstr "Cash register details"
+
+msgid "CASH_REGISTER_UPDATED"
+msgstr "Cash register updated successfully"
+
+msgid "CASH_REGISTER_DELETED"
+msgstr "Cash register deleted successfully"
+
+msgid "CASH_REGISTER_NOT_FOUND"
+msgstr "Cash register not found"
+
+msgid "CASH_REGISTERS_BULK_DELETE_DONE"
+msgstr "Bulk delete completed for cash registers"
+
+msgid "INVALID_CASH_CODE"
+msgstr "Invalid cash register code"
+
+msgid "DUPLICATE_CASH_CODE"
+msgstr "Duplicate cash register code"
+
 msgid "STRING_TOO_SHORT"
 msgstr "String is too short"
 
