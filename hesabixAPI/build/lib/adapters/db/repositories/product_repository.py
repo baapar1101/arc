@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, Optional
 from sqlalchemy.orm import Session
-from sqlalchemy import select, and_, func
+from sqlalchemy import select, and_, or_, func
 
 from .base_repo import BaseRepository
 from ..models.product import Product
@@ -24,6 +24,38 @@ class ProductRepository(BaseRepository[Product]):
                     Product.description.ilike(like),
                 )
             )
+
+        # Apply filters (supports minimal set used by clients)
+        if filters:
+            for f in filters:
+                # Support both dict and pydantic-like objects
+                if isinstance(f, dict):
+                    field = f.get("property")
+                    operator = f.get("operator")
+                    value = f.get("value")
+                else:
+                    field = getattr(f, "property", None)
+                    operator = getattr(f, "operator", None)
+                    value = getattr(f, "value", None)
+
+                if not field or not operator:
+                    continue
+
+                # Code filters
+                if field == "code":
+                    if operator == "=":
+                        stmt = stmt.where(Product.code == value)
+                    elif operator == "in" and isinstance(value, (list, tuple)):
+                        stmt = stmt.where(Product.code.in_(list(value)))
+                    continue
+
+                # Name contains
+                if field == "name":
+                    if operator in {"contains", "ilike"} and isinstance(value, str):
+                        stmt = stmt.where(Product.name.ilike(f"%{value}%"))
+                    elif operator == "=":
+                        stmt = stmt.where(Product.name == value)
+                    continue
 
         total = self.db.execute(select(func.count()).select_from(stmt.subquery())).scalar() or 0
 

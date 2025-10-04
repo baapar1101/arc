@@ -2837,4 +2837,64 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get comingSoon => 'Coming soon';
+
+  @override
+  String get pettyCashManagement => 'Petty Cash Management';
+
+  @override
+  String get pettyCashName => 'Petty Cash Name';
+
+  @override
+  String get pettyCashCode => 'Petty Cash Code';
+
+  @override
+  String get pettyCashDescription => 'Petty Cash Description';
+
+  @override
+  String get pettyCashCurrency => 'Currency';
+
+  @override
+  String get pettyCashIsActive => 'Active';
+
+  @override
+  String get pettyCashIsDefault => 'Default';
+
+  @override
+  String get pettyCashCreatedSuccessfully => 'Petty cash created successfully';
+
+  @override
+  String get pettyCashUpdatedSuccessfully => 'Petty cash updated successfully';
+
+  @override
+  String get pettyCashDeletedSuccessfully => 'Petty cash deleted successfully';
+
+  @override
+  String get pettyCashNotFound => 'Petty cash not found';
+
+  @override
+  String get pettyCashNameRequired => 'Petty cash name is required';
+
+  @override
+  String get duplicatePettyCashCode => 'Duplicate petty cash code';
+
+  @override
+  String get invalidPettyCashCode => 'Invalid petty cash code';
+
+  @override
+  String get pettyCashBulkDeleted => 'Petty cash items deleted successfully';
+
+  @override
+  String get pettyCashListFetched => 'Petty cash list fetched';
+
+  @override
+  String get pettyCashDetails => 'Petty cash details';
+
+  @override
+  String get pettyCashExportExcel => 'Export petty cash to Excel';
+
+  @override
+  String get pettyCashExportPdf => 'Export petty cash to PDF';
+
+  @override
+  String get pettyCashReport => 'Petty Cash Report';
 }

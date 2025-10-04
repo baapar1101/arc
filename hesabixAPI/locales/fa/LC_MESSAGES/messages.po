@@ -137,6 +137,34 @@ msgstr "پیکربندی ایمیل یافت نشد"
 msgid "Configuration name already exists"
 msgstr "نام پیکربندی قبلاً استفاده شده است"
 
+# Banking / Petty Cash
+msgid "PETTY_CASH_LIST_FETCHED"
+msgstr "لیست تنخواه گردان‌ها با موفقیت دریافت شد"
+
+msgid "PETTY_CASH_CREATED"
+msgstr "تنخواه گردان با موفقیت ایجاد شد"
+
+msgid "PETTY_CASH_DETAILS"
+msgstr "جزئیات تنخواه گردان"
+
+msgid "PETTY_CASH_UPDATED"
+msgstr "تنخواه گردان با موفقیت به‌روزرسانی شد"
+
+msgid "PETTY_CASH_DELETED"
+msgstr "تنخواه گردان با موفقیت حذف شد"
+
+msgid "PETTY_CASH_NOT_FOUND"
+msgstr "تنخواه گردان یافت نشد"
+
+msgid "PETTY_CASH_BULK_DELETE_DONE"
+msgstr "حذف گروهی تنخواه گردان‌ها انجام شد"
+
+msgid "INVALID_PETTY_CASH_CODE"
+msgstr "کد تنخواه گردان نامعتبر است"
+
+msgid "DUPLICATE_PETTY_CASH_CODE"
+msgstr "کد تنخواه گردان تکراری است"
+
 msgid "Connection test completed"
 msgstr "تست اتصال تکمیل شد"
 

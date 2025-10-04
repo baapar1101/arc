@@ -18,45 +18,30 @@ def upgrade() -> None:
     # Try to drop FK on price_lists.currency_id if exists
     if dialect == 'mysql':
         # Find foreign key constraint name dynamically and drop it
-        op.execute(sa.text(
+        fk_rows = conn.execute(sa.text(
             """
-            SET @fk_name := (
-              SELECT CONSTRAINT_NAME
-              FROM information_schema.KEY_COLUMN_USAGE
-              WHERE TABLE_SCHEMA = DATABASE()
-                AND TABLE_NAME = 'price_lists'
-                AND COLUMN_NAME = 'currency_id'
-                AND REFERENCED_TABLE_NAME IS NOT NULL
-              LIMIT 1
-            );
+            SELECT CONSTRAINT_NAME
+            FROM information_schema.KEY_COLUMN_USAGE
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = 'price_lists'
+              AND COLUMN_NAME = 'currency_id'
+              AND REFERENCED_TABLE_NAME IS NOT NULL
+            GROUP BY CONSTRAINT_NAME
             """
-        ))
-        op.execute(sa.text(
-            """
-            SET @q := IF(@fk_name IS NOT NULL, CONCAT('ALTER TABLE price_lists DROP FOREIGN KEY ', @fk_name), 'SELECT 1');
-            PREPARE stmt FROM @q; EXECUTE stmt; DEALLOCATE PREPARE stmt;
-            """
-        ))
-        # Drop indexes on columns if any
-        for col in ('currency_id', 'default_unit_id'):
-            op.execute(sa.text(
-                f"""
-                SET @idx := (
-                  SELECT INDEX_NAME FROM information_schema.STATISTICS
-                  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'price_lists' AND COLUMN_NAME = '{col}' LIMIT 1
-                );
-                """
-            ))
-            op.execute(sa.text(
-                """
-                SET @qi := IF(@idx IS NOT NULL, CONCAT('ALTER TABLE price_lists DROP INDEX ', @idx), 'SELECT 1');
-                PREPARE s FROM @qi; EXECUTE s; DEALLOCATE PREPARE s;
-                """
-            ))
+        )).fetchall()
+        for (fk_name,) in fk_rows:
+            conn.execute(sa.text(f"ALTER TABLE price_lists DROP FOREIGN KEY {fk_name}"))
 
-        # Finally drop columns if they exist
-        op.execute(sa.text("ALTER TABLE price_lists DROP COLUMN IF EXISTS currency_id"))
-        op.execute(sa.text("ALTER TABLE price_lists DROP COLUMN IF EXISTS default_unit_id"))
+        # Finally drop columns if they exist (manual check)
+        for col in ('currency_id', 'default_unit_id'):
+            exists = conn.execute(sa.text(
+                """
+                SELECT COUNT(*) as cnt FROM information_schema.COLUMNS
+                WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'price_lists' AND COLUMN_NAME = :col
+                """
+            ), {"col": col}).scalar() or 0
+            if int(exists) > 0:
+                conn.execute(sa.text(f"ALTER TABLE price_lists DROP COLUMN {col}"))
     else:
         # Best-effort: drop constraint by common names, then drop columns
         for name in ('price_lists_currency_id_fkey', 'fk_price_lists_currency_id', 'price_lists_currency_id_fk'):

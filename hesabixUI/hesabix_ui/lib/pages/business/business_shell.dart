@@ -7,6 +7,8 @@ import '../../theme/theme_controller.dart';
 import '../../widgets/combined_user_menu_button.dart';
 import '../../widgets/person/person_form_dialog.dart';
 import '../../widgets/banking/bank_account_form_dialog.dart';
+import '../../widgets/banking/cash_register_form_dialog.dart';
+import '../../widgets/banking/petty_cash_form_dialog.dart';
 import '../../widgets/product/product_form_dialog.dart';
 import '../../widgets/category/category_tree_dialog.dart';
 import '../../services/business_dashboard_service.dart';
@@ -59,6 +61,19 @@ class _BusinessShellState extends State<BusinessShell> {
     
     // بارگذاری اطلاعات کسب و کار و دسترسی‌ها
     _loadBusinessInfo();
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
+  }
+
+  void _refreshCurrentPage() {
+    // Force a rebuild of the current page
+    setState(() {
+      // This will cause the current page to rebuild
+      // and if it's PettyCashPage, it will refresh its data
+    });
   }
 
   Future<void> _loadBusinessInfo() async {
@@ -544,6 +559,58 @@ class _BusinessShellState extends State<BusinessShell> {
       }
     }
 
+    Future<void> showAddCashBoxDialog() async {
+      final result = await showDialog<bool>(
+        context: context,
+        builder: (context) => CashRegisterFormDialog(
+          businessId: widget.businessId,
+          onSuccess: () {
+            // Refresh the cash registers page if it's currently open
+            _refreshCurrentPage();
+          },
+        ),
+      );
+      if (result == true) {
+        // Cash register was successfully added, refresh the current page
+        _refreshCurrentPage();
+      }
+    }
+
+    Future<void> showAddPettyCashDialog() async {
+      final result = await showDialog<bool>(
+        context: context,
+        builder: (context) => PettyCashFormDialog(
+          businessId: widget.businessId,
+          onSuccess: () {
+            // Refresh the petty cash page if it's currently open
+            _refreshCurrentPage();
+          },
+        ),
+      );
+      if (result == true) {
+        // Petty cash was successfully added, refresh the current page
+        _refreshCurrentPage();
+      }
+    }
+
+    Future<void> showAddBankAccountDialog() async {
+      final result = await showDialog<bool>(
+        context: context,
+        builder: (context) => BankAccountFormDialog(
+          businessId: widget.businessId,
+          onSuccess: () {
+            // Refresh the bank accounts page if it's currently open
+            _refreshCurrentPage();
+          },
+        ),
+      );
+      if (result == true) {
+        // Bank account was successfully added, refresh the current page
+        _refreshCurrentPage();
+      }
+    }
+
+
     bool isExpanded(_MenuItem item) {
       if (item.label == t.productsAndServices) return _isProductsAndServicesExpanded;
       if (item.label == t.banking) return _isBankingExpanded;
@@ -728,23 +795,20 @@ class _BusinessShellState extends State<BusinessShell> {
                                         // Navigate to add product attribute
                                       } else if (child.label == t.accounts) {
                                         // Open add bank account dialog
-                                        showDialog(
-                                          context: context,
-                                          builder: (ctx) => BankAccountFormDialog(
-                                            businessId: widget.businessId,
-                                          ),
-                                        );
+                                        showAddBankAccountDialog();
                                       } else if (child.label == t.pettyCash) {
-                                        // Navigate to add petty cash
+                                        // Open add petty cash dialog
+                                        showAddPettyCashDialog();
                                       } else if (child.label == t.cashBox) {
-                                        // For cash box, navigate to the page and use its add
-                                        context.go('/business/${widget.businessId}/cash-box');
+                                        // Open add cash register dialog
+                                        showAddCashBoxDialog();
                                       } else if (child.label == t.wallet) {
                                         // Navigate to add wallet
                                       } else if (child.label == t.checks) {
                                         // Navigate to add check
                                       } else if (child.label == t.invoice) {
                                         // Navigate to add invoice
+                                        context.go('/business/${widget.businessId}/invoice/new');
                                       } else if (child.label == t.expenseAndIncome) {
                                         // Navigate to add expense/income
                                       } else if (child.label == t.warehouses) {
@@ -881,14 +945,9 @@ class _BusinessShellState extends State<BusinessShell> {
                                           if (item.label == t.people) {
                                             showAddPersonDialog();
                                           } else if (item.label == t.accounts) {
-                                            showDialog(
-                                              context: context,
-                                              builder: (ctx) => BankAccountFormDialog(
-                                                businessId: widget.businessId,
-                                              ),
-                                            );
+                                            showAddBankAccountDialog();
                                           } else if (item.label == t.cashBox) {
-                                            context.go('/business/${widget.businessId}/cash-box');
+                                            showAddCashBoxDialog();
                                           }
                                           // سایر مسیرهای افزودن در آینده متصل می‌شوند
                                         },
@@ -1036,17 +1095,21 @@ class _BusinessShellState extends State<BusinessShell> {
                             } else if (child.label == t.productAttributes) {
                               // Navigate to add product attribute
                             } else if (child.label == t.accounts) {
-                              // Navigate to add account
+                              // Open add bank account dialog
+                              showAddBankAccountDialog();
                             } else if (child.label == t.pettyCash) {
-                              // Navigate to add petty cash
+                              // Open add petty cash dialog
+                              showAddPettyCashDialog();
                             } else if (child.label == t.cashBox) {
-                              // Navigate to add cash box
+                              // Open add cash register dialog
+                              showAddCashBoxDialog();
                             } else if (child.label == t.wallet) {
                               // Navigate to add wallet
                             } else if (child.label == t.checks) {
                               // Navigate to add check
                             } else if (child.label == t.invoice) {
                               // Navigate to add invoice
+                              context.go('/business/${widget.businessId}/invoice/new');
                             } else if (child.label == t.expenseAndIncome) {
                               // Navigate to add expense/income
                             } else if (child.label == t.warehouses) {

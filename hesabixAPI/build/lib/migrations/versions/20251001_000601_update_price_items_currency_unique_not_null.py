@@ -28,21 +28,19 @@ def upgrade() -> None:
     conn = op.get_bind()
     dialect_name = conn.dialect.name
 
-    # MySQL: information_schema to check constraints
     if dialect_name == 'mysql':
-        op.execute(
-            sa.text(
-                """
-                SET @exists := (
-                  SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
-                  WHERE CONSTRAINT_SCHEMA = DATABASE()
-                    AND TABLE_NAME = 'price_items'
-                    AND CONSTRAINT_NAME = 'uq_price_items_unique_tier'
-                );
-                """
-            )
-        )
-        op.execute(sa.text("""SET @q := IF(@exists > 0, 'ALTER TABLE price_items DROP INDEX uq_price_items_unique_tier', 'SELECT 1'); PREPARE stmt FROM @q; EXECUTE stmt; DEALLOCATE PREPARE stmt;"""))
+        # Check via information_schema and drop index if present
+        exists = conn.execute(sa.text(
+            """
+            SELECT COUNT(*) as cnt
+            FROM information_schema.STATISTICS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = 'price_items'
+              AND INDEX_NAME = 'uq_price_items_unique_tier'
+            """
+        )).scalar() or 0
+        if int(exists) > 0:
+            conn.execute(sa.text("ALTER TABLE price_items DROP INDEX uq_price_items_unique_tier"))
     else:
         # Generic drop constraint best-effort
         try:
@@ -53,13 +51,32 @@ def upgrade() -> None:
     # 3) Make currency_id NOT NULL
     op.alter_column('price_items', 'currency_id', existing_type=sa.Integer(), nullable=False, existing_nullable=True)
 
-    # 4) Create new unique constraint including currency_id
-    # For MySQL, unique constraints are created as indexes as well
-    op.create_unique_constraint(
-        'uq_price_items_unique_tier_currency',
-        'price_items',
-        ['price_list_id', 'product_id', 'unit_id', 'tier_name', 'min_qty', 'currency_id']
-    )
+    # 4) Create new unique constraint including currency_id (idempotent)
+    if dialect_name == 'mysql':
+        exists_uc = conn.execute(sa.text(
+            """
+            SELECT COUNT(*) as cnt
+            FROM information_schema.STATISTICS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = 'price_items'
+              AND INDEX_NAME = 'uq_price_items_unique_tier_currency'
+            """
+        )).scalar() or 0
+        if int(exists_uc) == 0:
+            op.create_unique_constraint(
+                'uq_price_items_unique_tier_currency',
+                'price_items',
+                ['price_list_id', 'product_id', 'unit_id', 'tier_name', 'min_qty', 'currency_id']
+            )
+    else:
+        try:
+            op.create_unique_constraint(
+                'uq_price_items_unique_tier_currency',
+                'price_items',
+                ['price_list_id', 'product_id', 'unit_id', 'tier_name', 'min_qty', 'currency_id']
+            )
+        except Exception:
+            pass
 
 
 def downgrade() -> None:

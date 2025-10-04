@@ -5599,6 +5599,126 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Coming soon'**
   String get comingSoon;
+
+  /// No description provided for @pettyCashManagement.
+  ///
+  /// In en, this message translates to:
+  /// **'Petty Cash Management'**
+  String get pettyCashManagement;
+
+  /// No description provided for @pettyCashName.
+  ///
+  /// In en, this message translates to:
+  /// **'Petty Cash Name'**
+  String get pettyCashName;
+
+  /// No description provided for @pettyCashCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Petty Cash Code'**
+  String get pettyCashCode;
+
+  /// No description provided for @pettyCashDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Petty Cash Description'**
+  String get pettyCashDescription;
+
+  /// No description provided for @pettyCashCurrency.
+  ///
+  /// In en, this message translates to:
+  /// **'Currency'**
+  String get pettyCashCurrency;
+
+  /// No description provided for @pettyCashIsActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Active'**
+  String get pettyCashIsActive;
+
+  /// No description provided for @pettyCashIsDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Default'**
+  String get pettyCashIsDefault;
+
+  /// No description provided for @pettyCashCreatedSuccessfully.
+  ///
+  /// In en, this message translates to:
+  /// **'Petty cash created successfully'**
+  String get pettyCashCreatedSuccessfully;
+
+  /// No description provided for @pettyCashUpdatedSuccessfully.
+  ///
+  /// In en, this message translates to:
+  /// **'Petty cash updated successfully'**
+  String get pettyCashUpdatedSuccessfully;
+
+  /// No description provided for @pettyCashDeletedSuccessfully.
+  ///
+  /// In en, this message translates to:
+  /// **'Petty cash deleted successfully'**
+  String get pettyCashDeletedSuccessfully;
+
+  /// No description provided for @pettyCashNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'Petty cash not found'**
+  String get pettyCashNotFound;
+
+  /// No description provided for @pettyCashNameRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Petty cash name is required'**
+  String get pettyCashNameRequired;
+
+  /// No description provided for @duplicatePettyCashCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Duplicate petty cash code'**
+  String get duplicatePettyCashCode;
+
+  /// No description provided for @invalidPettyCashCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid petty cash code'**
+  String get invalidPettyCashCode;
+
+  /// No description provided for @pettyCashBulkDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Petty cash items deleted successfully'**
+  String get pettyCashBulkDeleted;
+
+  /// No description provided for @pettyCashListFetched.
+  ///
+  /// In en, this message translates to:
+  /// **'Petty cash list fetched'**
+  String get pettyCashListFetched;
+
+  /// No description provided for @pettyCashDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Petty cash details'**
+  String get pettyCashDetails;
+
+  /// No description provided for @pettyCashExportExcel.
+  ///
+  /// In en, this message translates to:
+  /// **'Export petty cash to Excel'**
+  String get pettyCashExportExcel;
+
+  /// No description provided for @pettyCashExportPdf.
+  ///
+  /// In en, this message translates to:
+  /// **'Export petty cash to PDF'**
+  String get pettyCashExportPdf;
+
+  /// No description provided for @pettyCashReport.
+  ///
+  /// In en, this message translates to:
+  /// **'Petty Cash Report'**
+  String get pettyCashReport;
 }
 
 class _AppLocalizationsDelegate

@@ -48,21 +48,43 @@ class AuthContext:
 	@staticmethod
 	def _normalize_permissions_value(value) -> dict:
 		"""نرمال‌سازی مقدار JSON دسترسی‌ها به dict برای سازگاری با داده‌های legacy"""
+		import logging
+		logger = logging.getLogger(__name__)
+		
+		logger.info(f"=== _normalize_permissions_value START ===")
+		logger.info(f"Input value type: {type(value)}")
+		logger.info(f"Input value: {value}")
+		
 		if isinstance(value, dict):
+			logger.info("Value is already a dict, returning as is")
+			logger.info(f"=== _normalize_permissions_value END ===")
 			return value
 		if isinstance(value, list):
+			logger.info("Value is a list, processing...")
 			try:
 				# لیست جفت‌ها مانند [["join", true], ["sales", {..}]]
 				if all(isinstance(item, list) and len(item) == 2 for item in value):
-					return {k: v for k, v in value if isinstance(k, str)}
+					logger.info("Detected list of key-value pairs")
+					result = {k: v for k, v in value if isinstance(k, str)}
+					logger.info(f"Converted to dict: {result}")
+					logger.info(f"=== _normalize_permissions_value END ===")
+					return result
 				# لیست دیکشنری‌ها مانند [{"join": true}, {"sales": {...}}]
 				if all(isinstance(item, dict) for item in value):
+					logger.info("Detected list of dictionaries")
 					merged = {}
 					for item in value:
 						merged.update({k: v for k, v in item.items()})
+					logger.info(f"Merged to dict: {merged}")
+					logger.info(f"=== _normalize_permissions_value END ===")
 					return merged
-			except Exception:
+			except Exception as e:
+				logger.error(f"Error processing list: {e}")
+				logger.info(f"=== _normalize_permissions_value END ===")
 				return {}
+		
+		logger.info(f"Unsupported value type {type(value)}, returning empty dict")
+		logger.info(f"=== _normalize_permissions_value END ===")
 		return {}
 	
 	def get_translator(self) -> Translator:
@@ -101,15 +123,34 @@ class AuthContext:
 	
 	def _get_business_permissions(self) -> dict:
 		"""دریافت دسترسی‌های کسب و کار از دیتابیس"""
+		import logging
+		logger = logging.getLogger(__name__)
+		
+		logger.info(f"=== _get_business_permissions START ===")
+		logger.info(f"User ID: {self.user.id}")
+		logger.info(f"Business ID: {self.business_id}")
+		logger.info(f"DB available: {self.db is not None}")
+		
 		if not self.business_id or not self.db:
+			logger.info("No business_id or db, returning empty permissions")
 			return {}
 		
 		from adapters.db.repositories.business_permission_repo import BusinessPermissionRepository
 		repo = BusinessPermissionRepository(self.db)
 		permission_obj = repo.get_by_user_and_business(self.user.id, self.business_id)
 		
+		logger.info(f"Permission object found: {permission_obj}")
+		
 		if permission_obj and permission_obj.business_permissions:
-			return AuthContext._normalize_permissions_value(permission_obj.business_permissions)
+			raw_permissions = permission_obj.business_permissions
+			logger.info(f"Raw permissions: {raw_permissions}")
+			normalized_permissions = AuthContext._normalize_permissions_value(raw_permissions)
+			logger.info(f"Normalized permissions: {normalized_permissions}")
+			logger.info(f"=== _get_business_permissions END ===")
+			return normalized_permissions
+		
+		logger.info("No permissions found, returning empty dict")
+		logger.info(f"=== _get_business_permissions END ===")
 		return {}
 	
 	# بررسی دسترسی‌های اپلیکیشن
@@ -146,15 +187,33 @@ class AuthContext:
 		import logging
 		logger = logging.getLogger(__name__)
 		
+		logger.info(f"=== is_business_owner START ===")
+		logger.info(f"Requested business_id: {business_id}")
+		logger.info(f"Context business_id: {self.business_id}")
+		logger.info(f"User ID: {self.user.id}")
+		logger.info(f"DB available: {self.db is not None}")
+		
 		target_business_id = business_id or self.business_id
+		logger.info(f"Target business_id: {target_business_id}")
+		
 		if not target_business_id or not self.db:
 			logger.info(f"is_business_owner: no business_id ({target_business_id}) or db ({self.db is not None})")
+			logger.info(f"=== is_business_owner END (no business_id or db) ===")
 			return False
 		
 		from adapters.db.models.business import Business
 		business = self.db.get(Business, target_business_id)
-		is_owner = business and business.owner_id == self.user.id
-		logger.info(f"is_business_owner: business_id={target_business_id}, business={business}, owner_id={business.owner_id if business else None}, user_id={self.user.id}, is_owner={is_owner}")
+		logger.info(f"Business lookup result: {business}")
+		
+		if business:
+			logger.info(f"Business owner_id: {business.owner_id}")
+			is_owner = business.owner_id == self.user.id
+			logger.info(f"is_owner: {is_owner}")
+		else:
+			logger.info("Business not found")
+			is_owner = False
+		
+		logger.info(f"=== is_business_owner END (result: {is_owner}) ===")
 		return is_owner
 	
 	# بررسی دسترسی‌های کسب و کار
@@ -250,22 +309,66 @@ class AuthContext:
 		import logging
 		logger = logging.getLogger(__name__)
 		
-		logger.info(f"Checking business access: user {self.user.id}, business {business_id}, context business_id {self.business_id}")
+		logger.info(f"=== can_access_business START ===")
+		logger.info(f"User ID: {self.user.id}")
+		logger.info(f"Requested business ID: {business_id}")
+		logger.info(f"User context business_id: {self.business_id}")
+		logger.info(f"User app permissions: {self.app_permissions}")
 		
 		# SuperAdmin دسترسی به همه کسب و کارها دارد
 		if self.is_superadmin():
 			logger.info(f"User {self.user.id} is superadmin, granting access to business {business_id}")
+			logger.info(f"=== can_access_business END (superadmin) ===")
 			return True
 		
-		# اگر مالک کسب و کار است، دسترسی دارد
-		if self.is_business_owner() and business_id == self.business_id:
-			logger.info(f"User {self.user.id} is business owner of {business_id}, granting access")
+		# بررسی مالکیت کسب و کار
+		if self.db:
+			from adapters.db.models.business import Business
+			business = self.db.get(Business, business_id)
+			logger.info(f"Business lookup result: {business}")
+			if business:
+				logger.info(f"Business owner ID: {business.owner_id}")
+				if business.owner_id == self.user.id:
+					logger.info(f"User {self.user.id} is business owner of {business_id}, granting access")
+					logger.info(f"=== can_access_business END (owner) ===")
+					return True
+		else:
+			logger.info("No database connection available for business lookup")
+		
+		# بررسی عضویت در کسب و کار
+		if self.db:
+			from adapters.db.repositories.business_permission_repo import BusinessPermissionRepository
+			permission_repo = BusinessPermissionRepository(self.db)
+			business_permission = permission_repo.get_by_user_and_business(self.user.id, business_id)
+			logger.info(f"Business permission lookup result: {business_permission}")
+			
+			if business_permission:
+				# بررسی دسترسی join
+				permissions = business_permission.business_permissions or {}
+				logger.info(f"User permissions for business {business_id}: {permissions}")
+				join_permission = permissions.get('join')
+				logger.info(f"Join permission: {join_permission}")
+				
+				if join_permission == True:
+					logger.info(f"User {self.user.id} is member of business {business_id}, granting access")
+					logger.info(f"=== can_access_business END (member) ===")
+					return True
+				else:
+					logger.info(f"User {self.user.id} does not have join permission for business {business_id}")
+			else:
+				logger.info(f"No business permission found for user {self.user.id} and business {business_id}")
+		else:
+			logger.info("No database connection available for permission lookup")
+		
+		# اگر کسب و کار در context کاربر است، دسترسی دارد
+		if business_id == self.business_id:
+			logger.info(f"User {self.user.id} has context access to business {business_id}")
+			logger.info(f"=== can_access_business END (context) ===")
 			return True
 		
-		# بررسی دسترسی‌های کسب و کار
-		has_access = business_id == self.business_id
-		logger.info(f"Business access check: {business_id} == {self.business_id} = {has_access}")
-		return has_access
+		logger.info(f"User {self.user.id} does not have access to business {business_id}")
+		logger.info(f"=== can_access_business END (denied) ===")
+		return False
 	
 	def is_business_member(self, business_id: int) -> bool:
 		"""بررسی اینکه آیا کاربر عضو کسب و کار است یا نه (دسترسی join)"""
@@ -378,7 +481,15 @@ def get_current_user(
 	# تشخیص سال مالی از هدر X-Fiscal-Year-ID (آینده)
 	fiscal_year_id = _detect_fiscal_year_id(request)
 
-	return AuthContext(
+	logger.info(f"Creating AuthContext for user {user.id}:")
+	logger.info(f"  - Language: {language}")
+	logger.info(f"  - Calendar type: {calendar_type}")
+	logger.info(f"  - Timezone: {timezone}")
+	logger.info(f"  - Business ID: {business_id}")
+	logger.info(f"  - Fiscal year ID: {fiscal_year_id}")
+	logger.info(f"  - App permissions: {user.app_permissions}")
+
+	auth_context = AuthContext(
 		user=user, 
 		api_key_id=obj.id,
 		language=language,
@@ -388,6 +499,9 @@ def get_current_user(
 		fiscal_year_id=fiscal_year_id,
 		db=db
 	)
+	
+	logger.info(f"AuthContext created successfully")
+	return auth_context
 
 
 def _detect_language(request: Request) -> str:
@@ -409,12 +523,22 @@ def _detect_timezone(request: Request) -> Optional[str]:
 
 def _detect_business_id(request: Request) -> Optional[int]:
 	"""تشخیص ID کسب و کار از هدر X-Business-ID (آینده)"""
+	import logging
+	logger = logging.getLogger(__name__)
+	
 	business_id_str = request.headers.get("X-Business-ID")
+	logger.info(f"X-Business-ID header: {business_id_str}")
+	
 	if business_id_str:
 		try:
-			return int(business_id_str)
+			business_id = int(business_id_str)
+			logger.info(f"Detected business ID: {business_id}")
+			return business_id
 		except ValueError:
+			logger.warning(f"Invalid business ID format: {business_id_str}")
 			pass
+	
+	logger.info("No business ID detected from headers")
 	return None
 
 

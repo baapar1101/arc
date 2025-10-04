@@ -138,7 +138,7 @@ class _BankAccountFormDialogState extends State<BankAccountFormDialog> {
       }
 
       if (mounted) {
-        Navigator.of(context).pop();
+        Navigator.of(context).pop(true); // Return true to indicate success
         widget.onSuccess?.call();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

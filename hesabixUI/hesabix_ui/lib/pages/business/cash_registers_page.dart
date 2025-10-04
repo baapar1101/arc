@@ -47,6 +47,23 @@ class _CashRegistersPageState extends State<CashRegistersPage> {
 		} catch (_) {}
 	}
 
+	/// Public method to refresh the data table
+	void refresh() {
+		try {
+			(_tableKey.currentState as dynamic)?.refresh();
+		} catch (_) {}
+	}
+
+	@override
+	void didUpdateWidget(CashRegistersPage oldWidget) {
+		super.didUpdateWidget(oldWidget);
+		// This will be called when the widget is updated
+		// Refresh the data table to show any new data
+		WidgetsBinding.instance.addPostFrameCallback((_) {
+			refresh();
+		});
+	}
+
 	@override
 	Widget build(BuildContext context) {
 		final t = AppLocalizations.of(context);
@@ -151,7 +168,7 @@ class _CashRegistersPageState extends State<CashRegistersPage> {
 					],
 				),
 			],
-			searchFields: ['code','description','payment_switch_number','payment_terminal_number','merchant_id'],
+			searchFields: ['name','code','description','payment_switch_number','payment_terminal_number','merchant_id'],
 			filterFields: ['is_active','is_default','currency_id'],
 			defaultPageSize: 20,
 			customHeaderActions: [

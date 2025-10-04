@@ -22,7 +22,7 @@ def create_price_list(db: Session, business_id: int, payload: PriceListCreateReq
         name=payload.name.strip(),
         is_active=payload.is_active,
     )
-    return {"message": "لیست قیمت ایجاد شد", "data": _pl_to_dict(obj)}
+    return {"message": "PRICE_LIST_CREATED", "data": _pl_to_dict(obj)}
 
 
 def list_price_lists(db: Session, business_id: int, query: Dict[str, Any]) -> Dict[str, Any]:
@@ -54,7 +54,7 @@ def update_price_list(db: Session, business_id: int, id: int, payload: PriceList
     updated = repo.update(id, name=payload.name.strip() if isinstance(payload.name, str) else None, is_active=payload.is_active)
     if not updated:
         return None
-    return {"message": "لیست قیمت بروزرسانی شد", "data": _pl_to_dict(updated)}
+    return {"message": "PRICE_LIST_UPDATED", "data": _pl_to_dict(updated)}
 
 
 def delete_price_list(db: Session, business_id: int, id: int) -> bool:
@@ -96,7 +96,7 @@ def upsert_price_item(db: Session, business_id: int, price_list_id: int, payload
         min_qty=payload.min_qty,
         price=payload.price,
     )
-    return {"message": "قیمت ثبت شد", "data": _pi_to_dict(obj)}
+    return {"message": "PRICE_ITEM_UPSERTED", "data": _pi_to_dict(obj)}
 
 
 def delete_price_item(db: Session, business_id: int, id: int) -> bool:

@@ -104,9 +104,22 @@ def require_business_access(business_id_param: str = "business_id"):
                 except Exception:
                     business_id = None
 
-            if business_id and not ctx.can_access_business(int(business_id)):
-                logger.warning(f"User {ctx.get_user_id()} does not have access to business {business_id}")
-                raise ApiError("FORBIDDEN", f"No access to business {business_id}", http_status=403)
+            if business_id:
+                logger.info(f"=== require_business_access decorator ===")
+                logger.info(f"Checking access for user {ctx.get_user_id()} to business {business_id}")
+                logger.info(f"User context business_id: {ctx.business_id}")
+                logger.info(f"Is superadmin: {ctx.is_superadmin()}")
+                
+                has_access = ctx.can_access_business(int(business_id))
+                logger.info(f"Access check result: {has_access}")
+                
+                if not has_access:
+                    logger.warning(f"User {ctx.get_user_id()} does not have access to business {business_id}")
+                    raise ApiError("FORBIDDEN", f"No access to business {business_id}", http_status=403)
+                else:
+                    logger.info(f"User {ctx.get_user_id()} has access to business {business_id}")
+            else:
+                logger.info("No business_id provided, skipping access check")
 
             # فراخوانی تابع اصلی و await در صورت نیاز
             result = func(*args, **kwargs)

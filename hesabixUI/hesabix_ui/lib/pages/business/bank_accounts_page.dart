@@ -49,6 +49,23 @@ class _BankAccountsPageState extends State<BankAccountsPage> {
     }
   }
 
+  /// Public method to refresh the data table
+  void refresh() {
+    try {
+      (_bankAccountsTableKey.currentState as dynamic)?.refresh();
+    } catch (_) {}
+  }
+
+  @override
+  void didUpdateWidget(BankAccountsPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // This will be called when the widget is updated
+    // Refresh the data table to show any new data
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      refresh();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);

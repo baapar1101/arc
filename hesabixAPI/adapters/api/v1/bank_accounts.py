@@ -211,9 +211,32 @@ async def export_bank_accounts_excel(
     result = list_bank_accounts(db, business_id, query_dict)
     items: List[Dict[str, Any]] = result.get("items", [])
     items = [format_datetime_fields(item, request) for item in items]
+
+    # Map currency_id -> currency title for display
+    try:
+        from adapters.db.models.currency import Currency
+        currency_ids = set()
+        for it in items:
+            cid = it.get("currency_id")
+            try:
+                if cid is not None:
+                    currency_ids.add(int(cid))
+            except Exception:
+                pass
+        currency_map: Dict[int, str] = {}
+        if currency_ids:
+            rows = db.query(Currency).filter(Currency.id.in_(list(currency_ids))).all()
+            currency_map = {c.id: (c.title or c.code or str(c.id)) for c in rows}
+        for it in items:
+            cid = it.get("currency_id")
+            it["currency"] = currency_map.get(cid, cid)
+    except Exception:
+        for it in items:
+            if "currency" not in it and "currency_id" in it:
+                it["currency"] = it.get("currency_id")
     
     headers: List[str] = [
-        "code", "name", "branch", "account_number", "sheba_number", "card_number", "owner_name", "pos_number", "is_active", "is_default"
+        "code", "name", "branch", "account_number", "sheba_number", "card_number", "owner_name", "pos_number", "currency", "is_active", "is_default"
     ]
 
     wb = Workbook()
@@ -245,6 +268,12 @@ async def export_bank_accounts_excel(
     for row_idx, item in enumerate(items, 2):
         for col_idx, key in enumerate(headers, 1):
             value = item.get(key, "")
+            if key in ("is_active", "is_default"):
+                try:
+                    truthy = bool(value) if isinstance(value, bool) else str(value).strip().lower() in ("true", "1", "yes", "y", "t")
+                except Exception:
+                    truthy = bool(value)
+                value = "✓" if truthy else "✗"
             if isinstance(value, list):
                 value = ", ".join(str(v) for v in value)
             cell = ws.cell(row=row_idx, column=col_idx, value=value)
@@ -314,6 +343,29 @@ async def export_bank_accounts_pdf(
     items: List[Dict[str, Any]] = result.get("items", [])
     items = [format_datetime_fields(item, request) for item in items]
 
+    # Map currency_id -> currency title for display
+    try:
+        from adapters.db.models.currency import Currency
+        currency_ids = set()
+        for it in items:
+            cid = it.get("currency_id")
+            try:
+                if cid is not None:
+                    currency_ids.add(int(cid))
+            except Exception:
+                pass
+        currency_map: Dict[int, str] = {}
+        if currency_ids:
+            rows = db.query(Currency).filter(Currency.id.in_(list(currency_ids))).all()
+            currency_map = {c.id: (c.title or c.code or str(c.id)) for c in rows}
+        for it in items:
+            cid = it.get("currency_id")
+            it["currency"] = currency_map.get(cid, cid)
+    except Exception:
+        for it in items:
+            if "currency" not in it and "currency_id" in it:
+                it["currency"] = it.get("currency_id")
+
     # Selection handling
     selected_only = bool(body.get('selected_only', False))
     selected_indices = body.get('selected_indices')
@@ -339,7 +391,10 @@ async def export_bank_accounts_pdf(
             key = col.get('key')
             label = col.get('label', key)
             if key:
-                keys.append(str(key))
+                if str(key) == 'currency_id':
+                    keys.append('currency')
+                else:
+                    keys.append(str(key))
                 headers.append(str(label))
     else:
         if items:
@@ -348,7 +403,7 @@ async def export_bank_accounts_pdf(
         else:
             keys = [
                 "code", "name", "branch", "account_number", "sheba_number",
-                "card_number", "owner_name", "pos_number", "is_active", "is_default",
+                "card_number", "owner_name", "pos_number", "currency", "is_active", "is_default",
             ]
             headers = keys
 
@@ -403,6 +458,12 @@ async def export_bank_accounts_pdf(
                 value = ""
             elif isinstance(value, list):
                 value = ", ".join(str(v) for v in value)
+            elif key in ("is_active", "is_default"):
+                try:
+                    truthy = bool(value) if isinstance(value, bool) else str(value).strip().lower() in ("true", "1", "yes", "y", "t")
+                except Exception:
+                    truthy = bool(value)
+                value = "✓" if truthy else "✗"
             tds.append(f"<td>{escape_val(value)}</td>")
         rows_html.append(f"<tr>{''.join(tds)}</tr>")
 

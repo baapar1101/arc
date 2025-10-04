@@ -108,3 +108,59 @@ class ProductResponse(BaseModel):
         from_attributes = True
 
 
+class BulkPriceUpdateType(str, Enum):
+    PERCENTAGE = "percentage"
+    AMOUNT = "amount"
+
+
+class BulkPriceUpdateDirection(str, Enum):
+    INCREASE = "increase"
+    DECREASE = "decrease"
+
+
+class BulkPriceUpdateTarget(str, Enum):
+    SALES_PRICE = "sales_price"
+    PURCHASE_PRICE = "purchase_price"
+    BOTH = "both"
+
+
+class BulkPriceUpdateRequest(BaseModel):
+    """درخواست تغییر قیمت‌های گروهی"""
+    update_type: BulkPriceUpdateType = Field(..., description="نوع تغییر: درصدی یا مقداری")
+    direction: BulkPriceUpdateDirection = Field(default=BulkPriceUpdateDirection.INCREASE, description="جهت تغییر: افزایش یا کاهش")
+    target: BulkPriceUpdateTarget = Field(..., description="هدف تغییر: قیمت فروش، خرید یا هر دو")
+    value: Decimal = Field(..., description="مقدار تغییر (درصد یا مبلغ)")
+    
+    # فیلترهای انتخاب کالاها
+    category_ids: Optional[List[int]] = Field(default=None, description="شناسه‌های دسته‌بندی")
+    currency_ids: Optional[List[int]] = Field(default=None, description="شناسه‌های ارز")
+    price_list_ids: Optional[List[int]] = Field(default=None, description="شناسه‌های لیست قیمت")
+    item_types: Optional[List[ProductItemType]] = Field(default=None, description="نوع آیتم‌ها")
+    product_ids: Optional[List[int]] = Field(default=None, description="شناسه‌های کالاهای خاص")
+    
+    # گزینه‌های اضافی
+    only_products_with_inventory: Optional[bool] = Field(default=None, description="فقط کالاهای با موجودی")
+    only_products_with_base_price: Optional[bool] = Field(default=True, description="فقط کالاهای با قیمت پایه")
+
+
+class BulkPriceUpdatePreview(BaseModel):
+    """پیش‌نمایش تغییرات قیمت"""
+    product_id: int
+    product_name: str
+    product_code: str
+    category_name: Optional[str] = None
+    current_sales_price: Optional[Decimal] = None
+    current_purchase_price: Optional[Decimal] = None
+    new_sales_price: Optional[Decimal] = None
+    new_purchase_price: Optional[Decimal] = None
+    sales_price_change: Optional[Decimal] = None
+    purchase_price_change: Optional[Decimal] = None
+
+
+class BulkPriceUpdatePreviewResponse(BaseModel):
+    """پاسخ پیش‌نمایش تغییرات قیمت"""
+    total_products: int
+    affected_products: List[BulkPriceUpdatePreview]
+    summary: dict = Field(..., description="خلاصه تغییرات")
+
+

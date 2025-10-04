@@ -1874,16 +1874,16 @@ class AppLocalizationsFa extends AppLocalizations {
   String get deleteCash => 'حذف صندوق‌ها';
 
   @override
-  String get addPettyCash => 'افزودن تنخواه';
+  String get addPettyCash => 'افزودن تنخواه گردان';
 
   @override
-  String get viewPettyCash => 'مشاهده تنخواه‌ها';
+  String get viewPettyCash => 'مشاهده تنخواه گردان';
 
   @override
-  String get editPettyCash => 'ویرایش تنخواه‌ها';
+  String get editPettyCash => 'ویرایش تنخواه گردان';
 
   @override
-  String get deletePettyCash => 'حذف تنخواه‌ها';
+  String get deletePettyCash => 'حذف تنخواه گردان';
 
   @override
   String get addCheck => 'افزودن چک';
@@ -2816,4 +2816,64 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get comingSoon => 'به‌زودی';
+
+  @override
+  String get pettyCashManagement => 'مدیریت تنخواه گردان';
+
+  @override
+  String get pettyCashName => 'نام تنخواه گردان';
+
+  @override
+  String get pettyCashCode => 'کد تنخواه گردان';
+
+  @override
+  String get pettyCashDescription => 'توضیحات تنخواه گردان';
+
+  @override
+  String get pettyCashCurrency => 'واحد پولی';
+
+  @override
+  String get pettyCashIsActive => 'فعال';
+
+  @override
+  String get pettyCashIsDefault => 'پیش‌فرض';
+
+  @override
+  String get pettyCashCreatedSuccessfully => 'تنخواه گردان با موفقیت ایجاد شد';
+
+  @override
+  String get pettyCashUpdatedSuccessfully => 'تنخواه گردان با موفقیت ویرایش شد';
+
+  @override
+  String get pettyCashDeletedSuccessfully => 'تنخواه گردان با موفقیت حذف شد';
+
+  @override
+  String get pettyCashNotFound => 'تنخواه گردان یافت نشد';
+
+  @override
+  String get pettyCashNameRequired => 'نام تنخواه گردان الزامی است';
+
+  @override
+  String get duplicatePettyCashCode => 'کد تنخواه گردان تکراری است';
+
+  @override
+  String get invalidPettyCashCode => 'کد تنخواه گردان نامعتبر است';
+
+  @override
+  String get pettyCashBulkDeleted => 'تنخواه گردان‌ها با موفقیت حذف شدند';
+
+  @override
+  String get pettyCashListFetched => 'لیست تنخواه گردان‌ها دریافت شد';
+
+  @override
+  String get pettyCashDetails => 'جزئیات تنخواه گردان';
+
+  @override
+  String get pettyCashExportExcel => 'خروجی Excel تنخواه گردان‌ها';
+
+  @override
+  String get pettyCashExportPdf => 'خروجی PDF تنخواه گردان‌ها';
+
+  @override
+  String get pettyCashReport => 'گزارش تنخواه گردان‌ها';
 }

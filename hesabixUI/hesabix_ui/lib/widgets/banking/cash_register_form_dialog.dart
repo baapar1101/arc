@@ -106,7 +106,7 @@ class _CashRegisterFormDialogState extends State<CashRegisterFormDialog> {
 			}
 
 			if (mounted) {
-				Navigator.of(context).pop();
+				Navigator.of(context).pop(true); // Return true to indicate success
 				widget.onSuccess?.call();
 				final t = AppLocalizations.of(context);
 				ScaffoldMessenger.of(context).showSnackBar(

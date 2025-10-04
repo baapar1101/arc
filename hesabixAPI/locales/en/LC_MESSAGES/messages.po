@@ -293,6 +293,34 @@ msgstr "of"
 msgid "noDataFound"
 msgstr "No data found"
 
+# Banking / Petty Cash
+msgid "PETTY_CASH_LIST_FETCHED"
+msgstr "Petty cash list retrieved successfully"
+
+msgid "PETTY_CASH_CREATED"
+msgstr "Petty cash created successfully"
+
+msgid "PETTY_CASH_DETAILS"
+msgstr "Petty cash details"
+
+msgid "PETTY_CASH_UPDATED"
+msgstr "Petty cash updated successfully"
+
+msgid "PETTY_CASH_DELETED"
+msgstr "Petty cash deleted successfully"
+
+msgid "PETTY_CASH_NOT_FOUND"
+msgstr "Petty cash not found"
+
+msgid "PETTY_CASH_BULK_DELETE_DONE"
+msgstr "Bulk delete completed for petty cash"
+
+msgid "INVALID_PETTY_CASH_CODE"
+msgstr "Invalid petty cash code"
+
+msgid "DUPLICATE_PETTY_CASH_CODE"
+msgstr "Duplicate petty cash code"
+
 msgid "activeFilters"
 msgstr "Active Filters"
 

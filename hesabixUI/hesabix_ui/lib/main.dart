@@ -24,6 +24,9 @@ import 'pages/business/dashboard/business_dashboard_page.dart';
 import 'pages/business/users_permissions_page.dart';
 import 'pages/business/accounts_page.dart';
 import 'pages/business/bank_accounts_page.dart';
+import 'pages/business/wallet_page.dart';
+import 'pages/business/invoice_page.dart';
+import 'pages/business/new_invoice_page.dart';
 import 'pages/business/settings_page.dart';
 import 'pages/business/persons_page.dart';
 import 'pages/business/product_attributes_page.dart';
@@ -31,6 +34,7 @@ import 'pages/business/products_page.dart';
 import 'pages/business/price_lists_page.dart';
 import 'pages/business/price_list_items_page.dart';
 import 'pages/business/cash_registers_page.dart';
+import 'pages/business/petty_cash_page.dart';
 import 'pages/error_404_page.dart';
 import 'core/locale_controller.dart';
 import 'core/calendar_controller.dart';
@@ -563,6 +567,24 @@ class _MyAppState extends State<MyApp> {
               },
             ),
             GoRoute(
+              path: 'petty-cash',
+              name: 'business_petty_cash',
+              builder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return BusinessShell(
+                  businessId: businessId,
+                  authStore: _authStore!,
+                  localeController: controller,
+                  calendarController: _calendarController!,
+                  themeController: themeController,
+                  child: PettyCashPage(
+                    businessId: businessId,
+                    authStore: _authStore!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
               path: 'cash-box',
               name: 'business_cash_box',
               builder: (context, state) {
@@ -574,6 +596,60 @@ class _MyAppState extends State<MyApp> {
                   calendarController: _calendarController!,
                   themeController: themeController,
                   child: CashRegistersPage(
+                    businessId: businessId,
+                    authStore: _authStore!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: 'wallet',
+              name: 'business_wallet',
+              builder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return BusinessShell(
+                  businessId: businessId,
+                  authStore: _authStore!,
+                  localeController: controller,
+                  calendarController: _calendarController!,
+                  themeController: themeController,
+                  child: WalletPage(
+                    businessId: businessId,
+                    authStore: _authStore!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: 'invoice',
+              name: 'business_invoice',
+              builder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return BusinessShell(
+                  businessId: businessId,
+                  authStore: _authStore!,
+                  localeController: controller,
+                  calendarController: _calendarController!,
+                  themeController: themeController,
+                  child: InvoicePage(
+                    businessId: businessId,
+                    authStore: _authStore!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: 'invoice/new',
+              name: 'business_new_invoice',
+              builder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return BusinessShell(
+                  businessId: businessId,
+                  authStore: _authStore!,
+                  localeController: controller,
+                  calendarController: _calendarController!,
+                  themeController: themeController,
+                  child: NewInvoicePage(
                     businessId: businessId,
                     authStore: _authStore!,
                   ),

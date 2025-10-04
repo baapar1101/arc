@@ -12,6 +12,8 @@ from adapters.api.v1.schemas import QueryInfo
 from adapters.api.v1.schema_models.product import (
     ProductCreateRequest,
     ProductUpdateRequest,
+    BulkPriceUpdateRequest,
+    BulkPriceUpdatePreviewResponse,
 )
 from app.services.product_service import (
     create_product,
@@ -20,8 +22,13 @@ from app.services.product_service import (
     update_product,
     delete_product,
 )
+from app.services.bulk_price_update_service import (
+    preview_bulk_price_update,
+    apply_bulk_price_update,
+)
 from adapters.db.models.business import Business
 from app.core.i18n import negotiate_locale
+from fastapi import UploadFile, File, Form
 
 
 router = APIRouter(prefix="/products", tags=["products"])
@@ -113,6 +120,64 @@ def delete_product_endpoint(
     ok = delete_product(db, product_id, business_id)
     return success_response({"deleted": ok}, request)
 
+
+@router.post("/business/{business_id}/bulk-delete",
+    summary="حذف گروهی محصولات",
+    description="حذف چندین آیتم بر اساس شناسه‌ها یا کدها",
+)
+@require_business_access("business_id")
+def bulk_delete_products_endpoint(
+    request: Request,
+    business_id: int,
+    body: Dict[str, Any],
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    if not ctx.has_business_permission("inventory", "delete"):
+        raise ApiError("FORBIDDEN", "Missing business permission: inventory.delete", http_status=403)
+
+    from sqlalchemy import and_ as _and
+    from adapters.db.models.product import Product
+
+    ids = body.get("ids")
+    codes = body.get("codes")
+    deleted = 0
+    skipped = 0
+
+    if not ids and not codes:
+        return success_response({"deleted": 0, "skipped": 0}, request)
+
+    # Normalize inputs
+    if isinstance(ids, list):
+        ids = [int(x) for x in ids if isinstance(x, (int, str)) and str(x).isdigit()]
+    else:
+        ids = []
+    if isinstance(codes, list):
+        codes = [str(x).strip() for x in codes if str(x).strip()]
+    else:
+        codes = []
+
+    # Delete by IDs first
+    if ids:
+        for pid in ids:
+            ok = delete_product(db, pid, business_id)
+            if ok:
+                deleted += 1
+            else:
+                skipped += 1
+
+    # Delete by codes
+    if codes:
+        items = db.query(Product).filter(_and(Product.business_id == business_id, Product.code.in_(codes))).all()
+        for obj in items:
+            try:
+                db.delete(obj)
+                deleted += 1
+            except Exception:
+                skipped += 1
+        db.commit()
+
+    return success_response({"deleted": deleted, "skipped": skipped}, request)
 
 @router.post("/business/{business_id}/export/excel",
     summary="خروجی Excel لیست محصولات",
@@ -267,6 +332,285 @@ async def export_products_excel(
     )
 
 
+@router.post("/business/{business_id}/import/template",
+    summary="دانلود تمپلیت ایمپورت محصولات",
+    description="فایل Excel تمپلیت برای ایمپورت کالا/خدمت را برمی‌گرداند",
+)
+@require_business_access("business_id")
+async def download_products_import_template(
+    request: Request,
+    business_id: int,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    import io
+    import datetime
+    from fastapi.responses import Response
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, Alignment
+
+    if not ctx.has_business_permission("inventory", "write"):
+        raise ApiError("FORBIDDEN", "Missing business permission: inventory.write", http_status=403)
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Template"
+
+    headers = [
+        "code","name","item_type","description","category_id",
+        "main_unit_id","secondary_unit_id","unit_conversion_factor",
+        "base_sales_price","base_purchase_price","track_inventory",
+        "reorder_point","min_order_qty","lead_time_days",
+        "is_sales_taxable","is_purchase_taxable","sales_tax_rate","purchase_tax_rate",
+        "tax_type_id","tax_code","tax_unit_id",
+        # attribute_ids can be comma-separated ids
+        "attribute_ids",
+    ]
+    for col, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col, value=header)
+        cell.font = Font(bold=True)
+        cell.alignment = Alignment(horizontal="center")
+
+    sample = [
+        "P1001","نمونه کالا","کالا","توضیح اختیاری", "", 
+        "", "", "", 
+        "150000", "120000", "TRUE",
+        "0", "0", "",
+        "FALSE", "FALSE", "", "",
+        "", "", "",
+        "1,2,3",
+    ]
+    for col, val in enumerate(sample, 1):
+        ws.cell(row=2, column=col, value=val)
+
+    # Auto width
+    for column in ws.columns:
+        try:
+            letter = column[0].column_letter
+            max_len = max(len(str(c.value)) if c.value is not None else 0 for c in column)
+            ws.column_dimensions[letter].width = min(max_len + 2, 50)
+        except Exception:
+            pass
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+
+    filename = f"products_import_template_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    return Response(
+        content=buf.getvalue(),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": f"attachment; filename={filename}",
+            "Access-Control-Expose-Headers": "Content-Disposition",
+        },
+    )
+
+
+@router.post("/business/{business_id}/import/excel",
+    summary="ایمپورت محصولات از فایل Excel",
+    description="فایل اکسل را دریافت می‌کند و به‌صورت dry-run یا واقعی پردازش می‌کند",
+)
+@require_business_access("business_id")
+async def import_products_excel(
+    request: Request,
+    business_id: int,
+    file: UploadFile = File(...),
+    dry_run: str = Form(default="true"),
+    match_by: str = Form(default="code"),
+    conflict_policy: str = Form(default="upsert"),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    import io
+    import json
+    import logging
+    import re
+    import zipfile
+    from decimal import Decimal
+    from typing import Optional
+    from openpyxl import load_workbook
+
+    if not ctx.has_business_permission("inventory", "write"):
+        raise ApiError("FORBIDDEN", "Missing business permission: inventory.write", http_status=403)
+
+    logger = logging.getLogger(__name__)
+
+    def _validate_excel_signature(content: bytes) -> bool:
+        try:
+            if not content.startswith(b'PK'):
+                return False
+            with zipfile.ZipFile(io.BytesIO(content), 'r') as zf:
+                return any(n.startswith('xl/') for n in zf.namelist())
+        except Exception:
+            return False
+
+    try:
+        is_dry_run = str(dry_run).lower() in ("true","1","yes","on")
+
+        if not file.filename or not file.filename.lower().endswith('.xlsx'):
+            raise ApiError("INVALID_FILE", "فرمت فایل معتبر نیست. تنها xlsx پشتیبانی می‌شود", http_status=400)
+
+        content = await file.read()
+        if len(content) < 100 or not _validate_excel_signature(content):
+            raise ApiError("INVALID_FILE", "فایل Excel معتبر نیست یا خالی است", http_status=400)
+
+        try:
+            wb = load_workbook(filename=io.BytesIO(content), data_only=True)
+        except zipfile.BadZipFile:
+            raise ApiError("INVALID_FILE", "فایل Excel خراب است یا فرمت آن معتبر نیست", http_status=400)
+
+        ws = wb.active
+        rows = list(ws.iter_rows(values_only=True))
+        if not rows:
+            return success_response(data={"summary": {"total": 0}}, request=request, message="EMPTY_FILE")
+
+        headers = [str(h).strip() if h is not None else "" for h in rows[0]]
+        data_rows = rows[1:]
+
+        def _parse_bool(v: object) -> Optional[bool]:
+            if v is None: return None
+            s = str(v).strip().lower()
+            if s in ("true","1","yes","on","بله","هست"):
+                return True
+            if s in ("false","0","no","off","خیر","نیست"):
+                return False
+            return None
+
+        def _parse_decimal(v: object) -> Optional[Decimal]:
+            if v is None or str(v).strip() == "":
+                return None
+            try:
+                return Decimal(str(v).replace(",",""))
+            except Exception:
+                return None
+
+        def _parse_int(v: object) -> Optional[int]:
+            if v is None or str(v).strip() == "":
+                return None
+            try:
+                return int(str(v).split(".")[0])
+            except Exception:
+                return None
+
+        def _normalize_item_type(v: object) -> Optional[str]:
+            if v is None: return None
+            s = str(v).strip()
+            mapping = {"product": "کالا", "service": "خدمت"}
+            low = s.lower()
+            if low in mapping: return mapping[low]
+            if s in ("کالا","خدمت"): return s
+            return None
+
+        errors: list[dict] = []
+        valid_items: list[dict] = []
+
+        for idx, row in enumerate(data_rows, start=2):
+            item: dict[str, Any] = {}
+            row_errors: list[str] = []
+
+            for ci, key in enumerate(headers):
+                if not key:
+                    continue
+                val = row[ci] if ci < len(row) else None
+                if isinstance(val, str):
+                    val = val.strip()
+                item[key] = val
+
+            # normalize & cast
+            if 'item_type' in item:
+                item['item_type'] = _normalize_item_type(item.get('item_type')) or 'کالا'
+            for k in ['base_sales_price','base_purchase_price','sales_tax_rate','purchase_tax_rate','unit_conversion_factor']:
+                if k in item:
+                    item[k] = _parse_decimal(item.get(k))
+            for k in ['reorder_point','min_order_qty','lead_time_days','category_id','main_unit_id','secondary_unit_id','tax_type_id','tax_unit_id']:
+                if k in item:
+                    item[k] = _parse_int(item.get(k))
+            for k in ['track_inventory','is_sales_taxable','is_purchase_taxable']:
+                if k in item:
+                    item[k] = _parse_bool(item.get(k)) if item.get(k) is not None else None
+
+            # attribute_ids: comma-separated
+            if 'attribute_ids' in item and item['attribute_ids']:
+                try:
+                    parts = [p.strip() for p in str(item['attribute_ids']).split(',') if p and p.strip()]
+                    item['attribute_ids'] = [int(p) for p in parts if p.isdigit()]
+                except Exception:
+                    item['attribute_ids'] = []
+
+            # validations
+            name = item.get('name')
+            if not name or str(name).strip() == "":
+                row_errors.append('name الزامی است')
+
+            # if code is empty, it will be auto-generated in service
+            code = item.get('code')
+            if code is not None and str(code).strip() == "":
+                item['code'] = None
+
+            if row_errors:
+                errors.append({"row": idx, "errors": row_errors})
+                continue
+
+            valid_items.append(item)
+
+        inserted = 0
+        updated = 0
+        skipped = 0
+
+        if not is_dry_run and valid_items:
+            from sqlalchemy import and_ as _and
+            from adapters.db.models.product import Product
+            from adapters.api.v1.schema_models.product import ProductCreateRequest, ProductUpdateRequest
+            from app.services.product_service import create_product, update_product
+
+            def _find_existing(session: Session, data: dict) -> Optional[Product]:
+                if match_by == 'code' and data.get('code'):
+                    return session.query(Product).filter(_and(Product.business_id == business_id, Product.code == str(data['code']).strip())).first()
+                if match_by == 'name' and data.get('name'):
+                    return session.query(Product).filter(_and(Product.business_id == business_id, Product.name == str(data['name']).strip())).first()
+                return None
+
+            for data in valid_items:
+                existing = _find_existing(db, data)
+                if existing is None:
+                    try:
+                        create_product(db, business_id, ProductCreateRequest(**data))
+                        inserted += 1
+                    except Exception as e:
+                        logger.error(f"Create product failed: {e}")
+                        skipped += 1
+                else:
+                    if conflict_policy == 'insert':
+                        skipped += 1
+                    elif conflict_policy in ('update','upsert'):
+                        try:
+                            update_product(db, existing.id, business_id, ProductUpdateRequest(**data))
+                            updated += 1
+                        except Exception as e:
+                            logger.error(f"Update product failed: {e}")
+                            skipped += 1
+
+        summary = {
+            "total": len(data_rows),
+            "valid": len(valid_items),
+            "invalid": len(errors),
+            "inserted": inserted,
+            "updated": updated,
+            "skipped": skipped,
+            "dry_run": is_dry_run,
+        }
+
+        return success_response(
+            data={"summary": summary, "errors": errors},
+            request=request,
+            message="PRODUCTS_IMPORT_RESULT",
+        )
+    except ApiError:
+        raise
+    except Exception as e:
+        logger.error(f"Import error: {e}", exc_info=True)
+        raise ApiError("IMPORT_ERROR", f"خطا در پردازش فایل: {e}", http_status=500)
 @router.post("/business/{business_id}/export/pdf",
     summary="خروجی PDF لیست محصولات",
     description="خروجی PDF لیست محصولات با قابلیت فیلتر و انتخاب ستون‌ها",
@@ -505,5 +849,43 @@ async def export_products_pdf(
             "Access-Control-Expose-Headers": "Content-Disposition",
         },
     )
+
+
+@router.post("/business/{business_id}/bulk-price-update/preview",
+    summary="پیش‌نمایش تغییر قیمت‌های گروهی",
+    description="پیش‌نمایش تغییرات قیمت قبل از اعمال",
+)
+@require_business_access("business_id")
+def preview_bulk_price_update_endpoint(
+    request: Request,
+    business_id: int,
+    payload: BulkPriceUpdateRequest,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    if not ctx.has_business_permission("inventory", "write"):
+        raise ApiError("FORBIDDEN", "Missing business permission: inventory.write", http_status=403)
+    
+    result = preview_bulk_price_update(db, business_id, payload)
+    return success_response(data=result.dict(), request=request)
+
+
+@router.post("/business/{business_id}/bulk-price-update/apply",
+    summary="اعمال تغییر قیمت‌های گروهی",
+    description="اعمال تغییرات قیمت بر روی کالاهای انتخاب شده",
+)
+@require_business_access("business_id")
+def apply_bulk_price_update_endpoint(
+    request: Request,
+    business_id: int,
+    payload: BulkPriceUpdateRequest,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    if not ctx.has_business_permission("inventory", "write"):
+        raise ApiError("FORBIDDEN", "Missing business permission: inventory.write", http_status=403)
+    
+    result = apply_bulk_price_update(db, business_id, payload)
+    return success_response(data=result, request=request)
 
 
