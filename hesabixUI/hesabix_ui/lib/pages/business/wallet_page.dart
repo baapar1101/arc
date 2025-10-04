@@ -34,20 +34,20 @@ class _WalletPageState extends State<WalletPage> {
             Icon(
               Icons.wallet,
               size: 80,
-              color: Theme.of(context).colorScheme.primary.withOpacity(0.6),
+              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.6),
             ),
             const SizedBox(height: 24),
             Text(
               t.wallet,
               style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
               ),
             ),
             const SizedBox(height: 16),
             Text(
               'صفحه کیف پول در حال توسعه است',
               style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
               ),
             ),
           ],

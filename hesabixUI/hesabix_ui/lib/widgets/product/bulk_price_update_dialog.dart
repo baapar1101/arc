@@ -172,9 +172,9 @@ class _BulkPriceUpdateDialogState extends State<BulkPriceUpdateDialog> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.orange.withOpacity(0.1),
+                color: Colors.orange.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
               ),
               child: Row(
                 children: [
@@ -273,7 +273,7 @@ class _BulkPriceUpdateDialogState extends State<BulkPriceUpdateDialog> {
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    colors: [primary.withOpacity(0.90), primary.withOpacity(0.75)],
+                    colors: [primary.withValues(alpha: 0.90), primary.withValues(alpha: 0.75)],
                     begin: Alignment.centerRight,
                     end: Alignment.centerLeft,
                   ),
@@ -284,7 +284,7 @@ class _BulkPriceUpdateDialogState extends State<BulkPriceUpdateDialog> {
                       width: 40,
                       height: 40,
                       decoration: BoxDecoration(
-                        color: onPrimary.withOpacity(0.15),
+                        color: onPrimary.withValues(alpha: 0.15),
                         shape: BoxShape.circle,
                       ),
                       child: Icon(Icons.price_change, color: onPrimary),
@@ -300,7 +300,7 @@ class _BulkPriceUpdateDialogState extends State<BulkPriceUpdateDialog> {
                           ),
                           Text(
                             t.bulkPriceUpdateSubtitle,
-                            style: theme.textTheme.bodySmall?.copyWith(color: onPrimary.withOpacity(0.9)),
+                            style: theme.textTheme.bodySmall?.copyWith(color: onPrimary.withValues(alpha: 0.9)),
                           ),
                         ],
                       ),
@@ -366,7 +366,7 @@ class _BulkPriceUpdateDialogState extends State<BulkPriceUpdateDialog> {
               Container(
                 padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
                 decoration: BoxDecoration(
-                  border: Border(top: BorderSide(color: theme.dividerColor.withOpacity(0.4))),
+                  border: Border(top: BorderSide(color: theme.dividerColor.withValues(alpha: 0.4))),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.end,
@@ -881,7 +881,7 @@ class _BulkPriceUpdateDialogState extends State<BulkPriceUpdateDialog> {
                   width: 28,
                   height: 28,
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.primary.withOpacity(0.10),
+                    color: theme.colorScheme.primary.withValues(alpha: 0.10),
                     shape: BoxShape.circle,
                   ),
                   child: Icon(icon, size: 16, color: theme.colorScheme.primary),

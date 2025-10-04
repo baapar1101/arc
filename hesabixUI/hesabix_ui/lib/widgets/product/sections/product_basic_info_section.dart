@@ -310,7 +310,7 @@ class ProductBasicInfoSection extends StatelessWidget {
             width: isSelected ? 2 : 1,
           ),
           color: isSelected 
-              ? Theme.of(context).primaryColor.withOpacity(0.05)
+              ? Theme.of(context).primaryColor.withValues(alpha: 0.05)
               : Theme.of(context).cardColor,
         ),
         child: Column(
@@ -336,7 +336,7 @@ class ProductBasicInfoSection extends StatelessWidget {
             Text(
               subtitle,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.7),
+                color: Theme.of(context).textTheme.bodySmall?.color?.withValues(alpha: 0.7),
               ),
               textAlign: TextAlign.center,
             ),

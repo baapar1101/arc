@@ -34,12 +34,7 @@ class Person(Base):
     alias_name: Mapped[str] = mapped_column(String(255), nullable=False, index=True, comment="نام مستعار (الزامی)")
     first_name: Mapped[str | None] = mapped_column(String(100), nullable=True, comment="نام")
     last_name: Mapped[str | None] = mapped_column(String(100), nullable=True, comment="نام خانوادگی")
-    person_type: Mapped[PersonType] = mapped_column(
-        SQLEnum(PersonType, values_callable=lambda obj: [e.value for e in obj], name="person_type_enum"),
-        nullable=False,
-        comment="نوع شخص"
-    )
-    person_types: Mapped[str | None] = mapped_column(Text, nullable=True, comment="لیست انواع شخص به صورت JSON")
+    person_types: Mapped[str] = mapped_column(Text, nullable=False, comment="لیست انواع شخص به صورت JSON")
     company_name: Mapped[str | None] = mapped_column(String(255), nullable=True, comment="نام شرکت")
     payment_id: Mapped[str | None] = mapped_column(String(100), nullable=True, comment="شناسه پرداخت")
     # سهام

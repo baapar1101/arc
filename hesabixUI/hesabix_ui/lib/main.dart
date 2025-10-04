@@ -652,6 +652,7 @@ class _MyAppState extends State<MyApp> {
                   child: NewInvoicePage(
                     businessId: businessId,
                     authStore: _authStore!,
+                    calendarController: _calendarController!,
                   ),
                 );
               },

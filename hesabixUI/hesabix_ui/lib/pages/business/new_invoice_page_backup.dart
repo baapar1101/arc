@@ -80,11 +80,11 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
           tabs: const [
             Tab(
               icon: Icon(Icons.info_outline),
-              text: 'اطلاعات فاکتور',
+              text: 'اطلاعات',
             ),
             Tab(
               icon: Icon(Icons.inventory_2_outlined),
-              text: 'کالاها و خدمات',
+              text: 'کالا و خدمات',
             ),
             Tab(
               icon: Icon(Icons.receipt_long_outlined),
@@ -100,9 +100,9 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
       body: TabBarView(
         controller: _tabController,
         children: [
-          // تب اطلاعات فاکتور
-          _buildInvoiceInfoTab(),
-          // تب کالاها و خدمات
+          // تب اطلاعات
+          _buildInfoTab(),
+          // تب کالا و خدمات
           _buildProductsTab(),
           // تب تراکنش‌ها
           _buildTransactionsTab(),
@@ -113,7 +113,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
     );
   }
 
-  Widget _buildInvoiceInfoTab() {
+  Widget _buildInfoTab() {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Center(
@@ -817,7 +817,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
           ),
           SizedBox(height: 16),
           Text(
-            'کالاها و خدمات',
+            'کالا و خدمات',
             style: TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.bold,

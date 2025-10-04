@@ -68,7 +68,6 @@ def create_person(db: Session, business_id: int, person_data: PersonCreateReques
         first_name=person_data.first_name,
         last_name=person_data.last_name,
         # ذخیره مقدار Enum با مقدار فارسی (values_callable در مدل مقادیر فارسی را می‌نویسد)
-        person_type=(mapped_single_type or (PersonType(types_list[0]) if types_list else PersonType.CUSTOMER)),
         person_types=json.dumps(types_list, ensure_ascii=False) if types_list else None,
         company_name=person_data.company_name,
         payment_id=person_data.payment_id,
@@ -198,14 +197,6 @@ def get_persons_by_business(
                     query = query.filter(Person.code.in_(value))
                 continue
 
-            # نوع شخص تک‌انتخابی
-            if field == 'person_type':
-                if operator == '=':
-                    query = query.filter(Person.person_type == value)
-                elif operator == 'in' and isinstance(value, list):
-                    query = query.filter(Person.person_type.in_(value))
-                continue
-
             # انواع شخص چندانتخابی (رشته JSON)
             if field == 'person_types':
                 if operator == '=' and isinstance(value, str):
@@ -295,8 +286,7 @@ def get_persons_by_business(
         query = query.order_by(Person.first_name.desc() if sort_desc else Person.first_name.asc())
     elif sort_by == 'last_name':
         query = query.order_by(Person.last_name.desc() if sort_desc else Person.last_name.asc())
-    elif sort_by == 'person_type':
-        query = query.order_by(Person.person_type.desc() if sort_desc else Person.person_type.asc())
+    # person_type sorting removed - use person_types instead
     elif sort_by == 'created_at':
         query = query.order_by(Person.created_at.desc() if sort_desc else Person.created_at.asc())
     elif sort_by == 'updated_at':
@@ -367,23 +357,7 @@ def update_person(
         types_list = [t.value if hasattr(t, 'value') else str(t) for t in incoming]
         person.person_types = json.dumps(types_list, ensure_ascii=False) if types_list else None
         # همگام کردن person_type تکی برای سازگاری
-        if types_list:
-            # مقدار Enum را با مقدار فارسی ست می‌کنیم
-            try:
-                person.person_type = PersonType(types_list[0])
-            except Exception:
-                pass
-
-    # مدیریت person_type تکی از اسکیما
-    if 'person_type' in update_data and update_data['person_type'] is not None:
-        single_type = update_data['person_type']
-        # نگاشت به Enum (مقدار فارسی)
-        try:
-            person.person_type = PersonType(getattr(single_type, 'value', str(single_type)))
-        except Exception:
-            pass
-        # پس از ست کردن مستقیم، از دیکشنری حذف شود تا در حلقه عمومی دوباره اعمال نشود
-        update_data.pop('person_type', None)
+        # person_type handling removed - only person_types is used now
 
     # اگر شخص سهامدار شد، share_count معتبر باشد
     resulting_types: List[str] = []
@@ -394,7 +368,7 @@ def update_person(
                 resulting_types = [str(x) for x in tmp]
         except Exception:
             resulting_types = []
-    if (person.person_type == 'سهامدار') or ('سهامدار' in resulting_types):
+    if 'سهامدار' in resulting_types:
         sc_val2 = update_data.get('share_count', person.share_count)
         if sc_val2 is None or (isinstance(sc_val2, int) and sc_val2 <= 0):
             raise ApiError("INVALID_SHARE_COUNT", "برای سهامدار، تعداد سهام الزامی و باید بزرگتر از صفر باشد", http_status=400)
@@ -442,7 +416,7 @@ def get_person_summary(db: Session, business_id: int) -> Dict[str, Any]:
     by_type = {}
     for person_type in PersonType:
         count = db.query(Person).filter(
-            and_(Person.business_id == business_id, Person.person_type == person_type)
+            and_(Person.business_id == business_id, Person.person_types.ilike(f'%"{person_type.value}"%'))
         ).count()
         by_type[person_type.value] = count
     
@@ -473,7 +447,6 @@ def _person_to_dict(person: Person) -> Dict[str, Any]:
         'alias_name': person.alias_name,
         'first_name': person.first_name,
         'last_name': person.last_name,
-        'person_type': person.person_type.value,
         'person_types': types_list,
         'company_name': person.company_name,
         'payment_id': person.payment_id,
@@ -514,3 +487,51 @@ def _person_to_dict(person: Person) -> Dict[str, Any]:
             for ba in person.bank_accounts
         ]
     }
+
+
+def search_persons(db: Session, business_id: int, search_query: Optional[str] = None, 
+                  page: int = 1, limit: int = 20) -> List[Person]:
+    """جست‌وجو در اشخاص"""
+    query = db.query(Person).filter(Person.business_id == business_id)
+    
+    if search_query:
+        # جست‌وجو در نام، نام خانوادگی، نام مستعار، کد، تلفن و ایمیل
+        search_filter = or_(
+            Person.alias_name.ilike(f"%{search_query}%"),
+            Person.first_name.ilike(f"%{search_query}%"),
+            Person.last_name.ilike(f"%{search_query}%"),
+            Person.company_name.ilike(f"%{search_query}%"),
+            Person.phone.ilike(f"%{search_query}%"),
+            Person.mobile.ilike(f"%{search_query}%"),
+            Person.email.ilike(f"%{search_query}%"),
+            Person.code == int(search_query) if search_query.isdigit() else False
+        )
+        query = query.filter(search_filter)
+    
+    # مرتب‌سازی بر اساس نام مستعار
+    query = query.order_by(Person.alias_name)
+    
+    # صفحه‌بندی
+    offset = (page - 1) * limit
+    return query.offset(offset).limit(limit).all()
+
+
+def count_persons(db: Session, business_id: int, search_query: Optional[str] = None) -> int:
+    """شمارش تعداد اشخاص"""
+    query = db.query(Person).filter(Person.business_id == business_id)
+    
+    if search_query:
+        # جست‌وجو در نام، نام خانوادگی، نام مستعار، کد، تلفن و ایمیل
+        search_filter = or_(
+            Person.alias_name.ilike(f"%{search_query}%"),
+            Person.first_name.ilike(f"%{search_query}%"),
+            Person.last_name.ilike(f"%{search_query}%"),
+            Person.company_name.ilike(f"%{search_query}%"),
+            Person.phone.ilike(f"%{search_query}%"),
+            Person.mobile.ilike(f"%{search_query}%"),
+            Person.email.ilike(f"%{search_query}%"),
+            Person.code == int(search_query) if search_query.isdigit() else False
+        )
+        query = query.filter(search_filter)
+    
+    return query.count()

@@ -103,9 +103,7 @@ class _PersonsPageState extends State<PersonsPage> {
             FilterOption(value: 'فروشنده', label: t.personTypeSeller),
             FilterOption(value: 'سهامدار', label: 'سهامدار'),
           ],
-          formatter: (person) => (person.personTypes.isNotEmpty
-              ? person.personTypes.map((e) => e.persianName).join('، ')
-              : person.personType.persianName),
+          formatter: (person) => person.personTypes.map((e) => e.persianName).join('، '),
         ),
         TextColumn(
           'company_name',

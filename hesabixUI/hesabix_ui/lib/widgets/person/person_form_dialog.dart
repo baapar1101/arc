@@ -100,10 +100,10 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
       _faxController.text = person.fax ?? '';
       _emailController.text = person.email ?? '';
       _websiteController.text = person.website ?? '';
-      _selectedPersonType = person.personType;
+      _selectedPersonType = person.personTypes.isNotEmpty ? person.personTypes.first : PersonType.customer;
       _selectedPersonTypes
         ..clear()
-        ..addAll(person.personTypes.isNotEmpty ? person.personTypes : [person.personType]);
+        ..addAll(person.personTypes);
       _isActive = person.isActive;
       _bankAccounts = List.from(person.bankAccounts);
       // مقدار اولیه سهام
@@ -230,7 +230,6 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
           aliasName: _aliasNameController.text.trim(),
           firstName: _firstNameController.text.trim().isEmpty ? null : _firstNameController.text.trim(),
           lastName: _lastNameController.text.trim().isEmpty ? null : _lastNameController.text.trim(),
-          personType: null,
           personTypes: _selectedPersonTypes.isNotEmpty ? _selectedPersonTypes.toList() : null,
           companyName: _companyNameController.text.trim().isEmpty ? null : _companyNameController.text.trim(),
           paymentId: _paymentIdController.text.trim().isEmpty ? null : _paymentIdController.text.trim(),

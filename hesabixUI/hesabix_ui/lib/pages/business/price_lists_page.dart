@@ -169,8 +169,8 @@ class _PriceListsPageState extends State<PriceListsPage> {
                           child: ListTile(
                             leading: CircleAvatar(
                               backgroundColor: isActive 
-                                  ? Theme.of(context).primaryColor.withOpacity(0.1)
-                                  : Colors.grey.withOpacity(0.1),
+                                  ? Theme.of(context).primaryColor.withValues(alpha: 0.1)
+                                  : Colors.grey.withValues(alpha: 0.1),
                               child: Icon(
                                 Icons.price_change,
                                 color: isActive 
@@ -193,7 +193,7 @@ class _PriceListsPageState extends State<PriceListsPage> {
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                     decoration: BoxDecoration(
-                                      color: Colors.grey.withOpacity(0.2),
+                                      color: Colors.grey.withValues(alpha: 0.2),
                                       borderRadius: BorderRadius.circular(12),
                                     ),
                                     child: Text(
@@ -392,9 +392,9 @@ class _PriceListsPageState extends State<PriceListsPage> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.red.withOpacity(0.1),
+                color: Colors.red.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.red.withOpacity(0.3)),
+                border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
               ),
               child: Row(
                 children: [

@@ -948,6 +948,9 @@ class _BusinessShellState extends State<BusinessShell> {
                                             showAddBankAccountDialog();
                                           } else if (item.label == t.cashBox) {
                                             showAddCashBoxDialog();
+                                          } else if (item.label == t.invoice) {
+                                            // Navigate to add invoice
+                                            context.go('/business/${widget.businessId}/invoice/new');
                                           }
                                           // سایر مسیرهای افزودن در آینده متصل می‌شوند
                                         },
@@ -1044,6 +1047,9 @@ class _BusinessShellState extends State<BusinessShell> {
                                 // در حال حاضر فقط اشخاص پشتیبانی می‌شود
                                 if (item.label == t.people) {
                                   showAddPersonDialog();
+                                } else if (item.label == t.invoice) {
+                                  // Navigate to add invoice
+                                  context.go('/business/${widget.businessId}/invoice/new');
                                 }
                               },
                               child: Container(

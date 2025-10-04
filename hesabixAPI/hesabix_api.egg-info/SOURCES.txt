@@ -12,6 +12,7 @@ adapters/api/v1/businesses.py
 adapters/api/v1/cash_registers.py
 adapters/api/v1/categories.py
 adapters/api/v1/currencies.py
+adapters/api/v1/customers.py
 adapters/api/v1/health.py
 adapters/api/v1/persons.py
 adapters/api/v1/petty_cash.py
@@ -177,6 +178,7 @@ migrations/versions/4b2ea782bcb3_merge_heads.py
 migrations/versions/5553f8745c6e_add_support_tables.py
 migrations/versions/9f9786ae7191_create_tax_units_table.py
 migrations/versions/a1443c153b47_merge_heads.py
+migrations/versions/c302bc2f2cb8_remove_person_type_column.py
 migrations/versions/caf3f4ef4b76_add_tax_units_table.py
 migrations/versions/d3e84892c1c2_sync_person_type_enum_values_callable_.py
 migrations/versions/f876bfa36805_merge_multiple_heads.py

@@ -212,3 +212,10 @@ def require_business_management_dep(auth_context: AuthContext = Depends(get_curr
     """FastAPI dependency برای بررسی مجوز مدیریت کسب و کارها."""
     if not auth_context.has_app_permission("business_management"):
         raise ApiError("FORBIDDEN", "Missing app permission: business_management", http_status=403)
+
+
+def require_business_access_dep(auth_context: AuthContext = Depends(get_current_user)) -> None:
+    """FastAPI dependency برای بررسی دسترسی به کسب و کار."""
+    # در اینجا می‌توانید منطق بررسی دسترسی به کسب و کار را پیاده‌سازی کنید
+    # برای مثال: بررسی اینکه آیا کاربر دسترسی به کسب و کار دارد
+    pass

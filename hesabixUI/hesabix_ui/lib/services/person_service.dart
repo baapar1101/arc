@@ -37,7 +37,13 @@ class PersonService {
       }
 
       if (filters != null && filters.isNotEmpty) {
-        queryParams['filters'] = filters;
+        // تبدیل Map به لیست برای API
+        final filtersList = filters.entries.map((e) => {
+          'property': e.key,
+          'operator': 'in', // برای فیلترهای چندتایی از عملگر 'in' استفاده می‌کنیم
+          'value': e.value,
+        }).toList();
+        queryParams['filters'] = filtersList;
       }
 
       final response = await _apiClient.post(

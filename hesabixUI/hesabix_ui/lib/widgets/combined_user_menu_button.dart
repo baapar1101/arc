@@ -40,7 +40,7 @@ class CombinedUserMenuButton extends StatelessWidget {
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.1),
+                color: Colors.black.withValues(alpha: 0.1),
                 blurRadius: 20,
                 offset: const Offset(0, 8),
               ),
@@ -53,7 +53,7 @@ class CombinedUserMenuButton extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: cs.primaryContainer.withOpacity(0.1),
+                  color: cs.primaryContainer.withValues(alpha: 0.1),
                   borderRadius: const BorderRadius.only(
                     topLeft: Radius.circular(16),
                     topRight: Radius.circular(16),
@@ -106,10 +106,10 @@ class CombinedUserMenuButton extends StatelessWidget {
                     Container(
                       width: double.infinity,
                       decoration: BoxDecoration(
-                        color: cs.primaryContainer.withOpacity(0.1),
+                        color: cs.primaryContainer.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                          color: cs.primary.withOpacity(0.2),
+                          color: cs.primary.withValues(alpha: 0.2),
                           width: 1,
                         ),
                       ),
@@ -175,7 +175,7 @@ class CombinedUserMenuButton extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: cs.surfaceContainerHighest.withOpacity(0.3),
+                        color: cs.surfaceContainerHighest.withValues(alpha: 0.3),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Column(
@@ -242,10 +242,10 @@ class CombinedUserMenuButton extends StatelessWidget {
                     Container(
                       width: double.infinity,
                       decoration: BoxDecoration(
-                        color: cs.errorContainer.withOpacity(0.1),
+                        color: cs.errorContainer.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                          color: cs.error.withOpacity(0.2),
+                          color: cs.error.withValues(alpha: 0.2),
                           width: 1,
                         ),
                       ),
@@ -342,7 +342,7 @@ class CombinedUserMenuButton extends StatelessWidget {
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.1),
+                color: Colors.black.withValues(alpha: 0.1),
                 blurRadius: 20,
                 offset: const Offset(0, 8),
               ),
@@ -355,7 +355,7 @@ class CombinedUserMenuButton extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: cs.errorContainer.withOpacity(0.1),
+                  color: cs.errorContainer.withValues(alpha: 0.1),
                   borderRadius: const BorderRadius.only(
                     topLeft: Radius.circular(16),
                     topRight: Radius.circular(16),

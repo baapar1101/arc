@@ -102,7 +102,6 @@ class Person {
   final String aliasName;
   final String? firstName;
   final String? lastName;
-  final PersonType personType;
   final List<PersonType> personTypes;
   final String? companyName;
   final String? paymentId;
@@ -140,8 +139,7 @@ class Person {
     required this.aliasName,
     this.firstName,
     this.lastName,
-    required this.personType,
-    this.personTypes = const [],
+    required this.personTypes,
     this.companyName,
     this.paymentId,
     this.nationalId,
@@ -176,9 +174,6 @@ class Person {
             ?.map((e) => PersonType.fromString(e.toString()))
             .toList() ??
         [];
-    final PersonType primaryType = types.isNotEmpty
-        ? types.first
-        : PersonType.fromString(json['person_type']);
     return Person(
       id: json['id'],
       businessId: json['business_id'],
@@ -186,7 +181,6 @@ class Person {
       aliasName: json['alias_name'],
       firstName: json['first_name'],
       lastName: json['last_name'],
-      personType: primaryType,
       personTypes: types,
       companyName: json['company_name'],
       paymentId: json['payment_id'],
@@ -228,7 +222,6 @@ class Person {
       'alias_name': aliasName,
       'first_name': firstName,
       'last_name': lastName,
-      'person_type': personType.persianName,
       'person_types': personTypes.map((t) => t.persianName).toList(),
       'company_name': companyName,
       'payment_id': paymentId,
@@ -266,7 +259,7 @@ class Person {
     String? aliasName,
     String? firstName,
     String? lastName,
-    PersonType? personType,
+    List<PersonType>? personTypes,
     String? companyName,
     String? paymentId,
     String? nationalId,
@@ -293,7 +286,7 @@ class Person {
       aliasName: aliasName ?? this.aliasName,
       firstName: firstName ?? this.firstName,
       lastName: lastName ?? this.lastName,
-      personType: personType ?? this.personType,
+      personTypes: personTypes ?? this.personTypes,
       companyName: companyName ?? this.companyName,
       paymentId: paymentId ?? this.paymentId,
       nationalId: nationalId ?? this.nationalId,
@@ -444,7 +437,6 @@ class PersonUpdateRequest {
   final String? aliasName;
   final String? firstName;
   final String? lastName;
-  final PersonType? personType;
   final List<PersonType>? personTypes;
   final String? companyName;
   final String? paymentId;
@@ -476,7 +468,6 @@ class PersonUpdateRequest {
     this.aliasName,
     this.firstName,
     this.lastName,
-    this.personType,
     this.personTypes,
     this.companyName,
     this.paymentId,
@@ -511,7 +502,6 @@ class PersonUpdateRequest {
     if (aliasName != null) json['alias_name'] = aliasName;
     if (firstName != null) json['first_name'] = firstName;
     if (lastName != null) json['last_name'] = lastName;
-    if (personType != null) json['person_type'] = personType!.persianName;
     if (personTypes != null) json['person_types'] = personTypes!.map((t) => t.persianName).toList();
     if (companyName != null) json['company_name'] = companyName;
     if (paymentId != null) json['payment_id'] = paymentId;
