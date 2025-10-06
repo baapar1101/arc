@@ -12,7 +12,6 @@ import '../../widgets/invoice/commission_type_selector.dart';
 import '../../widgets/invoice/commission_amount_field.dart';
 import '../../widgets/date_input_field.dart';
 import '../../widgets/banking/currency_picker_widget.dart';
-import '../../core/date_utils.dart';
 import '../../models/invoice_type_model.dart';
 import '../../models/customer_model.dart';
 import '../../models/person_model.dart';
@@ -59,6 +58,14 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
   num _sumDiscount = 0;
   num _sumTax = 0;
   num _sumTotal = 0;
+  
+  // تنظیمات چاپ و ارسال
+  bool _printAfterSave = false;
+  String? _selectedPrinter;
+  String? _selectedPaperSize;
+  bool _isOfficialInvoice = false;
+  String? _selectedPrintTemplate;
+  bool _sendToTaxFolder = false;
 
   @override
   void initState() {
@@ -134,6 +141,16 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
       appBar: AppBar(
         title: Text(t.addInvoice),
         toolbarHeight: 56,
+        actions: [
+          Tooltip(
+            message: 'ذخیره فاکتور',
+            child: IconButton(
+              onPressed: _saveInvoice,
+              icon: const Icon(Icons.save),
+              tooltip: 'ذخیره فاکتور',
+            ),
+          ),
+        ],
         bottom: TabBar(
           controller: _tabController,
           tabs: [
@@ -680,98 +697,6 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
               ),
               const SizedBox(height: 32),
               
-              // دکمه ادامه
-              Center(
-                child: ElevatedButton.icon(
-                  onPressed: (_selectedInvoiceType != null && _invoiceDate != null) ? _continueToInvoiceForm : null,
-                  icon: const Icon(Icons.arrow_forward),
-                  label: Text('ادامه ایجاد فاکتور'),
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                    backgroundColor: Theme.of(context).colorScheme.primary,
-                    foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                    minimumSize: const Size(200, 48),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 24),
-              
-              // نمایش اطلاعات انتخاب شده
-              if (_selectedInvoiceType != null || _invoiceDate != null || _dueDate != null)
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
-                    ),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.check_circle,
-                            color: Theme.of(context).colorScheme.primary,
-                            size: 20,
-                          ),
-                          const SizedBox(width: 12),
-                          Text(
-                            'اطلاعات انتخاب شده:',
-                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w600,
-                              color: Theme.of(context).colorScheme.primary,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      // نمایش اطلاعات در دو ستون
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                if (_selectedInvoiceType != null)
-                                  _buildInfoItem('نوع فاکتور', _selectedInvoiceType!.label),
-                                if (_invoiceDate != null)
-                                  _buildInfoItem('تاریخ فاکتور', HesabixDateUtils.formatForDisplay(_invoiceDate, widget.calendarController.isJalali == true)),
-                                if (_dueDate != null)
-                                  _buildInfoItem('تاریخ سررسید', HesabixDateUtils.formatForDisplay(_dueDate, widget.calendarController.isJalali == true)),
-                                if (_selectedCurrencyId != null)
-                                  _buildInfoItem('ارز فاکتور', 'انتخاب شده'),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 24),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                if (_selectedSeller != null)
-                                  _buildInfoItem('فروشنده/بازاریاب', '${_selectedSeller!.displayName} (${_selectedSeller!.personTypes.isNotEmpty ? _selectedSeller!.personTypes.first.persianName : 'نامشخص'})'),
-                                if (_commissionType != null)
-                                  _buildInfoItem('نوع کارمزد', _commissionType!.label),
-                                if (_commissionPercentage != null)
-                                  _buildInfoItem('درصد کارمزد', '${_commissionPercentage!.toStringAsFixed(1)}%'),
-                                if (_commissionAmount != null)
-                                  _buildInfoItem('مبلغ کارمزد', '${_commissionAmount!.toStringAsFixed(0)} ریال'),
-                                if (_invoiceTitle != null)
-                                  _buildInfoItem('عنوان فاکتور', _invoiceTitle!),
-                                if (_invoiceReference != null)
-                                  _buildInfoItem('ارجاع', _invoiceReference!),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
             ],
           ),
         ),
@@ -779,102 +704,18 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
     );
   }
 
-  Widget _buildInfoItem(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 120,
-            child: Text(
-              '$label:',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.w500,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _continueToInvoiceForm() {
-    if (_selectedInvoiceType == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('لطفا نوع فاکتور را انتخاب کنید'),
-          backgroundColor: Theme.of(context).colorScheme.error,
-        ),
-      );
-      return;
-    }
-
-    final invoiceNumberText = _autoGenerateInvoiceNumber
-        ? 'شماره فاکتور: اتوماتیک\n'
-        : (_invoiceNumber != null 
-            ? 'شماره فاکتور: $_invoiceNumber\n'
-            : 'شماره فاکتور: انتخاب نشده\n');
+  void _saveInvoice() {
+    // TODO: پیاده‌سازی عملیات ذخیره فاکتور
+    final printInfo = _printAfterSave ? '\n• چاپ فاکتور: فعال' : '';
+    final taxInfo = _sendToTaxFolder ? '\n• ارسال به کارپوشه مودیان: فعال' : '';
     
-    final customerText = _selectedCustomer != null
-        ? 'مشتری: ${_selectedCustomer!.name}\n'
-        : 'مشتری: خویشتنفروش\n';
-
-    final sellerText = _selectedSeller != null
-        ? 'فروشنده/بازاریاب: ${_selectedSeller!.displayName} (${_selectedSeller!.personTypes.isNotEmpty ? _selectedSeller!.personTypes.first.persianName : 'نامشخص'})\n'
-        : '';
-
-    final commissionText = _commissionPercentage != null
-        ? 'درصد کارمزد: ${_commissionPercentage!.toStringAsFixed(1)}%\n'
-        : '';
-
-    final invoiceDateText = _invoiceDate != null
-        ? 'تاریخ فاکتور: ${HesabixDateUtils.formatForDisplay(_invoiceDate, widget.calendarController.isJalali == true)}\n'
-        : 'تاریخ فاکتور: انتخاب نشده\n';
-
-    final dueDateText = _dueDate != null
-        ? 'تاریخ سررسید: ${HesabixDateUtils.formatForDisplay(_dueDate, widget.calendarController.isJalali == true)}\n'
-        : 'تاریخ سررسید: انتخاب نشده\n';
-
-    final currencyText = _selectedCurrencyId != null
-        ? 'ارز فاکتور: انتخاب شده\n'
-        : 'ارز فاکتور: انتخاب نشده\n';
-
-    final titleText = _invoiceTitle != null
-        ? 'عنوان فاکتور: $_invoiceTitle\n'
-        : 'عنوان فاکتور: انتخاب نشده\n';
-
-    final referenceText = _invoiceReference != null
-        ? 'ارجاع: $_invoiceReference\n'
-        : 'ارجاع: انتخاب نشده\n';
-
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('نوع فاکتور: ${_selectedInvoiceType!.label}\n$invoiceNumberText$customerText$sellerText$commissionText$invoiceDateText$dueDateText$currencyText$titleText$referenceText\nفرم کامل فاکتور به زودی اضافه خواهد شد'),
+        content: Text('عملیات ذخیره فاکتور به زودی پیاده‌سازی خواهد شد$printInfo$taxInfo'),
         backgroundColor: Theme.of(context).colorScheme.primary,
-        duration: const Duration(seconds: 5),
+        duration: const Duration(seconds: 3),
       ),
     );
-    
-    // TODO: در آینده می‌توانید به صفحه فرم کامل فاکتور بروید
-    // Navigator.push(
-    //   context,
-    //   MaterialPageRoute(
-    //     builder: (context) => InvoiceFormPage(
-    //       businessId: widget.businessId,
-    //       authStore: widget.authStore,
-    //       invoiceType: _selectedInvoiceType!,
-    //       invoiceNumber: _invoiceNumber,
-    //     ),
-    //   ),
-    // );
   }
 
   Widget _buildProductsTab() {
@@ -954,33 +795,201 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
   }
 
   Widget _buildSettingsTab() {
-    return const Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.settings_outlined,
-            size: 64,
-            color: Colors.grey,
+    final theme = Theme.of(context);
+    
+    // بررسی اینکه آیا فاکتور فروش یا برگشت از فروش است و پیش‌نویس نیست
+    final isSalesOrReturn = _selectedInvoiceType == InvoiceType.sales || 
+                           _selectedInvoiceType == InvoiceType.salesReturn;
+    final showTaxFolderOption = isSalesOrReturn && !_isDraft;
+    
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 800),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // عنوان بخش
+              Text(
+                'تنظیمات فاکتور',
+                style: theme.textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 24),
+              
+              // چاپ فاکتور بعد از صدور
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SwitchListTile(
+                        title: const Text('چاپ فاکتور بعد از صدور'),
+                        subtitle: const Text('فاکتور بلافاصله پس از ذخیره چاپ شود'),
+                        value: _printAfterSave,
+                        onChanged: (value) {
+                          setState(() {
+                            _printAfterSave = value;
+                          });
+                        },
+                      ),
+                      
+                      // تنظیمات چاپ (فقط اگر چاپ فعال باشد)
+                      if (_printAfterSave) ...[
+                        const Divider(),
+                        const SizedBox(height: 16),
+                        
+                        // انتخاب پرینتر
+                        DropdownButtonFormField<String>(
+                          initialValue: _selectedPrinter,
+                          decoration: const InputDecoration(
+                            labelText: 'پرینتر',
+                            border: OutlineInputBorder(),
+                          ),
+                          items: const [
+                            DropdownMenuItem(value: 'default', child: Text('پرینتر پیش‌فرض')),
+                            DropdownMenuItem(value: 'printer1', child: Text('پرینتر 1')),
+                            DropdownMenuItem(value: 'printer2', child: Text('پرینتر 2')),
+                          ],
+                          onChanged: (value) {
+                            setState(() {
+                              _selectedPrinter = value;
+                            });
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                        
+                        // انتخاب سایز کاغذ
+                        DropdownButtonFormField<String>(
+                          initialValue: _selectedPaperSize,
+                          decoration: const InputDecoration(
+                            labelText: 'سایز کاغذ',
+                            border: OutlineInputBorder(),
+                          ),
+                          items: const [
+                            DropdownMenuItem(value: 'A4', child: Text('A4')),
+                            DropdownMenuItem(value: 'A5', child: Text('A5')),
+                            DropdownMenuItem(value: 'A6', child: Text('A6')),
+                            DropdownMenuItem(value: '80mm', child: Text('80mm (فیش)')),
+                          ],
+                          onChanged: (value) {
+                            setState(() {
+                              _selectedPaperSize = value;
+                            });
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                        
+                        // فاکتور رسمی
+                        SwitchListTile(
+                          title: const Text('فاکتور رسمی'),
+                          subtitle: const Text('فاکتور با مهر و امضا رسمی چاپ شود'),
+                          value: _isOfficialInvoice,
+                          onChanged: (value) {
+                            setState(() {
+                              _isOfficialInvoice = value;
+                            });
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                        
+                        // انتخاب قالب چاپ
+                        DropdownButtonFormField<String>(
+                          initialValue: _selectedPrintTemplate,
+                          decoration: const InputDecoration(
+                            labelText: 'قالب چاپ',
+                            border: OutlineInputBorder(),
+                          ),
+                          items: const [
+                            DropdownMenuItem(value: 'standard', child: Text('قالب استاندارد')),
+                            DropdownMenuItem(value: 'compact', child: Text('قالب فشرده')),
+                            DropdownMenuItem(value: 'detailed', child: Text('قالب تفصیلی')),
+                            DropdownMenuItem(value: 'custom', child: Text('قالب سفارشی')),
+                          ],
+                          onChanged: (value) {
+                            setState(() {
+                              _selectedPrintTemplate = value;
+                            });
+                          },
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+              
+              const SizedBox(height: 24),
+              
+              // ارسال به کارپوشه مودیان
+              if (showTaxFolderOption) ...[
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        SwitchListTile(
+                          title: const Text('ارسال به کارپوشه مودیان'),
+                          subtitle: const Text('فاکتور پس از ثبت به کارپوشه مودیان مالیاتی ارسال شود'),
+                          value: _sendToTaxFolder,
+                          onChanged: (value) {
+                            setState(() {
+                              _sendToTaxFolder = value;
+                            });
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+              
+              const SizedBox(height: 24),
+              
+              // اطلاعات اضافی
+              Card(
+                color: theme.colorScheme.surfaceContainerHighest,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.info_outline,
+                            color: theme.colorScheme.primary,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'اطلاعات',
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
+                              color: theme.colorScheme.primary,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        '• تنظیمات چاپ فقط برای فاکتورهای نهایی اعمال می‌شود\n'
+                        '• ارسال به کارپوشه مودیان فقط برای فاکتورهای فروش و برگشت از فروش فعال است\n'
+                        '• فاکتورهای پیش‌نویس به کارپوشه مودیان ارسال نمی‌شوند',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
-          SizedBox(height: 16),
-          Text(
-            'تنظیمات',
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: Colors.grey,
-            ),
-          ),
-          SizedBox(height: 8),
-          Text(
-            'این بخش در آینده پیاده‌سازی خواهد شد',
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
