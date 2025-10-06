@@ -164,7 +164,8 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
       if (!isTaxable) return 0;
       
       final v = p['purchase_tax_rate'];
-      if (v is num && v > 0) return v;
+      final rate = _toNum(v);
+      if (rate > 0) return rate;
       // اگر محصول نرخ مالیات خرید نداشته باشد، از نرخ پیش‌فرض استفاده کن
       return _getDefaultTaxRateForInvoiceType();
     }
@@ -174,7 +175,8 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
     if (!isTaxable) return 0;
     
     final v = p['sales_tax_rate'];
-    if (v is num && v > 0) return v;
+    final rate = _toNum(v);
+    if (rate > 0) return rate;
     // اگر محصول نرخ مالیات فروش نداشته باشد، از نرخ پیش‌فرض استفاده کن
     return _getDefaultTaxRateForInvoiceType();
   }
@@ -353,8 +355,11 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                       _notify();
                       return;
                     }
+                    
                     final mainUnit = p['main_unit']?.toString();
                     final secondaryUnit = p['secondary_unit']?.toString();
+                    final taxRate = _defaultTaxRateFromProduct(p);
+                    
                     final updated = item.copyWith(
                       productId: _toInt(p['id']),
                       productCode: p['code']?.toString(),
@@ -365,7 +370,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                       selectedUnit: mainUnit,
                       baseSalesPriceMainUnit: _toNum(p['base_sales_price']),
                       basePurchasePriceMainUnit: _toNum(p['base_purchase_price']),
-                      taxRate: _defaultTaxRateFromProduct(p),
+                      taxRate: taxRate,
                       minOrderQty: _toInt(p['min_order_qty']),
                       trackInventory: p['track_inventory'] == true,
                     );

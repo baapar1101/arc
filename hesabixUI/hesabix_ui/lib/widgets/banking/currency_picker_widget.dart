@@ -29,11 +29,23 @@ class _CurrencyPickerWidgetState extends State<CurrencyPickerWidget> {
   List<Map<String, dynamic>> _currencies = [];
   bool _isLoading = false;
   String? _error;
+  int? _selectedValue;
 
   @override
   void initState() {
     super.initState();
+    _selectedValue = widget.selectedCurrencyId;
     _loadCurrencies();
+  }
+
+  @override
+  void didUpdateWidget(CurrencyPickerWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.selectedCurrencyId != widget.selectedCurrencyId) {
+      setState(() {
+        _selectedValue = widget.selectedCurrencyId;
+      });
+    }
   }
 
   Future<void> _loadCurrencies() async {
@@ -61,64 +73,90 @@ class _CurrencyPickerWidgetState extends State<CurrencyPickerWidget> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const SizedBox(
+      return SizedBox(
         height: 56,
-        child: Center(
-          child: CircularProgressIndicator(),
+        child: InputDecorator(
+          decoration: InputDecoration(
+            labelText: widget.label ?? 'ارز',
+            hintText: widget.hintText ?? 'انتخاب ارز',
+            border: const OutlineInputBorder(),
+            enabled: false,
+          ),
+          child: const Center(
+            child: CircularProgressIndicator(),
+          ),
         ),
       );
     }
 
     if (_error != null) {
-      return Container(
+      return SizedBox(
         height: 56,
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          border: Border.all(color: Colors.red),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Row(
-          children: [
-            const Icon(Icons.error_outline, color: Colors.red),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                'خطا در بارگذاری ارزها: $_error',
-                style: const TextStyle(color: Colors.red),
+        child: InputDecorator(
+          decoration: InputDecoration(
+            labelText: widget.label ?? 'ارز',
+            hintText: widget.hintText ?? 'انتخاب ارز',
+            border: OutlineInputBorder(
+              borderSide: BorderSide(color: Colors.red),
+            ),
+            enabled: false,
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.error_outline, color: Colors.red),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'خطا در بارگذاری ارزها',
+                  style: const TextStyle(color: Colors.red),
+                ),
               ),
-            ),
-            TextButton(
-              onPressed: _loadCurrencies,
-              child: const Text('تلاش مجدد'),
-            ),
-          ],
+              TextButton(
+                onPressed: _loadCurrencies,
+                child: const Text('تلاش مجدد'),
+              ),
+            ],
+          ),
         ),
       );
     }
 
     if (_currencies.isEmpty) {
-      return Container(
+      return SizedBox(
         height: 56,
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          border: Border.all(color: Colors.grey),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: const Center(
-          child: Text('هیچ ارزی یافت نشد'),
+        child: InputDecorator(
+          decoration: InputDecoration(
+            labelText: widget.label ?? 'ارز',
+            hintText: widget.hintText ?? 'انتخاب ارز',
+            border: const OutlineInputBorder(),
+            enabled: false,
+          ),
+          child: const Center(
+            child: Text('هیچ ارزی یافت نشد'),
+          ),
         ),
       );
     }
 
-    return DropdownButtonFormField<int>(
-      value: widget.selectedCurrencyId,
-      onChanged: widget.enabled ? widget.onChanged : null,
-      decoration: InputDecoration(
-        labelText: widget.label ?? 'ارز',
-        hintText: widget.hintText ?? 'انتخاب ارز',
-        border: const OutlineInputBorder(),
-        enabled: widget.enabled,
-      ),
+    return SizedBox(
+      height: 56, // ارتفاع ثابت مثل سایر فیلدها
+      child: InputDecorator(
+        decoration: InputDecoration(
+          labelText: widget.label ?? 'ارز',
+          hintText: widget.hintText ?? 'انتخاب ارز',
+          border: const OutlineInputBorder(),
+          enabled: widget.enabled,
+        ),
+        child: DropdownButtonHideUnderline(
+          child: DropdownButton<int>(
+            value: _selectedValue,
+            isExpanded: true,
+            onChanged: widget.enabled ? (value) {
+              setState(() {
+                _selectedValue = value;
+              });
+              widget.onChanged(value);
+            } : null,
       items: _currencies.map((currency) {
         final isDefault = currency['is_default'] == true;
         return DropdownMenuItem<int>(
@@ -153,12 +191,9 @@ class _CurrencyPickerWidgetState extends State<CurrencyPickerWidget> {
           ),
         );
       }).toList(),
-      validator: (value) {
-        if (value == null) {
-          return 'انتخاب ارز الزامی است';
-        }
-        return null;
-      },
+          ),
+        ),
+      ),
     );
   }
 }

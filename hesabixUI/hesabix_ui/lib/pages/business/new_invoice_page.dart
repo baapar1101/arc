@@ -18,6 +18,8 @@ import '../../models/customer_model.dart';
 import '../../models/person_model.dart';
 import '../../widgets/invoice/line_items_table.dart';
 import '../../utils/number_formatters.dart';
+import '../../services/currency_service.dart';
+import '../../core/api_client.dart';
 
 class NewInvoicePage extends StatefulWidget {
   final int businessId;
@@ -62,8 +64,37 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
   void initState() {
     super.initState();
     _tabController = TabController(length: 4, vsync: this); // شروع با 4 تب
+    // تنظیم نوع فاکتور پیش‌فرض
+    _selectedInvoiceType = InvoiceType.sales;
     // تنظیم ارز پیش‌فرض از AuthStore
     _selectedCurrencyId = widget.authStore.selectedCurrencyId;
+    // اگر ارز انتخاب نشده، ارز پیش‌فرض را بارگذاری کن
+    if (_selectedCurrencyId == null) {
+      _loadDefaultCurrency();
+    }
+    // تنظیم تاریخ‌های پیش‌فرض
+    _invoiceDate = DateTime.now();
+    _dueDate = DateTime.now();
+  }
+
+  Future<void> _loadDefaultCurrency() async {
+    try {
+      final currencyService = CurrencyService(ApiClient());
+      final currencies = await currencyService.listBusinessCurrencies(businessId: widget.businessId);
+      if (currencies.isNotEmpty) {
+        // ارز پیش‌فرض را پیدا کن
+        final defaultCurrency = currencies.firstWhere(
+          (c) => c['is_default'] == true,
+          orElse: () => currencies.first,
+        );
+        setState(() {
+          _selectedCurrencyId = defaultCurrency['id'] as int;
+        });
+        // ارز پیش‌فرض بارگذاری شد
+      }
+    } catch (e) {
+      // خطا در بارگذاری ارز پیش‌فرض
+    }
   }
 
 

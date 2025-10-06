@@ -479,6 +479,7 @@ class AuthStore with ChangeNotifier {
   Future<void> _ensureCurrencyForBusiness() async {
     final business = _currentBusiness;
     if (business == null) return;
+    
     // اگر ارزی انتخاب نشده، یا کد/شناسه فعلی جزو ارزهای کسب‌وکار نیست
     final allowedCodes = business.currencies.map((c) => c.code).toSet();
     final allowedIds = business.currencies.map((c) => c.id).toSet();
