@@ -16,6 +16,8 @@ import '../../core/date_utils.dart';
 import '../../models/invoice_type_model.dart';
 import '../../models/customer_model.dart';
 import '../../models/person_model.dart';
+import '../../widgets/invoice/line_items_table.dart';
+import '../../utils/number_formatters.dart';
 
 class NewInvoicePage extends StatefulWidget {
   final int businessId;
@@ -50,11 +52,37 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
   int? _selectedCurrencyId;
   String? _invoiceTitle;
   String? _invoiceReference;
+  // جمع‌های محاسباتی ردیف‌ها
+  num _sumSubtotal = 0;
+  num _sumDiscount = 0;
+  num _sumTax = 0;
+  num _sumTotal = 0;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 4, vsync: this); // شروع با 4 تب
+    // تنظیم ارز پیش‌فرض از AuthStore
+    _selectedCurrencyId = widget.authStore.selectedCurrencyId;
+  }
+
+
+  // محاسبه تعداد تب‌ها بر اساس نوع فاکتور
+  int _getTabCountForType(InvoiceType? type) {
+    if (type == InvoiceType.waste || 
+        type == InvoiceType.directConsumption || 
+        type == InvoiceType.production) {
+      return 3; // اطلاعات فاکتور، کالاها و خدمات، تنظیمات
+    }
+    return 4; // همه تب‌ها
+  }
+
+
+  // بررسی اینکه آیا تب تراکنش‌ها باید نمایش داده شود
+  bool get _shouldShowTransactionsTab {
+    return _selectedInvoiceType != InvoiceType.waste && 
+           _selectedInvoiceType != InvoiceType.directConsumption && 
+           _selectedInvoiceType != InvoiceType.production;
   }
 
   @override
@@ -77,20 +105,21 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
         toolbarHeight: 56,
         bottom: TabBar(
           controller: _tabController,
-          tabs: const [
-            Tab(
+          tabs: [
+            const Tab(
               icon: Icon(Icons.info_outline),
               text: 'اطلاعات فاکتور',
             ),
-            Tab(
+            const Tab(
               icon: Icon(Icons.inventory_2_outlined),
               text: 'کالاها و خدمات',
             ),
-            Tab(
-              icon: Icon(Icons.receipt_long_outlined),
-              text: 'تراکنش‌ها',
-            ),
-            Tab(
+            if (_shouldShowTransactionsTab)
+              const Tab(
+                icon: Icon(Icons.receipt_long_outlined),
+                text: 'تراکنش‌ها',
+              ),
+            const Tab(
               icon: Icon(Icons.settings_outlined),
               text: 'تنظیمات',
             ),
@@ -104,8 +133,8 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
           _buildInvoiceInfoTab(),
           // تب کالاها و خدمات
           _buildProductsTab(),
-          // تب تراکنش‌ها
-          _buildTransactionsTab(),
+          // تب تراکنش‌ها (فقط اگر باید نمایش داده شود)
+          if (_shouldShowTransactionsTab) _buildTransactionsTab(),
           // تب تنظیمات
           _buildSettingsTab(),
         ],
@@ -135,6 +164,12 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                           onTypeChanged: (type) {
                             setState(() {
                               _selectedInvoiceType = type;
+                              // به‌روزرسانی TabController اگر تعداد تب‌ها تغییر کرده
+                              final newTabCount = _getTabCountForType(type);
+                              if (newTabCount != _tabController.length) {
+                                _tabController.dispose();
+                                _tabController = TabController(length: newTabCount, vsync: this);
+                              }
                             });
                           },
                           isDraft: _isDraft,
@@ -364,6 +399,12 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                                 onTypeChanged: (type) {
                                   setState(() {
                                     _selectedInvoiceType = type;
+                                    // به‌روزرسانی TabController اگر تعداد تب‌ها تغییر کرده
+                                    final newTabCount = _getTabCountForType(type);
+                                    if (newTabCount != _tabController.length) {
+                                      _tabController.dispose();
+                                      _tabController = TabController(length: newTabCount, vsync: this);
+                                    }
                                   });
                                 },
                                 isDraft: _isDraft,
@@ -806,33 +847,45 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
   }
 
   Widget _buildProductsTab() {
-    return const Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.inventory_2_outlined,
-            size: 64,
-            color: Colors.grey,
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1600),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              InvoiceLineItemsTable(
+                businessId: widget.businessId,
+                selectedCurrencyId: _selectedCurrencyId,
+                invoiceType: (_selectedInvoiceType?.value ?? 'sales'),
+                onChanged: (rows) {
+                  setState(() {
+                    _sumSubtotal = rows.fold<num>(0, (acc, e) => acc + e.subtotal);
+                    _sumDiscount = rows.fold<num>(0, (acc, e) => acc + e.discountAmount);
+                    _sumTax = rows.fold<num>(0, (acc, e) => acc + e.taxAmount);
+                    _sumTotal = rows.fold<num>(0, (acc, e) => acc + e.total);
+                  });
+                },
+              ),
+              const SizedBox(height: 12),
+              // نوار خلاصه جمع‌ها در والد (برای همگام‌سازی با سایر بخش‌ها)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Wrap(
+                  spacing: 16,
+                  runSpacing: 8,
+                  children: [
+                    Text('جمع مبلغ: ${formatWithThousands(_sumSubtotal, decimalPlaces: 0)}', style: Theme.of(context).textTheme.bodyLarge),
+                    Text('جمع تخفیف: ${formatWithThousands(_sumDiscount, decimalPlaces: 0)}', style: Theme.of(context).textTheme.bodyLarge),
+                    Text('جمع مالیات: ${formatWithThousands(_sumTax, decimalPlaces: 0)}', style: Theme.of(context).textTheme.bodyLarge),
+                    Text('جمع کل: ${formatWithThousands(_sumTotal, decimalPlaces: 0)}', style: Theme.of(context).textTheme.bodyLarge),
+                  ],
+                ),
+              ),
+            ],
           ),
-          SizedBox(height: 16),
-          Text(
-            'کالاها و خدمات',
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: Colors.grey,
-            ),
-          ),
-          SizedBox(height: 8),
-          Text(
-            'این بخش در آینده پیاده‌سازی خواهد شد',
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }

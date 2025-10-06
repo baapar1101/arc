@@ -19,8 +19,8 @@ class ProductFormData {
   String? basePurchaseNote;
   
   // Units
-  int? mainUnitId;
-  int? secondaryUnitId;
+  String? mainUnit;
+  String? secondaryUnit;
   num unitConversionFactor;
   
   // Taxes
@@ -49,8 +49,8 @@ class ProductFormData {
     this.basePurchasePrice,
     this.baseSalesNote,
     this.basePurchaseNote,
-    this.mainUnitId,
-    this.secondaryUnitId,
+    this.mainUnit = 'عدد',
+    this.secondaryUnit,
     this.unitConversionFactor = 1,
     this.isSalesTaxable = false,
     this.isPurchaseTaxable = false,
@@ -76,8 +76,8 @@ class ProductFormData {
     num? basePurchasePrice,
     String? baseSalesNote,
     String? basePurchaseNote,
-    int? mainUnitId,
-    int? secondaryUnitId,
+    String? mainUnit,
+    String? secondaryUnit,
     num? unitConversionFactor,
     bool? isSalesTaxable,
     bool? isPurchaseTaxable,
@@ -102,8 +102,8 @@ class ProductFormData {
       basePurchasePrice: basePurchasePrice ?? this.basePurchasePrice,
       baseSalesNote: baseSalesNote ?? this.baseSalesNote,
       basePurchaseNote: basePurchaseNote ?? this.basePurchaseNote,
-      mainUnitId: mainUnitId ?? this.mainUnitId,
-      secondaryUnitId: secondaryUnitId ?? this.secondaryUnitId,
+      mainUnit: mainUnit ?? this.mainUnit,
+      secondaryUnit: secondaryUnit ?? this.secondaryUnit,
       unitConversionFactor: unitConversionFactor ?? this.unitConversionFactor,
       isSalesTaxable: isSalesTaxable ?? this.isSalesTaxable,
       isPurchaseTaxable: isPurchaseTaxable ?? this.isPurchaseTaxable,
@@ -134,9 +134,9 @@ class ProductFormData {
       'is_purchase_taxable': isPurchaseTaxable,
       'sales_tax_rate': salesTaxRate ?? 0,
       'purchase_tax_rate': purchaseTaxRate ?? 0,
-      // Keep optional IDs and factor as-is (do not force zero)
-      'main_unit_id': mainUnitId,
-      'secondary_unit_id': secondaryUnitId,
+      // Units as strings
+      'main_unit': mainUnit,
+      'secondary_unit': secondaryUnit,
       'unit_conversion_factor': unitConversionFactor,
       'base_sales_note': baseSalesNote,
       'base_purchase_note': basePurchaseNote,
@@ -160,8 +160,8 @@ class ProductFormData {
       trackInventory: (product['track_inventory'] == true),
       baseSalesPrice: _parseNumeric(product['base_sales_price']),
       basePurchasePrice: _parseNumeric(product['base_purchase_price']),
-      mainUnitId: product['main_unit_id'] as int?,
-      secondaryUnitId: product['secondary_unit_id'] as int?,
+      mainUnit: product['main_unit']?.toString(),
+      secondaryUnit: product['secondary_unit']?.toString(),
       unitConversionFactor: _parseNumeric(product['unit_conversion_factor']) ?? 1,
       baseSalesNote: product['base_sales_note']?.toString(),
       basePurchaseNote: product['base_purchase_note']?.toString(),

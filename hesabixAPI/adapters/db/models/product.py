@@ -56,8 +56,8 @@ class Product(Base):
     category_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("categories.id", ondelete="SET NULL"), nullable=True, index=True)
 
     # واحدها
-    main_unit_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
-    secondary_unit_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    main_unit: Mapped[str | None] = mapped_column(String(32), nullable=True, index=True, comment="واحد اصلی شمارش")
+    secondary_unit: Mapped[str | None] = mapped_column(String(32), nullable=True, index=True, comment="واحد فرعی شمارش")
     unit_conversion_factor: Mapped[Decimal | None] = mapped_column(Numeric(18, 6), nullable=True)
 
     # قیمت‌های پایه (نمایشی)

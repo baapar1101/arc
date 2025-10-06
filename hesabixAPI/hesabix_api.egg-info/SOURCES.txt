@@ -65,6 +65,7 @@ adapters/db/models/price_list.py
 adapters/db/models/product.py
 adapters/db/models/product_attribute.py
 adapters/db/models/product_attribute_link.py
+adapters/db/models/tax_type.py
 adapters/db/models/tax_unit.py
 adapters/db/models/user.py
 adapters/db/models/support/__init__.py
@@ -138,6 +139,10 @@ hesabix_api.egg-info/top_level.txt
 migrations/env.py
 migrations/versions/1f0abcdd7300_add_petty_cash_table.py
 migrations/versions/20250102_000001_seed_support_data.py
+migrations/versions/20250106_000001_fix_tax_types_structure.py
+migrations/versions/20250106_000002_remove_tax_fields.py
+migrations/versions/20250106_000003_cleanup_tax_units_table.py
+migrations/versions/20250106_000004_seed_tax_units_list.py
 migrations/versions/20250117_000003_add_business_table.py
 migrations/versions/20250117_000004_add_business_contact_fields.py
 migrations/versions/20250117_000005_add_business_geographic_fields.py
@@ -174,10 +179,13 @@ migrations/versions/20251001_001201_merge_heads_drop_currency_tax_units.py
 migrations/versions/20251002_000101_add_bank_accounts_table.py
 migrations/versions/20251003_000201_add_cash_registers_table.py
 migrations/versions/20251003_010501_add_name_to_cash_registers.py
+migrations/versions/20251006_000001_add_tax_types_table_and_product_fks.py
 migrations/versions/4b2ea782bcb3_merge_heads.py
 migrations/versions/5553f8745c6e_add_support_tables.py
+migrations/versions/7891282548e9_merge_tax_types_and_unit_fields_heads.py
 migrations/versions/9f9786ae7191_create_tax_units_table.py
 migrations/versions/a1443c153b47_merge_heads.py
+migrations/versions/b2b68cf299a3_convert_unit_fields_to_string.py
 migrations/versions/c302bc2f2cb8_remove_person_type_column.py
 migrations/versions/caf3f4ef4b76_add_tax_units_table.py
 migrations/versions/d3e84892c1c2_sync_person_type_enum_values_callable_.py

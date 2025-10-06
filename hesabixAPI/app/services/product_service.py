@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Tuple
 from sqlalchemy.orm import Session
 from sqlalchemy import select, and_, func
 from decimal import Decimal
@@ -39,9 +39,20 @@ def _validate_tax(payload: ProductCreateRequest | ProductUpdateRequest) -> None:
         pass
 
 
-def _validate_units(main_unit_id: Optional[int], secondary_unit_id: Optional[int], factor: Optional[Decimal]) -> None:
-    if secondary_unit_id and not factor:
+def _validate_units(main_unit: Optional[str], secondary_unit: Optional[str], factor: Optional[Decimal]) -> None:
+    if secondary_unit and not factor:
         raise ApiError("INVALID_UNIT_FACTOR", "برای واحد فرعی تعیین ضریب تبدیل الزامی است", http_status=400)
+def _validate_unit_string(unit: Optional[str]) -> Optional[str]:
+    """Validate and clean unit string"""
+    if unit is None:
+        return None
+    cleaned = str(unit).strip()
+    if not cleaned:
+        return None
+    if len(cleaned) > 32:
+        raise ApiError("INVALID_UNIT_LENGTH", "واحد شمارش نمی‌تواند بیش از 32 کاراکتر باشد", http_status=400)
+    return cleaned
+
 
 
 def _upsert_attributes(db: Session, product_id: int, business_id: int, attribute_ids: Optional[List[int]]) -> None:
@@ -64,7 +75,10 @@ def _upsert_attributes(db: Session, product_id: int, business_id: int, attribute
 def create_product(db: Session, business_id: int, payload: ProductCreateRequest) -> Dict[str, Any]:
     repo = ProductRepository(db)
     _validate_tax(payload)
-    _validate_units(payload.main_unit_id, payload.secondary_unit_id, payload.unit_conversion_factor)
+    # Validate and clean unit strings
+    main_unit = _validate_unit_string(payload.main_unit)
+    secondary_unit = _validate_unit_string(payload.secondary_unit)
+    _validate_units(main_unit, secondary_unit, payload.unit_conversion_factor)
 
     code = payload.code.strip() if isinstance(payload.code, str) and payload.code.strip() else None
     if code:
@@ -81,8 +95,8 @@ def create_product(db: Session, business_id: int, payload: ProductCreateRequest)
         name=payload.name.strip(),
         description=payload.description,
         category_id=payload.category_id,
-        main_unit_id=payload.main_unit_id,
-        secondary_unit_id=payload.secondary_unit_id,
+        main_unit=main_unit,
+        secondary_unit=secondary_unit,
         unit_conversion_factor=payload.unit_conversion_factor,
         base_sales_price=payload.base_sales_price,
         base_sales_note=payload.base_sales_note,
@@ -103,7 +117,14 @@ def create_product(db: Session, business_id: int, payload: ProductCreateRequest)
 
     _upsert_attributes(db, obj.id, business_id, payload.attribute_ids)
 
-    return {"message": "PRODUCT_CREATED", "data": _to_dict(obj)}
+    data = _to_dict(obj)
+    # enrich titles from payload if provided
+    if getattr(payload, 'main_unit_title', None):
+        data["main_unit_title"] = str(getattr(payload, 'main_unit_title'))
+    if getattr(payload, 'secondary_unit_title', None):
+        data["secondary_unit_title"] = str(getattr(payload, 'secondary_unit_title'))
+
+    return {"message": "PRODUCT_CREATED", "data": data}
 
 
 def list_products(db: Session, business_id: int, query: Dict[str, Any]) -> Dict[str, Any]:
@@ -144,9 +165,13 @@ def update_product(db: Session, product_id: int, business_id: int, payload: Prod
             raise ApiError("DUPLICATE_PRODUCT_CODE", "کد کالا/خدمت تکراری است", http_status=400)
 
     _validate_tax(payload)
-    _validate_units(payload.main_unit_id if payload.main_unit_id is not None else obj.main_unit_id,
-                    payload.secondary_unit_id if payload.secondary_unit_id is not None else obj.secondary_unit_id,
-                    payload.unit_conversion_factor if payload.unit_conversion_factor is not None else obj.unit_conversion_factor)
+    # از فیلدهای explicitly-set برای تشخیص پاک‌سازی (None) استفاده کن
+    fields_set = getattr(payload, 'model_fields_set', getattr(payload, '__fields_set__', set()))
+    # Validate and clean unit strings
+    main_unit_val = (_validate_unit_string(payload.main_unit) if 'main_unit' in fields_set else obj.main_unit)
+    secondary_unit_val = (_validate_unit_string(payload.secondary_unit) if 'secondary_unit' in fields_set else obj.secondary_unit)
+    factor_val = payload.unit_conversion_factor if 'unit_conversion_factor' in fields_set else obj.unit_conversion_factor
+    _validate_units(main_unit_val, secondary_unit_val, factor_val)
 
     updated = repo.update(
         product_id,
@@ -155,8 +180,8 @@ def update_product(db: Session, product_id: int, business_id: int, payload: Prod
         name=payload.name.strip() if isinstance(payload.name, str) else None,
         description=payload.description,
         category_id=payload.category_id,
-        main_unit_id=payload.main_unit_id,
-        secondary_unit_id=payload.secondary_unit_id,
+        main_unit=main_unit_val if 'main_unit' in fields_set else None,
+        secondary_unit=secondary_unit_val if 'secondary_unit' in fields_set else None,
         unit_conversion_factor=payload.unit_conversion_factor,
         base_sales_price=payload.base_sales_price,
         base_sales_note=payload.base_sales_note,
@@ -178,7 +203,8 @@ def update_product(db: Session, product_id: int, business_id: int, payload: Prod
         return None
 
     _upsert_attributes(db, product_id, business_id, payload.attribute_ids)
-    return {"message": "PRODUCT_UPDATED", "data": _to_dict(updated)}
+    data = _to_dict(updated)
+    return {"message": "PRODUCT_UPDATED", "data": data}
 
 
 def delete_product(db: Session, product_id: int, business_id: int) -> bool:
@@ -198,8 +224,8 @@ def _to_dict(obj: Product) -> Dict[str, Any]:
         "name": obj.name,
         "description": obj.description,
         "category_id": obj.category_id,
-        "main_unit_id": obj.main_unit_id,
-        "secondary_unit_id": obj.secondary_unit_id,
+        "main_unit": obj.main_unit,
+        "secondary_unit": obj.secondary_unit,
         "unit_conversion_factor": obj.unit_conversion_factor,
         "base_sales_price": obj.base_sales_price,
         "base_sales_note": obj.base_sales_note,

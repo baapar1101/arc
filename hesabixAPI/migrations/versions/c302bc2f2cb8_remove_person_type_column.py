@@ -17,8 +17,18 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # حذف ستون person_type از جدول persons
-    op.drop_column('persons', 'person_type')
+    # Check if column exists before dropping
+    connection = op.get_bind()
+    result = connection.execute(sa.text("""
+        SELECT COUNT(*) 
+        FROM information_schema.columns 
+        WHERE table_schema = DATABASE() 
+        AND table_name = 'persons' 
+        AND column_name = 'person_type'
+    """)).fetchone()
+    
+    if result[0] > 0:
+        op.drop_column('persons', 'person_type')
 
 
 def downgrade() -> None:

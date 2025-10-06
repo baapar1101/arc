@@ -242,8 +242,8 @@ async def export_products_excel(
             ("category_id", "دسته"),
             ("base_sales_price", "قیمت فروش"),
             ("base_purchase_price", "قیمت خرید"),
-            ("main_unit_id", "واحد اصلی"),
-            ("secondary_unit_id", "واحد فرعی"),
+            ("main_unit", "واحد اصلی"),
+            ("secondary_unit", "واحد فرعی"),
             ("track_inventory", "کنترل موجودی"),
             ("created_at_formatted", "ایجاد"),
         ]
@@ -358,7 +358,7 @@ async def download_products_import_template(
 
     headers = [
         "code","name","item_type","description","category_id",
-        "main_unit_id","secondary_unit_id","unit_conversion_factor",
+        "main_unit","secondary_unit","unit_conversion_factor",
         "base_sales_price","base_purchase_price","track_inventory",
         "reorder_point","min_order_qty","lead_time_days",
         "is_sales_taxable","is_purchase_taxable","sales_tax_rate","purchase_tax_rate",
@@ -523,7 +523,7 @@ async def import_products_excel(
             for k in ['base_sales_price','base_purchase_price','sales_tax_rate','purchase_tax_rate','unit_conversion_factor']:
                 if k in item:
                     item[k] = _parse_decimal(item.get(k))
-            for k in ['reorder_point','min_order_qty','lead_time_days','category_id','main_unit_id','secondary_unit_id','tax_type_id','tax_unit_id']:
+            for k in ['reorder_point','min_order_qty','lead_time_days','category_id','tax_type_id','tax_unit_id']:
                 if k in item:
                     item[k] = _parse_int(item.get(k))
             for k in ['track_inventory','is_sales_taxable','is_purchase_taxable']:
@@ -673,8 +673,8 @@ async def export_products_pdf(
             ("category_id", "دسته"),
             ("base_sales_price", "قیمت فروش"),
             ("base_purchase_price", "قیمت خرید"),
-            ("main_unit_id", "واحد اصلی"),
-            ("secondary_unit_id", "واحد فرعی"),
+            ("main_unit", "واحد اصلی"),
+            ("secondary_unit", "واحد فرعی"),
             ("track_inventory", "کنترل موجودی"),
             ("created_at_formatted", "ایجاد"),
         ]

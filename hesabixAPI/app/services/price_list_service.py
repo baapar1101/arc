@@ -83,7 +83,7 @@ def upsert_price_item(db: Session, business_id: int, price_list_id: int, payload
     if not pr or pr.business_id != business_id:
         raise ApiError("NOT_FOUND", "کالا/خدمت یافت نشد", http_status=404)
     # اگر unit_id داده شده و با واحدهای محصول سازگار نباشد، خطا بده
-    if payload.unit_id is not None and payload.unit_id not in [pr.main_unit_id, pr.secondary_unit_id]:
+    if payload.unit_id is not None and payload.unit_id not in [pr.main_unit, pr.secondary_unit]:
         raise ApiError("INVALID_UNIT", "واحد انتخابی با واحدهای محصول همخوانی ندارد", http_status=400)
 
     repo = PriceItemRepository(db)

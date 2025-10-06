@@ -11,7 +11,6 @@ class ProductBasicInfoSection extends StatelessWidget {
   final ValueChanged<ProductFormData> onChanged;
   final List<Map<String, dynamic>> categories;
   final List<Map<String, dynamic>> attributes;
-  final List<Map<String, dynamic>> units;
 
   const ProductBasicInfoSection({
     super.key,
@@ -20,7 +19,6 @@ class ProductBasicInfoSection extends StatelessWidget {
     required this.onChanged,
     required this.categories,
     required this.attributes,
-    required this.units,
   });
 
   @override
@@ -161,44 +159,55 @@ class ProductBasicInfoSection extends StatelessWidget {
   }
 
   Widget _buildUnitsSection(BuildContext context) {
+    final t = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(AppLocalizations.of(context).unitsTitle, style: Theme.of(context).textTheme.titleSmall),
+        Text(t.unitsTitle, style: Theme.of(context).textTheme.titleSmall),
         const SizedBox(height: 8),
         Row(
           children: [
-            Expanded(child: _buildUnitTextField(
-              context: context,
-              label: AppLocalizations.of(context).mainUnit,
-              isRequired: true,
-              initialText: _unitNameById(formData.mainUnitId) ?? 'عدد',
-              onChanged: (text) {
-                final mappedId = _findUnitIdByTitle(text);
-                _updateFormData(formData.copyWith(mainUnitId: mappedId));
-              },
-            )),
+            Expanded(
+              child: TextFormField(
+                initialValue: formData.mainUnit ?? '',
+                decoration: InputDecoration(labelText: t.mainUnit),
+                validator: (v) => (v == null || v.trim().isEmpty) ? t.required : null,
+                onChanged: (text) {
+                  _updateFormData(formData.copyWith(
+                    mainUnit: text.trim().isEmpty ? null : text.trim(),
+                  ));
+                },
+              ),
+            ),
             const SizedBox(width: 12),
-            Expanded(child: _buildUnitTextField(
-              context: context,
-              label: AppLocalizations.of(context).secondaryUnit,
-              isRequired: false,
-              initialText: _unitNameById(formData.secondaryUnitId) ?? '',
-              onChanged: (text) {
-                final mappedId = _findUnitIdByTitle(text);
-                _updateFormData(formData.copyWith(secondaryUnitId: mappedId));
-              },
-            )),
+            Expanded(
+              child: TextFormField(
+                initialValue: formData.secondaryUnit ?? '',
+                decoration: InputDecoration(labelText: t.secondaryUnit),
+                onChanged: (text) {
+                  _updateFormData(formData.copyWith(
+                    secondaryUnit: text.trim().isEmpty ? null : text.trim(),
+                  ));
+                },
+              ),
+            ),
             const SizedBox(width: 12),
             Expanded(
               child: TextFormField(
                 initialValue: formData.unitConversionFactor.toString(),
-                decoration: InputDecoration(labelText: AppLocalizations.of(context).unitConversionFactor),
+                decoration: InputDecoration(labelText: t.unitConversionFactor),
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
                 inputFormatters: [
-                  FilteringTextInputFormatter.allow(RegExp(r'^\\d*\\.?\\d{0,2}$')),
+                  FilteringTextInputFormatter.allow(RegExp(r'[0-9\.]')),
                 ],
-                validator: ProductFormValidator.validateConversionFactor,
+                validator: (value) {
+                  // اگر واحد فرعی انتخاب شده، ضریب اجباری و > 0 است
+                  final hasSecondary = formData.secondaryUnit?.trim().isNotEmpty == true;
+                  if (hasSecondary && (value == null || value.trim().isEmpty)) {
+                    return t.required;
+                  }
+                  return ProductFormValidator.validateConversionFactor(value);
+                },
                 onChanged: (value) => _updateFormData(formData.copyWith(unitConversionFactor: num.tryParse(value))),
               ),
             ),
@@ -208,44 +217,6 @@ class ProductBasicInfoSection extends StatelessWidget {
     );
   }
 
-  Widget _buildUnitTextField({
-    required BuildContext context,
-    required String label,
-    required bool isRequired,
-    required String initialText,
-    required ValueChanged<String> onChanged,
-  }) {
-    return TextFormField(
-      initialValue: initialText,
-      decoration: InputDecoration(labelText: label),
-      keyboardType: TextInputType.text,
-      validator: isRequired ? (v) => (v == null || v.trim().isEmpty) ? '${AppLocalizations.of(context).required}' : null : null,
-      onChanged: onChanged,
-    );
-  }
-
-  String? _unitNameById(int? id) {
-    if (id == null) return null;
-    try {
-      final u = units.firstWhere((e) => (e['id'] as num).toInt() == id);
-      return (u['title'] ?? u['name'])?.toString();
-    } catch (_) {
-      return null;
-    }
-  }
-
-  int? _findUnitIdByTitle(String? title) {
-    if (title == null) return null;
-    final t = title.trim();
-    if (t.isEmpty) return null;
-    for (final u in units) {
-      final name = (u['title'] ?? u['name'] ?? '').toString();
-      if (name.trim().toLowerCase() == t.toLowerCase()) {
-        return (u['id'] as num).toInt();
-      }
-    }
-    return null;
-  }
 
   Widget _buildItemTypeSelector(BuildContext context) {
     final t = AppLocalizations.of(context);

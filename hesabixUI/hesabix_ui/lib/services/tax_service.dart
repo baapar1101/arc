@@ -5,10 +5,10 @@ class TaxService {
   final ApiClient _apiClient;
   TaxService({ApiClient? apiClient}) : _apiClient = apiClient ?? ApiClient();
 
-  Future<List<Map<String, dynamic>>> getTaxTypes({required int businessId}) async {
+  Future<List<Map<String, dynamic>>> getTaxTypes({int? businessId}) async {
     try {
       final res = await _apiClient.get<Map<String, dynamic>>(
-        '/api/v1/tax-types/business/$businessId',
+        '/api/v1/tax-types/',
       );
       final data = res.data?['data'];
       if (data is List) {
@@ -28,10 +28,10 @@ class TaxService {
     }
   }
 
-  Future<List<Map<String, dynamic>>> getTaxUnits({required int businessId}) async {
+  Future<List<Map<String, dynamic>>> getTaxUnits({int? businessId}) async {
     try {
       final res = await _apiClient.get<Map<String, dynamic>>(
-        '/api/v1/tax-units/business/$businessId',
+        '/api/v1/tax-units/',
       );
       final data = res.data?['data'];
       if (data is List) {

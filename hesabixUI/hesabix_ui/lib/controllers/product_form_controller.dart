@@ -3,7 +3,6 @@ import '../models/product_form_data.dart';
 import '../services/product_service.dart';
 import '../services/category_service.dart';
 import '../services/product_attribute_service.dart';
-import '../services/unit_service.dart';
 import '../services/tax_service.dart';
 import '../services/price_list_service.dart';
 import '../services/currency_service.dart';
@@ -16,7 +15,6 @@ class ProductFormController extends ChangeNotifier {
   late final ProductService _productService;
   late final CategoryService _categoryService;
   late final ProductAttributeService _attributeService;
-  late final UnitService _unitService;
   late final TaxService _taxService;
   late final PriceListService _priceListService;
   late final CurrencyService _currencyService;
@@ -29,7 +27,6 @@ class ProductFormController extends ChangeNotifier {
   // Reference data
   List<Map<String, dynamic>> _categories = [];
   List<Map<String, dynamic>> _attributes = [];
-  List<Map<String, dynamic>> _units = [];
   List<Map<String, dynamic>> _taxTypes = [];
   List<Map<String, dynamic>> _taxUnits = [];
   List<Map<String, dynamic>> _priceLists = [];
@@ -49,7 +46,6 @@ class ProductFormController extends ChangeNotifier {
     _productService = ProductService(apiClient: _apiClient);
     _categoryService = CategoryService(_apiClient);
     _attributeService = ProductAttributeService(apiClient: _apiClient);
-    _unitService = UnitService(apiClient: _apiClient);
     _taxService = TaxService(apiClient: _apiClient);
     _priceListService = PriceListService(apiClient: _apiClient);
     _currencyService = CurrencyService(_apiClient);
@@ -61,7 +57,6 @@ class ProductFormController extends ChangeNotifier {
   String? get errorMessage => _errorMessage;
   List<Map<String, dynamic>> get categories => _categories;
   List<Map<String, dynamic>> get attributes => _attributes;
-  List<Map<String, dynamic>> get units => _units;
   List<Map<String, dynamic>> get taxTypes => _taxTypes;
   List<Map<String, dynamic>> get taxUnits => _taxUnits;
   List<Map<String, dynamic>> get priceLists => _priceLists;
@@ -139,20 +134,8 @@ class ProductFormController extends ChangeNotifier {
           }
         }
       }
-      // Default main unit id: prefer unit titled "عدد", then first available, else 1
-      if (_formData.mainUnitId == null) {
-        int? unitId;
-        try {
-          final numberUnit = _units.firstWhere(
-            (e) => ((e['title'] ?? e['name'])?.toString().trim() ?? '') == 'عدد',
-          );
-          unitId = (numberUnit['id'] as num?)?.toInt();
-        } catch (_) {
-          // ignore
-        }
-        unitId ??= _units.isNotEmpty ? (_units.first['id'] as num).toInt() : 1;
-        _formData = _formData.copyWith(mainUnitId: unitId);
-      }
+      // دیگر واحد اصلی را به‌صورت خودکار مقداردهی نکن؛
+      // کاربر می‌تواند عنوان واحد را در فرم وارد کند و در صورت تطبیق با لیست، آیدی ست می‌شود
       
       _clearError();
       notifyListeners();
@@ -178,23 +161,17 @@ class ProductFormController extends ChangeNotifier {
         _attributes = [];
       }
       
-      // Load units
-      try {
-        _units = await _unitService.getUnits(businessId: businessId);
-      } catch (_) {
-        _units = [];
-      }
       
       // Load tax types
       try {
-        _taxTypes = await _taxService.getTaxTypes(businessId: businessId);
+        _taxTypes = await _taxService.getTaxTypes();
       } catch (_) {
         _taxTypes = [];
       }
       
       // Load tax units
       try {
-        _taxUnits = await _taxService.getTaxUnits(businessId: businessId);
+        _taxUnits = await _taxService.getTaxUnits();
       } catch (_) {
         _taxUnits = [];
       }

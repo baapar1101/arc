@@ -18,8 +18,8 @@ class ProductCreateRequest(BaseModel):
     description: Optional[str] = Field(default=None, max_length=2000)
     category_id: Optional[int] = None
 
-    main_unit_id: Optional[int] = None
-    secondary_unit_id: Optional[int] = None
+    main_unit: Optional[str] = Field(default=None, max_length=32, description="واحد اصلی شمارش")
+    secondary_unit: Optional[str] = Field(default=None, max_length=32, description="واحد فرعی شمارش")
     unit_conversion_factor: Optional[Decimal] = None
 
     base_sales_price: Optional[Decimal] = None
@@ -50,8 +50,8 @@ class ProductUpdateRequest(BaseModel):
     description: Optional[str] = Field(default=None, max_length=2000)
     category_id: Optional[int] = None
 
-    main_unit_id: Optional[int] = None
-    secondary_unit_id: Optional[int] = None
+    main_unit: Optional[str] = Field(default=None, max_length=32, description="واحد اصلی شمارش")
+    secondary_unit: Optional[str] = Field(default=None, max_length=32, description="واحد فرعی شمارش")
     unit_conversion_factor: Optional[Decimal] = None
 
     base_sales_price: Optional[Decimal] = None
@@ -83,8 +83,8 @@ class ProductResponse(BaseModel):
     name: str
     description: Optional[str] = None
     category_id: Optional[int] = None
-    main_unit_id: Optional[int] = None
-    secondary_unit_id: Optional[int] = None
+    main_unit: Optional[str] = None
+    secondary_unit: Optional[str] = None
     unit_conversion_factor: Optional[Decimal] = None
     base_sales_price: Optional[Decimal] = None
     base_sales_note: Optional[str] = None

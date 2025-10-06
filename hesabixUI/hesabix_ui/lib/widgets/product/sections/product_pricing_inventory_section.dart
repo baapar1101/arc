@@ -8,7 +8,6 @@ import '../../../utils/product_form_validator.dart';
 class ProductPricingInventorySection extends StatelessWidget {
   final ProductFormData formData;
   final ValueChanged<ProductFormData> onChanged;
-  final List<Map<String, dynamic>> units;
   final List<Map<String, dynamic>> priceLists;
   final List<Map<String, dynamic>> currencies;
   final List<Map<String, dynamic>> draftPriceItems;
@@ -19,7 +18,6 @@ class ProductPricingInventorySection extends StatelessWidget {
     super.key,
     required this.formData,
     required this.onChanged,
-    required this.units,
     required this.priceLists,
     required this.currencies,
     required this.draftPriceItems,

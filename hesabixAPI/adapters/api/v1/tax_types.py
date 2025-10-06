@@ -1,49 +1,59 @@
-from typing import Dict, Any, List
+from typing import Dict, Any
 from fastapi import APIRouter, Depends, Request
 
 from adapters.api.v1.schemas import SuccessResponse
-from adapters.db.session import get_db  # noqa: F401  (kept for consistency/future use)
+from adapters.db.session import get_db
 from app.core.responses import success_response
-from app.core.auth_dependency import get_current_user, AuthContext
-from app.core.permissions import require_business_access
-from sqlalchemy.orm import Session  # noqa: F401
+from sqlalchemy.orm import Session
+from adapters.db.models.tax_type import TaxType
 
 
 router = APIRouter(prefix="/tax-types", tags=["tax-types"])
 
 
-def _static_tax_types() -> List[Dict[str, Any]]:
-    titles = [
-        "دارو",
-        "دخانیات",
-        "موبایل",
-        "لوازم خانگی برقی",
-        "قطعات مصرفی و یدکی وسایل نقلیه",
-        "فراورده ها و مشتقات نفتی و گازی و پتروشیمیایی",
-        "طلا اعم از شمش، مسکوکات و مصنوعات زینتی",
-        "منسوجات و پوشاک",
-        "اسباب بازی",
-        "دام زنده، گوشت سفید و قرمز",
-        "محصولات اساسی کشاورزی",
-        "سایر کالا ها",
-    ]
-    return [{"id": idx + 1, "title": t} for idx, t in enumerate(titles)]
-
-
-@router.get(
-    "/business/{business_id}",
-    summary="لیست نوع‌های مالیات",
-    description="دریافت لیست نوع‌های مالیات (ثابت)",
+@router.get("/", 
+    summary="لیست نوع‌های مالیات", 
+    description="دریافت لیست تمام نوع‌های مالیات استاندارد",
     response_model=SuccessResponse,
+    responses={
+        200: {
+            "description": "لیست نوع‌های مالیات با موفقیت دریافت شد",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "success": True,
+                        "message": "لیست نوع‌های مالیات دریافت شد",
+                        "data": [
+                            {
+                                "id": 1,
+                                "title": "ارزش افزوده گروه دارو",
+                                "code": "VAT_DRUG",
+                                "description": "مالیات ارزش افزوده برای گروه دارو و تجهیزات پزشکی",
+                                "created_at": "2024-01-01T00:00:00Z",
+                                "updated_at": "2024-01-01T00:00:00Z"
+                            }
+                        ]
+                    }
+                }
+            }
+        }
+    }
 )
-@require_business_access()
 def list_tax_types(
     request: Request,
-    business_id: int,
-    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
-    # Currently returns a static list; later can be sourced from DB if needed
-    items = _static_tax_types()
+    """دریافت لیست تمام نوع‌های مالیات استاندارد"""
+    
+    items = [
+        {
+            "id": it.id,
+            "title": it.title,
+            "code": it.code,
+            "description": it.description,
+            "created_at": it.created_at.isoformat(),
+            "updated_at": it.updated_at.isoformat(),
+        }
+        for it in db.query(TaxType).order_by(TaxType.title).all()
+    ]
     return success_response(items, request)
-
-

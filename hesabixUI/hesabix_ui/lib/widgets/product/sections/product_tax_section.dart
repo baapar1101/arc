@@ -4,7 +4,7 @@ import 'package:flutter/services.dart';
 import '../../../models/product_form_data.dart';
 import '../../../utils/product_form_validator.dart';
 
-class ProductTaxSection extends StatelessWidget {
+class ProductTaxSection extends StatefulWidget {
   final ProductFormData formData;
   final ValueChanged<ProductFormData> onChanged;
   final List<Map<String, dynamic>> taxTypes;
@@ -17,6 +17,12 @@ class ProductTaxSection extends StatelessWidget {
     required this.taxTypes,
     required this.taxUnits,
   });
+
+  @override
+  State<ProductTaxSection> createState() => _ProductTaxSectionState();
+}
+
+class _ProductTaxSectionState extends State<ProductTaxSection> {
 
   @override
   Widget build(BuildContext context) {
@@ -66,10 +72,10 @@ class ProductTaxSection extends StatelessWidget {
   Widget _buildTaxCodeField(BuildContext context) {
     final t = AppLocalizations.of(context);
     return TextFormField(
-      initialValue: formData.taxCode,
+      initialValue: widget.formData.taxCode,
       decoration: InputDecoration(labelText: t.taxCode),
-      onChanged: (value) => _updateFormData(
-        formData.copyWith(taxCode: value.trim().isEmpty ? null : value),
+      onChanged: (value) => widget.onChanged(
+        widget.formData.copyWith(taxCode: value.trim().isEmpty ? null : value),
       ),
     );
   }
@@ -80,21 +86,21 @@ class ProductTaxSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SwitchListTile(
-          value: formData.isSalesTaxable,
-          onChanged: (value) => _updateFormData(formData.copyWith(isSalesTaxable: value)),
+          value: widget.formData.isSalesTaxable,
+          onChanged: (value) => widget.onChanged(widget.formData.copyWith(isSalesTaxable: value)),
           title: Text(t.isSalesTaxable),
         ),
-        if (formData.isSalesTaxable) ...[
+        if (widget.formData.isSalesTaxable) ...[
           const SizedBox(height: 16),
           TextFormField(
-            initialValue: formData.salesTaxRate?.toString(),
+            initialValue: widget.formData.salesTaxRate?.toString(),
             decoration: InputDecoration(labelText: t.salesTaxRate),
             keyboardType: TextInputType.number,
             inputFormatters: [
               FilteringTextInputFormatter.digitsOnly,
             ],
             validator: (value) => ProductFormValidator.validateTaxRate(value, fieldName: t.salesTaxRate),
-            onChanged: (value) => _updateFormData(formData.copyWith(salesTaxRate: num.tryParse(value))),
+            onChanged: (value) => widget.onChanged(widget.formData.copyWith(salesTaxRate: num.tryParse(value))),
           ),
         ],
       ],
@@ -107,21 +113,21 @@ class ProductTaxSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SwitchListTile(
-          value: formData.isPurchaseTaxable,
-          onChanged: (value) => _updateFormData(formData.copyWith(isPurchaseTaxable: value)),
+          value: widget.formData.isPurchaseTaxable,
+          onChanged: (value) => widget.onChanged(widget.formData.copyWith(isPurchaseTaxable: value)),
           title: Text(t.isPurchaseTaxable),
         ),
-        if (formData.isPurchaseTaxable) ...[
+        if (widget.formData.isPurchaseTaxable) ...[
           const SizedBox(height: 16),
           TextFormField(
-            initialValue: formData.purchaseTaxRate?.toString(),
+            initialValue: widget.formData.purchaseTaxRate?.toString(),
             decoration: InputDecoration(labelText: t.purchaseTaxRate),
             keyboardType: TextInputType.number,
             inputFormatters: [
               FilteringTextInputFormatter.digitsOnly,
             ],
             validator: (value) => ProductFormValidator.validateTaxRate(value, fieldName: t.purchaseTaxRate),
-            onChanged: (value) => _updateFormData(formData.copyWith(purchaseTaxRate: num.tryParse(value))),
+            onChanged: (value) => widget.onChanged(widget.formData.copyWith(purchaseTaxRate: num.tryParse(value))),
           ),
         ],
       ],
@@ -129,52 +135,62 @@ class ProductTaxSection extends StatelessWidget {
   }
 
   Widget _buildTaxTypeDropdown(BuildContext context) {
-    if (taxTypes.isNotEmpty) {
+    if (widget.taxTypes.isNotEmpty) {
       final t = AppLocalizations.of(context);
       return DropdownButtonFormField<int>(
-        value: formData.taxTypeId,
-        items: taxTypes
-            .map((taxType) => DropdownMenuItem<int>(
-                  value: (taxType['id'] as num).toInt(),
-                  child: Text((taxType['title'] ?? taxType['name'] ?? 'نوع ${taxType['id']}').toString()),
-                ))
-            .toList(),
-        onChanged: (value) => _updateFormData(formData.copyWith(taxTypeId: value)),
+        initialValue: widget.formData.taxTypeId,
+        items: [
+          DropdownMenuItem<int>(
+            value: null,
+            child: Text('انتخاب ${t.taxType}'),
+          ),
+          ...widget.taxTypes
+              .map((taxType) => DropdownMenuItem<int>(
+                    value: (taxType['id'] as num).toInt(),
+                    child: Text((taxType['title'] ?? taxType['name'] ?? 'نوع ${taxType['id']}').toString()),
+                  )),
+        ],
+        onChanged: (value) => widget.onChanged(widget.formData.copyWith(taxTypeId: value)),
         decoration: InputDecoration(labelText: t.taxType),
       );
     } else {
       final t = AppLocalizations.of(context);
       return TextFormField(
-        initialValue: formData.taxTypeId?.toString(),
-        decoration: InputDecoration(labelText: t.taxTypeId),
+        initialValue: widget.formData.taxTypeId?.toString(),
+        decoration: InputDecoration(labelText: t.taxType),
         keyboardType: TextInputType.number,
-        onChanged: (value) => _updateFormData(formData.copyWith(taxTypeId: int.tryParse(value))),
+        onChanged: (value) => widget.onChanged(widget.formData.copyWith(taxTypeId: int.tryParse(value))),
       );
     }
   }
 
   Widget _buildTaxUnitDropdown(BuildContext context) {
-    final List<Map<String, dynamic>> effectiveTaxUnits = taxUnits.isNotEmpty ? taxUnits : _fallbackTaxUnits();
+    final List<Map<String, dynamic>> effectiveTaxUnits = widget.taxUnits.isNotEmpty ? widget.taxUnits : _fallbackTaxUnits();
     if (effectiveTaxUnits.isNotEmpty) {
       final t = AppLocalizations.of(context);
       return DropdownButtonFormField<int>(
-        value: formData.taxUnitId,
-        items: effectiveTaxUnits
-            .map((taxUnit) => DropdownMenuItem<int>(
-                  value: (taxUnit['id'] as num).toInt(),
-                  child: Text((taxUnit['title'] ?? taxUnit['name'] ?? 'واحد ${taxUnit['id']}').toString()),
-                ))
-            .toList(),
-        onChanged: (value) => _updateFormData(formData.copyWith(taxUnitId: value)),
+        initialValue: widget.formData.taxUnitId,
+        items: [
+          DropdownMenuItem<int>(
+            value: null,
+            child: Text('انتخاب ${t.taxUnit}'),
+          ),
+          ...effectiveTaxUnits
+              .map((taxUnit) => DropdownMenuItem<int>(
+                    value: (taxUnit['id'] as num).toInt(),
+                    child: Text((taxUnit['title'] ?? taxUnit['name'] ?? 'واحد ${taxUnit['id']}').toString()),
+                  )),
+        ],
+        onChanged: (value) => widget.onChanged(widget.formData.copyWith(taxUnitId: value)),
         decoration: InputDecoration(labelText: t.taxUnit),
       );
     } else {
       final t = AppLocalizations.of(context);
       return TextFormField(
-        initialValue: formData.taxUnitId?.toString(),
+        initialValue: widget.formData.taxUnitId?.toString(),
         decoration: InputDecoration(labelText: t.taxUnitId),
         keyboardType: TextInputType.number,
-        onChanged: (value) => _updateFormData(formData.copyWith(taxUnitId: int.tryParse(value))),
+        onChanged: (value) => widget.onChanged(widget.formData.copyWith(taxUnitId: int.tryParse(value))),
       );
     }
   }
@@ -201,7 +217,4 @@ class ProductTaxSection extends StatelessWidget {
     });
   }
 
-  void _updateFormData(ProductFormData newData) {
-    onChanged(newData);
-  }
 }

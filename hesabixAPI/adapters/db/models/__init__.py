@@ -36,5 +36,6 @@ from .product import Product  # noqa: F401
 from .price_list import PriceList, PriceItem  # noqa: F401
 from .product_attribute_link import ProductAttributeLink  # noqa: F401
 from .tax_unit import TaxUnit  # noqa: F401
+from .tax_type import TaxType  # noqa: F401
 from .bank_account import BankAccount  # noqa: F401
 from .petty_cash import PettyCash  # noqa: F401

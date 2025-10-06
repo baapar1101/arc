@@ -131,7 +131,6 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
         onChanged: _controller.updateFormData,
         categories: _controller.categories,
         attributes: _controller.attributes,
-        units: _controller.units,
       ),
     );
   }
@@ -142,7 +141,6 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
       child: ProductPricingInventorySection(
         formData: _controller.formData,
         onChanged: _controller.updateFormData,
-        units: _controller.units,
         priceLists: _controller.priceLists,
         currencies: _controller.currencies,
         draftPriceItems: _controller.draftPriceItems,

@@ -78,6 +78,33 @@ class ProductService {
     }
     return false;
   }
+
+  Future<List<Map<String, dynamic>>> searchProducts({
+    required int businessId,
+    String? searchQuery,
+    int limit = 20,
+    int skip = 0,
+    List<Map<String, dynamic>>? filters,
+    List<String>? searchFields,
+  }) async {
+    final body = <String, dynamic>{
+      'take': limit,
+      'skip': skip,
+      if (searchQuery != null && searchQuery.trim().isNotEmpty) 'search': searchQuery.trim(),
+      if (filters != null && filters.isNotEmpty) 'filters': filters,
+      if (searchFields != null && searchFields.isNotEmpty) 'searchFields': searchFields,
+    };
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/products/business/$businessId/search',
+      data: body,
+    );
+    final data = res.data?['data'];
+    final items = (data is Map<String, dynamic>) ? data['items'] : null;
+    if (items is List) {
+      return items.map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e as Map)).toList();
+    }
+    return const <Map<String, dynamic>>[];
+  }
 }
 
 

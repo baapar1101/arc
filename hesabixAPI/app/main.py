@@ -21,7 +21,6 @@ from adapters.api.v1.bank_accounts import router as bank_accounts_router
 from adapters.api.v1.cash_registers import router as cash_registers_router
 from adapters.api.v1.petty_cash import router as petty_cash_router
 from adapters.api.v1.tax_units import router as tax_units_router
-from adapters.api.v1.tax_units import alias_router as units_alias_router
 from adapters.api.v1.tax_types import router as tax_types_router
 from adapters.api.v1.support.tickets import router as support_tickets_router
 from adapters.api.v1.support.operator import router as support_operator_router
@@ -301,7 +300,6 @@ def create_app() -> FastAPI:
     application.include_router(cash_registers_router, prefix=settings.api_v1_prefix)
     application.include_router(petty_cash_router, prefix=settings.api_v1_prefix)
     application.include_router(tax_units_router, prefix=settings.api_v1_prefix)
-    application.include_router(units_alias_router, prefix=settings.api_v1_prefix)
     application.include_router(tax_types_router, prefix=settings.api_v1_prefix)
     
     # Support endpoints

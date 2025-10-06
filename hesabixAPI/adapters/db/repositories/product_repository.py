@@ -78,8 +78,8 @@ class ProductRepository(BaseRepository[Product]):
                 "name": p.name,
                 "description": p.description,
                 "category_id": p.category_id,
-                "main_unit_id": p.main_unit_id,
-                "secondary_unit_id": p.secondary_unit_id,
+                "main_unit": p.main_unit,
+                "secondary_unit": p.secondary_unit,
                 "unit_conversion_factor": p.unit_conversion_factor,
                 "base_sales_price": p.base_sales_price,
                 "base_sales_note": p.base_sales_note,
@@ -125,9 +125,14 @@ class ProductRepository(BaseRepository[Product]):
         obj = self.db.get(Product, product_id)
         if not obj:
             return None
+        # اجازه بده فیلدهای خاص حتی اگر None باشند هم ست شوند
+        nullable_overrides = {"main_unit_id", "secondary_unit_id", "unit_conversion_factor"}
         for k, v in data.items():
-            if hasattr(obj, k) and v is not None:
-                setattr(obj, k, v)
+            if hasattr(obj, k):
+                if k in nullable_overrides:
+                    setattr(obj, k, v)
+                elif v is not None:
+                    setattr(obj, k, v)
         self.db.commit()
         self.db.refresh(obj)
         return obj
