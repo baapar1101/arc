@@ -16,9 +16,11 @@ import '../../models/invoice_type_model.dart';
 import '../../models/customer_model.dart';
 import '../../models/person_model.dart';
 import '../../widgets/invoice/line_items_table.dart';
+import '../../widgets/invoice/invoice_transactions_widget.dart';
 import '../../utils/number_formatters.dart';
 import '../../services/currency_service.dart';
 import '../../core/api_client.dart';
+import '../../models/invoice_transaction.dart';
 
 class NewInvoicePage extends StatefulWidget {
   final int businessId;
@@ -66,6 +68,9 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
   bool _isOfficialInvoice = false;
   String? _selectedPrintTemplate;
   bool _sendToTaxFolder = false;
+  
+  // تراکنش‌های فاکتور
+  List<InvoiceTransaction> _transactions = [];
 
   @override
   void initState() {
@@ -708,10 +713,11 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
     // TODO: پیاده‌سازی عملیات ذخیره فاکتور
     final printInfo = _printAfterSave ? '\n• چاپ فاکتور: فعال' : '';
     final taxInfo = _sendToTaxFolder ? '\n• ارسال به کارپوشه مودیان: فعال' : '';
+    final transactionInfo = _transactions.isNotEmpty ? '\n• تعداد تراکنش‌ها: ${_transactions.length}' : '';
     
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('عملیات ذخیره فاکتور به زودی پیاده‌سازی خواهد شد$printInfo$taxInfo'),
+        content: Text('عملیات ذخیره فاکتور به زودی پیاده‌سازی خواهد شد$printInfo$taxInfo$transactionInfo'),
         backgroundColor: Theme.of(context).colorScheme.primary,
         duration: const Duration(seconds: 3),
       ),
@@ -763,33 +769,22 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
   }
 
   Widget _buildTransactionsTab() {
-    return const Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.receipt_long_outlined,
-            size: 64,
-            color: Colors.grey,
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1200),
+          child: InvoiceTransactionsWidget(
+            transactions: _transactions,
+            businessId: widget.businessId,
+            calendarController: widget.calendarController,
+            onChanged: (transactions) {
+              setState(() {
+                _transactions = transactions;
+              });
+            },
           ),
-          SizedBox(height: 16),
-          Text(
-            'تراکنش‌ها',
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: Colors.grey,
-            ),
-          ),
-          SizedBox(height: 8),
-          Text(
-            'این بخش در آینده پیاده‌سازی خواهد شد',
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
