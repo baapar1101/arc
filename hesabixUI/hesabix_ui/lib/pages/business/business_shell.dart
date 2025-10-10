@@ -951,6 +951,9 @@ class _BusinessShellState extends State<BusinessShell> {
                                           } else if (item.label == t.invoice) {
                                             // Navigate to add invoice
                                             context.go('/business/${widget.businessId}/invoice/new');
+                                          } else if (item.label == t.checks) {
+                                            // Navigate to add check
+                                            context.go('/business/${widget.businessId}/checks/new');
                                           }
                                           // سایر مسیرهای افزودن در آینده متصل می‌شوند
                                         },
@@ -1050,6 +1053,9 @@ class _BusinessShellState extends State<BusinessShell> {
                                 } else if (item.label == t.invoice) {
                                   // Navigate to add invoice
                                   context.go('/business/${widget.businessId}/invoice/new');
+                                } else if (item.label == t.checks) {
+                                  // Navigate to add check
+                                  context.go('/business/${widget.businessId}/checks/new');
                                 }
                               },
                               child: Container(

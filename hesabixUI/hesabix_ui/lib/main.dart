@@ -36,6 +36,8 @@ import 'pages/business/price_lists_page.dart';
 import 'pages/business/price_list_items_page.dart';
 import 'pages/business/cash_registers_page.dart';
 import 'pages/business/petty_cash_page.dart';
+import 'pages/business/checks_page.dart';
+import 'pages/business/check_form_page.dart';
 import 'pages/error_404_page.dart';
 import 'core/locale_controller.dart';
 import 'core/calendar_controller.dart';
@@ -788,6 +790,63 @@ class _MyAppState extends State<MyApp> {
                   child: PersonsPage(
                     businessId: businessId,
                     authStore: _authStore!,
+                  ),
+                );
+              },
+            ),
+            // Checks: list, new, edit
+            GoRoute(
+              path: 'checks',
+              name: 'business_checks',
+              builder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return BusinessShell(
+                  businessId: businessId,
+                  authStore: _authStore!,
+                  localeController: controller,
+                  calendarController: _calendarController!,
+                  themeController: themeController,
+                  child: ChecksPage(
+                    businessId: businessId,
+                    authStore: _authStore!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: 'checks/new',
+              name: 'business_new_check',
+              builder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return BusinessShell(
+                  businessId: businessId,
+                  authStore: _authStore!,
+                  localeController: controller,
+                  calendarController: _calendarController!,
+                  themeController: themeController,
+                  child: CheckFormPage(
+                    businessId: businessId,
+                    authStore: _authStore!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: 'checks/:check_id/edit',
+              name: 'business_edit_check',
+              builder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                final checkId = int.tryParse(state.pathParameters['check_id'] ?? '0');
+                return BusinessShell(
+                  businessId: businessId,
+                  authStore: _authStore!,
+                  localeController: controller,
+                  calendarController: _calendarController!,
+                  themeController: themeController,
+                  child: CheckFormPage(
+                    businessId: businessId,
+                    authStore: _authStore!,
+                    checkId: checkId,
                   ),
                 );
               },
