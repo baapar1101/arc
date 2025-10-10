@@ -109,7 +109,7 @@ class ProductFormValidator {
       errors['basePurchasePrice'] = 'قیمت خرید نمی‌تواند منفی باشد';
     }
 
-    if (formData.unitConversionFactor != null && formData.unitConversionFactor! <= 0) {
+    if (formData.unitConversionFactor <= 0) {
       errors['unitConversionFactor'] = 'ضریب تبدیل باید بزرگتر از صفر باشد';
     }
 

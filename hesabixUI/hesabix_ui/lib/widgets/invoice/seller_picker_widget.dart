@@ -33,6 +33,9 @@ class _SellerPickerWidgetState extends State<SellerPickerWidget> {
   List<Person> _sellers = [];
   bool _isLoading = false;
   bool _isSearching = false;
+  int _searchSeq = 0; // برای جلوگیری از نمایش نتایج قدیمی
+  String _latestQuery = '';
+  void Function(void Function())? _setModalState;
 
   @override
   void initState() {
@@ -57,7 +60,8 @@ class _SellerPickerWidgetState extends State<SellerPickerWidget> {
       final response = await _personService.getPersons(
         businessId: widget.businessId,
         filters: {
-          'person_types': ['فروشنده', 'بازاریاب'], // فقط فروشنده و بازاریاب
+          // یکسان‌سازی با API: استفاده از person_types (لیستی از مقادیر)
+          'person_types': ['فروشنده', 'بازاریاب'],
         },
         limit: 100, // دریافت همه فروشندگان/بازاریاب‌ها
       );
@@ -86,40 +90,62 @@ class _SellerPickerWidgetState extends State<SellerPickerWidget> {
   }
 
   Future<void> _searchSellers(String query) async {
-    if (query.isEmpty) {
-      _loadSellers();
-      return;
-    }
+    final int seq = ++_searchSeq;
+    _latestQuery = query;
 
     if (!mounted) return;
-    
+
     setState(() {
-      _isSearching = true;
+      if (query.isEmpty) {
+        _isLoading = true; // برای نمایش لودینگ مرکزی هنگام پاک‌کردن کوئری
+      } else {
+        _isSearching = true; // برای نمایش اسپینر کوچک کنار فیلد جست‌وجو
+      }
     });
+    _setModalState?.call(() {});
 
     try {
       final response = await _personService.getPersons(
         businessId: widget.businessId,
-        search: query,
+        search: query.isEmpty ? null : query,
         filters: {
           'person_types': ['فروشنده', 'بازاریاب'],
         },
-        limit: 50,
+        limit: query.isEmpty ? 100 : 50,
       );
+
+      // پاسخ کهنه را نادیده بگیر
+      if (seq != _searchSeq || query != _latestQuery) {
+        return;
+      }
 
       final sellers = _personService.parsePersonsList(response);
       
       if (mounted) {
         setState(() {
           _sellers = sellers;
-          _isSearching = false;
+          if (query.isEmpty) {
+            _isLoading = false;
+          } else {
+            _isSearching = false;
+          }
         });
+        _setModalState?.call(() {});
       }
     } catch (e) {
+      // پاسخ کهنه را نادیده بگیر
+      if (seq != _searchSeq || query != _latestQuery) {
+        return;
+      }
       if (mounted) {
         setState(() {
-          _isSearching = false;
+          if (query.isEmpty) {
+            _isLoading = false;
+          } else {
+            _isSearching = false;
+          }
         });
+        _setModalState?.call(() {});
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('خطا در جست‌وجو: $e'),
@@ -134,16 +160,21 @@ class _SellerPickerWidgetState extends State<SellerPickerWidget> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      builder: (context) => _SellerPickerBottomSheet(
-        sellers: _sellers,
-        selectedSeller: widget.selectedSeller,
-        onSellerSelected: (seller) {
-          widget.onSellerChanged(seller);
-          Navigator.pop(context);
+      builder: (context) => StatefulBuilder(
+        builder: (context, setModalState) {
+          _setModalState = setModalState;
+          return _SellerPickerBottomSheet(
+            sellers: _sellers,
+            selectedSeller: widget.selectedSeller,
+            onSellerSelected: (seller) {
+              widget.onSellerChanged(seller);
+              Navigator.pop(context);
+            },
+            searchController: _searchController,
+            onSearchChanged: _searchSellers,
+            isLoading: _isLoading || _isSearching,
+          );
         },
-        searchController: _searchController,
-        onSearchChanged: _searchSellers,
-        isLoading: _isLoading || _isSearching,
       ),
     );
   }

@@ -26,6 +26,10 @@ class PersonService {
 
       if (search != null && search.isNotEmpty) {
         queryParams['search'] = search;
+        // اگر search_fields مشخص نشده، فیلدهای پیش‌فرض را استفاده کن
+        if (searchFields == null || searchFields.isEmpty) {
+          queryParams['search_fields'] = ['alias_name', 'first_name', 'last_name', 'company_name', 'mobile', 'email'];
+        }
       }
 
       if (searchFields != null && searchFields.isNotEmpty) {
@@ -37,22 +41,55 @@ class PersonService {
       }
 
       if (filters != null && filters.isNotEmpty) {
-        // تبدیل Map به لیست برای API
-        final filtersList = filters.entries.map((e) => {
-          'property': e.key,
-          'operator': 'in', // برای فیلترهای چندتایی از عملگر 'in' استفاده می‌کنیم
-          'value': e.value,
-        }).toList();
+        // تبدیل Map به لیست برای API با پشتیبانی از person_type و person_types
+        final List<Map<String, dynamic>> filtersList = <Map<String, dynamic>>[];
+        filters.forEach((key, value) {
+          // یکسان‌سازی: اگر person_type ارسال شود، به person_types (لیستی) تبدیل می‌کنیم
+          if (key == 'person_type') {
+            final List<dynamic> values = value is List ? List<dynamic>.from(value) : <dynamic>[value];
+            filtersList.add({
+              'property': 'person_types',
+              'operator': 'in',
+              'value': values,
+            });
+            return;
+          }
+
+          if (key == 'person_types') {
+            final List<dynamic> values = value is List ? List<dynamic>.from(value) : <dynamic>[value];
+            filtersList.add({
+              'property': 'person_types',
+              'operator': 'in',
+              'value': values,
+            });
+            return;
+          }
+
+          // سایر فیلترها: اگر مقدار لیست باشد از in، در غیر این صورت از = استفاده می‌کنیم
+          final bool isList = value is List;
+          filtersList.add({
+            'property': key,
+            'operator': isList ? 'in' : '=',
+            'value': value,
+          });
+        });
         queryParams['filters'] = filtersList;
       }
 
+      // Debug: نمایش پارامترهای ارسالی
+      print('PersonService API Call:');
+      print('URL: /api/v1/persons/businesses/$businessId/persons');
+      print('Data: $queryParams');
+      
       final response = await _apiClient.post(
         '/api/v1/persons/businesses/$businessId/persons',
         data: queryParams,
       );
 
       if (response.statusCode == 200) {
-        return response.data['data'];
+        final data = response.data['data'];
+        print('PersonService Response Data: $data');
+        return data;
       } else {
         throw Exception('خطا در دریافت لیست اشخاص');
       }

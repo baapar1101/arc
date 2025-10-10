@@ -1,15 +1,26 @@
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 import '../../models/invoice_transaction.dart';
+import '../../models/person_model.dart';
 import '../../core/date_utils.dart';
 import '../../core/calendar_controller.dart';
 import '../../utils/number_formatters.dart';
+import '../../services/bank_account_service.dart';
+import '../../services/cash_register_service.dart';
+import '../../services/petty_cash_service.dart';
+import '../../services/person_service.dart';
+import 'person_combobox_widget.dart';
+import 'bank_account_combobox_widget.dart';
+import 'cash_register_combobox_widget.dart';
+import 'petty_cash_combobox_widget.dart';
+import '../../models/invoice_type_model.dart';
 
 class InvoiceTransactionsWidget extends StatefulWidget {
   final List<InvoiceTransaction> transactions;
   final ValueChanged<List<InvoiceTransaction>> onChanged;
   final int businessId;
   final CalendarController calendarController;
+  final InvoiceType invoiceType;
 
   const InvoiceTransactionsWidget({
     super.key,
@@ -17,6 +28,7 @@ class InvoiceTransactionsWidget extends StatefulWidget {
     required this.onChanged,
     required this.businessId,
     required this.calendarController,
+    required this.invoiceType,
   });
 
   @override
@@ -305,6 +317,7 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
         transaction: transaction,
         businessId: widget.businessId,
         calendarController: widget.calendarController,
+        invoiceType: widget.invoiceType,
         onSave: (newTransaction) {
           if (index != null) {
             // ویرایش تراکنش موجود
@@ -328,12 +341,14 @@ class TransactionDialog extends StatefulWidget {
   final int businessId;
   final CalendarController calendarController;
   final ValueChanged<InvoiceTransaction> onSave;
+  final InvoiceType invoiceType;
 
   const TransactionDialog({
     super.key,
     this.transaction,
     required this.businessId,
     required this.calendarController,
+    required this.invoiceType,
     required this.onSave,
   });
 
@@ -351,6 +366,12 @@ class _TransactionDialogState extends State<TransactionDialog> {
   final _commissionController = TextEditingController();
   final _descriptionController = TextEditingController();
   
+  // سرویس‌ها
+  final BankAccountService _bankService = BankAccountService();
+  final CashRegisterService _cashRegisterService = CashRegisterService();
+  final PettyCashService _pettyCashService = PettyCashService();
+  final PersonService _personService = PersonService();
+  
   // فیلدهای خاص هر نوع تراکنش
   String? _selectedBankId;
   String? _selectedCashRegisterId;
@@ -358,6 +379,14 @@ class _TransactionDialogState extends State<TransactionDialog> {
   String? _selectedCheckId;
   String? _selectedPersonId;
   String? _selectedAccountId;
+  
+  // لیست‌های داده
+  List<Map<String, dynamic>> _banks = [];
+  List<Map<String, dynamic>> _cashRegisters = [];
+  List<Map<String, dynamic>> _pettyCashList = [];
+  List<Map<String, dynamic>> _persons = [];
+  
+  bool _isLoading = false;
 
   @override
   void initState() {
@@ -375,6 +404,53 @@ class _TransactionDialogState extends State<TransactionDialog> {
     _selectedCheckId = widget.transaction?.checkId;
     _selectedPersonId = widget.transaction?.personId;
     _selectedAccountId = widget.transaction?.accountId;
+    
+    // لود کردن داده‌ها از دیتابیس
+    _loadData();
+  }
+  
+  Future<void> _loadData() async {
+    setState(() {
+      _isLoading = true;
+    });
+    
+    try {
+      // لود کردن بانک‌ها
+      final bankResponse = await _bankService.list(
+        businessId: widget.businessId,
+        queryInfo: {'take': 100, 'skip': 0},
+      );
+      _banks = (bankResponse['items'] as List<dynamic>?)?.cast<Map<String, dynamic>>() ?? [];
+      
+      // لود کردن صندوق‌ها
+      final cashRegisterResponse = await _cashRegisterService.list(
+        businessId: widget.businessId,
+        queryInfo: {'take': 100, 'skip': 0},
+      );
+      _cashRegisters = (cashRegisterResponse['items'] as List<dynamic>?)?.cast<Map<String, dynamic>>() ?? [];
+      
+      // لود کردن تنخواهگردان‌ها
+      final pettyCashResponse = await _pettyCashService.list(
+        businessId: widget.businessId,
+        queryInfo: {'take': 100, 'skip': 0},
+      );
+      _pettyCashList = (pettyCashResponse['items'] as List<dynamic>?)?.cast<Map<String, dynamic>>() ?? [];
+      
+      // لود کردن اشخاص
+      final personResponse = await _personService.getPersons(
+        businessId: widget.businessId,
+        limit: 100,
+      );
+      _persons = (personResponse['items'] as List<dynamic>?)?.cast<Map<String, dynamic>>() ?? [];
+      
+    } catch (e) {
+      // در صورت خطا، لیست‌ها خالی باقی می‌مانند
+      print('خطا در لود کردن داده‌ها: $e');
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
   }
 
   @override
@@ -447,7 +523,7 @@ class _TransactionDialogState extends State<TransactionDialog> {
                           labelText: 'نوع تراکنش *',
                           border: OutlineInputBorder(),
                         ),
-                        items: TransactionType.allTypes.map((type) {
+                        items: _availableTransactionTypes().map((type) {
                           return DropdownMenuItem(
                             value: type,
                             child: Text(type.label),
@@ -464,7 +540,10 @@ class _TransactionDialogState extends State<TransactionDialog> {
                       const SizedBox(height: 16),
                       
                       // فیلدهای خاص بر اساس نوع تراکنش
-                      _buildTypeSpecificFields(),
+                      if (_isLoading)
+                        const Center(child: CircularProgressIndicator())
+                      else
+                        _buildTypeSpecificFields(),
                       const SizedBox(height: 16),
                       
                       // تاریخ تراکنش
@@ -595,61 +674,56 @@ class _TransactionDialogState extends State<TransactionDialog> {
     }
   }
 
+  List<TransactionType> _availableTransactionTypes() {
+    // خرج چک فقط برای خرید یا برگشت از فروش نمایش داده شود
+    final showCheckExpense = widget.invoiceType == InvoiceType.purchase || widget.invoiceType == InvoiceType.salesReturn;
+    final all = TransactionType.allTypes;
+    if (showCheckExpense) return all;
+    return all.where((t) => t != TransactionType.checkExpense).toList();
+  }
+
   Widget _buildBankFields() {
-    return DropdownButtonFormField<String>(
-      initialValue: _selectedBankId,
-      decoration: const InputDecoration(
-        labelText: 'بانک *',
-        border: OutlineInputBorder(),
-      ),
-      items: const [
-        DropdownMenuItem(value: 'bank1', child: Text('بانک ملی')),
-        DropdownMenuItem(value: 'bank2', child: Text('بانک صادرات')),
-        DropdownMenuItem(value: 'bank3', child: Text('بانک ملت')),
-      ],
-      onChanged: (value) {
+    return BankAccountComboboxWidget(
+      businessId: widget.businessId,
+      selectedAccountId: _selectedBankId,
+      onChanged: (opt) {
         setState(() {
-          _selectedBankId = value;
+          _selectedBankId = opt?.id;
         });
       },
+      label: 'بانک *',
+      hintText: 'جست‌وجو و انتخاب بانک',
+      isRequired: true,
     );
   }
 
   Widget _buildCashRegisterFields() {
-    return DropdownButtonFormField<String>(
-      initialValue: _selectedCashRegisterId,
-      decoration: const InputDecoration(
-        labelText: 'صندوق *',
-        border: OutlineInputBorder(),
-      ),
-      items: const [
-        DropdownMenuItem(value: 'cash1', child: Text('صندوق اصلی')),
-        DropdownMenuItem(value: 'cash2', child: Text('صندوق فرعی')),
-      ],
-      onChanged: (value) {
+    return CashRegisterComboboxWidget(
+      businessId: widget.businessId,
+      selectedRegisterId: _selectedCashRegisterId,
+      onChanged: (opt) {
         setState(() {
-          _selectedCashRegisterId = value;
+          _selectedCashRegisterId = opt?.id;
         });
       },
+      label: 'صندوق *',
+      hintText: 'جست‌وجو و انتخاب صندوق',
+      isRequired: true,
     );
   }
 
   Widget _buildPettyCashFields() {
-    return DropdownButtonFormField<String>(
-      initialValue: _selectedPettyCashId,
-      decoration: const InputDecoration(
-        labelText: 'تنخواهگردان *',
-        border: OutlineInputBorder(),
-      ),
-      items: const [
-        DropdownMenuItem(value: 'petty1', child: Text('تنخواهگردان اصلی')),
-        DropdownMenuItem(value: 'petty2', child: Text('تنخواهگردان فرعی')),
-      ],
-      onChanged: (value) {
+    return PettyCashComboboxWidget(
+      businessId: widget.businessId,
+      selectedPettyCashId: _selectedPettyCashId,
+      onChanged: (opt) {
         setState(() {
-          _selectedPettyCashId = value;
+          _selectedPettyCashId = opt?.id;
         });
       },
+      label: 'تنخواهگردان *',
+      hintText: 'جست‌وجو و انتخاب تنخواه‌گردان',
+      isRequired: true,
     );
   }
 
@@ -692,21 +766,30 @@ class _TransactionDialogState extends State<TransactionDialog> {
   }
 
   Widget _buildPersonFields() {
-    return DropdownButtonFormField<String>(
-      initialValue: _selectedPersonId,
-      decoration: const InputDecoration(
-        labelText: 'شخص *',
-        border: OutlineInputBorder(),
-      ),
-      items: const [
-        DropdownMenuItem(value: 'person1', child: Text('احمد محمدی')),
-        DropdownMenuItem(value: 'person2', child: Text('فاطمه احمدی')),
-      ],
-      onChanged: (value) {
+    // پیدا کردن شخص انتخاب شده از لیست
+    Person? selectedPerson;
+    if (_selectedPersonId != null) {
+      try {
+        final personData = _persons.firstWhere(
+          (p) => p['id']?.toString() == _selectedPersonId,
+        );
+        selectedPerson = Person.fromJson(personData);
+      } catch (e) {
+        selectedPerson = null;
+      }
+    }
+
+    return PersonComboboxWidget(
+      businessId: widget.businessId,
+      selectedPerson: selectedPerson,
+      onChanged: (person) {
         setState(() {
-          _selectedPersonId = value;
+          _selectedPersonId = person?.id?.toString();
         });
       },
+      label: 'شخص *',
+      hintText: 'انتخاب شخص',
+      isRequired: true,
     );
   }
 
@@ -780,28 +863,30 @@ class _TransactionDialogState extends State<TransactionDialog> {
   }
 
   String? _getBankName(String? id) {
-    switch (id) {
-      case 'bank1': return 'بانک ملی';
-      case 'bank2': return 'بانک صادرات';
-      case 'bank3': return 'بانک ملت';
-      default: return null;
-    }
+    if (id == null) return null;
+    final bank = _banks.firstWhere(
+      (b) => b['id']?.toString() == id,
+      orElse: () => <String, dynamic>{},
+    );
+    return bank['name']?.toString();
   }
 
   String? _getCashRegisterName(String? id) {
-    switch (id) {
-      case 'cash1': return 'صندوق اصلی';
-      case 'cash2': return 'صندوق فرعی';
-      default: return null;
-    }
+    if (id == null) return null;
+    final cashRegister = _cashRegisters.firstWhere(
+      (c) => c['id']?.toString() == id,
+      orElse: () => <String, dynamic>{},
+    );
+    return cashRegister['name']?.toString();
   }
 
   String? _getPettyCashName(String? id) {
-    switch (id) {
-      case 'petty1': return 'تنخواهگردان اصلی';
-      case 'petty2': return 'تنخواهگردان فرعی';
-      default: return null;
-    }
+    if (id == null) return null;
+    final pettyCash = _pettyCashList.firstWhere(
+      (p) => p['id']?.toString() == id,
+      orElse: () => <String, dynamic>{},
+    );
+    return pettyCash['name']?.toString();
   }
 
   String? _getCheckNumber(String? id) {
@@ -813,11 +898,12 @@ class _TransactionDialogState extends State<TransactionDialog> {
   }
 
   String? _getPersonName(String? id) {
-    switch (id) {
-      case 'person1': return 'احمد محمدی';
-      case 'person2': return 'فاطمه احمدی';
-      default: return null;
-    }
+    if (id == null) return null;
+    final person = _persons.firstWhere(
+      (p) => p['id']?.toString() == id,
+      orElse: () => <String, dynamic>{},
+    );
+    return person['name']?.toString();
   }
 
   String? _getAccountName(String? id) {

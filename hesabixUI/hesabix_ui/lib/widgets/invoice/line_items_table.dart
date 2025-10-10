@@ -241,9 +241,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                   ),
                 )
               else
-                ..._rows.asMap().entries.map((e) => _buildCompactRow(context, e.key, e.value)).toList(),
-              const Divider(height: 1),
-              _buildFooter(context),
+                ..._rows.asMap().entries.map((e) => _buildCompactRow(context, e.key, e.value)),
             ],
           ),
         ),
@@ -418,13 +416,23 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
               const SizedBox(width: 8),
               Flexible(
                 flex: 2,
-                child: Align(
-                  alignment: Alignment.centerRight,
+                child: SizedBox(
+                  height: 36,
                   child: Tooltip(
                     message: 'مبلغ کل این ردیف',
-                    child: Text(
-                      formatWithThousands(item.total, decimalPlaces: 0),
-                      style: theme.textTheme.bodyMedium,
+                    child: InputDecorator(
+                      decoration: const InputDecoration(
+                        isDense: true,
+                        border: OutlineInputBorder(),
+                        contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                      ),
+                      child: Align(
+                        alignment: Alignment.centerRight,
+                        child: Text(
+                          formatWithThousands(item.total, decimalPlaces: 0),
+                          style: theme.textTheme.bodyMedium,
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -449,11 +457,12 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                   onChanged: (v) {
                     _updateRow(index, item.copyWith(description: v));
                   },
-                  decoration: const InputDecoration(
-                    isDense: true,
-                    border: OutlineInputBorder(),
-                    hintText: 'شرح (اختیاری)'
-                    ),
+                      decoration: const InputDecoration(
+                        isDense: true,
+                        border: OutlineInputBorder(),
+                        contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                        hintText: 'شرح (اختیاری)'
+                        ),
                   ),
                 ),
               ),
@@ -509,26 +518,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
   }
 
 
-  Widget _buildFooter(BuildContext context) {
-    final sumSubtotal = _rows.fold<num>(0, (acc, e) => acc + e.subtotal);
-    final sumDiscount = _rows.fold<num>(0, (acc, e) => acc + e.discountAmount);
-    final sumTax = _rows.fold<num>(0, (acc, e) => acc + e.taxAmount);
-    final sumTotal = _rows.fold<num>(0, (acc, e) => acc + e.total);
-    final style = Theme.of(context).textTheme.bodyLarge;
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-      child: Row(
-        children: [
-          const Spacer(),
-          SizedBox(width: 140, child: Text('جمع مبلغ: ${formatWithThousands(sumSubtotal, decimalPlaces: 0)}', style: style)),
-          SizedBox(width: 120, child: Text('جمع تخفیف: ${formatWithThousands(sumDiscount, decimalPlaces: 0)}', style: style)),
-          SizedBox(width: 120, child: Text('جمع مالیات: ${formatWithThousands(sumTax, decimalPlaces: 0)}', style: style)),
-          SizedBox(width: 140, child: Align(alignment: Alignment.centerRight, child: Text('جمع کل: ${formatWithThousands(sumTotal, decimalPlaces: 0)}', style: style))),
-          const SizedBox(width: 40),
-        ],
-      ),
-    );
-  }
+  // فوتر جمع‌ها حذف شد؛ جمع‌ها در صفحهٔ والد نمایش داده می‌شوند
 
   void _showUnitSelectorDialog(InvoiceLineItem item, ValueChanged<String?> onChanged) {
     showDialog(
@@ -625,7 +615,7 @@ class _DiscountCellState extends State<_DiscountCell> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    String _typeLabel(String t) => t == 'percent' ? 'درصد' : 'مبلغ';
+    String typeLabel(String t) => t == 'percent' ? 'درصد' : 'مبلغ';
     return SizedBox(
       height: 36,
       child: TextFormField(
@@ -647,7 +637,7 @@ class _DiscountCellState extends State<_DiscountCell> {
               else
                 Padding(
                   padding: const EdgeInsetsDirectional.only(end: 4),
-                  child: Text(_typeLabel(_type), style: theme.textTheme.bodySmall),
+                  child: Text(typeLabel(_type), style: theme.textTheme.bodySmall),
                 ),
               PopupMenuButton<String>(
                 tooltip: 'نوع تخفیف',
@@ -694,11 +684,13 @@ class _TaxCell extends StatefulWidget {
 class _TaxCellState extends State<_TaxCell> {
   late TextEditingController _controller;
   bool _isUserTyping = false;
+  late TextEditingController _amountCtrl;
 
   @override
   void initState() {
     super.initState();
     _controller = TextEditingController(text: widget.rate.toString());
+    _amountCtrl = TextEditingController(text: formatWithThousands(widget.taxAmount, decimalPlaces: 0));
   }
 
   @override
@@ -708,11 +700,15 @@ class _TaxCellState extends State<_TaxCell> {
     if (oldWidget.rate != widget.rate && !_isUserTyping) {
       _controller.text = widget.rate.toString();
     }
+    if (oldWidget.taxAmount != widget.taxAmount) {
+      _amountCtrl.text = formatWithThousands(widget.taxAmount, decimalPlaces: 0);
+    }
   }
 
   @override
   void dispose() {
     _controller.dispose();
+    _amountCtrl.dispose();
     super.dispose();
   }
 
@@ -722,6 +718,7 @@ class _TaxCellState extends State<_TaxCell> {
       children: [
         SizedBox(
           width: 70,
+          height: 36,
           child: TextFormField(
             controller: _controller,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -735,18 +732,29 @@ class _TaxCellState extends State<_TaxCell> {
                 }
               });
             },
-            decoration: const InputDecoration(isDense: true, border: OutlineInputBorder(), suffixText: '%'),
+            decoration: const InputDecoration(
+              isDense: true,
+              border: OutlineInputBorder(),
+              contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+              suffixText: '%',
+            ),
           ),
         ),
         const SizedBox(width: 8),
         Expanded(
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-            decoration: BoxDecoration(
-              border: Border.all(color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5)),
-              borderRadius: BorderRadius.circular(8),
+          child: SizedBox(
+            height: 36,
+            child: TextFormField(
+              controller: _amountCtrl,
+              readOnly: true,
+              enableInteractiveSelection: false,
+              textAlign: TextAlign.right,
+              decoration: const InputDecoration(
+                isDense: true,
+                border: OutlineInputBorder(),
+                contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+              ),
             ),
-            child: Text(formatWithThousands(widget.taxAmount, decimalPlaces: 0)),
           ),
         ),
       ],
@@ -779,7 +787,7 @@ class _UnitPriceCell extends StatefulWidget {
 
 class _UnitPriceCellState extends State<_UnitPriceCell> {
   late TextEditingController _ctrl;
-  bool _loading = false;
+  final bool _loading = false;
   final PriceListService _pls = PriceListService(apiClient: ApiClient());
   late FocusNode _focusNode;
 

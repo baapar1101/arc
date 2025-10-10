@@ -65,23 +65,13 @@ class ProductFormController extends ChangeNotifier {
 
   void addOrUpdateDraftPriceItem(Map<String, dynamic> item) {
     final String key = (
-      (item['price_list_id']?.toString() ?? '') + '|' +
-      (item['product_id']?.toString() ?? '') + '|' +
-      (item['unit_id']?.toString() ?? 'null') + '|' +
-      (item['currency_id']?.toString() ?? '') + '|' +
-      (item['tier_name']?.toString() ?? '') + '|' +
-      (item['min_qty']?.toString() ?? '0')
+      '${item['price_list_id']?.toString() ?? ''}|${item['product_id']?.toString() ?? ''}|${item['unit_id']?.toString() ?? 'null'}|${item['currency_id']?.toString() ?? ''}|${item['tier_name']?.toString() ?? ''}|${item['min_qty']?.toString() ?? '0'}'
     );
     int existingIndex = -1;
     for (int i = 0; i < _draftPriceItems.length; i++) {
       final it = _draftPriceItems[i];
       final itKey = (
-        (it['price_list_id']?.toString() ?? '') + '|' +
-        (it['product_id']?.toString() ?? '') + '|' +
-        (it['unit_id']?.toString() ?? 'null') + '|' +
-        (it['currency_id']?.toString() ?? '') + '|' +
-        (it['tier_name']?.toString() ?? '') + '|' +
-        (it['min_qty']?.toString() ?? '0')
+        '${it['price_list_id']?.toString() ?? ''}|${it['product_id']?.toString() ?? ''}|${it['unit_id']?.toString() ?? 'null'}|${it['currency_id']?.toString() ?? ''}|${it['tier_name']?.toString() ?? ''}|${it['min_qty']?.toString() ?? '0'}'
       );
       if (itKey == key) {
         existingIndex = i;
@@ -371,8 +361,4 @@ class ProductFormController extends ChangeNotifier {
     _errorMessage = null;
   }
 
-  @override
-  void dispose() {
-    super.dispose();
-  }
 }

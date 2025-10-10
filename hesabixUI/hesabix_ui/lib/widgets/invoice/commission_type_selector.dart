@@ -67,7 +67,7 @@ class _CommissionTypeSelectorState extends State<CommissionTypeSelector> {
     final colorScheme = theme.colorScheme;
 
     return DropdownButtonFormField<CommissionType>(
-      value: _selectedType,
+      initialValue: _selectedType,
       onChanged: (CommissionType? newValue) {
         if (newValue != null) {
           _selectType(newValue);

@@ -514,7 +514,7 @@ class _BulkPriceUpdateDialogState extends State<BulkPriceUpdateDialog> {
                 return 'مقدار نامعتبر';
               }
               if (parsed < 0) {
-                return 'مقدار نمی\تواند منفی باشد';
+                return 'مقدار نمیتواند منفی باشد';
               }
               return null;
             }
@@ -526,7 +526,7 @@ class _BulkPriceUpdateDialogState extends State<BulkPriceUpdateDialog> {
               return 'مقدار نامعتبر';
             }
             if (parsed < 0) {
-              return 'مقدار نمی\تواند منفی باشد';
+              return 'مقدار نمیتواند منفی باشد';
             }
             return null;
           },
@@ -611,7 +611,7 @@ class _BulkPriceUpdateDialogState extends State<BulkPriceUpdateDialog> {
         const Text('ارز'),
         const SizedBox(height: 4),
         DropdownButtonFormField<int?>(
-          value: _selectedCurrencyIds.isNotEmpty ? _selectedCurrencyIds.first : null,
+          initialValue: _selectedCurrencyIds.isNotEmpty ? _selectedCurrencyIds.first : null,
           items: [
             const DropdownMenuItem<int?>(
               value: null,
@@ -643,7 +643,7 @@ class _BulkPriceUpdateDialogState extends State<BulkPriceUpdateDialog> {
         const Text('لیست قیمت'),
         const SizedBox(height: 4),
         DropdownButtonFormField<int?>(
-          value: _selectedPriceListIds.isNotEmpty ? _selectedPriceListIds.first : null,
+          initialValue: _selectedPriceListIds.isNotEmpty ? _selectedPriceListIds.first : null,
           items: [
             const DropdownMenuItem<int?>(
               value: null,
@@ -675,7 +675,7 @@ class _BulkPriceUpdateDialogState extends State<BulkPriceUpdateDialog> {
         const Text('نوع آیتم'),
         const SizedBox(height: 4),
         DropdownButtonFormField<String?>(
-          value: _selectedItemTypes.isNotEmpty ? _selectedItemTypes.first : null,
+          initialValue: _selectedItemTypes.isNotEmpty ? _selectedItemTypes.first : null,
           items: const [
             DropdownMenuItem<String?>(
               value: null,

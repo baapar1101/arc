@@ -21,6 +21,8 @@ import '../../utils/number_formatters.dart';
 import '../../services/currency_service.dart';
 import '../../core/api_client.dart';
 import '../../models/invoice_transaction.dart';
+import '../../models/invoice_line_item.dart';
+import '../../services/invoice_service.dart';
 
 class NewInvoicePage extends StatefulWidget {
   final int businessId;
@@ -44,7 +46,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
   InvoiceType? _selectedInvoiceType;
   bool _isDraft = false;
   String? _invoiceNumber;
-  bool _autoGenerateInvoiceNumber = true;
+  final bool _autoGenerateInvoiceNumber = true;
   Customer? _selectedCustomer;
   Person? _selectedSeller;
   double? _commissionPercentage;
@@ -71,6 +73,8 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
   
   // تراکنش‌های فاکتور
   List<InvoiceTransaction> _transactions = [];
+  // ردیف‌های فاکتور برای ساخت payload
+  List<InvoiceLineItem> _lineItems = <InvoiceLineItem>[];
 
   @override
   void initState() {
@@ -280,8 +284,11 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                         ),
                         const SizedBox(height: 16),
                         
-                        // مشتری
-                        CustomerComboboxWidget(
+                        // مشتری (برای ضایعات/مصرف مستقیم/تولید مخفی می‌شود)
+                        if (!(_selectedInvoiceType == InvoiceType.waste ||
+                              _selectedInvoiceType == InvoiceType.directConsumption ||
+                              _selectedInvoiceType == InvoiceType.production))
+                          CustomerComboboxWidget(
                           selectedCustomer: _selectedCustomer,
                           onCustomerChanged: (customer) {
                             setState(() {
@@ -516,7 +523,11 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                             ),
                             const SizedBox(width: 12),
                             Expanded(
-                              child: CustomerComboboxWidget(
+                              child: (_selectedInvoiceType == InvoiceType.waste ||
+                                      _selectedInvoiceType == InvoiceType.directConsumption ||
+                                      _selectedInvoiceType == InvoiceType.production)
+                                  ? const SizedBox()
+                                  : CustomerComboboxWidget(
                                 selectedCustomer: _selectedCustomer,
                                 onCustomerChanged: (customer) {
                                   setState(() {
@@ -528,7 +539,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                                 isRequired: false,
                                 label: 'مشتری',
                                 hintText: 'انتخاب مشتری',
-                              ),
+                                  ),
                             ),
                           ],
                         ),
@@ -709,17 +720,136 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
     );
   }
 
-  void _saveInvoice() {
-    // TODO: پیاده‌سازی عملیات ذخیره فاکتور
-    final printInfo = _printAfterSave ? '\n• چاپ فاکتور: فعال' : '';
-    final taxInfo = _sendToTaxFolder ? '\n• ارسال به کارپوشه مودیان: فعال' : '';
-    final transactionInfo = _transactions.isNotEmpty ? '\n• تعداد تراکنش‌ها: ${_transactions.length}' : '';
-    
+  Future<void> _saveInvoice() async {
+    final validation = _validateAndBuildPayload();
+    if (validation is String) {
+      _showError(validation);
+      return;
+    }
+    final payload = validation as Map<String, dynamic>;
+
+    try {
+      final service = InvoiceService(apiClient: ApiClient());
+      await service.createInvoice(businessId: widget.businessId, payload: payload);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('فاکتور با موفقیت ثبت شد'),
+          backgroundColor: Theme.of(context).colorScheme.primary,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    } catch (e) {
+      _showError('خطا در ذخیره فاکتور: ${e.toString()}');
+    }
+  }
+
+  dynamic _validateAndBuildPayload() {
+    // اعتبارسنجی‌های پایه
+    if (_selectedInvoiceType == null) {
+      return 'نوع فاکتور الزامی است';
+    }
+    if (_invoiceDate == null) {
+      return 'تاریخ فاکتور الزامی است';
+    }
+    if (_selectedCurrencyId == null) {
+      return 'ارز فاکتور الزامی است';
+    }
+    if (_lineItems.isEmpty) {
+      return 'حداقل یک ردیف کالا/خدمت وارد کنید';
+    }
+    // اعتبارسنجی ردیف‌ها
+    for (int i = 0; i < _lineItems.length; i++) {
+      final r = _lineItems[i];
+      if (r.productId == null) {
+        return 'محصول ردیف ${i + 1} انتخاب نشده است';
+      }
+      if ((r.quantity) <= 0) {
+        return 'تعداد ردیف ${i + 1} باید بزرگ‌تر از صفر باشد';
+      }
+      if (r.unitPrice < 0) {
+        return 'قیمت واحد ردیف ${i + 1} نمی‌تواند منفی باشد';
+      }
+      if (r.discountType == 'percent' && (r.discountValue < 0 || r.discountValue > 100)) {
+        return 'درصد تخفیف ردیف ${i + 1} باید بین 0 تا 100 باشد';
+      }
+      if (r.taxRate < 0 || r.taxRate > 100) {
+        return 'درصد مالیات ردیف ${i + 1} باید بین 0 تا 100 باشد';
+      }
+    }
+
+    final isSalesOrReturn = _selectedInvoiceType == InvoiceType.sales || _selectedInvoiceType == InvoiceType.salesReturn;
+    // مشتری برای انواع خاص الزامی نیست
+    final shouldHaveCustomer = !(_selectedInvoiceType == InvoiceType.waste || _selectedInvoiceType == InvoiceType.directConsumption || _selectedInvoiceType == InvoiceType.production);
+    if (shouldHaveCustomer && _selectedCustomer == null) {
+      return 'انتخاب مشتری الزامی است';
+    }
+
+    // اعتبارسنجی کارمزد در حالت فروش
+    if (isSalesOrReturn && _selectedSeller != null && _commissionType != null) {
+      if (_commissionType == CommissionType.percentage) {
+        final p = _commissionPercentage ?? 0;
+        if (p < 0 || p > 100) return 'درصد کارمزد باید بین 0 تا 100 باشد';
+      } else if (_commissionType == CommissionType.amount) {
+        final a = _commissionAmount ?? 0;
+        if (a < 0) return 'مبلغ کارمزد نمی‌تواند منفی باشد';
+      }
+    }
+
+    // ساخت payload
+    final payload = <String, dynamic>{
+      'type': _selectedInvoiceType!.value,
+      'is_draft': _isDraft,
+      if (_invoiceNumber != null && _invoiceNumber!.trim().isNotEmpty) 'number': _invoiceNumber!.trim(),
+      'invoice_date': _invoiceDate!.toIso8601String(),
+      if (_dueDate != null) 'due_date': _dueDate!.toIso8601String(),
+      'currency_id': _selectedCurrencyId,
+      if (_invoiceTitle != null && _invoiceTitle!.isNotEmpty) 'title': _invoiceTitle,
+      if (_invoiceReference != null && _invoiceReference!.isNotEmpty) 'reference': _invoiceReference,
+      if (_selectedCustomer != null) 'customer_id': _selectedCustomer!.id,
+      if (_selectedSeller?.id != null) 'seller_id': _selectedSeller!.id,
+      if (_commissionType != null) 'commission_type': _commissionType == CommissionType.percentage ? 'percentage' : 'amount',
+      if (_commissionType == CommissionType.percentage && _commissionPercentage != null) 'commission_percentage': _commissionPercentage,
+      if (_commissionType == CommissionType.amount && _commissionAmount != null) 'commission_amount': _commissionAmount,
+      'settings': {
+        'print_after_save': _printAfterSave,
+        'printer': _selectedPrinter,
+        'paper_size': _selectedPaperSize,
+        'is_official_invoice': _isOfficialInvoice,
+        'print_template': _selectedPrintTemplate,
+        'send_to_tax_folder': _sendToTaxFolder,
+      },
+      'transactions': _transactions.map((t) => t.toJson()).toList(),
+      'line_items': _lineItems.map((e) => _serializeLineItem(e)).toList(),
+      'summary': {
+        'subtotal': _sumSubtotal,
+        'discount': _sumDiscount,
+        'tax': _sumTax,
+        'total': _sumTotal,
+      },
+    };
+    return payload;
+  }
+
+  Map<String, dynamic> _serializeLineItem(InvoiceLineItem e) {
+    return <String, dynamic>{
+      'product_id': e.productId,
+      'unit': e.selectedUnit ?? e.mainUnit,
+      'quantity': e.quantity,
+      'unit_price': e.unitPrice,
+      'unit_price_source': e.unitPriceSource,
+      'discount_type': e.discountType,
+      'discount_value': e.discountValue,
+      'tax_rate': e.taxRate,
+      if ((e.description ?? '').isNotEmpty) 'description': e.description,
+    };
+  }
+
+  void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('عملیات ذخیره فاکتور به زودی پیاده‌سازی خواهد شد$printInfo$taxInfo$transactionInfo'),
-        backgroundColor: Theme.of(context).colorScheme.primary,
-        duration: const Duration(seconds: 3),
+        content: Text(message),
+        backgroundColor: Theme.of(context).colorScheme.error,
       ),
     );
   }
@@ -739,6 +869,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                 invoiceType: (_selectedInvoiceType?.value ?? 'sales'),
                 onChanged: (rows) {
                   setState(() {
+                    _lineItems = rows;
                     _sumSubtotal = rows.fold<num>(0, (acc, e) => acc + e.subtotal);
                     _sumDiscount = rows.fold<num>(0, (acc, e) => acc + e.discountAmount);
                     _sumTax = rows.fold<num>(0, (acc, e) => acc + e.taxAmount);
@@ -778,6 +909,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
             transactions: _transactions,
             businessId: widget.businessId,
             calendarController: widget.calendarController,
+            invoiceType: _selectedInvoiceType ?? InvoiceType.sales,
             onChanged: (transactions) {
               setState(() {
                 _transactions = transactions;

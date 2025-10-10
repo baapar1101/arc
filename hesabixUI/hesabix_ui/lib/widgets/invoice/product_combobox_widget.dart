@@ -34,7 +34,7 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
   void initState() {
     super.initState();
     _searchCtrl.text = widget.selectedProduct != null
-        ? ((widget.selectedProduct!['code']?.toString() ?? '') + ' - ' + (widget.selectedProduct!['name']?.toString() ?? ''))
+        ? ('${widget.selectedProduct!['code']?.toString() ?? ''} - ${widget.selectedProduct!['name']?.toString() ?? ''}')
         : '';
     _loadRecent();
   }

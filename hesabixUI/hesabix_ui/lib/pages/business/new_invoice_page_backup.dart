@@ -39,7 +39,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
   InvoiceType? _selectedInvoiceType;
   bool _isDraft = false;
   String? _invoiceNumber;
-  bool _autoGenerateInvoiceNumber = true;
+  final bool _autoGenerateInvoiceNumber = true;
   Customer? _selectedCustomer;
   Person? _selectedSeller;
   double? _commissionPercentage;

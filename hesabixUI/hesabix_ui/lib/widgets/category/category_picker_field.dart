@@ -10,12 +10,10 @@ class CategoryPickerField extends FormField<int?> {
     required this.businessId,
     required List<Map<String, dynamic>> categoriesTree,
     required ValueChanged<int?> onChanged,
-    int? initialValue,
+    super.initialValue,
     String? label,
-    String? Function(int?)? validator,
+    super.validator,
   }) : super(
-          initialValue: initialValue,
-          validator: validator,
           builder: (state) {
             final context = state.context;
             final t = AppLocalizations.of(context);
@@ -263,8 +261,11 @@ class _CategoryPickerDialogState extends State<_CategoryPickerDialog> {
             'children': <Map<String, dynamic>>[],
           };
           byId[nid] = existing;
-          if (parent == null) roots.add(existing);
-          else (parent['children'] as List).add(existing);
+          if (parent == null) {
+            roots.add(existing);
+          } else {
+            (parent['children'] as List).add(existing);
+          }
         }
         parent = existing;
       }

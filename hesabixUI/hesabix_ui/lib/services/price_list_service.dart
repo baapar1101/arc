@@ -32,7 +32,7 @@ class PriceListService {
     final qp = <String, String>{};
     if (productId != null) qp['product_id'] = '$productId';
     if (currencyId != null) qp['currency_id'] = '$currencyId';
-    final query = qp.isEmpty ? '' : ('?' + qp.entries.map((e) => '${e.key}=${Uri.encodeComponent(e.value)}').join('&'));
+    final query = qp.isEmpty ? '' : ('?${qp.entries.map((e) => '${e.key}=${Uri.encodeComponent(e.value)}').join('&')}');
     final res = await _api.get<Map<String, dynamic>>('/api/v1/price-lists/business/$businessId/$priceListId/items$query');
     final data = res.data?['data'];
     final items = (data is Map<String, dynamic>) ? data['items'] : null;

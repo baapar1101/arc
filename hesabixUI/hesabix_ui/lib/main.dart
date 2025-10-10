@@ -28,6 +28,7 @@ import 'pages/business/wallet_page.dart';
 import 'pages/business/invoice_page.dart';
 import 'pages/business/new_invoice_page.dart';
 import 'pages/business/settings_page.dart';
+import 'pages/business/reports_page.dart';
 import 'pages/business/persons_page.dart';
 import 'pages/business/product_attributes_page.dart';
 import 'pages/business/products_page.dart';
@@ -658,10 +659,32 @@ class _MyAppState extends State<MyApp> {
               },
             ),
             GoRoute(
+              path: 'reports',
+              name: 'business_reports',
+              builder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return BusinessShell(
+                  businessId: businessId,
+                  authStore: _authStore!,
+                  localeController: controller,
+                  calendarController: _calendarController!,
+                  themeController: themeController,
+                  child: ReportsPage(
+                    businessId: businessId,
+                    authStore: _authStore!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
               path: 'settings',
               name: 'business_settings',
               builder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
+                // گارد دسترسی: فقط کاربرانی که دسترسی join دارند
+                if (!_authStore!.hasBusinessPermission('settings', 'join')) {
+                  return PermissionGuard.buildAccessDeniedPage();
+                }
                 return BusinessShell(
                   businessId: businessId,
                   authStore: _authStore!,

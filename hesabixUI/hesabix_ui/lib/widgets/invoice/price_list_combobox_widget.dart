@@ -67,7 +67,7 @@ class _PriceListComboboxWidgetState extends State<PriceListComboboxWidget> {
       child: Tooltip(
         message: _selected != null ? (_selected!['name']?.toString() ?? '') : widget.hintText,
         child: DropdownButtonFormField<int>(
-        value: _selected != null ? (_selected!['id'] as int) : null,
+        initialValue: _selected != null ? (_selected!['id'] as int) : null,
         isExpanded: true,
         items: _items
             .map((e) => DropdownMenuItem<int>(

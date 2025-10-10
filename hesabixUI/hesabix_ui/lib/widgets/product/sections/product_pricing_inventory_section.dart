@@ -190,7 +190,7 @@ class ProductPricingInventorySection extends StatelessWidget {
               ),
             ),
           );
-        }).toList(),
+        }),
       ],
     );
   }
@@ -290,7 +290,7 @@ class ProductPricingInventorySection extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 DropdownButtonFormField<int>(
-                  value: priceListId,
+                  initialValue: priceListId,
                   items: priceLists
                       .map((pl) => DropdownMenuItem<int>(
                             value: (pl['id'] as num).toInt(),
@@ -303,7 +303,7 @@ class ProductPricingInventorySection extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<int>(
-                  value: currencyId,
+                  initialValue: currencyId,
                   items: currencies
                       .map((c) => DropdownMenuItem<int>(
                             value: (c['id'] as num).toInt(),

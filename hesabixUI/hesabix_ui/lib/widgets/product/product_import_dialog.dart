@@ -193,7 +193,7 @@ class _ProductImportDialogState extends State<ProductImportDialog> {
               children: [
                 Expanded(
                   child: DropdownButtonFormField<String>(
-                    value: _matchBy,
+                    initialValue: _matchBy,
                     isDense: true,
                     items: [
                       DropdownMenuItem(value: 'code', child: Text('${t.matchBy}: ${t.code}')),
@@ -206,7 +206,7 @@ class _ProductImportDialogState extends State<ProductImportDialog> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: DropdownButtonFormField<String>(
-                    value: _conflictPolicy,
+                    initialValue: _conflictPolicy,
                     isDense: true,
                     items: [
                       DropdownMenuItem(value: 'insert', child: Text('${t.conflictPolicy}: ${t.policyInsertOnly}')),

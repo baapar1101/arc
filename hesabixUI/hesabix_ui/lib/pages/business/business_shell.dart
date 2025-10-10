@@ -1226,7 +1226,15 @@ class _BusinessShellState extends State<BusinessShell> {
       return true;
     }
     
-    // برای کاربران عضو، بررسی دسترسی view
+    // برای کاربران عضو، بررسی دسترسی
+    // تنظیمات: نیازمند دسترسی join
+    if (section == 'settings' && item.label == AppLocalizations.of(context).settings) {
+      final hasJoin = widget.authStore.hasBusinessPermission('settings', 'join');
+      print('    Settings item requires join permission: $hasJoin');
+      return hasJoin;
+    }
+
+    // سایر سکشن‌ها: بررسی دسترسی view
     final hasAccess = widget.authStore.canReadSection(section);
     print('    Checking view permission for section "$section": $hasAccess');
     
@@ -1276,6 +1284,7 @@ class _BusinessShellState extends State<BusinessShell> {
     if (label == t.documents) return 'accounting_documents';
     if (label == t.chartOfAccounts) return 'chart_of_accounts';
     if (label == t.openingBalance) return 'opening_balance';
+    if (label == t.reports) return 'reports';
     if (label == t.warehouses) return 'warehouses';
     if (label == t.shipments) return 'warehouse_transfers';
     if (label == t.inquiries) return 'reports';

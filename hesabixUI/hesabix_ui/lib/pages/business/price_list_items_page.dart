@@ -125,7 +125,7 @@ class _PriceListItemsPageState extends State<PriceListItemsPage> {
                     onChanged: (v) => productId = int.tryParse(v),
                   ),
                   DropdownButtonFormField<int>(
-                    value: currencyId,
+                    initialValue: currencyId,
                     items: _fallbackCurrencies
                         .map((c) => DropdownMenuItem<int>(
                               value: c['id'] as int,
@@ -143,7 +143,7 @@ class _PriceListItemsPageState extends State<PriceListItemsPage> {
                     onChanged: (v) => tierName = v,
                   ),
                   DropdownButtonFormField<int>(
-                    value: unitId,
+                    initialValue: unitId,
                     items: _fallbackUnits
                         .map((u) => DropdownMenuItem<int>(
                               value: u['id'] as int,

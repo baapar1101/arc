@@ -1397,7 +1397,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
       thumbVisibility: true,
       child: DataTableTheme(
         data: DataTableThemeData(
-          headingRowColor: MaterialStatePropertyAll(
+          headingRowColor: WidgetStatePropertyAll(
             theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
           ),
           headingTextStyle: theme.textTheme.titleSmall?.copyWith(

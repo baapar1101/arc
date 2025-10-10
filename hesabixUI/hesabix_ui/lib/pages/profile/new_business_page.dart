@@ -21,7 +21,7 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
   final BusinessData _businessData = BusinessData();
   int _currentStep = 0;
   bool _isLoading = false;
-  int _fiscalTabIndex = 0;
+  final int _fiscalTabIndex = 0;
   late TextEditingController _fiscalTitleController;
   List<Map<String, dynamic>> _currencies = [];
 
@@ -87,7 +87,7 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
     }
     final fiscal = _businessData.fiscalYears[_fiscalTabIndex];
 
-    String _autoTitle() {
+    String autoTitle() {
       final isJalali = widget.calendarController.isJalali;
       final end = fiscal.endDate;
       if (end == null) return fiscal.title;
@@ -139,7 +139,7 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
                                     final s = fiscal.startDate!;
                                     fiscal.endDate = DateTime(s.year + 1, s.month, s.day);
                                   }
-                                  fiscal.title = _autoTitle();
+                                  fiscal.title = autoTitle();
                                   _fiscalTitleController.text = fiscal.title;
                                 }
                               });
@@ -157,7 +157,7 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
                               setState(() {
                                 fiscal.endDate = d;
                                 if (fiscal.title.trim().isEmpty || fiscal.title.startsWith('سال مالی منتهی به')) {
-                                  fiscal.title = _autoTitle();
+                                  fiscal.title = autoTitle();
                                   _fiscalTitleController.text = fiscal.title;
                                 }
                               });
@@ -1524,7 +1524,7 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     DropdownButtonFormField<int>(
-                      value: _businessData.defaultCurrencyId,
+                      initialValue: _businessData.defaultCurrencyId,
                       items: _currencies.map((c) {
                         return DropdownMenuItem<int>(
                           value: c['id'] as int,

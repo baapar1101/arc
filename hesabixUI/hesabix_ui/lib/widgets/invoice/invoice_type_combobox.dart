@@ -71,7 +71,7 @@ class _InvoiceTypeComboboxState extends State<InvoiceTypeCombobox> {
     final colorScheme = theme.colorScheme;
 
     return DropdownButtonFormField<InvoiceType>(
-      value: _selectedType,
+      initialValue: _selectedType,
       onChanged: (InvoiceType? newValue) {
         if (newValue != null) {
           _selectType(newValue);

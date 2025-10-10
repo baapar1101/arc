@@ -15,6 +15,7 @@ from adapters.api.v1.categories import router as categories_router
 from adapters.api.v1.product_attributes import router as product_attributes_router
 from adapters.api.v1.products import router as products_router
 from adapters.api.v1.price_lists import router as price_lists_router
+from adapters.api.v1.invoices import router as invoices_router
 from adapters.api.v1.persons import router as persons_router
 from adapters.api.v1.customers import router as customers_router
 from adapters.api.v1.bank_accounts import router as bank_accounts_router
@@ -294,6 +295,7 @@ def create_app() -> FastAPI:
     application.include_router(product_attributes_router, prefix=settings.api_v1_prefix)
     application.include_router(products_router, prefix=settings.api_v1_prefix)
     application.include_router(price_lists_router, prefix=settings.api_v1_prefix)
+    application.include_router(invoices_router, prefix=settings.api_v1_prefix)
     application.include_router(persons_router, prefix=settings.api_v1_prefix)
     application.include_router(customers_router, prefix=settings.api_v1_prefix)
     application.include_router(bank_accounts_router, prefix=settings.api_v1_prefix)
