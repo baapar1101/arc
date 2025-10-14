@@ -39,3 +39,4 @@ from .tax_unit import TaxUnit  # noqa: F401
 from .tax_type import TaxType  # noqa: F401
 from .bank_account import BankAccount  # noqa: F401
 from .petty_cash import PettyCash  # noqa: F401
+from .check import Check  # noqa: F401

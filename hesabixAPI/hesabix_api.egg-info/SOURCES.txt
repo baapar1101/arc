@@ -11,14 +11,17 @@ adapters/api/v1/business_users.py
 adapters/api/v1/businesses.py
 adapters/api/v1/cash_registers.py
 adapters/api/v1/categories.py
+adapters/api/v1/checks.py
 adapters/api/v1/currencies.py
 adapters/api/v1/customers.py
 adapters/api/v1/health.py
+adapters/api/v1/invoices.py
 adapters/api/v1/persons.py
 adapters/api/v1/petty_cash.py
 adapters/api/v1/price_lists.py
 adapters/api/v1/product_attributes.py
 adapters/api/v1/products.py
+adapters/api/v1/receipts_payments.py
 adapters/api/v1/schemas.py
 adapters/api/v1/tax_types.py
 adapters/api/v1/tax_units.py
@@ -28,6 +31,7 @@ adapters/api/v1/admin/file_storage.py
 adapters/api/v1/schema_models/__init__.py
 adapters/api/v1/schema_models/account.py
 adapters/api/v1/schema_models/bank_account.py
+adapters/api/v1/schema_models/check.py
 adapters/api/v1/schema_models/email.py
 adapters/api/v1/schema_models/file_storage.py
 adapters/api/v1/schema_models/person.py
@@ -52,6 +56,7 @@ adapters/db/models/business_permission.py
 adapters/db/models/captcha.py
 adapters/db/models/cash_register.py
 adapters/db/models/category.py
+adapters/db/models/check.py
 adapters/db/models/currency.py
 adapters/db/models/document.py
 adapters/db/models/document_line.py
@@ -118,6 +123,7 @@ app/services/business_dashboard_service.py
 app/services/business_service.py
 app/services/captcha_service.py
 app/services/cash_register_service.py
+app/services/check_service.py
 app/services/email_service.py
 app/services/file_storage_service.py
 app/services/person_service.py
@@ -126,6 +132,7 @@ app/services/price_list_service.py
 app/services/product_attribute_service.py
 app/services/product_service.py
 app/services/query_service.py
+app/services/receipt_payment_service.py
 app/services/pdf/__init__.py
 app/services/pdf/base_pdf_service.py
 app/services/pdf/modules/__init__.py
@@ -180,6 +187,9 @@ migrations/versions/20251002_000101_add_bank_accounts_table.py
 migrations/versions/20251003_000201_add_cash_registers_table.py
 migrations/versions/20251003_010501_add_name_to_cash_registers.py
 migrations/versions/20251006_000001_add_tax_types_table_and_product_fks.py
+migrations/versions/20251011_000901_add_checks_table.py
+migrations/versions/20251011_010001_replace_accounts_chart_seed.py
+migrations/versions/20251012_000101_update_accounts_account_type_to_english.py
 migrations/versions/4b2ea782bcb3_merge_heads.py
 migrations/versions/5553f8745c6e_add_support_tables.py
 migrations/versions/7891282548e9_merge_tax_types_and_unit_fields_heads.py

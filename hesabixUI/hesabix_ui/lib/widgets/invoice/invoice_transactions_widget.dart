@@ -54,7 +54,7 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
             ),
             const SizedBox(width: 8),
             Text(
-              'تراکنش‌های فاکتور',
+              'تراکنش‌ها',
               style: theme.textTheme.titleLarge?.copyWith(
                 fontWeight: FontWeight.bold,
               ),

@@ -1091,5 +1091,14 @@
   "pettyCashExportExcel": "Export petty cash to Excel",
   "pettyCashExportPdf": "Export petty cash to PDF",
   "pettyCashReport": "Petty Cash Report"
+  ,
+  "accountTypeBank": "Bank",
+  "accountTypeCashRegister": "Cash Register",
+  "accountTypePettyCash": "Petty Cash",
+  "accountTypeCheck": "Check",
+  "accountTypePerson": "Person",
+  "accountTypeProduct": "Product",
+  "accountTypeService": "Service",
+  "accountTypeAccountingDocument": "Accounting Document"
 }
 

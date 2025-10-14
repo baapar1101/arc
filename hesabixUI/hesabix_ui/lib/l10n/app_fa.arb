@@ -1073,6 +1073,14 @@
   "pettyCashDetails": "جزئیات تنخواه گردان",
   "pettyCashExportExcel": "خروجی Excel تنخواه گردان‌ها",
   "pettyCashExportPdf": "خروجی PDF تنخواه گردان‌ها",
-  "pettyCashReport": "گزارش تنخواه گردان‌ها"
+  "pettyCashReport": "گزارش تنخواه گردان‌ها",
+  "accountTypeBank": "بانک",
+  "accountTypeCashRegister": "صندوق",
+  "accountTypePettyCash": "تنخواه گردان",
+  "accountTypeCheck": "چک",
+  "accountTypePerson": "شخص",
+  "accountTypeProduct": "کالا",
+  "accountTypeService": "خدمات",
+  "accountTypeAccountingDocument": "سند حسابداری"
 }
 

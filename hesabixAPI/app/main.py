@@ -30,6 +30,7 @@ from adapters.api.v1.support.priorities import router as support_priorities_rout
 from adapters.api.v1.support.statuses import router as support_statuses_router
 from adapters.api.v1.admin.file_storage import router as admin_file_storage_router
 from adapters.api.v1.admin.email_config import router as admin_email_config_router
+from adapters.api.v1.receipts_payments import router as receipts_payments_router
 from app.core.i18n import negotiate_locale, Translator
 from app.core.error_handlers import register_error_handlers
 from app.core.smart_normalizer import smart_normalize_json, SmartNormalizerConfig
@@ -299,10 +300,13 @@ def create_app() -> FastAPI:
     application.include_router(persons_router, prefix=settings.api_v1_prefix)
     application.include_router(customers_router, prefix=settings.api_v1_prefix)
     application.include_router(bank_accounts_router, prefix=settings.api_v1_prefix)
+    from adapters.api.v1.checks import router as checks_router
+    application.include_router(checks_router, prefix=settings.api_v1_prefix)
     application.include_router(cash_registers_router, prefix=settings.api_v1_prefix)
     application.include_router(petty_cash_router, prefix=settings.api_v1_prefix)
     application.include_router(tax_units_router, prefix=settings.api_v1_prefix)
     application.include_router(tax_types_router, prefix=settings.api_v1_prefix)
+    application.include_router(receipts_payments_router, prefix=settings.api_v1_prefix)
     
     # Support endpoints
     application.include_router(support_tickets_router, prefix=f"{settings.api_v1_prefix}/support")

@@ -5719,6 +5719,54 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Petty Cash Report'**
   String get pettyCashReport;
+
+  /// No description provided for @accountTypeBank.
+  ///
+  /// In en, this message translates to:
+  /// **'Bank'**
+  String get accountTypeBank;
+
+  /// No description provided for @accountTypeCashRegister.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash Register'**
+  String get accountTypeCashRegister;
+
+  /// No description provided for @accountTypePettyCash.
+  ///
+  /// In en, this message translates to:
+  /// **'Petty Cash'**
+  String get accountTypePettyCash;
+
+  /// No description provided for @accountTypeCheck.
+  ///
+  /// In en, this message translates to:
+  /// **'Check'**
+  String get accountTypeCheck;
+
+  /// No description provided for @accountTypePerson.
+  ///
+  /// In en, this message translates to:
+  /// **'Person'**
+  String get accountTypePerson;
+
+  /// No description provided for @accountTypeProduct.
+  ///
+  /// In en, this message translates to:
+  /// **'Product'**
+  String get accountTypeProduct;
+
+  /// No description provided for @accountTypeService.
+  ///
+  /// In en, this message translates to:
+  /// **'Service'**
+  String get accountTypeService;
+
+  /// No description provided for @accountTypeAccountingDocument.
+  ///
+  /// In en, this message translates to:
+  /// **'Accounting Document'**
+  String get accountTypeAccountingDocument;
 }
 
 class _AppLocalizationsDelegate

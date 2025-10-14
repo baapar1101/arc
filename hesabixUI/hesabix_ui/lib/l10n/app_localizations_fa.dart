@@ -2876,4 +2876,28 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get pettyCashReport => 'گزارش تنخواه گردان‌ها';
+
+  @override
+  String get accountTypeBank => 'بانک';
+
+  @override
+  String get accountTypeCashRegister => 'صندوق';
+
+  @override
+  String get accountTypePettyCash => 'تنخواه گردان';
+
+  @override
+  String get accountTypeCheck => 'چک';
+
+  @override
+  String get accountTypePerson => 'شخص';
+
+  @override
+  String get accountTypeProduct => 'کالا';
+
+  @override
+  String get accountTypeService => 'خدمات';
+
+  @override
+  String get accountTypeAccountingDocument => 'سند حسابداری';
 }

@@ -2897,4 +2897,28 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get pettyCashReport => 'Petty Cash Report';
+
+  @override
+  String get accountTypeBank => 'Bank';
+
+  @override
+  String get accountTypeCashRegister => 'Cash Register';
+
+  @override
+  String get accountTypePettyCash => 'Petty Cash';
+
+  @override
+  String get accountTypeCheck => 'Check';
+
+  @override
+  String get accountTypePerson => 'Person';
+
+  @override
+  String get accountTypeProduct => 'Product';
+
+  @override
+  String get accountTypeService => 'Service';
+
+  @override
+  String get accountTypeAccountingDocument => 'Accounting Document';
 }
