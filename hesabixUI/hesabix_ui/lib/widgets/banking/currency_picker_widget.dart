@@ -61,6 +61,16 @@ class _CurrencyPickerWidgetState extends State<CurrencyPickerWidget> {
       setState(() {
         _currencies = currencies;
         _isLoading = false;
+        
+        // اگر ارزی انتخاب نشده و ارز پیشفرض موجود است، آن را انتخاب کن
+        if (_selectedValue == null && currencies.isNotEmpty) {
+          final defaultCurrency = currencies.firstWhere(
+            (currency) => currency['is_default'] == true,
+            orElse: () => currencies.first,
+          );
+          _selectedValue = defaultCurrency['id'] as int;
+          widget.onChanged(_selectedValue);
+        }
       });
     } catch (e) {
       setState(() {

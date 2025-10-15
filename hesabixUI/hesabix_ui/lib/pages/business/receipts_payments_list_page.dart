@@ -1,26 +1,32 @@
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
-import '../../core/calendar_controller.dart';
-import '../../core/date_utils.dart' show HesabixDateUtils;
-import '../../utils/number_formatters.dart' show formatWithThousands;
-import '../../widgets/invoice/person_combobox_widget.dart';
-import '../../widgets/invoice/invoice_transactions_widget.dart';
-import '../../widgets/date_input_field.dart';
-import '../../models/invoice_transaction.dart';
-import '../../models/invoice_type_model.dart';
-import '../../models/person_model.dart';
-import '../../models/business_dashboard_models.dart';
-import '../../widgets/banking/currency_picker_widget.dart';
-import '../../core/auth_store.dart';
-import '../../core/api_client.dart';
-import '../../services/receipt_payment_service.dart';
+import 'package:hesabix_ui/core/calendar_controller.dart';
+import 'package:hesabix_ui/core/auth_store.dart';
+import 'package:hesabix_ui/core/api_client.dart';
+import 'package:hesabix_ui/models/receipt_payment_document.dart';
+import 'package:hesabix_ui/services/receipt_payment_list_service.dart';
+import 'package:hesabix_ui/services/receipt_payment_service.dart';
+import 'package:hesabix_ui/widgets/data_table/data_table_widget.dart';
+import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
+import 'package:hesabix_ui/widgets/date_input_field.dart';
+import 'package:hesabix_ui/widgets/invoice/person_combobox_widget.dart';
+import 'package:hesabix_ui/widgets/invoice/invoice_transactions_widget.dart';
+import 'package:hesabix_ui/widgets/banking/currency_picker_widget.dart';
+import 'package:hesabix_ui/utils/number_formatters.dart' show formatWithThousands;
+import 'package:hesabix_ui/core/date_utils.dart' show HesabixDateUtils;
+import 'package:hesabix_ui/models/invoice_transaction.dart';
+import 'package:hesabix_ui/models/invoice_type_model.dart';
+import 'package:hesabix_ui/models/person_model.dart';
+import 'package:hesabix_ui/models/business_dashboard_models.dart';
 
-class ReceiptsPaymentsPage extends StatefulWidget {
+/// صفحه لیست اسناد دریافت و پرداخت با ویجت جدول
+class ReceiptsPaymentsListPage extends StatefulWidget {
   final int businessId;
   final CalendarController calendarController;
   final AuthStore authStore;
   final ApiClient apiClient;
-  const ReceiptsPaymentsPage({
+
+  const ReceiptsPaymentsListPage({
     super.key,
     required this.businessId,
     required this.calendarController,
@@ -29,100 +35,54 @@ class ReceiptsPaymentsPage extends StatefulWidget {
   });
 
   @override
-  State<ReceiptsPaymentsPage> createState() => _ReceiptsPaymentsPageState();
+  State<ReceiptsPaymentsListPage> createState() => _ReceiptsPaymentsListPageState();
 }
 
-class _ReceiptsPaymentsPageState extends State<ReceiptsPaymentsPage> {
-  int _tabIndex = 0;
-  final List<_BulkSettlementDraft> _drafts = <_BulkSettlementDraft>[];
+class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
+  late ReceiptPaymentListService _service;
+  String? _selectedDocumentType;
+  DateTime? _fromDate;
+  DateTime? _toDate;
+  int _refreshKey = 0; // کلید برای تازه‌سازی جدول
+
+  @override
+  void initState() {
+    super.initState();
+    _service = ReceiptPaymentListService(widget.apiClient);
+  }
+
+  /// تازه‌سازی داده‌های جدول
+  void _refreshData() {
+    setState(() {
+      _refreshKey++; // تغییر کلید باعث rebuild شدن جدول می‌شود
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
+    
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      t.receiptsAndPayments,
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                  ),
-                  FilledButton.icon(
-                    onPressed: () async {
-                      final draft = await showDialog<_BulkSettlementDraft>(
-                        context: context,
-                        builder: (_) => _BulkSettlementDialog(
-                          businessId: widget.businessId,
-                          calendarController: widget.calendarController,
-                          isReceipt: _tabIndex == 0,
-                          businessInfo: widget.authStore.currentBusiness,
-                          apiClient: widget.apiClient,
-                        ),
-                      );
-                      if (draft != null) {
-                        setState(() {
-                          _drafts.removeWhere((d) => d.id == draft.id);
-                          _drafts.add(draft);
-                        });
-                      }
-                    },
-                    icon: const Icon(Icons.add),
-                    label: Text(t.add),
-                  ),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: SegmentedButton<int>(
-                segments: [
-                  ButtonSegment<int>(value: 0, label: Text(t.receipts), icon: const Icon(Icons.download_done_outlined)),
-                  ButtonSegment<int>(value: 1, label: Text(t.payments), icon: const Icon(Icons.upload_outlined)),
-                ],
-                selected: {_tabIndex},
-                onSelectionChanged: (set) => setState(() => _tabIndex = set.first),
-              ),
-            ),
-            const SizedBox(height: 12),
+            // هدر صفحه
+            _buildHeader(t),
+            
+            // فیلترها
+            _buildFilters(t),
+            
+            // جدول داده‌ها
             Expanded(
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                child: _DraftsList(
-                  businessId: widget.businessId,
-                  drafts: _drafts.where((d) => d.isReceipt == (_tabIndex == 0)).toList(),
-                  onEdit: (d) async {
-                    final updated = await showDialog<_BulkSettlementDraft>(
-                      context: context,
-                      builder: (_) => _BulkSettlementDialog(
-                        businessId: widget.businessId,
-                        calendarController: widget.calendarController,
-                        isReceipt: d.isReceipt,
-                        initial: d,
-                        apiClient: widget.apiClient,
-                      ),
-                    );
-                    if (updated != null) {
-                      setState(() {
-                        final idx = _drafts.indexWhere((x) => x.id == updated.id);
-                        if (idx >= 0) {
-                          _drafts[idx] = updated;
-                        } else {
-                          _drafts.add(updated);
-                        }
-                      });
-                    }
-                  },
-                  onDelete: (d) {
-                    setState(() => _drafts.removeWhere((x) => x.id == d.id));
-                  },
+                padding: const EdgeInsets.all(8.0),
+                child: DataTableWidget<ReceiptPaymentDocument>(
+                  key: ValueKey(_refreshKey),
+                  config: _buildTableConfig(t),
+                  fromJson: (json) => ReceiptPaymentDocument.fromJson(json),
+                  calendarController: widget.calendarController,
                 ),
               ),
             ),
@@ -131,86 +91,376 @@ class _ReceiptsPaymentsPageState extends State<ReceiptsPaymentsPage> {
       ),
     );
   }
-}
 
-class _DraftsList extends StatelessWidget {
-  final int businessId;
-  final List<_BulkSettlementDraft> drafts;
-  final ValueChanged<_BulkSettlementDraft> onEdit;
-  final ValueChanged<_BulkSettlementDraft> onDelete;
-  const _DraftsList({
-    required this.businessId,
-    required this.drafts,
-    required this.onEdit,
-    required this.onDelete,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final t = AppLocalizations.of(context);
-    return Card(
-      margin: const EdgeInsets.all(8),
-      child: Column(
+  /// ساخت هدر صفحه
+  Widget _buildHeader(AppLocalizations t) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      child: Row(
         children: [
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Row(
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(child: Text(t.receiptsAndPayments, style: Theme.of(context).textTheme.titleMedium)),
+                Text(
+                  t.receiptsAndPayments,
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'مدیریت اسناد دریافت و پرداخت',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
               ],
             ),
           ),
-          const Divider(height: 1),
-          Expanded(
-            child: drafts.isEmpty
-                ? Center(child: Text(t.noDataFound))
-                : ListView.builder(
-                    itemCount: drafts.length,
-                    itemBuilder: (ctx, i) {
-                      final d = drafts[i];
-                      final sumPersons = d.personLines.fold<double>(0, (p, e) => p + e.amount);
-                      final sumCenters = d.centerTransactions.fold<double>(0, (p, e) => p + (e.amount.toDouble()));
-                      return ListTile(
-                        title: Text('${formatWithThousands(sumPersons)}  |  ${formatWithThousands(sumCenters)}'),
-                        subtitle: Text('${HesabixDateUtils.formatForDisplay(d.documentDate, true)}  •  ${d.isReceipt ? t.receipts : t.payments}'),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(icon: const Icon(Icons.edit), onPressed: () => onEdit(d)),
-                            IconButton(icon: const Icon(Icons.delete_outline), onPressed: () => onDelete(d)),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
+          FilledButton.icon(
+            onPressed: _onAddNew,
+            icon: const Icon(Icons.add),
+            label: Text(t.add),
           ),
         ],
       ),
     );
   }
+
+  /// ساخت بخش فیلترها
+  Widget _buildFilters(AppLocalizations t) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        children: [
+          // فیلتر نوع سند
+          Expanded(
+            flex: 2,
+            child: SegmentedButton<String?>(
+              segments: [
+                ButtonSegment<String?>(
+                  value: null,
+                  label: Text('همه'),
+                  icon: const Icon(Icons.all_inclusive),
+                ),
+                ButtonSegment<String?>(
+                  value: 'receipt',
+                  label: Text(t.receipts),
+                  icon: const Icon(Icons.download_done_outlined),
+                ),
+                ButtonSegment<String?>(
+                  value: 'payment',
+                  label: Text(t.payments),
+                  icon: const Icon(Icons.upload_outlined),
+                ),
+              ],
+              selected: {_selectedDocumentType},
+              onSelectionChanged: (set) {
+                setState(() {
+                  _selectedDocumentType = set.first;
+                });
+                // refresh data when filter changes
+                _refreshData();
+              },
+            ),
+          ),
+          
+          const SizedBox(width: 16),
+          
+          // فیلتر تاریخ
+          Expanded(
+            flex: 3,
+            child: Row(
+              children: [
+                Expanded(
+                  child: DateInputField(
+                    value: _fromDate,
+                    calendarController: widget.calendarController,
+                    onChanged: (date) {
+                      setState(() => _fromDate = date);
+                      _refreshData();
+                    },
+                    labelText: 'از تاریخ',
+                    hintText: 'انتخاب تاریخ شروع',
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: DateInputField(
+                    value: _toDate,
+                    calendarController: widget.calendarController,
+                    onChanged: (date) {
+                      setState(() => _toDate = date);
+                      _refreshData();
+                    },
+                    labelText: 'تا تاریخ',
+                    hintText: 'انتخاب تاریخ پایان',
+                  ),
+                ),
+                const SizedBox(width: 8),
+                IconButton(
+                  onPressed: () {
+                    setState(() {
+                      _fromDate = null;
+                      _toDate = null;
+                    });
+                    _refreshData();
+                  },
+                  icon: const Icon(Icons.clear),
+                  tooltip: 'پاک کردن فیلتر تاریخ',
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// ساخت تنظیمات جدول
+  DataTableConfig<ReceiptPaymentDocument> _buildTableConfig(AppLocalizations t) {
+    return DataTableConfig<ReceiptPaymentDocument>(
+      endpoint: '/businesses/${widget.businessId}/receipts-payments',
+      title: t.receiptsAndPayments,
+      excelEndpoint: '/businesses/${widget.businessId}/receipts-payments/export/excel',
+      pdfEndpoint: '/businesses/${widget.businessId}/receipts-payments/export/pdf',
+      getExportParams: () => {
+        'business_id': widget.businessId,
+        if (_selectedDocumentType != null) 'document_type': _selectedDocumentType,
+        if (_fromDate != null) 'from_date': _fromDate!.toIso8601String(),
+        if (_toDate != null) 'to_date': _toDate!.toIso8601String(),
+      },
+      columns: [
+        // کد سند
+        TextColumn(
+          'code',
+          'کد سند',
+          width: ColumnWidth.medium,
+          formatter: (item) => item.code,
+        ),
+        
+        // نوع سند
+        TextColumn(
+          'document_type',
+          'نوع',
+          width: ColumnWidth.small,
+          formatter: (item) => item.documentTypeName,
+        ),
+        
+        // تاریخ سند
+        DateColumn(
+          'document_date',
+          'تاریخ سند',
+          width: ColumnWidth.medium,
+          formatter: (item) => HesabixDateUtils.formatForDisplay(item.documentDate, widget.calendarController.isJalali),
+        ),
+        
+        // مبلغ کل
+        NumberColumn(
+          'total_amount',
+          'مبلغ کل',
+          width: ColumnWidth.large,
+          formatter: (item) => formatWithThousands(item.totalAmount),
+          suffix: ' ریال',
+        ),
+        
+        // نام اشخاص
+        TextColumn(
+          'person_names',
+          'اشخاص',
+          width: ColumnWidth.medium,
+          formatter: (item) => item.personNames ?? 'نامشخص',
+        ),
+        
+        // تعداد حساب‌ها
+        NumberColumn(
+          'account_lines_count',
+          'حساب‌ها',
+          width: ColumnWidth.small,
+          formatter: (item) => item.accountLinesCount.toString(),
+        ),
+        
+        // ایجادکننده
+        TextColumn(
+          'created_by_name',
+          'ایجادکننده',
+          width: ColumnWidth.medium,
+          formatter: (item) => item.createdByName ?? 'نامشخص',
+        ),
+        
+        // تاریخ ثبت
+        DateColumn(
+          'registered_at',
+          'تاریخ ثبت',
+          width: ColumnWidth.medium,
+          formatter: (item) => HesabixDateUtils.formatForDisplay(item.registeredAt, widget.calendarController.isJalali),
+        ),
+        
+        // عملیات
+        ActionColumn(
+          'actions',
+          'عملیات',
+          width: ColumnWidth.medium,
+          actions: [
+            DataTableAction(
+              icon: Icons.visibility,
+              label: 'مشاهده',
+              onTap: (item) => _onView(item),
+            ),
+            DataTableAction(
+              icon: Icons.edit,
+              label: 'ویرایش',
+              onTap: (item) => _onEdit(item),
+            ),
+            DataTableAction(
+              icon: Icons.delete,
+              label: 'حذف',
+              onTap: (item) => _onDelete(item),
+              isDestructive: true,
+            ),
+          ],
+        ),
+      ],
+      searchFields: ['code', 'created_by_name'],
+      filterFields: ['document_type'],
+      dateRangeField: 'document_date',
+      showSearch: true,
+      showFilters: true,
+      showPagination: true,
+      showColumnSearch: true,
+      showRefreshButton: true,
+      showClearFiltersButton: true,
+      enableRowSelection: true,
+      enableMultiRowSelection: true,
+      showExportButtons: true,
+      showExcelExport: true,
+      showPdfExport: true,
+      defaultPageSize: 20,
+      pageSizeOptions: [10, 20, 50, 100],
+      additionalParams: {
+        if (_selectedDocumentType != null) 'document_type': _selectedDocumentType,
+        if (_fromDate != null) 'from_date': _fromDate!.toIso8601String(),
+        if (_toDate != null) 'to_date': _toDate!.toIso8601String(),
+      },
+      onRowTap: (item) => _onView(item),
+      onRowDoubleTap: (item) => _onEdit(item),
+      emptyStateMessage: 'هیچ سند دریافت یا پرداختی یافت نشد',
+      loadingMessage: 'در حال بارگذاری اسناد...',
+      errorMessage: 'خطا در بارگذاری اسناد',
+    );
+  }
+
+  /// افزودن سند جدید
+  void _onAddNew() async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (_) => BulkSettlementDialog(
+        businessId: widget.businessId,
+        calendarController: widget.calendarController,
+        isReceipt: true, // پیش‌فرض دریافت
+        businessInfo: widget.authStore.currentBusiness,
+        apiClient: widget.apiClient,
+      ),
+    );
+    
+    // اگر سند با موفقیت ثبت شد، جدول را تازه‌سازی کن
+    if (result == true) {
+      _refreshData();
+    }
+  }
+
+  /// مشاهده جزئیات سند
+  void _onView(ReceiptPaymentDocument document) {
+    // TODO: باز کردن صفحه جزئیات سند
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('مشاهده سند ${document.code}'),
+      ),
+    );
+  }
+
+  /// ویرایش سند
+  void _onEdit(ReceiptPaymentDocument document) {
+    // TODO: باز کردن صفحه ویرایش سند
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('ویرایش سند ${document.code}'),
+      ),
+    );
+  }
+
+  /// حذف سند
+  void _onDelete(ReceiptPaymentDocument document) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('تأیید حذف'),
+        content: Text('آیا از حذف سند ${document.code} اطمینان دارید؟'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('انصراف'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              await _performDelete(document);
+            },
+            child: const Text('حذف'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// انجام عملیات حذف
+  Future<void> _performDelete(ReceiptPaymentDocument document) async {
+    try {
+      final success = await _service.delete(document.id);
+      if (success) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('سند ${document.code} با موفقیت حذف شد'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } else {
+        throw Exception('خطا در حذف سند');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('خطا در حذف سند: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
 }
 
-class _BulkSettlementDialog extends StatefulWidget {
+class BulkSettlementDialog extends StatefulWidget {
   final int businessId;
   final CalendarController calendarController;
   final bool isReceipt;
   final BusinessWithPermission? businessInfo;
-  final _BulkSettlementDraft? initial;
   final ApiClient apiClient;
-  const _BulkSettlementDialog({
+  const BulkSettlementDialog({
+    super.key,
     required this.businessId,
     required this.calendarController,
     required this.isReceipt,
     this.businessInfo,
-    this.initial,
     required this.apiClient,
   });
 
   @override
-  State<_BulkSettlementDialog> createState() => _BulkSettlementDialogState();
+  State<BulkSettlementDialog> createState() => _BulkSettlementDialogState();
 }
 
-class _BulkSettlementDialogState extends State<_BulkSettlementDialog> {
+class _BulkSettlementDialogState extends State<BulkSettlementDialog> {
   final _formKey = GlobalKey<FormState>();
 
   late DateTime _docDate;
@@ -222,13 +472,10 @@ class _BulkSettlementDialogState extends State<_BulkSettlementDialog> {
   @override
   void initState() {
     super.initState();
-    _docDate = widget.initial?.documentDate ?? DateTime.now();
-    _isReceipt = widget.initial?.isReceipt ?? widget.isReceipt;
+    _docDate = DateTime.now();
+    _isReceipt = widget.isReceipt;
+    // اگر ارز پیشفرض موجود است، آن را انتخاب کن، در غیر این صورت null بگذار تا CurrencyPickerWidget خودکار انتخاب کند
     _selectedCurrencyId = widget.businessInfo?.defaultCurrency?.id;
-    if (widget.initial != null) {
-      _personLines.addAll(widget.initial!.personLines);
-      _centerTransactions.addAll(widget.initial!.centerTransactions);
-    }
   }
 
   @override
@@ -433,7 +680,7 @@ class _BulkSettlementDialogState extends State<_BulkSettlementDialog> {
       Navigator.pop(context);
       
       // بستن dialog اصلی با موفقیت
-      Navigator.pop(context, null);
+      Navigator.pop(context, true);
       
       // نمایش پیام موفقیت
       ScaffoldMessenger.of(context).showSnackBar(
@@ -657,21 +904,6 @@ class _TotalChip extends StatelessWidget {
   }
 }
 
-class _BulkSettlementDraft {
-  final String id;
-  final bool isReceipt;
-  final DateTime documentDate;
-  final List<_PersonLine> personLines;
-  final List<InvoiceTransaction> centerTransactions;
-  _BulkSettlementDraft({
-    required this.id,
-    required this.isReceipt,
-    required this.documentDate,
-    required this.personLines,
-    required this.centerTransactions,
-  });
-}
-
 class _PersonLine {
   final String? personId;
   final String? personName;
@@ -691,5 +923,4 @@ class _PersonLine {
     );
   }
 }
-
 

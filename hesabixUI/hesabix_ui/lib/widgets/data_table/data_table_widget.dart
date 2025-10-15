@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
-import 'helpers/file_saver.dart';
-// // // import 'dart:html' as html; // Not available on Linux // Not available on Linux // Not available on Linux
+import 'package:file_saver/file_saver.dart';
 import 'package:flutter/material.dart';
 import 'package:data_table_2/data_table_2.dart';
 import 'package:dio/dio.dart';
@@ -687,29 +687,49 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
 
   // Cross-platform save using conditional FileSaver
   Future<void> _saveBytesToDownloads(dynamic data, String filename) async {
-    List<int> bytes;
+    Uint8List bytes;
     if (data is List<int>) {
-      bytes = data;
+      bytes = Uint8List.fromList(data);
     } else if (data is Uint8List) {
-      bytes = data.toList();
+      bytes = data;
     } else {
       throw Exception('Unsupported binary data type: ${data.runtimeType}');
     }
-    await FileSaver.saveBytes(bytes, filename);
+    
+    // Use file_saver package for cross-platform file saving
+    try {
+      final fileSaver = FileSaver.instance;
+      final extension = filename.split('.').last;
+      await fileSaver.saveFile(
+        name: filename,
+        bytes: bytes,
+        ext: extension,
+      );
+    } catch (e) {
+      print('Error saving file: $e');
+      rethrow;
+    }
   }
 
   // Platform-specific download functions for Linux
-  // Platform-specific download functions for Linux
   Future<void> _downloadPdf(dynamic data, String filename) async {
-    // For Linux desktop, we'll save to Downloads folder
-    print('Download PDF: $filename (Linux desktop - save to Downloads folder)');
-    // TODO: Implement proper file saving for Linux
+    try {
+      await _saveBytesToDownloads(data, filename);
+      print('✅ PDF downloaded successfully: $filename');
+    } catch (e) {
+      print('❌ Error downloading PDF: $e');
+      rethrow;
+    }
   }
 
   Future<void> _downloadExcel(dynamic data, String filename) async {
-    // For Linux desktop, we'll save to Downloads folder
-    print('Download Excel: $filename (Linux desktop - save to Downloads folder)');
-    // TODO: Implement proper file saving for Linux
+    try {
+      await _saveBytesToDownloads(data, filename);
+      print('✅ Excel downloaded successfully: $filename');
+    } catch (e) {
+      print('❌ Error downloading Excel: $e');
+      rethrow;
+    }
   }
 
 

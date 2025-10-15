@@ -246,6 +246,9 @@ class DataTableConfig<T> {
   final String? excelEndpoint;
   final String? pdfEndpoint;
   final Map<String, dynamic> Function()? getExportParams;
+  final bool showExportButtons;
+  final bool showExcelExport;
+  final bool showPdfExport;
   
   // Column settings configuration
   final String? tableId;
@@ -321,6 +324,9 @@ class DataTableConfig<T> {
     this.excelEndpoint,
     this.pdfEndpoint,
     this.getExportParams,
+    this.showExportButtons = false,
+    this.showExcelExport = true,
+    this.showPdfExport = true,
     this.tableId,
     this.enableColumnSettings = true,
     this.showColumnSettingsButton = true,
@@ -452,6 +458,7 @@ class QueryInfo {
       'take': take,
       'skip': skip,
       'sort_desc': sortDesc,
+      'sort_by': sortBy ?? 'document_date', // مقدار پیش‌فرض برای sort_by
     };
 
     if (search != null && search!.isNotEmpty) {
@@ -459,10 +466,6 @@ class QueryInfo {
       if (searchFields != null && searchFields!.isNotEmpty) {
         json['search_fields'] = searchFields;
       }
-    }
-
-    if (sortBy != null && sortBy!.isNotEmpty) {
-      json['sort_by'] = sortBy;
     }
 
     if (filters != null && filters!.isNotEmpty) {

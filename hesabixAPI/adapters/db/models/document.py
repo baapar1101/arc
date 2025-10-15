@@ -17,6 +17,7 @@ class Document(Base):
 	id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
 	code: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
 	business_id: Mapped[int] = mapped_column(Integer, ForeignKey("businesses.id", ondelete="CASCADE"), nullable=False, index=True)
+	fiscal_year_id: Mapped[int] = mapped_column(Integer, ForeignKey("fiscal_years.id", ondelete="RESTRICT"), nullable=False, index=True)
 	currency_id: Mapped[int] = mapped_column(Integer, ForeignKey("currencies.id", ondelete="RESTRICT"), nullable=False, index=True)
 	created_by_user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, index=True)
 	registered_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
@@ -30,6 +31,7 @@ class Document(Base):
 
 	# Relationships
 	business = relationship("Business", back_populates="documents")
+	fiscal_year = relationship("FiscalYear", back_populates="documents")
 	currency = relationship("Currency", back_populates="documents")
 	created_by = relationship("User", foreign_keys=[created_by_user_id])
 	lines = relationship("DocumentLine", back_populates="document", cascade="all, delete-orphan")

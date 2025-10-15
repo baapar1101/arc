@@ -3,8 +3,8 @@ import sqlalchemy as sa
 from sqlalchemy import inspect
 
 # revision identifiers, used by Alembic.
-revision = '20250926_000011_drop_person_is_active'
-down_revision = '20250926_000010_add_person_code_and_types'
+revision = '20250926_000011_drop_active'
+down_revision = '20250926_000010_add_person_code'
 branch_labels = None
 depends_on = None
 

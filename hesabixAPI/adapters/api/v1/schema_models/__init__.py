@@ -3,6 +3,9 @@
 # Import from file_storage module
 from .file_storage import *
 
+# Import document line schemas
+from .document_line import *
+
 # Re-export from parent schemas module
 import sys
 import os

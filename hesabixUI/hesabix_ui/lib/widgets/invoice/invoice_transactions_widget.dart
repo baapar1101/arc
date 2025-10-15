@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 import '../../models/invoice_transaction.dart';
 import '../../models/person_model.dart';
+import '../../models/account_tree_node.dart';
 import '../../core/date_utils.dart';
 import '../../core/calendar_controller.dart';
 import '../../utils/number_formatters.dart';
@@ -9,10 +10,12 @@ import '../../services/bank_account_service.dart';
 import '../../services/cash_register_service.dart';
 import '../../services/petty_cash_service.dart';
 import '../../services/person_service.dart';
+import '../../services/account_service.dart';
 import 'person_combobox_widget.dart';
 import 'bank_account_combobox_widget.dart';
 import 'cash_register_combobox_widget.dart';
 import 'petty_cash_combobox_widget.dart';
+import 'account_tree_combobox_widget.dart';
 import '../../models/invoice_type_model.dart';
 
 class InvoiceTransactionsWidget extends StatefulWidget {
@@ -194,7 +197,7 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
         
         const SizedBox(height: 8),
         
-        // تاریخ و مبلغ
+        // تاریخ، مبلغ و کارمزد
         Row(
           children: [
             Expanded(
@@ -204,6 +207,12 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
                   transaction.transactionDate,
                   widget.calendarController.isJalali == true,
                 ),
+              ),
+            ),
+            Expanded(
+              child: _buildDetailRow(
+                'مبلغ:',
+                formatWithThousands(transaction.amount, decimalPlaces: 0),
               ),
             ),
             if (transaction.commission != null)
@@ -371,6 +380,7 @@ class _TransactionDialogState extends State<TransactionDialog> {
   final CashRegisterService _cashRegisterService = CashRegisterService();
   final PettyCashService _pettyCashService = PettyCashService();
   final PersonService _personService = PersonService();
+  final AccountService _accountService = AccountService();
   
   // فیلدهای خاص هر نوع تراکنش
   String? _selectedBankId;
@@ -378,7 +388,7 @@ class _TransactionDialogState extends State<TransactionDialog> {
   String? _selectedPettyCashId;
   String? _selectedCheckId;
   String? _selectedPersonId;
-  String? _selectedAccountId;
+  AccountTreeNode? _selectedAccount;
   
   // لیست‌های داده
   List<Map<String, dynamic>> _banks = [];
@@ -403,12 +413,44 @@ class _TransactionDialogState extends State<TransactionDialog> {
     _selectedPettyCashId = widget.transaction?.pettyCashId;
     _selectedCheckId = widget.transaction?.checkId;
     _selectedPersonId = widget.transaction?.personId;
-    _selectedAccountId = widget.transaction?.accountId;
+    
+    // اگر حساب انتخاب شده است، باید آن را از API دریافت کنیم
+    if (widget.transaction?.accountId != null) {
+      _loadSelectedAccount();
+    }
     
     // لود کردن داده‌ها از دیتابیس
     _loadData();
   }
   
+  Future<void> _loadSelectedAccount() async {
+    try {
+      final response = await _accountService.getAccountsTree(businessId: widget.businessId);
+      final items = (response['items'] as List<dynamic>?)
+          ?.map((item) => AccountTreeNode.fromJson(item as Map<String, dynamic>))
+          .toList() ?? [];
+      
+      // جستجو برای پیدا کردن حساب انتخاب شده
+      final accountId = int.tryParse(widget.transaction?.accountId ?? '');
+      if (accountId != null) {
+        for (final account in items) {
+          final foundAccount = account.getAllAccounts().firstWhere(
+            (acc) => acc.id == accountId,
+            orElse: () => throw StateError('Account not found'),
+          );
+          if (foundAccount.id == accountId) {
+            setState(() {
+              _selectedAccount = foundAccount;
+            });
+            break;
+          }
+        }
+      }
+    } catch (e) {
+      print('خطا در لود کردن حساب انتخاب شده: $e');
+    }
+  }
+
   Future<void> _loadData() async {
     setState(() {
       _isLoading = true;
@@ -794,21 +836,17 @@ class _TransactionDialogState extends State<TransactionDialog> {
   }
 
   Widget _buildAccountFields() {
-    return DropdownButtonFormField<String>(
-      initialValue: _selectedAccountId,
-      decoration: const InputDecoration(
-        labelText: 'حساب *',
-        border: OutlineInputBorder(),
-      ),
-      items: const [
-        DropdownMenuItem(value: 'account1', child: Text('حساب جاری')),
-        DropdownMenuItem(value: 'account2', child: Text('حساب پس‌انداز')),
-      ],
-      onChanged: (value) {
+    return AccountTreeComboboxWidget(
+      businessId: widget.businessId,
+      selectedAccount: _selectedAccount,
+      onChanged: (account) {
         setState(() {
-          _selectedAccountId = value;
+          _selectedAccount = account;
         });
       },
+      label: 'حساب *',
+      hintText: 'انتخاب حساب',
+      isRequired: true,
     );
   }
 
@@ -848,8 +886,8 @@ class _TransactionDialogState extends State<TransactionDialog> {
       checkNumber: _getCheckNumber(_selectedCheckId),
       personId: _selectedPersonId,
       personName: _getPersonName(_selectedPersonId),
-      accountId: _selectedAccountId,
-      accountName: _getAccountName(_selectedAccountId),
+      accountId: _selectedAccount?.id.toString(),
+      accountName: _selectedAccount?.name,
       transactionDate: _transactionDate,
       amount: amount,
       commission: commission,
@@ -903,14 +941,7 @@ class _TransactionDialogState extends State<TransactionDialog> {
       (p) => p['id']?.toString() == id,
       orElse: () => <String, dynamic>{},
     );
-    return person['name']?.toString();
+    return person['alias_name']?.toString() ?? person['name']?.toString();
   }
 
-  String? _getAccountName(String? id) {
-    switch (id) {
-      case 'account1': return 'حساب جاری';
-      case 'account2': return 'حساب پس‌انداز';
-      default: return null;
-    }
-  }
 }

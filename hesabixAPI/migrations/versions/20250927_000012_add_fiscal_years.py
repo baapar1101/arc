@@ -6,8 +6,8 @@ from sqlalchemy import inspect
 
 
 # revision identifiers, used by Alembic.
-revision = '20250927_000012_add_fiscal_years_table'
-down_revision = '20250926_000011_drop_person_is_active'
+revision = '20250927_000012_add_fiscal_years'
+down_revision = '20250926_000011_drop_active'
 branch_labels = None
 depends_on = ('20250117_000003',)
 

@@ -11,6 +11,7 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional
 from datetime import datetime, date
 from decimal import Decimal
+import logging
 
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_, func
@@ -21,7 +22,11 @@ from adapters.db.models.account import Account
 from adapters.db.models.person import Person
 from adapters.db.models.currency import Currency
 from adapters.db.models.user import User
+from adapters.db.models.fiscal_year import FiscalYear
 from app.core.responses import ApiError
+
+# تنظیم لاگر
+logger = logging.getLogger(__name__)
 
 
 # نوع‌های سند
@@ -50,14 +55,57 @@ def _parse_iso_date(dt: str | datetime | date) -> date:
         raise ApiError("INVALID_DATE", f"Invalid date: {dt}", http_status=400)
 
 
-def _get_or_create_person_account(
+def _get_current_fiscal_year(db: Session, business_id: int) -> FiscalYear:
+    """دریافت سال مالی فعلی برای کسب‌وکار"""
+    fiscal_year = db.query(FiscalYear).filter(
+        and_(
+            FiscalYear.business_id == business_id,
+            FiscalYear.is_last == True
+        )
+    ).first()
+    
+    if not fiscal_year:
+        raise ApiError("NO_FISCAL_YEAR", "No active fiscal year found for this business", http_status=400)
+    
+    return fiscal_year
+
+
+def _get_fixed_account_by_code(db: Session, account_code: str) -> Account:
+    """
+    دریافت حساب ثابت بر اساس کد
+    
+    Args:
+        db: Session پایگاه داده
+        account_code: کد حساب (مثل 10201, 10202, 10203)
+    
+    Returns:
+        Account: حساب ثابت
+    """
+    account = db.query(Account).filter(
+        and_(
+            Account.business_id == None,  # حساب‌های عمومی
+            Account.code == account_code
+        )
+    ).first()
+    
+    if not account:
+        raise ApiError(
+            "ACCOUNT_NOT_FOUND",
+            f"Account with code {account_code} not found",
+            http_status=500
+        )
+    
+    return account
+
+
+def _get_person_account(
     db: Session,
     business_id: int,
     person_id: int,
     is_receivable: bool
 ) -> Account:
     """
-    ایجاد یا دریافت حساب شخص (حساب دریافتنی یا پرداختنی)
+    دریافت حساب شخص (حساب دریافتنی یا پرداختنی عمومی)
     
     Args:
         business_id: شناسه کسب‌وکار
@@ -65,7 +113,7 @@ def _get_or_create_person_account(
         is_receivable: اگر True باشد، حساب دریافتنی و اگر False باشد حساب پرداختنی
     
     Returns:
-        Account: حساب شخص
+        Account: حساب شخص عمومی
     """
     person = db.query(Person).filter(
         and_(Person.id == person_id, Person.business_id == business_id)
@@ -74,53 +122,11 @@ def _get_or_create_person_account(
     if not person:
         raise ApiError("PERSON_NOT_FOUND", "Person not found", http_status=404)
     
-    # کد حساب والد
-    parent_code = "10401" if is_receivable else "20201"
-    account_type = ACCOUNT_TYPE_RECEIVABLE if is_receivable else ACCOUNT_TYPE_PAYABLE
+    # کد حساب عمومی (بدون ایجاد حساب جداگانه)
+    account_code = "10401" if is_receivable else "20201"
     
-    # پیدا کردن حساب والد
-    parent_account = db.query(Account).filter(
-        and_(
-            Account.business_id == None,  # حساب‌های عمومی
-            Account.code == parent_code
-        )
-    ).first()
-    
-    if not parent_account:
-        raise ApiError(
-            "PARENT_ACCOUNT_NOT_FOUND",
-            f"Parent account with code {parent_code} not found",
-            http_status=500
-        )
-    
-    # بررسی وجود حساب شخص
-    person_account_code = f"{parent_code}-{person_id}"
-    person_account = db.query(Account).filter(
-        and_(
-            Account.business_id == business_id,
-            Account.code == person_account_code
-        )
-    ).first()
-    
-    if not person_account:
-        # ایجاد حساب جدید برای شخص
-        account_name = f"{person.alias_name}"
-        if is_receivable:
-            account_name = f"طلب از {account_name}"
-        else:
-            account_name = f"بدهی به {account_name}"
-        
-        person_account = Account(
-            business_id=business_id,
-            code=person_account_code,
-            name=account_name,
-            account_type=account_type,
-            parent_id=parent_account.id,
-        )
-        db.add(person_account)
-        db.flush()  # برای دریافت ID
-    
-    return person_account
+    # استفاده از تابع کمکی
+    return _get_fixed_account_by_code(db, account_code)
 
 
 def create_receipt_payment(
@@ -146,12 +152,17 @@ def create_receipt_payment(
     Returns:
         Dict: اطلاعات سند ایجاد شده
     """
+    logger.info(f"=== شروع ایجاد سند دریافت/پرداخت ===")
+    logger.info(f"business_id: {business_id}, user_id: {user_id}")
+    logger.info(f"داده‌های ورودی: {data}")
     # اعتبارسنجی نوع سند
     document_type = str(data.get("document_type", "")).lower()
+    logger.info(f"نوع سند: {document_type}")
     if document_type not in (DOCUMENT_TYPE_RECEIPT, DOCUMENT_TYPE_PAYMENT):
         raise ApiError("INVALID_DOCUMENT_TYPE", "document_type must be 'receipt' or 'payment'", http_status=400)
     
     is_receipt = (document_type == DOCUMENT_TYPE_RECEIPT)
+    logger.info(f"آیا دریافت است: {is_receipt}")
     
     # اعتبارسنجی تاریخ
     document_date = _parse_iso_date(data.get("document_date", datetime.now()))
@@ -165,13 +176,22 @@ def create_receipt_payment(
     if not currency:
         raise ApiError("CURRENCY_NOT_FOUND", "Currency not found", http_status=404)
     
+    # دریافت سال مالی فعلی
+    logger.info(f"دریافت سال مالی فعلی برای business_id={business_id}")
+    fiscal_year = _get_current_fiscal_year(db, business_id)
+    logger.info(f"سال مالی فعلی: id={fiscal_year.id}, title={fiscal_year.title}")
+    
     # اعتبارسنجی خطوط اشخاص
     person_lines = data.get("person_lines", [])
+    logger.info(f"تعداد خطوط اشخاص: {len(person_lines)}")
+    logger.info(f"خطوط اشخاص: {person_lines}")
     if not person_lines or not isinstance(person_lines, list):
         raise ApiError("PERSON_LINES_REQUIRED", "At least one person line is required", http_status=400)
     
     # اعتبارسنجی خطوط حساب‌ها
     account_lines = data.get("account_lines", [])
+    logger.info(f"تعداد خطوط حساب‌ها: {len(account_lines)}")
+    logger.info(f"خطوط حساب‌ها: {account_lines}")
     if not account_lines or not isinstance(account_lines, list):
         raise ApiError("ACCOUNT_LINES_REQUIRED", "At least one account line is required", http_status=400)
     
@@ -213,6 +233,7 @@ def create_receipt_payment(
     # ایجاد سند
     document = Document(
         business_id=business_id,
+        fiscal_year_id=fiscal_year.id,
         code=doc_code,
         document_type=document_type,
         document_date=document_date,
@@ -226,51 +247,74 @@ def create_receipt_payment(
     db.flush()  # برای دریافت document.id
     
     # ایجاد خطوط سند برای اشخاص
-    for person_line in person_lines:
+    logger.info(f"=== شروع ایجاد خطوط اشخاص ===")
+    for i, person_line in enumerate(person_lines):
+        logger.info(f"پردازش خط شخص {i+1}: {person_line}")
         person_id = person_line.get("person_id")
+        logger.info(f"person_id: {person_id}")
         if not person_id:
+            logger.warning(f"خط شخص {i+1}: person_id موجود نیست، رد می‌شود")
             continue
         
         amount = Decimal(str(person_line.get("amount", 0)))
+        logger.info(f"مبلغ: {amount}")
         if amount <= 0:
+            logger.warning(f"خط شخص {i+1}: مبلغ صفر یا منفی، رد می‌شود")
             continue
         
         description = person_line.get("description", "").strip() or None
+        logger.info(f"توضیحات: {description}")
         
-        # دریافت یا ایجاد حساب شخص
-        # در دریافت: حساب دریافتنی (receivable)
-        # در پرداخت: حساب پرداختنی (payable)
-        person_account = _get_or_create_person_account(
+        # دریافت حساب شخص عمومی
+        # در دریافت: حساب دریافتنی (receivable) - کد 10401
+        # در پرداخت: حساب پرداختنی (payable) - کد 20201
+        logger.info(f"دریافت حساب شخص برای person_id={person_id}, is_receivable={is_receipt}")
+        person_account = _get_person_account(
             db,
             business_id,
             int(person_id),
             is_receivable=is_receipt
         )
+        logger.info(f"حساب شخص پیدا شد: id={person_account.id}, code={person_account.code}, name={person_account.name}")
         
         # ایجاد خط سند برای شخص
         # در دریافت: شخص بستانکار (credit)
         # در پرداخت: شخص بدهکار (debit)
+        debit_amount = amount if not is_receipt else Decimal(0)
+        credit_amount = amount if is_receipt else Decimal(0)
+        logger.info(f"مقادیر بدهکار/بستانکار: debit={debit_amount}, credit={credit_amount}")
+        
         line = DocumentLine(
             document_id=document.id,
             account_id=person_account.id,
-            debit=amount if not is_receipt else Decimal(0),
-            credit=amount if is_receipt else Decimal(0),
+            person_id=int(person_id),
+            quantity=person_line.get("quantity"),
+            debit=debit_amount,
+            credit=credit_amount,
             description=description,
             extra_info={
                 "person_id": int(person_id),
                 "person_name": person_line.get("person_name"),
             }
         )
+        logger.info(f"خط سند شخص ایجاد شد: {line}")
         db.add(line)
     
     # ایجاد خطوط سند برای حساب‌ها
-    for account_line in account_lines:
+    logger.info(f"=== شروع ایجاد خطوط حساب‌ها ===")
+    total_commission = Decimal(0)  # مجموع کارمزدها
+    
+    for i, account_line in enumerate(account_lines):
+        logger.info(f"پردازش خط حساب {i+1}: {account_line}")
         account_id = account_line.get("account_id")
+        logger.info(f"account_id: {account_id}")
         if not account_id:
-            continue
+            logger.info(f"خط حساب {i+1}: account_id موجود نیست، ادامه می‌دهد")
         
         amount = Decimal(str(account_line.get("amount", 0)))
+        logger.info(f"مبلغ: {amount}")
         if amount <= 0:
+            logger.warning(f"خط حساب {i+1}: مبلغ صفر یا منفی، رد می‌شود")
             continue
         
         description = account_line.get("description", "").strip() or None
@@ -278,23 +322,69 @@ def create_receipt_payment(
         transaction_date = account_line.get("transaction_date")
         commission = account_line.get("commission")
         
-        # بررسی وجود حساب
-        account = db.query(Account).filter(
-            and_(
-                Account.id == int(account_id),
-                or_(
-                    Account.business_id == business_id,
-                    Account.business_id == None  # حساب‌های عمومی
+        logger.info(f"نوع تراکنش: {transaction_type}")
+        logger.info(f"تاریخ تراکنش: {transaction_date}")
+        logger.info(f"کمیسیون: {commission}")
+        
+        # اضافه کردن کارمزد به مجموع
+        if commission:
+            commission_amount = Decimal(str(commission))
+            total_commission += commission_amount
+            logger.info(f"کارمزد اضافه شد: {commission_amount}, مجموع: {total_commission}")
+        
+        # تعیین حساب بر اساس transaction_type
+        account = None
+        
+        if transaction_type == "bank":
+            # برای بانک، از حساب بانک استفاده کن
+            account_code = "10203"  # بانک
+            logger.info(f"انتخاب حساب بانک با کد: {account_code}")
+            account = _get_fixed_account_by_code(db, account_code)
+        elif transaction_type == "cash_register":
+            # برای صندوق، از حساب صندوق استفاده کن
+            account_code = "10202"  # صندوق
+            logger.info(f"انتخاب حساب صندوق با کد: {account_code}")
+            account = _get_fixed_account_by_code(db, account_code)
+        elif transaction_type == "petty_cash":
+            # برای تنخواهگردان، از حساب تنخواهگردان استفاده کن
+            account_code = "10201"  # تنخواه گردان
+            logger.info(f"انتخاب حساب تنخواهگردان با کد: {account_code}")
+            account = _get_fixed_account_by_code(db, account_code)
+        elif transaction_type == "check":
+            # برای چک، بر اساس نوع سند از کد مناسب استفاده کن
+            if is_receipt:
+                account_code = "10403"  # اسناد دریافتنی (چک دریافتی)
+            else:
+                account_code = "20202"  # اسناد پرداختنی (چک پرداختی)
+            logger.info(f"انتخاب حساب چک با کد: {account_code}")
+            account = _get_fixed_account_by_code(db, account_code)
+        elif transaction_type == "person":
+            # برای شخص، از حساب شخص عمومی استفاده کن
+            account_code = "20201"  # حساب‌های پرداختنی
+            logger.info(f"انتخاب حساب شخص با کد: {account_code}")
+            account = _get_fixed_account_by_code(db, account_code)
+        elif account_id:
+            # اگر account_id مشخص باشد، از آن استفاده کن
+            logger.info(f"استفاده از account_id مشخص: {account_id}")
+            account = db.query(Account).filter(
+                and_(
+                    Account.id == int(account_id),
+                    or_(
+                        Account.business_id == business_id,
+                        Account.business_id == None  # حساب‌های عمومی
+                    )
                 )
-            )
-        ).first()
+            ).first()
         
         if not account:
+            logger.error(f"خط حساب {i+1}: حساب پیدا نشد برای transaction_type: {transaction_type}")
             raise ApiError(
                 "ACCOUNT_NOT_FOUND",
-                f"Account with id {account_id} not found",
+                f"Account not found for transaction_type: {transaction_type}",
                 http_status=404
             )
+        
+        logger.info(f"حساب پیدا شد: id={account.id}, code={account.code}, name={account.name}")
         
         # ایجاد اطلاعات اضافی برای خط سند
         extra_info = {}
@@ -330,19 +420,141 @@ def create_receipt_payment(
         # ایجاد خط سند برای حساب
         # در دریافت: حساب بدهکار (debit) - دارایی افزایش می‌یابد
         # در پرداخت: حساب بستانکار (credit) - دارایی کاهش می‌یابد
+        debit_amount = amount if is_receipt else Decimal(0)
+        credit_amount = amount if not is_receipt else Decimal(0)
+        logger.info(f"مقادیر بدهکار/بستانکار برای حساب: debit={debit_amount}, credit={credit_amount}")
+        
+        # تنظیم bank_account_id بر اساس bank_id ارسالی
+        bank_account_id = None
+        if transaction_type == "bank" and account_line.get("bank_id"):
+            try:
+                bank_account_id = int(account_line.get("bank_id"))
+                logger.info(f"bank_account_id تنظیم شد: {bank_account_id}")
+            except (ValueError, TypeError):
+                logger.warning(f"خطا در تبدیل bank_id: {account_line.get('bank_id')}")
+        
+        # تنظیم person_id برای transaction_type="person"
+        person_id_for_line = None
+        if transaction_type == "person" and account_line.get("person_id"):
+            try:
+                person_id_for_line = int(account_line.get("person_id"))
+                logger.info(f"person_id تنظیم شد: {person_id_for_line}")
+            except (ValueError, TypeError):
+                logger.warning(f"خطا در تبدیل person_id: {account_line.get('person_id')}")
+        
         line = DocumentLine(
             document_id=document.id,
             account_id=account.id,
-            debit=amount if is_receipt else Decimal(0),
-            credit=amount if not is_receipt else Decimal(0),
+            person_id=person_id_for_line,
+            bank_account_id=bank_account_id,
+            cash_register_id=account_line.get("cash_register_id"),
+            petty_cash_id=account_line.get("petty_cash_id"),
+            check_id=account_line.get("check_id"),
+            quantity=account_line.get("quantity"),
+            debit=debit_amount,
+            credit=credit_amount,
             description=description,
             extra_info=extra_info if extra_info else None,
         )
+        logger.info(f"خط سند حساب ایجاد شد: {line}")
         db.add(line)
     
+    # ایجاد خطوط کارمزد اگر کارمزدی وجود دارد
+    if total_commission > 0:
+        logger.info(f"=== ایجاد خطوط کارمزد ===")
+        logger.info(f"مجموع کارمزد: {total_commission}")
+        
+        # ایجاد خط کارمزد برای هر تراکنش که کارمزد دارد
+        for i, account_line in enumerate(account_lines):
+            commission = account_line.get("commission")
+            if not commission or Decimal(str(commission)) <= 0:
+                continue
+                
+            commission_amount = Decimal(str(commission))
+            transaction_type = account_line.get("transaction_type")
+            logger.info(f"ایجاد خط کارمزد برای تراکنش {i+1}: مبلغ={commission_amount}, نوع={transaction_type}")
+            
+            # تعیین حساب کارمزد بر اساس نوع تراکنش
+            commission_account = None
+            commission_account_code = None
+            
+            if transaction_type == "bank":
+                commission_account_code = "10203"  # بانک
+            elif transaction_type == "cash_register":
+                commission_account_code = "10202"  # صندوق
+            elif transaction_type == "petty_cash":
+                commission_account_code = "10201"  # تنخواه گردان
+            elif transaction_type == "check":
+                if is_receipt:
+                    commission_account_code = "10403"  # اسناد دریافتنی
+                else:
+                    commission_account_code = "20202"  # اسناد پرداختنی
+            elif transaction_type == "person":
+                commission_account_code = "20201"  # حساب‌های پرداختنی
+            
+            if commission_account_code:
+                commission_account = _get_fixed_account_by_code(db, commission_account_code)
+                logger.info(f"حساب کارمزد پیدا شد: id={commission_account.id}, code={commission_account.code}, name={commission_account.name}")
+                
+                # ایجاد خط کارمزد برای حساب (بانک/صندوق/تنخواهگردان)
+                # در دریافت: کارمزد از حساب کم می‌شود (credit)
+                # در پرداخت: کارمزد به حساب اضافه می‌شود (debit)
+                commission_debit = commission_amount if not is_receipt else Decimal(0)
+                commission_credit = commission_amount if is_receipt else Decimal(0)
+                
+                commission_line = DocumentLine(
+                    document_id=document.id,
+                    account_id=commission_account.id,
+                    bank_account_id=account_line.get("bank_id"),
+                    cash_register_id=account_line.get("cash_register_id"),
+                    petty_cash_id=account_line.get("petty_cash_id"),
+                    check_id=account_line.get("check_id"),
+                    debit=commission_debit,
+                    credit=commission_credit,
+                    description=f"کارمزد تراکنش {transaction_type}",
+                    extra_info={
+                        "transaction_type": transaction_type,
+                        "commission": float(commission_amount),
+                        "is_commission_line": True,
+                        "original_transaction_index": i,
+                    }
+                )
+                logger.info(f"خط کارمزد حساب ایجاد شد: {commission_line}")
+                db.add(commission_line)
+                
+                # ایجاد خط کارمزد برای حساب کارمزد خدمات بانکی (کد 70902)
+                # در دریافت: کارمزد به حساب کارمزد اضافه می‌شود (debit)
+                # در پرداخت: کارمزد از حساب کارمزد کم می‌شود (credit)
+                logger.info(f"ایجاد خط کارمزد برای حساب کارمزد خدمات بانکی")
+                
+                # دریافت حساب کارمزد خدمات بانکی
+                commission_service_account = _get_fixed_account_by_code(db, "70902")
+                logger.info(f"حساب کارمزد خدمات بانکی پیدا شد: id={commission_service_account.id}, code={commission_service_account.code}, name={commission_service_account.name}")
+                
+                commission_service_debit = commission_amount if is_receipt else Decimal(0)
+                commission_service_credit = commission_amount if not is_receipt else Decimal(0)
+                
+                commission_service_line = DocumentLine(
+                    document_id=document.id,
+                    account_id=commission_service_account.id,
+                    debit=commission_service_debit,
+                    credit=commission_service_credit,
+                    description=f"کارمزد خدمات بانکی",
+                    extra_info={
+                        "commission": float(commission_amount),
+                        "is_commission_line": True,
+                        "original_transaction_index": i,
+                        "commission_type": "banking_service",
+                    }
+                )
+                logger.info(f"خط کارمزد خدمات بانکی ایجاد شد: {commission_service_line}")
+                db.add(commission_service_line)
+    
     # ذخیره تغییرات
+    logger.info(f"=== ذخیره تغییرات ===")
     db.commit()
     db.refresh(document)
+    logger.info(f"سند با موفقیت ایجاد شد: id={document.id}, code={document.code}")
     
     return document_to_dict(db, document)
 
@@ -404,7 +616,8 @@ def list_receipts_payments(
     sort_by = query.get("sort_by", "document_date")
     sort_desc = query.get("sort_desc", True)
     
-    if hasattr(Document, sort_by):
+    # بررسی اینکه sort_by معتبر است
+    if sort_by and isinstance(sort_by, str) and hasattr(Document, sort_by):
         col = getattr(Document, sort_by)
         q = q.order_by(col.desc() if sort_desc else col.asc())
     else:
@@ -464,6 +677,13 @@ def document_to_dict(db: Session, document: Document) -> Dict[str, Any]:
         line_dict = {
             "id": line.id,
             "account_id": line.account_id,
+            "person_id": line.person_id,
+            "product_id": line.product_id,
+            "bank_account_id": line.bank_account_id,
+            "cash_register_id": line.cash_register_id,
+            "petty_cash_id": line.petty_cash_id,
+            "check_id": line.check_id,
+            "quantity": float(line.quantity) if line.quantity else None,
             "account_name": account.name,
             "account_code": account.code,
             "account_type": account.account_type,
@@ -498,9 +718,25 @@ def document_to_dict(db: Session, document: Document) -> Dict[str, Any]:
                 line_dict["check_id"] = line.extra_info["check_id"]
             if "check_number" in line.extra_info:
                 line_dict["check_number"] = line.extra_info["check_number"]
+            if "person_name" in line.extra_info:
+                line_dict["person_name"] = line.extra_info["person_name"]
+        
+        # اگر person_id موجود است، نام شخص را از دیتابیس دریافت کن
+        if line.person_id and "person_name" not in line_dict:
+            person = db.query(Person).filter(Person.id == line.person_id).first()
+            if person:
+                line_dict["person_name"] = person.alias_name or f"{person.first_name} {person.last_name}".strip()
+            else:
+                line_dict["person_name"] = "نامشخص"
         
         # تشخیص اینکه آیا این خط مربوط به شخص است یا حساب
-        if line.extra_info and line.extra_info.get("person_id"):
+        # خطوط کارمزد را جداگانه تشخیص می‌دهیم
+        is_commission_line = line.extra_info and line.extra_info.get("is_commission_line", False)
+        
+        if is_commission_line:
+            # خط کارمزد - همیشه در account_lines قرار می‌گیرد
+            account_lines.append(line_dict)
+        elif line.extra_info and line.extra_info.get("person_id"):
             person_lines.append(line_dict)
         else:
             account_lines.append(line_dict)
@@ -513,11 +749,28 @@ def document_to_dict(db: Session, document: Document) -> Dict[str, Any]:
     currency = db.query(Currency).filter(Currency.id == document.currency_id).first()
     currency_code = currency.code if currency else None
     
+    # محاسبه مبلغ کل و تعداد خطوط
+    total_amount = sum(line.get("amount", 0) for line in person_lines)
+    person_lines_count = len(person_lines)
+    account_lines_count = len(account_lines)
+    
+    # ایجاد لیست نام اشخاص برای نمایش
+    person_names = []
+    for line in person_lines:
+        person_name = line.get("person_name")
+        if person_name and person_name not in person_names:
+            person_names.append(person_name)
+    person_names_str = ", ".join(person_names) if person_names else "نامشخص"
+    
+    # تعیین نام نوع سند
+    document_type_name = "دریافت" if document.document_type == DOCUMENT_TYPE_RECEIPT else "پرداخت"
+    
     return {
         "id": document.id,
         "code": document.code,
         "business_id": document.business_id,
         "document_type": document.document_type,
+        "document_type_name": document_type_name,
         "document_date": document.document_date.isoformat(),
         "registered_at": document.registered_at.isoformat(),
         "currency_id": document.currency_id,
@@ -528,6 +781,10 @@ def document_to_dict(db: Session, document: Document) -> Dict[str, Any]:
         "extra_info": document.extra_info,
         "person_lines": person_lines,
         "account_lines": account_lines,
+        "total_amount": total_amount,
+        "person_lines_count": person_lines_count,
+        "account_lines_count": account_lines_count,
+        "person_names": person_names_str,
         "created_at": document.created_at.isoformat(),
         "updated_at": document.updated_at.isoformat(),
     }

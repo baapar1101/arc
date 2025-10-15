@@ -14,6 +14,7 @@ import '../../widgets/category/category_tree_dialog.dart';
 import '../../services/business_dashboard_service.dart';
 import '../../core/api_client.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
+import 'receipts_payments_list_page.dart' show BulkSettlementDialog;
 
 class BusinessShell extends StatefulWidget {
   final int businessId;
@@ -68,7 +69,25 @@ class _BusinessShellState extends State<BusinessShell> {
     super.dispose();
   }
 
-  void _refreshCurrentPage() {
+    Future<void> showAddReceiptPaymentDialog() async {
+      final calendarController = widget.calendarController ?? await CalendarController.load();
+      final result = await showDialog<bool>(
+        context: context,
+        builder: (context) => BulkSettlementDialog(
+          businessId: widget.businessId,
+          calendarController: calendarController,
+          isReceipt: true, // پیش‌فرض دریافت
+          businessInfo: widget.authStore.currentBusiness,
+          apiClient: ApiClient(),
+        ),
+      );
+      if (result == true) {
+        // Refresh the receipts payments page if it's currently open
+        _refreshCurrentPage();
+      }
+    }
+
+    void _refreshCurrentPage() {
     // Force a rebuild of the current page
     setState(() {
       // This will cause the current page to rebuild
@@ -809,6 +828,9 @@ class _BusinessShellState extends State<BusinessShell> {
                                       } else if (child.label == t.invoice) {
                                         // Navigate to add invoice
                                         context.go('/business/${widget.businessId}/invoice/new');
+                                      } else if (child.label == t.receiptsAndPayments) {
+                                        // Show add receipt payment dialog
+                                        showAddReceiptPaymentDialog();
                                       } else if (child.label == t.expenseAndIncome) {
                                         // Navigate to add expense/income
                                       } else if (child.label == t.warehouses) {
@@ -951,6 +973,9 @@ class _BusinessShellState extends State<BusinessShell> {
                                           } else if (item.label == t.invoice) {
                                             // Navigate to add invoice
                                             context.go('/business/${widget.businessId}/invoice/new');
+                                          } else if (item.label == t.receiptsAndPayments) {
+                                            // Show add receipt payment dialog
+                                            showAddReceiptPaymentDialog();
                                           } else if (item.label == t.checks) {
                                             // Navigate to add check
                                             context.go('/business/${widget.businessId}/checks/new');
@@ -1122,6 +1147,9 @@ class _BusinessShellState extends State<BusinessShell> {
                             } else if (child.label == t.invoice) {
                               // Navigate to add invoice
                               context.go('/business/${widget.businessId}/invoice/new');
+                            } else if (child.label == t.receiptsAndPayments) {
+                              // Show add receipt payment dialog
+                              showAddReceiptPaymentDialog();
                             } else if (child.label == t.expenseAndIncome) {
                               // Navigate to add expense/income
                             } else if (child.label == t.warehouses) {

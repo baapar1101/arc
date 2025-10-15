@@ -22,5 +22,6 @@ class FiscalYear(Base):
 
 	# Relationships
 	business = relationship("Business", back_populates="fiscal_years")
+	documents = relationship("Document", back_populates="fiscal_year", cascade="all, delete-orphan")
 
 

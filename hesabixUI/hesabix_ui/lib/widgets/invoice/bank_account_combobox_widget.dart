@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:developer';
 import 'package:flutter/material.dart';
 import '../../services/bank_account_service.dart';
 
@@ -99,7 +100,10 @@ class _BankAccountComboboxWidgetState extends State<BankAccountComboboxWidget> {
           : res['items'];
       final items = ((itemsRaw as List<dynamic>? ?? const <dynamic>[])).map((e) {
         final m = Map<String, dynamic>.from(e as Map);
-        return BankAccountOption('${m['id']}', (m['name']?.toString() ?? 'نامشخص'));
+        final id = m['id']?.toString();
+        final name = m['name']?.toString() ?? 'نامشخص';
+        log('Bank account item: id=$id, name=$name');
+        return BankAccountOption(id ?? '', name);
       }).toList();
       if (!mounted) return;
       setState(() {

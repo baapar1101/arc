@@ -38,7 +38,7 @@ import 'pages/business/cash_registers_page.dart';
 import 'pages/business/petty_cash_page.dart';
 import 'pages/business/checks_page.dart';
 import 'pages/business/check_form_page.dart';
-import 'pages/business/receipts_payments_page.dart';
+import 'pages/business/receipts_payments_list_page.dart';
 import 'pages/error_404_page.dart';
 import 'core/locale_controller.dart';
 import 'core/calendar_controller.dart';
@@ -795,7 +795,7 @@ class _MyAppState extends State<MyApp> {
                 );
               },
             ),
-            // Checks: list, new, edit
+            // Receipts & Payments: list with data table
             GoRoute(
               path: 'receipts-payments',
               name: 'business_receipts_payments',
@@ -807,7 +807,7 @@ class _MyAppState extends State<MyApp> {
                   localeController: controller,
                   calendarController: _calendarController!,
                   themeController: themeController,
-                  child: ReceiptsPaymentsPage(
+                  child: ReceiptsPaymentsListPage(
                     businessId: businessId,
                     calendarController: _calendarController!,
                     authStore: _authStore!,
