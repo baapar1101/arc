@@ -3,6 +3,8 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../../services/business_dashboard_service.dart';
 import '../../../core/api_client.dart';
 import '../../../models/business_dashboard_models.dart';
+import '../../../core/fiscal_year_controller.dart';
+import '../../../widgets/fiscal_year_switcher.dart';
 
 class BusinessDashboardPage extends StatefulWidget {
   final int businessId;
@@ -14,7 +16,8 @@ class BusinessDashboardPage extends StatefulWidget {
 }
 
 class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
-  final BusinessDashboardService _service = BusinessDashboardService(ApiClient());
+  late final FiscalYearController _fiscalController;
+  late final BusinessDashboardService _service;
   BusinessDashboardResponse? _dashboardData;
   bool _loading = true;
   String? _error;
@@ -22,7 +25,20 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
   @override
   void initState() {
     super.initState();
-    _loadDashboard();
+    _init();
+  }
+
+  Future<void> _init() async {
+    _fiscalController = await FiscalYearController.load();
+    _service = BusinessDashboardService(ApiClient(), fiscalYearController: _fiscalController);
+    ApiClient.bindFiscalYear(ValueNotifier<int?>(_fiscalController.fiscalYearId));
+    _fiscalController.addListener(() {
+      // به‌روزرسانی هدر سراسری
+      ApiClient.bindFiscalYear(ValueNotifier<int?>(_fiscalController.fiscalYearId));
+      // رفرش داشبورد
+      _loadDashboard();
+    });
+    await _loadDashboard();
   }
 
   Future<void> _loadDashboard() async {
@@ -85,9 +101,45 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            t.businessDashboard,
-            style: Theme.of(context).textTheme.headlineMedium,
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  t.businessDashboard,
+                  style: Theme.of(context).textTheme.headlineMedium,
+                ),
+              ),
+              FutureBuilder<List<Map<String, dynamic>>>(
+                future: _service.listFiscalYears(widget.businessId),
+                builder: (context, snapshot) {
+                  final items = snapshot.data ?? const <Map<String, dynamic>>[];
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2));
+                  }
+                  if (items.isEmpty) {
+                    return const SizedBox.shrink();
+                  }
+                  return Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.timeline, size: 16),
+                        const SizedBox(width: 6),
+                        FiscalYearSwitcher(
+                          controller: _fiscalController,
+                          fiscalYears: items,
+                          onChanged: () => _loadDashboard(),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ],
           ),
           const SizedBox(height: 16),
           if (_dashboardData != null) ...[

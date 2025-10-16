@@ -399,3 +399,35 @@ msgstr "Storage connection test - to be implemented"
 
 msgid "TEST_STORAGE_CONFIG_ERROR"
 msgstr "Error testing storage connection"
+
+# Receipts & Payments
+msgid "RECEIPTS_PAYMENTS_LIST_FETCHED"
+msgstr "Receipts & payments list retrieved successfully"
+
+msgid "RECEIPT_PAYMENT_CREATED"
+msgstr "Receipt/Payment created successfully"
+
+msgid "RECEIPT_PAYMENT_DETAILS"
+msgstr "Receipt/Payment details"
+
+msgid "RECEIPT_PAYMENT_DELETED"
+msgstr "Receipt/Payment deleted successfully"
+
+# Common errors for receipts/payments
+msgid "DOCUMENT_NOT_FOUND"
+msgstr "Document not found"
+
+msgid "FORBIDDEN"
+msgstr "Access denied"
+
+msgid "FISCAL_YEAR_LOCKED"
+msgstr "Document does not belong to the current fiscal year and cannot be deleted"
+
+msgid "DOCUMENT_LOCKED"
+msgstr "This document is locked and cannot be deleted"
+
+msgid "DOCUMENT_REFERENCED"
+msgstr "This document has dependencies (e.g., check) and cannot be deleted"
+
+msgid "RECEIPT_PAYMENT_UPDATED"
+msgstr "Receipt/Payment updated successfully"

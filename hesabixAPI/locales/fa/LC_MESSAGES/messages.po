@@ -422,3 +422,35 @@ msgid "TEST_STORAGE_CONFIG_ERROR"
 msgstr "خطا در تست اتصال"
 
 
+# Receipts & Payments
+msgid "RECEIPTS_PAYMENTS_LIST_FETCHED"
+msgstr "لیست اسناد دریافت و پرداخت با موفقیت دریافت شد"
+
+msgid "RECEIPT_PAYMENT_CREATED"
+msgstr "سند دریافت/پرداخت با موفقیت ایجاد شد"
+
+msgid "RECEIPT_PAYMENT_DETAILS"
+msgstr "جزئیات سند دریافت/پرداخت"
+
+msgid "RECEIPT_PAYMENT_DELETED"
+msgstr "سند دریافت/پرداخت با موفقیت حذف شد"
+
+# Common errors for receipts/payments
+msgid "DOCUMENT_NOT_FOUND"
+msgstr "سند یافت نشد"
+
+msgid "FORBIDDEN"
+msgstr "دسترسی مجاز نیست"
+
+msgid "FISCAL_YEAR_LOCKED"
+msgstr "سند متعلق به سال مالی جاری نیست و قابل حذف نمی‌باشد"
+
+msgid "DOCUMENT_LOCKED"
+msgstr "این سند قفل است و قابل حذف نمی‌باشد"
+
+msgid "DOCUMENT_REFERENCED"
+msgstr "این سند دارای وابستگی (مانند چک) است و قابل حذف نیست"
+
+msgid "RECEIPT_PAYMENT_UPDATED"
+msgstr "سند دریافت/پرداخت با موفقیت ویرایش شد"
+

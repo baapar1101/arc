@@ -583,6 +583,22 @@ def list_receipts_payments(
             Document.document_type.in_([DOCUMENT_TYPE_RECEIPT, DOCUMENT_TYPE_PAYMENT])
         )
     )
+
+    # فیلتر بر اساس سال مالی (از query یا پیشفرض سال جاری)
+    fiscal_year_id = query.get("fiscal_year_id")
+    if fiscal_year_id is not None:
+        try:
+            fiscal_year_id = int(fiscal_year_id)
+        except (TypeError, ValueError):
+            fiscal_year_id = None
+    if fiscal_year_id is None:
+        try:
+            fiscal_year = _get_current_fiscal_year(db, business_id)
+            fiscal_year_id = fiscal_year.id
+        except Exception:
+            fiscal_year_id = None
+    if fiscal_year_id is not None:
+        q = q.filter(Document.fiscal_year_id == fiscal_year_id)
     
     # فیلتر بر اساس نوع
     doc_type = query.get("document_type")
@@ -653,6 +669,61 @@ def delete_receipt_payment(db: Session, document_id: int) -> bool:
     
     if document.document_type not in (DOCUMENT_TYPE_RECEIPT, DOCUMENT_TYPE_PAYMENT):
         return False
+
+    # 1) جلوگیری از حذف در سال مالی غیر جاری
+    try:
+        fiscal_year = db.query(FiscalYear).filter(FiscalYear.id == document.fiscal_year_id).first()
+        if fiscal_year is not None and getattr(fiscal_year, "is_last", False) is not True:
+            raise ApiError(
+                "FISCAL_YEAR_LOCKED",
+                "سند متعلق به سال مالی جاری نیست و قابل حذف نمی‌باشد",
+                http_status=409,
+            )
+    except ApiError:
+        # عبور خطای آگاهانه
+        raise
+    except Exception:
+        # اگر به هر دلیل نتوانستیم وضعیت سال مالی را بررسی کنیم، حذف را متوقف نکن
+        pass
+
+    # 2) جلوگیری از حذف در صورت قفل بودن سند (براساس extra_info یا developer_settings)
+    try:
+        locked_flags = []
+        if isinstance(document.extra_info, dict):
+            locked_flags.append(bool(document.extra_info.get("locked")))
+            locked_flags.append(bool(document.extra_info.get("is_locked")))
+        if isinstance(document.developer_settings, dict):
+            locked_flags.append(bool(document.developer_settings.get("locked")))
+            locked_flags.append(bool(document.developer_settings.get("is_locked")))
+        if any(locked_flags):
+            raise ApiError(
+                "DOCUMENT_LOCKED",
+                "این سند قفل است و قابل حذف نمی‌باشد",
+                http_status=409,
+            )
+    except ApiError:
+        raise
+    except Exception:
+        pass
+
+    # 3) جلوگیری از حذف اگر خطوط سند به چک مرتبط باشند
+    try:
+        has_related_checks = db.query(DocumentLine).filter(
+            and_(
+                DocumentLine.document_id == document.id,
+                DocumentLine.check_id.isnot(None),
+            )
+        ).first() is not None
+        if has_related_checks:
+            raise ApiError(
+                "DOCUMENT_REFERENCED",
+                "این سند دارای اقلام مرتبط با چک است و قابل حذف نمی‌باشد",
+                http_status=409,
+            )
+    except ApiError:
+        raise
+    except Exception:
+        pass
     
     db.delete(document)
     db.commit()
@@ -660,6 +731,287 @@ def delete_receipt_payment(db: Session, document_id: int) -> bool:
     return True
 
 
+def update_receipt_payment(
+    db: Session,
+    document_id: int,
+    user_id: int,
+    data: Dict[str, Any]
+) -> Dict[str, Any]:
+    """به‌روزرسانی سند دریافت/پرداخت - استراتژی Full-Replace خطوط"""
+    document = db.query(Document).filter(Document.id == document_id).first()
+    if document is None:
+        raise ApiError("DOCUMENT_NOT_FOUND", "Document not found", http_status=404)
+
+    if document.document_type not in (DOCUMENT_TYPE_RECEIPT, DOCUMENT_TYPE_PAYMENT):
+        raise ApiError("INVALID_DOCUMENT_TYPE", "Invalid document type", http_status=400)
+
+    # 1) محدودیت‌های سال مالی/قفل/وابستگی مشابه حذف
+    try:
+        fiscal_year = db.query(FiscalYear).filter(FiscalYear.id == document.fiscal_year_id).first()
+        if fiscal_year is not None and getattr(fiscal_year, "is_last", False) is not True:
+            raise ApiError(
+                "FISCAL_YEAR_LOCKED",
+                "سند متعلق به سال مالی جاری نیست و قابل ویرایش نمی‌باشد",
+                http_status=409,
+            )
+    except ApiError:
+        raise
+    except Exception:
+        pass
+
+    try:
+        locked_flags = []
+        if isinstance(document.extra_info, dict):
+            locked_flags.append(bool(document.extra_info.get("locked")))
+            locked_flags.append(bool(document.extra_info.get("is_locked")))
+        if isinstance(document.developer_settings, dict):
+            locked_flags.append(bool(document.developer_settings.get("locked")))
+            locked_flags.append(bool(document.developer_settings.get("is_locked")))
+        if any(locked_flags):
+            raise ApiError(
+                "DOCUMENT_LOCKED",
+                "این سند قفل است و قابل ویرایش نمی‌باشد",
+                http_status=409,
+            )
+    except ApiError:
+        raise
+    except Exception:
+        pass
+
+    try:
+        has_related_checks = db.query(DocumentLine).filter(
+            and_(
+                DocumentLine.document_id == document.id,
+                DocumentLine.check_id.isnot(None),
+            )
+        ).first() is not None
+        if has_related_checks:
+            raise ApiError(
+                "DOCUMENT_REFERENCED",
+                "این سند دارای اقلام مرتبط با چک است و قابل ویرایش نمی‌باشد",
+                http_status=409,
+            )
+    except ApiError:
+        raise
+    except Exception:
+        pass
+
+    # 2) اعتبارسنجی ورودی‌ها (مشابه create)
+    document_date = _parse_iso_date(data.get("document_date", document.document_date))
+    currency_id = data.get("currency_id", document.currency_id)
+    if not currency_id:
+        raise ApiError("CURRENCY_REQUIRED", "currency_id is required", http_status=400)
+    currency = db.query(Currency).filter(Currency.id == int(currency_id)).first()
+    if not currency:
+        raise ApiError("CURRENCY_NOT_FOUND", "Currency not found", http_status=404)
+
+    person_lines = data.get("person_lines", [])
+    account_lines = data.get("account_lines", [])
+    if not isinstance(person_lines, list) or not person_lines:
+        raise ApiError("PERSON_LINES_REQUIRED", "At least one person line is required", http_status=400)
+    if not isinstance(account_lines, list) or not account_lines:
+        raise ApiError("ACCOUNT_LINES_REQUIRED", "At least one account line is required", http_status=400)
+
+    person_total = sum(float(line.get("amount", 0)) for line in person_lines)
+    account_total = sum(float(line.get("amount", 0)) for line in account_lines)
+    if abs(person_total - account_total) > 0.01:
+        raise ApiError("UNBALANCED_AMOUNTS", "Totals must be balanced", http_status=400)
+
+    # 3) اعمال تغییرات در سند (بدون تغییر code و document_type)
+    document.document_date = document_date
+    document.currency_id = int(currency_id)
+    if isinstance(data.get("extra_info"), dict) or data.get("extra_info") is None:
+        document.extra_info = data.get("extra_info")
+
+    # تعیین نوع دریافت/پرداخت برای محاسبات بدهکار/بستانکار
+    is_receipt = (document.document_type == DOCUMENT_TYPE_RECEIPT)
+
+    # حذف خطوط فعلی و ایجاد مجدد
+    db.query(DocumentLine).filter(DocumentLine.document_id == document.id).delete(synchronize_session=False)
+
+    # خطوط شخص
+    for person_line in person_lines:
+        person_id = person_line.get("person_id")
+        if not person_id:
+            continue
+        amount = Decimal(str(person_line.get("amount", 0)))
+        if amount <= 0:
+            continue
+        description = (person_line.get("description") or "").strip() or None
+        person_account = _get_person_account(db, document.business_id, int(person_id), is_receivable=is_receipt)
+        debit_amount = amount if not is_receipt else Decimal(0)
+        credit_amount = amount if is_receipt else Decimal(0)
+        line = DocumentLine(
+            document_id=document.id,
+            account_id=person_account.id,
+            person_id=int(person_id),
+            quantity=person_line.get("quantity"),
+            debit=debit_amount,
+            credit=credit_amount,
+            description=description,
+            extra_info={
+                "person_id": int(person_id),
+                "person_name": person_line.get("person_name"),
+            },
+        )
+        db.add(line)
+
+    # خطوط حساب‌ها + کارمزدها
+    total_commission = Decimal(0)
+    for i, account_line in enumerate(account_lines):
+        amount = Decimal(str(account_line.get("amount", 0)))
+        if amount <= 0:
+            continue
+        description = (account_line.get("description") or "").strip() or None
+        transaction_type = account_line.get("transaction_type")
+        transaction_date = account_line.get("transaction_date")
+        commission = account_line.get("commission")
+        if commission:
+            total_commission += Decimal(str(commission))
+
+        # انتخاب حساب بر اساس transaction_type یا account_id
+        account = None
+        if transaction_type == "bank":
+            account = _get_fixed_account_by_code(db, "10203")
+        elif transaction_type == "cash_register":
+            account = _get_fixed_account_by_code(db, "10202")
+        elif transaction_type == "petty_cash":
+            account = _get_fixed_account_by_code(db, "10201")
+        elif transaction_type == "check":
+            account = _get_fixed_account_by_code(db, "10403" if is_receipt else "20202")
+        elif transaction_type == "person":
+            account = _get_fixed_account_by_code(db, "20201")
+        elif account_line.get("account_id"):
+            account = db.query(Account).filter(
+                and_(
+                    Account.id == int(account_line.get("account_id")),
+                    or_(Account.business_id == document.business_id, Account.business_id == None),
+                )
+            ).first()
+        if not account:
+            raise ApiError("ACCOUNT_NOT_FOUND", "Account not found for transaction_type", http_status=404)
+
+        extra_info: Dict[str, Any] = {}
+        if transaction_type:
+            extra_info["transaction_type"] = transaction_type
+        if transaction_date:
+            extra_info["transaction_date"] = transaction_date
+        if commission:
+            extra_info["commission"] = float(commission)
+        if transaction_type == "bank":
+            if account_line.get("bank_id"):
+                extra_info["bank_id"] = account_line.get("bank_id")
+            if account_line.get("bank_name"):
+                extra_info["bank_name"] = account_line.get("bank_name")
+        elif transaction_type == "cash_register":
+            if account_line.get("cash_register_id"):
+                extra_info["cash_register_id"] = account_line.get("cash_register_id")
+            if account_line.get("cash_register_name"):
+                extra_info["cash_register_name"] = account_line.get("cash_register_name")
+        elif transaction_type == "petty_cash":
+            if account_line.get("petty_cash_id"):
+                extra_info["petty_cash_id"] = account_line.get("petty_cash_id")
+            if account_line.get("petty_cash_name"):
+                extra_info["petty_cash_name"] = account_line.get("petty_cash_name")
+        elif transaction_type == "check":
+            if account_line.get("check_id"):
+                extra_info["check_id"] = account_line.get("check_id")
+            if account_line.get("check_number"):
+                extra_info["check_number"] = account_line.get("check_number")
+
+        debit_amount = amount if is_receipt else Decimal(0)
+        credit_amount = amount if not is_receipt else Decimal(0)
+
+        bank_account_id = None
+        if transaction_type == "bank" and account_line.get("bank_id"):
+            try:
+                bank_account_id = int(account_line.get("bank_id"))
+            except Exception:
+                bank_account_id = None
+
+        person_id_for_line = None
+        if transaction_type == "person" and account_line.get("person_id"):
+            try:
+                person_id_for_line = int(account_line.get("person_id"))
+            except Exception:
+                person_id_for_line = None
+
+        line = DocumentLine(
+            document_id=document.id,
+            account_id=account.id,
+            person_id=person_id_for_line,
+            bank_account_id=bank_account_id,
+            cash_register_id=account_line.get("cash_register_id"),
+            petty_cash_id=account_line.get("petty_cash_id"),
+            check_id=account_line.get("check_id"),
+            quantity=account_line.get("quantity"),
+            debit=debit_amount,
+            credit=credit_amount,
+            description=description,
+            extra_info=extra_info if extra_info else None,
+        )
+        db.add(line)
+
+    # خطوط کارمزد
+    if total_commission > 0:
+        for i, account_line in enumerate(account_lines):
+            commission = account_line.get("commission")
+            if not commission or Decimal(str(commission)) <= 0:
+                continue
+            commission_amount = Decimal(str(commission))
+            transaction_type = account_line.get("transaction_type")
+            commission_account_code = None
+            if transaction_type == "bank":
+                commission_account_code = "10203"
+            elif transaction_type == "cash_register":
+                commission_account_code = "10202"
+            elif transaction_type == "petty_cash":
+                commission_account_code = "10201"
+            elif transaction_type == "check":
+                commission_account_code = "10403" if is_receipt else "20202"
+            elif transaction_type == "person":
+                commission_account_code = "20201"
+            if commission_account_code:
+                commission_account = _get_fixed_account_by_code(db, commission_account_code)
+                commission_debit = commission_amount if not is_receipt else Decimal(0)
+                commission_credit = commission_amount if is_receipt else Decimal(0)
+                db.add(DocumentLine(
+                    document_id=document.id,
+                    account_id=commission_account.id,
+                    bank_account_id=account_line.get("bank_id"),
+                    cash_register_id=account_line.get("cash_register_id"),
+                    petty_cash_id=account_line.get("petty_cash_id"),
+                    check_id=account_line.get("check_id"),
+                    debit=commission_debit,
+                    credit=commission_credit,
+                    description=f"کارمزد تراکنش {transaction_type}",
+                    extra_info={
+                        "transaction_type": transaction_type,
+                        "commission": float(commission_amount),
+                        "is_commission_line": True,
+                        "original_transaction_index": i,
+                    },
+                ))
+                commission_service_account = _get_fixed_account_by_code(db, "70902")
+                commission_service_debit = commission_amount if is_receipt else Decimal(0)
+                commission_service_credit = commission_amount if not is_receipt else Decimal(0)
+                db.add(DocumentLine(
+                    document_id=document.id,
+                    account_id=commission_service_account.id,
+                    debit=commission_service_debit,
+                    credit=commission_service_credit,
+                    description="کارمزد خدمات بانکی",
+                    extra_info={
+                        "commission": float(commission_amount),
+                        "is_commission_line": True,
+                        "original_transaction_index": i,
+                        "commission_type": "banking_service",
+                    },
+                ))
+
+    db.commit()
+    db.refresh(document)
+    return document_to_dict(db, document)
 def document_to_dict(db: Session, document: Document) -> Dict[str, Any]:
     """تبدیل سند به دیکشنری"""
     # دریافت خطوط سند

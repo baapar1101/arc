@@ -21,6 +21,7 @@ from app.services.receipt_payment_service import (
     get_receipt_payment,
     list_receipts_payments,
     delete_receipt_payment,
+    update_receipt_payment,
 )
 from adapters.db.models.business import Business
 
@@ -67,6 +68,14 @@ async def list_receipts_payments_endpoint(
     except Exception:
         pass
     
+    # دریافت fiscal_year_id از هدر برای اولویت دادن به انتخاب کاربر
+    try:
+        fy_header = request.headers.get("X-Fiscal-Year-ID")
+        if fy_header:
+            query_dict["fiscal_year_id"] = int(fy_header)
+    except Exception:
+        pass
+
     result = list_receipts_payments(db, business_id, query_dict)
     result["items"] = [format_datetime_fields(item, request) for item in result.get("items", [])]
     
@@ -205,6 +214,37 @@ async def delete_receipt_payment_endpoint(
         data=None,
         request=request,
         message="RECEIPT_PAYMENT_DELETED"
+    )
+
+
+@router.put(
+    "/receipts-payments/{document_id}",
+    summary="ویرایش سند دریافت/پرداخت",
+    description="به‌روزرسانی یک سند دریافت یا پرداخت",
+)
+async def update_receipt_payment_endpoint(
+    request: Request,
+    document_id: int,
+    body: Dict[str, Any] = Body(...),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+    _: None = Depends(require_business_management_dep),
+):
+    """ویرایش سند"""
+    # دریافت سند برای بررسی دسترسی
+    result = get_receipt_payment(db, document_id)
+    if not result:
+        raise ApiError("DOCUMENT_NOT_FOUND", "Receipt/Payment document not found", http_status=404)
+
+    business_id = result.get("business_id")
+    if business_id and not ctx.can_access_business(business_id):
+        raise ApiError("FORBIDDEN", "Access denied", http_status=403)
+
+    updated = update_receipt_payment(db, document_id, ctx.get_user_id(), body)
+    return success_response(
+        data=format_datetime_fields(updated, request),
+        request=request,
+        message="RECEIPT_PAYMENT_UPDATED",
     )
 
 

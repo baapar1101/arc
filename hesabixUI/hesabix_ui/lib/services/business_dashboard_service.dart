@@ -1,17 +1,23 @@
 import 'package:dio/dio.dart';
 import '../core/api_client.dart';
 import '../models/business_dashboard_models.dart';
+import '../core/fiscal_year_controller.dart';
 
 class BusinessDashboardService {
   final ApiClient _apiClient;
+  final FiscalYearController? fiscalYearController;
 
-  BusinessDashboardService(this._apiClient);
+  BusinessDashboardService(this._apiClient, {this.fiscalYearController});
 
   /// دریافت داشبورد کسب و کار
   Future<BusinessDashboardResponse> getDashboard(int businessId) async {
     try {
       final response = await _apiClient.post<Map<String, dynamic>>(
         '/api/v1/business/$businessId/dashboard',
+        options: Options(headers: {
+          if (fiscalYearController?.fiscalYearId != null)
+            'X-Fiscal-Year-ID': fiscalYearController!.fiscalYearId.toString(),
+        }),
       );
 
       if (response.data?['success'] == true) {
@@ -62,6 +68,10 @@ class BusinessDashboardService {
     try {
       final response = await _apiClient.post<Map<String, dynamic>>(
         '/api/v1/business/$businessId/statistics',
+        options: Options(headers: {
+          if (fiscalYearController?.fiscalYearId != null)
+            'X-Fiscal-Year-ID': fiscalYearController!.fiscalYearId.toString(),
+        }),
       );
 
       if (response.data?['success'] == true) {
@@ -80,6 +90,13 @@ class BusinessDashboardService {
     } catch (e) {
       throw Exception('خطا در بارگذاری آمار: $e');
     }
+  }
+
+  Future<List<Map<String, dynamic>>> listFiscalYears(int businessId) async {
+    final res = await _apiClient.get<Map<String, dynamic>>('/api/v1/business/$businessId/fiscal-years');
+    final data = res.data as Map<String, dynamic>;
+    final items = (data['data']?['items'] as List?) ?? const [];
+    return items.cast<Map<String, dynamic>>();
   }
 
   /// دریافت لیست کسب و کارهای کاربر (مالک + عضو)

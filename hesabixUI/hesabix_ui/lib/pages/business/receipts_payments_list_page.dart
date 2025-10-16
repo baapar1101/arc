@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:dio/dio.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/core/auth_store.dart';
@@ -43,7 +44,9 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
   String? _selectedDocumentType;
   DateTime? _fromDate;
   DateTime? _toDate;
-  int _refreshKey = 0; // کلید برای تازه‌سازی جدول
+  // کلید کنترل جدول برای دسترسی به selection و refresh
+  final GlobalKey _tableKey = GlobalKey();
+  int _selectedCount = 0; // تعداد سطرهای انتخاب‌شده
 
   @override
   void initState() {
@@ -53,9 +56,17 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
 
   /// تازه‌سازی داده‌های جدول
   void _refreshData() {
-    setState(() {
-      _refreshKey++; // تغییر کلید باعث rebuild شدن جدول می‌شود
-    });
+    final state = _tableKey.currentState;
+    if (state != null) {
+      try {
+        // استفاده از متد عمومی refresh در ویجت جدول
+        // نوت: دسترسی دینامیک چون State کلاس خصوصی است
+        // ignore: avoid_dynamic_calls
+        (state as dynamic).refresh();
+        return;
+      } catch (_) {}
+    }
+    if (mounted) setState(() {});
   }
 
   @override
@@ -79,7 +90,7 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
               child: Padding(
                 padding: const EdgeInsets.all(8.0),
                 child: DataTableWidget<ReceiptPaymentDocument>(
-                  key: ValueKey(_refreshKey),
+                  key: _tableKey,
                   config: _buildTableConfig(t),
                   fromJson: (json) => ReceiptPaymentDocument.fromJson(json),
                   calendarController: widget.calendarController,
@@ -223,6 +234,21 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
       title: t.receiptsAndPayments,
       excelEndpoint: '/businesses/${widget.businessId}/receipts-payments/export/excel',
       pdfEndpoint: '/businesses/${widget.businessId}/receipts-payments/export/pdf',
+      // دکمه حذف گروهی در هدر جدول
+      customHeaderActions: [
+        Tooltip(
+          message: 'حذف انتخاب‌شده‌ها',
+          child: FilledButton.icon(
+            onPressed: _selectedCount > 0 ? _onBulkDelete : null,
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.errorContainer,
+              foregroundColor: Theme.of(context).colorScheme.onErrorContainer,
+            ),
+            icon: const Icon(Icons.delete_forever),
+            label: Text('حذف (${_selectedCount})'),
+          ),
+        ),
+      ],
       getExportParams: () => {
         'business_id': widget.businessId,
         if (_selectedDocumentType != null) 'document_type': _selectedDocumentType,
@@ -336,6 +362,11 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
       showPdfExport: true,
       defaultPageSize: 20,
       pageSizeOptions: [10, 20, 50, 100],
+      onRowSelectionChanged: (rows) {
+        setState(() {
+          _selectedCount = rows.length;
+        });
+      },
       additionalParams: {
         if (_selectedDocumentType != null) 'document_type': _selectedDocumentType,
         if (_fromDate != null) 'from_date': _fromDate!.toIso8601String(),
@@ -379,13 +410,39 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
   }
 
   /// ویرایش سند
-  void _onEdit(ReceiptPaymentDocument document) {
-    // TODO: باز کردن صفحه ویرایش سند
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('ویرایش سند ${document.code}'),
-      ),
-    );
+  void _onEdit(ReceiptPaymentDocument document) async {
+    try {
+      // دریافت جزئیات کامل سند
+      final fullDoc = await _service.getById(document.id);
+      if (fullDoc == null) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('سند یافت نشد')),
+        );
+        return;
+      }
+
+      final result = await showDialog<bool>(
+        context: context,
+        builder: (_) => BulkSettlementDialog(
+          businessId: widget.businessId,
+          calendarController: widget.calendarController,
+          isReceipt: fullDoc.isReceipt,
+          businessInfo: widget.authStore.currentBusiness,
+          apiClient: widget.apiClient,
+          initialDocument: fullDoc,
+        ),
+      );
+
+      if (result == true) {
+        _refreshData();
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('خطا در آماده‌سازی ویرایش: $e')),
+      );
+    }
   }
 
   /// حذف سند
@@ -394,7 +451,7 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('تأیید حذف'),
-        content: Text('آیا از حذف سند ${document.code} اطمینان دارید؟'),
+        content: Text('حذف سند ${document.code} غیرقابل بازگشت است. آیا ادامه می‌دهید؟'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -415,28 +472,166 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
   /// انجام عملیات حذف
   Future<void> _performDelete(ReceiptPaymentDocument document) async {
     try {
+      // نمایش لودینگ هنگام حذف
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const Center(child: CircularProgressIndicator()),
+      );
+
       final success = await _service.delete(document.id);
       if (success) {
         if (mounted) {
+          Navigator.pop(context); // بستن لودینگ
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('سند ${document.code} با موفقیت حذف شد'),
               backgroundColor: Colors.green,
             ),
           );
+          setState(() {
+            _selectedCount = 0; // پاک‌سازی شمارنده انتخاب پس از حذف
+          });
+          _refreshData();
         }
       } else {
+        if (mounted) Navigator.pop(context);
         throw Exception('خطا در حذف سند');
       }
     } catch (e) {
       if (mounted) {
+        // بستن لودینگ در صورت بروز خطا
+        Navigator.pop(context);
+
+        String message = 'خطا در حذف سند';
+        int? statusCode;
+        if (e is DioException) {
+          statusCode = e.response?.statusCode;
+          final data = e.response?.data;
+          try {
+            final detail = (data is Map<String, dynamic>) ? data['detail'] : null;
+            if (detail is Map<String, dynamic>) {
+              final err = detail['error'];
+              if (err is Map<String, dynamic>) {
+                final m = err['message'];
+                if (m is String && m.trim().isNotEmpty) {
+                  message = m;
+                }
+              }
+            }
+          } catch (_) {
+            // ignore parse errors
+          }
+
+          if (statusCode == 404) {
+            message = 'سند یافت نشد یا قبلاً حذف شده است';
+            _refreshData();
+          } else if (statusCode == 403) {
+            message = 'دسترسی لازم برای حذف این سند را ندارید';
+          } else if (statusCode == 409) {
+            // پیام از سرور استخراج شده است (مثلاً سند قفل/دارای وابستگی)
+            if (message == 'خطا در حذف سند') {
+              message = 'حذف این سند امکان‌پذیر نیست';
+            }
+          }
+        } else {
+          message = e.toString();
+        }
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('خطا در حذف سند: $e'),
+            content: Text(message),
             backgroundColor: Colors.red,
           ),
         );
       }
+    }
+  }
+
+  /// حذف گروهی اسناد انتخاب‌شده
+  Future<void> _onBulkDelete() async {
+    // استخراج آیتم‌های انتخاب‌شده از جدول
+    final state = _tableKey.currentState;
+    if (state == null) return;
+
+    List<dynamic> selectedItems = const [];
+    try {
+      // ignore: avoid_dynamic_calls
+      selectedItems = (state as dynamic).getSelectedItems();
+    } catch (_) {}
+
+    if (selectedItems.isEmpty) return;
+
+    // نگاشت به مدل و شناسه‌ها
+    final docs = selectedItems.cast<ReceiptPaymentDocument>();
+    final ids = docs.map((d) => d.id).toList();
+    final codes = docs.map((d) => d.code).toList();
+
+    // تایید کاربر
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          title: const Text('تأیید حذف گروهی'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('تعداد اسناد انتخاب‌شده: ${ids.length}'),
+              const SizedBox(height: 8),
+              Text('این عملیات غیرقابل بازگشت است. ادامه می‌دهید؟'),
+              if (codes.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Text('نمونه کدها: ${codes.take(5).join(', ')}${codes.length > 5 ? ' ...' : ''}'),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('انصراف')),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('حذف')),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true) return;
+
+    // نمایش لودینگ
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      await _service.deleteMultiple(ids);
+      if (!mounted) return;
+      Navigator.pop(context); // بستن لودینگ
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${ids.length} سند با موفقیت حذف شد'),
+          backgroundColor: Colors.green,
+        ),
+      );
+      setState(() {
+        _selectedCount = 0; // پاک‌سازی شمارنده انتخاب پس از حذف گروهی
+      });
+      _refreshData();
+    } catch (e) {
+      if (!mounted) return;
+      Navigator.pop(context); // بستن لودینگ
+      String message = 'خطا در حذف اسناد';
+      if (e is DioException) {
+        message = e.message ?? message;
+      } else {
+        message = e.toString();
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 }
@@ -447,6 +642,7 @@ class BulkSettlementDialog extends StatefulWidget {
   final bool isReceipt;
   final BusinessWithPermission? businessInfo;
   final ApiClient apiClient;
+  final ReceiptPaymentDocument? initialDocument;
   const BulkSettlementDialog({
     super.key,
     required this.businessId,
@@ -454,6 +650,7 @@ class BulkSettlementDialog extends StatefulWidget {
     required this.isReceipt,
     this.businessInfo,
     required this.apiClient,
+    this.initialDocument,
   });
 
   @override
@@ -472,10 +669,59 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog> {
   @override
   void initState() {
     super.initState();
-    _docDate = DateTime.now();
-    _isReceipt = widget.isReceipt;
-    // اگر ارز پیشفرض موجود است، آن را انتخاب کن، در غیر این صورت null بگذار تا CurrencyPickerWidget خودکار انتخاب کند
-    _selectedCurrencyId = widget.businessInfo?.defaultCurrency?.id;
+    final initial = widget.initialDocument;
+    if (initial != null) {
+      // حالت ویرایش: پرکردن اولیه از سند
+      _isReceipt = initial.isReceipt;
+      _docDate = initial.documentDate;
+      _selectedCurrencyId = initial.currencyId;
+      // تبدیل خطوط اشخاص
+      _personLines.clear();
+      for (final pl in initial.personLines) {
+        _personLines.add(
+          _PersonLine(
+            personId: pl.personId?.toString(),
+            personName: pl.personName,
+            amount: pl.amount,
+            description: pl.description,
+          ),
+        );
+      }
+      // تبدیل خطوط حساب‌ها (حذف خطوط کارمزد)
+      _centerTransactions.clear();
+      for (final al in initial.accountLines) {
+        final isCommission = (al.extraInfo != null && (al.extraInfo!['is_commission_line'] == true));
+        if (isCommission) continue;
+        final t = TransactionType.fromValue(al.transactionType ?? '') ?? TransactionType.person;
+        _centerTransactions.add(
+          InvoiceTransaction(
+            id: al.id.toString(),
+            type: t,
+            bankId: al.extraInfo?['bank_id']?.toString(),
+            bankName: al.extraInfo?['bank_name']?.toString(),
+            cashRegisterId: al.extraInfo?['cash_register_id']?.toString(),
+            cashRegisterName: al.extraInfo?['cash_register_name']?.toString(),
+            pettyCashId: al.extraInfo?['petty_cash_id']?.toString(),
+            pettyCashName: al.extraInfo?['petty_cash_name']?.toString(),
+            checkId: al.extraInfo?['check_id']?.toString(),
+            checkNumber: al.extraInfo?['check_number']?.toString(),
+            personId: al.extraInfo?['person_id']?.toString(),
+            personName: al.extraInfo?['person_name']?.toString(),
+            accountId: al.accountId.toString(),
+            accountName: al.accountName,
+            transactionDate: al.transactionDate ?? _docDate,
+            amount: al.amount,
+            commission: al.commission,
+            description: al.description,
+          ),
+        );
+      }
+    } else {
+      // حالت ایجاد
+      _docDate = DateTime.now();
+      _isReceipt = widget.isReceipt;
+      _selectedCurrencyId = widget.businessInfo?.defaultCurrency?.id;
+    }
   }
 
   @override
@@ -504,14 +750,15 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog> {
                         style: Theme.of(context).textTheme.titleLarge,
                       ),
                     ),
-                    SegmentedButton<bool>(
+                    if (widget.initialDocument == null)
+                      SegmentedButton<bool>(
                       segments: [
                         ButtonSegment<bool>(value: true, label: Text(t.receipts)),
                         ButtonSegment<bool>(value: false, label: Text(t.payments)),
                       ],
                       selected: {_isReceipt},
                       onSelectionChanged: (s) => setState(() => _isReceipt = s.first),
-                    ),
+                      ),
                     const SizedBox(width: 12),
                     SizedBox(
                       width: 200,
@@ -664,15 +911,26 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog> {
         },
       }).toList();
       
-      // ارسال به سرور
-      await service.createReceiptPayment(
-        businessId: widget.businessId,
-        documentType: _isReceipt ? 'receipt' : 'payment',
-        documentDate: _docDate,
-        currencyId: _selectedCurrencyId!,
-        personLines: personLinesData,
-        accountLines: accountLinesData,
-      );
+      // اگر initialDocument وجود دارد، حالت ویرایش
+      if (widget.initialDocument != null) {
+        await service.updateReceiptPayment(
+          documentId: widget.initialDocument!.id,
+          documentDate: _docDate,
+          currencyId: _selectedCurrencyId!,
+          personLines: personLinesData,
+          accountLines: accountLinesData,
+        );
+      } else {
+        // ایجاد سند جدید
+        await service.createReceiptPayment(
+          businessId: widget.businessId,
+          documentType: _isReceipt ? 'receipt' : 'payment',
+          documentDate: _docDate,
+          currencyId: _selectedCurrencyId!,
+          personLines: personLinesData,
+          accountLines: accountLinesData,
+        );
+      }
       
       if (!mounted) return;
       
@@ -686,9 +944,9 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            _isReceipt 
-              ? 'سند دریافت با موفقیت ثبت شد'
-              : 'سند پرداخت با موفقیت ثبت شد',
+            widget.initialDocument != null
+              ? 'سند با موفقیت ویرایش شد'
+              : (_isReceipt ? 'سند دریافت با موفقیت ثبت شد' : 'سند پرداخت با موفقیت ثبت شد'),
           ),
           backgroundColor: Colors.green,
         ),

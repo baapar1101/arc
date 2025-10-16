@@ -23,6 +23,7 @@ class ApiClient {
   static Locale? _currentLocale;
   static AuthStore? _authStore;
   static CalendarController? _calendarController;
+  static ValueNotifier<int?>? _fiscalYearId;
 
   static void setCurrentLocale(Locale locale) {
     _currentLocale = locale;
@@ -34,6 +35,11 @@ class ApiClient {
 
   static void bindCalendarController(CalendarController controller) {
     _calendarController = controller;
+  }
+
+  // Fiscal Year binding (allows UI to update selected fiscal year globally)
+  static void bindFiscalYear(ValueNotifier<int?> fiscalYearId) {
+    _fiscalYearId = fiscalYearId;
   }
 
   ApiClient._(this._dio);
@@ -70,6 +76,11 @@ class ApiClient {
           final calendarType = _calendarController?.calendarType.value;
           if (calendarType != null && calendarType.isNotEmpty) {
             options.headers['X-Calendar-Type'] = calendarType;
+          }
+          // Inject Fiscal Year header if provided
+          final fyId = _fiscalYearId?.value;
+          if (fyId != null && fyId > 0) {
+            options.headers['X-Fiscal-Year-ID'] = fyId.toString();
           }
           // Inject X-Business-ID header when request targets a specific business
           try {

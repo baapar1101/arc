@@ -98,6 +98,28 @@ class ReceiptPaymentService {
     );
   }
 
+  /// ویرایش سند دریافت/پرداخت
+  Future<Map<String, dynamic>> updateReceiptPayment({
+    required int documentId,
+    required DateTime documentDate,
+    required int currencyId,
+    required List<Map<String, dynamic>> personLines,
+    required List<Map<String, dynamic>> accountLines,
+    Map<String, dynamic>? extraInfo,
+  }) async {
+    final response = await _apiClient.put(
+      '/receipts-payments/$documentId',
+      data: {
+        'document_date': documentDate.toIso8601String(),
+        'currency_id': currencyId,
+        'person_lines': personLines,
+        'account_lines': accountLines,
+        if (extraInfo != null) 'extra_info': extraInfo,
+      },
+    );
+    return response.data['data'] as Map<String, dynamic>;
+  }
+
   /// ایجاد سند دریافت
   /// 
   /// این متد یک wrapper ساده برای createReceiptPayment است
