@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:dio/dio.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
@@ -19,6 +20,7 @@ import 'package:hesabix_ui/models/invoice_transaction.dart';
 import 'package:hesabix_ui/models/invoice_type_model.dart';
 import 'package:hesabix_ui/models/person_model.dart';
 import 'package:hesabix_ui/models/business_dashboard_models.dart';
+import 'dart:html' as html;
 
 /// صفحه لیست اسناد دریافت و پرداخت با ویجت جدول
 class ReceiptsPaymentsListPage extends StatefulWidget {
@@ -164,7 +166,7 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
                   icon: const Icon(Icons.upload_outlined),
                 ),
               ],
-              selected: {_selectedDocumentType},
+              selected: _selectedDocumentType != null ? {_selectedDocumentType} : <String?>{},
               onSelectionChanged: (set) {
                 setState(() {
                   _selectedDocumentType = set.first;
@@ -251,9 +253,10 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
       ],
       getExportParams: () => {
         'business_id': widget.businessId,
-        if (_selectedDocumentType != null) 'document_type': _selectedDocumentType,
-        if (_fromDate != null) 'from_date': _fromDate!.toIso8601String(),
-        if (_toDate != null) 'to_date': _toDate!.toIso8601String(),
+        // همیشه document_type را ارسال کن، حتی اگر null باشد
+        'document_type': _selectedDocumentType,
+        if (_fromDate != null) 'from_date': _fromDate!.toUtc().toIso8601String(),
+        if (_toDate != null) 'to_date': _toDate!.toUtc().toIso8601String(),
       },
       columns: [
         // کد سند
@@ -295,6 +298,14 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
           'اشخاص',
           width: ColumnWidth.medium,
           formatter: (item) => item.personNames ?? 'نامشخص',
+        ),
+        
+        // توضیحات
+        TextColumn(
+          'description',
+          'توضیحات',
+          width: ColumnWidth.large,
+          formatter: (item) => item.description ?? '',
         ),
         
         // تعداد حساب‌ها
@@ -368,9 +379,10 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
         });
       },
       additionalParams: {
-        if (_selectedDocumentType != null) 'document_type': _selectedDocumentType,
-        if (_fromDate != null) 'from_date': _fromDate!.toIso8601String(),
-        if (_toDate != null) 'to_date': _toDate!.toIso8601String(),
+        // همیشه document_type را ارسال کن، حتی اگر null باشد
+        'document_type': _selectedDocumentType,
+        if (_fromDate != null) 'from_date': _fromDate!.toUtc().toIso8601String(),
+        if (_toDate != null) 'to_date': _toDate!.toUtc().toIso8601String(),
       },
       onRowTap: (item) => _onView(item),
       onRowDoubleTap: (item) => _onEdit(item),
@@ -400,13 +412,34 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
   }
 
   /// مشاهده جزئیات سند
-  void _onView(ReceiptPaymentDocument document) {
-    // TODO: باز کردن صفحه جزئیات سند
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('مشاهده سند ${document.code}'),
-      ),
-    );
+  void _onView(ReceiptPaymentDocument document) async {
+    try {
+      // دریافت جزئیات کامل سند
+      final fullDoc = await _service.getById(document.id);
+      if (fullDoc == null) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('سند یافت نشد')),
+        );
+        return;
+      }
+
+      // نمایش دیالوگ مشاهده جزئیات
+      await showDialog(
+        context: context,
+        builder: (_) => ReceiptPaymentViewDialog(
+          document: fullDoc,
+          calendarController: widget.calendarController,
+          businessId: widget.businessId,
+          apiClient: widget.apiClient,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('خطا در بارگذاری جزئیات: $e')),
+      );
+    }
   }
 
   /// ویرایش سند
@@ -663,6 +696,7 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog> {
   late DateTime _docDate;
   late bool _isReceipt;
   int? _selectedCurrencyId;
+  final TextEditingController _descriptionController = TextEditingController();
   final List<_PersonLine> _personLines = <_PersonLine>[];
   final List<InvoiceTransaction> _centerTransactions = <InvoiceTransaction>[];
 
@@ -675,6 +709,7 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog> {
       _isReceipt = initial.isReceipt;
       _docDate = initial.documentDate;
       _selectedCurrencyId = initial.currencyId;
+      _descriptionController.text = initial.description ?? '';
       // تبدیل خطوط اشخاص
       _personLines.clear();
       for (final pl in initial.personLines) {
@@ -722,6 +757,12 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog> {
       _isReceipt = widget.isReceipt;
       _selectedCurrencyId = widget.businessInfo?.defaultCurrency?.id;
     }
+  }
+
+  @override
+  void dispose() {
+    _descriptionController.dispose();
+    super.dispose();
   }
 
   @override
@@ -782,6 +823,18 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog> {
                       ),
                     ),
                   ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: TextField(
+                  controller: _descriptionController,
+                  decoration: const InputDecoration(
+                    labelText: 'توضیحات کلی سند',
+                    hintText: 'توضیحات اختیاری...',
+                    border: OutlineInputBorder(),
+                  ),
+                  maxLines: 2,
                 ),
               ),
               const Divider(height: 1),
@@ -917,6 +970,7 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog> {
           documentId: widget.initialDocument!.id,
           documentDate: _docDate,
           currencyId: _selectedCurrencyId!,
+          description: _descriptionController.text.trim().isNotEmpty ? _descriptionController.text.trim() : null,
           personLines: personLinesData,
           accountLines: accountLinesData,
         );
@@ -927,6 +981,7 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog> {
           documentType: _isReceipt ? 'receipt' : 'payment',
           documentDate: _docDate,
           currencyId: _selectedCurrencyId!,
+          description: _descriptionController.text.trim().isNotEmpty ? _descriptionController.text.trim() : null,
           personLines: personLinesData,
           accountLines: accountLinesData,
         );
@@ -1179,6 +1234,435 @@ class _PersonLine {
       amount: amount ?? this.amount,
       description: description ?? this.description,
     );
+  }
+}
+
+/// دیالوگ مشاهده جزئیات سند دریافت/پرداخت
+class ReceiptPaymentViewDialog extends StatefulWidget {
+  final ReceiptPaymentDocument document;
+  final CalendarController calendarController;
+  final int businessId;
+  final ApiClient apiClient;
+
+  const ReceiptPaymentViewDialog({
+    super.key,
+    required this.document,
+    required this.calendarController,
+    required this.businessId,
+    required this.apiClient,
+  });
+
+  @override
+  State<ReceiptPaymentViewDialog> createState() => _ReceiptPaymentViewDialogState();
+}
+
+class _ReceiptPaymentViewDialogState extends State<ReceiptPaymentViewDialog> {
+  bool _isGeneratingPdf = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
+    final doc = widget.document;
+    
+    return Dialog(
+      insetPadding: const EdgeInsets.all(16),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 1000, maxHeight: 800),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // هدر دیالوگ
+            _buildHeader(t, doc),
+            
+            // محتوای اصلی
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // اطلاعات کلی سند
+                    _buildDocumentInfo(t, doc),
+                    
+                    const SizedBox(height: 24),
+                    
+                    // خطوط اشخاص
+                    _buildPersonLines(t, doc),
+                    
+                    const SizedBox(height: 24),
+                    
+                    // خطوط حساب‌ها
+                    _buildAccountLines(t, doc),
+                  ],
+                ),
+              ),
+            ),
+            
+            // دکمه‌های پایین
+            _buildFooter(t),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeader(AppLocalizations t, ReceiptPaymentDocument doc) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.primaryContainer,
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(12),
+          topRight: Radius.circular(12),
+        ),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'جزئیات سند ${doc.documentTypeName}',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    color: Theme.of(context).colorScheme.onPrimaryContainer,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'کد سند: ${doc.code}',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.onPrimaryContainer,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            onPressed: () => Navigator.pop(context),
+            icon: const Icon(Icons.close),
+            tooltip: 'بستن',
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDocumentInfo(AppLocalizations t, ReceiptPaymentDocument doc) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'اطلاعات کلی سند',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 12),
+            _buildInfoRow('نوع سند', doc.documentTypeName),
+            _buildInfoRow('تاریخ سند', HesabixDateUtils.formatForDisplay(doc.documentDate, widget.calendarController.isJalali)),
+            _buildInfoRow('تاریخ ثبت', HesabixDateUtils.formatForDisplay(doc.registeredAt, widget.calendarController.isJalali)),
+            _buildInfoRow('ارز', doc.currencyCode ?? 'نامشخص'),
+            _buildInfoRow('ایجادکننده', doc.createdByName ?? 'نامشخص'),
+            _buildInfoRow('مبلغ کل', formatWithThousands(doc.totalAmount) + ' ریال'),
+            if (doc.description != null && doc.description!.isNotEmpty)
+              _buildInfoRow('توضیحات', doc.description!),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 120,
+            child: Text(
+              '$label:',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPersonLines(AppLocalizations t, ReceiptPaymentDocument doc) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'خطوط اشخاص (${doc.personLinesCount})',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 12),
+            if (doc.personLines.isEmpty)
+              const Text('هیچ خط شخصی یافت نشد')
+            else
+              ...doc.personLines.map((line) => _buildPersonLineItem(line)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPersonLineItem(PersonLine line) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        border: Border.all(color: Theme.of(context).colorScheme.outline),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  line.personName ?? 'نامشخص',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                if (line.description != null && line.description!.isNotEmpty)
+                  Text(
+                    line.description!,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+              ],
+            ),
+          ),
+          Text(
+            formatWithThousands(line.amount) + ' ریال',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAccountLines(AppLocalizations t, ReceiptPaymentDocument doc) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'خطوط حساب‌ها (${doc.accountLinesCount})',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 12),
+            if (doc.accountLines.isEmpty)
+              const Text('هیچ خط حسابی یافت نشد')
+            else
+              ...doc.accountLines.map((line) => _buildAccountLineItem(line)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAccountLineItem(AccountLine line) {
+    final isCommission = line.extraInfo?['is_commission_line'] == true;
+    
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        border: Border.all(
+          color: isCommission 
+            ? Theme.of(context).colorScheme.error 
+            : Theme.of(context).colorScheme.outline,
+        ),
+        borderRadius: BorderRadius.circular(8),
+        color: isCommission 
+          ? Theme.of(context).colorScheme.errorContainer.withOpacity(0.1)
+          : null,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      line.accountName,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    Text(
+                      'کد: ${line.accountCode}',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                    if (line.transactionType != null)
+                      Text(
+                        'نوع: ${_getTransactionTypeName(line.transactionType!)}',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                  ],
+                ),
+              ),
+              Text(
+                formatWithThousands(line.amount) + ' ریال',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+          if (line.description != null && line.description!.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              line.description!,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
+          if (isCommission) ...[
+            const SizedBox(height: 4),
+            Text(
+              'کارمزد',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.error,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  String _getTransactionTypeName(String type) {
+    switch (type) {
+      case 'bank':
+        return 'بانک';
+      case 'cash_register':
+        return 'صندوق';
+      case 'petty_cash':
+        return 'تنخواهگردان';
+      case 'check':
+        return 'چک';
+      case 'person':
+        return 'شخص';
+      default:
+        return type;
+    }
+  }
+
+  Widget _buildFooter(AppLocalizations t) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: const BorderRadius.only(
+          bottomLeft: Radius.circular(12),
+          bottomRight: Radius.circular(12),
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(t.close),
+          ),
+          const SizedBox(width: 8),
+          FilledButton.icon(
+            onPressed: _isGeneratingPdf ? null : _generatePdf,
+            icon: _isGeneratingPdf 
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.picture_as_pdf),
+            label: Text(_isGeneratingPdf ? 'در حال تولید...' : 'خروجی PDF'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _generatePdf() async {
+    setState(() {
+      _isGeneratingPdf = true;
+    });
+
+    try {
+      // ایجاد PDF از سند
+      final pdfBytes = await widget.apiClient.downloadPdf(
+        '/receipts-payments/${widget.document.id}/pdf',
+      );
+
+      // ذخیره فایل
+      await _savePdfFile(pdfBytes, widget.document.code);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('فایل PDF با موفقیت تولید شد'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('خطا در تولید PDF: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isGeneratingPdf = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _savePdfFile(List<int> bytes, String filename) async {
+    try {
+      // استفاده از dart:html برای دانلود فایل در وب
+      final blob = html.Blob([bytes]);
+      final url = html.Url.createObjectUrlFromBlob(blob);
+      html.AnchorElement(href: url)
+        ..setAttribute('download', filename.endsWith('.pdf') ? filename : '$filename.pdf')
+        ..click();
+      html.Url.revokeObjectUrl(url);
+      
+      print('✅ PDF downloaded successfully: $filename');
+    } catch (e) {
+      print('❌ Error downloading PDF: $e');
+      rethrow;
+    }
   }
 }
 

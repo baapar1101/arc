@@ -65,6 +65,7 @@ async def list_receipts_payments_endpoint(
             for key in ["document_type", "from_date", "to_date"]:
                 if key in body_json:
                     query_dict[key] = body_json[key]
+                    print(f"API - پارامتر {key}: {body_json[key]}")
     except Exception:
         pass
     
@@ -108,6 +109,7 @@ async def create_receipt_payment_endpoint(
         "document_type": "receipt" | "payment",
         "document_date": "2025-01-15T10:30:00",
         "currency_id": 1,
+        "description": "توضیحات کلی سند (اختیاری)",
         "person_lines": [
             {
                 "person_id": 123,
@@ -430,6 +432,259 @@ async def export_receipts_payments_excel(
         headers={
             "Content-Disposition": f"attachment; filename={filename}",
             "Content-Length": str(len(content)),
+            "Access-Control-Expose-Headers": "Content-Disposition",
+        },
+    )
+
+
+@router.get(
+    "/receipts-payments/{document_id}/pdf",
+    summary="خروجی PDF تک سند دریافت/پرداخت",
+    description="خروجی PDF یک سند دریافت یا پرداخت",
+)
+async def export_single_receipt_payment_pdf(
+    document_id: int,
+    request: Request,
+    auth_context: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """خروجی PDF تک سند دریافت/پرداخت"""
+    from weasyprint import HTML, CSS
+    from weasyprint.text.fonts import FontConfiguration
+    from app.core.i18n import negotiate_locale
+    from html import escape
+    
+    # دریافت سند
+    result = get_receipt_payment(db, document_id)
+    if not result:
+        raise ApiError(
+            "DOCUMENT_NOT_FOUND",
+            "Receipt/Payment document not found",
+            http_status=404
+        )
+    
+    # بررسی دسترسی
+    business_id = result.get("business_id")
+    if business_id and not auth_context.can_access_business(business_id):
+        raise ApiError("FORBIDDEN", "Access denied", http_status=403)
+    
+    # دریافت اطلاعات کسب‌وکار
+    business_name = ""
+    try:
+        b = db.query(Business).filter(Business.id == business_id).first()
+        if b is not None:
+            business_name = b.name or ""
+    except Exception:
+        business_name = ""
+
+    # Locale handling
+    locale = negotiate_locale(request.headers.get("Accept-Language"))
+    is_fa = locale == 'fa'
+    
+    # آماده‌سازی داده‌ها
+    doc_type_name = result.get("document_type_name", "")
+    doc_code = result.get("code", "")
+    doc_date = result.get("document_date", "")
+    total_amount = result.get("total_amount", 0)
+    description = result.get("description", "")
+    person_lines = result.get("person_lines", [])
+    account_lines = result.get("account_lines", [])
+    
+    # تاریخ تولید
+    now = datetime.datetime.now().strftime('%Y/%m/%d %H:%M')
+    title_text = f"سند {doc_type_name}" if is_fa else f"{doc_type_name} Document"
+    label_biz = "کسب و کار" if is_fa else "Business"
+    label_date = "تاریخ تولید" if is_fa else "Generated Date"
+    footer_text = f"تولید شده در {now}" if is_fa else f"Generated at {now}"
+
+    # ایجاد HTML برای PDF
+    html_content = f"""
+    <!DOCTYPE html>
+    <html dir="{'rtl' if is_fa else 'ltr'}">
+      <head>
+        <meta charset="utf-8">
+        <title>{title_text}</title>
+        <style>
+          @page {{
+            margin: 1cm;
+            size: A4;
+          }}
+          body {{
+            font-family: {'Tahoma, Arial' if is_fa else 'Arial, sans-serif'};
+            font-size: 12px;
+            line-height: 1.4;
+            color: #333;
+            direction: {'rtl' if is_fa else 'ltr'};
+          }}
+          .header {{
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #366092;
+          }}
+          .title {{
+            font-size: 18px;
+            font-weight: bold;
+            color: #366092;
+          }}
+          .meta {{
+            font-size: 11px;
+            color: #666;
+          }}
+          .document-info {{
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+          }}
+          .info-row {{
+            display: flex;
+            margin-bottom: 8px;
+          }}
+          .info-label {{
+            font-weight: bold;
+            width: 150px;
+            flex-shrink: 0;
+          }}
+          .info-value {{
+            flex: 1;
+          }}
+          .section {{
+            margin: 20px 0;
+          }}
+          .section-title {{
+            font-size: 14px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            padding: 8px;
+            background-color: #366092;
+            color: white;
+            border-radius: 3px;
+          }}
+          .lines-table {{
+            width: 100%;
+            border-collapse: collapse;
+            margin: 10px 0;
+            font-size: 11px;
+          }}
+          .lines-table th {{
+            background-color: #f0f0f0;
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: {'right' if is_fa else 'left'};
+            font-weight: bold;
+          }}
+          .lines-table td {{
+            border: 1px solid #ddd;
+            padding: 6px;
+            text-align: {'right' if is_fa else 'left'};
+          }}
+          .lines-table tr:nth-child(even) {{
+            background-color: #f9f9f9;
+          }}
+          .amount {{
+            text-align: {'left' if is_fa else 'right'};
+            font-weight: bold;
+          }}
+          .commission-row {{
+            background-color: #ffe6e6 !important;
+            font-style: italic;
+          }}
+          .footer {{
+            position: running(footer);
+            font-size: 10px;
+            color: #666;
+            margin-top: 8px;
+            text-align: {'left' if is_fa else 'right'};
+          }}
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div>
+            <div class="title">{title_text}</div>
+            <div class="meta">{label_biz}: {escape(business_name)}</div>
+          </div>
+          <div class="meta">{label_date}: {escape(now)}</div>
+        </div>
+        
+        <div class="document-info">
+          <div class="info-row">
+            <div class="info-label">کد سند:</div>
+            <div class="info-value">{escape(doc_code)}</div>
+          </div>
+          <div class="info-row">
+            <div class="info-label">نوع سند:</div>
+            <div class="info-value">{escape(doc_type_name)}</div>
+          </div>
+          <div class="info-row">
+            <div class="info-label">تاریخ سند:</div>
+            <div class="info-value">{escape(doc_date)}</div>
+          </div>
+          <div class="info-row">
+            <div class="info-label">مبلغ کل:</div>
+            <div class="info-value">{escape(str(total_amount))} ریال</div>
+          </div>
+          {f'<div class="info-row"><div class="info-label">توضیحات:</div><div class="info-value">{escape(description or "")}</div></div>' if description else ''}
+        </div>
+        
+        <div class="section">
+          <div class="section-title">خطوط اشخاص</div>
+          <table class="lines-table">
+            <thead>
+              <tr>
+                <th>نام شخص</th>
+                <th>مبلغ</th>
+                <th>توضیحات</th>
+              </tr>
+            </thead>
+            <tbody>
+              {''.join([f'<tr><td>{escape(line.get("person_name") or "نامشخص")}</td><td class="amount">{escape(str(line.get("amount", 0)))} ریال</td><td>{escape(line.get("description") or "")}</td></tr>' for line in person_lines])}
+            </tbody>
+          </table>
+        </div>
+        
+        <div class="section">
+          <div class="section-title">خطوط حساب‌ها</div>
+          <table class="lines-table">
+            <thead>
+              <tr>
+                <th>نام حساب</th>
+                <th>کد حساب</th>
+                <th>نوع تراکنش</th>
+                <th>مبلغ</th>
+                <th>توضیحات</th>
+              </tr>
+            </thead>
+            <tbody>
+              {''.join([f'<tr class="{"commission-row" if line.get("extra_info", {}).get("is_commission_line") else ""}"><td>{escape(line.get("account_name") or "")}</td><td>{escape(line.get("account_code") or "")}</td><td>{escape(line.get("transaction_type") or "")}</td><td class="amount">{escape(str(line.get("amount", 0)))} ریال</td><td>{escape(line.get("description") or "")}</td></tr>' for line in account_lines])}
+            </tbody>
+          </table>
+        </div>
+        
+        <div class="footer">{footer_text}</div>
+      </body>
+    </html>
+    """
+
+    font_config = FontConfiguration()
+    pdf_bytes = HTML(string=html_content).write_pdf(font_config=font_config)
+
+    # Build filename
+    def slugify(text: str) -> str:
+        return re.sub(r"[^A-Za-z0-9_-]+", "_", text).strip("_")
+    
+    filename = f"receipt_payment_{slugify(doc_code)}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+    
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f"attachment; filename={filename}",
+            "Content-Length": str(len(pdf_bytes)),
             "Access-Control-Expose-Headers": "Content-Disposition",
         },
     )

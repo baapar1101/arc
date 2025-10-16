@@ -1,4 +1,5 @@
 import '../core/api_client.dart';
+import '../models/receipt_payment_document.dart';
 
 /// سرویس دریافت و پرداخت
 class ReceiptPaymentService {
@@ -14,6 +15,7 @@ class ReceiptPaymentService {
   /// [currencyId] شناسه ارز
   /// [personLines] لیست تراکنش‌های اشخاص
   /// [accountLines] لیست تراکنش‌های حساب‌ها
+  /// [description] توضیحات کلی سند (اختیاری)
   /// [extraInfo] اطلاعات اضافی (اختیاری)
   Future<Map<String, dynamic>> createReceiptPayment({
     required int businessId,
@@ -22,6 +24,7 @@ class ReceiptPaymentService {
     required int currencyId,
     required List<Map<String, dynamic>> personLines,
     required List<Map<String, dynamic>> accountLines,
+    String? description,
     Map<String, dynamic>? extraInfo,
   }) async {
     final response = await _apiClient.post(
@@ -30,6 +33,7 @@ class ReceiptPaymentService {
         'document_type': documentType,
         'document_date': documentDate.toIso8601String(),
         'currency_id': currencyId,
+        if (description != null && description.isNotEmpty) 'description': description,
         'person_lines': personLines,
         'account_lines': accountLines,
         if (extraInfo != null) 'extra_info': extraInfo,
@@ -66,8 +70,9 @@ class ReceiptPaymentService {
       if (sortBy != null) 'sort_by': sortBy,
       if (search != null && search.isNotEmpty) 'search': search,
       if (documentType != null) 'document_type': documentType,
-      if (fromDate != null) 'from_date': fromDate.toIso8601String(),
-      if (toDate != null) 'to_date': toDate.toIso8601String(),
+      // ارسال تاریخ به صورت ISO8601 با تنظیم timezone
+      if (fromDate != null) 'from_date': fromDate.toUtc().toIso8601String(),
+      if (toDate != null) 'to_date': toDate.toUtc().toIso8601String(),
     };
 
     final response = await _apiClient.post(
@@ -89,6 +94,18 @@ class ReceiptPaymentService {
     return response.data['data'] as Map<String, dynamic>;
   }
 
+  /// دریافت جزئیات یک سند دریافت/پرداخت (wrapper برای getReceiptPayment)
+  /// 
+  /// [documentId] شناسه سند
+  Future<ReceiptPaymentDocument?> getById(int documentId) async {
+    try {
+      final data = await getReceiptPayment(documentId);
+      return ReceiptPaymentDocument.fromJson(data);
+    } catch (e) {
+      return null;
+    }
+  }
+
   /// حذف سند دریافت/پرداخت
   /// 
   /// [documentId] شناسه سند
@@ -105,6 +122,7 @@ class ReceiptPaymentService {
     required int currencyId,
     required List<Map<String, dynamic>> personLines,
     required List<Map<String, dynamic>> accountLines,
+    String? description,
     Map<String, dynamic>? extraInfo,
   }) async {
     final response = await _apiClient.put(
@@ -112,6 +130,7 @@ class ReceiptPaymentService {
       data: {
         'document_date': documentDate.toIso8601String(),
         'currency_id': currencyId,
+        if (description != null && description.isNotEmpty) 'description': description,
         'person_lines': personLines,
         'account_lines': accountLines,
         if (extraInfo != null) 'extra_info': extraInfo,
@@ -129,6 +148,7 @@ class ReceiptPaymentService {
     required int currencyId,
     required List<Map<String, dynamic>> personLines,
     required List<Map<String, dynamic>> accountLines,
+    String? description,
     Map<String, dynamic>? extraInfo,
   }) {
     return createReceiptPayment(
@@ -138,6 +158,7 @@ class ReceiptPaymentService {
       currencyId: currencyId,
       personLines: personLines,
       accountLines: accountLines,
+      description: description,
       extraInfo: extraInfo,
     );
   }
@@ -151,6 +172,7 @@ class ReceiptPaymentService {
     required int currencyId,
     required List<Map<String, dynamic>> personLines,
     required List<Map<String, dynamic>> accountLines,
+    String? description,
     Map<String, dynamic>? extraInfo,
   }) {
     return createReceiptPayment(
@@ -160,6 +182,7 @@ class ReceiptPaymentService {
       currencyId: currencyId,
       personLines: personLines,
       accountLines: accountLines,
+      description: description,
       extraInfo: extraInfo,
     );
   }

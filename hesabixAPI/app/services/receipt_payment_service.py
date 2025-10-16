@@ -24,6 +24,7 @@ from adapters.db.models.currency import Currency
 from adapters.db.models.user import User
 from adapters.db.models.fiscal_year import FiscalYear
 from app.core.responses import ApiError
+import jdatetime
 
 # تنظیم لاگر
 logger = logging.getLogger(__name__)
@@ -43,16 +44,57 @@ ACCOUNT_TYPE_CHECK_PAYABLE = "check"  # اسناد پرداختنی (چک پرد
 
 
 def _parse_iso_date(dt: str | datetime | date) -> date:
-    """تبدیل تاریخ به فرمت date"""
+    """تبدیل تاریخ به فرمت date - پشتیبانی از تاریخ‌های شمسی و میلادی"""
     if isinstance(dt, date):
         return dt
     if isinstance(dt, datetime):
         return dt.date()
+    
+    dt_str = str(dt).strip()
+    
     try:
-        parsed = datetime.fromisoformat(str(dt).replace('Z', '+00:00'))
+        # ابتدا سعی کن ISO8601 را پردازش کنی
+        dt_str_clean = dt_str.replace('Z', '+00:00')
+        parsed = datetime.fromisoformat(dt_str_clean)
         return parsed.date()
     except Exception:
-        raise ApiError("INVALID_DATE", f"Invalid date: {dt}", http_status=400)
+        pass
+    
+    try:
+        # بررسی فرمت YYYY-MM-DD (میلادی)
+        if len(dt_str) == 10 and dt_str.count('-') == 2:
+            return datetime.strptime(dt_str, '%Y-%m-%d').date()
+    except Exception:
+        pass
+    
+    try:
+        # بررسی فرمت YYYY/MM/DD (ممکن است شمسی باشد)
+        if len(dt_str) == 10 and dt_str.count('/') == 2:
+            parts = dt_str.split('/')
+            if len(parts) == 3:
+                year, month, day = parts
+                try:
+                    year_int = int(year)
+                    month_int = int(month)
+                    day_int = int(day)
+                    
+                    # اگر سال بزرگتر از 1500 باشد، احتمالاً شمسی است
+                    if year_int > 1500:
+                        # تبدیل شمسی به میلادی
+                        jalali_date = jdatetime.date(year_int, month_int, day_int)
+                        gregorian_date = jalali_date.togregorian()
+                        return gregorian_date
+                    else:
+                        # احتمالاً میلادی است
+                        return datetime.strptime(dt_str, '%Y/%m/%d').date()
+                except (ValueError, jdatetime.JalaliDateError):
+                    # اگر تبدیل شمسی ناموفق بود، سعی کن میلادی کنی
+                    return datetime.strptime(dt_str, '%Y/%m/%d').date()
+    except Exception:
+        pass
+    
+    # اگر هیچ فرمتی کار نکرد، خطا بده
+    raise ApiError("INVALID_DATE", f"Invalid date format: {dt}", http_status=400)
 
 
 def _get_current_fiscal_year(db: Session, business_id: int) -> FiscalYear:
@@ -241,6 +283,7 @@ def create_receipt_payment(
         created_by_user_id=user_id,
         registered_at=datetime.utcnow(),
         is_proforma=False,
+        description=data.get("description"),
         extra_info=data.get("extra_info"),
     )
     db.add(document)
@@ -602,8 +645,12 @@ def list_receipts_payments(
     
     # فیلتر بر اساس نوع
     doc_type = query.get("document_type")
+    logger.info(f"فیلتر نوع سند: {doc_type}")
     if doc_type:
         q = q.filter(Document.document_type == doc_type)
+        logger.info(f"فیلتر نوع سند اعمال شد: {doc_type}")
+    else:
+        logger.info("فیلتر نوع سند اعمال نشد - نمایش همه انواع")
     
     # فیلتر بر اساس تاریخ
     from_date = query.get("from_date")
@@ -613,14 +660,18 @@ def list_receipts_payments(
         try:
             from_dt = _parse_iso_date(from_date)
             q = q.filter(Document.document_date >= from_dt)
-        except Exception:
+            logger.info(f"فیلتر تاریخ از: {from_date} -> {from_dt}")
+        except Exception as e:
+            logger.warning(f"خطا در پردازش تاریخ از: {from_date}, خطا: {e}")
             pass
     
     if to_date:
         try:
             to_dt = _parse_iso_date(to_date)
             q = q.filter(Document.document_date <= to_dt)
-        except Exception:
+            logger.info(f"فیلتر تاریخ تا: {to_date} -> {to_dt}")
+        except Exception as e:
+            logger.warning(f"خطا در پردازش تاریخ تا: {to_date}, خطا: {e}")
             pass
     
     # جستجو
@@ -822,6 +873,8 @@ def update_receipt_payment(
     document.currency_id = int(currency_id)
     if isinstance(data.get("extra_info"), dict) or data.get("extra_info") is None:
         document.extra_info = data.get("extra_info")
+    if isinstance(data.get("description"), str) or data.get("description") is None:
+        document.description = data.get("description")
 
     # تعیین نوع دریافت/پرداخت برای محاسبات بدهکار/بستانکار
     is_receipt = (document.document_type == DOCUMENT_TYPE_RECEIPT)
@@ -1130,6 +1183,7 @@ def document_to_dict(db: Session, document: Document) -> Dict[str, Any]:
         "created_by_user_id": document.created_by_user_id,
         "created_by_name": created_by_name,
         "is_proforma": document.is_proforma,
+        "description": document.description,
         "extra_info": document.extra_info,
         "person_lines": person_lines,
         "account_lines": account_lines,

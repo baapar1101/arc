@@ -39,6 +39,7 @@ import 'pages/business/petty_cash_page.dart';
 import 'pages/business/checks_page.dart';
 import 'pages/business/check_form_page.dart';
 import 'pages/business/receipts_payments_list_page.dart';
+import 'pages/business/transfers_page.dart';
 import 'pages/error_404_page.dart';
 import 'core/locale_controller.dart';
 import 'core/calendar_controller.dart';
@@ -808,6 +809,26 @@ class _MyAppState extends State<MyApp> {
                   calendarController: _calendarController!,
                   themeController: themeController,
                   child: ReceiptsPaymentsListPage(
+                    businessId: businessId,
+                    calendarController: _calendarController!,
+                    authStore: _authStore!,
+                    apiClient: ApiClient(),
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: 'transfers',
+              name: 'business_transfers',
+              builder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return BusinessShell(
+                  businessId: businessId,
+                  authStore: _authStore!,
+                  localeController: controller,
+                  calendarController: _calendarController!,
+                  themeController: themeController,
+                  child: TransfersPage(
                     businessId: businessId,
                     calendarController: _calendarController!,
                     authStore: _authStore!,

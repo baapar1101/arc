@@ -116,6 +116,7 @@ class ReceiptPaymentDocument {
   final int createdByUserId;
   final String? createdByName;
   final bool isProforma;
+  final String? description;
   final Map<String, dynamic>? extraInfo;
   final List<PersonLine> personLines;
   final List<AccountLine> accountLines;
@@ -135,6 +136,7 @@ class ReceiptPaymentDocument {
     required this.createdByUserId,
     this.createdByName,
     required this.isProforma,
+    this.description,
     this.extraInfo,
     required this.personLines,
     required this.accountLines,
@@ -156,6 +158,7 @@ class ReceiptPaymentDocument {
       createdByUserId: json['created_by_user_id'] ?? 0,
       createdByName: json['created_by_name'],
       isProforma: json['is_proforma'] ?? false,
+      description: json['description'],
       extraInfo: json['extra_info'],
       personLines: (json['person_lines'] as List<dynamic>?)
           ?.map((item) => PersonLine.fromJson(item))
@@ -182,6 +185,7 @@ class ReceiptPaymentDocument {
       'created_by_user_id': createdByUserId,
       'created_by_name': createdByName,
       'is_proforma': isProforma,
+      'description': description,
       'extra_info': extraInfo,
       'person_lines': personLines.map((item) => item.toJson()).toList(),
       'account_lines': accountLines.map((item) => item.toJson()).toList(),

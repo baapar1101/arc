@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
-from sqlalchemy import String, Integer, DateTime, Boolean, ForeignKey, JSON, Date, UniqueConstraint
+from sqlalchemy import String, Integer, DateTime, Boolean, ForeignKey, JSON, Date, UniqueConstraint, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from adapters.db.session import Base
@@ -24,6 +24,7 @@ class Document(Base):
 	document_date: Mapped[date] = mapped_column(Date, nullable=False)
 	document_type: Mapped[str] = mapped_column(String(50), nullable=False)
 	is_proforma: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+	description: Mapped[str | None] = mapped_column(Text, nullable=True)
 	extra_info: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 	developer_settings: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 	created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)

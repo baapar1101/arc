@@ -188,7 +188,9 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
   }
 
   Future<void> _fetchData() async {
-    setState(() => _loadingList = true);
+    if (mounted) {
+      setState(() => _loadingList = true);
+    }
     _error = null;
 
     try {
@@ -217,14 +219,16 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
       if (body is Map<String, dynamic>) {
         final response = DataTableResponse<T>.fromJson(body, widget.fromJson);
         
-        setState(() {
-          _items = response.items;
-          _page = response.page;
-          _limit = response.limit;
-          _total = response.total;
-          _totalPages = response.totalPages;
-          _selectedRows.clear(); // Clear selection when data changes
-        });
+        if (mounted) {
+          setState(() {
+            _items = response.items;
+            _page = response.page;
+            _limit = response.limit;
+            _total = response.total;
+            _totalPages = response.totalPages;
+            _selectedRows.clear(); // Clear selection when data changes
+          });
+        }
         
         // Call the refresh callback if provided
         if (widget.onRefresh != null) {
@@ -234,11 +238,15 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
         }
       }
     } catch (e) {
-      setState(() {
-        _error = e.toString();
-      });
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+        });
+      }
     } finally {
-      setState(() => _loadingList = false);
+      if (mounted) {
+        setState(() => _loadingList = false);
+      }
     }
   }
 

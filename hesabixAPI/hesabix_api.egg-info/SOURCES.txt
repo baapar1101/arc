@@ -14,6 +14,7 @@ adapters/api/v1/categories.py
 adapters/api/v1/checks.py
 adapters/api/v1/currencies.py
 adapters/api/v1/customers.py
+adapters/api/v1/fiscal_years.py
 adapters/api/v1/health.py
 adapters/api/v1/invoices.py
 adapters/api/v1/persons.py
@@ -199,6 +200,7 @@ migrations/versions/4b2ea782bcb3_merge_heads.py
 migrations/versions/5553f8745c6e_add_support_tables.py
 migrations/versions/7891282548e9_merge_tax_types_and_unit_fields_heads.py
 migrations/versions/7ecb63029764_merge_heads.py
+migrations/versions/9a06b0cb880a_add_description_to_documents.py
 migrations/versions/9f9786ae7191_create_tax_units_table.py
 migrations/versions/a1443c153b47_merge_heads.py
 migrations/versions/ac9e4b3dcffc_add_fiscal_year_to_documents.py

@@ -193,6 +193,20 @@ class ApiClient {
       },
     );
   }
+
+  // Download PDF API
+  Future<List<int>> downloadPdf(String path) async {
+    final response = await get<List<int>>(
+      path,
+      responseType: ResponseType.bytes,
+      options: Options(
+        headers: {
+          'Accept': 'application/pdf',
+        },
+      ),
+    );
+    return response.data ?? [];
+  }
 }
 
 // Utilities

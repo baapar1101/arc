@@ -216,6 +216,7 @@ class _BulkSettlementDialogState extends State<_BulkSettlementDialog> {
   late DateTime _docDate;
   late bool _isReceipt;
   int? _selectedCurrencyId;
+  final TextEditingController _descriptionController = TextEditingController();
   final List<_PersonLine> _personLines = <_PersonLine>[];
   final List<InvoiceTransaction> _centerTransactions = <InvoiceTransaction>[];
 
@@ -229,6 +230,12 @@ class _BulkSettlementDialogState extends State<_BulkSettlementDialog> {
       _personLines.addAll(widget.initial!.personLines);
       _centerTransactions.addAll(widget.initial!.centerTransactions);
     }
+  }
+
+  @override
+  void dispose() {
+    _descriptionController.dispose();
+    super.dispose();
   }
 
   @override
@@ -288,6 +295,18 @@ class _BulkSettlementDialogState extends State<_BulkSettlementDialog> {
                       ),
                     ),
                   ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: TextField(
+                  controller: _descriptionController,
+                  decoration: const InputDecoration(
+                    labelText: 'توضیحات کلی سند',
+                    hintText: 'توضیحات اختیاری...',
+                    border: OutlineInputBorder(),
+                  ),
+                  maxLines: 2,
                 ),
               ),
               const Divider(height: 1),
@@ -423,6 +442,7 @@ class _BulkSettlementDialogState extends State<_BulkSettlementDialog> {
         documentType: _isReceipt ? 'receipt' : 'payment',
         documentDate: _docDate,
         currencyId: _selectedCurrencyId!,
+        description: _descriptionController.text.trim().isNotEmpty ? _descriptionController.text.trim() : null,
         personLines: personLinesData,
         accountLines: accountLinesData,
       );
