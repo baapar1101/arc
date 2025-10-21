@@ -62,6 +62,7 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
   bool _commissionExcludeAdditionsDeductions = false;
   bool _commissionPostInInvoiceDocument = false;
 
+  // ignore: unused_field
   PersonType _selectedPersonType = PersonType.customer; // legacy single select (for compatibility)
   final Set<PersonType> _selectedPersonTypes = <PersonType>{};
   bool _isActive = true;
@@ -588,15 +589,6 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
     );
   }
 
-  Widget _buildSectionHeader(String title) {
-    return Text(
-      title,
-      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-        fontWeight: FontWeight.bold,
-        color: Theme.of(context).primaryColor,
-      ),
-    );
-  }
 
   Widget _buildBasicInfoFields(AppLocalizations t) {
     return Column(

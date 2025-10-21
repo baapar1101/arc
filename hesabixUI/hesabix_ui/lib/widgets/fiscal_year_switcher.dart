@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../core/fiscal_year_controller.dart';
-import 'package:hesabix_ui/l10n/app_localizations.dart';
 
 class FiscalYearSwitcher extends StatelessWidget {
   final FiscalYearController controller;
@@ -11,7 +10,6 @@ class FiscalYearSwitcher extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final t = AppLocalizations.of(context);
     final int? selectedId = controller.fiscalYearId ?? _currentDefaultId();
 
     return DropdownButtonHideUnderline(

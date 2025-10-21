@@ -1,11 +1,14 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../services/petty_cash_service.dart';
+import '../../core/api_client.dart';
+import '../../services/currency_service.dart';
 
 class PettyCashOption {
   final String id;
   final String name;
-  const PettyCashOption(this.id, this.name);
+  final int? currencyId;
+  const PettyCashOption(this.id, this.name, {this.currencyId});
 }
 
 class PettyCashComboboxWidget extends StatefulWidget {
@@ -15,6 +18,7 @@ class PettyCashComboboxWidget extends StatefulWidget {
   final String label;
   final String hintText;
   final bool isRequired;
+  final int? filterCurrencyId;
 
   const PettyCashComboboxWidget({
     super.key,
@@ -24,6 +28,7 @@ class PettyCashComboboxWidget extends StatefulWidget {
     this.label = 'تنخواه‌گردان',
     this.hintText = 'جست‌وجو و انتخاب تنخواه‌گردان',
     this.isRequired = false,
+    this.filterCurrencyId,
   });
 
   @override
@@ -42,11 +47,22 @@ class _PettyCashComboboxWidgetState extends State<PettyCashComboboxWidget> {
   bool _isLoading = false;
   bool _isSearching = false;
   bool _hasSearched = false;
+  final CurrencyService _currencyService = CurrencyService(ApiClient());
+  Map<int, Map<String, dynamic>> _currencyById = <int, Map<String, dynamic>>{};
 
   @override
   void initState() {
     super.initState();
+    _loadCurrencies();
     _load();
+  }
+
+  @override
+  void didUpdateWidget(covariant PettyCashComboboxWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.filterCurrencyId != widget.filterCurrencyId) {
+      _performSearch(_latestQuery);
+    }
   }
 
   @override
@@ -58,6 +74,35 @@ class _PettyCashComboboxWidgetState extends State<PettyCashComboboxWidget> {
 
   Future<void> _load() async {
     await _performSearch('');
+  }
+
+  Future<void> _loadCurrencies() async {
+    try {
+      final list = await _currencyService.listBusinessCurrencies(businessId: widget.businessId);
+      final map = <int, Map<String, dynamic>>{};
+      for (final m in list) {
+        final id = m['id'];
+        if (id is int) {
+          map[id] = m;
+        }
+      }
+      if (!mounted) return;
+      setState(() {
+        _currencyById = map;
+      });
+    } catch (_) {
+      // ignore errors
+    }
+  }
+
+  String _formatCurrencyLabel(int? currencyId) {
+    if (currencyId == null) return '';
+    final m = _currencyById[currencyId];
+    if (m == null) return '';
+    final code = (m['code'] ?? '').toString();
+    final title = (m['title'] ?? '').toString();
+    if (code.isNotEmpty && title.isNotEmpty) return '$code';
+    return code.isNotEmpty ? code : title;
   }
 
   void _onSearchChanged(String q) {
@@ -95,10 +140,18 @@ class _PettyCashComboboxWidgetState extends State<PettyCashComboboxWidget> {
       final dynamic itemsRaw = (res['data'] != null && res['data'] is Map && (res['data'] as Map)['items'] != null)
           ? (res['data'] as Map)['items']
           : res['items'];
-      final items = ((itemsRaw as List<dynamic>? ?? const <dynamic>[])).map((e) {
+      var items = ((itemsRaw as List<dynamic>? ?? const <dynamic>[])).map((e) {
         final m = Map<String, dynamic>.from(e as Map);
-        return PettyCashOption('${m['id']}', (m['name']?.toString() ?? 'نامشخص'));
+        final currencyId = (m['currency_id'] ?? m['currencyId']);
+        return PettyCashOption(
+          '${m['id']}',
+          (m['name']?.toString() ?? 'نامشخص'),
+          currencyId: currencyId is int ? currencyId : int.tryParse('${currencyId ?? ''}'),
+        );
       }).toList();
+      if (widget.filterCurrencyId != null) {
+        items = items.where((it) => it.currencyId == widget.filterCurrencyId).toList();
+      }
       if (!mounted) return;
       setState(() {
         _items = items;
@@ -143,6 +196,7 @@ class _PettyCashComboboxWidgetState extends State<PettyCashComboboxWidget> {
             isSearching: _isSearching,
             hasSearched: _hasSearched,
             onSearchChanged: _onSearchChanged,
+            currencyLabelBuilder: _formatCurrencyLabel,
             onSelected: (opt) {
               widget.onChanged(opt);
               Navigator.pop(context);
@@ -160,8 +214,11 @@ class _PettyCashComboboxWidgetState extends State<PettyCashComboboxWidget> {
       (e) => e.id == widget.selectedPettyCashId,
       orElse: () => const PettyCashOption('', ''),
     );
+    final currencyText = _formatCurrencyLabel(selected.currencyId);
     final text = (widget.selectedPettyCashId != null && widget.selectedPettyCashId!.isNotEmpty)
-        ? (selected.name.isNotEmpty ? selected.name : widget.hintText)
+        ? (selected.name.isNotEmpty
+            ? (currencyText.isNotEmpty ? '${selected.name} - $currencyText' : selected.name)
+            : widget.hintText)
         : widget.hintText;
 
     return InkWell(
@@ -203,6 +260,7 @@ class _PettyCashPickerBottomSheet extends StatelessWidget {
   final bool hasSearched;
   final ValueChanged<String> onSearchChanged;
   final ValueChanged<PettyCashOption?> onSelected;
+  final String Function(int?)? currencyLabelBuilder;
 
   const _PettyCashPickerBottomSheet({
     required this.label,
@@ -213,6 +271,7 @@ class _PettyCashPickerBottomSheet extends StatelessWidget {
     required this.isSearching,
     required this.hasSearched,
     required this.onSearchChanged,
+    required this.currencyLabelBuilder,
     required this.onSelected,
   });
 
@@ -270,12 +329,30 @@ class _PettyCashPickerBottomSheet extends StatelessWidget {
                         itemCount: items.length,
                         itemBuilder: (context, index) {
                           final it = items[index];
+                          final currencyText = (it.currencyId != null) ? (currencyLabelBuilder?.call(it.currencyId) ?? '') : '';
                           return ListTile(
                             leading: CircleAvatar(
                               backgroundColor: colorScheme.primaryContainer,
                               child: Icon(Icons.wallet, color: colorScheme.onPrimaryContainer),
                             ),
                             title: Text(it.name),
+                            trailing: currencyText.isNotEmpty
+                                ? Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: colorScheme.primary.withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      currencyText,
+                                      style: TextStyle(
+                                        color: colorScheme.primary,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  )
+                                : null,
                             onTap: () => onSelected(it),
                           );
                         },

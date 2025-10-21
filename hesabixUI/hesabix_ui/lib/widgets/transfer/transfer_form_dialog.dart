@@ -1,20 +1,30 @@
 import 'package:flutter/material.dart';
 import '../../core/calendar_controller.dart';
-import '../../services/bank_account_service.dart';
-import '../../services/cash_register_service.dart';
-import '../../services/petty_cash_service.dart';
 import '../date_input_field.dart';
+import '../invoice/bank_account_combobox_widget.dart';
+import '../invoice/cash_register_combobox_widget.dart';
+import '../invoice/petty_cash_combobox_widget.dart';
+import '../../core/auth_store.dart';
+import '../../core/api_client.dart';
+import '../../services/transfer_service.dart';
+import '../../widgets/banking/currency_picker_widget.dart';
 
 class TransferFormDialog extends StatefulWidget {
   final int businessId;
   final CalendarController calendarController;
   final VoidCallback? onSuccess;
+  final AuthStore? authStore;
+  final ApiClient? apiClient;
+  final Map<String, dynamic>? initial; // اگر موجود باشد، حالت ویرایش
 
   const TransferFormDialog({
     super.key,
     required this.businessId,
     required this.calendarController,
     this.onSuccess,
+    this.authStore,
+    this.apiClient,
+    this.initial,
   });
 
   @override
@@ -29,29 +39,68 @@ class _TransferFormDialogState extends State<TransferFormDialog> {
   
   bool _isLoading = false;
   DateTime _transferDate = DateTime.now();
-  
-  // سرویس‌ها
-  final BankAccountService _bankService = BankAccountService();
-  final CashRegisterService _cashRegisterService = CashRegisterService();
-  final PettyCashService _pettyCashService = PettyCashService();
+  int? _currencyId;
   
   // انتخاب مبدا و مقصد
   String? _fromType = 'bank'; // پیش‌فرض بانک
   String? _toType = 'bank';   // پیش‌فرض بانک
-  int? _fromId;
-  int? _toId;
-  
-  // لیست‌های داده
-  List<Map<String, dynamic>> _banks = [];
-  List<Map<String, dynamic>> _cashRegisters = [];
-  List<Map<String, dynamic>> _pettyCashList = [];
-  
-  bool _isDataLoaded = false;
+  String? _fromId;
+  String? _toId;
 
   @override
   void initState() {
     super.initState();
-    _loadData();
+    // Prefill when editing
+    final init = widget.initial;
+    if (init != null) {
+      try {
+        final docDate = init['document_date'] as String?;
+        if (docDate != null) {
+          _transferDate = DateTime.tryParse(docDate) ?? _transferDate;
+        }
+        _descriptionController.text = (init['description'] as String?) ?? '';
+        final amount = (init['total_amount'] as num?)?.toDouble();
+        if (amount != null && amount > 0) {
+          _amountController.text = amount.toStringAsFixed(0);
+        }
+        _currencyId = (init['currency_id'] as int?);
+        // Infer commission from lines
+        final lines = List<Map<String, dynamic>>.from(init['account_lines'] as List? ?? const []);
+        final commissionLine = lines.firstWhere(
+          (l) => (l['is_commission_line'] as bool?) == true && (l['account_code'] == '70902'),
+          orElse: () => <String, dynamic>{},
+        );
+        final commissionVal = (commissionLine['amount'] as num?)?.toDouble();
+        if (commissionVal != null && commissionVal > 0) {
+          _commissionController.text = commissionVal.toStringAsFixed(0);
+        }
+        // Detect source/destination lines
+        final src = lines.firstWhere(
+          (l) => (l['side'] as String?) == 'source' && (l['is_commission_line'] as bool?) != true,
+          orElse: () => <String, dynamic>{},
+        );
+        final dst = lines.firstWhere(
+          (l) => (l['side'] as String?) == 'destination' && (l['is_commission_line'] as bool?) != true,
+          orElse: () => <String, dynamic>{},
+        );
+        if (src.isNotEmpty) {
+          _fromType = (src['source_type'] as String?) ?? _fromType;
+          final bid = src['bank_account_id'];
+          final cid = src['cash_register_id'];
+          final pid = src['petty_cash_id'];
+          _fromId = (bid ?? cid ?? pid)?.toString();
+        }
+        if (dst.isNotEmpty) {
+          _toType = (dst['destination_type'] as String?) ?? _toType;
+          final bid = dst['bank_account_id'];
+          final cid = dst['cash_register_id'];
+          final pid = dst['petty_cash_id'];
+          _toId = (bid ?? cid ?? pid)?.toString();
+        }
+      } catch (_) {}
+    }
+    // If still not set (create), use business default currency
+    _currencyId ??= widget.authStore?.currentBusiness?.defaultCurrency?.id;
   }
 
   @override
@@ -62,59 +111,6 @@ class _TransferFormDialogState extends State<TransferFormDialog> {
     super.dispose();
   }
 
-  Future<void> _loadData() async {
-    if (_isDataLoaded) return;
-    
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      // بارگذاری لیست بانک‌ها
-      final bankResponse = await _bankService.list(
-        businessId: widget.businessId,
-        queryInfo: {'take': 100, 'skip': 0},
-      );
-      _banks = (bankResponse['items'] as List<dynamic>?)
-          ?.map((item) => item as Map<String, dynamic>)
-          .toList() ?? [];
-
-      // بارگذاری لیست صندوق‌ها
-      final cashRegisterResponse = await _cashRegisterService.list(
-        businessId: widget.businessId,
-        queryInfo: {'take': 100, 'skip': 0},
-      );
-      _cashRegisters = (cashRegisterResponse['items'] as List<dynamic>?)
-          ?.map((item) => item as Map<String, dynamic>)
-          .toList() ?? [];
-
-      // بارگذاری لیست تنخواه گردان‌ها
-      final pettyCashResponse = await _pettyCashService.list(
-        businessId: widget.businessId,
-        queryInfo: {'take': 100, 'skip': 0},
-      );
-      _pettyCashList = (pettyCashResponse['items'] as List<dynamic>?)
-          ?.map((item) => item as Map<String, dynamic>)
-          .toList() ?? [];
-
-      setState(() {
-        _isDataLoaded = true;
-      });
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('خطا در بارگذاری داده‌ها: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
-    }
-  }
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
@@ -154,20 +150,59 @@ class _TransferFormDialogState extends State<TransferFormDialog> {
     });
 
     try {
-      // TODO: ایجاد سرویس انتقال و ارسال درخواست به API
-      // فعلاً فقط پیام موفقیت نمایش می‌دهیم
-      
-      await Future.delayed(const Duration(seconds: 1)); // شبیه‌سازی درخواست API
-      
+      final api = widget.apiClient ?? ApiClient();
+      final service = TransferService(api);
+      final currencyId = _currencyId;
+      if (currencyId == null) throw Exception('ارز انتخاب نشده است');
+
+      final double amount = double.parse(_amountController.text.replaceAll(',', ''));
+      final double? commission = _commissionController.text.trim().isEmpty
+          ? null
+          : double.parse(_commissionController.text.replaceAll(',', ''));
+
+      final src = {
+        'type': _fromType,
+        'id': _fromId != null ? int.tryParse(_fromId!) ?? _fromId : null,
+      }..removeWhere((k, v) => v == null);
+
+      final dst = {
+        'type': _toType,
+        'id': _toId != null ? int.tryParse(_toId!) ?? _toId : null,
+      }..removeWhere((k, v) => v == null);
+
+      final isEdit = widget.initial != null && widget.initial!['id'] != null;
+      if (isEdit) {
+        await service.update(
+          documentId: widget.initial!['id'] as int,
+          documentDate: _transferDate,
+          currencyId: currencyId,
+          source: src,
+          destination: dst,
+          amount: amount,
+          commission: commission,
+          description: _descriptionController.text.trim(),
+        );
+      } else {
+        await service.create(
+          businessId: widget.businessId,
+          documentDate: _transferDate,
+          currencyId: currencyId,
+          source: src,
+          destination: dst,
+          amount: amount,
+          commission: commission,
+          description: _descriptionController.text.trim(),
+        );
+      }
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('انتقال با موفقیت ثبت شد'),
+          SnackBar(
+            content: Text(isEdit ? 'ویرایش با موفقیت انجام شد' : 'انتقال با موفقیت ثبت شد'),
             backgroundColor: Colors.green,
           ),
         );
-        
-        Navigator.of(context).pop();
+        Navigator.of(context).pop(true);
         widget.onSuccess?.call();
       }
     } catch (e) {
@@ -189,250 +224,382 @@ class _TransferFormDialogState extends State<TransferFormDialog> {
   Widget _buildAccountSelector({
     required String label,
     required String? selectedType,
-    required int? selectedId,
+    required String? selectedId,
     required ValueChanged<String?> onTypeChanged,
-    required ValueChanged<int?> onIdChanged,
+    required ValueChanged<String?> onIdChanged,
   }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+          width: 1,
         ),
-        const SizedBox(height: 12),
-        
-        // انتخاب نوع حساب با SegmentedButton
-        Card(
-          elevation: 4,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+        color: Theme.of(context).colorScheme.surface,
+        boxShadow: [
+          BoxShadow(
+            color: Theme.of(context).colorScheme.shadow.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
-          child: Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.3),
-                  Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.1),
-                ],
-              ),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: [
-                  // SegmentedButton برای انتخاب نوع
-                  SegmentedButton<String>(
-                    segments: const [
-                      ButtonSegment<String>(
-                        value: 'bank',
-                        label: Text('بانک'),
-                        icon: Icon(Icons.account_balance, size: 16),
-                      ),
-                      ButtonSegment<String>(
-                        value: 'cash_register',
-                        label: Text('صندوق'),
-                        icon: Icon(Icons.point_of_sale, size: 16),
-                      ),
-                      ButtonSegment<String>(
-                        value: 'petty_cash',
-                        label: Text('تنخواه'),
-                        icon: Icon(Icons.money, size: 16),
-                      ),
-                    ],
-                    selected: selectedType != null ? {selectedType} : <String>{},
-                    onSelectionChanged: (Set<String> selection) {
-                      if (selection.isNotEmpty) {
-                        onTypeChanged(selection.first);
-                        onIdChanged(null); // ریست کردن انتخاب قبلی
-                      }
-                    },
-                    style: ButtonStyle(
-                      backgroundColor: MaterialStateProperty.resolveWith((states) {
-                        if (states.contains(MaterialState.selected)) {
-                          return Theme.of(context).primaryColor;
-                        }
-                        return Theme.of(context).colorScheme.surface;
-                      }),
-                      foregroundColor: MaterialStateProperty.resolveWith((states) {
-                        if (states.contains(MaterialState.selected)) {
-                          return Colors.white;
-                        }
-                        return Theme.of(context).colorScheme.onSurface;
-                      }),
-                      minimumSize: MaterialStateProperty.all(const Size(0, 40)),
-                      padding: MaterialStateProperty.all(const EdgeInsets.symmetric(horizontal: 8)),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-        
-        const SizedBox(height: 12),
-        
-        // انتخاب حساب خاص
-        if (selectedType != null)
-          Card(
-            elevation: 2,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: DropdownButtonFormField<int>(
-                value: selectedId,
-                decoration: InputDecoration(
-                  labelText: _getAccountTypeLabel(selectedType),
-                  border: OutlineInputBorder(
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header with icon and label
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).primaryColor.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide(
-                      color: Theme.of(context).colorScheme.outline.withOpacity(0.5),
-                    ),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide(
-                      color: Theme.of(context).primaryColor,
-                      width: 2,
-                    ),
-                  ),
-                  prefixIcon: Icon(
-                    _getAccountTypeIcon(selectedType),
+                  child: Icon(
+                    Icons.account_balance_wallet,
                     color: Theme.of(context).primaryColor,
+                    size: 20,
                   ),
-                  filled: true,
-                  fillColor: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.3),
                 ),
-                items: _getAccountItems(selectedType),
-                onChanged: onIdChanged,
-                validator: (value) {
-                  if (value == null) return 'لطفاً حساب را انتخاب کنید';
-                  return null;
-                },
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    label,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            
+            const SizedBox(height: 20),
+            
+            // Account type selection with improved styling
+            Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.3),
+                border: Border.all(
+                  color: Theme.of(context).colorScheme.outline.withOpacity(0.1),
+                ),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(4),
+                child: SegmentedButton<String>(
+                  segments: const [
+                    ButtonSegment<String>(
+                      value: 'bank',
+                      label: Text('بانک'),
+                      icon: Icon(Icons.account_balance, size: 18),
+                    ),
+                    ButtonSegment<String>(
+                      value: 'cash_register',
+                      label: Text('صندوق'),
+                      icon: Icon(Icons.point_of_sale, size: 18),
+                    ),
+                    ButtonSegment<String>(
+                      value: 'petty_cash',
+                      label: Text('تنخواه'),
+                      icon: Icon(Icons.money, size: 18),
+                    ),
+                  ],
+                  selected: selectedType != null ? {selectedType} : <String>{},
+                  onSelectionChanged: (Set<String> selection) {
+                    if (selection.isNotEmpty) {
+                      final selectedType = selection.first;
+                      onTypeChanged(selectedType);
+                      onIdChanged(null);
+                    }
+                  },
+                  style: ButtonStyle(
+                    backgroundColor: MaterialStateProperty.resolveWith((states) {
+                      if (states.contains(MaterialState.selected)) {
+                        return Theme.of(context).primaryColor;
+                      }
+                      return Colors.transparent;
+                    }),
+                    foregroundColor: MaterialStateProperty.resolveWith((states) {
+                      if (states.contains(MaterialState.selected)) {
+                        return Colors.white;
+                      }
+                      return Theme.of(context).colorScheme.onSurface;
+                    }),
+                    minimumSize: MaterialStateProperty.all(const Size(0, 44)),
+                    padding: MaterialStateProperty.all(const EdgeInsets.symmetric(horizontal: 12)),
+                    shape: MaterialStateProperty.all(
+                      RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
+                ),
               ),
             ),
-          ),
-      ],
+            
+            const SizedBox(height: 16),
+            
+            // Account selection combobox
+            if (selectedType != null)
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeInOut,
+                child: _buildAccountCombobox(selectedType, selectedId, onIdChanged),
+              ),
+          ],
+        ),
+      ),
     );
   }
 
-  String _getAccountTypeLabel(String type) {
-    switch (type) {
+  Widget _buildAccountCombobox(String accountType, String? selectedId, ValueChanged<String?> onIdChanged) {
+    switch (accountType) {
       case 'bank':
-        return 'انتخاب بانک';
+        return BankAccountComboboxWidget(
+          businessId: widget.businessId,
+          selectedAccountId: selectedId,
+          onChanged: (option) {
+            onIdChanged(option?.id);
+          },
+          label: 'انتخاب بانک',
+          hintText: 'جست‌وجو و انتخاب بانک',
+          isRequired: true,
+          filterCurrencyId: _currencyId,
+        );
       case 'cash_register':
-        return 'انتخاب صندوق';
+        return CashRegisterComboboxWidget(
+          businessId: widget.businessId,
+          selectedRegisterId: selectedId,
+          onChanged: (option) {
+            onIdChanged(option?.id);
+          },
+          label: 'انتخاب صندوق',
+          hintText: 'جست‌وجو و انتخاب صندوق',
+          isRequired: true,
+          filterCurrencyId: _currencyId,
+        );
       case 'petty_cash':
-        return 'انتخاب تنخواه گردان';
+        return PettyCashComboboxWidget(
+          businessId: widget.businessId,
+          selectedPettyCashId: selectedId,
+          onChanged: (option) {
+            onIdChanged(option?.id);
+          },
+          label: 'انتخاب تنخواه گردان',
+          hintText: 'جست‌وجو و انتخاب تنخواه گردان',
+          isRequired: true,
+          filterCurrencyId: _currencyId,
+        );
       default:
-        return 'انتخاب حساب';
+        return Container();
     }
   }
 
-  IconData _getAccountTypeIcon(String type) {
-    switch (type) {
-      case 'bank':
-        return Icons.account_balance;
-      case 'cash_register':
-        return Icons.point_of_sale;
-      case 'petty_cash':
-        return Icons.money;
-      default:
-        return Icons.account_balance_wallet;
-    }
+
+  Widget _buildInputField({
+    required TextEditingController controller,
+    required String labelText,
+    required IconData icon,
+    String? suffixText,
+    String? helperText,
+    TextInputType? keyboardType,
+    int maxLines = 1,
+    String? Function(String?)? validator,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+          width: 1,
+        ),
+        color: Theme.of(context).colorScheme.surface,
+        boxShadow: [
+          BoxShadow(
+            color: Theme.of(context).colorScheme.shadow.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(4),
+        child: TextFormField(
+          controller: controller,
+          keyboardType: keyboardType,
+          maxLines: maxLines,
+          validator: validator,
+          decoration: InputDecoration(
+            labelText: labelText,
+            labelStyle: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+              fontSize: 14,
+            ),
+            suffixText: suffixText,
+            helperText: helperText,
+            helperStyle: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+              fontSize: 12,
+            ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide.none,
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide.none,
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(
+                color: Theme.of(context).primaryColor,
+                width: 2,
+              ),
+            ),
+            prefixIcon: Container(
+              margin: const EdgeInsets.all(8),
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Theme.of(context).primaryColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Icon(
+                icon,
+                color: Theme.of(context).primaryColor,
+                size: 18,
+              ),
+            ),
+            filled: true,
+            fillColor: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.2),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          ),
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurface,
+            fontSize: 16,
+          ),
+        ),
+      ),
+    );
   }
 
-
-  List<DropdownMenuItem<int>> _getAccountItems(String type) {
-    List<Map<String, dynamic>> items = [];
-    
-    switch (type) {
-      case 'bank':
-        items = _banks;
-        break;
-      case 'cash_register':
-        items = _cashRegisters;
-        break;
-      case 'petty_cash':
-        items = _pettyCashList;
-        break;
-    }
-    
-    return items.map((item) {
-      return DropdownMenuItem<int>(
-        value: item['id'] as int,
-        child: Text(item['name'] as String? ?? 'نامشخص'),
-      );
-    }).toList();
+  Widget _buildDateField() {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+          width: 1,
+        ),
+        color: Theme.of(context).colorScheme.surface,
+        boxShadow: [
+          BoxShadow(
+            color: Theme.of(context).colorScheme.shadow.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(4),
+        child: DateInputField(
+          value: _transferDate,
+          onChanged: (date) {
+            if (date != null) {
+              setState(() {
+                _transferDate = date;
+              });
+            }
+          },
+          labelText: 'تاریخ انتقال',
+          calendarController: widget.calendarController,
+          firstDate: DateTime(2020),
+          lastDate: DateTime.now().add(const Duration(days: 365)),
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Dialog(
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
       ),
-      elevation: 8,
+      elevation: 12,
       child: Container(
-        width: MediaQuery.of(context).size.width * 0.9,
+        width: MediaQuery.of(context).size.width * 0.95,
         constraints: BoxConstraints(
-          maxHeight: MediaQuery.of(context).size.height * 0.9,
-          maxWidth: 1000, // حداکثر عرض برای دسکتاپ
+          maxHeight: MediaQuery.of(context).size.height * 0.95,
+          maxWidth: 1200, // حداکثر عرض برای دسکتاپ
         ),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(20),
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
               Theme.of(context).colorScheme.surface,
-              Theme.of(context).colorScheme.surface.withOpacity(0.95),
+              Theme.of(context).colorScheme.surface.withOpacity(0.98),
             ],
           ),
+          boxShadow: [
+            BoxShadow(
+              color: Theme.of(context).colorScheme.shadow.withOpacity(0.1),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
+            ),
+          ],
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             // هدر دیالوگ با طراحی بهبود یافته
             Container(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.all(28),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
                   colors: [
                     Theme.of(context).primaryColor,
-                    Theme.of(context).primaryColor.withOpacity(0.8),
+                    Theme.of(context).primaryColor.withOpacity(0.85),
                   ],
                 ),
                 borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(16),
-                  topRight: Radius.circular(16),
+                  topLeft: Radius.circular(20),
+                  topRight: Radius.circular(20),
                 ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Theme.of(context).primaryColor.withOpacity(0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
               child: Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(12),
+                      color: Colors.white.withOpacity(0.25),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: Colors.white.withOpacity(0.3),
+                        width: 1,
+                      ),
                     ),
                     child: const Icon(
                       Icons.swap_horiz,
                       color: Colors.white,
-                      size: 24,
+                      size: 26,
                     ),
                   ),
-                  const SizedBox(width: 16),
+                  const SizedBox(width: 20),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -441,13 +608,16 @@ class _TransferFormDialogState extends State<TransferFormDialog> {
                           'ثبت انتقال',
                           style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                             color: Colors.white,
-                            fontWeight: FontWeight.bold,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 24,
                           ),
                         ),
+                        const SizedBox(height: 4),
                         Text(
                           'انتقال بین حساب‌های مختلف',
                           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                             color: Colors.white.withOpacity(0.9),
+                            fontSize: 16,
                           ),
                         ),
                       ],
@@ -455,12 +625,13 @@ class _TransferFormDialogState extends State<TransferFormDialog> {
                   ),
                   IconButton(
                     onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.close, color: Colors.white),
+                    icon: const Icon(Icons.close, color: Colors.white, size: 24),
                     style: IconButton.styleFrom(
                       backgroundColor: Colors.white.withOpacity(0.2),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(12),
                       ),
+                      padding: const EdgeInsets.all(12),
                     ),
                   ),
                 ],
@@ -476,12 +647,30 @@ class _TransferFormDialogState extends State<TransferFormDialog> {
                     final isDesktop = constraints.maxWidth > 800;
                     
                     if (isDesktop) {
-                      // طراحی دو ستونه برای دسکتاپ
+                      // طراحی دو ستونه برای دسکتاپ با بهبود تراز
                       return SingleChildScrollView(
                         child: Padding(
-                          padding: const EdgeInsets.all(16),
+                          padding: const EdgeInsets.all(24),
                           child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
+                              // ردیف 0: انتخاب ارز
+                              Row(
+                                children: [
+                                  SizedBox(
+                                    width: 260,
+                                    child: CurrencyPickerWidget(
+                                      businessId: widget.businessId,
+                                      selectedCurrencyId: _currencyId,
+                                      onChanged: (id) => setState(() => _currencyId = id),
+                                      label: 'ارز',
+                                      hintText: 'انتخاب ارز',
+                                    ),
+                                  ),
+                                  const Spacer(),
+                                ],
+                              ),
+                              const SizedBox(height: 16),
                               // ردیف اول: انتخاب مبدا و مقصد
                               Row(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -504,7 +693,7 @@ class _TransferFormDialogState extends State<TransferFormDialog> {
                                       },
                                     ),
                                   ),
-                                  const SizedBox(width: 24),
+                                  const SizedBox(width: 32),
                                   Expanded(
                                     child: _buildAccountSelector(
                                       label: 'به (مقصد)',
@@ -526,40 +715,18 @@ class _TransferFormDialogState extends State<TransferFormDialog> {
                                 ],
                               ),
                               
-                              const SizedBox(height: 24),
+                              const SizedBox(height: 32),
                               
-                              // ردیف دوم: مبلغ و کارمزد
+                              // ردیف دوم: مبلغ و کارمزد با طراحی بهبود یافته
                               Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Expanded(
-                                    child: TextFormField(
+                                    child: _buildInputField(
                                       controller: _amountController,
-                                      decoration: InputDecoration(
-                                        labelText: 'مبلغ انتقال',
-                                        border: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(8),
-                                        ),
-                                        enabledBorder: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(8),
-                                          borderSide: BorderSide(
-                                            color: Theme.of(context).colorScheme.outline.withOpacity(0.5),
-                                          ),
-                                        ),
-                                        focusedBorder: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(8),
-                                          borderSide: BorderSide(
-                                            color: Theme.of(context).primaryColor,
-                                            width: 2,
-                                          ),
-                                        ),
-                                        suffixText: 'ریال',
-                                        prefixIcon: Icon(
-                                          Icons.attach_money,
-                                          color: Theme.of(context).primaryColor,
-                                        ),
-                                        filled: true,
-                                        fillColor: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.3),
-                                      ),
+                                      labelText: 'مبلغ انتقال',
+                                      icon: Icons.attach_money,
+                                      suffixText: 'ریال',
                                       keyboardType: TextInputType.number,
                                       validator: (value) {
                                         if (value == null || value.isEmpty) {
@@ -575,37 +742,14 @@ class _TransferFormDialogState extends State<TransferFormDialog> {
                                       },
                                     ),
                                   ),
-                                  const SizedBox(width: 24),
+                                  const SizedBox(width: 32),
                                   Expanded(
-                                    child: TextFormField(
+                                    child: _buildInputField(
                                       controller: _commissionController,
-                                      decoration: InputDecoration(
-                                        labelText: 'کارمزد',
-                                        border: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(8),
-                                        ),
-                                        enabledBorder: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(8),
-                                          borderSide: BorderSide(
-                                            color: Theme.of(context).colorScheme.outline.withOpacity(0.5),
-                                          ),
-                                        ),
-                                        focusedBorder: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(8),
-                                          borderSide: BorderSide(
-                                            color: Theme.of(context).primaryColor,
-                                            width: 2,
-                                          ),
-                                        ),
-                                        suffixText: 'ریال',
-                                        helperText: 'اختیاری',
-                                        prefixIcon: Icon(
-                                          Icons.percent,
-                                          color: Theme.of(context).primaryColor,
-                                        ),
-                                        filled: true,
-                                        fillColor: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.3),
-                                      ),
+                                      labelText: 'کارمزد',
+                                      icon: Icons.percent,
+                                      suffixText: 'ریال',
+                                      helperText: 'اختیاری',
                                       keyboardType: TextInputType.number,
                                       validator: (value) {
                                         if (value != null && value.isNotEmpty) {
@@ -623,81 +767,49 @@ class _TransferFormDialogState extends State<TransferFormDialog> {
                                 ],
                               ),
                               
-                              const SizedBox(height: 24),
+                              const SizedBox(height: 32),
                               
-                              // ردیف سوم: تاریخ
+                              // ردیف سوم: تاریخ و توضیحات
                               Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Expanded(
-                                    child: DateInputField(
-                                      value: _transferDate,
-                                      onChanged: (date) {
-                                        if (date != null) {
-                                          setState(() {
-                                            _transferDate = date;
-                                          });
-                                        }
-                                      },
-                                      labelText: 'تاریخ انتقال',
-                                      calendarController: widget.calendarController,
-                                      firstDate: DateTime(2020),
-                                      lastDate: DateTime.now().add(const Duration(days: 365)),
+                                    child: _buildDateField(),
+                                  ),
+                                  const SizedBox(width: 32),
+                                  Expanded(
+                                    child: _buildInputField(
+                                      controller: _descriptionController,
+                                      labelText: 'توضیحات',
+                                      icon: Icons.description,
+                                      maxLines: 3,
+                                      // اختیاری: بدون اعتبارسنجی اجباری
+                                      validator: (value) => null,
                                     ),
                                   ),
-                                  const SizedBox(width: 24),
-                                  const Expanded(child: SizedBox()), // فضای خالی برای تراز کردن
                                 ],
-                              ),
-                              
-                              const SizedBox(height: 24),
-                              
-                              // ردیف چهارم: توضیحات (تمام عرض)
-                              TextFormField(
-                                controller: _descriptionController,
-                                decoration: InputDecoration(
-                                  labelText: 'توضیحات',
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  enabledBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                    borderSide: BorderSide(
-                                      color: Theme.of(context).colorScheme.outline.withOpacity(0.5),
-                                    ),
-                                  ),
-                                  focusedBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                    borderSide: BorderSide(
-                                      color: Theme.of(context).primaryColor,
-                                      width: 2,
-                                    ),
-                                  ),
-                                  prefixIcon: Icon(
-                                    Icons.description,
-                                    color: Theme.of(context).primaryColor,
-                                  ),
-                                  filled: true,
-                                  fillColor: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.3),
-                                ),
-                                maxLines: 3,
-                                validator: (value) {
-                                  if (value == null || value.isEmpty) {
-                                    return 'لطفاً توضیحات را وارد کنید';
-                                  }
-                                  return null;
-                                },
                               ),
                             ],
                           ),
                         ),
                       );
                     } else {
-                      // طراحی تک ستونه برای موبایل
+                      // طراحی تک ستونه برای موبایل با بهبود تراز
                       return SingleChildScrollView(
                         child: Padding(
-                          padding: const EdgeInsets.all(16),
+                          padding: const EdgeInsets.all(20),
                           child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
+                              // ارز
+                              CurrencyPickerWidget(
+                                businessId: widget.businessId,
+                                selectedCurrencyId: _currencyId,
+                                onChanged: (id) => setState(() => _currencyId = id),
+                                label: 'ارز',
+                                hintText: 'انتخاب ارز',
+                              ),
+                              const SizedBox(height: 16),
                               // انتخاب مبدا
                               _buildAccountSelector(
                                 label: 'از (مبدا)',
@@ -739,13 +851,11 @@ class _TransferFormDialogState extends State<TransferFormDialog> {
                               const SizedBox(height: 24),
                               
                               // مبلغ
-                              TextFormField(
+                              _buildInputField(
                                 controller: _amountController,
-                                decoration: const InputDecoration(
-                                  labelText: 'مبلغ انتقال',
-                                  border: OutlineInputBorder(),
-                                  suffixText: 'ریال',
-                                ),
+                                labelText: 'مبلغ انتقال',
+                                icon: Icons.attach_money,
+                                suffixText: 'ریال',
                                 keyboardType: TextInputType.number,
                                 validator: (value) {
                                   if (value == null || value.isEmpty) {
@@ -764,14 +874,12 @@ class _TransferFormDialogState extends State<TransferFormDialog> {
                               const SizedBox(height: 24),
                               
                               // کارمزد
-                              TextFormField(
+                              _buildInputField(
                                 controller: _commissionController,
-                                decoration: const InputDecoration(
-                                  labelText: 'کارمزد',
-                                  border: OutlineInputBorder(),
-                                  suffixText: 'ریال',
-                                  helperText: 'اختیاری',
-                                ),
+                                labelText: 'کارمزد',
+                                icon: Icons.percent,
+                                suffixText: 'ریال',
+                                helperText: 'اختیاری',
                                 keyboardType: TextInputType.number,
                                 validator: (value) {
                                   if (value != null && value.isNotEmpty) {
@@ -789,58 +897,17 @@ class _TransferFormDialogState extends State<TransferFormDialog> {
                               const SizedBox(height: 24),
                               
                               // تاریخ
-                              DateInputField(
-                                value: _transferDate,
-                                onChanged: (date) {
-                                  if (date != null) {
-                                    setState(() {
-                                      _transferDate = date;
-                                    });
-                                  }
-                                },
-                                labelText: 'تاریخ انتقال',
-                                calendarController: widget.calendarController,
-                                firstDate: DateTime(2020),
-                                lastDate: DateTime.now().add(const Duration(days: 365)),
-                              ),
+                              _buildDateField(),
                               
                               const SizedBox(height: 24),
                               
                               // توضیحات
-                              TextFormField(
+                              _buildInputField(
                                 controller: _descriptionController,
-                                decoration: InputDecoration(
-                                  labelText: 'توضیحات',
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  enabledBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                    borderSide: BorderSide(
-                                      color: Theme.of(context).colorScheme.outline.withOpacity(0.5),
-                                    ),
-                                  ),
-                                  focusedBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                    borderSide: BorderSide(
-                                      color: Theme.of(context).primaryColor,
-                                      width: 2,
-                                    ),
-                                  ),
-                                  prefixIcon: Icon(
-                                    Icons.description,
-                                    color: Theme.of(context).primaryColor,
-                                  ),
-                                  filled: true,
-                                  fillColor: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.3),
-                                ),
+                                labelText: 'توضیحات',
+                                icon: Icons.description,
                                 maxLines: 3,
-                                validator: (value) {
-                                  if (value == null || value.isEmpty) {
-                                    return 'لطفاً توضیحات را وارد کنید';
-                                  }
-                                  return null;
-                                },
+                                validator: (value) => null,
                               ),
                             ],
                           ),
@@ -854,12 +921,18 @@ class _TransferFormDialogState extends State<TransferFormDialog> {
             
             // دکمه‌های عملیات با طراحی بهبود یافته
             Container(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.all(28),
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.3),
+                color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.2),
                 borderRadius: const BorderRadius.only(
-                  bottomLeft: Radius.circular(16),
-                  bottomRight: Radius.circular(16),
+                  bottomLeft: Radius.circular(20),
+                  bottomRight: Radius.circular(20),
+                ),
+                border: Border(
+                  top: BorderSide(
+                    color: Theme.of(context).colorScheme.outline.withOpacity(0.1),
+                    width: 1,
+                  ),
                 ),
               ),
               child: Row(
@@ -867,36 +940,49 @@ class _TransferFormDialogState extends State<TransferFormDialog> {
                 children: [
                   OutlinedButton.icon(
                     onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.close),
+                    icon: const Icon(Icons.close, size: 20),
                     label: const Text('انصراف'),
                     style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(12),
                       ),
+                      side: BorderSide(
+                        color: Theme.of(context).colorScheme.outline.withOpacity(0.5),
+                        width: 1.5,
+                      ),
+                      foregroundColor: Theme.of(context).colorScheme.onSurface,
                     ),
                   ),
-                  const SizedBox(width: 16),
+                  const SizedBox(width: 20),
                   ElevatedButton.icon(
                     onPressed: _isLoading ? null : _save,
                     icon: _isLoading
                         ? const SizedBox(
-                            width: 16,
-                            height: 16,
+                            width: 18,
+                            height: 18,
                             child: CircularProgressIndicator(
-                              strokeWidth: 2,
+                              strokeWidth: 2.5,
                               color: Colors.white,
                             ),
                           )
-                        : const Icon(Icons.save),
-                    label: Text(_isLoading ? 'در حال ثبت...' : 'ثبت انتقال'),
+                        : const Icon(Icons.save, size: 20),
+                    label: Text(
+                      _isLoading ? 'در حال ثبت...' : 'ثبت انتقال',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 16,
+                      ),
+                    ),
                     style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(12),
                       ),
                       backgroundColor: Theme.of(context).primaryColor,
                       foregroundColor: Colors.white,
+                      elevation: 4,
+                      shadowColor: Theme.of(context).primaryColor.withOpacity(0.3),
                     ),
                   ),
                 ],

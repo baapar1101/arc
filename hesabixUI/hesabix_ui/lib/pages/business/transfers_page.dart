@@ -1,9 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../core/auth_store.dart';
 import '../../core/calendar_controller.dart';
 import '../../core/api_client.dart';
+import '../../models/transfer_document.dart';
+import '../../services/transfer_service.dart';
+import '../../widgets/data_table/data_table_widget.dart';
+import '../../widgets/data_table/data_table_config.dart';
+import '../../core/date_utils.dart' show HesabixDateUtils;
+import '../../utils/number_formatters.dart' show formatWithThousands;
+import '../../widgets/date_input_field.dart';
 import '../../widgets/transfer/transfer_form_dialog.dart';
-import 'package:hesabix_ui/l10n/app_localizations.dart';
+import '../../widgets/transfer/transfer_details_dialog.dart';
 
 class TransfersPage extends StatefulWidget {
   final int businessId;
@@ -24,84 +32,326 @@ class TransfersPage extends StatefulWidget {
 }
 
 class _TransfersPageState extends State<TransfersPage> {
-  Future<void> _showAddTransferDialog() async {
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (context) => TransferFormDialog(
-        businessId: widget.businessId,
-        calendarController: widget.calendarController,
-        onSuccess: () {
-          // TODO: بروزرسانی لیست انتقالات
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('انتقال با موفقیت ثبت شد'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        },
-      ),
-    );
-    
-    if (result == true) {
-      // بروزرسانی صفحه در صورت نیاز
-      setState(() {});
+  // کنترل جدول برای دسترسی به refresh
+  final GlobalKey _tableKey = GlobalKey();
+  DateTime? _fromDate;
+  DateTime? _toDate;
+
+  void _refreshData() {
+    final state = _tableKey.currentState;
+    if (state != null) {
+      try {
+        // ignore: avoid_dynamic_calls
+        (state as dynamic).refresh();
+        return;
+      } catch (_) {}
     }
+    if (mounted) setState(() {});
   }
 
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
-    
+
     return Scaffold(
-      appBar: AppBar(
-        title: Text(t.transfers),
-        backgroundColor: Theme.of(context).colorScheme.surface,
-        foregroundColor: Theme.of(context).colorScheme.onSurface,
-        elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.add),
-            onPressed: () => _showAddTransferDialog(),
-            tooltip: 'اضافه کردن انتقال جدید',
-          ),
-        ],
-      ),
-      body: Center(
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      body: SafeArea(
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Icon(
-              Icons.swap_horiz,
-              size: 80,
-              color: Theme.of(context).colorScheme.primary.withOpacity(0.5),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'صفحه لیست انتقال',
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                color: Theme.of(context).colorScheme.onSurface,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'این صفحه به زودی آماده خواهد شد',
-              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
-              ),
-            ),
-            const SizedBox(height: 32),
-            ElevatedButton.icon(
-              onPressed: () => _showAddTransferDialog(),
-              icon: const Icon(Icons.add),
-              label: const Text('اضافه کردن انتقال جدید'),
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            _buildHeader(t),
+            _buildFilters(t),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: DataTableWidget<TransferDocument>(
+                  key: _tableKey,
+                  config: _buildTableConfig(t),
+                  fromJson: (json) => TransferDocument.fromJson(json),
+                  calendarController: widget.calendarController,
+                ),
               ),
             ),
           ],
         ),
       ),
     );
+  }
+
+  Widget _buildHeader(AppLocalizations t) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  t.transfers,
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'مدیریت اسناد انتقال وجه',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                ),
+              ],
+            ),
+          ),
+          Tooltip(
+            message: 'افزودن انتقال جدید',
+            child: FilledButton.icon(
+              onPressed: _onAddNew,
+              icon: const Icon(Icons.add),
+              label: Text(t.add),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFilters(AppLocalizations t) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: Row(
+              children: [
+                Expanded(
+                  child: DateInputField(
+                    value: _fromDate,
+                    calendarController: widget.calendarController,
+                    onChanged: (date) {
+                      setState(() => _fromDate = date);
+                      _refreshData();
+                    },
+                    labelText: 'از تاریخ',
+                    hintText: 'انتخاب تاریخ شروع',
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: DateInputField(
+                    value: _toDate,
+                    calendarController: widget.calendarController,
+                    onChanged: (date) {
+                      setState(() => _toDate = date);
+                      _refreshData();
+                    },
+                    labelText: 'تا تاریخ',
+                    hintText: 'انتخاب تاریخ پایان',
+                  ),
+                ),
+                IconButton(
+                  onPressed: () {
+                    setState(() {
+                      _fromDate = null;
+                      _toDate = null;
+                    });
+                    _refreshData();
+                  },
+                  icon: const Icon(Icons.clear),
+                  tooltip: 'پاک کردن فیلتر تاریخ',
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  DataTableConfig<TransferDocument> _buildTableConfig(AppLocalizations t) {
+    return DataTableConfig<TransferDocument>(
+      endpoint: '/businesses/${widget.businessId}/transfers',
+      title: t.transfers,
+      excelEndpoint: '/businesses/${widget.businessId}/transfers/export/excel',
+      pdfEndpoint: '/businesses/${widget.businessId}/transfers/export/pdf',
+      getExportParams: () => {
+        if (_fromDate != null) 'from_date': _fromDate!.toUtc().toIso8601String(),
+        if (_toDate != null) 'to_date': _toDate!.toUtc().toIso8601String(),
+      },
+      columns: [
+        TextColumn(
+          'code',
+          'کد سند',
+          width: ColumnWidth.medium,
+          formatter: (it) => it.code,
+        ),
+        TextColumn(
+          'description',
+          'توضیحات',
+          width: ColumnWidth.large,
+          formatter: (it) => (it.description ?? '').isNotEmpty ? it.description! : _composeDesc(it),
+        ),
+        TextColumn(
+          'route',
+          'مبدا → مقصد',
+          width: ColumnWidth.large,
+          formatter: (it) => _composeRoute(it),
+        ),
+        DateColumn(
+          'document_date',
+          'تاریخ سند',
+          width: ColumnWidth.medium,
+          formatter: (it) => HesabixDateUtils.formatForDisplay(it.documentDate, widget.calendarController.isJalali),
+        ),
+        NumberColumn(
+          'total_amount',
+          'مبلغ کل',
+          width: ColumnWidth.large,
+          formatter: (it) => formatWithThousands(it.totalAmount),
+          suffix: ' ریال',
+        ),
+        TextColumn(
+          'created_by_name',
+          'ایجادکننده',
+          width: ColumnWidth.medium,
+          formatter: (it) => it.createdByName ?? 'نامشخص',
+        ),
+        DateColumn(
+          'registered_at',
+          'تاریخ ثبت',
+          width: ColumnWidth.medium,
+          formatter: (it) => HesabixDateUtils.formatForDisplay(it.registeredAt, widget.calendarController.isJalali),
+        ),
+        ActionColumn(
+          'actions',
+          'عملیات',
+          width: ColumnWidth.medium,
+          actions: [
+            DataTableAction(icon: Icons.visibility, label: 'مشاهده', onTap: (it) => _onView(it as TransferDocument)),
+            DataTableAction(icon: Icons.edit, label: 'ویرایش', onTap: (it) => _onEdit(it as TransferDocument)),
+            DataTableAction(icon: Icons.delete, label: 'حذف', onTap: (it) => _onDelete(it as TransferDocument), isDestructive: true),
+          ],
+        ),
+      ],
+      searchFields: ['code', 'created_by_name'],
+      dateRangeField: 'document_date',
+      showSearch: true,
+      showFilters: true,
+      showPagination: true,
+      showColumnSearch: true,
+      showRefreshButton: true,
+      showClearFiltersButton: true,
+      enableRowSelection: true,
+      enableMultiRowSelection: true,
+      showExportButtons: true,
+      showExcelExport: true,
+      showPdfExport: true,
+      defaultPageSize: 20,
+      pageSizeOptions: [10, 20, 50, 100],
+      // انتخاب سطرها در این صفحه استفاده خاصی ندارد
+      additionalParams: {
+        if (_fromDate != null) 'from_date': _fromDate!.toUtc().toIso8601String(),
+        if (_toDate != null) 'to_date': _toDate!.toUtc().toIso8601String(),
+      },
+      onRowTap: (item) => _onView(item as TransferDocument),
+      onRowDoubleTap: (item) => _onEdit(item as TransferDocument),
+      emptyStateMessage: 'هیچ سند انتقالی یافت نشد',
+      loadingMessage: 'در حال بارگذاری اسناد انتقال...',
+      errorMessage: 'خطا در بارگذاری اسناد انتقال',
+    );
+  }
+
+  String _typeFa(String? t) {
+    switch (t) {
+      case 'bank':
+        return 'بانک';
+      case 'cash_register':
+        return 'صندوق';
+      case 'petty_cash':
+        return 'تنخواه';
+      default:
+        return t ?? '';
+    }
+  }
+
+  String _composeRoute(TransferDocument it) {
+    final src = '${_typeFa(it.sourceType)} ${it.sourceName ?? ''}'.trim();
+    final dst = '${_typeFa(it.destinationType)} ${it.destinationName ?? ''}'.trim();
+    if (src.isEmpty && dst.isEmpty) return '';
+    return '$src → $dst';
+  }
+
+  String _composeDesc(TransferDocument it) {
+    final r = _composeRoute(it);
+    if (r.isEmpty) return '';
+    return 'انتقال $r';
+  }
+
+  void _onAddNew() async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => TransferFormDialog(
+        businessId: widget.businessId,
+        calendarController: widget.calendarController,
+        authStore: widget.authStore,
+        apiClient: widget.apiClient,
+        onSuccess: () {},
+      ),
+    );
+    if (result == true) _refreshData();
+  }
+
+  void _onView(TransferDocument item) async {
+    final svc = TransferService(widget.apiClient);
+    final full = await svc.getById(item.id);
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      builder: (_) => TransferDetailsDialog(document: full),
+    );
+  }
+
+  void _onEdit(TransferDocument item) async {
+    final svc = TransferService(widget.apiClient);
+    final full = await svc.getById(item.id);
+    if (!mounted) return;
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (_) => TransferFormDialog(
+        businessId: widget.businessId,
+        calendarController: widget.calendarController,
+        authStore: widget.authStore,
+        apiClient: widget.apiClient,
+        initial: full,
+        onSuccess: () {},
+      ),
+    );
+    if (result == true) _refreshData();
+  }
+
+  void _onDelete(TransferDocument item) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('حذف انتقال'),
+        content: Text('آیا از حذف سند ${item.code} مطمئن هستید؟'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('انصراف')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('حذف')),
+        ],
+      ),
+    );
+    if (confirm == true) {
+      try {
+        final svc = TransferService(widget.apiClient);
+        await svc.deleteById(item.id);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('حذف شد'), backgroundColor: Colors.green));
+        }
+        _refreshData();
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطا: $e'), backgroundColor: Colors.red));
+        }
+      }
+    }
   }
 }

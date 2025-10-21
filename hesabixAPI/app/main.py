@@ -31,6 +31,7 @@ from adapters.api.v1.support.statuses import router as support_statuses_router
 from adapters.api.v1.admin.file_storage import router as admin_file_storage_router
 from adapters.api.v1.admin.email_config import router as admin_email_config_router
 from adapters.api.v1.receipts_payments import router as receipts_payments_router
+from adapters.api.v1.transfers import router as transfers_router
 from adapters.api.v1.fiscal_years import router as fiscal_years_router
 from app.core.i18n import negotiate_locale, Translator
 from app.core.error_handlers import register_error_handlers
@@ -308,6 +309,9 @@ def create_app() -> FastAPI:
     application.include_router(tax_units_router, prefix=settings.api_v1_prefix)
     application.include_router(tax_types_router, prefix=settings.api_v1_prefix)
     application.include_router(receipts_payments_router, prefix=settings.api_v1_prefix)
+    application.include_router(transfers_router, prefix=settings.api_v1_prefix)
+    from adapters.api.v1.expense_income import router as expense_income_router
+    application.include_router(expense_income_router, prefix=settings.api_v1_prefix)
     application.include_router(fiscal_years_router, prefix=settings.api_v1_prefix)
     
     # Support endpoints

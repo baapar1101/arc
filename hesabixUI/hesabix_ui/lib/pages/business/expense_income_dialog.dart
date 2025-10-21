@@ -1,0 +1,338 @@
+import 'package:flutter/material.dart';
+import '../../core/calendar_controller.dart';
+import '../../core/api_client.dart';
+import '../../core/auth_store.dart';
+import '../../widgets/date_input_field.dart';
+import '../../widgets/invoice/invoice_transactions_widget.dart';
+import '../../widgets/invoice/account_tree_combobox_widget.dart';
+import '../../models/invoice_type_model.dart';
+import '../../models/invoice_transaction.dart';
+import '../../models/account_tree_node.dart';
+import '../../services/expense_income_service.dart';
+
+class ExpenseIncomeDialog extends StatefulWidget {
+  final int businessId;
+  final CalendarController calendarController;
+  final AuthStore authStore;
+  final ApiClient apiClient;
+  final Map<String, dynamic>? initial; // optional document for edit
+  const ExpenseIncomeDialog({super.key, required this.businessId, required this.calendarController, required this.authStore, required this.apiClient, this.initial});
+
+  @override
+  State<ExpenseIncomeDialog> createState() => _ExpenseIncomeDialogState();
+}
+
+class _ExpenseIncomeDialogState extends State<ExpenseIncomeDialog> {
+  final _formKey = GlobalKey<FormState>();
+  String _docType = 'expense';
+  DateTime _docDate = DateTime.now();
+  int? _currencyId;
+  final _descCtrl = TextEditingController();
+
+  final List<_ItemLine> _items = <_ItemLine>[];
+  final List<InvoiceTransaction> _transactions = <InvoiceTransaction>[];
+
+  @override
+  void initState() {
+    super.initState();
+    _currencyId = widget.authStore.currentBusiness?.defaultCurrency?.id;
+    if (widget.initial != null) {
+      _docType = (widget.initial!['document_type'] as String?) ?? 'expense';
+      final dd = widget.initial!['document_date'] as String?;
+      if (dd != null) _docDate = DateTime.tryParse(dd) ?? _docDate;
+      _descCtrl.text = (widget.initial!['description'] as String?) ?? '';
+      // items and counterparties could be mapped if provided
+    }
+  }
+
+  @override
+  void dispose() {
+    _descCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final sumItems = _items.fold<double>(0, (p, e) => p + e.amount);
+    final sumTx = _transactions.fold<double>(0, (p, e) => p + (e.amount.toDouble()));
+    final diff = (_docType == 'income') ? (sumTx - sumItems) : (sumItems - sumTx);
+
+    return Dialog(
+      insetPadding: const EdgeInsets.all(16),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 1100, maxHeight: 720),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                child: Row(
+                  children: [
+                    const Expanded(child: Text('هزینه و درآمد', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600))),
+                    SegmentedButton<String>(
+                      segments: const [ButtonSegment(value: 'expense', label: Text('هزینه')), ButtonSegment(value: 'income', label: Text('درآمد'))],
+                      selected: {_docType},
+                      onSelectionChanged: (s) => setState(() => _docType = s.first),
+                    ),
+                    const SizedBox(width: 12),
+                    SizedBox(
+                      width: 200,
+                      child: DateInputField(
+                        value: _docDate,
+                        calendarController: widget.calendarController,
+                        onChanged: (d) => setState(() => _docDate = d ?? _docDate),
+                        labelText: 'تاریخ سند',
+                        hintText: 'انتخاب تاریخ',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: TextField(
+                  controller: _descCtrl,
+                  decoration: const InputDecoration(labelText: 'توضیحات کلی سند', border: OutlineInputBorder()),
+                  maxLines: 2,
+                ),
+              ),
+              const Divider(height: 1),
+              Expanded(
+                child: Row(
+                  children: [
+                    Expanded(child: _ItemsPanel(businessId: widget.businessId, lines: _items, onChanged: (ls) => setState(() { _items..clear()..addAll(ls);}))),
+                    const VerticalDivider(width: 1),
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: InvoiceTransactionsWidget(
+                          transactions: _transactions,
+                          onChanged: (txs) => setState(() { _transactions..clear()..addAll(txs); }),
+                          businessId: widget.businessId,
+                          calendarController: widget.calendarController,
+                          invoiceType: _docType == 'income' ? InvoiceType.sales : InvoiceType.purchase,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Wrap(spacing: 16, runSpacing: 8, children: [
+                        _chip('جمع اقلام', sumItems),
+                        _chip('جمع طرف‌حساب', sumTx),
+                        _chip('اختلاف', diff, isError: diff != 0),
+                      ]),
+                    ),
+                    TextButton(onPressed: () => Navigator.pop(context), child: const Text('انصراف')),
+                    const SizedBox(width: 8),
+                    FilledButton.icon(onPressed: _canSave ? _save : null, icon: const Icon(Icons.save), label: const Text('ثبت')),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  bool get _canSave {
+    if (_currencyId == null) return false;
+    if (_items.isEmpty || _transactions.isEmpty) return false;
+    final sumItems = _items.fold<double>(0, (p, e) => p + e.amount);
+    final sumTx = _transactions.fold<double>(0, (p, e) => p + (e.amount.toDouble()));
+    return sumItems == sumTx;
+  }
+
+  Future<void> _save() async {
+    showDialog(context: context, barrierDismissible: false, builder: (_) => const Center(child: CircularProgressIndicator()));
+    try {
+      final service = ExpenseIncomeService(widget.apiClient);
+      final itemsData = _items.map((e) => {'account_id': e.account?.id, 'amount': e.amount, if (e.description?.isNotEmpty == true) 'description': e.description}).toList();
+      final txData = _transactions.map((tx) => {
+            'transaction_type': tx.type.value,
+            'transaction_date': tx.transactionDate.toIso8601String(),
+            'amount': tx.amount.toDouble(),
+            if (tx.commission != null) 'commission': tx.commission?.toDouble(),
+            if (tx.description != null && tx.description!.isNotEmpty) 'description': tx.description,
+            'bank_id': tx.bankId,
+            'bank_name': tx.bankName,
+            'cash_register_id': tx.cashRegisterId,
+            'cash_register_name': tx.cashRegisterName,
+            'petty_cash_id': tx.pettyCashId,
+            'petty_cash_name': tx.pettyCashName,
+            'check_id': tx.checkId,
+            'check_number': tx.checkNumber,
+            'person_id': tx.personId,
+            'person_name': tx.personName,
+            'account_id': tx.accountId,
+            'account_name': tx.accountName,
+          }..removeWhere((k, v) => v == null)).toList();
+      await service.create(
+        businessId: widget.businessId,
+        documentType: _docType,
+        documentDate: _docDate,
+        currencyId: _currencyId!,
+        description: _descCtrl.text.trim(),
+        itemLines: itemsData,
+        counterpartyLines: txData,
+      );
+      if (!mounted) return;
+      Navigator.pop(context); // loading
+      Navigator.pop(context, true); // dialog success
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('سند با موفقیت ثبت شد'), backgroundColor: Colors.green));
+    } catch (e) {
+      if (!mounted) return;
+      Navigator.pop(context); // loading
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطا: $e'), backgroundColor: Colors.red));
+    }
+  }
+}
+
+class _ItemsPanel extends StatelessWidget {
+  final int businessId;
+  final List<_ItemLine> lines;
+  final ValueChanged<List<_ItemLine>> onChanged;
+  const _ItemsPanel({required this.businessId, required this.lines, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              const Expanded(child: Text('اقلام')),
+              IconButton(onPressed: () { final nl = List<_ItemLine>.from(lines); nl.add(_ItemLine.empty()); onChanged(nl); }, icon: const Icon(Icons.add)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Expanded(
+            child: lines.isEmpty
+                ? const Center(child: Text('موردی ثبت نشده'))
+                : ListView.separated(
+                    itemCount: lines.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 8),
+                    itemBuilder: (ctx, i) => _ItemTile(
+                      businessId: businessId,
+                      line: lines[i],
+                      onChanged: (l) { final nl = List<_ItemLine>.from(lines); nl[i] = l; onChanged(nl); },
+                      onDelete: () { final nl = List<_ItemLine>.from(lines); nl.removeAt(i); onChanged(nl); },
+                    ),
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ItemTile extends StatefulWidget {
+  final int businessId;
+  final _ItemLine line;
+  final ValueChanged<_ItemLine> onChanged;
+  final VoidCallback onDelete;
+  const _ItemTile({required this.businessId, required this.line, required this.onChanged, required this.onDelete});
+
+  @override
+  State<_ItemTile> createState() => _ItemTileState();
+}
+
+class _ItemTileState extends State<_ItemTile> {
+  final _amountCtrl = TextEditingController();
+  final _descCtrl = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _amountCtrl.text = widget.line.amount == 0 ? '' : widget.line.amount.toStringAsFixed(0);
+    _descCtrl.text = widget.line.description ?? '';
+  }
+
+  @override
+  void dispose() {
+    _amountCtrl.dispose();
+    _descCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: AccountTreeComboboxWidget(
+                    businessId: widget.businessId,
+                    selectedAccount: widget.line.account,
+                    onChanged: (acc) => widget.onChanged(widget.line.copyWith(account: acc)),
+                    label: 'حساب *',
+                    hintText: 'انتخاب حساب',
+                    isRequired: true,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                SizedBox(
+                  width: 180,
+                  child: TextFormField(
+                    controller: _amountCtrl,
+                    decoration: const InputDecoration(labelText: 'مبلغ', hintText: '1,000,000'),
+                    keyboardType: TextInputType.number,
+                    onChanged: (v) {
+                      final val = double.tryParse(v.replaceAll(',', '')) ?? 0;
+                      widget.onChanged(widget.line.copyWith(amount: val));
+                    },
+                  ),
+                ),
+                const SizedBox(width: 8),
+                IconButton(onPressed: widget.onDelete, icon: const Icon(Icons.delete_outline)),
+              ],
+            ),
+            const SizedBox(height: 8),
+            TextFormField(
+              controller: _descCtrl,
+              decoration: const InputDecoration(labelText: 'توضیحات'),
+              onChanged: (v) => widget.onChanged(widget.line.copyWith(description: v.trim().isEmpty ? null : v.trim())),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ItemLine {
+  final AccountTreeNode? account;
+  final double amount;
+  final String? description;
+  const _ItemLine({this.account, required this.amount, this.description});
+  factory _ItemLine.empty() => const _ItemLine(amount: 0);
+  _ItemLine copyWith({AccountTreeNode? account, double? amount, String? description}) => _ItemLine(
+        account: account ?? this.account,
+        amount: amount ?? this.amount,
+        description: description ?? this.description,
+      );
+}
+
+Widget _chip(String label, double value, {bool isError = false}) {
+  return Chip(
+    label: Text('$label: ${value.toStringAsFixed(0)}'),
+    backgroundColor: isError ? Colors.red.shade100 : Colors.grey.shade200,
+  );
+}
+
+

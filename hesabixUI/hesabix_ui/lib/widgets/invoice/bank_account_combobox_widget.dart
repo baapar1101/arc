@@ -2,11 +2,14 @@ import 'dart:async';
 import 'dart:developer';
 import 'package:flutter/material.dart';
 import '../../services/bank_account_service.dart';
+import '../../core/api_client.dart';
+import '../../services/currency_service.dart';
 
 class BankAccountOption {
   final String id;
   final String name;
-  const BankAccountOption(this.id, this.name);
+  final int? currencyId;
+  const BankAccountOption(this.id, this.name, {this.currencyId});
 }
 
 class BankAccountComboboxWidget extends StatefulWidget {
@@ -16,6 +19,7 @@ class BankAccountComboboxWidget extends StatefulWidget {
   final String label;
   final String hintText;
   final bool isRequired;
+  final int? filterCurrencyId;
 
   const BankAccountComboboxWidget({
     super.key,
@@ -25,6 +29,7 @@ class BankAccountComboboxWidget extends StatefulWidget {
     this.label = 'بانک',
     this.hintText = 'جست‌وجو و انتخاب بانک',
     this.isRequired = false,
+    this.filterCurrencyId,
   });
 
   @override
@@ -38,6 +43,8 @@ class _BankAccountComboboxWidgetState extends State<BankAccountComboboxWidget> {
   int _seq = 0;
   String _latestQuery = '';
   void Function(void Function())? _setModalState;
+  final CurrencyService _currencyService = CurrencyService(ApiClient());
+  Map<int, Map<String, dynamic>> _currencyById = <int, Map<String, dynamic>>{};
 
   List<BankAccountOption> _items = <BankAccountOption>[];
   bool _isLoading = false;
@@ -47,7 +54,17 @@ class _BankAccountComboboxWidgetState extends State<BankAccountComboboxWidget> {
   @override
   void initState() {
     super.initState();
+    _loadCurrencies();
     _load();
+  }
+
+  @override
+  void didUpdateWidget(covariant BankAccountComboboxWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.filterCurrencyId != widget.filterCurrencyId) {
+      // بازخوانی با فیلتر جدید ارز
+      _performSearch(_latestQuery);
+    }
   }
 
   @override
@@ -59,6 +76,35 @@ class _BankAccountComboboxWidgetState extends State<BankAccountComboboxWidget> {
 
   Future<void> _load() async {
     await _performSearch('');
+  }
+
+  Future<void> _loadCurrencies() async {
+    try {
+      final list = await _currencyService.listBusinessCurrencies(businessId: widget.businessId);
+      final map = <int, Map<String, dynamic>>{};
+      for (final m in list) {
+        final id = m['id'];
+        if (id is int) {
+          map[id] = m;
+        }
+      }
+      if (!mounted) return;
+      setState(() {
+        _currencyById = map;
+      });
+    } catch (_) {
+      // ignore errors, currency labels will be omitted
+    }
+  }
+
+  String _formatCurrencyLabel(int? currencyId) {
+    if (currencyId == null) return '';
+    final m = _currencyById[currencyId];
+    if (m == null) return '';
+    final code = (m['code'] ?? '').toString();
+    final title = (m['title'] ?? '').toString();
+    if (code.isNotEmpty && title.isNotEmpty) return '$code';
+    return code.isNotEmpty ? code : title;
   }
 
   void _onSearchChanged(String q) {
@@ -98,13 +144,18 @@ class _BankAccountComboboxWidgetState extends State<BankAccountComboboxWidget> {
       final dynamic itemsRaw = (res['data'] != null && res['data'] is Map && (res['data'] as Map)['items'] != null)
           ? (res['data'] as Map)['items']
           : res['items'];
-      final items = ((itemsRaw as List<dynamic>? ?? const <dynamic>[])).map((e) {
+      var items = ((itemsRaw as List<dynamic>? ?? const <dynamic>[])).map((e) {
         final m = Map<String, dynamic>.from(e as Map);
         final id = m['id']?.toString();
         final name = m['name']?.toString() ?? 'نامشخص';
-        log('Bank account item: id=$id, name=$name');
-        return BankAccountOption(id ?? '', name);
+        final currencyId = (m['currency_id'] ?? m['currencyId']);
+        log('Bank account item: id=$id, name=$name, currencyId=$currencyId');
+        return BankAccountOption(id ?? '', name, currencyId: currencyId is int ? currencyId : int.tryParse('${currencyId ?? ''}'));
       }).toList();
+      // Filter by currency if requested
+      if (widget.filterCurrencyId != null) {
+        items = items.where((it) => it.currencyId == widget.filterCurrencyId).toList();
+      }
       if (!mounted) return;
       setState(() {
         _items = items;
@@ -149,6 +200,7 @@ class _BankAccountComboboxWidgetState extends State<BankAccountComboboxWidget> {
             isSearching: _isSearching,
             hasSearched: _hasSearched,
             onSearchChanged: _onSearchChanged,
+            currencyLabelBuilder: _formatCurrencyLabel,
             onSelected: (opt) {
               widget.onChanged(opt);
               Navigator.pop(context);
@@ -166,8 +218,11 @@ class _BankAccountComboboxWidgetState extends State<BankAccountComboboxWidget> {
       (e) => e.id == widget.selectedAccountId,
       orElse: () => const BankAccountOption('', ''),
     );
+    final currencyText = _formatCurrencyLabel(selected.currencyId);
     final text = (widget.selectedAccountId != null && widget.selectedAccountId!.isNotEmpty)
-        ? (selected.name.isNotEmpty ? selected.name : widget.hintText)
+        ? (selected.name.isNotEmpty
+            ? (currencyText.isNotEmpty ? '${selected.name} - $currencyText' : selected.name)
+            : widget.hintText)
         : widget.hintText;
 
     return InkWell(
@@ -209,6 +264,7 @@ class _BankPickerBottomSheet extends StatelessWidget {
   final bool hasSearched;
   final ValueChanged<String> onSearchChanged;
   final ValueChanged<BankAccountOption?> onSelected;
+  final String Function(int?)? currencyLabelBuilder;
 
   const _BankPickerBottomSheet({
     required this.label,
@@ -219,6 +275,7 @@ class _BankPickerBottomSheet extends StatelessWidget {
     required this.isSearching,
     required this.hasSearched,
     required this.onSearchChanged,
+    required this.currencyLabelBuilder,
     required this.onSelected,
   });
 
@@ -272,16 +329,34 @@ class _BankPickerBottomSheet extends StatelessWidget {
                           ],
                         ),
                       )
-                    : ListView.builder(
+                      : ListView.builder(
                         itemCount: items.length,
                         itemBuilder: (context, index) {
                           final it = items[index];
+                          final currencyText = (it.currencyId != null) ? (currencyLabelBuilder?.call(it.currencyId) ?? '') : '';
                           return ListTile(
                             leading: CircleAvatar(
                               backgroundColor: colorScheme.primaryContainer,
                               child: Icon(Icons.account_balance, color: colorScheme.onPrimaryContainer),
                             ),
                             title: Text(it.name),
+                            trailing: currencyText.isNotEmpty
+                                ? Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: colorScheme.primary.withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      currencyText,
+                                      style: TextStyle(
+                                        color: colorScheme.primary,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  )
+                                : null,
                             onTap: () => onSelected(it),
                           );
                         },

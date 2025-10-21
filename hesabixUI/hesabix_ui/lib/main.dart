@@ -39,6 +39,7 @@ import 'pages/business/petty_cash_page.dart';
 import 'pages/business/checks_page.dart';
 import 'pages/business/check_form_page.dart';
 import 'pages/business/receipts_payments_list_page.dart';
+import 'pages/business/expense_income_list_page.dart';
 import 'pages/business/transfers_page.dart';
 import 'pages/error_404_page.dart';
 import 'core/locale_controller.dart';
@@ -489,10 +490,8 @@ class _MyAppState extends State<MyApp> {
             ),
           ],
         ),
-        GoRoute(
-          path: '/business/:business_id',
-          name: 'business_shell',
-          builder: (context, state) {
+        ShellRoute(
+          builder: (context, state, child) {
             final businessId = int.parse(state.pathParameters['business_id']!);
             return BusinessShell(
               businessId: businessId,
@@ -500,36 +499,25 @@ class _MyAppState extends State<MyApp> {
               localeController: controller,
               calendarController: _calendarController!,
               themeController: themeController,
-              child: const SizedBox.shrink(), // Will be replaced by child routes
+              child: child,
             );
           },
           routes: [
             GoRoute(
-              path: 'dashboard',
+              path: '/business/:business_id/dashboard',
               name: 'business_dashboard',
-              builder: (context, state) {
-                final businessId = int.parse(state.pathParameters['business_id']!);
-                return BusinessShell(
-                  businessId: businessId,
-                  authStore: _authStore!,
-                  localeController: controller,
-                  calendarController: _calendarController!,
-                  themeController: themeController,
-                  child: BusinessDashboardPage(businessId: businessId),
-                );
-              },
+              pageBuilder: (context, state) => NoTransitionPage(
+                child: BusinessDashboardPage(
+                  businessId: int.parse(state.pathParameters['business_id']!),
+                ),
+              ),
             ),
             GoRoute(
-              path: 'users-permissions',
+              path: '/business/:business_id/users-permissions',
               name: 'business_users_permissions',
-              builder: (context, state) {
+              pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return BusinessShell(
-                  businessId: businessId,
-                  authStore: _authStore!,
-                  localeController: controller,
-                  calendarController: _calendarController!,
-                  themeController: themeController,
+                return NoTransitionPage(
                   child: UsersPermissionsPage(
                     businessId: businessId.toString(),
                     authStore: _authStore!,
@@ -539,31 +527,20 @@ class _MyAppState extends State<MyApp> {
               },
             ),
             GoRoute(
-              path: 'chart-of-accounts',
+              path: '/business/:business_id/chart-of-accounts',
               name: 'business_chart_of_accounts',
-              builder: (context, state) {
-                final businessId = int.parse(state.pathParameters['business_id']!);
-                return BusinessShell(
-                  businessId: businessId,
-                  authStore: _authStore!,
-                  localeController: controller,
-                  calendarController: _calendarController!,
-                  themeController: themeController,
-                  child: AccountsPage(businessId: businessId),
-                );
-              },
+              pageBuilder: (context, state) => NoTransitionPage(
+                child: AccountsPage(
+                  businessId: int.parse(state.pathParameters['business_id']!),
+                ),
+              ),
             ),
             GoRoute(
-              path: 'accounts',
+              path: '/business/:business_id/accounts',
               name: 'business_accounts',
-              builder: (context, state) {
+              pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return BusinessShell(
-                  businessId: businessId,
-                  authStore: _authStore!,
-                  localeController: controller,
-                  calendarController: _calendarController!,
-                  themeController: themeController,
+                return NoTransitionPage(
                   child: BankAccountsPage(
                     businessId: businessId,
                     authStore: _authStore!,
@@ -572,16 +549,11 @@ class _MyAppState extends State<MyApp> {
               },
             ),
             GoRoute(
-              path: 'petty-cash',
+              path: '/business/:business_id/petty-cash',
               name: 'business_petty_cash',
-              builder: (context, state) {
+              pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return BusinessShell(
-                  businessId: businessId,
-                  authStore: _authStore!,
-                  localeController: controller,
-                  calendarController: _calendarController!,
-                  themeController: themeController,
+                return NoTransitionPage(
                   child: PettyCashPage(
                     businessId: businessId,
                     authStore: _authStore!,
@@ -590,16 +562,11 @@ class _MyAppState extends State<MyApp> {
               },
             ),
             GoRoute(
-              path: 'cash-box',
+              path: '/business/:business_id/cash-box',
               name: 'business_cash_box',
-              builder: (context, state) {
+              pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return BusinessShell(
-                  businessId: businessId,
-                  authStore: _authStore!,
-                  localeController: controller,
-                  calendarController: _calendarController!,
-                  themeController: themeController,
+                return NoTransitionPage(
                   child: CashRegistersPage(
                     businessId: businessId,
                     authStore: _authStore!,
@@ -608,16 +575,11 @@ class _MyAppState extends State<MyApp> {
               },
             ),
             GoRoute(
-              path: 'wallet',
+              path: '/business/:business_id/wallet',
               name: 'business_wallet',
-              builder: (context, state) {
+              pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return BusinessShell(
-                  businessId: businessId,
-                  authStore: _authStore!,
-                  localeController: controller,
-                  calendarController: _calendarController!,
-                  themeController: themeController,
+                return NoTransitionPage(
                   child: WalletPage(
                     businessId: businessId,
                     authStore: _authStore!,
@@ -626,16 +588,11 @@ class _MyAppState extends State<MyApp> {
               },
             ),
             GoRoute(
-              path: 'invoice',
+              path: '/business/:business_id/invoice',
               name: 'business_invoice',
-              builder: (context, state) {
+              pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return BusinessShell(
-                  businessId: businessId,
-                  authStore: _authStore!,
-                  localeController: controller,
-                  calendarController: _calendarController!,
-                  themeController: themeController,
+                return NoTransitionPage(
                   child: InvoicePage(
                     businessId: businessId,
                     authStore: _authStore!,
@@ -644,16 +601,11 @@ class _MyAppState extends State<MyApp> {
               },
             ),
             GoRoute(
-              path: 'invoice/new',
+              path: '/business/:business_id/invoice/new',
               name: 'business_new_invoice',
-              builder: (context, state) {
+              pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return BusinessShell(
-                  businessId: businessId,
-                  authStore: _authStore!,
-                  localeController: controller,
-                  calendarController: _calendarController!,
-                  themeController: themeController,
+                return NoTransitionPage(
                   child: NewInvoicePage(
                     businessId: businessId,
                     authStore: _authStore!,
@@ -663,16 +615,11 @@ class _MyAppState extends State<MyApp> {
               },
             ),
             GoRoute(
-              path: 'reports',
+              path: '/business/:business_id/reports',
               name: 'business_reports',
-              builder: (context, state) {
+              pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return BusinessShell(
-                  businessId: businessId,
-                  authStore: _authStore!,
-                  localeController: controller,
-                  calendarController: _calendarController!,
-                  themeController: themeController,
+                return NoTransitionPage(
                   child: ReportsPage(
                     businessId: businessId,
                     authStore: _authStore!,
@@ -681,20 +628,17 @@ class _MyAppState extends State<MyApp> {
               },
             ),
             GoRoute(
-              path: 'settings',
+              path: '/business/:business_id/settings',
               name: 'business_settings',
-              builder: (context, state) {
+              pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
                 // گارد دسترسی: فقط کاربرانی که دسترسی join دارند
                 if (!_authStore!.hasBusinessPermission('settings', 'join')) {
-                  return PermissionGuard.buildAccessDeniedPage();
+                  return NoTransitionPage(
+                    child: PermissionGuard.buildAccessDeniedPage(),
+                  );
                 }
-                return BusinessShell(
-                  businessId: businessId,
-                  authStore: _authStore!,
-                  localeController: controller,
-                  calendarController: _calendarController!,
-                  themeController: themeController,
+                return NoTransitionPage(
                   child: SettingsPage(
                     businessId: businessId,
                     localeController: controller,
@@ -705,16 +649,11 @@ class _MyAppState extends State<MyApp> {
               },
             ),
             GoRoute(
-              path: 'product-attributes',
+              path: '/business/:business_id/product-attributes',
               name: 'business_product_attributes',
-              builder: (context, state) {
+              pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return BusinessShell(
-                  businessId: businessId,
-                  authStore: _authStore!,
-                  localeController: controller,
-                  calendarController: _calendarController!,
-                  themeController: themeController,
+                return NoTransitionPage(
                   child: ProductAttributesPage(
                     businessId: businessId,
                     authStore: _authStore!,
@@ -723,16 +662,11 @@ class _MyAppState extends State<MyApp> {
               },
             ),
             GoRoute(
-              path: 'products',
+              path: '/business/:business_id/products',
               name: 'business_products',
-              builder: (context, state) {
+              pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return BusinessShell(
-                  businessId: businessId,
-                  authStore: _authStore!,
-                  localeController: controller,
-                  calendarController: _calendarController!,
-                  themeController: themeController,
+                return NoTransitionPage(
                   child: ProductsPage(
                     businessId: businessId,
                     authStore: _authStore!,
@@ -741,16 +675,11 @@ class _MyAppState extends State<MyApp> {
               },
             ),
             GoRoute(
-              path: 'price-lists',
+              path: '/business/:business_id/price-lists',
               name: 'business_price_lists',
-              builder: (context, state) {
+              pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return BusinessShell(
-                  businessId: businessId,
-                  authStore: _authStore!,
-                  localeController: controller,
-                  calendarController: _calendarController!,
-                  themeController: themeController,
+                return NoTransitionPage(
                   child: PriceListsPage(
                     businessId: businessId,
                     authStore: _authStore!,
@@ -759,17 +688,12 @@ class _MyAppState extends State<MyApp> {
               },
             ),
             GoRoute(
-              path: 'price-lists/:price_list_id/items',
+              path: '/business/:business_id/price-lists/:price_list_id/items',
               name: 'business_price_list_items',
-              builder: (context, state) {
+              pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
                 final priceListId = int.parse(state.pathParameters['price_list_id']!);
-                return BusinessShell(
-                  businessId: businessId,
-                  authStore: _authStore!,
-                  localeController: controller,
-                  calendarController: _calendarController!,
-                  themeController: themeController,
+                return NoTransitionPage(
                   child: PriceListItemsPage(
                     businessId: businessId,
                     priceListId: priceListId,
@@ -779,16 +703,11 @@ class _MyAppState extends State<MyApp> {
               },
             ),
             GoRoute(
-              path: 'persons',
+              path: '/business/:business_id/persons',
               name: 'business_persons',
-              builder: (context, state) {
+              pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return BusinessShell(
-                  businessId: businessId,
-                  authStore: _authStore!,
-                  localeController: controller,
-                  calendarController: _calendarController!,
-                  themeController: themeController,
+                return NoTransitionPage(
                   child: PersonsPage(
                     businessId: businessId,
                     authStore: _authStore!,
@@ -798,16 +717,11 @@ class _MyAppState extends State<MyApp> {
             ),
             // Receipts & Payments: list with data table
             GoRoute(
-              path: 'receipts-payments',
+              path: '/business/:business_id/receipts-payments',
               name: 'business_receipts_payments',
-              builder: (context, state) {
+              pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return BusinessShell(
-                  businessId: businessId,
-                  authStore: _authStore!,
-                  localeController: controller,
-                  calendarController: _calendarController!,
-                  themeController: themeController,
+                return NoTransitionPage(
                   child: ReceiptsPaymentsListPage(
                     businessId: businessId,
                     calendarController: _calendarController!,
@@ -818,16 +732,26 @@ class _MyAppState extends State<MyApp> {
               },
             ),
             GoRoute(
-              path: 'transfers',
-              name: 'business_transfers',
-              builder: (context, state) {
+              path: '/business/:business_id/expense-income',
+              name: 'business_expense_income',
+              pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return BusinessShell(
-                  businessId: businessId,
-                  authStore: _authStore!,
-                  localeController: controller,
-                  calendarController: _calendarController!,
-                  themeController: themeController,
+                return NoTransitionPage(
+                  child: ExpenseIncomeListPage(
+                    businessId: businessId,
+                    calendarController: _calendarController!,
+                    authStore: _authStore!,
+                    apiClient: ApiClient(),
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/transfers',
+              name: 'business_transfers',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return NoTransitionPage(
                   child: TransfersPage(
                     businessId: businessId,
                     calendarController: _calendarController!,
@@ -838,16 +762,11 @@ class _MyAppState extends State<MyApp> {
               },
             ),
             GoRoute(
-              path: 'checks',
+              path: '/business/:business_id/checks',
               name: 'business_checks',
-              builder: (context, state) {
+              pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return BusinessShell(
-                  businessId: businessId,
-                  authStore: _authStore!,
-                  localeController: controller,
-                  calendarController: _calendarController!,
-                  themeController: themeController,
+                return NoTransitionPage(
                   child: ChecksPage(
                     businessId: businessId,
                     authStore: _authStore!,
@@ -856,16 +775,11 @@ class _MyAppState extends State<MyApp> {
               },
             ),
             GoRoute(
-              path: 'checks/new',
+              path: '/business/:business_id/checks/new',
               name: 'business_new_check',
-              builder: (context, state) {
+              pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return BusinessShell(
-                  businessId: businessId,
-                  authStore: _authStore!,
-                  localeController: controller,
-                  calendarController: _calendarController!,
-                  themeController: themeController,
+                return NoTransitionPage(
                   child: CheckFormPage(
                     businessId: businessId,
                     authStore: _authStore!,
@@ -875,17 +789,12 @@ class _MyAppState extends State<MyApp> {
               },
             ),
             GoRoute(
-              path: 'checks/:check_id/edit',
+              path: '/business/:business_id/checks/:check_id/edit',
               name: 'business_edit_check',
-              builder: (context, state) {
+              pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
                 final checkId = int.tryParse(state.pathParameters['check_id'] ?? '0');
-                return BusinessShell(
-                  businessId: businessId,
-                  authStore: _authStore!,
-                  localeController: controller,
-                  calendarController: _calendarController!,
-                  themeController: themeController,
+                return NoTransitionPage(
                   child: CheckFormPage(
                     businessId: businessId,
                     authStore: _authStore!,
