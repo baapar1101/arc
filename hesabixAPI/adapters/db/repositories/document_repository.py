@@ -333,7 +333,7 @@ class DocumentRepository:
             line_dict["cash_register_name"] = line.cash_register.title
 
         if line.petty_cash:
-            line_dict["petty_cash_name"] = line.petty_cash.title
+            line_dict["petty_cash_name"] = line.petty_cash.name
 
         if line.check:
             line_dict["check_number"] = line.check.check_number
