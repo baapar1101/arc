@@ -5,6 +5,8 @@ from app.core.responses import ApiError
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_, func
 from adapters.db.models.person import Person, PersonBankAccount, PersonType
+from adapters.db.models.document import Document
+from adapters.db.models.document_line import DocumentLine
 from adapters.api.v1.schema_models.person import (
     PersonCreateRequest, PersonUpdateRequest, PersonBankAccountCreateRequest
 )
@@ -137,10 +139,29 @@ def get_person_by_id(db: Session, person_id: int, business_id: int) -> Optional[
 def get_persons_by_business(
     db: Session, 
     business_id: int, 
-    query_info: Dict[str, Any]
+    query_info: Dict[str, Any],
+    fiscal_year_id: Optional[int] = None
 ) -> Dict[str, Any]:
     """دریافت لیست اشخاص با جستجو و فیلتر"""
     query = db.query(Person).filter(Person.business_id == business_id)
+    
+    # بررسی نیاز به محاسبه تراز قبل از pagination
+    # (برای فیلتر یا مرتب‌سازی بر اساس تراز/وضعیت)
+    needs_balance_before_pagination = False
+    sort_by = query_info.get('sort_by', 'created_at')
+    if sort_by in ['balance', 'status']:
+        needs_balance_before_pagination = True
+    
+    # بررسی فیلترها برای balance و status
+    if query_info.get('filters'):
+        for filter_item in query_info['filters']:
+            if isinstance(filter_item, dict):
+                field = filter_item.get('property')
+            else:
+                field = getattr(filter_item, 'property', None)
+            if field in ['balance', 'status']:
+                needs_balance_before_pagination = True
+                break
     
     # اعمال جستجو
     if query_info.get('search') and query_info.get('search_fields'):
@@ -274,38 +295,106 @@ def get_persons_by_business(
     # شمارش کل رکوردها
     total = query.count()
     
-    # اعمال مرتب‌سازی
-    sort_by = query_info.get('sort_by', 'created_at')
+    # اعمال مرتب‌سازی (فقط برای فیلدهای دیتابیس)
     sort_desc = query_info.get('sort_desc', True)
     
-    if sort_by == 'code':
-        query = query.order_by(Person.code.desc() if sort_desc else Person.code.asc())
-    elif sort_by == 'alias_name':
-        query = query.order_by(Person.alias_name.desc() if sort_desc else Person.alias_name.asc())
-    elif sort_by == 'first_name':
-        query = query.order_by(Person.first_name.desc() if sort_desc else Person.first_name.asc())
-    elif sort_by == 'last_name':
-        query = query.order_by(Person.last_name.desc() if sort_desc else Person.last_name.asc())
-    # person_type sorting removed - use person_types instead
-    elif sort_by == 'created_at':
-        query = query.order_by(Person.created_at.desc() if sort_desc else Person.created_at.asc())
-    elif sort_by == 'updated_at':
-        query = query.order_by(Person.updated_at.desc() if sort_desc else Person.updated_at.asc())
-    else:
-        query = query.order_by(Person.created_at.desc())
+    if sort_by not in ['balance', 'status']:
+        # مرتب‌سازی در دیتابیس
+        if sort_by == 'code':
+            query = query.order_by(Person.code.desc() if sort_desc else Person.code.asc())
+        elif sort_by == 'alias_name':
+            query = query.order_by(Person.alias_name.desc() if sort_desc else Person.alias_name.asc())
+        elif sort_by == 'first_name':
+            query = query.order_by(Person.first_name.desc() if sort_desc else Person.first_name.asc())
+        elif sort_by == 'last_name':
+            query = query.order_by(Person.last_name.desc() if sort_desc else Person.last_name.asc())
+        elif sort_by == 'created_at':
+            query = query.order_by(Person.created_at.desc() if sort_desc else Person.created_at.asc())
+        elif sort_by == 'updated_at':
+            query = query.order_by(Person.updated_at.desc() if sort_desc else Person.updated_at.asc())
+        else:
+            query = query.order_by(Person.created_at.desc())
     
-    # اعمال صفحه‌بندی
     skip = query_info.get('skip', 0)
     take = query_info.get('take', 20)
     
-    persons = query.offset(skip).limit(take).all()
-    
-    # تبدیل به دیکشنری
-    items = [_person_to_dict(person) for person in persons]
+    # اگر نیاز به محاسبه تراز قبل از pagination است
+    if needs_balance_before_pagination:
+        # دریافت همه persons
+        all_persons = query.all()
+        
+        # تبدیل به دیکشنری و محاسبه تراز
+        all_items = []
+        person_ids = [p.id for p in all_persons]
+        balances = calculate_persons_balances_bulk(db, person_ids, fiscal_year_id)
+        
+        for person in all_persons:
+            item = _person_to_dict(person)
+            balance, status = balances.get(person.id, (0.0, "بدون تراکنش"))
+            item['balance'] = balance
+            item['status'] = status
+            all_items.append(item)
+        
+        # اعمال فیلتر balance و status
+        if query_info.get('filters'):
+            for filter_item in query_info['filters']:
+                if isinstance(filter_item, dict):
+                    field = filter_item.get('property')
+                    operator = filter_item.get('operator')
+                    value = filter_item.get('value')
+                else:
+                    field = getattr(filter_item, 'property', None)
+                    operator = getattr(filter_item, 'operator', None)
+                    value = getattr(filter_item, 'value', None)
+                
+                if field == 'balance':
+                    if operator == '=':
+                        all_items = [item for item in all_items if item['balance'] == value]
+                    elif operator == '>':
+                        all_items = [item for item in all_items if item['balance'] > value]
+                    elif operator == '>=':
+                        all_items = [item for item in all_items if item['balance'] >= value]
+                    elif operator == '<':
+                        all_items = [item for item in all_items if item['balance'] < value]
+                    elif operator == '<=':
+                        all_items = [item for item in all_items if item['balance'] <= value]
+                elif field == 'status':
+                    if operator == '=' and isinstance(value, str):
+                        all_items = [item for item in all_items if item['status'] == value]
+                    elif operator == 'in' and isinstance(value, list):
+                        all_items = [item for item in all_items if item['status'] in value]
+        
+        # مرتب‌سازی
+        if sort_by == 'balance':
+            all_items.sort(key=lambda x: x['balance'], reverse=sort_desc)
+        elif sort_by == 'status':
+            all_items.sort(key=lambda x: x['status'], reverse=sort_desc)
+        
+        # محاسبه total بعد از فیلتر
+        total = len(all_items)
+        
+        # اعمال pagination
+        items = all_items[skip:skip + take]
+    else:
+        # روش معمولی: ابتدا pagination، سپس محاسبه تراز
+        persons = query.offset(skip).limit(take).all()
+        
+        # تبدیل به دیکشنری
+        items = [_person_to_dict(person) for person in persons]
+        
+        # محاسبه تراز برای persons فعلی
+        person_ids = [p.id for p in persons]
+        balances = calculate_persons_balances_bulk(db, person_ids, fiscal_year_id)
+        
+        for item in items:
+            person_id = item['id']
+            balance, status = balances.get(person_id, (0.0, "بدون تراکنش"))
+            item['balance'] = balance
+            item['status'] = status
     
     # محاسبه اطلاعات صفحه‌بندی
-    total_pages = (total + take - 1) // take
-    current_page = (skip // take) + 1
+    total_pages = (total + take - 1) // take if take > 0 else 0
+    current_page = (skip // take) + 1 if take > 0 else 1
     
     pagination = {
         'total': total,
@@ -535,3 +624,129 @@ def count_persons(db: Session, business_id: int, search_query: Optional[str] = N
         query = query.filter(search_filter)
     
     return query.count()
+
+
+def calculate_person_balance(
+    db: Session, 
+    person_id: int, 
+    fiscal_year_id: Optional[int] = None
+) -> tuple[float, str]:
+    """
+    محاسبه تراز و وضعیت مالی یک شخص
+    
+    Args:
+        db: نشست پایگاه داده
+        person_id: شناسه شخص
+        fiscal_year_id: شناسه سال مالی (اختیاری)
+    
+    Returns:
+        tuple: (تراز, وضعیت)
+        - تراز: credit - debit
+        - وضعیت: "بستانکار" | "بدهکار" | "بالانس" | "بدون تراکنش"
+    """
+    # Query برای محاسبه مجموع بستانکار و بدهکار
+    query = db.query(
+        func.coalesce(func.sum(DocumentLine.credit), 0).label('total_credit'),
+        func.coalesce(func.sum(DocumentLine.debit), 0).label('total_debit')
+    ).join(
+        Document, DocumentLine.document_id == Document.id
+    ).filter(
+        DocumentLine.person_id == person_id,
+        Document.is_proforma == False  # فقط اسناد قطعی
+    )
+    
+    # اعمال فیلتر سال مالی
+    if fiscal_year_id:
+        query = query.filter(Document.fiscal_year_id == fiscal_year_id)
+    
+    result = query.first()
+    
+    if result is None:
+        return 0.0, "بدون تراکنش"
+    
+    total_credit = float(result.total_credit or 0)
+    total_debit = float(result.total_debit or 0)
+    
+    # محاسبه تراز: بستانکار - بدهکار
+    balance = total_credit - total_debit
+    
+    # تعیین وضعیت
+    if total_credit == 0 and total_debit == 0:
+        status = "بدون تراکنش"
+    elif balance > 0:
+        status = "بستانکار"
+    elif balance < 0:
+        status = "بدهکار"
+    else:  # balance == 0
+        status = "بالانس"
+    
+    return balance, status
+
+
+def calculate_persons_balances_bulk(
+    db: Session, 
+    person_ids: List[int], 
+    fiscal_year_id: Optional[int] = None
+) -> Dict[int, tuple[float, str]]:
+    """
+    محاسبه تراز و وضعیت چندین شخص به صورت دسته‌جمعی
+    
+    Args:
+        db: نشست پایگاه داده
+        person_ids: لیست شناسه‌های اشخاص
+        fiscal_year_id: شناسه سال مالی (اختیاری)
+    
+    Returns:
+        dict: {person_id: (balance, status)}
+    """
+    if not person_ids:
+        return {}
+    
+    # Query برای محاسبه مجموع بستانکار و بدهکار برای هر شخص
+    query = db.query(
+        DocumentLine.person_id,
+        func.coalesce(func.sum(DocumentLine.credit), 0).label('total_credit'),
+        func.coalesce(func.sum(DocumentLine.debit), 0).label('total_debit')
+    ).join(
+        Document, DocumentLine.document_id == Document.id
+    ).filter(
+        DocumentLine.person_id.in_(person_ids),
+        Document.is_proforma == False  # فقط اسناد قطعی
+    )
+    
+    # اعمال فیلتر سال مالی
+    if fiscal_year_id:
+        query = query.filter(Document.fiscal_year_id == fiscal_year_id)
+    
+    # Group by person_id
+    query = query.group_by(DocumentLine.person_id)
+    
+    results = query.all()
+    
+    # ساخت دیکشنری نتایج
+    balances: Dict[int, tuple[float, str]] = {}
+    
+    # ابتدا همه را به "بدون تراکنش" تنظیم می‌کنیم
+    for person_id in person_ids:
+        balances[person_id] = (0.0, "بدون تراکنش")
+    
+    # سپس نتایج واقعی را اعمال می‌کنیم
+    for result in results:
+        person_id = result.person_id
+        total_credit = float(result.total_credit or 0)
+        total_debit = float(result.total_debit or 0)
+        
+        # محاسبه تراز
+        balance = total_credit - total_debit
+        
+        # تعیین وضعیت
+        if balance > 0:
+            status = "بستانکار"
+        elif balance < 0:
+            status = "بدهکار"
+        else:  # balance == 0
+            status = "بالانس"
+        
+        balances[person_id] = (balance, status)
+    
+    return balances

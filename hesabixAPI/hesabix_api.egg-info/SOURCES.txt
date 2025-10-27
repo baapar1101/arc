@@ -6,6 +6,7 @@ adapters/api/v1/__init__.py
 adapters/api/v1/accounts.py
 adapters/api/v1/auth.py
 adapters/api/v1/bank_accounts.py
+adapters/api/v1/boms.py
 adapters/api/v1/business_dashboard.py
 adapters/api/v1/business_users.py
 adapters/api/v1/businesses.py
@@ -14,6 +15,8 @@ adapters/api/v1/categories.py
 adapters/api/v1/checks.py
 adapters/api/v1/currencies.py
 adapters/api/v1/customers.py
+adapters/api/v1/documents.py
+adapters/api/v1/expense_income.py
 adapters/api/v1/fiscal_years.py
 adapters/api/v1/health.py
 adapters/api/v1/invoices.py
@@ -26,13 +29,16 @@ adapters/api/v1/receipts_payments.py
 adapters/api/v1/schemas.py
 adapters/api/v1/tax_types.py
 adapters/api/v1/tax_units.py
+adapters/api/v1/transfers.py
 adapters/api/v1/users.py
+adapters/api/v1/warehouses.py
 adapters/api/v1/admin/email_config.py
 adapters/api/v1/admin/file_storage.py
 adapters/api/v1/schema_models/__init__.py
 adapters/api/v1/schema_models/account.py
 adapters/api/v1/schema_models/bank_account.py
 adapters/api/v1/schema_models/check.py
+adapters/api/v1/schema_models/document.py
 adapters/api/v1/schema_models/document_line.py
 adapters/api/v1/schema_models/email.py
 adapters/api/v1/schema_models/file_storage.py
@@ -40,6 +46,8 @@ adapters/api/v1/schema_models/person.py
 adapters/api/v1/schema_models/price_list.py
 adapters/api/v1/schema_models/product.py
 adapters/api/v1/schema_models/product_attribute.py
+adapters/api/v1/schema_models/product_bom.py
+adapters/api/v1/schema_models/warehouse.py
 adapters/api/v1/support/__init__.py
 adapters/api/v1/support/categories.py
 adapters/api/v1/support/operator.py
@@ -72,9 +80,11 @@ adapters/db/models/price_list.py
 adapters/db/models/product.py
 adapters/db/models/product_attribute.py
 adapters/db/models/product_attribute_link.py
+adapters/db/models/product_bom.py
 adapters/db/models/tax_type.py
 adapters/db/models/tax_unit.py
 adapters/db/models/user.py
+adapters/db/models/warehouse.py
 adapters/db/models/support/__init__.py
 adapters/db/models/support/category.py
 adapters/db/models/support/message.py
@@ -87,6 +97,7 @@ adapters/db/repositories/business_permission_repo.py
 adapters/db/repositories/business_repo.py
 adapters/db/repositories/cash_register_repository.py
 adapters/db/repositories/category_repository.py
+adapters/db/repositories/document_repository.py
 adapters/db/repositories/email_config_repository.py
 adapters/db/repositories/file_storage_repository.py
 adapters/db/repositories/fiscal_year_repo.py
@@ -94,8 +105,10 @@ adapters/db/repositories/password_reset_repo.py
 adapters/db/repositories/petty_cash_repository.py
 adapters/db/repositories/price_list_repository.py
 adapters/db/repositories/product_attribute_repository.py
+adapters/db/repositories/product_bom_repository.py
 adapters/db/repositories/product_repository.py
 adapters/db/repositories/user_repo.py
+adapters/db/repositories/warehouse_repository.py
 adapters/db/repositories/support/__init__.py
 adapters/db/repositories/support/category_repository.py
 adapters/db/repositories/support/message_repository.py
@@ -120,13 +133,16 @@ app/core/smart_normalizer.py
 app/services/api_key_service.py
 app/services/auth_service.py
 app/services/bank_account_service.py
+app/services/bom_service.py
 app/services/bulk_price_update_service.py
 app/services/business_dashboard_service.py
 app/services/business_service.py
 app/services/captcha_service.py
 app/services/cash_register_service.py
 app/services/check_service.py
+app/services/document_service.py
 app/services/email_service.py
+app/services/expense_income_service.py
 app/services/file_storage_service.py
 app/services/person_service.py
 app/services/petty_cash_service.py
@@ -135,6 +151,8 @@ app/services/product_attribute_service.py
 app/services/product_service.py
 app/services/query_service.py
 app/services/receipt_payment_service.py
+app/services/transfer_service.py
+app/services/warehouse_service.py
 app/services/pdf/__init__.py
 app/services/pdf/base_pdf_service.py
 app/services/pdf/modules/__init__.py
@@ -196,6 +214,7 @@ migrations/versions/20251014_000201_add_person_id_to_document_lines.py
 migrations/versions/20251014_000301_add_product_id_to_document_lines.py
 migrations/versions/20251014_000401_add_payment_refs_to_document_lines.py
 migrations/versions/20251014_000501_add_quantity_to_document_lines.py
+migrations/versions/20251021_000601_add_bom_and_warehouses.py
 migrations/versions/4b2ea782bcb3_merge_heads.py
 migrations/versions/5553f8745c6e_add_support_tables.py
 migrations/versions/7891282548e9_merge_tax_types_and_unit_fields_heads.py

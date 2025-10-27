@@ -131,6 +131,10 @@ class Person {
   final bool commissionExcludeDiscounts;
   final bool commissionExcludeAdditionsDeductions;
   final bool commissionPostInInvoiceDocument;
+  
+  // تراز و وضعیت مالی
+  final double? balance;
+  final String? status;
 
   Person({
     this.id,
@@ -167,6 +171,8 @@ class Person {
     this.commissionExcludeDiscounts = false,
     this.commissionExcludeAdditionsDeductions = false,
     this.commissionPostInInvoiceDocument = false,
+    this.balance,
+    this.status,
   });
 
   factory Person.fromJson(Map<String, dynamic> json) {
@@ -211,6 +217,8 @@ class Person {
       commissionExcludeDiscounts: json['commission_exclude_discounts'] ?? false,
       commissionExcludeAdditionsDeductions: json['commission_exclude_additions_deductions'] ?? false,
       commissionPostInInvoiceDocument: json['commission_post_in_invoice_document'] ?? false,
+      balance: (json['balance'] as num?)?.toDouble(),
+      status: json['status'] as String?,
     );
   }
 
@@ -250,6 +258,8 @@ class Person {
       'commission_exclude_discounts': commissionExcludeDiscounts,
       'commission_exclude_additions_deductions': commissionExcludeAdditionsDeductions,
       'commission_post_in_invoice_document': commissionPostInInvoiceDocument,
+      'balance': balance,
+      'status': status,
     };
   }
 

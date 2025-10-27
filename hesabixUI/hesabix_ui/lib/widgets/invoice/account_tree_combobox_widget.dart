@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
+import '../../models/account_model.dart';
 import '../../models/account_tree_node.dart';
 import '../../services/account_service.dart';
 
+/// ویجت انتخاب حساب با ساختار درختی
+/// فقط حساب‌هایی که فرزند ندارند (leaf nodes) قابل انتخاب هستند
 class AccountTreeComboboxWidget extends StatefulWidget {
   final int businessId;
-  final AccountTreeNode? selectedAccount;
-  final ValueChanged<AccountTreeNode?> onChanged;
+  final Account? selectedAccount;
+  final ValueChanged<Account?> onChanged;
   final String label;
   final String hintText;
   final bool isRequired;
@@ -26,16 +29,25 @@ class AccountTreeComboboxWidget extends StatefulWidget {
 
 class _AccountTreeComboboxWidgetState extends State<AccountTreeComboboxWidget> {
   final AccountService _accountService = AccountService();
-  List<AccountTreeNode> _accounts = [];
+  final TextEditingController _searchController = TextEditingController();
+  
+  List<AccountTreeNode> _accountTree = [];
   bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
-    _loadAccounts();
+    _searchController.text = widget.selectedAccount?.displayName ?? '';
+    _loadAccountsTree();
   }
 
-  Future<void> _loadAccounts() async {
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadAccountsTree() async {
     setState(() {
       _isLoading = true;
     });
@@ -47,12 +59,12 @@ class _AccountTreeComboboxWidgetState extends State<AccountTreeComboboxWidget> {
           .toList() ?? [];
       
       setState(() {
-        _accounts = items;
+        _accountTree = items;
       });
     } catch (e) {
-      print('خطا در لود کردن حساب‌ها: $e');
+      print('خطا در لود کردن درخت حساب‌ها: $e');
       setState(() {
-        _accounts = [];
+        _accountTree = [];
       });
     } finally {
       setState(() {
@@ -61,92 +73,47 @@ class _AccountTreeComboboxWidgetState extends State<AccountTreeComboboxWidget> {
     }
   }
 
-
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // لیبل
-        if (widget.label.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Row(
-              children: [
-                Text(
-                  widget.label,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w500,
-                  ),
+    return TextFormField(
+      controller: _searchController,
+      decoration: InputDecoration(
+        labelText: widget.label,
+        hintText: widget.hintText,
+        suffixIcon: _isLoading
+            ? const SizedBox(
+                width: 20,
+                height: 20,
+                child: Padding(
+                  padding: EdgeInsets.all(12),
+                  child: CircularProgressIndicator(strokeWidth: 2),
                 ),
-                if (widget.isRequired)
-                  Text(
-                    ' *',
-                    style: TextStyle(
-                      color: theme.colorScheme.error,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        
-        // فیلد انتخاب
-        InkWell(
-          onTap: _isLoading ? null : _showAccountDialog,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-            decoration: BoxDecoration(
-              border: Border.all(color: theme.colorScheme.outline),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.account_balance_wallet,
-                  color: theme.colorScheme.onSurfaceVariant,
-                  size: 20,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    widget.selectedAccount?.toString() ?? widget.hintText,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: widget.selectedAccount != null
-                          ? theme.colorScheme.onSurface
-                          : theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ),
-                if (_isLoading)
-                  const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                else
-                  Icon(
-                    Icons.arrow_drop_down,
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-              ],
-            ),
-          ),
-        ),
-      ],
+              )
+            : const Icon(Icons.account_tree),
+        border: const OutlineInputBorder(),
+      ),
+      readOnly: true,
+      validator: widget.isRequired
+          ? (value) {
+              if (value == null || value.isEmpty) {
+                return '${widget.label} الزامی است';
+              }
+              return null;
+            }
+          : null,
+      onTap: () => _showAccountTreeDialog(),
     );
   }
 
-  void _showAccountDialog() {
+  void _showAccountTreeDialog() {
     showDialog(
       context: context,
-      builder: (context) => AccountSelectionDialog(
-        accounts: _accounts,
+      builder: (context) => _AccountTreeDialog(
+        accountTree: _accountTree,
         selectedAccount: widget.selectedAccount,
         onAccountSelected: (account) {
           widget.onChanged(account);
+          _searchController.text = account?.displayName ?? '';
           Navigator.pop(context);
         },
       ),
@@ -154,55 +121,112 @@ class _AccountTreeComboboxWidgetState extends State<AccountTreeComboboxWidget> {
   }
 }
 
-class AccountSelectionDialog extends StatefulWidget {
-  final List<AccountTreeNode> accounts;
-  final AccountTreeNode? selectedAccount;
-  final ValueChanged<AccountTreeNode?> onAccountSelected;
+/// دیالوگ انتخاب حساب با ساختار درختی
+class _AccountTreeDialog extends StatefulWidget {
+  final List<AccountTreeNode> accountTree;
+  final Account? selectedAccount;
+  final ValueChanged<Account?> onAccountSelected;
 
-  const AccountSelectionDialog({
-    super.key,
-    required this.accounts,
+  const _AccountTreeDialog({
+    required this.accountTree,
     this.selectedAccount,
     required this.onAccountSelected,
   });
 
   @override
-  State<AccountSelectionDialog> createState() => _AccountSelectionDialogState();
+  State<_AccountTreeDialog> createState() => _AccountTreeDialogState();
 }
 
-class _AccountSelectionDialogState extends State<AccountSelectionDialog> {
+class _AccountTreeDialogState extends State<_AccountTreeDialog> {
+  final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
-  List<AccountTreeNode> _filteredAccounts = [];
-  final Set<int> _expandedNodes = <int>{};
+  final Set<int> _expandedNodes = {};
 
   @override
   void initState() {
     super.initState();
-    _filteredAccounts = widget.accounts;
-    // همه گره‌های سطح اول را به صورت پیش‌فرض باز کن
-    _expandedNodes.addAll(widget.accounts.map((account) => account.id));
+    // باز کردن خودکار مسیر به حساب انتخاب شده
+    if (widget.selectedAccount != null) {
+      _expandToNode(widget.accountTree, widget.selectedAccount!.id!);
+    }
   }
 
-  void _filterAccounts(String query) {
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  /// باز کردن مسیر تا یک نود خاص
+  bool _expandToNode(List<AccountTreeNode> nodes, int targetId) {
+    for (final node in nodes) {
+      if (node.id == targetId) {
+        return true;
+      }
+      if (node.children.isNotEmpty) {
+        if (_expandToNode(node.children, targetId)) {
+          setState(() {
+            _expandedNodes.add(node.id);
+          });
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  /// فیلتر کردن درخت بر اساس جستجو
+  List<AccountTreeNode> _filterTree(List<AccountTreeNode> nodes) {
+    if (_searchQuery.isEmpty) {
+      return nodes;
+    }
+
+    final List<AccountTreeNode> filtered = [];
+    final query = _searchQuery.toLowerCase();
+
+    for (final node in nodes) {
+      final matchesSearch = node.name.toLowerCase().contains(query) ||
+          node.code.toLowerCase().contains(query);
+      
+      final filteredChildren = _filterTree(node.children);
+      
+      if (matchesSearch || filteredChildren.isNotEmpty) {
+        filtered.add(AccountTreeNode(
+          id: node.id,
+          code: node.code,
+          name: node.name,
+          accountType: node.accountType,
+          parentId: node.parentId,
+          children: filteredChildren,
+        ));
+        
+        // باز کردن خودکار نودهای دارای نتیجه جستجو
+        if (filteredChildren.isNotEmpty) {
+          _expandedNodes.add(node.id);
+        }
+      }
+    }
+
+    return filtered;
+  }
+
+  void _toggleExpanded(int nodeId) {
     setState(() {
-      _searchQuery = query;
-      if (query.isEmpty) {
-        _filteredAccounts = widget.accounts;
+      if (_expandedNodes.contains(nodeId)) {
+        _expandedNodes.remove(nodeId);
       } else {
-        _filteredAccounts = widget.accounts
-            .expand((account) => account.searchAccounts(query))
-            .where((account) => !account.hasChildren) // فقط حساب‌های بدون فرزند
-            .toList();
+        _expandedNodes.add(nodeId);
       }
     });
   }
 
-  void _expandAll() {
+  void _expandAll(List<AccountTreeNode> nodes) {
     setState(() {
-      _expandedNodes.clear();
-      // همه گره‌هایی که فرزند دارند را باز کن
-      for (final account in widget.accounts) {
-        _addAllExpandableNodes(account);
+      for (final node in nodes) {
+        if (node.children.isNotEmpty) {
+          _expandedNodes.add(node.id);
+          _expandAll(node.children);
+        }
       }
     });
   }
@@ -213,31 +237,21 @@ class _AccountSelectionDialogState extends State<AccountSelectionDialog> {
     });
   }
 
-  void _addAllExpandableNodes(AccountTreeNode account) {
-    if (account.hasChildren) {
-      _expandedNodes.add(account.id);
-      for (final child in account.children) {
-        _addAllExpandableNodes(child);
-      }
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final filteredTree = _filterTree(widget.accountTree);
     
     return Dialog(
-      child: Container(
-        width: 600,
-        height: 500,
-        margin: const EdgeInsets.all(16),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 700, maxHeight: 600),
         child: Column(
           children: [
-            // هدر
+            // هدر دیالوگ
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: theme.colorScheme.primary,
+                color: theme.colorScheme.primaryContainer,
                 borderRadius: const BorderRadius.only(
                   topLeft: Radius.circular(12),
                   topRight: Radius.circular(12),
@@ -246,99 +260,116 @@ class _AccountSelectionDialogState extends State<AccountSelectionDialog> {
               child: Row(
                 children: [
                   Icon(
-                    Icons.account_balance_wallet,
-                    color: theme.colorScheme.onPrimary,
-                    size: 24,
+                    Icons.account_tree,
+                    color: theme.colorScheme.onPrimaryContainer,
                   ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'انتخاب حساب',
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      color: theme.colorScheme.onPrimary,
-                      fontWeight: FontWeight.bold,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'انتخاب حساب (درختی)',
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        color: theme.colorScheme.onPrimaryContainer,
+                      ),
                     ),
                   ),
-                  const Spacer(),
                   IconButton(
                     onPressed: () => Navigator.pop(context),
                     icon: const Icon(Icons.close),
-                    color: theme.colorScheme.onPrimary,
+                    tooltip: 'بستن',
                   ),
                 ],
               ),
             ),
             
-            // جستجو و دکمه‌های کنترل
+            // فیلد جستجو و دکمه‌های باز/بسته کردن
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              padding: const EdgeInsets.all(16),
               child: Column(
                 children: [
                   TextField(
-                    decoration: InputDecoration(
-                      hintText: 'جستجو در حساب‌ها...',
-                      prefixIcon: const Icon(Icons.search),
-                      border: const OutlineInputBorder(),
+                    controller: _searchController,
+                    decoration: const InputDecoration(
+                      labelText: 'جستجو',
+                      hintText: 'نام یا کد حساب...',
+                      prefixIcon: Icon(Icons.search),
+                      border: OutlineInputBorder(),
                     ),
-                    onChanged: _filterAccounts,
+                    onChanged: (value) {
+                      setState(() {
+                        _searchQuery = value;
+                      });
+                    },
                   ),
-                  if (_searchQuery.isEmpty) ...[
-                    const SizedBox(height: 12),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        TextButton.icon(
-                          onPressed: _expandAll,
-                          icon: const Icon(Icons.expand_more),
-                          label: const Text('همه را باز کن'),
-                        ),
-                        TextButton.icon(
-                          onPressed: _collapseAll,
-                          icon: const Icon(Icons.expand_less),
-                          label: const Text('همه را ببند'),
-                        ),
-                      ],
-                    ),
-                  ],
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton.icon(
+                        onPressed: () => _expandAll(filteredTree),
+                        icon: const Icon(Icons.unfold_more, size: 18),
+                        label: const Text('باز کردن همه'),
+                      ),
+                      const SizedBox(width: 8),
+                      TextButton.icon(
+                        onPressed: _collapseAll,
+                        icon: const Icon(Icons.unfold_less, size: 18),
+                        label: const Text('بستن همه'),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
             
-            // لیست حساب‌ها
+            const Divider(height: 1),
+            
+            // درخت حساب‌ها
             Expanded(
-              child: Container(
-                margin: const EdgeInsets.symmetric(horizontal: 8),
-                child: _searchQuery.isEmpty
-                    ? _buildTreeView()
-                    : _buildSearchResults(),
-              ),
+              child: filteredTree.isEmpty
+                  ? Center(
+                      child: Text(
+                        _searchQuery.isEmpty ? 'هیچ حسابی یافت نشد' : 'نتیجه‌ای یافت نشد',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    )
+                  : ListView(
+                      padding: const EdgeInsets.all(8),
+                      children: _buildTreeNodes(filteredTree, 0),
+                    ),
             ),
             
-            // دکمه‌ها
+            const Divider(height: 1),
+            
+            // دکمه‌های پایین
             Container(
               padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHighest,
-                borderRadius: const BorderRadius.only(
-                  bottomLeft: Radius.circular(12),
-                  bottomRight: Radius.circular(12),
-                ),
-              ),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text('انصراف'),
-                  ),
-                  const SizedBox(width: 8),
-                  if (widget.selectedAccount != null)
-                    TextButton(
-                      onPressed: () {
-                        widget.onAccountSelected(null);
-                        Navigator.pop(context);
-                      },
-                      child: const Text('حذف انتخاب'),
+                  Text(
+                    'فقط حساب‌های انتهایی قابل انتخاب هستند',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      fontStyle: FontStyle.italic,
                     ),
+                  ),
+                  Row(
+                    children: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('انصراف'),
+                      ),
+                      const SizedBox(width: 8),
+                      FilledButton(
+                        onPressed: () {
+                          widget.onAccountSelected(null);
+                        },
+                        child: const Text('پاک کردن'),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -348,141 +379,160 @@ class _AccountSelectionDialogState extends State<AccountSelectionDialog> {
     );
   }
 
-  Widget _buildTreeView() {
-    return ListView.builder(
-      itemCount: widget.accounts.length,
-      itemBuilder: (context, index) {
-        return _buildAccountNode(widget.accounts[index], 0);
-      },
-    );
-  }
-
-  Widget _buildSearchResults() {
-    return ListView.builder(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      itemCount: _filteredAccounts.length,
-      itemBuilder: (context, index) {
-        final account = _filteredAccounts[index];
-        return Container(
-          margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-          child: ListTile(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-            tileColor: account.id == widget.selectedAccount?.id
-                ? Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.3)
-                : null,
-            leading: Icon(
-              Icons.account_balance_wallet,
-              color: account.id == widget.selectedAccount?.id
-                  ? Theme.of(context).colorScheme.primary
-                  : Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-            title: Text(account.name),
-            subtitle: Text('کد: ${account.code}'),
-            trailing: account.id == widget.selectedAccount?.id
-                ? Icon(
-                    Icons.check_circle,
-                    color: Theme.of(context).colorScheme.primary,
-                  )
-                : null,
-            onTap: () => widget.onAccountSelected(account),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildAccountNode(AccountTreeNode account, int level) {
-    final theme = Theme.of(context);
-    final isSelected = account.id == widget.selectedAccount?.id;
-    final canSelect = !account.hasChildren;
-    final isExpanded = _expandedNodes.contains(account.id);
+  List<Widget> _buildTreeNodes(List<AccountTreeNode> nodes, int level) {
+    final List<Widget> widgets = [];
     
-    return Column(
-      children: [
-        Container(
-          margin: EdgeInsets.symmetric(
-            horizontal: 8,
-            vertical: 2,
-          ),
-          child: ListTile(
-            contentPadding: EdgeInsets.symmetric(
-              horizontal: 16 + (level * 24),
-              vertical: 8,
-            ),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-            tileColor: isSelected 
-                ? theme.colorScheme.primaryContainer.withValues(alpha: 0.3)
-                : null,
-            leading: account.hasChildren
-                ? IconButton(
-                    icon: Icon(
-                      isExpanded ? Icons.expand_less : Icons.expand_more,
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                    onPressed: () {
-                      setState(() {
-                        if (isExpanded) {
-                          _expandedNodes.remove(account.id);
-                        } else {
-                          _expandedNodes.add(account.id);
-                        }
-                      });
-                    },
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(
-                      minWidth: 24,
-                      minHeight: 24,
-                    ),
-                  )
-                : Icon(
-                    Icons.account_balance_wallet,
-                    color: canSelect
-                        ? (isSelected ? theme.colorScheme.primary : theme.colorScheme.onSurfaceVariant)
-                        : theme.colorScheme.outline,
-                  ),
-            title: Text(
-              account.name,
-              style: TextStyle(
-                color: canSelect
-                    ? theme.colorScheme.onSurface
-                    : theme.colorScheme.outline,
-                fontWeight: account.hasChildren ? FontWeight.bold : FontWeight.normal,
-              ),
-            ),
-            subtitle: Text(
-              'کد: ${account.code}',
-              style: TextStyle(
-                color: canSelect
-                    ? theme.colorScheme.onSurfaceVariant
-                    : theme.colorScheme.outline,
-              ),
-            ),
-            trailing: isSelected
-                ? Icon(
-                    Icons.check_circle,
+    for (final node in nodes) {
+      final isExpanded = _expandedNodes.contains(node.id);
+      final hasChildren = node.children.isNotEmpty;
+      final isSelected = widget.selectedAccount?.id == node.id;
+      final isSelectable = node.isSelectable;
+      
+      widgets.add(
+        _TreeNodeWidget(
+          node: node,
+          level: level,
+          isExpanded: isExpanded,
+          hasChildren: hasChildren,
+          isSelected: isSelected,
+          isSelectable: isSelectable,
+          onTap: isSelectable
+              ? () => widget.onAccountSelected(node.toAccount())
+              : null,
+          onToggleExpand: hasChildren ? () => _toggleExpanded(node.id) : null,
+        ),
+      );
+      
+      if (isExpanded && hasChildren) {
+        widgets.addAll(_buildTreeNodes(node.children, level + 1));
+      }
+    }
+    
+    return widgets;
+  }
+}
+
+/// ویجت نمایش یک نود در درخت
+class _TreeNodeWidget extends StatelessWidget {
+  final AccountTreeNode node;
+  final int level;
+  final bool isExpanded;
+  final bool hasChildren;
+  final bool isSelected;
+  final bool isSelectable;
+  final VoidCallback? onTap;
+  final VoidCallback? onToggleExpand;
+
+  const _TreeNodeWidget({
+    required this.node,
+    required this.level,
+    required this.isExpanded,
+    required this.hasChildren,
+    required this.isSelected,
+    required this.isSelectable,
+    this.onTap,
+    this.onToggleExpand,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final indent = level * 24.0;
+    
+    return InkWell(
+      onTap: isSelectable ? onTap : onToggleExpand,
+      child: Container(
+        padding: EdgeInsets.only(
+          right: indent + 8,
+          left: 8,
+          top: 8,
+          bottom: 8,
+        ),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? theme.colorScheme.primaryContainer.withOpacity(0.5)
+              : null,
+          border: Border(
+            right: isSelected
+                ? BorderSide(
                     color: theme.colorScheme.primary,
+                    width: 3,
                   )
-                : null,
-            onTap: canSelect ? () => widget.onAccountSelected(account) : null,
+                : BorderSide.none,
           ),
         ),
-        // نمایش فرزندان فقط اگر گره باز باشد
-        if (account.hasChildren && isExpanded)
-          ...account.children.map((child) => _buildAccountNode(child, level + 1)),
-        // خط جداکننده بین حساب‌های مختلف (فقط برای سطح اول)
-        if (level == 0 && account != widget.accounts.last)
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-            child: Divider(
-              height: 1,
-              color: theme.colorScheme.outline.withValues(alpha: 0.2),
+        child: Row(
+          children: [
+            // آیکون باز/بسته کردن
+            SizedBox(
+              width: 24,
+              child: hasChildren
+                  ? IconButton(
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      iconSize: 20,
+                      onPressed: onToggleExpand,
+                      icon: Icon(
+                        isExpanded ? Icons.expand_more : Icons.chevron_left,
+                        color: theme.colorScheme.onSurface,
+                      ),
+                    )
+                  : null,
             ),
-          ),
-      ],
+            
+            const SizedBox(width: 8),
+            
+            // آیکون حساب
+            Icon(
+              hasChildren ? Icons.folder : Icons.receipt_long,
+              size: 20,
+              color: isSelectable
+                  ? theme.colorScheme.primary
+                  : theme.colorScheme.onSurfaceVariant,
+            ),
+            
+            const SizedBox(width: 12),
+            
+            // اطلاعات حساب
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    node.name,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: hasChildren ? FontWeight.bold : FontWeight.normal,
+                      color: isSelectable
+                          ? theme.colorScheme.onSurface
+                          : theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  Text(
+                    'کد: ${node.code}',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            
+            // نشانگر انتخاب یا غیرفعال بودن
+            if (isSelected)
+              Icon(
+                Icons.check_circle,
+                color: theme.colorScheme.primary,
+                size: 20,
+              )
+            else if (!isSelectable)
+              Icon(
+                Icons.lock_outline,
+                color: theme.colorScheme.onSurfaceVariant,
+                size: 18,
+              ),
+          ],
+        ),
+      ),
     );
   }
 }

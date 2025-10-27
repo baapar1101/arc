@@ -222,6 +222,10 @@ class PersonResponse(BaseModel):
     commission_exclude_discounts: Optional[bool] = Field(default=False, description="عدم محاسبه تخفیف")
     commission_exclude_additions_deductions: Optional[bool] = Field(default=False, description="عدم محاسبه اضافات و کسورات")
     commission_post_in_invoice_document: Optional[bool] = Field(default=False, description="ثبت پورسانت در سند فاکتور")
+    
+    # تراز و وضعیت مالی
+    balance: Optional[float] = Field(default=None, description="تراز شخص (بستانکار - بدهکار)")
+    status: Optional[str] = Field(default=None, description="وضعیت مالی (بستانکار/بدهکار/بالانس/بدون تراکنش)")
 
     class Config:
         from_attributes = True

@@ -352,6 +352,30 @@ def list_transfers(db: Session, business_id: int, query: Dict[str, Any]) -> Dict
         except Exception:
             pass
 
+    # Apply advanced filters (e.g., DataTable date range filters)
+    filters = query.get("filters")
+    if filters and isinstance(filters, (list, tuple)):
+        for flt in filters:
+            try:
+                prop = getattr(flt, 'property', None) if not isinstance(flt, dict) else flt.get('property')
+                op = getattr(flt, 'operator', None) if not isinstance(flt, dict) else flt.get('operator')
+                val = getattr(flt, 'value', None) if not isinstance(flt, dict) else flt.get('value')
+                if not prop or not op:
+                    continue
+                if prop == 'document_date':
+                    if isinstance(val, str) and val:
+                        try:
+                            dt = _parse_iso_date(val)
+                            col = getattr(Document, prop)
+                            if op == ">=":
+                                q = q.filter(col >= dt)
+                            elif op == "<=":
+                                q = q.filter(col <= dt)
+                        except Exception:
+                            pass
+            except Exception:
+                pass
+
     search = query.get("search")
     if search:
         q = q.filter(Document.code.ilike(f"%{search}%"))
@@ -606,10 +630,14 @@ def transfer_document_to_dict(db: Session, document: Document) -> Dict[str, Any]
                 line_dict["side"] = line.extra_info["side"]
             if "source_type" in line.extra_info:
                 line_dict["source_type"] = line.extra_info["source_type"]
-                source_type = source_type or line.extra_info["source_type"]
+                # Only assign source_type from source lines
+                if line_dict.get("side") == "source":
+                    source_type = source_type or line.extra_info["source_type"]
             if "destination_type" in line.extra_info:
                 line_dict["destination_type"] = line.extra_info["destination_type"]
-                destination_type = destination_type or line.extra_info["destination_type"]
+                # Only assign destination_type from destination lines
+                if line_dict.get("side") == "destination":
+                    destination_type = destination_type or line.extra_info["destination_type"]
             if "is_commission_line" in line.extra_info:
                 line_dict["is_commission_line"] = line.extra_info["is_commission_line"]
 

@@ -49,9 +49,13 @@ async def list_transfers_endpoint(
     try:
         body_json = await request.json()
         if isinstance(body_json, dict):
+            # Forward simple date range params
             for key in ["from_date", "to_date"]:
                 if key in body_json:
                     query_dict[key] = body_json[key]
+            # Forward advanced filters from DataTable (e.g., document_date range)
+            if "filters" in body_json:
+                query_dict["filters"] = body_json.get("filters")
     except Exception:
         pass
 

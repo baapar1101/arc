@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import '../../widgets/data_table/data_table_widget.dart';
@@ -227,6 +228,89 @@ class _PersonsPageState extends State<PersonsPage> {
           t.personWebsite,
           width: ColumnWidth.large,
           formatter: (person) => person.website ?? '-',
+        ),
+        CustomColumn(
+          'balance',
+          'تراز',
+          width: ColumnWidth.medium,
+          sortable: true,
+          formatter: (person) {
+            final balance = person.balance ?? 0.0;
+            final formatter = NumberFormat('#,##0', 'en_US');
+            return formatter.format(balance);
+          },
+          builder: (person, index) {
+            final balance = person.balance ?? 0.0;
+            final formatter = NumberFormat('#,##0', 'en_US');
+            final formattedBalance = formatter.format(balance);
+            
+            Color balanceColor;
+            if (balance > 0) {
+              balanceColor = Colors.green;
+            } else if (balance < 0) {
+              balanceColor = Colors.red;
+            } else {
+              balanceColor = Colors.grey;
+            }
+            
+            return Text(
+              formattedBalance,
+              style: TextStyle(
+                color: balanceColor,
+                fontWeight: FontWeight.bold,
+              ),
+              textAlign: TextAlign.center,
+            );
+          },
+        ),
+        CustomColumn(
+          'status',
+          'وضعیت',
+          width: ColumnWidth.medium,
+          filterType: ColumnFilterType.multiSelect,
+          filterOptions: [
+            FilterOption(value: 'بستانکار', label: 'بستانکار'),
+            FilterOption(value: 'بدهکار', label: 'بدهکار'),
+            FilterOption(value: 'بالانس', label: 'بالانس'),
+            FilterOption(value: 'بدون تراکنش', label: 'بدون تراکنش'),
+          ],
+          formatter: (person) => person.status ?? '-',
+          builder: (person, index) {
+            final status = person.status ?? '-';
+            Color statusColor;
+            switch (status) {
+              case 'بستانکار':
+                statusColor = Colors.green;
+                break;
+              case 'بدهکار':
+                statusColor = Colors.red;
+                break;
+              case 'بالانس':
+                statusColor = Colors.blue;
+                break;
+              case 'بدون تراکنش':
+                statusColor = Colors.grey;
+                break;
+              default:
+                statusColor = Colors.black;
+            }
+            return Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: statusColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(color: statusColor.withOpacity(0.3)),
+              ),
+              child: Text(
+                status,
+                style: TextStyle(
+                  color: statusColor,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                ),
+              ),
+            );
+          },
         ),
         ActionColumn(
           'actions',

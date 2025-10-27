@@ -15,6 +15,7 @@ import '../../services/business_dashboard_service.dart';
 import '../../core/api_client.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'receipts_payments_list_page.dart' show BulkSettlementDialog;
+import '../../widgets/document/document_form_dialog.dart';
 
 class BusinessShell extends StatefulWidget {
   final int businessId;
@@ -629,6 +630,26 @@ class _BusinessShellState extends State<BusinessShell> {
       }
     }
 
+    Future<void> showAddDocumentDialog() async {
+      final calendarController = widget.calendarController ?? await CalendarController.load();
+      final result = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => DocumentFormDialog(
+          businessId: widget.businessId,
+          calendarController: calendarController,
+          authStore: widget.authStore,
+          apiClient: ApiClient(),
+          fiscalYearId: null, // TODO: از context یا state بگیریم
+          currencyId: 1, // TODO: از تنظیمات بگیریم
+        ),
+      );
+      if (result == true) {
+        // Document was successfully added, refresh the current page
+        _refreshCurrentPage();
+      }
+    }
+
 
     bool isExpanded(_MenuItem item) {
       if (item.label == t.productsAndServices) return _isProductsAndServicesExpanded;
@@ -979,6 +1000,9 @@ class _BusinessShellState extends State<BusinessShell> {
                                           } else if (item.label == t.checks) {
                                             // Navigate to add check
                                             context.go('/business/${widget.businessId}/checks/new');
+                                          } else if (item.label == t.documents) {
+                                            // Show add document dialog
+                                            showAddDocumentDialog();
                                           }
                                           // سایر مسیرهای افزودن در آینده متصل می‌شوند
                                         },
@@ -1081,6 +1105,9 @@ class _BusinessShellState extends State<BusinessShell> {
                                 } else if (item.label == t.checks) {
                                   // Navigate to add check
                                   context.go('/business/${widget.businessId}/checks/new');
+                                } else if (item.label == t.documents) {
+                                  // Show add document dialog
+                                  showAddDocumentDialog();
                                 }
                               },
                               child: Container(

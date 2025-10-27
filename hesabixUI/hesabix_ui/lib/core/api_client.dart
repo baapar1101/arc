@@ -207,6 +207,21 @@ class ApiClient {
     );
     return response.data ?? [];
   }
+
+  // Download Excel API
+  Future<List<int>> downloadExcel(String path, {Map<String, dynamic>? params}) async {
+    final response = await post<List<int>>(
+      path,
+      data: params,
+      responseType: ResponseType.bytes,
+      options: Options(
+        headers: {
+          'Accept': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        },
+      ),
+    );
+    return response.data ?? [];
+  }
 }
 
 // Utilities

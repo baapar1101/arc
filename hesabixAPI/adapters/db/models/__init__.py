@@ -41,3 +41,5 @@ from .bank_account import BankAccount  # noqa: F401
 from .cash_register import CashRegister  # noqa: F401
 from .petty_cash import PettyCash  # noqa: F401
 from .check import Check  # noqa: F401
+from .warehouse import Warehouse  # noqa: F401
+from .product_bom import ProductBOM, ProductBOMItem, ProductBOMOutput, ProductBOMOperation  # noqa: F401

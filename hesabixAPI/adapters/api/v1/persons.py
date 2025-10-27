@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Body, Form
 from fastapi import UploadFile, File
 from sqlalchemy.orm import Session
+from sqlalchemy import and_
 from typing import Dict, Any, List, Optional
 
 from adapters.db.session import get_db
@@ -19,6 +20,7 @@ from app.services.person_service import (
 )
 from adapters.db.models.person import Person
 from adapters.db.models.business import Business
+from adapters.db.models.fiscal_year import FiscalYear
 
 router = APIRouter(prefix="/persons", tags=["persons"])
 
@@ -190,6 +192,26 @@ async def get_persons_endpoint(
     auth_context: AuthContext = Depends(get_current_user),
 ):
     """دریافت لیست اشخاص کسب و کار"""
+    # دریافت سال مالی از header
+    fiscal_year_id = None
+    fy_header = request.headers.get('X-Fiscal-Year-ID')
+    if fy_header:
+        try:
+            fiscal_year_id = int(fy_header)
+        except (ValueError, TypeError):
+            pass
+    
+    # اگر سال مالی مشخص نشده، از سال مالی جاری business استفاده می‌کنیم
+    if not fiscal_year_id:
+        fiscal_year = db.query(FiscalYear).filter(
+            and_(
+                FiscalYear.business_id == business_id,
+                FiscalYear.is_last == True
+            )
+        ).first()
+        if fiscal_year:
+            fiscal_year_id = fiscal_year.id
+    
     query_dict = {
         "take": query_info.take,
         "skip": query_info.skip,
@@ -199,7 +221,7 @@ async def get_persons_endpoint(
         "search_fields": query_info.search_fields,
         "filters": query_info.filters,
     }
-    result = get_persons_by_business(db, business_id, query_dict)
+    result = get_persons_by_business(db, business_id, query_dict, fiscal_year_id)
     
     # فرمت کردن تاریخ‌ها
     result['items'] = [
@@ -232,6 +254,26 @@ async def export_persons_excel(
     from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
     from fastapi.responses import Response
 
+    # دریافت سال مالی از header
+    fiscal_year_id = None
+    fy_header = request.headers.get('X-Fiscal-Year-ID')
+    if fy_header:
+        try:
+            fiscal_year_id = int(fy_header)
+        except (ValueError, TypeError):
+            pass
+    
+    # اگر سال مالی مشخص نشده، از سال مالی جاری business استفاده می‌کنیم
+    if not fiscal_year_id:
+        fiscal_year = db.query(FiscalYear).filter(
+            and_(
+                FiscalYear.business_id == business_id,
+                FiscalYear.is_last == True
+            )
+        ).first()
+        if fiscal_year:
+            fiscal_year_id = fiscal_year.id
+    
     # Build query dict similar to list endpoint from flat body
     query_dict = {
         "take": int(body.get("take", 20)),
@@ -243,7 +285,7 @@ async def export_persons_excel(
         "filters": body.get("filters"),
     }
 
-    result = get_persons_by_business(db, business_id, query_dict)
+    result = get_persons_by_business(db, business_id, query_dict, fiscal_year_id)
 
     items = result.get('items', [])
     # Format date/time fields using existing helper
@@ -381,6 +423,26 @@ async def export_persons_pdf(
     from weasyprint import HTML, CSS
     from weasyprint.text.fonts import FontConfiguration
 
+    # دریافت سال مالی از header
+    fiscal_year_id = None
+    fy_header = request.headers.get('X-Fiscal-Year-ID')
+    if fy_header:
+        try:
+            fiscal_year_id = int(fy_header)
+        except (ValueError, TypeError):
+            pass
+    
+    # اگر سال مالی مشخص نشده، از سال مالی جاری business استفاده می‌کنیم
+    if not fiscal_year_id:
+        fiscal_year = db.query(FiscalYear).filter(
+            and_(
+                FiscalYear.business_id == business_id,
+                FiscalYear.is_last == True
+            )
+        ).first()
+        if fiscal_year:
+            fiscal_year_id = fiscal_year.id
+    
     # Build query dict from flat body
     query_dict = {
         "take": int(body.get("take", 20)),
@@ -392,7 +454,7 @@ async def export_persons_pdf(
         "filters": body.get("filters"),
     }
 
-    result = get_persons_by_business(db, business_id, query_dict)
+    result = get_persons_by_business(db, business_id, query_dict, fiscal_year_id)
     items = result.get('items', [])
     items = [format_datetime_fields(item, request) for item in items]
 

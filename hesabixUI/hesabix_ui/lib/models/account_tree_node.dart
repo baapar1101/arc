@@ -1,3 +1,5 @@
+import 'account_model.dart';
+
 class AccountTreeNode {
   final int id;
   final String code;
@@ -81,9 +83,26 @@ class AccountTreeNode {
     }).toList();
   }
 
+  /// آیا این نود قابل انتخاب است؟ (فقط leaf nodes)
+  bool get isSelectable => !hasChildren;
+
+  /// نمایش نام کامل با کد
+  String get displayName => '$code - $name';
+
+  /// تبدیل به Account
+  Account toAccount() {
+    return Account(
+      id: id,
+      code: code,
+      name: name,
+      accountType: accountType ?? 'accounting_document',
+      parentId: parentId,
+    );
+  }
+
   @override
   String toString() {
-    return '$code - $name';
+    return displayName;
   }
 
   @override

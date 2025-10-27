@@ -838,10 +838,22 @@ class _TransactionDialogState extends State<TransactionDialog> {
   Widget _buildAccountFields() {
     return AccountTreeComboboxWidget(
       businessId: widget.businessId,
-      selectedAccount: _selectedAccount,
+      selectedAccount: _selectedAccount?.toAccount(),
       onChanged: (account) {
         setState(() {
-          _selectedAccount = account;
+          // تبدیل Account به AccountTreeNode - فقط id را نگه می‌داریم
+          // برای استفاده کامل، باید از tree اصلی پیدا شود
+          if (account != null) {
+            _selectedAccount = AccountTreeNode(
+              id: account.id!,
+              code: account.code,
+              name: account.name,
+              accountType: account.accountType,
+              parentId: account.parentId,
+            );
+          } else {
+            _selectedAccount = null;
+          }
         });
       },
       label: 'حساب *',

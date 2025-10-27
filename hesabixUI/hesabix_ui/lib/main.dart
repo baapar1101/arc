@@ -41,6 +41,8 @@ import 'pages/business/check_form_page.dart';
 import 'pages/business/receipts_payments_list_page.dart';
 import 'pages/business/expense_income_list_page.dart';
 import 'pages/business/transfers_page.dart';
+import 'pages/business/documents_page.dart';
+import 'pages/business/warehouses_page.dart';
 import 'pages/error_404_page.dart';
 import 'core/locale_controller.dart';
 import 'core/calendar_controller.dart';
@@ -753,6 +755,33 @@ class _MyAppState extends State<MyApp> {
                 final businessId = int.parse(state.pathParameters['business_id']!);
                 return NoTransitionPage(
                   child: TransfersPage(
+                    businessId: businessId,
+                    calendarController: _calendarController!,
+                    authStore: _authStore!,
+                    apiClient: ApiClient(),
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/warehouses',
+              name: 'business_warehouses',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return NoTransitionPage(
+                  child: WarehousesPage(
+                    businessId: businessId,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/documents',
+              name: 'business_documents',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return NoTransitionPage(
+                  child: DocumentsPage(
                     businessId: businessId,
                     calendarController: _calendarController!,
                     authStore: _authStore!,

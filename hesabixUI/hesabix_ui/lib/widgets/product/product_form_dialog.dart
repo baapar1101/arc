@@ -5,6 +5,7 @@ import '../../controllers/product_form_controller.dart';
 import 'sections/product_basic_info_section.dart';
 import 'sections/product_pricing_inventory_section.dart';
 import 'sections/product_tax_section.dart';
+import 'sections/product_bom_section.dart';
 
 class ProductFormDialog extends StatefulWidget {
   final int businessId;
@@ -83,7 +84,7 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
 
   Widget _buildFormContent() {
     return DefaultTabController(
-      length: 3,
+      length: 4,
       child: SizedBox(
         height: MediaQuery.of(context).size.height > 800 ? 700 : 600,
         child: Column(
@@ -99,6 +100,7 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
                     _buildBasicInfoTab(),
                     _buildPricingInventoryTab(),
                     _buildTaxTab(),
+                    _buildBomTab(),
                   ],
                 ),
               ),
@@ -118,6 +120,7 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
         Tab(text: t.productGeneralInfo),
         Tab(text: t.pricingAndInventory),
         Tab(text: t.tax),
+        const Tab(text: 'فرمول تولید'),
       ],
     );
   }
@@ -164,6 +167,17 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
         onChanged: _controller.updateFormData,
         taxTypes: _controller.taxTypes,
         taxUnits: _controller.taxUnits,
+      ),
+    );
+  }
+
+  Widget _buildBomTab() {
+    final productId = widget.product != null ? widget.product!['id'] as int? : null;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      child: ProductBomSection(
+        businessId: widget.businessId,
+        productId: productId,
       ),
     );
   }

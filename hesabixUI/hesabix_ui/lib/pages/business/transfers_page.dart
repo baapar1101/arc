@@ -190,10 +190,16 @@ class _TransfersPageState extends State<TransfersPage> {
           formatter: (it) => (it.description ?? '').isNotEmpty ? it.description! : _composeDesc(it),
         ),
         TextColumn(
-          'route',
-          'مبدا → مقصد',
+          'source',
+          'مبدا',
           width: ColumnWidth.large,
-          formatter: (it) => _composeRoute(it),
+          formatter: (it) => _composeSource(it),
+        ),
+        TextColumn(
+          'destination',
+          'مقصد',
+          width: ColumnWidth.large,
+          formatter: (it) => _composeDestination(it),
         ),
         DateColumn(
           'document_date',
@@ -231,7 +237,7 @@ class _TransfersPageState extends State<TransfersPage> {
           ],
         ),
       ],
-      searchFields: ['code', 'created_by_name'],
+      searchFields: ['code', 'created_by_name', 'source', 'destination'],
       dateRangeField: 'document_date',
       showSearch: true,
       showFilters: true,
@@ -272,17 +278,19 @@ class _TransfersPageState extends State<TransfersPage> {
     }
   }
 
-  String _composeRoute(TransferDocument it) {
-    final src = '${_typeFa(it.sourceType)} ${it.sourceName ?? ''}'.trim();
-    final dst = '${_typeFa(it.destinationType)} ${it.destinationName ?? ''}'.trim();
-    if (src.isEmpty && dst.isEmpty) return '';
-    return '$src → $dst';
+  String _composeSource(TransferDocument it) {
+    return '${_typeFa(it.sourceType)} ${it.sourceName ?? ''}'.trim();
+  }
+
+  String _composeDestination(TransferDocument it) {
+    return '${_typeFa(it.destinationType)} ${it.destinationName ?? ''}'.trim();
   }
 
   String _composeDesc(TransferDocument it) {
-    final r = _composeRoute(it);
-    if (r.isEmpty) return '';
-    return 'انتقال $r';
+    final src = _composeSource(it);
+    final dst = _composeDestination(it);
+    if (src.isEmpty && dst.isEmpty) return '';
+    return 'انتقال $src → $dst';
   }
 
   void _onAddNew() async {
@@ -305,7 +313,10 @@ class _TransfersPageState extends State<TransfersPage> {
     if (!mounted) return;
     showDialog(
       context: context,
-      builder: (_) => TransferDetailsDialog(document: full),
+      builder: (_) => TransferDetailsDialog(
+        document: full,
+        calendarController: widget.calendarController,
+      ),
     );
   }
 

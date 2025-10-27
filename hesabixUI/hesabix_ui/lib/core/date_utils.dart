@@ -67,10 +67,15 @@ class HesabixDateUtils {
     return monthNames[month - 1];
   }
 
-  /// Format date for API (always Gregorian)
-  static String formatForAPI(DateTime? date) {
+  /// Format date with both Jalali and Gregorian for display
+  static String formatDualCalendar(DateTime? date) {
     if (date == null) return '';
-    return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+    
+    final jalali = Jalali.fromDateTime(date);
+    final jalaliStr = '${jalali.year}/${jalali.month.toString().padLeft(2, '0')}/${jalali.day.toString().padLeft(2, '0')}';
+    final gregorianStr = '${date.year}/${date.month.toString().padLeft(2, '0')}/${date.day.toString().padLeft(2, '0')}';
+    
+    return '$jalaliStr (میلادی: $gregorianStr)';
   }
 
   /// Parse date from API (always Gregorian)
