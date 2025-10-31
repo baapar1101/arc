@@ -131,6 +131,40 @@ def list_user_businesses(
     return success_response(formatted_data, request)
 
 
+@router.get("/{business_id}", 
+    summary="جزئیات کسب و کار", 
+    description="دریافت جزئیات یک کسب و کار خاص",
+    response_model=SuccessResponse,
+    responses={
+        200: {
+            "description": "جزئیات کسب و کار با موفقیت دریافت شد",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "success": True,
+                        "message": "جزئیات کسب و کار دریافت شد",
+                        "data": {
+                            "id": 1,
+                            "name": "شرکت نمونه",
+                            "business_type": "شرکت",
+                            "business_field": "تولیدی",
+                            "owner_id": 1,
+                            "address": "تهران، خیابان ولیعصر",
+                            "phone": "02112345678",
+                            "created_at": "1403/01/01 00:00:00"
+                        }
+                    }
+                }
+            }
+        },
+        401: {
+            "description": "کاربر احراز هویت نشده است"
+        },
+        404: {
+            "description": "کسب و کار یافت نشد"
+        }
+    }
+)
 @router.post("/{business_id}/details", 
     summary="جزئیات کسب و کار", 
     description="دریافت جزئیات یک کسب و کار خاص",
@@ -217,6 +251,7 @@ def get_business(
         }
     }
 )
+@require_business_management()
 def update_business_info(
     request: Request,
     business_id: int,

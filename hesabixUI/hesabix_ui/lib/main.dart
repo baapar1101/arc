@@ -25,9 +25,10 @@ import 'pages/business/users_permissions_page.dart';
 import 'pages/business/accounts_page.dart';
 import 'pages/business/bank_accounts_page.dart';
 import 'pages/business/wallet_page.dart';
-import 'pages/business/invoice_page.dart';
+import 'pages/business/invoices_list_page.dart';
 import 'pages/business/new_invoice_page.dart';
 import 'pages/business/settings_page.dart';
+import 'pages/business/business_info_settings_page.dart';
 import 'pages/business/reports_page.dart';
 import 'pages/business/persons_page.dart';
 import 'pages/business/product_attributes_page.dart';
@@ -595,9 +596,11 @@ class _MyAppState extends State<MyApp> {
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
                 return NoTransitionPage(
-                  child: InvoicePage(
+                  child: InvoicesListPage(
                     businessId: businessId,
+                    calendarController: _calendarController!,
                     authStore: _authStore!,
+                    apiClient: ApiClient(),
                   ),
                 );
               },
@@ -647,6 +650,21 @@ class _MyAppState extends State<MyApp> {
                     calendarController: _calendarController!,
                     themeController: themeController,
                   ),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/settings/business',
+              name: 'business_settings_business',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                if (!_authStore!.hasBusinessPermission('settings', 'join')) {
+                  return NoTransitionPage(
+                    child: PermissionGuard.buildAccessDeniedPage(),
+                  );
+                }
+                return NoTransitionPage(
+                  child: BusinessInfoSettingsPage(businessId: businessId),
                 );
               },
             ),

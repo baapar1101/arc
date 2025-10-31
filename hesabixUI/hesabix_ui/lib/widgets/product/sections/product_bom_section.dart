@@ -1,6 +1,16 @@
 import 'package:flutter/material.dart';
 import '../../../services/bom_service.dart';
 import '../../../models/bom_models.dart';
+import '../../product/bom_editor_dialog.dart';
+import '../../../core/api_client.dart';
+import '../../../core/auth_store.dart';
+import '../../../core/calendar_controller.dart';
+import '../../document/document_form_dialog.dart';
+import '../../document/document_line_editor.dart';
+import '../../../services/account_service.dart';
+import '../../../models/account_model.dart';
+import '../production_settings_dialog.dart';
+import '../../../services/production_settings_service.dart';
 
 class ProductBomSection extends StatefulWidget {
   final int businessId;
@@ -69,6 +79,18 @@ class _ProductBomSectionState extends State<ProductBomSection> {
           children: [
             Text('فرمول‌های تولید', style: Theme.of(context).textTheme.titleMedium),
             const Spacer(),
+            Tooltip(
+              message: 'تنظیمات تولید',
+              child: IconButton(
+                onPressed: () async {
+                  await showDialog<bool>(
+                    context: context,
+                    builder: (_) => ProductionSettingsDialog(businessId: widget.businessId),
+                  );
+                },
+                icon: const Icon(Icons.settings_suggest_outlined),
+              ),
+            ),
             FilledButton.icon(
               onPressed: _showCreateDialog,
               icon: const Icon(Icons.add),
@@ -94,6 +116,11 @@ class _ProductBomSectionState extends State<ProductBomSection> {
                           tooltip: 'انفجار فرمول',
                           icon: const Icon(Icons.auto_awesome),
                           onPressed: () => _explode(bom),
+                        ),
+                        IconButton(
+                          tooltip: 'ویرایش جزئیات',
+                          icon: const Icon(Icons.tune),
+                          onPressed: () => _openEditor(bom),
                         ),
                         IconButton(
                           tooltip: 'ویرایش',
@@ -127,16 +154,37 @@ class _ProductBomSectionState extends State<ProductBomSection> {
 
   Future<void> _explode(ProductBOM bom) async {
     try {
+      // دریافت مقدار تولید از کاربر
+      final qtyController = TextEditingController(text: '1');
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: const Text('انفجار فرمول')
+          ,
+          content: TextField(
+            controller: qtyController,
+            decoration: const InputDecoration(labelText: 'مقدار تولید', hintText: 'مثلاً 10'),
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('انصراف')),
+            FilledButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('ادامه')),
+          ],
+        ),
+      );
+      if (ok != true) return;
+      final qty = double.tryParse(qtyController.text.replaceAll(',', '.')) ?? 1;
+
       final result = await _service.explode(
         businessId: widget.businessId,
         bomId: bom.id,
-        quantity: 1,
+        quantity: qty,
       );
       if (!mounted) return;
       await showDialog<void>(
         context: context,
         builder: (_) => AlertDialog(
-          title: const Text('خروجی انفجار فرمول (برای ۱ واحد)'),
+          title: Text('خروجی انفجار فرمول (برای ${qty.toString()} واحد)'),
           content: SizedBox(
             width: 500,
             child: Column(
@@ -151,7 +199,29 @@ class _ProductBomSectionState extends State<ProductBomSection> {
                     itemCount: result.items.length,
                     itemBuilder: (ctx, i) {
                       final it = result.items[i];
-                      return Text('- ${it.componentProductId} × ${it.requiredQty} ${it.uom ?? ''}');
+                      final name = it.componentProductName ?? '#${it.componentProductId}';
+                      final unit = it.uom ?? it.componentProductMainUnit ?? '';
+                      final mainUnit = it.mainUnit ?? it.componentProductMainUnit ?? '';
+                      final showConv = it.requiredQtyMainUnit != null && (unit != mainUnit) && mainUnit.isNotEmpty;
+                      final convText = showConv ? ' (≈ ${it.requiredQtyMainUnit} $mainUnit)' : '';
+                      return Text('- $name × ${it.requiredQty} ${unit.isEmpty ? '' : unit}$convText');
+                    },
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text('خروجی‌ها:'),
+                const SizedBox(height: 8),
+                SizedBox(
+                  height: 120,
+                  child: ListView.builder(
+                    itemCount: result.outputs.length,
+                    itemBuilder: (ctx, i) {
+                      final ot = result.outputs[i];
+                      final name = ot.outputProductName ?? '#${ot.outputProductId}';
+                      final mainUnit = ot.mainUnit;
+                      final showConv = ot.ratioMainUnit != null && mainUnit != null && (ot.uom ?? '') != mainUnit;
+                      final convText = showConv ? ' (≈ ${ot.ratioMainUnit} $mainUnit)' : '';
+                      return Text('- $name: ${ot.ratio} ${ot.uom ?? ''}$convText');
                     },
                   ),
                 ),
@@ -160,6 +230,87 @@ class _ProductBomSectionState extends State<ProductBomSection> {
           ),
           actions: [
             TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('بستن')),
+            FilledButton.icon(
+              onPressed: () async {
+                try {
+                  final draft = await _service.produceDraft(
+                    businessId: widget.businessId,
+                    bomId: bom.id,
+                    quantity: qty,
+                  );
+                  if (!mounted) return;
+                      Navigator.of(context).pop();
+                      // یافتن حساب‌های پیش‌فرض
+                      final accountService = AccountService(client: ApiClient());
+                      final prodSettings = ProductionSettingsService();
+                      final (savedInvCode, savedWipCode) = await prodSettings.getDefaultAccounts(widget.businessId);
+                      Future<Account?> _getAccountByCode(String code) async {
+                        try {
+                          final res = await accountService.searchAccounts(businessId: widget.businessId, searchQuery: code, limit: 10);
+                          final items = (res['items'] as List<dynamic>? ?? const <dynamic>[])
+                              .map((e) => Account.fromJson(Map<String, dynamic>.from(e as Map)))
+                              .toList();
+                          // جستجوی دقیق بر اساس کد
+                          final exact = items.where((a) => a.code == code).toList();
+                          if (exact.isNotEmpty) return exact.first;
+                          return items.isNotEmpty ? items.first : null;
+                        } catch (_) {
+                          return null;
+                        }
+                      }
+
+                      final inventoryAccount = await _getAccountByCode((savedInvCode ?? '10102'));
+                      final wipAccount = await _getAccountByCode((savedWipCode ?? '10106'));
+
+                      // ساخت خطوط اولیه از پیش‌نویس برای فرم سند
+                      final lines = <DocumentLineEdit>[];
+                      final draftLines = (draft['lines'] as List?) ?? const <dynamic>[];
+                      for (final raw in draftLines) {
+                        final m = Map<String, dynamic>.from(raw as Map);
+                        final isConsumption = (m['description']?.toString() ?? '').contains('مصرف');
+                        final Account? defaultAccount = isConsumption
+                            ? inventoryAccount
+                            : (wipAccount ?? inventoryAccount);
+                        lines.add(
+                          DocumentLineEdit(
+                            account: defaultAccount,
+                            detail: {
+                              if (m['product_id'] != null) 'product_id': m['product_id'],
+                            },
+                            quantity: m['quantity'] is num ? (m['quantity'] as num).toDouble() : double.tryParse(m['quantity']?.toString() ?? ''),
+                            debit: 0,
+                            credit: 0,
+                            description: m['description']?.toString(),
+                          ),
+                        );
+                      }
+
+                      // بارگذاری کنترلر تقویم (در صورت عدم وجود)
+                      final calendarController = await CalendarController.load();
+
+                      // باز کردن فرم سند با مقداردهی اولیه
+                      await showDialog<bool>(
+                        context: context,
+                        barrierDismissible: false,
+                        builder: (_) => DocumentFormDialog(
+                          businessId: widget.businessId,
+                          calendarController: calendarController,
+                          authStore: AuthStore(),
+                          apiClient: ApiClient(),
+                          fiscalYearId: null,
+                          currencyId: null,
+                          initialLines: lines,
+                          initialDescription: draft['description']?.toString(),
+                        ),
+                      );
+                } catch (e) {
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطا در ایجاد پیش‌نویس: $e')));
+                }
+              },
+              icon: const Icon(Icons.playlist_add),
+              label: const Text('ایجاد پیش‌نویس سند تولید'),
+            ),
           ],
         ),
       );
@@ -271,6 +422,18 @@ class _ProductBomSectionState extends State<ProductBomSection> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطا: $e')));
+    }
+  }
+
+  Future<void> _openEditor(ProductBOM bom) async {
+    final updated = await showDialog<ProductBOM>(
+      context: context,
+      builder: (_) => BomEditorDialog(businessId: widget.businessId, bom: bom),
+    );
+    if (updated != null && mounted) {
+      setState(() {
+        _items = _items.map((e) => e.id == updated.id ? updated : e).toList();
+      });
     }
   }
 

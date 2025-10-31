@@ -24,7 +24,10 @@ def require_app_permission(permission: str):
             
             if not ctx.has_app_permission(permission):
                 raise ApiError("FORBIDDEN", f"Missing app permission: {permission}", http_status=403)
-            return await func(*args, **kwargs)
+            result = func(*args, **kwargs)
+            if inspect.isawaitable(result):
+                result = await result
+            return result
         return wrapper
     return decorator
 

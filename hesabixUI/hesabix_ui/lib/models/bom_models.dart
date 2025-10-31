@@ -51,12 +51,20 @@ class BomOutput {
   final int outputProductId;
   final double ratio;
   final String? uom;
+  final String? outputProductName;
+  final String? outputProductCode;
+  final double? ratioMainUnit;
+  final String? mainUnit;
 
   const BomOutput({
     required this.lineNo,
     required this.outputProductId,
     required this.ratio,
     this.uom,
+    this.outputProductName,
+    this.outputProductCode,
+    this.ratioMainUnit,
+    this.mainUnit,
   });
 
   factory BomOutput.fromJson(Map<String, dynamic> json) {
@@ -65,6 +73,10 @@ class BomOutput {
       outputProductId: (json['output_product_id'] ?? json['outputProductId']) as int,
       ratio: double.tryParse(json['ratio']?.toString() ?? '0') ?? 0,
       uom: json['uom'] as String?,
+      outputProductName: json['output_product_name'] as String?,
+      outputProductCode: json['output_product_code'] as String?,
+      ratioMainUnit: json['ratio_main_unit'] != null ? double.tryParse(json['ratio_main_unit'].toString()) : null,
+      mainUnit: json['main_unit'] as String?,
     );
   }
 
@@ -74,6 +86,10 @@ class BomOutput {
       'output_product_id': outputProductId,
       'ratio': ratio,
       'uom': uom,
+      if (outputProductName != null) 'output_product_name': outputProductName,
+      if (outputProductCode != null) 'output_product_code': outputProductCode,
+      if (ratioMainUnit != null) 'ratio_main_unit': ratioMainUnit,
+      if (mainUnit != null) 'main_unit': mainUnit,
     };
   }
 }
@@ -219,6 +235,11 @@ class BomExplosionItem {
   final int? suggestedWarehouseId;
   final bool isOptional;
   final String? substituteGroup;
+  final String? componentProductName;
+  final String? componentProductCode;
+  final String? componentProductMainUnit;
+  final double? requiredQtyMainUnit;
+  final String? mainUnit;
 
   const BomExplosionItem({
     required this.componentProductId,
@@ -227,6 +248,11 @@ class BomExplosionItem {
     this.suggestedWarehouseId,
     this.isOptional = false,
     this.substituteGroup,
+    this.componentProductName,
+    this.componentProductCode,
+    this.componentProductMainUnit,
+    this.requiredQtyMainUnit,
+    this.mainUnit,
   });
 
   factory BomExplosionItem.fromJson(Map<String, dynamic> json) {
@@ -237,6 +263,11 @@ class BomExplosionItem {
       suggestedWarehouseId: json['suggested_warehouse_id'] as int?,
       isOptional: (json['is_optional'] ?? false) as bool,
       substituteGroup: json['substitute_group'] as String?,
+      componentProductName: json['component_product_name'] as String?,
+      componentProductCode: json['component_product_code'] as String?,
+      componentProductMainUnit: json['component_product_main_unit'] as String?,
+      requiredQtyMainUnit: json['required_qty_main_unit'] != null ? double.tryParse(json['required_qty_main_unit'].toString()) : null,
+      mainUnit: json['main_unit'] as String?,
     );
   }
 }

@@ -59,6 +59,8 @@ class BaseRepository(Generic[T]):
 		self.db.delete(obj)
 		self.db.commit()
 	
-	def update(self, obj: T) -> None:
-		"""بروزرسانی رکورد در دیتابیس"""
+	def update(self, obj: T) -> T:
+		"""بروزرسانی رکورد در دیتابیس و برگرداندن شیء تازه‌سازی شده"""
 		self.db.commit()
+		self.db.refresh(obj)
+		return obj

@@ -7,6 +7,7 @@ import '../../widgets/invoice/invoice_type_combobox.dart';
 import '../../widgets/invoice/code_field_widget.dart';
 import '../../widgets/invoice/customer_combobox_widget.dart';
 import '../../widgets/invoice/seller_picker_widget.dart';
+import '../../widgets/invoice/person_combobox_widget.dart';
 import '../../widgets/invoice/commission_percentage_field.dart';
 import '../../widgets/invoice/commission_type_selector.dart';
 import '../../widgets/invoice/commission_amount_field.dart';
@@ -49,6 +50,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
   final bool _autoGenerateInvoiceNumber = true;
   Customer? _selectedCustomer;
   Person? _selectedSeller;
+  Person? _selectedSupplier; // برای فاکتورهای خرید
   double? _commissionPercentage;
   double? _commissionAmount;
   CommissionType? _commissionType;
@@ -219,16 +221,27 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                         InvoiceTypeCombobox(
                           selectedType: _selectedInvoiceType,
                           onTypeChanged: (type) {
-                            setState(() {
-                              _selectedInvoiceType = type;
-                              // به‌روزرسانی TabController اگر تعداد تب‌ها تغییر کرده
-                              final newTabCount = _getTabCountForType(type);
-                              if (newTabCount != _tabController.length) {
-                                _tabController.dispose();
-                                _tabController = TabController(length: newTabCount, vsync: this);
-                              }
-                            });
-                          },
+                                  setState(() {
+                                    _selectedInvoiceType = type;
+                                    // پاک کردن انتخاب‌های قبلی هنگام تغییر نوع فاکتور
+                                    if (type == InvoiceType.purchase || type == InvoiceType.purchaseReturn) {
+                                      _selectedCustomer = null;
+                                      _selectedSeller = null;
+                                    } else if (type == InvoiceType.sales || type == InvoiceType.salesReturn) {
+                                      _selectedSupplier = null;
+                                    } else {
+                                      _selectedCustomer = null;
+                                      _selectedSupplier = null;
+                                      _selectedSeller = null;
+                                    }
+                                    // به‌روزرسانی TabController اگر تعداد تب‌ها تغییر کرده
+                                    final newTabCount = _getTabCountForType(type);
+                                    if (newTabCount != _tabController.length) {
+                                      _tabController.dispose();
+                                      _tabController = TabController(length: newTabCount, vsync: this);
+                                    }
+                                  });
+                                },
                           isDraft: _isDraft,
                           onDraftChanged: (isDraft) {
                             setState(() {
@@ -284,23 +297,41 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                         ),
                         const SizedBox(height: 16),
                         
-                        // مشتری (برای ضایعات/مصرف مستقیم/تولید مخفی می‌شود)
-                        if (!(_selectedInvoiceType == InvoiceType.waste ||
-                              _selectedInvoiceType == InvoiceType.directConsumption ||
-                              _selectedInvoiceType == InvoiceType.production))
+                        // مشتری (فقط برای فروش و برگشت از فروش)
+                        if (_selectedInvoiceType == InvoiceType.sales || 
+                            _selectedInvoiceType == InvoiceType.salesReturn)
                           CustomerComboboxWidget(
-                          selectedCustomer: _selectedCustomer,
-                          onCustomerChanged: (customer) {
-                            setState(() {
-                              _selectedCustomer = customer;
-                            });
-                          },
-                          businessId: widget.businessId,
-                          authStore: widget.authStore,
-                          isRequired: false,
-                          label: 'مشتری',
-                          hintText: 'انتخاب مشتری',
-                        ),
+                            selectedCustomer: _selectedCustomer,
+                            onCustomerChanged: (customer) {
+                              setState(() {
+                                _selectedCustomer = customer;
+                              });
+                            },
+                            businessId: widget.businessId,
+                            authStore: widget.authStore,
+                            isRequired: false,
+                            label: 'مشتری',
+                            hintText: 'انتخاب مشتری',
+                          ),
+                        // تامین‌کننده (فقط برای خرید و برگشت از خرید)
+                        if (_selectedInvoiceType == InvoiceType.purchase || 
+                            _selectedInvoiceType == InvoiceType.purchaseReturn) ...[
+                          const SizedBox(height: 16),
+                          PersonComboboxWidget(
+                            businessId: widget.businessId,
+                            selectedPerson: _selectedSupplier,
+                            onChanged: (person) {
+                              setState(() {
+                                _selectedSupplier = person;
+                              });
+                            },
+                            isRequired: false,
+                            label: 'تامین‌کننده',
+                            hintText: 'انتخاب تامین‌کننده',
+                            personTypes: ['تامین‌کننده', 'فروشنده'],
+                            searchHint: 'جست‌وجو در تامین‌کنندگان...',
+                          ),
+                        ],
                         const SizedBox(height: 16),
                         
                         // ارز فاکتور
@@ -459,6 +490,17 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                                 onTypeChanged: (type) {
                                   setState(() {
                                     _selectedInvoiceType = type;
+                                    // پاک کردن انتخاب‌های قبلی هنگام تغییر نوع فاکتور
+                                    if (type == InvoiceType.purchase || type == InvoiceType.purchaseReturn) {
+                                      _selectedCustomer = null;
+                                      _selectedSeller = null;
+                                    } else if (type == InvoiceType.sales || type == InvoiceType.salesReturn) {
+                                      _selectedSupplier = null;
+                                    } else {
+                                      _selectedCustomer = null;
+                                      _selectedSupplier = null;
+                                      _selectedSeller = null;
+                                    }
                                     // به‌روزرسانی TabController اگر تعداد تب‌ها تغییر کرده
                                     final newTabCount = _getTabCountForType(type);
                                     if (newTabCount != _tabController.length) {
@@ -527,19 +569,38 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                                       _selectedInvoiceType == InvoiceType.directConsumption ||
                                       _selectedInvoiceType == InvoiceType.production)
                                   ? const SizedBox()
-                                  : CustomerComboboxWidget(
-                                selectedCustomer: _selectedCustomer,
-                                onCustomerChanged: (customer) {
-                                  setState(() {
-                                    _selectedCustomer = customer;
-                                  });
-                                },
-                                businessId: widget.businessId,
-                                authStore: widget.authStore,
-                                isRequired: false,
-                                label: 'مشتری',
-                                hintText: 'انتخاب مشتری',
-                                  ),
+                                  : (_selectedInvoiceType == InvoiceType.sales || 
+                                      _selectedInvoiceType == InvoiceType.salesReturn)
+                                      ? CustomerComboboxWidget(
+                                          selectedCustomer: _selectedCustomer,
+                                          onCustomerChanged: (customer) {
+                                            setState(() {
+                                              _selectedCustomer = customer;
+                                            });
+                                          },
+                                          businessId: widget.businessId,
+                                          authStore: widget.authStore,
+                                          isRequired: false,
+                                          label: 'مشتری',
+                                          hintText: 'انتخاب مشتری',
+                                        )
+                                      : (_selectedInvoiceType == InvoiceType.purchase || 
+                                          _selectedInvoiceType == InvoiceType.purchaseReturn)
+                                          ? PersonComboboxWidget(
+                                              businessId: widget.businessId,
+                                              selectedPerson: _selectedSupplier,
+                                              onChanged: (person) {
+                                                setState(() {
+                                                  _selectedSupplier = person;
+                                                });
+                                              },
+                                              isRequired: false,
+                                              label: 'تامین‌کننده',
+                                              hintText: 'انتخاب تامین‌کننده',
+                                              personTypes: ['تامین‌کننده', 'فروشنده'],
+                                              searchHint: 'جست‌وجو در تامین‌کنندگان...',
+                                            )
+                                          : const SizedBox(),
                             ),
                           ],
                         ),
@@ -779,10 +840,16 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
     }
 
     final isSalesOrReturn = _selectedInvoiceType == InvoiceType.sales || _selectedInvoiceType == InvoiceType.salesReturn;
-    // مشتری برای انواع خاص الزامی نیست
-    final shouldHaveCustomer = !(_selectedInvoiceType == InvoiceType.waste || _selectedInvoiceType == InvoiceType.directConsumption || _selectedInvoiceType == InvoiceType.production);
-    if (shouldHaveCustomer && _selectedCustomer == null) {
+    final isPurchaseOrReturn = _selectedInvoiceType == InvoiceType.purchase || _selectedInvoiceType == InvoiceType.purchaseReturn;
+    
+    // اعتبارسنجی مشتری برای فروش
+    if (isSalesOrReturn && _selectedCustomer == null) {
       return 'انتخاب مشتری الزامی است';
+    }
+    
+    // اعتبارسنجی تامین‌کننده برای خرید
+    if (isPurchaseOrReturn && _selectedSupplier == null) {
+      return 'انتخاب تامین‌کننده الزامی است';
     }
 
     // اعتبارسنجی کارمزد در حالت فروش
@@ -796,52 +863,97 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
       }
     }
 
-    // ساخت payload
-    final payload = <String, dynamic>{
-      'type': _selectedInvoiceType!.value,
-      'is_draft': _isDraft,
-      if (_invoiceNumber != null && _invoiceNumber!.trim().isNotEmpty) 'number': _invoiceNumber!.trim(),
-      'invoice_date': _invoiceDate!.toIso8601String(),
-      if (_dueDate != null) 'due_date': _dueDate!.toIso8601String(),
-      'currency_id': _selectedCurrencyId,
-      if (_invoiceTitle != null && _invoiceTitle!.isNotEmpty) 'title': _invoiceTitle,
-      if (_invoiceReference != null && _invoiceReference!.isNotEmpty) 'reference': _invoiceReference,
-      if (_selectedCustomer != null) 'customer_id': _selectedCustomer!.id,
-      if (_selectedSeller?.id != null) 'seller_id': _selectedSeller!.id,
-      if (_commissionType != null) 'commission_type': _commissionType == CommissionType.percentage ? 'percentage' : 'amount',
-      if (_commissionType == CommissionType.percentage && _commissionPercentage != null) 'commission_percentage': _commissionPercentage,
-      if (_commissionType == CommissionType.amount && _commissionAmount != null) 'commission_amount': _commissionAmount,
-      'settings': {
-        'print_after_save': _printAfterSave,
-        'printer': _selectedPrinter,
-        'paper_size': _selectedPaperSize,
-        'is_official_invoice': _isOfficialInvoice,
-        'print_template': _selectedPrintTemplate,
-        'send_to_tax_folder': _sendToTaxFolder,
-      },
-      'transactions': _transactions.map((t) => t.toJson()).toList(),
-      'line_items': _lineItems.map((e) => _serializeLineItem(e)).toList(),
-      'summary': {
-        'subtotal': _sumSubtotal,
+    // تبدیل نوع فاکتور به فرمت API
+    String _convertInvoiceTypeToApi(InvoiceType type) {
+      return 'invoice_${type.value}';
+    }
+    
+    // ساخت extra_info با person_id و totals
+    final extraInfo = <String, dynamic>{
+      'totals': {
+        'gross': _sumSubtotal,
         'discount': _sumDiscount,
         'tax': _sumTax,
-        'total': _sumTotal,
+        'net': _sumTotal,
       },
     };
+    
+    // افزودن person_id بر اساس نوع فاکتور
+    if (isSalesOrReturn && _selectedCustomer != null) {
+      extraInfo['person_id'] = _selectedCustomer!.id;
+    } else if (isPurchaseOrReturn && _selectedSupplier != null) {
+      extraInfo['person_id'] = _selectedSupplier!.id;
+    }
+    
+    // افزودن اطلاعات فروشنده و کارمزد (اختیاری)
+    if (isSalesOrReturn && _selectedSeller != null) {
+      extraInfo['seller_id'] = _selectedSeller!.id;
+      if (_commissionType != null) {
+        extraInfo['commission'] = {
+          'type': _commissionType == CommissionType.percentage ? 'percentage' : 'amount',
+          if (_commissionType == CommissionType.percentage && _commissionPercentage != null)
+            'value': _commissionPercentage,
+          if (_commissionType == CommissionType.amount && _commissionAmount != null)
+            'value': _commissionAmount,
+        };
+      }
+    }
+    
+    // ساخت payload
+    final payload = <String, dynamic>{
+      'invoice_type': _convertInvoiceTypeToApi(_selectedInvoiceType!),
+      'document_date': _invoiceDate!.toIso8601String().split('T')[0], // فقط تاریخ بدون زمان
+      'currency_id': _selectedCurrencyId,
+      'is_proforma': _isDraft,
+      'extra_info': extraInfo,
+      if (_invoiceTitle != null && _invoiceTitle!.isNotEmpty) 'description': _invoiceTitle,
+      'lines': _lineItems.map((e) => _serializeLineItem(e)).toList(),
+    };
+    
+    // افزودن payments اگر وجود دارد
+    if (_transactions.isNotEmpty) {
+      payload['payments'] = _transactions.map((t) => t.toJson()).toList();
+    }
+    
     return payload;
   }
 
   Map<String, dynamic> _serializeLineItem(InvoiceLineItem e) {
+    // تعیین movement بر اساس نوع فاکتور
+    String? movement;
+    if (_selectedInvoiceType == InvoiceType.sales || 
+        _selectedInvoiceType == InvoiceType.purchaseReturn ||
+        _selectedInvoiceType == InvoiceType.directConsumption ||
+        _selectedInvoiceType == InvoiceType.waste) {
+      movement = 'out';
+    } else if (_selectedInvoiceType == InvoiceType.purchase || 
+               _selectedInvoiceType == InvoiceType.salesReturn) {
+      movement = 'in';
+    }
+    // برای production، movement باید در UI تعیین شود (می‌تواند out یا in باشد)
+    
+    // محاسبه مقادیر
+    final lineDiscount = e.discountAmount;
+    final taxAmount = e.taxAmount;
+    final lineTotal = e.total;
+    
     return <String, dynamic>{
       'product_id': e.productId,
-      'unit': e.selectedUnit ?? e.mainUnit,
       'quantity': e.quantity,
-      'unit_price': e.unitPrice,
-      'unit_price_source': e.unitPriceSource,
-      'discount_type': e.discountType,
-      'discount_value': e.discountValue,
-      'tax_rate': e.taxRate,
       if ((e.description ?? '').isNotEmpty) 'description': e.description,
+      'extra_info': {
+        'unit_price': e.unitPrice,
+        'line_discount': lineDiscount,
+        'tax_amount': taxAmount,
+        'line_total': lineTotal,
+        if (movement != null) 'movement': movement,
+        // اطلاعات اضافی برای ردیابی
+        'unit': e.selectedUnit ?? e.mainUnit,
+        'unit_price_source': e.unitPriceSource,
+        'discount_type': e.discountType,
+        'discount_value': e.discountValue,
+        'tax_rate': e.taxRate,
+      },
     };
   }
 

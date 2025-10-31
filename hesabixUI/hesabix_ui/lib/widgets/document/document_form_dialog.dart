@@ -8,6 +8,7 @@ import 'package:hesabix_ui/services/document_service.dart';
 import 'package:hesabix_ui/services/account_service.dart';
 import 'package:hesabix_ui/widgets/date_input_field.dart';
 import 'package:hesabix_ui/widgets/document/document_line_editor.dart';
+import 'package:hesabix_ui/widgets/banking/currency_picker_widget.dart';
 
 /// دیالوگ ایجاد یا ویرایش سند حسابداری دستی
 class DocumentFormDialog extends StatefulWidget {
@@ -18,6 +19,9 @@ class DocumentFormDialog extends StatefulWidget {
   final DocumentModel? document; // null = ایجاد جدید, not null = ویرایش
   final int? fiscalYearId;
   final int? currencyId;
+  final List<DocumentLineEdit>? initialLines; // خطوط اولیه (مثلاً پیشنویس تولید)
+  final String? initialDescription;
+  final DateTime? initialDocumentDate;
 
   const DocumentFormDialog({
     super.key,
@@ -28,6 +32,9 @@ class DocumentFormDialog extends StatefulWidget {
     this.document,
     this.fiscalYearId,
     this.currencyId,
+    this.initialLines,
+    this.initialDescription,
+    this.initialDocumentDate,
   });
 
   @override
@@ -56,18 +63,26 @@ class _DocumentFormDialogState extends State<DocumentFormDialog> {
   void initState() {
     super.initState();
     _service = DocumentService(widget.apiClient);
-    _currencyId = widget.currencyId ?? 1; // پیش‌فرض ریال
-    _documentDate = DateTime.now();
+    _currencyId = widget.currencyId; // اگر null باشد، CurrencyPickerWidget ارز پیش‌فرض را از API انتخاب می‌کند
+    _documentDate = widget.initialDocumentDate ?? DateTime.now();
 
     // اگر حالت ویرایش است، مقادیر را بارگذاری کن
     if (widget.document != null) {
       _loadDocumentData();
     } else {
-      // خط خالی برای شروع
-      _lines = [
-        DocumentLineEdit(),
-        DocumentLineEdit(),
-      ];
+      // اگر خطوط اولیه ارسال شده باشد (مثل پیشنویس تولید) از آن استفاده کن
+      if (widget.initialLines != null && widget.initialLines!.isNotEmpty) {
+        _lines = widget.initialLines!.map((e) => e.copy()).toList();
+        if (widget.initialDescription != null && widget.initialDescription!.isNotEmpty) {
+          _descriptionController.text = widget.initialDescription!;
+        }
+      } else {
+        // خط خالی برای شروع
+        _lines = [
+          DocumentLineEdit(),
+          DocumentLineEdit(),
+        ];
+      }
     }
   }
 
@@ -177,6 +192,14 @@ class _DocumentFormDialogState extends State<DocumentFormDialog> {
     if (_documentDate == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('تاریخ سند الزامی است')),
+      );
+      return;
+    }
+
+    // بررسی ارز انتخابی
+    if (_currencyId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('انتخاب ارز الزامی است')),
       );
       return;
     }
@@ -418,25 +441,19 @@ class _DocumentFormDialogState extends State<DocumentFormDialog> {
                 ),
                 const SizedBox(width: 16),
 
-                // ارز (ساده شده - در آینده از API بیاید)
+                // ارز (لیست ارزهای کسب‌وکار با انتخاب خودکار ارز پیش‌فرض)
                 Expanded(
                   flex: 2,
-                  child: DropdownButtonFormField<int>(
-                    value: _currencyId,
-                    decoration: const InputDecoration(
-                      labelText: 'ارز',
-                      border: OutlineInputBorder(),
-                    ),
-                    items: const [
-                      DropdownMenuItem(value: 1, child: Text('ریال')),
-                      DropdownMenuItem(value: 2, child: Text('دلار')),
-                      DropdownMenuItem(value: 3, child: Text('یورو')),
-                    ],
+                  child: CurrencyPickerWidget(
+                    businessId: widget.businessId,
+                    selectedCurrencyId: _currencyId,
                     onChanged: (value) {
                       setState(() {
                         _currencyId = value;
                       });
                     },
+                    label: 'ارز',
+                    hintText: 'انتخاب ارز',
                   ),
                 ),
                 const SizedBox(width: 16),

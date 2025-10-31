@@ -324,13 +324,13 @@ class DocumentRepository:
             line_dict["person_name"] = line.person.alias_name
 
         if line.product:
-            line_dict["product_name"] = line.product.title
+            line_dict["product_name"] = line.product.name
 
         if line.bank_account:
-            line_dict["bank_account_name"] = line.bank_account.account_title
+            line_dict["bank_account_name"] = line.bank_account.name
 
         if line.cash_register:
-            line_dict["cash_register_name"] = line.cash_register.title
+            line_dict["cash_register_name"] = line.cash_register.name
 
         if line.petty_cash:
             line_dict["petty_cash_name"] = line.petty_cash.name

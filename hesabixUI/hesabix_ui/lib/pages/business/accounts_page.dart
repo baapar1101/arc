@@ -78,6 +78,106 @@ class _AccountsPageState extends State<AccountsPage> {
 		}
 	}
 
+	List<Map<String, String>> _flattenNodes() {
+		final List<Map<String, String>> items = <Map<String, String>>[];
+		void dfs(AccountNode n, int level) {
+			items.add({
+				"id": n.id,
+				"title": ("\u200f" * level) + n.code + " - " + n.name,
+			});
+			for (final c in n.children) {
+				dfs(c, level + 1);
+			}
+		}
+		for (final r in _roots) {
+			dfs(r, 0);
+		}
+		return items;
+	}
+
+	Future<void> _openCreateDialog() async {
+		final t = AppLocalizations.of(context);
+		final codeCtrl = TextEditingController();
+		final nameCtrl = TextEditingController();
+		final typeCtrl = TextEditingController();
+		String? selectedParentId;
+		final parents = _flattenNodes();
+		final result = await showDialog<bool>(
+			context: context,
+			builder: (ctx) {
+				return AlertDialog(
+					title: Text(t.addAccount),
+					content: SingleChildScrollView(
+						child: Column(
+							mainAxisSize: MainAxisSize.min,
+							children: [
+								TextField(
+									controller: codeCtrl,
+									decoration: InputDecoration(labelText: t.code),
+								),
+								TextField(
+									controller: nameCtrl,
+									decoration: InputDecoration(labelText: t.title),
+								),
+								TextField(
+									controller: typeCtrl,
+									decoration: InputDecoration(labelText: t.type),
+								),
+								DropdownButtonFormField<String>(
+									value: selectedParentId,
+									items: [
+										DropdownMenuItem<String>(value: null, child: Text('بدون والد')),
+										...parents.map((p) => DropdownMenuItem<String>(value: p["id"], child: Text(p["title"]!))).toList(),
+									],
+									onChanged: (v) {
+										selectedParentId = v;
+									},
+									decoration: const InputDecoration(labelText: 'حساب والد'),
+								),
+							],
+						),
+					),
+					actions: [
+						TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(t.cancel)),
+						FilledButton(
+							onPressed: () async {
+								final name = nameCtrl.text.trim();
+								final code = codeCtrl.text.trim();
+								final atype = typeCtrl.text.trim();
+								if (name.isEmpty || code.isEmpty || atype.isEmpty) {
+									return;
+								}
+								final Map<String, dynamic> payload = {
+									"name": name,
+									"code": code,
+									"account_type": atype,
+								};
+								if (selectedParentId != null && selectedParentId!.isNotEmpty) {
+									final pid = int.tryParse(selectedParentId!);
+									if (pid != null) payload["parent_id"] = pid;
+								}
+								try {
+									final api = ApiClient();
+									await api.post(
+										'/api/v1/accounts/business/${widget.businessId}/create',
+										data: payload,
+									);
+									if (context.mounted) Navigator.of(ctx).pop(true);
+								} catch (_) {
+									// نمایش خطا می‌تواند بعداً اضافه شود
+								}
+							},
+								child: Text(t.add),
+						),
+					],
+				);
+			},
+		);
+		if (result == true) {
+			await _fetch();
+		}
+	}
+
 	List<_VisibleNode> _buildVisibleNodes() {
 		final List<_VisibleNode> result = <_VisibleNode>[];
 		void dfs(AccountNode node, int level) {
@@ -224,6 +324,10 @@ class _AccountsPageState extends State<AccountsPage> {
 						),
 					),
 				],
+			),
+			floatingActionButton: FloatingActionButton(
+				onPressed: _openCreateDialog,
+				child: const Icon(Icons.add),
 			),
 		);
 	}

@@ -1,5 +1,4 @@
 import '../core/api_client.dart';
-import '../models/account_model.dart';
 
 class AccountService {
   final ApiClient _client;
@@ -88,3 +87,4 @@ class AccountService {
     }
   }
 }
+

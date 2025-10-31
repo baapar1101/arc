@@ -13,6 +13,7 @@ from adapters.api.v1.schema_models.product_bom import (
     ProductBOMCreateRequest,
     ProductBOMUpdateRequest,
     BOMExplosionRequest,
+    ProductionDraftRequest,
 )
 
 
@@ -190,13 +191,53 @@ def explode_bom(db: Session, business_id: int, req: BOMExplosionRequest) -> Dict
     items = db.query(ProductBOMItem).filter(ProductBOMItem.bom_id == bom.id).order_by(ProductBOMItem.line_no).all()
     outputs = db.query(ProductBOMOutput).filter(ProductBOMOutput.bom_id == bom.id).order_by(ProductBOMOutput.line_no).all()
 
+    # Prepare product lookup for enriching names/units in response
+    product_ids: set[int] = set([it.component_product_id for it in items] + [ot.output_product_id for ot in outputs])
+    products_by_id: dict[int, Product] = {}
+    if product_ids:
+        for p in db.query(Product).filter(Product.id.in_(product_ids)).all():
+            products_by_id[p.id] = p
+
     qty = Decimal(str(req.quantity))
+
+    # Apply BOM-level wastage and yield to inputs
+    # factor_inputs scales required input quantities. Example: yield 80% => factor 1.25; wastage 5% => factor * 1.05
+    factor_inputs = Decimal("1")
+    if bom.wastage_percent:
+        factor_inputs *= (Decimal("1.0") + Decimal(str(bom.wastage_percent)) / Decimal("100"))
+    if bom.yield_percent:
+        try:
+            y = Decimal(str(bom.yield_percent))
+            if y > 0:
+                factor_inputs *= (Decimal("100") / y)
+        except Exception:
+            pass
     explosion_items: List[Dict[str, Any]] = []
     for it in items:
         base = Decimal(str(it.qty_per)) * qty
         # apply line wastage
         if it.wastage_percent:
             base = base * (Decimal("1.0") + Decimal(str(it.wastage_percent)) / Decimal("100"))
+        # apply BOM-level factors
+        base = base * factor_inputs
+        prod = products_by_id.get(it.component_product_id)
+
+        # Unit conversion to main unit (if BOM line uom equals secondary and factor exists)
+        required_qty_main_unit = None
+        main_unit = getattr(prod, "main_unit", None) if prod else None
+        secondary_unit = getattr(prod, "secondary_unit", None) if prod else None
+        unit_factor = getattr(prod, "unit_conversion_factor", None) if prod else None
+        if it.uom and prod and secondary_unit and main_unit and unit_factor is not None:
+            try:
+                # When line uom is secondary, convert to main by multiplying factor
+                if str(it.uom) == str(secondary_unit):
+                    required_qty_main_unit = base * Decimal(str(unit_factor))
+                elif str(it.uom) == str(main_unit):
+                    required_qty_main_unit = base
+                else:
+                    required_qty_main_unit = None
+            except Exception:
+                required_qty_main_unit = None
         explosion_items.append({
             "component_product_id": it.component_product_id,
             "required_qty": base,
@@ -204,18 +245,84 @@ def explode_bom(db: Session, business_id: int, req: BOMExplosionRequest) -> Dict
             "suggested_warehouse_id": it.suggested_warehouse_id,
             "is_optional": it.is_optional,
             "substitute_group": it.substitute_group,
+            # enriched (optional) fields for UI friendliness
+            "component_product_name": getattr(prod, "name", None) if prod else None,
+            "component_product_code": getattr(prod, "code", None) if prod else None,
+            "component_product_main_unit": getattr(prod, "main_unit", None) if prod else None,
+            "required_qty_main_unit": required_qty_main_unit,
+            "main_unit": main_unit,
         })
 
     # outputs scaling
     out_scaled = []
     for ot in outputs:
+        prod = products_by_id.get(ot.output_product_id)
+        # Convert output to main unit if needed
+        ratio_val = Decimal(str(ot.ratio)) * qty
+        ratio_main_unit = None
+        try:
+            main_unit = getattr(prod, "main_unit", None) if prod else None
+            secondary_unit = getattr(prod, "secondary_unit", None) if prod else None
+            unit_factor = getattr(prod, "unit_conversion_factor", None) if prod else None
+            if ot.uom and prod and secondary_unit and main_unit and unit_factor is not None:
+                if str(ot.uom) == str(secondary_unit):
+                    ratio_main_unit = ratio_val * Decimal(str(unit_factor))
+                elif str(ot.uom) == str(main_unit):
+                    ratio_main_unit = ratio_val
+        except Exception:
+            ratio_main_unit = None
         out_scaled.append({
             "line_no": ot.line_no,
             "output_product_id": ot.output_product_id,
-            "ratio": Decimal(str(ot.ratio)) * qty,
+            "ratio": ratio_val,
             "uom": ot.uom,
+            # enriched optional fields
+            "output_product_name": getattr(prod, "name", None) if prod else None,
+            "output_product_code": getattr(prod, "code", None) if prod else None,
+            "ratio_main_unit": ratio_main_unit,
+            "main_unit": getattr(prod, "main_unit", None) if prod else None,
         })
 
     return {"items": explosion_items, "outputs": out_scaled}
+
+
+def produce_draft(db: Session, business_id: int, req: ProductionDraftRequest) -> Dict[str, Any]:
+    """Create a draft payload for a production document based on BOM explosion (no persistence)."""
+    exp = explode_bom(db, business_id, BOMExplosionRequest(product_id=req.product_id, bom_id=req.bom_id, quantity=req.quantity))
+
+    # Build draft lines: for UI to prefill later; debit/credit left 0 to be set by user
+    lines: list[dict[str, Any]] = []
+    for it in exp["items"]:
+        lines.append({
+            "product_id": it["component_product_id"],
+            "quantity": it["required_qty"],
+            "debit": 0,
+            "credit": 0,
+            "description": f"مصرف مواد برای تولید",
+            "extra_info": {
+                "uom": it.get("uom"),
+                "suggested_warehouse_id": it.get("suggested_warehouse_id"),
+                "is_optional": it.get("is_optional"),
+                "substitute_group": it.get("substitute_group"),
+            },
+        })
+
+    for ot in exp["outputs"]:
+        lines.append({
+            "product_id": ot["output_product_id"],
+            "quantity": ot["ratio"],
+            "debit": 0,
+            "credit": 0,
+            "description": "خروجی تولید",
+            "extra_info": {"uom": ot.get("uom")},
+        })
+
+    desc = "پیش‌نویس سند تولید بر اساس BOM"
+    return {
+        "document_type": "production",
+        "description": desc,
+        "lines": lines,
+        "extra_info": {"source": "bom", "bom_id": int(req.bom_id) if req.bom_id else None, "product_id": int(req.product_id) if req.product_id else None, "quantity": str(req.quantity)},
+    }
 
 

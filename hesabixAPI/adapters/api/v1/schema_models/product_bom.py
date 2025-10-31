@@ -124,3 +124,18 @@ class BOMExplosionResult(BaseModel):
     notes: Optional[str] = None
 
 
+class ProductionDraftRequest(BaseModel):
+    product_id: Optional[int] = None
+    bom_id: Optional[int] = None
+    quantity: Decimal
+    document_date: Optional[str] = None
+    fiscal_year_id: Optional[int] = None
+    currency_id: Optional[int] = None
+
+
+class ProductionDraftResponse(BaseModel):
+    document_type: str
+    description: Optional[str] = None
+    lines: List[dict]
+    extra_info: Optional[dict] = None
+

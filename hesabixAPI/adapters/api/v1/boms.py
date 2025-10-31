@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from typing import Dict, Any, Optional
 from fastapi import APIRouter, Depends, Request, Query
 from sqlalchemy.orm import Session
@@ -12,6 +10,7 @@ from adapters.api.v1.schema_models.product_bom import (
     ProductBOMCreateRequest,
     ProductBOMUpdateRequest,
     BOMExplosionRequest,
+    ProductionDraftRequest,
 )
 from app.services.bom_service import (
     create_bom,
@@ -20,6 +19,7 @@ from app.services.bom_service import (
     update_bom,
     delete_bom,
     explode_bom,
+    produce_draft,
 )
 
 
@@ -118,4 +118,19 @@ def explode_bom_endpoint(
     if not ctx.can_read_section("inventory"):
         raise ApiError("FORBIDDEN", "Missing business permission: inventory.read", http_status=403)
     result = explode_bom(db, business_id, payload)
+    return success_response(data=format_datetime_fields(result, request), request=request)
+
+
+@router.post("/business/{business_id}/produce_draft")
+@require_business_access("business_id")
+def produce_draft_endpoint(
+    request: Request,
+    business_id: int,
+    payload: ProductionDraftRequest,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    if not ctx.has_business_permission("inventory", "write"):
+        raise ApiError("FORBIDDEN", "Missing business permission: inventory.write", http_status=403)
+    result = produce_draft(db, business_id, payload)
     return success_response(data=format_datetime_fields(result, request), request=request)

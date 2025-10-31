@@ -1,16 +1,17 @@
 from typing import List, Dict, Any, Optional
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, Body
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
 from adapters.db.session import get_db
 from adapters.api.v1.schemas import SuccessResponse
-from adapters.api.v1.schema_models.account import AccountTreeNode
-from app.core.responses import success_response
+from adapters.api.v1.schema_models.account import AccountTreeNode, AccountCreateRequest, AccountUpdateRequest
+from app.core.responses import success_response, ApiError
 from app.core.auth_dependency import get_current_user, AuthContext
 from app.core.permissions import require_business_access
 from adapters.db.models.account import Account
+from app.services.account_service import create_account, update_account, delete_account, get_account
 
 
 router = APIRouter(prefix="/accounts", tags=["accounts"])
@@ -195,5 +196,118 @@ def search_accounts(
 		"skip": search_request.skip,
 		"take": search_request.take,
 	}, request)
+
+
+@router.post(
+	"/business/{business_id}/create",
+	summary="ایجاد حساب جدید برای یک کسب‌وکار",
+	description="ایجاد حساب اختصاصی (business-specific).",
+)
+@require_business_access("business_id")
+def create_business_account(
+	request: Request,
+	business_id: int,
+	body: AccountCreateRequest = Body(...),
+	ctx: AuthContext = Depends(get_current_user),
+	db: Session = Depends(get_db),
+) -> dict:
+	# اجازه نوشتن در بخش حسابداری لازم است
+	if not ctx.can_write_section("accounting"):
+		raise ApiError("FORBIDDEN", "Missing write permission for accounting", http_status=403)
+	try:
+		created = create_account(
+			db,
+			name=body.name,
+			code=body.code,
+			account_type=body.account_type,
+			business_id=business_id,
+			parent_id=body.parent_id,
+		)
+		return success_response(created, request, message="ACCOUNT_CREATED")
+	except ValueError as e:
+		code = str(e)
+		if code == "ACCOUNT_CODE_NOT_UNIQUE":
+			raise ApiError("ACCOUNT_CODE_NOT_UNIQUE", "Account code must be unique per business", http_status=400)
+		if code == "PARENT_NOT_FOUND":
+			raise ApiError("PARENT_NOT_FOUND", "Parent account not found", http_status=400)
+		if code == "INVALID_PARENT_BUSINESS":
+			raise ApiError("INVALID_PARENT_BUSINESS", "Parent must be public or within the same business", http_status=400)
+		raise
+
+
+@router.put(
+	"/account/{account_id}",
+	summary="ویرایش حساب",
+	description="ویرایش حساب عمومی (فقط سوپرادمین) یا حساب اختصاصی بیزنس (دارای دسترسی write).",
+)
+def update_account_endpoint(
+	request: Request,
+	account_id: int,
+	body: AccountUpdateRequest = Body(...),
+	ctx: AuthContext = Depends(get_current_user),
+	db: Session = Depends(get_db),
+) -> dict:
+	data = get_account(db, account_id)
+	if not data:
+		raise ApiError("ACCOUNT_NOT_FOUND", "Account not found", http_status=404)
+	acc_business_id = data.get("business_id")
+	# اگر عمومی است، فقط سوپرادمین
+	if acc_business_id is None and not ctx.is_superadmin():
+		raise ApiError("FORBIDDEN", "Only superadmin can edit public accounts", http_status=403)
+	# اگر متعلق به بیزنس است باید دسترسی داشته باشد و write accounting داشته باشد
+	if acc_business_id is not None:
+		if not ctx.can_access_business(int(acc_business_id)):
+			raise ApiError("FORBIDDEN", "No access to business", http_status=403)
+		if not ctx.can_write_section("accounting"):
+			raise ApiError("FORBIDDEN", "Missing write permission for accounting", http_status=403)
+	try:
+		updated = update_account(
+			db,
+			account_id,
+			name=body.name,
+			code=body.code,
+			account_type=body.account_type,
+			parent_id=body.parent_id,
+		)
+		if updated is None:
+			raise ApiError("ACCOUNT_NOT_FOUND", "Account not found", http_status=404)
+		return success_response(updated, request, message="ACCOUNT_UPDATED")
+	except ValueError as e:
+		code = str(e)
+		if code == "ACCOUNT_CODE_NOT_UNIQUE":
+			raise ApiError("ACCOUNT_CODE_NOT_UNIQUE", "Account code must be unique per business", http_status=400)
+		if code == "PARENT_NOT_FOUND":
+			raise ApiError("PARENT_NOT_FOUND", "Parent account not found", http_status=400)
+		if code == "INVALID_PARENT_BUSINESS":
+			raise ApiError("INVALID_PARENT_BUSINESS", "Parent must be public or within the same business", http_status=400)
+		raise
+
+
+@router.delete(
+	"/account/{account_id}",
+	summary="حذف حساب",
+	description="حذف حساب عمومی (فقط سوپرادمین) یا حساب اختصاصی بیزنس (دارای دسترسی write).",
+)
+def delete_account_endpoint(
+	request: Request,
+	account_id: int,
+	ctx: AuthContext = Depends(get_current_user),
+	db: Session = Depends(get_db),
+) -> dict:
+	data = get_account(db, account_id)
+	if not data:
+		raise ApiError("ACCOUNT_NOT_FOUND", "Account not found", http_status=404)
+	acc_business_id = data.get("business_id")
+	if acc_business_id is None and not ctx.is_superadmin():
+		raise ApiError("FORBIDDEN", "Only superadmin can delete public accounts", http_status=403)
+	if acc_business_id is not None:
+		if not ctx.can_access_business(int(acc_business_id)):
+			raise ApiError("FORBIDDEN", "No access to business", http_status=403)
+		if not ctx.can_write_section("accounting"):
+			raise ApiError("FORBIDDEN", "Missing write permission for accounting", http_status=403)
+	ok = delete_account(db, account_id)
+	if not ok:
+		raise ApiError("ACCOUNT_NOT_FOUND", "Account not found", http_status=404)
+	return success_response(None, request, message="ACCOUNT_DELETED")
 
 

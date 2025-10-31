@@ -48,6 +48,19 @@ class BomService {
     final data = (res.data?['data'] as Map<String, dynamic>? ?? <String, dynamic>{});
     return BomExplosionResult.fromJson(data);
   }
+
+  Future<Map<String, dynamic>> produceDraft({required int businessId, int? productId, int? bomId, required double quantity, int? currencyId, int? fiscalYearId, String? documentDate}) async {
+    final payload = <String, dynamic>{
+      if (productId != null) 'product_id': productId,
+      if (bomId != null) 'bom_id': bomId,
+      'quantity': quantity,
+      if (currencyId != null) 'currency_id': currencyId,
+      if (fiscalYearId != null) 'fiscal_year_id': fiscalYearId,
+      if (documentDate != null) 'document_date': documentDate,
+    };
+    final res = await _api.post<Map<String, dynamic>>('/api/v1/boms/business/$businessId/produce_draft', data: payload);
+    return (res.data?['data'] as Map<String, dynamic>? ?? <String, dynamic>{});
+  }
 }
 
 

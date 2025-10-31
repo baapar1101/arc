@@ -17,3 +17,17 @@ class AccountTreeNode(BaseModel):
 		from_attributes = True
 
 
+class AccountCreateRequest(BaseModel):
+	name: str = Field(..., min_length=1, max_length=255)
+	code: str = Field(..., min_length=1, max_length=50)
+	account_type: str = Field(..., min_length=1, max_length=50)
+	parent_id: Optional[int] = Field(default=None)
+
+
+class AccountUpdateRequest(BaseModel):
+	name: Optional[str] = Field(default=None, min_length=1, max_length=255)
+	code: Optional[str] = Field(default=None, min_length=1, max_length=50)
+	account_type: Optional[str] = Field(default=None, min_length=1, max_length=50)
+	parent_id: Optional[int] = Field(default=None)
+
+

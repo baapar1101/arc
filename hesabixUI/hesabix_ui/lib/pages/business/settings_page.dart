@@ -54,7 +54,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   title: t.businessSettings,
                   subtitle: t.businessSettingsDescription,
                   icon: Icons.business,
-                  onTap: () => _showBusinessSettingsDialog(context),
+                  onTap: () => context.go('/business/${widget.businessId}/settings/business'),
                 ),
                 _buildSettingItem(
                   context,
@@ -215,32 +215,7 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   // دیالوگ‌های تنظیمات
-  void _showBusinessSettingsDialog(BuildContext context) {
-    final t = AppLocalizations.of(context);
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(t.businessSettings),
-        content: Text(t.businessSettingsDialogContent),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(t.close),
-          ),
-          FilledButton(
-            onPressed: () {
-              Navigator.pop(context);
-              // Navigate to business dashboard for now (until business settings page is created)
-              context.go('/business/${widget.businessId}/dashboard');
-            },
-            child: Text(t.edit),
-          ),
-        ],
-      ),
-    );
-  }
-
-
+  
   void _showPrintDocumentsDialog(BuildContext context) {
     final t = AppLocalizations.of(context);
     showDialog(
