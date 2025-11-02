@@ -535,6 +535,7 @@ class _MyAppState extends State<MyApp> {
               pageBuilder: (context, state) => NoTransitionPage(
                 child: AccountsPage(
                   businessId: int.parse(state.pathParameters['business_id']!),
+                  authStore: _authStore!,
                 ),
               ),
             ),

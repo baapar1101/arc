@@ -1,5 +1,5 @@
 from functools import wraps
-from typing import Callable, Any
+from typing import Callable, Any, get_type_hints
 import inspect
 
 from fastapi import Depends
@@ -131,6 +131,12 @@ def require_business_access(business_id_param: str = "business_id"):
             return result
         # Preserve original signature so FastAPI sees correct parameters (including Request)
         wrapper.__signature__ = inspect.signature(func)  # type: ignore[attr-defined]
+        # Also preserve evaluated type annotations to avoid ForwardRef issues under __future__.annotations
+        try:
+            wrapper.__annotations__ = get_type_hints(func, globalns=getattr(func, "__globals__", None))  # type: ignore[attr-defined]
+        except Exception:
+            # Fallback to original annotations (may be string-based) if evaluation fails
+            wrapper.__annotations__ = getattr(func, "__annotations__", {})
         return wrapper
     return decorator
 

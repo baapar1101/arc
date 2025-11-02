@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/core/api_client.dart';
+import 'package:hesabix_ui/core/auth_store.dart';
 
 class AccountNode {
 	final String id;
@@ -42,8 +43,9 @@ class _VisibleNode {
 }
 
 class AccountsPage extends StatefulWidget {
-	final int businessId;
-	const AccountsPage({super.key, required this.businessId});
+  final int businessId;
+  final AuthStore authStore;
+  const AccountsPage({super.key, required this.businessId, required this.authStore});
 
 	@override
 	State<AccountsPage> createState() => _AccountsPageState();
@@ -156,16 +158,20 @@ class _AccountsPageState extends State<AccountsPage> {
 									final pid = int.tryParse(selectedParentId!);
 									if (pid != null) payload["parent_id"] = pid;
 								}
-								try {
-									final api = ApiClient();
-									await api.post(
-										'/api/v1/accounts/business/${widget.businessId}/create',
-										data: payload,
-									);
-									if (context.mounted) Navigator.of(ctx).pop(true);
-								} catch (_) {
-									// نمایش خطا می‌تواند بعداً اضافه شود
-								}
+									try {
+										final api = ApiClient();
+										await api.post(
+											'/api/v1/accounts/business/${widget.businessId}/create',
+											data: payload,
+										);
+										if (context.mounted) Navigator.of(ctx).pop(true);
+									} catch (e) {
+										if (context.mounted) {
+											ScaffoldMessenger.of(context).showSnackBar(
+												SnackBar(content: Text('خطا در ایجاد حساب: $e')),
+											);
+										}
+									}
 							},
 								child: Text(t.add),
 						),
@@ -204,6 +210,105 @@ class _AccountsPageState extends State<AccountsPage> {
 				}
 			}
 		});
+	}
+
+	Future<void> _openEditDialog(AccountNode node) async {
+		final t = AppLocalizations.of(context);
+		final codeCtrl = TextEditingController(text: node.code);
+		final nameCtrl = TextEditingController(text: node.name);
+		final typeCtrl = TextEditingController(text: node.accountType ?? '');
+		final parents = _flattenNodes();
+		String? selectedParentId;
+		final result = await showDialog<bool>(
+			context: context,
+			builder: (ctx) {
+				return AlertDialog(
+					title: Text(t.edit),
+					content: SingleChildScrollView(
+						child: Column(
+							mainAxisSize: MainAxisSize.min,
+							children: [
+								TextField(controller: codeCtrl, decoration: InputDecoration(labelText: t.code)),
+								TextField(controller: nameCtrl, decoration: InputDecoration(labelText: t.title)),
+								TextField(controller: typeCtrl, decoration: InputDecoration(labelText: t.type)),
+								DropdownButtonFormField<String>(
+									value: selectedParentId,
+									items: [
+										DropdownMenuItem<String>(value: null, child: Text('بدون والد')),
+										...parents.map((p) => DropdownMenuItem<String>(value: p["id"], child: Text(p["title"]!))).toList(),
+									],
+									onChanged: (v) { selectedParentId = v; },
+									decoration: const InputDecoration(labelText: 'حساب والد'),
+								),
+							],
+						),
+					),
+					actions: [
+						TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(t.cancel)),
+						FilledButton(
+							onPressed: () async {
+								final name = nameCtrl.text.trim();
+								final code = codeCtrl.text.trim();
+								final atype = typeCtrl.text.trim();
+								if (name.isEmpty || code.isEmpty || atype.isEmpty) return;
+								final Map<String, dynamic> payload = {"name": name, "code": code, "account_type": atype};
+								if (selectedParentId != null && selectedParentId!.isNotEmpty) {
+									final pid = int.tryParse(selectedParentId!);
+									if (pid != null) payload["parent_id"] = pid;
+								}
+									try {
+									final id = int.tryParse(node.id);
+									if (id == null) return;
+									final api = ApiClient();
+									await api.put('/api/v1/accounts/account/$id', data: payload);
+									if (context.mounted) Navigator.of(ctx).pop(true);
+									} catch (e) {
+										if (context.mounted) {
+											ScaffoldMessenger.of(context).showSnackBar(
+												SnackBar(content: Text('خطا در ویرایش حساب: $e')),
+											);
+										}
+									}
+							},
+							child: Text(t.save),
+						),
+					],
+				);
+			},
+		);
+		if (result == true) {
+			await _fetch();
+		}
+	}
+
+	Future<void> _confirmDelete(AccountNode node) async {
+		final t = AppLocalizations.of(context);
+		final id = int.tryParse(node.id);
+		if (id == null) return;
+		final ok = await showDialog<bool>(
+			context: context,
+			builder: (ctx) => AlertDialog(
+				title: Text(t.delete),
+				content: const Text('آیا مطمئن هستید؟'),
+				actions: [
+					TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(t.cancel)),
+					FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: Text(t.delete)),
+				],
+			),
+		);
+		if (ok == true) {
+			try {
+				final api = ApiClient();
+				await api.delete('/api/v1/accounts/account/$id');
+				await _fetch();
+			} catch (e) {
+				if (context.mounted) {
+					ScaffoldMessenger.of(context).showSnackBar(
+						SnackBar(content: Text('خطا در حذف حساب: $e')),
+					);
+				}
+			}
+		}
 	}
 
 	String _localizedAccountType(AppLocalizations t, String? value) {
@@ -273,7 +378,7 @@ class _AccountsPageState extends State<AccountsPage> {
 					Container(
 						padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
 						color: Theme.of(context).colorScheme.surfaceContainerHighest,
-						child: Row(
+										child: Row(
 							children: [
 								const SizedBox(width: 28), // expander space
 								Expanded(flex: 2, child: Text(t.code, style: const TextStyle(fontWeight: FontWeight.w600))),
@@ -314,7 +419,21 @@ class _AccountsPageState extends State<AccountsPage> {
 													),
 													Expanded(flex: 2, child: Text(node.code, style: const TextStyle(fontFeatures: []))),
 													Expanded(flex: 5, child: Text(node.name)),
-													Expanded(flex: 3, child: Text(_localizedAccountType(t, node.accountType))),
+												Expanded(flex: 3, child: Text(_localizedAccountType(t, node.accountType))),
+												SizedBox(
+													width: 40,
+													child: PopupMenuButton<String>(
+														padding: EdgeInsets.zero,
+														onSelected: (v) {
+															if (v == 'edit') _openEditDialog(node);
+															if (v == 'delete') _confirmDelete(node);
+														},
+														itemBuilder: (context) => [
+															const PopupMenuItem<String>(value: 'edit', child: Text('ویرایش')),
+															const PopupMenuItem<String>(value: 'delete', child: Text('حذف')),
+														],
+													),
+												),
 												],
 											),
 										),
@@ -325,10 +444,12 @@ class _AccountsPageState extends State<AccountsPage> {
 					),
 				],
 			),
-			floatingActionButton: FloatingActionButton(
-				onPressed: _openCreateDialog,
-				child: const Icon(Icons.add),
-			),
+			floatingActionButton: widget.authStore.canWriteSection('accounting')
+				? FloatingActionButton(
+					onPressed: _openCreateDialog,
+					child: const Icon(Icons.add),
+				)
+				: null,
 		);
 	}
 }

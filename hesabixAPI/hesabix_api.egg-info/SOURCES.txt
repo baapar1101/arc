@@ -130,6 +130,7 @@ app/core/responses.py
 app/core/security.py
 app/core/settings.py
 app/core/smart_normalizer.py
+app/services/account_service.py
 app/services/api_key_service.py
 app/services/auth_service.py
 app/services/bank_account_service.py
@@ -144,6 +145,7 @@ app/services/document_service.py
 app/services/email_service.py
 app/services/expense_income_service.py
 app/services/file_storage_service.py
+app/services/invoice_service.py
 app/services/person_service.py
 app/services/petty_cash_service.py
 app/services/price_list_service.py

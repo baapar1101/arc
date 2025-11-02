@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../services/warehouse_service.dart';
 import '../../models/warehouse_model.dart';
+import '../../widgets/data_table/data_table_widget.dart';
+import '../../widgets/data_table/data_table_config.dart';
 
 class WarehousesPage extends StatefulWidget {
   final int businessId;
@@ -12,69 +14,81 @@ class WarehousesPage extends StatefulWidget {
 
 class _WarehousesPageState extends State<WarehousesPage> {
   final WarehouseService _service = WarehouseService();
-  bool _loading = true;
-  String? _error;
-  List<Warehouse> _items = const <Warehouse>[];
+  final GlobalKey _tableKey = GlobalKey();
 
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
-
-  Future<void> _load() async {
+  void _refreshTable() {
     try {
-      setState(() {
-        _loading = true;
-        _error = null;
-      });
-      final items = await _service.listWarehouses(businessId: widget.businessId);
-      if (!mounted) return;
-      setState(() {
-        _items = items;
-        _loading = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _error = e.toString();
-        _loading = false;
-      });
-    }
+      final current = _tableKey.currentState as dynamic;
+      current?.refresh();
+    } catch (_) {}
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('مدیریت انبارها')),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _showCreateDialog,
-        child: const Icon(Icons.add),
+      body: DataTableWidget<Warehouse>(
+        key: _tableKey,
+        fromJson: (m) => Warehouse.fromJson(m),
+        config: DataTableConfig<Warehouse>(
+          endpoint: '/api/v1/warehouses/business/${widget.businessId}/query',
+          title: 'فهرست انبارها',
+          showBackButton: true,
+          onBack: () => Navigator.of(context).maybePop(),
+          showTableIcon: false,
+          showSearch: true,
+          showPagination: true,
+          showRowNumbers: true,
+          enableSorting: true,
+          searchFields: const ['code', 'name', 'description'],
+          customHeaderActions: [
+            Tooltip(
+              message: 'افزودن انبار',
+              child: IconButton(
+                onPressed: _showCreateDialog,
+                icon: const Icon(Icons.add),
+              ),
+            ),
+          ],
+          columns: [
+            ActionColumn('actions', 'عملیات', actions: [
+              DataTableAction(
+                icon: Icons.edit_outlined,
+                label: 'ویرایش',
+                onTap: (item) {
+                  if (item is Warehouse) _showEditDialog(item);
+                },
+              ),
+              DataTableAction(
+                icon: Icons.delete_outline,
+                label: 'حذف',
+                onTap: (item) {
+                  if (item is Warehouse) _delete(item);
+                },
+                isDestructive: true,
+              ),
+            ]),
+            TextColumn('code', 'کد',
+                formatter: (item) => (item as Warehouse).code,
+                width: ColumnWidth.small),
+            TextColumn('name', 'نام',
+                formatter: (item) => (item as Warehouse).name,
+                width: ColumnWidth.medium),
+            TextColumn('description', 'توضیحات',
+                formatter: (item) => (item as Warehouse).description ?? '',
+                width: ColumnWidth.large,
+                searchable: true),
+            TextColumn('is_default', 'پیش‌فرض',
+                formatter: (item) => (item as Warehouse).isDefault ? 'بله' : 'خیر',
+                sortable: false,
+                searchable: false,
+                width: ColumnWidth.small),
+            DateColumn('created_at', 'ایجاد',
+                formatter: (item) => (item as Warehouse).createdAt?.toIso8601String() ?? '',
+                showTime: false,
+                width: ColumnWidth.small),
+          ],
+        ),
       ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : _error != null
-              ? Center(child: Text(_error!, style: TextStyle(color: Colors.red.shade700)))
-              : RefreshIndicator(
-                  onRefresh: _load,
-                  child: ListView.separated(
-                    itemCount: _items.length,
-                    separatorBuilder: (_, __) => const Divider(height: 1),
-                    itemBuilder: (ctx, idx) {
-                      final w = _items[idx];
-                      return ListTile(
-                        leading: Icon(w.isDefault ? Icons.star : Icons.store, color: w.isDefault ? Colors.orange : null),
-                        title: Text('${w.code} - ${w.name}'),
-                        subtitle: Text(w.description ?? ''),
-                        onTap: () => _showEditDialog(w),
-                        trailing: IconButton(
-                          icon: const Icon(Icons.delete_outline),
-                          onPressed: () => _delete(w),
-                        ),
-                      );
-                    },
-                  ),
-                ),
     );
   }
 
@@ -109,7 +123,7 @@ class _WarehousesPageState extends State<WarehousesPage> {
     );
     if (ok != true) return;
     try {
-      final created = await _service.createWarehouse(
+      await _service.createWarehouse(
         businessId: widget.businessId,
         payload: {
           'code': codeCtrl.text.trim(),
@@ -118,9 +132,7 @@ class _WarehousesPageState extends State<WarehousesPage> {
         },
       );
       if (!mounted) return;
-      setState(() {
-        _items = [created, ..._items];
-      });
+      _refreshTable();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطا: $e')));
@@ -158,7 +170,7 @@ class _WarehousesPageState extends State<WarehousesPage> {
     );
     if (ok != true) return;
     try {
-      final updated = await _service.updateWarehouse(
+      await _service.updateWarehouse(
         businessId: widget.businessId,
         warehouseId: w.id!,
         payload: {
@@ -168,9 +180,7 @@ class _WarehousesPageState extends State<WarehousesPage> {
         },
       );
       if (!mounted) return;
-      setState(() {
-        _items = _items.map((e) => e.id == updated.id ? updated : e).toList();
-      });
+      _refreshTable();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطا: $e')));
@@ -194,9 +204,7 @@ class _WarehousesPageState extends State<WarehousesPage> {
       final deleted = await _service.deleteWarehouse(businessId: widget.businessId, warehouseId: w.id!);
       if (!mounted) return;
       if (deleted) {
-        setState(() {
-          _items = _items.where((e) => e.id != w.id).toList();
-        });
+        _refreshTable();
       }
     } catch (e) {
       if (!mounted) return;

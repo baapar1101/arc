@@ -8,6 +8,8 @@ from app.core.responses import ApiError
 from adapters.db.models.warehouse import Warehouse
 from adapters.db.repositories.warehouse_repository import WarehouseRepository
 from adapters.api.v1.schema_models.warehouse import WarehouseCreateRequest, WarehouseUpdateRequest
+from adapters.api.v1.schemas import QueryInfo, FilterItem
+from app.services.query_service import QueryService
 
 
 def _to_dict(obj: Warehouse) -> Dict[str, Any]:
@@ -87,4 +89,37 @@ def delete_warehouse(db: Session, business_id: int, warehouse_id: int) -> bool:
     repo = WarehouseRepository(db)
     return repo.delete(warehouse_id)
 
+
+
+def query_warehouses(db: Session, business_id: int, query_info: QueryInfo) -> Dict[str, Any]:
+    """Query warehouses with filters/search/sorting/pagination scoped to business."""
+    # Ensure business scoping via filters
+    base_filter = FilterItem(property="business_id", operator="=", value=business_id)
+    merged_filters = [base_filter]
+    if query_info.filters:
+        merged_filters.extend(query_info.filters)
+
+    effective_query = QueryInfo(
+        sort_by=query_info.sort_by,
+        sort_desc=query_info.sort_desc,
+        take=query_info.take,
+        skip=query_info.skip,
+        search=query_info.search,
+        search_fields=query_info.search_fields,
+        filters=merged_filters,
+    )
+
+    results, total = QueryService.query_with_filters(Warehouse, db, effective_query)
+    items = [_to_dict(w) for w in results]
+    limit = max(1, effective_query.take)
+    page = (effective_query.skip // limit) + 1
+    total_pages = (total + limit - 1) // limit
+
+    return {
+        "items": items,
+        "total": total,
+        "page": page,
+        "limit": limit,
+        "total_pages": total_pages,
+    }
 

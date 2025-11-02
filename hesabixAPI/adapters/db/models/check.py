@@ -19,8 +19,8 @@ from adapters.db.session import Base
 
 
 class CheckType(str, Enum):
-    RECEIVED = "received"
-    TRANSFERRED = "transferred"
+    RECEIVED = "RECEIVED"
+    TRANSFERRED = "TRANSFERRED"
 
 
 class Check(Base):

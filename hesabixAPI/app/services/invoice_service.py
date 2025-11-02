@@ -68,12 +68,24 @@ def _iter_product_movements(
     """
     if not product_ids:
         return []
+    # فقط کالاهای با کنترل موجودی را لحاظ کن
+    tracked_ids: List[int] = [
+        int(pid)
+        for pid, tracked in db.query(Product.id, Product.track_inventory).filter(
+            Product.business_id == business_id,
+            Product.id.in_(list({int(pid) for pid in product_ids})),
+        ).all()
+        if bool(tracked)
+    ]
+    if not tracked_ids:
+        return []
+
     q = db.query(DocumentLine, Document).join(Document, Document.id == DocumentLine.document_id).filter(
         and_(
             Document.business_id == business_id,
             Document.is_proforma == False,  # noqa: E712
             Document.document_date <= up_to_date,
-            DocumentLine.product_id.in_(list({int(pid) for pid in product_ids})),
+            DocumentLine.product_id.in_(tracked_ids),
         )
     )
     if exclude_document_id is not None:
@@ -353,6 +365,9 @@ def _extract_cogs_total(lines: List[Dict[str, Any]]) -> Decimal:
     total = Decimal(0)
     for line in lines:
         info = line.get("extra_info") or {}
+        # فقط برای کالاهای دارای کنترل موجودی
+        if not bool(info.get("inventory_tracked")):
+            continue
         qty = Decimal(str(line.get("quantity", 0) or 0))
         if info.get("cogs_amount") is not None:
             total += Decimal(str(info.get("cogs_amount")))
@@ -486,20 +501,45 @@ def create_invoice(
         if mv == "out":
             outgoing_lines.append(ln)
 
-    # Ensure stock sufficiency for outgoing
-    if outgoing_lines:
-        _ensure_stock_sufficient(db, business_id, document_date, outgoing_lines)
+    # Resolve inventory tracking per product and annotate lines
+    all_product_ids = [int(ln.get("product_id")) for ln in lines_input if ln.get("product_id")]
+    track_map: Dict[int, bool] = {}
+    if all_product_ids:
+        for pid, tracked in db.query(Product.id, Product.track_inventory).filter(
+            Product.business_id == business_id,
+            Product.id.in_(all_product_ids),
+        ).all():
+            track_map[int(pid)] = bool(tracked)
 
-    # Costing method
+    for ln in lines_input:
+        pid = ln.get("product_id")
+        if not pid:
+            continue
+        info = dict(ln.get("extra_info") or {})
+        info["inventory_tracked"] = bool(track_map.get(int(pid), False))
+        ln["extra_info"] = info
+
+    # Filter outgoing lines to only inventory-tracked products for stock checks
+    tracked_outgoing_lines: List[Dict[str, Any]] = []
+    for ln in outgoing_lines:
+        pid = ln.get("product_id")
+        if pid and track_map.get(int(pid)):
+            tracked_outgoing_lines.append(ln)
+
+    # Ensure stock sufficiency for outgoing (only for tracked products)
+    if tracked_outgoing_lines:
+        _ensure_stock_sufficient(db, business_id, document_date, tracked_outgoing_lines)
+
+    # Costing method (only for tracked products)
     costing_method = _get_costing_method(data)
-    if costing_method == "fifo" and outgoing_lines:
-        fifo_costs = _calculate_fifo_cogs_for_outgoing(db, business_id, document_date, outgoing_lines)
-        # annotate lines with cogs_amount in the same order as outgoing_lines
+    if costing_method == "fifo" and tracked_outgoing_lines:
+        fifo_costs = _calculate_fifo_cogs_for_outgoing(db, business_id, document_date, tracked_outgoing_lines)
+        # annotate lines with cogs_amount in the same order as tracked_outgoing_lines
         i = 0
         for ln in lines_input:
             info = ln.get("extra_info") or {}
             mv = info.get("movement") or movement_hint
-            if mv == "out":
+            if mv == "out" and info.get("inventory_tracked"):
                 amt = fifo_costs[i]
                 i += 1
                 info = dict(info)
@@ -901,18 +941,41 @@ def update_invoice(
         if mv == "out":
             outgoing_lines.append(ln)
 
-    if outgoing_lines:
-        _ensure_stock_sufficient(db, document.business_id, document.document_date, outgoing_lines, exclude_document_id=document.id)
+    # Resolve and annotate inventory tracking for all lines
+    all_product_ids = [int(ln.get("product_id")) for ln in lines_input if ln.get("product_id")]
+    track_map: Dict[int, bool] = {}
+    if all_product_ids:
+        for pid, tracked in db.query(Product.id, Product.track_inventory).filter(
+            Product.business_id == document.business_id,
+            Product.id.in_(all_product_ids),
+        ).all():
+            track_map[int(pid)] = bool(tracked)
+    for ln in lines_input:
+        pid = ln.get("product_id")
+        if not pid:
+            continue
+        info = dict(ln.get("extra_info") or {})
+        info["inventory_tracked"] = bool(track_map.get(int(pid), False))
+        ln["extra_info"] = info
+
+    tracked_outgoing_lines: List[Dict[str, Any]] = []
+    for ln in outgoing_lines:
+        pid = ln.get("product_id")
+        if pid and track_map.get(int(pid)):
+            tracked_outgoing_lines.append(ln)
+
+    if tracked_outgoing_lines:
+        _ensure_stock_sufficient(db, document.business_id, document.document_date, tracked_outgoing_lines, exclude_document_id=document.id)
 
     header_for_costing = data if data else {"extra_info": document.extra_info}
     costing_method = _get_costing_method(header_for_costing)
-    if costing_method == "fifo" and outgoing_lines:
-        fifo_costs = _calculate_fifo_cogs_for_outgoing(db, document.business_id, document.document_date, outgoing_lines, exclude_document_id=document.id)
+    if costing_method == "fifo" and tracked_outgoing_lines:
+        fifo_costs = _calculate_fifo_cogs_for_outgoing(db, document.business_id, document.document_date, tracked_outgoing_lines, exclude_document_id=document.id)
         i = 0
         for ln in lines_input:
             info = ln.get("extra_info") or {}
             mv = info.get("movement") or movement_hint
-            if mv == "out":
+            if mv == "out" and info.get("inventory_tracked"):
                 amt = fifo_costs[i]
                 i += 1
                 info = dict(info)

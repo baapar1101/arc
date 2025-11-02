@@ -21,11 +21,11 @@ def _parse_iso(dt: str) -> datetime:
 
 def create_check(db: Session, business_id: int, data: Dict[str, Any]) -> Dict[str, Any]:
     ctype = str(data.get('type', '')).lower()
-    if ctype not in (CheckType.RECEIVED.value, CheckType.TRANSFERRED.value):
+    if ctype not in ("received", "transferred"):
         raise ApiError("INVALID_CHECK_TYPE", "Invalid check type", http_status=400)
 
     person_id = data.get('person_id')
-    if ctype == CheckType.RECEIVED.value and not person_id:
+    if ctype == "received" and not person_id:
         raise ApiError("PERSON_REQUIRED", "person_id is required for received checks", http_status=400)
 
     issue_date = _parse_iso(str(data.get('issue_date')))
@@ -63,7 +63,7 @@ def create_check(db: Session, business_id: int, data: Dict[str, Any]) -> Dict[st
 
     obj = Check(
         business_id=business_id,
-        type=CheckType(ctype),
+        type=CheckType[ctype.upper()],
         person_id=int(person_id) if person_id else None,
         issue_date=issue_date,
         due_date=due_date,
@@ -93,9 +93,9 @@ def update_check(db: Session, check_id: int, data: Dict[str, Any]) -> Optional[D
 
     if 'type' in data and data['type'] is not None:
         ctype = str(data['type']).lower()
-        if ctype not in (CheckType.RECEIVED.value, CheckType.TRANSFERRED.value):
+        if ctype not in ("received", "transferred"):
             raise ApiError("INVALID_CHECK_TYPE", "Invalid check type", http_status=400)
-        obj.type = CheckType(ctype)
+        obj.type = CheckType[ctype.upper()]
 
     if 'person_id' in data:
         obj.person_id = int(data['person_id']) if data['person_id'] is not None else None
@@ -192,7 +192,11 @@ def list_checks(db: Session, business_id: int, query: Dict[str, Any]) -> Dict[st
             if not prop or not op:
                 continue
             if prop == 'type' and op == '=':
-                q = q.filter(Check.type == val)
+                try:
+                    enum_val = CheckType[str(val).upper()]
+                    q = q.filter(Check.type == enum_val)
+                except Exception:
+                    pass
             elif prop == 'currency' and op == '=':
                 try:
                     q = q.filter(Check.currency_id == int(val))
@@ -267,7 +271,7 @@ def check_to_dict(db: Session, obj: Optional[Check]) -> Optional[Dict[str, Any]]
     return {
         "id": obj.id,
         "business_id": obj.business_id,
-        "type": obj.type.value,
+        "type": obj.type.name.lower(),
         "person_id": obj.person_id,
         "person_name": person_name,
         "issue_date": obj.issue_date.isoformat(),
