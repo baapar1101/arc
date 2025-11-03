@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/core/api_client.dart';
@@ -65,12 +66,27 @@ class _PersonsPageState extends State<PersonsPage> {
       enableRowSelection: true,
       enableMultiRowSelection: true,
       columns: [
-        NumberColumn(
+        CustomColumn(
           'code',
           t.personCode,
           width: ColumnWidth.small,
+          sortable: true,
           formatter: (person) => (person.code?.toString() ?? '-'),
-          textAlign: TextAlign.center,
+          builder: (person, index) {
+            final codeText = person.code?.toString() ?? '-';
+            return InkWell(
+              onTap: () {
+                if (person.id != null) {
+                  context.go('/business/${widget.businessId}/reports/kardex?person_id=${person.id}');
+                }
+              },
+              child: Text(
+                codeText,
+                textAlign: TextAlign.center,
+                style: const TextStyle(decoration: TextDecoration.underline),
+              ),
+            );
+          },
         ),
         TextColumn(
           'alias_name',
@@ -316,6 +332,20 @@ class _PersonsPageState extends State<PersonsPage> {
           'actions',
           t.actions,
           actions: [
+            DataTableAction(
+              icon: Icons.view_kanban,
+              label: 'کاردکس',
+              onTap: (person) {
+                if (person is Person && person.id != null) {
+                  context.go('/business/${widget.businessId}/reports/kardex?person_id=${person.id}');
+                } else if (person is Map<String, dynamic>) {
+                  final id = person['id'];
+                  if (id is int) {
+                    context.go('/business/${widget.businessId}/reports/kardex?person_id=$id');
+                  }
+                }
+              },
+            ),
             DataTableAction(
               icon: Icons.edit,
               label: t.edit,

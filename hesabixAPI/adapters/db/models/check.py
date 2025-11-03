@@ -12,6 +12,7 @@ from sqlalchemy import (
     Numeric,
     Enum as SQLEnum,
     Index,
+    JSON,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -22,6 +23,21 @@ class CheckType(str, Enum):
     RECEIVED = "RECEIVED"
     TRANSFERRED = "TRANSFERRED"
 
+
+class CheckStatus(str, Enum):
+    RECEIVED_ON_HAND = "RECEIVED_ON_HAND"          # چک دریافتی در دست
+    TRANSFERRED_ISSUED = "TRANSFERRED_ISSUED"      # چک پرداختنی صادر و تحویل شده
+    DEPOSITED = "DEPOSITED"                        # سپرده به بانک (در جریان وصول)
+    CLEARED = "CLEARED"                            # پاس/وصول شده
+    ENDORSED = "ENDORSED"                          # واگذار شده به شخص ثالث
+    RETURNED = "RETURNED"                          # عودت شده
+    BOUNCED = "BOUNCED"                            # برگشت خورده
+    CANCELLED = "CANCELLED"                        # ابطال شده
+
+class HolderType(str, Enum):
+    BUSINESS = "BUSINESS"
+    BANK = "BANK"
+    PERSON = "PERSON"
 
 class Check(Base):
     __tablename__ = "checks"
@@ -54,6 +70,14 @@ class Check(Base):
     amount: Mapped[float] = mapped_column(Numeric(18, 2), nullable=False)
     currency_id: Mapped[int] = mapped_column(Integer, ForeignKey("currencies.id", ondelete="RESTRICT"), nullable=False, index=True)
 
+    # وضعیت و نگهدارنده
+    status: Mapped[CheckStatus | None] = mapped_column(SQLEnum(CheckStatus, name="check_status"), nullable=True, index=True)
+    status_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    current_holder_type: Mapped[HolderType | None] = mapped_column(SQLEnum(HolderType, name="check_holder_type"), nullable=True, index=True)
+    current_holder_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    last_action_document_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("documents.id", ondelete="SET NULL"), nullable=True, index=True)
+    developer_data: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
@@ -61,5 +85,6 @@ class Check(Base):
     business = relationship("Business", backref="checks")
     person = relationship("Person", lazy="joined")
     currency = relationship("Currency")
+    last_action_document = relationship("Document")
 
 

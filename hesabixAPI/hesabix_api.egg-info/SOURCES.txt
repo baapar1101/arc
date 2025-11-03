@@ -20,6 +20,7 @@ adapters/api/v1/expense_income.py
 adapters/api/v1/fiscal_years.py
 adapters/api/v1/health.py
 adapters/api/v1/invoices.py
+adapters/api/v1/kardex.py
 adapters/api/v1/persons.py
 adapters/api/v1/petty_cash.py
 adapters/api/v1/price_lists.py
@@ -146,6 +147,7 @@ app/services/email_service.py
 app/services/expense_income_service.py
 app/services/file_storage_service.py
 app/services/invoice_service.py
+app/services/kardex_service.py
 app/services/person_service.py
 app/services/petty_cash_service.py
 app/services/price_list_service.py
@@ -217,6 +219,7 @@ migrations/versions/20251014_000301_add_product_id_to_document_lines.py
 migrations/versions/20251014_000401_add_payment_refs_to_document_lines.py
 migrations/versions/20251014_000501_add_quantity_to_document_lines.py
 migrations/versions/20251021_000601_add_bom_and_warehouses.py
+migrations/versions/20251102_120001_add_check_status_fields.py
 migrations/versions/4b2ea782bcb3_merge_heads.py
 migrations/versions/5553f8745c6e_add_support_tables.py
 migrations/versions/7891282548e9_merge_tax_types_and_unit_fields_heads.py

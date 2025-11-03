@@ -1223,7 +1223,7 @@ class AppLocalizationsFa extends AppLocalizations {
   String get edit => 'ویرایش';
 
   @override
-  String get actions => 'اقدامات';
+  String get actions => 'عملیات';
 
   @override
   String get search => 'جستجو';

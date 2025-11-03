@@ -34,12 +34,15 @@ class _CheckFormPageState extends State<CheckFormPage> {
   DateTime? _dueDate;
   int? _currencyId;
   dynamic _selectedPerson; // using Person type would be ideal; keep dynamic to avoid imports complexity
+  bool _autoPost = false;
+  DateTime? _documentDate;
 
   final _checkNumberCtrl = TextEditingController();
   final _sayadCtrl = TextEditingController();
   final _bankCtrl = TextEditingController();
   final _branchCtrl = TextEditingController();
   final _amountCtrl = TextEditingController();
+  final _docDescCtrl = TextEditingController();
 
   bool _loading = false;
 
@@ -50,6 +53,7 @@ class _CheckFormPageState extends State<CheckFormPage> {
     _currencyId = widget.authStore.selectedCurrencyId;
     _issueDate = DateTime.now();
     _dueDate = DateTime.now();
+    _documentDate = _issueDate;
     if (widget.checkId != null) {
       _loadData();
     }
@@ -114,6 +118,9 @@ class _CheckFormPageState extends State<CheckFormPage> {
         if (_branchCtrl.text.trim().isNotEmpty) 'branch_name': _branchCtrl.text.trim(),
         'amount': num.tryParse(_amountCtrl.text.replaceAll(',', '').trim()),
         'currency_id': _currencyId,
+        'auto_post': _autoPost,
+        if (_autoPost && _documentDate != null) 'document_date': _documentDate!.toIso8601String(),
+        if (_autoPost && _docDescCtrl.text.trim().isNotEmpty) 'document_description': _docDescCtrl.text.trim(),
       };
 
       if (widget.checkId == null) {
@@ -152,6 +159,7 @@ class _CheckFormPageState extends State<CheckFormPage> {
     _bankCtrl.dispose();
     _branchCtrl.dispose();
     _amountCtrl.dispose();
+    _docDescCtrl.dispose();
     super.dispose();
   }
 
@@ -159,6 +167,7 @@ class _CheckFormPageState extends State<CheckFormPage> {
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
     final isEdit = widget.checkId != null;
+    final canAccountingWrite = widget.authStore.canWriteSection('accounting');
 
     if (!widget.authStore.canWriteSection('checks')) {
       return AccessDeniedPage(message: t.accessDenied);
@@ -320,6 +329,43 @@ class _CheckFormPageState extends State<CheckFormPage> {
                         ),
                       ],
                     ),
+
+                    const SizedBox(height: 16),
+                    if (canAccountingWrite) ...[
+                      SwitchListTile(
+                        value: _autoPost,
+                        onChanged: (v) => setState(() {
+                          _autoPost = v;
+                          _documentDate ??= _issueDate;
+                        }),
+                        title: const Text('ثبت سند حسابداری همزمان'),
+                      ),
+                      if (_autoPost) ...[
+                        Row(
+                          children: [
+                            Expanded(
+                              child: DateInputField(
+                                value: _documentDate,
+                                labelText: 'تاریخ سند',
+                                hintText: 'انتخاب تاریخ سند',
+                                calendarController: widget.calendarController!,
+                                onChanged: (d) => setState(() => _documentDate = d),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: TextFormField(
+                                controller: _docDescCtrl,
+                                decoration: const InputDecoration(
+                                  labelText: 'شرح سند',
+                                  border: OutlineInputBorder(),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ],
 
                     const SizedBox(height: 16),
                     Row(

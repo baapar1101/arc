@@ -35,6 +35,7 @@ from adapters.api.v1.transfers import router as transfers_router
 from adapters.api.v1.fiscal_years import router as fiscal_years_router
 from adapters.api.v1.expense_income import router as expense_income_router
 from adapters.api.v1.documents import router as documents_router
+from adapters.api.v1.kardex import router as kardex_router
 from app.core.i18n import negotiate_locale, Translator
 from app.core.error_handlers import register_error_handlers
 from app.core.smart_normalizer import smart_normalize_json, SmartNormalizerConfig
@@ -319,6 +320,7 @@ def create_app() -> FastAPI:
     application.include_router(expense_income_router, prefix=settings.api_v1_prefix)
     application.include_router(documents_router, prefix=settings.api_v1_prefix)
     application.include_router(fiscal_years_router, prefix=settings.api_v1_prefix)
+    application.include_router(kardex_router, prefix=settings.api_v1_prefix)
     
     # Support endpoints
     application.include_router(support_tickets_router, prefix=f"{settings.api_v1_prefix}/support")

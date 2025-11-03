@@ -15,6 +15,10 @@ class CheckCreateRequest(BaseModel):
     branch_name: Optional[str] = Field(default=None, max_length=255)
     amount: float = Field(..., gt=0)
     currency_id: int = Field(..., ge=1)
+    # گزینه‌های حسابداری
+    auto_post: Optional[bool] = Field(default=False)
+    document_date: Optional[str] = None
+    document_description: Optional[str] = Field(default=None, max_length=500)
 
     @field_validator('sayad_code')
     @classmethod
@@ -69,4 +73,52 @@ class CheckResponse(BaseModel):
     class Config:
         from_attributes = True
 
+
+
+# =====================
+# Action Schemas
+# =====================
+
+class CheckEndorseRequest(BaseModel):
+    target_person_id: int = Field(..., ge=1)
+    document_date: Optional[str] = None
+    description: Optional[str] = Field(default=None, max_length=500)
+    auto_post: bool = Field(default=True)
+
+
+class CheckClearRequest(BaseModel):
+    bank_account_id: int = Field(..., ge=1)
+    document_date: Optional[str] = None
+    description: Optional[str] = Field(default=None, max_length=500)
+    auto_post: bool = Field(default=True)
+
+
+class CheckReturnRequest(BaseModel):
+    target_person_id: Optional[int] = Field(default=None, ge=1)
+    document_date: Optional[str] = None
+    description: Optional[str] = Field(default=None, max_length=500)
+    auto_post: bool = Field(default=True)
+
+
+class CheckBounceRequest(BaseModel):
+    bank_account_id: Optional[int] = Field(default=None, ge=1)
+    expense_account_id: Optional[int] = Field(default=None, ge=1)
+    expense_amount: Optional[float] = Field(default=None, gt=0)
+    document_date: Optional[str] = None
+    description: Optional[str] = Field(default=None, max_length=500)
+    auto_post: bool = Field(default=True)
+
+
+class CheckPayRequest(BaseModel):
+    bank_account_id: int = Field(..., ge=1)
+    document_date: Optional[str] = None
+    description: Optional[str] = Field(default=None, max_length=500)
+    auto_post: bool = Field(default=True)
+
+
+class CheckDepositRequest(BaseModel):
+    bank_account_id: int = Field(..., ge=1)
+    document_date: Optional[str] = None
+    description: Optional[str] = Field(default=None, max_length=500)
+    auto_post: bool = Field(default=True)
 

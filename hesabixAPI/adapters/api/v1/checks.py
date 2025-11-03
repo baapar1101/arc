@@ -10,6 +10,12 @@ from adapters.api.v1.schemas import QueryInfo
 from adapters.api.v1.schema_models.check import (
     CheckCreateRequest,
     CheckUpdateRequest,
+    CheckEndorseRequest,
+    CheckClearRequest,
+    CheckReturnRequest,
+    CheckBounceRequest,
+    CheckPayRequest,
+    CheckDepositRequest,
 )
 from app.services.check_service import (
     create_check,
@@ -17,6 +23,12 @@ from app.services.check_service import (
     delete_check,
     get_check_by_id,
     list_checks,
+    endorse_check,
+    clear_check,
+    return_check,
+    bounce_check,
+    pay_check,
+    deposit_check,
 )
 
 
@@ -82,8 +94,183 @@ async def create_check_endpoint(
     _: None = Depends(require_business_management_dep),
 ):
     payload: Dict[str, Any] = body.model_dump(exclude_unset=True)
-    created = create_check(db, business_id, payload)
+    # اگر کاربر درخواست ثبت سند همزمان داد، باید دسترسی نوشتن حسابداری داشته باشد
+    try:
+        if bool(payload.get("auto_post")) and not ctx.has_any_permission("accounting", "write"):
+            raise ApiError("FORBIDDEN", "Missing permission: accounting.write for auto_post", http_status=403)
+    except Exception:
+        # در صورت هرگونه خطای غیرمنتظره در بررسی، اجازه ادامه نمی‌دهیم
+        raise
+    created = create_check(db, business_id, ctx.get_user_id(), payload)
     return success_response(data=format_datetime_fields(created, request), request=request, message="CHECK_CREATED")
+@router.post(
+    "/checks/{check_id}/actions/endorse",
+    summary="واگذاری چک دریافتی به شخص",
+    description="واگذاری چک دریافتی به شخص دیگر",
+)
+async def endorse_check_endpoint(
+    request: Request,
+    check_id: int,
+    body: CheckEndorseRequest = Body(...),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    payload: Dict[str, Any] = body.model_dump(exclude_unset=True)
+    # access check
+    before = get_check_by_id(db, check_id)
+    if not before:
+        raise ApiError("CHECK_NOT_FOUND", "Check not found", http_status=404)
+    try:
+        biz_id = int(before.get("business_id"))
+    except Exception:
+        biz_id = None
+    if biz_id is not None and not ctx.can_access_business(biz_id):
+        raise ApiError("FORBIDDEN", "Access denied", http_status=403)
+    if bool(payload.get("auto_post")) and not ctx.has_any_permission("accounting", "write"):
+        raise ApiError("FORBIDDEN", "Missing permission: accounting.write for auto_post", http_status=403)
+    result = endorse_check(db, check_id, ctx.get_user_id(), payload)
+    return success_response(data=format_datetime_fields(result, request), request=request, message="CHECK_ENDORSED")
+
+
+@router.post(
+    "/checks/{check_id}/actions/clear",
+    summary="وصول/پاس چک",
+    description="انتقال حساب چک به بانک در زمان پاس/وصول",
+)
+async def clear_check_endpoint(
+    request: Request,
+    check_id: int,
+    body: CheckClearRequest = Body(...),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    payload: Dict[str, Any] = body.model_dump(exclude_unset=True)
+    before = get_check_by_id(db, check_id)
+    if not before:
+        raise ApiError("CHECK_NOT_FOUND", "Check not found", http_status=404)
+    try:
+        biz_id = int(before.get("business_id"))
+    except Exception:
+        biz_id = None
+    if biz_id is not None and not ctx.can_access_business(biz_id):
+        raise ApiError("FORBIDDEN", "Access denied", http_status=403)
+    if bool(payload.get("auto_post")) and not ctx.has_any_permission("accounting", "write"):
+        raise ApiError("FORBIDDEN", "Missing permission: accounting.write for auto_post", http_status=403)
+    result = clear_check(db, check_id, ctx.get_user_id(), payload)
+    return success_response(data=format_datetime_fields(result, request), request=request, message="CHECK_CLEARED")
+
+
+@router.post(
+    "/checks/{check_id}/actions/return",
+    summary="عودت چک",
+    description="عودت چک به طرف مقابل",
+)
+async def return_check_endpoint(
+    request: Request,
+    check_id: int,
+    body: CheckReturnRequest = Body(...),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    payload: Dict[str, Any] = body.model_dump(exclude_unset=True)
+    before = get_check_by_id(db, check_id)
+    if not before:
+        raise ApiError("CHECK_NOT_FOUND", "Check not found", http_status=404)
+    try:
+        biz_id = int(before.get("business_id"))
+    except Exception:
+        biz_id = None
+    if biz_id is not None and not ctx.can_access_business(biz_id):
+        raise ApiError("FORBIDDEN", "Access denied", http_status=403)
+    if bool(payload.get("auto_post")) and not ctx.has_any_permission("accounting", "write"):
+        raise ApiError("FORBIDDEN", "Missing permission: accounting.write for auto_post", http_status=403)
+    result = return_check(db, check_id, ctx.get_user_id(), payload)
+    return success_response(data=format_datetime_fields(result, request), request=request, message="CHECK_RETURNED")
+
+
+@router.post(
+    "/checks/{check_id}/actions/bounce",
+    summary="برگشت چک",
+    description="برگشت چک و ثبت هزینه احتمالی",
+)
+async def bounce_check_endpoint(
+    request: Request,
+    check_id: int,
+    body: CheckBounceRequest = Body(...),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    payload: Dict[str, Any] = body.model_dump(exclude_unset=True)
+    before = get_check_by_id(db, check_id)
+    if not before:
+        raise ApiError("CHECK_NOT_FOUND", "Check not found", http_status=404)
+    try:
+        biz_id = int(before.get("business_id"))
+    except Exception:
+        biz_id = None
+    if biz_id is not None and not ctx.can_access_business(biz_id):
+        raise ApiError("FORBIDDEN", "Access denied", http_status=403)
+    if bool(payload.get("auto_post")) and not ctx.has_any_permission("accounting", "write"):
+        raise ApiError("FORBIDDEN", "Missing permission: accounting.write for auto_post", http_status=403)
+    result = bounce_check(db, check_id, ctx.get_user_id(), payload)
+    return success_response(data=format_datetime_fields(result, request), request=request, message="CHECK_BOUNCED")
+
+
+@router.post(
+    "/checks/{check_id}/actions/pay",
+    summary="پرداخت چک پرداختنی",
+    description="پاس چک پرداختنی از بانک",
+)
+async def pay_check_endpoint(
+    request: Request,
+    check_id: int,
+    body: CheckPayRequest = Body(...),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    payload: Dict[str, Any] = body.model_dump(exclude_unset=True)
+    before = get_check_by_id(db, check_id)
+    if not before:
+        raise ApiError("CHECK_NOT_FOUND", "Check not found", http_status=404)
+    try:
+        biz_id = int(before.get("business_id"))
+    except Exception:
+        biz_id = None
+    if biz_id is not None and not ctx.can_access_business(biz_id):
+        raise ApiError("FORBIDDEN", "Access denied", http_status=403)
+    if bool(payload.get("auto_post")) and not ctx.has_any_permission("accounting", "write"):
+        raise ApiError("FORBIDDEN", "Missing permission: accounting.write for auto_post", http_status=403)
+    result = pay_check(db, check_id, ctx.get_user_id(), payload)
+    return success_response(data=format_datetime_fields(result, request), request=request, message="CHECK_PAID")
+
+
+@router.post(
+    "/checks/{check_id}/actions/deposit",
+    summary="سپرده چک به بانک (اختیاری)",
+    description="انتقال به اسناد در جریان وصول",
+)
+async def deposit_check_endpoint(
+    request: Request,
+    check_id: int,
+    body: CheckDepositRequest = Body(...),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    payload: Dict[str, Any] = body.model_dump(exclude_unset=True)
+    before = get_check_by_id(db, check_id)
+    if not before:
+        raise ApiError("CHECK_NOT_FOUND", "Check not found", http_status=404)
+    try:
+        biz_id = int(before.get("business_id"))
+    except Exception:
+        biz_id = None
+    if biz_id is not None and not ctx.can_access_business(biz_id):
+        raise ApiError("FORBIDDEN", "Access denied", http_status=403)
+    if bool(payload.get("auto_post")) and not ctx.has_any_permission("accounting", "write"):
+        raise ApiError("FORBIDDEN", "Missing permission: accounting.write for auto_post", http_status=403)
+    result = deposit_check(db, check_id, ctx.get_user_id(), payload)
+    return success_response(data=format_datetime_fields(result, request), request=request, message="CHECK_DEPOSITED")
+
 
 
 @router.get(

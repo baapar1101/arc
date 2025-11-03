@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
+import 'package:go_router/go_router.dart';
 import '../../core/auth_store.dart';
 import '../../widgets/permission/access_denied_page.dart';
 
@@ -27,6 +28,22 @@ class ReportsPage extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            _buildSection(
+              context,
+              title: 'گزارشات عمومی',
+              icon: Icons.assessment,
+              children: [
+                _buildReportItem(
+                  context,
+                  title: 'کاردکس اسناد',
+                  subtitle: 'نمایش ریز تراکنش‌ها بر اساس شخص/کالا/بانک/حساب/چک با فیلتر تاریخ',
+                  icon: Icons.view_kanban,
+                  onTap: () => context.go('/business/$businessId/reports/kardex'),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 24),
             _buildSection(
               context,
               title: 'گزارشات اشخاص',

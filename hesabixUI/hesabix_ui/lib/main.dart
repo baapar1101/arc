@@ -30,6 +30,7 @@ import 'pages/business/new_invoice_page.dart';
 import 'pages/business/settings_page.dart';
 import 'pages/business/business_info_settings_page.dart';
 import 'pages/business/reports_page.dart';
+import 'pages/business/kardex_page.dart';
 import 'pages/business/persons_page.dart';
 import 'pages/business/product_attributes_page.dart';
 import 'pages/business/products_page.dart';
@@ -629,6 +630,19 @@ class _MyAppState extends State<MyApp> {
                   child: ReportsPage(
                     businessId: businessId,
                     authStore: _authStore!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/reports/kardex',
+              name: 'business_reports_kardex',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return NoTransitionPage(
+                  child: KardexPage(
+                    businessId: businessId,
+                    calendarController: _calendarController!,
                   ),
                 );
               },

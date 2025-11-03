@@ -67,6 +67,37 @@ class CheckService {
       options: Options(responseType: ResponseType.bytes),
     );
   }
+
+  // ===== Actions =====
+  Future<Map<String, dynamic>> endorse({required int checkId, required Map<String, dynamic> body}) async {
+    final res = await _client.post<Map<String, dynamic>>('/api/v1/checks/checks/$checkId/actions/endorse', data: body);
+    return (res.data?['data'] as Map<String, dynamic>? ?? <String, dynamic>{});
+  }
+
+  Future<Map<String, dynamic>> clear({required int checkId, required Map<String, dynamic> body}) async {
+    final res = await _client.post<Map<String, dynamic>>('/api/v1/checks/checks/$checkId/actions/clear', data: body);
+    return (res.data?['data'] as Map<String, dynamic>? ?? <String, dynamic>{});
+  }
+
+  Future<Map<String, dynamic>> pay({required int checkId, required Map<String, dynamic> body}) async {
+    final res = await _client.post<Map<String, dynamic>>('/api/v1/checks/checks/$checkId/actions/pay', data: body);
+    return (res.data?['data'] as Map<String, dynamic>? ?? <String, dynamic>{});
+  }
+
+  Future<Map<String, dynamic>> returnCheck({required int checkId, required Map<String, dynamic> body}) async {
+    final res = await _client.post<Map<String, dynamic>>('/api/v1/checks/checks/$checkId/actions/return', data: body);
+    return (res.data?['data'] as Map<String, dynamic>? ?? <String, dynamic>{});
+  }
+
+  Future<Map<String, dynamic>> bounce({required int checkId, required Map<String, dynamic> body}) async {
+    final res = await _client.post<Map<String, dynamic>>('/api/v1/checks/checks/$checkId/actions/bounce', data: body);
+    return (res.data?['data'] as Map<String, dynamic>? ?? <String, dynamic>{});
+  }
+
+  Future<Map<String, dynamic>> deposit({required int checkId, required Map<String, dynamic> body}) async {
+    final res = await _client.post<Map<String, dynamic>>('/api/v1/checks/checks/$checkId/actions/deposit', data: body);
+    return (res.data?['data'] as Map<String, dynamic>? ?? <String, dynamic>{});
+  }
 }
 
 
