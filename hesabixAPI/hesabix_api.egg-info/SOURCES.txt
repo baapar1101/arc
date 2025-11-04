@@ -19,6 +19,7 @@ adapters/api/v1/documents.py
 adapters/api/v1/expense_income.py
 adapters/api/v1/fiscal_years.py
 adapters/api/v1/health.py
+adapters/api/v1/inventory_transfers.py
 adapters/api/v1/invoices.py
 adapters/api/v1/kardex.py
 adapters/api/v1/persons.py
@@ -146,6 +147,7 @@ app/services/document_service.py
 app/services/email_service.py
 app/services/expense_income_service.py
 app/services/file_storage_service.py
+app/services/inventory_transfer_service.py
 app/services/invoice_service.py
 app/services/kardex_service.py
 app/services/person_service.py

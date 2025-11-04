@@ -77,7 +77,12 @@ class _PersonsPageState extends State<PersonsPage> {
             return InkWell(
               onTap: () {
                 if (person.id != null) {
-                  context.go('/business/${widget.businessId}/reports/kardex?person_id=${person.id}');
+                  context.go(
+                    '/business/${widget.businessId}/reports/kardex',
+                    extra: {
+                      'person_ids': [person.id]
+                    },
+                  );
                 }
               },
               child: Text(
@@ -337,11 +342,21 @@ class _PersonsPageState extends State<PersonsPage> {
               label: 'کاردکس',
               onTap: (person) {
                 if (person is Person && person.id != null) {
-                  context.go('/business/${widget.businessId}/reports/kardex?person_id=${person.id}');
+                  context.go(
+                    '/business/${widget.businessId}/reports/kardex',
+                    extra: {
+                      'person_ids': [person.id]
+                    },
+                  );
                 } else if (person is Map<String, dynamic>) {
                   final id = person['id'];
                   if (id is int) {
-                    context.go('/business/${widget.businessId}/reports/kardex?person_id=$id');
+                    context.go(
+                      '/business/${widget.businessId}/reports/kardex',
+                      extra: {
+                        'person_ids': [id]
+                      },
+                    );
                   }
                 }
               },

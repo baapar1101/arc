@@ -29,6 +29,7 @@ class InvoiceLineItem {
   // inventory/constraints
   final int? minOrderQty;
   final bool trackInventory;
+  final int? warehouseId; // انبار انتخابی برای ردیف
 
   // presentation
   String? description;
@@ -52,6 +53,7 @@ class InvoiceLineItem {
     this.basePurchasePriceMainUnit,
     this.minOrderQty,
     this.trackInventory = false,
+    this.warehouseId,
   });
 
   InvoiceLineItem copyWith({
@@ -73,6 +75,7 @@ class InvoiceLineItem {
     num? basePurchasePriceMainUnit,
     int? minOrderQty,
     bool? trackInventory,
+    int? warehouseId,
   }) {
     return InvoiceLineItem(
       productId: productId ?? this.productId,
@@ -93,6 +96,7 @@ class InvoiceLineItem {
       basePurchasePriceMainUnit: basePurchasePriceMainUnit ?? this.basePurchasePriceMainUnit,
       minOrderQty: minOrderQty ?? this.minOrderQty,
       trackInventory: trackInventory ?? this.trackInventory,
+      warehouseId: warehouseId ?? this.warehouseId,
     );
   }
 

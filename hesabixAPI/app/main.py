@@ -36,6 +36,7 @@ from adapters.api.v1.fiscal_years import router as fiscal_years_router
 from adapters.api.v1.expense_income import router as expense_income_router
 from adapters.api.v1.documents import router as documents_router
 from adapters.api.v1.kardex import router as kardex_router
+from adapters.api.v1.inventory_transfers import router as inventory_transfers_router
 from app.core.i18n import negotiate_locale, Translator
 from app.core.error_handlers import register_error_handlers
 from app.core.smart_normalizer import smart_normalize_json, SmartNormalizerConfig
@@ -321,6 +322,7 @@ def create_app() -> FastAPI:
     application.include_router(documents_router, prefix=settings.api_v1_prefix)
     application.include_router(fiscal_years_router, prefix=settings.api_v1_prefix)
     application.include_router(kardex_router, prefix=settings.api_v1_prefix)
+    application.include_router(inventory_transfers_router, prefix=settings.api_v1_prefix)
     
     # Support endpoints
     application.include_router(support_tickets_router, prefix=f"{settings.api_v1_prefix}/support")
@@ -334,6 +336,25 @@ def create_app() -> FastAPI:
     application.include_router(admin_email_config_router, prefix=settings.api_v1_prefix)
 
     register_error_handlers(application)
+
+    @application.middleware("http")
+    async def log_slow_requests(request: Request, call_next):
+        import time
+        import structlog
+        start = time.perf_counter()
+        try:
+            response = await call_next(request)
+            return response
+        finally:
+            duration_ms = int((time.perf_counter() - start) * 1000)
+            if duration_ms > 2000:
+                logger = structlog.get_logger()
+                logger.warning(
+                    "slow_request",
+                    path=str(request.url.path),
+                    method=request.method,
+                    duration_ms=duration_ms,
+                )
 
     @application.get("/", 
         summary="اطلاعات سرویس",

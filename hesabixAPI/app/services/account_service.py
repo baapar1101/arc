@@ -72,6 +72,9 @@ def update_account(
 	obj = db.get(Account, account_id)
 	if not obj:
 		return None
+	# جلوگیری از تغییر حساب‌های عمومی در لایه سرویس
+	if obj.business_id is None:
+		raise ValueError("PUBLIC_IMMUTABLE")
 	if parent_id is not None:
 		parent_id = _validate_parent(db, parent_id, obj.business_id)
 	if name is not None:
@@ -94,6 +97,12 @@ def delete_account(db: Session, account_id: int) -> bool:
 	obj = db.get(Account, account_id)
 	if not obj:
 		return False
+	# جلوگیری از حذف اگر فرزند دارد
+	if obj.children and len(obj.children) > 0:
+		raise ValueError("ACCOUNT_HAS_CHILDREN")
+	# جلوگیری از حذف اگر در اسناد استفاده شده است
+	if obj.document_lines and len(obj.document_lines) > 0:
+		raise ValueError("ACCOUNT_IN_USE")
 	db.delete(obj)
 	db.commit()
 	return True

@@ -4,11 +4,13 @@ from typing import Any, Dict, List, Optional, Tuple
 from datetime import date
 
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_, exists, select
+import logging
+from sqlalchemy import and_, or_, exists, select, Integer, cast
 
 from adapters.db.models.document import Document
 from adapters.db.models.document_line import DocumentLine
 from adapters.db.models.fiscal_year import FiscalYear
+from adapters.db.models.warehouse import Warehouse
 
 
 # Helpers (reuse existing helpers from other services when possible)
@@ -42,6 +44,14 @@ def _collect_ids(query: Dict[str, Any], key: str) -> List[int]:
 
 
 def list_kardex_lines(db: Session, business_id: int, query: Dict[str, Any]) -> Dict[str, Any]:
+    logger = logging.getLogger(__name__)
+    try:
+        logger.debug("KARDEX list_kardex_lines called | business_id=%s | keys=%s", business_id, list(query.keys()))
+        logger.debug("KARDEX filters | person_ids=%s product_ids=%s account_ids=%s match_mode=%s result_scope=%s from=%s to=%s fy=%s",
+                     query.get('person_ids'), query.get('product_ids'), query.get('account_ids'),
+                     query.get('match_mode'), query.get('result_scope'), query.get('from_date'), query.get('to_date'), query.get('fiscal_year_id'))
+    except Exception:
+        pass
     """لیست خطوط اسناد (کاردکس) با پشتیبانی از انتخاب چندگانه و حالت‌های تطابق.
 
     پارامترهای ورودی مورد انتظار در query:
@@ -97,6 +107,7 @@ def list_kardex_lines(db: Session, business_id: int, query: Dict[str, Any]) -> D
     petty_cash_ids = _collect_ids(query, "petty_cash_ids")
     account_ids = _collect_ids(query, "account_ids")
     check_ids = _collect_ids(query, "check_ids")
+    warehouse_ids = _collect_ids(query, "warehouse_ids")
 
     # Match mode
     match_mode = str(query.get("match_mode") or "any").lower()
@@ -176,6 +187,17 @@ def list_kardex_lines(db: Session, business_id: int, query: Dict[str, Any]) -> D
             # any: OR across groups on the same line
             q = q.filter(or_(*group_filters))
 
+    # Warehouse filter (JSON attribute inside extra_info)
+    if warehouse_ids:
+        try:
+            q = q.filter(cast(DocumentLine.extra_info["warehouse_id"].as_string(), Integer).in_(warehouse_ids))
+        except Exception:
+            try:
+                q = q.filter(cast(DocumentLine.extra_info["warehouse_id"].astext, Integer).in_(warehouse_ids))
+            except Exception:
+                # در صورت عدم پشتیبانی از عملگر JSON، از فیلتر نرم‌افزاری بعد از واکشی استفاده خواهد شد
+                pass
+
     # Sorting
     sort_by = (query.get("sort_by") or "document_date")
     sort_desc = bool(query.get("sort_desc", True))
@@ -206,12 +228,48 @@ def list_kardex_lines(db: Session, business_id: int, query: Dict[str, Any]) -> D
         take = 20
 
     total = q.count()
+    try:
+        logger.debug("KARDEX query total=%s (after filters)", total)
+    except Exception:
+        pass
     rows: List[Tuple[DocumentLine, Document]] = q.offset(skip).limit(take).all()
 
     # Running balance (optional)
     include_running = bool(query.get("include_running_balance", False))
     running_amount: float = 0.0
     running_quantity: float = 0.0
+
+    # گردآوری شناسه‌های انبار جهت نام‌گذاری
+    wh_ids_in_page: set[int] = set()
+    for line, _ in rows:
+        try:
+            info = line.extra_info or {}
+            wid = info.get("warehouse_id")
+            if wid is not None:
+                wh_ids_in_page.add(int(wid))
+        except Exception:
+            pass
+
+    wh_map: Dict[int, str] = {}
+    if wh_ids_in_page:
+        for w in db.query(Warehouse).filter(Warehouse.business_id == business_id, Warehouse.id.in_(list(wh_ids_in_page))).all():
+            try:
+                name = (w.name or "").strip()
+                code = (w.code or "").strip()
+                wh_map[int(w.id)] = f"{code} - {name}" if code else name
+            except Exception:
+                continue
+
+    def _movement_from_type(inv_type: str | None) -> str | None:
+        t = (inv_type or "").strip()
+        if t in ("invoice_sales",):
+            return "out"
+        if t in ("invoice_sales_return", "invoice_purchase"):
+            return "in"
+        if t in ("invoice_purchase_return", "invoice_direct_consumption", "invoice_waste"):
+            return "out"
+        # production: both in/out ممکن است
+        return None
 
     items: List[Dict[str, Any]] = []
     for line, doc in rows:
@@ -233,6 +291,20 @@ def list_kardex_lines(db: Session, business_id: int, query: Dict[str, Any]) -> D
             "petty_cash_id": line.petty_cash_id,
             "check_id": line.check_id,
         }
+
+        # movement & warehouse
+        try:
+            info = line.extra_info or {}
+            mv = info.get("movement")
+            if mv is None:
+                mv = _movement_from_type(getattr(doc, "document_type", None))
+            wid = info.get("warehouse_id")
+            item["movement"] = mv
+            item["warehouse_id"] = int(wid) if wid is not None else None
+            if wid is not None:
+                item["warehouse_name"] = wh_map.get(int(wid))
+        except Exception:
+            pass
 
         if include_running:
             try:

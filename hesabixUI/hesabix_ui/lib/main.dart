@@ -45,6 +45,7 @@ import 'pages/business/expense_income_list_page.dart';
 import 'pages/business/transfers_page.dart';
 import 'pages/business/documents_page.dart';
 import 'pages/business/warehouses_page.dart';
+import 'pages/business/inventory_transfers_page.dart';
 import 'pages/error_404_page.dart';
 import 'core/locale_controller.dart';
 import 'core/calendar_controller.dart';
@@ -639,10 +640,37 @@ class _MyAppState extends State<MyApp> {
               name: 'business_reports_kardex',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
+                // Parse person_id(s) from query
+                final qp = state.uri.queryParameters;
+                final qpAll = state.uri.queryParametersAll;
+                final Set<int> initialPersonIds = <int>{};
+                final single = int.tryParse(qp['person_id'] ?? '');
+                if (single != null) initialPersonIds.add(single);
+                final multi = (qpAll['person_id'] ?? const <String>[]) 
+                    .map((e) => int.tryParse(e))
+                    .whereType<int>();
+                initialPersonIds.addAll(multi);
+                // Also parse from extra
+                try {
+                  if (state.extra is Map) {
+                    final extra = state.extra as Map;
+                    final list = extra['person_ids'];
+                    if (list is List) {
+                      for (final v in list) {
+                        if (v is int) initialPersonIds.add(v);
+                        else {
+                          final p = int.tryParse('$v');
+                          if (p != null) initialPersonIds.add(p);
+                        }
+                      }
+                    }
+                  }
+                } catch (_) {}
                 return NoTransitionPage(
                   child: KardexPage(
                     businessId: businessId,
                     calendarController: _calendarController!,
+                    initialPersonIds: initialPersonIds.toList(),
                   ),
                 );
               },
@@ -804,6 +832,19 @@ class _MyAppState extends State<MyApp> {
                 return NoTransitionPage(
                   child: WarehousesPage(
                     businessId: businessId,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/inventory-transfers',
+              name: 'business_inventory_transfers',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return NoTransitionPage(
+                  child: InventoryTransfersPage(
+                    businessId: businessId,
+                    calendarController: _calendarController!,
                   ),
                 );
               },

@@ -54,6 +54,23 @@ def _get_costing_method(data: Dict[str, Any]) -> str:
         return "average"
 
 
+def _is_inventory_posting_enabled(data: Dict[str, Any]) -> bool:
+    """خواندن فلگ ثبت اسناد انبار از extra_info. پیش‌فرض: فعال (True)."""
+    try:
+        extra = data.get("extra_info") or {}
+        val = extra.get("post_inventory")
+        if val is None:
+            return True
+        if isinstance(val, bool):
+            return val
+        if isinstance(val, (int, float)):
+            return bool(val)
+        s = str(val).strip().lower()
+        return s not in ("false", "0", "no", "off")
+    except Exception:
+        return True
+
+
 def _iter_product_movements(
     db: Session,
     business_id: int,
@@ -94,6 +111,13 @@ def _iter_product_movements(
     movements = []
     for line, doc in rows:
         info = line.extra_info or {}
+        # اگر خط صراحتاً به عنوان عدم ثبت انبار علامت‌گذاری شده، از حرکت صرف‌نظر کن
+        try:
+            posted = info.get("inventory_posted")
+            if posted is False:
+                continue
+        except Exception:
+            pass
         movement = (info.get("movement") or None)
         wh_id = info.get("warehouse_id")
         if movement is None:
@@ -319,9 +343,19 @@ def _get_fixed_account_by_code(db: Session, account_code: str) -> Account:
     return account
 
 
-def _get_person_control_account(db: Session) -> Account:
-    # عمومی اشخاص (پرداختنی/دریافتنی) پیش‌فرض: 20201
-    return _get_fixed_account_by_code(db, "20201")
+def _get_person_control_account(db: Session, invoice_type: str | None = None) -> Account:
+    # انتخاب حساب طرف‌شخص بر اساس نوع فاکتور
+    # فروش/برگشت از فروش → دریافتنی ها 10401
+    # خرید/برگشت از خرید → پرداختنی ها 20201 (پیش‌فرض)
+    try:
+        inv_type = (invoice_type or "").strip()
+        if inv_type in {INVOICE_SALES, INVOICE_SALES_RETURN}:
+            return _get_fixed_account_by_code(db, "10401")
+        # سایر موارد (شامل خرید/برگشت از خرید)
+        return _get_fixed_account_by_code(db, "20201")
+    except Exception:
+        # fallback امن
+        return _get_fixed_account_by_code(db, "20201")
 
 
 def _build_doc_code(prefix_base: str) -> str:
@@ -368,6 +402,9 @@ def _extract_cogs_total(lines: List[Dict[str, Any]]) -> Decimal:
         # فقط برای کالاهای دارای کنترل موجودی
         if not bool(info.get("inventory_tracked")):
             continue
+        # اگر خط برای انبار پست نشده، در COGS لحاظ نشود
+        if info.get("inventory_posted") is False:
+            continue
         qty = Decimal(str(line.get("quantity", 0) or 0))
         if info.get("cogs_amount") is not None:
             total += Decimal(str(info.get("cogs_amount")))
@@ -386,23 +423,111 @@ def _extract_cogs_total(lines: List[Dict[str, Any]]) -> Decimal:
 def _resolve_accounts_for_invoice(db: Session, data: Dict[str, Any]) -> Dict[str, Account]:
     # امکان override از extra_info.account_codes
     overrides = ((data.get("extra_info") or {}).get("account_codes") or {})
+    invoice_type = str(data.get("invoice_type", "")).strip()
 
     def code(name: str, default_code: str) -> str:
         return str(overrides.get(name) or default_code)
 
     return {
-        "revenue": _get_fixed_account_by_code(db, code("revenue", "70101")),
-        "sales_return": _get_fixed_account_by_code(db, code("sales_return", "70102")),
-        "inventory": _get_fixed_account_by_code(db, code("inventory", "10301")),
-        "inventory_finished": _get_fixed_account_by_code(db, code("inventory_finished", "10302")),
-        "cogs": _get_fixed_account_by_code(db, code("cogs", "60101")),
-        "vat_out": _get_fixed_account_by_code(db, code("vat_out", "20801")),
-        "vat_in": _get_fixed_account_by_code(db, code("vat_in", "10801")),
-        "direct_consumption": _get_fixed_account_by_code(db, code("direct_consumption", "60201")),
-        "wip": _get_fixed_account_by_code(db, code("wip", "60301")),
-        "waste_expense": _get_fixed_account_by_code(db, code("waste_expense", "60401")),
-        "person": _get_person_control_account(db),
+        # درآمد و برگشت فروش مطابق چارت سید:
+        "revenue": _get_fixed_account_by_code(db, code("revenue", "50001")),
+        "sales_return": _get_fixed_account_by_code(db, code("sales_return", "50002")),
+        # موجودی و ساخته‌شده (در نبود حساب مجزا) هر دو 10102
+        "inventory": _get_fixed_account_by_code(db, code("inventory", "10102")),
+        "inventory_finished": _get_fixed_account_by_code(db, code("inventory_finished", "10102")),
+        # بهای تمام شده و VAT ها مطابق سید
+        "cogs": _get_fixed_account_by_code(db, code("cogs", "40001")),
+        "vat_out": _get_fixed_account_by_code(db, code("vat_out", "20101")),
+        "vat_in": _get_fixed_account_by_code(db, code("vat_in", "10104")),
+        # مصرف مستقیم و ضایعات
+        "direct_consumption": _get_fixed_account_by_code(db, code("direct_consumption", "70406")),
+        "wip": _get_fixed_account_by_code(db, code("wip", "10106")),
+        "waste_expense": _get_fixed_account_by_code(db, code("waste_expense", "70407")),
+        # طرف‌شخص بر اساس نوع فاکتور
+        "person": _get_person_control_account(db, invoice_type),
     }
+
+
+def _calculate_seller_commission(
+    db: Session,
+    invoice_type: str,
+    header_extra: Dict[str, Any],
+    totals: Dict[str, Any],
+) -> Tuple[int | None, Decimal]:
+    """محاسبه پورسانت فروشنده/بازاریاب بر اساس تنظیمات شخص یا override در فاکتور.
+
+    Returns: (seller_id, commission_amount)
+    """
+    try:
+        ei = header_extra or {}
+        seller_id_raw = ei.get("seller_id")
+        seller_id: int | None = int(seller_id_raw) if seller_id_raw is not None else None
+    except Exception:
+        seller_id = None
+    if not seller_id:
+        return (None, Decimal(0))
+
+    # مبنای محاسبه
+    gross = Decimal(str((totals or {}).get("gross", 0)))
+    discount = Decimal(str((totals or {}).get("discount", 0)))
+    net = gross - discount
+
+    # اگر در فاکتور override شده باشد، همان اعمال شود
+    commission_cfg = ei.get("commission") if isinstance(ei.get("commission"), dict) else None
+    if commission_cfg:
+        value = Decimal(str(commission_cfg.get("value", 0))) if commission_cfg.get("value") is not None else Decimal(0)
+        ctype = (commission_cfg.get("type") or "").strip().lower()
+        if value <= 0:
+            return (seller_id, Decimal(0))
+        if ctype == "percentage":
+            amount = (net * value) / Decimal(100)
+            return (seller_id, amount)
+        if ctype == "amount":
+            return (seller_id, value)
+        return (seller_id, Decimal(0))
+
+    # در غیر اینصورت، از تنظیمات شخص استفاده می‌کنیم
+    person = db.query(Person).filter(Person.id == seller_id).first()
+    if not person:
+        return (seller_id, Decimal(0))
+
+    # اگر شخص اجازه‌ی ثبت پورسانت در سند فاکتور را نداده است، صفر برگردان
+    try:
+        if not bool(getattr(person, "commission_post_in_invoice_document", False)):
+            return (seller_id, Decimal(0))
+    except Exception:
+        pass
+
+    exclude_discounts = bool(getattr(person, "commission_exclude_discounts", False))
+    base_amount = gross if exclude_discounts else net
+
+    amount = Decimal(0)
+    if invoice_type == INVOICE_SALES:
+        percent = getattr(person, "commission_sale_percent", None)
+        fixed = getattr(person, "commission_sales_amount", None)
+    elif invoice_type == INVOICE_SALES_RETURN:
+        percent = getattr(person, "commission_sales_return_percent", None)
+        fixed = getattr(person, "commission_sales_return_amount", None)
+    else:
+        percent = None
+        fixed = None
+
+    if percent is not None:
+        try:
+            p = Decimal(str(percent))
+            if p > 0:
+                amount = (base_amount * p) / Decimal(100)
+        except Exception:
+            pass
+    elif fixed is not None:
+        try:
+            f = Decimal(str(fixed))
+            if f > 0:
+                amount = f
+        except Exception:
+            pass
+
+    return (seller_id, amount)
 
 
 def _person_id_from_header(data: Dict[str, Any]) -> Optional[int]:
@@ -492,6 +617,7 @@ def create_invoice(
         totals = _extract_totals_from_lines(lines_input)
 
     # Inventory validation and costing pre-calculation
+    post_inventory: bool = _is_inventory_posting_enabled(data)
     # Determine outgoing lines for stock checks
     movement_hint, _ = _movement_from_type(invoice_type)
     outgoing_lines: List[Dict[str, Any]] = []
@@ -518,6 +644,17 @@ def create_invoice(
         info = dict(ln.get("extra_info") or {})
         info["inventory_tracked"] = bool(track_map.get(int(pid), False))
         ln["extra_info"] = info
+    # اگر ثبت انبار فعال است، اطمینان از وجود انبار برای خطوط دارای حرکت
+    if post_inventory:
+        for ln in lines_input:
+            info = ln.get("extra_info") or {}
+            inv_tracked = bool(info.get("inventory_tracked"))
+            mv = info.get("movement") or movement_hint
+            if inv_tracked and mv in ("in", "out"):
+                wh = info.get("warehouse_id")
+                if wh is None:
+                    raise ApiError("WAREHOUSE_REQUIRED", "برای ردیف‌های دارای حرکت انبار، انتخاب انبار الزامی است", http_status=400)
+
 
     # Filter outgoing lines to only inventory-tracked products for stock checks
     tracked_outgoing_lines: List[Dict[str, Any]] = []
@@ -527,12 +664,12 @@ def create_invoice(
             tracked_outgoing_lines.append(ln)
 
     # Ensure stock sufficiency for outgoing (only for tracked products)
-    if tracked_outgoing_lines:
+    if post_inventory and tracked_outgoing_lines:
         _ensure_stock_sufficient(db, business_id, document_date, tracked_outgoing_lines)
 
     # Costing method (only for tracked products)
     costing_method = _get_costing_method(data)
-    if costing_method == "fifo" and tracked_outgoing_lines:
+    if post_inventory and costing_method == "fifo" and tracked_outgoing_lines:
         fifo_costs = _calculate_fifo_cogs_for_outgoing(db, business_id, document_date, tracked_outgoing_lines)
         # annotate lines with cogs_amount in the same order as tracked_outgoing_lines
         i = 0
@@ -580,7 +717,9 @@ def create_invoice(
         qty = Decimal(str(line.get("quantity", 0) or 0))
         if not product_id or qty <= 0:
             raise ApiError("INVALID_LINE", "line.product_id and positive quantity are required", http_status=400)
-        extra_info = line.get("extra_info") or {}
+        extra_info = dict(line.get("extra_info") or {})
+        # علامت‌گذاری اینکه این خط در انبار پست شده/نشده است
+        extra_info["inventory_posted"] = bool(post_inventory)
         db.add(DocumentLine(
             document_id=document.id,
             product_id=int(product_id),
@@ -599,7 +738,7 @@ def create_invoice(
         tax = Decimal(str(totals["tax"]))
         total_with_tax = net + tax
 
-        # COGS when applicable
+        # COGS when applicable (خطوط غیرپست انبار، در COGS لحاظ نمی‌شوند)
         cogs_total = _extract_cogs_total(lines_input)
 
         # Sales
@@ -645,6 +784,51 @@ def create_invoice(
                     credit=cogs_total,
                     description="خروج از موجودی بابت فروش",
                 ))
+
+            # --- پورسانت فروشنده/بازاریاب (در صورت وجود) ---
+        # محاسبه و ثبت پورسانت برای فروش و برگشت از فروش
+        if invoice_type in (INVOICE_SALES, INVOICE_SALES_RETURN):
+            seller_id, commission_amount = _calculate_seller_commission(db, invoice_type, header_extra, totals)
+            if seller_id and commission_amount > 0:
+                # هزینه پورسانت: 70702، بستانکار: پرداختنی به فروشنده 20201
+                commission_expense = _get_fixed_account_by_code(db, "70702")
+                seller_payable = _get_fixed_account_by_code(db, "20201")
+                if invoice_type == INVOICE_SALES:
+                    # بدهکار هزینه، بستانکار فروشنده
+                    db.add(DocumentLine(
+                        document_id=document.id,
+                        account_id=commission_expense.id,
+                        debit=commission_amount,
+                        credit=Decimal(0),
+                        description="هزینه پورسانت فروش",
+                    ))
+                    db.add(DocumentLine(
+                        document_id=document.id,
+                        account_id=seller_payable.id,
+                        person_id=int(seller_id),
+                        debit=Decimal(0),
+                        credit=commission_amount,
+                        description="بابت پورسانت فروشنده/بازاریاب",
+                        extra_info={"seller_id": int(seller_id)},
+                    ))
+                else:
+                    # برگشت از فروش: معکوس
+                    db.add(DocumentLine(
+                        document_id=document.id,
+                        account_id=seller_payable.id,
+                        person_id=int(seller_id),
+                        debit=commission_amount,
+                        credit=Decimal(0),
+                        description="تعدیل پورسانت فروشنده بابت برگشت از فروش",
+                        extra_info={"seller_id": int(seller_id)},
+                    ))
+                    db.add(DocumentLine(
+                        document_id=document.id,
+                        account_id=commission_expense.id,
+                        debit=Decimal(0),
+                        credit=commission_amount,
+                        description="تعدیل هزینه پورسانت",
+                    ))
 
         # Sales Return
         elif invoice_type == INVOICE_SALES_RETURN:
@@ -957,6 +1141,16 @@ def update_invoice(
         info = dict(ln.get("extra_info") or {})
         info["inventory_tracked"] = bool(track_map.get(int(pid), False))
         ln["extra_info"] = info
+    # اگر ثبت انبار فعال است، اطمینان از وجود انبار برای خطوط دارای حرکت
+    if post_inventory_update:
+        for ln in lines_input:
+            info = ln.get("extra_info") or {}
+            inv_tracked = bool(info.get("inventory_tracked"))
+            mv = info.get("movement") or movement_hint
+            if inv_tracked and mv in ("in", "out"):
+                wh = info.get("warehouse_id")
+                if wh is None:
+                    raise ApiError("WAREHOUSE_REQUIRED", "برای ردیف‌های دارای حرکت انبار، انتخاب انبار الزامی است", http_status=400)
 
     tracked_outgoing_lines: List[Dict[str, Any]] = []
     for ln in outgoing_lines:
@@ -964,12 +1158,13 @@ def update_invoice(
         if pid and track_map.get(int(pid)):
             tracked_outgoing_lines.append(ln)
 
-    if tracked_outgoing_lines:
+    header_for_costing = data if data else {"extra_info": document.extra_info}
+    post_inventory_update: bool = _is_inventory_posting_enabled(header_for_costing)
+    if post_inventory_update and tracked_outgoing_lines:
         _ensure_stock_sufficient(db, document.business_id, document.document_date, tracked_outgoing_lines, exclude_document_id=document.id)
 
-    header_for_costing = data if data else {"extra_info": document.extra_info}
     costing_method = _get_costing_method(header_for_costing)
-    if costing_method == "fifo" and tracked_outgoing_lines:
+    if post_inventory_update and costing_method == "fifo" and tracked_outgoing_lines:
         fifo_costs = _calculate_fifo_cogs_for_outgoing(db, document.business_id, document.document_date, tracked_outgoing_lines, exclude_document_id=document.id)
         i = 0
         for ln in lines_input:
@@ -987,7 +1182,8 @@ def update_invoice(
         qty = Decimal(str(line.get("quantity", 0) or 0))
         if not product_id or qty <= 0:
             raise ApiError("INVALID_LINE", "line.product_id and positive quantity are required", http_status=400)
-        extra_info = line.get("extra_info") or {}
+        extra_info = dict(line.get("extra_info") or {})
+        extra_info["inventory_posted"] = bool(post_inventory_update)
         db.add(DocumentLine(
             document_id=document.id,
             product_id=int(product_id),
@@ -1000,7 +1196,8 @@ def update_invoice(
 
     # Accounting lines if finalized
     if not document.is_proforma:
-        accounts = _resolve_accounts_for_invoice(db, data if data else {"extra_info": document.extra_info})
+        header_for_accounts: Dict[str, Any] = {"invoice_type": inv_type, **(data or {"extra_info": document.extra_info})}
+        accounts = _resolve_accounts_for_invoice(db, header_for_accounts)
         header_extra = data.get("extra_info") or document.extra_info or {}
         totals = (header_extra.get("totals") or {})
         if not totals:
@@ -1058,6 +1255,47 @@ def update_invoice(
             if finished_cost > 0:
                 db.add(DocumentLine(document_id=document.id, account_id=accounts["inventory_finished"].id, debit=finished_cost, credit=Decimal(0), description="ورود ساخته‌شده"))
                 db.add(DocumentLine(document_id=document.id, account_id=accounts["wip"].id, debit=Decimal(0), credit=finished_cost, description="انتقال از کاردرجریان"))
+
+        # --- پورسانت فروشنده/بازاریاب (به‌صورت تکمیلی) ---
+        if inv_type in (INVOICE_SALES, INVOICE_SALES_RETURN):
+            seller_id, commission_amount = _calculate_seller_commission(db, inv_type, header_extra, totals)
+            if seller_id and commission_amount > 0:
+                commission_expense = _get_fixed_account_by_code(db, "70702")
+                seller_payable = _get_fixed_account_by_code(db, "20201")
+                if inv_type == INVOICE_SALES:
+                    db.add(DocumentLine(
+                        document_id=document.id,
+                        account_id=commission_expense.id,
+                        debit=commission_amount,
+                        credit=Decimal(0),
+                        description="هزینه پورسانت فروش",
+                    ))
+                    db.add(DocumentLine(
+                        document_id=document.id,
+                        account_id=seller_payable.id,
+                        person_id=int(seller_id),
+                        debit=Decimal(0),
+                        credit=commission_amount,
+                        description="بابت پورسانت فروشنده/بازاریاب",
+                        extra_info={"seller_id": int(seller_id)},
+                    ))
+                else:
+                    db.add(DocumentLine(
+                        document_id=document.id,
+                        account_id=seller_payable.id,
+                        person_id=int(seller_id),
+                        debit=commission_amount,
+                        credit=Decimal(0),
+                        description="تعدیل پورسانت فروشنده بابت برگشت از فروش",
+                        extra_info={"seller_id": int(seller_id)},
+                    ))
+                    db.add(DocumentLine(
+                        document_id=document.id,
+                        account_id=commission_expense.id,
+                        debit=Decimal(0),
+                        credit=commission_amount,
+                        description="تعدیل هزینه پورسانت",
+                    ))
 
     db.commit()
     db.refresh(document)

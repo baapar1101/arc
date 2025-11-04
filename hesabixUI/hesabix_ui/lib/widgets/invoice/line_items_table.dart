@@ -5,12 +5,14 @@ import './product_combobox_widget.dart';
 // import './price_list_combobox_widget.dart';
 import '../../services/price_list_service.dart';
 import '../../core/api_client.dart';
+import './warehouse_combobox_widget.dart';
 
 class InvoiceLineItemsTable extends StatefulWidget {
   final int businessId;
   final int? selectedCurrencyId; // از تب ارز فاکتور
   final ValueChanged<List<InvoiceLineItem>>? onChanged;
   final String invoiceType; // sales | purchase | sales_return | purchase_return | ...
+  final bool postInventory;
 
   const InvoiceLineItemsTable({
     super.key,
@@ -18,6 +20,7 @@ class InvoiceLineItemsTable extends StatefulWidget {
     this.selectedCurrencyId,
     this.onChanged,
     this.invoiceType = 'sales',
+    this.postInventory = true,
   });
 
   @override
@@ -272,6 +275,15 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
             ),
           ),
           const SizedBox(width: 8),
+          if (widget.postInventory)
+            Expanded(
+              flex: 2,
+              child: Tooltip(
+                message: 'انبار',
+                child: Text('انبار', style: style),
+              ),
+            ),
+          const SizedBox(width: 8),
           Expanded(
             flex: 3,
             child: Tooltip(
@@ -392,6 +404,24 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                 }),
               ),
               const SizedBox(width: 8),
+              if (widget.postInventory)
+                Flexible(
+                  flex: 2,
+                  child: SizedBox(
+                    height: 36,
+                    child: WarehouseComboboxWidget(
+                      businessId: widget.businessId,
+                      selectedWarehouseId: item.warehouseId,
+                      onChanged: (wid) {
+                        _updateRow(index, item.copyWith(warehouseId: wid));
+                      },
+                      label: 'انبار',
+                      hintText: 'انتخاب انبار',
+                      isRequired: item.trackInventory,
+                    ),
+                  ),
+                ),
+              if (widget.postInventory) const SizedBox(width: 8),
               Flexible(
                 flex: 3,
                 child: SizedBox(

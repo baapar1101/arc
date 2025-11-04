@@ -19,6 +19,10 @@ class Settings(BaseSettings):
 	db_port: int = 3306
 	db_name: str = "hesabix"
 	sqlalchemy_echo: bool = False
+	# DB Pooling
+	db_pool_size: int = 10
+	db_max_overflow: int = 20
+	db_pool_timeout: int = 10
 
 	# Logging
 	log_level: str = "INFO"

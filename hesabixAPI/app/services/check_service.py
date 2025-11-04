@@ -178,32 +178,34 @@ def create_check(db: Session, business_id: int, user_id: int, data: Dict[str, An
                     "check_id": obj.id,
                 })
 
-            # ایجاد سند
-            document = Document(
-                code=f"CHK-{document_date.strftime('%Y%m%d')}-{int(datetime.utcnow().timestamp())%100000}",
-                business_id=business_id,
-                fiscal_year_id=fiscal_year.id,
-                currency_id=int(data.get("currency_id")),
-                created_by_user_id=int(user_id),
-                document_date=document_date,
-                document_type="check",
-                is_proforma=False,
-                description=description,
-                extra_info={
-                    "source": "check_create",
-                    "check_id": obj.id,
-                    "check_type": ctype,
-                },
-            )
-            db.add(document)
-            db.flush()
+            # ایجاد سند (اگر چک واگذار شخص ندارد، از ثبت سند صرف‌نظر میشود)
+            skip_autopost = (ctype == "transferred" and not person_id)
+            if not skip_autopost:
+                document = Document(
+                    code=f"CHK-{document_date.strftime('%Y%m%d')}-{int(datetime.utcnow().timestamp())%100000}",
+                    business_id=business_id,
+                    fiscal_year_id=fiscal_year.id,
+                    currency_id=int(data.get("currency_id")),
+                    created_by_user_id=int(user_id),
+                    document_date=document_date,
+                    document_type="check",
+                    is_proforma=False,
+                    description=description,
+                    extra_info={
+                        "source": "check_create",
+                        "check_id": obj.id,
+                        "check_type": ctype,
+                    },
+                )
+                db.add(document)
+                db.flush()
 
-            for line in lines:
-                db.add(DocumentLine(document_id=document.id, **line))
+                for line in lines:
+                    db.add(DocumentLine(document_id=document.id, **line))
 
-            db.commit()
-            db.refresh(document)
-            created_document_id = document.id
+                db.commit()
+                db.refresh(document)
+                created_document_id = document.id
     except Exception:
         # در صورت شکست ایجاد سند، تغییری در ایجاد چک نمی‌دهیم و خطا نمی‌ریزیم
         # (می‌توان رفتار را سخت‌گیرانه کرد و رول‌بک نمود؛ فعلاً نرم)
@@ -335,7 +337,8 @@ def clear_check(db: Session, check_id: int, user_id: int, data: Dict[str, Any]) 
     lines: List[Dict[str, Any]] = []
 
     if obj.type == CheckType.RECEIVED:
-        # Dr 10203 (bank), Cr 10403
+        # Dr 10203 (bank), Cr 10403 یا 10404 بسته به وضعیت
+        credit_code = "10404" if obj.status == CheckStatus.DEPOSITED else "10403"
         lines.append({
             "account_id": _ensure_account(db, "10203"),
             "bank_account_id": int(data.get("bank_account_id")),
@@ -345,7 +348,7 @@ def clear_check(db: Session, check_id: int, user_id: int, data: Dict[str, Any]) 
             "check_id": obj.id,
         })
         lines.append({
-            "account_id": _ensure_account(db, "10403"),
+            "account_id": _ensure_account(db, credit_code),
             "debit": Decimal(0),
             "credit": amount_dec,
             "description": description or "وصول چک",
@@ -483,23 +486,45 @@ def bounce_check(db: Session, check_id: int, user_id: int, data: Dict[str, Any])
     lines: List[Dict[str, Any]] = []
 
     if obj.type == CheckType.RECEIVED:
-        # Reverse cash if previously cleared; simplified: Dr 10403, Cr 10203
+        # فقط از وضعیتهای DEPOSITED یا CLEARED اجازه برگشت
+        if obj.status not in (CheckStatus.DEPOSITED, CheckStatus.CLEARED):
+            raise ApiError("INVALID_STATE", f"Cannot bounce from status {obj.status}", http_status=400)
         bank_account_id = data.get("bank_account_id")
-        lines.append({
-            "account_id": _ensure_account(db, "10403"),
-            "debit": amount_dec,
-            "credit": Decimal(0),
-            "description": description or "برگشت چک",
-            "check_id": obj.id,
-        })
-        lines.append({
-            "account_id": _ensure_account(db, "10203"),
-            **({"bank_account_id": int(bank_account_id)} if bank_account_id else {}),
-            "debit": Decimal(0),
-            "credit": amount_dec,
-            "description": description or "برگشت چک",
-            "check_id": obj.id,
-        })
+        if obj.status == CheckStatus.DEPOSITED:
+            # Dr 10403, Cr 10404
+            lines.append({
+                "account_id": _ensure_account(db, "10403"),
+                "debit": amount_dec,
+                "credit": Decimal(0),
+                "description": description or "برگشت چک",
+                "check_id": obj.id,
+            })
+            lines.append({
+                "account_id": _ensure_account(db, "10404"),
+                "debit": Decimal(0),
+                "credit": amount_dec,
+                "description": description or "برگشت چک",
+                "check_id": obj.id,
+            })
+        else:
+            # CLEARED: Dr 10403, Cr 10203 (نیازمند bank_account_id)
+            if not bank_account_id:
+                raise ApiError("BANK_ACCOUNT_REQUIRED", "bank_account_id is required to bounce a cleared check", http_status=400)
+            lines.append({
+                "account_id": _ensure_account(db, "10403"),
+                "debit": amount_dec,
+                "credit": Decimal(0),
+                "description": description or "برگشت چک",
+                "check_id": obj.id,
+            })
+            lines.append({
+                "account_id": _ensure_account(db, "10203"),
+                "bank_account_id": int(bank_account_id),
+                "debit": Decimal(0),
+                "credit": amount_dec,
+                "description": description or "برگشت چک",
+                "check_id": obj.id,
+            })
     else:
         # transferred: Dr 20202, Cr 20201(person) (increase AP again)
         if not obj.person_id:

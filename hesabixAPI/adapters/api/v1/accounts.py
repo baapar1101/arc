@@ -31,7 +31,16 @@ def _build_tree(nodes: list[Dict[str, Any]]) -> list[AccountTreeNode]:
 	roots: list[AccountTreeNode] = []
 	for n in nodes:
 		node = AccountTreeNode(
-			id=n['id'], code=n['code'], name=n['name'], account_type=n.get('account_type'), parent_id=n.get('parent_id')
+			id=n['id'],
+			code=n['code'],
+			name=n['name'],
+			account_type=n.get('account_type'),
+			parent_id=n.get('parent_id'),
+			business_id=n.get('business_id'),
+			is_public=n.get('is_public'),
+			has_children=n.get('has_children'),
+			can_edit=n.get('can_edit'),
+			can_delete=n.get('can_delete'),
 		)
 		by_id[node.id] = node
 	for node in list(by_id.values()):
@@ -58,10 +67,29 @@ def get_accounts_tree(
 	rows = db.query(Account).filter(
 		(Account.business_id == None) | (Account.business_id == business_id)  # noqa: E711
 	).order_by(Account.code.asc()).all()
-	flat = [
-		{"id": r.id, "code": r.code, "name": r.name, "account_type": r.account_type, "parent_id": r.parent_id}
-		for r in rows
-	]
+	# محاسبه has_children با شمارش فرزندان در مجموعه
+	children_map: dict[int, int] = {}
+	for r in rows:
+		if r.parent_id:
+			children_map[r.parent_id] = children_map.get(r.parent_id, 0) + 1
+	flat: list[Dict[str, Any]] = []
+	for r in rows:
+		is_public = r.business_id is None
+		has_children = children_map.get(r.id, 0) > 0
+		can_edit = (r.business_id == business_id) and True  # شرط دسترسی نوشتن پایین‌تر بررسی می‌شود در UI/Endpoint
+		can_delete = can_edit and (not has_children)
+		flat.append({
+			"id": r.id,
+			"code": r.code,
+			"name": r.name,
+			"account_type": r.account_type,
+			"parent_id": r.parent_id,
+			"business_id": r.business_id,
+			"is_public": is_public,
+			"has_children": has_children,
+			"can_edit": can_edit,
+			"can_delete": can_delete,
+		})
 	tree = _build_tree(flat)
 	return success_response({"items": [n.model_dump() for n in tree]}, request)
 
@@ -214,6 +242,17 @@ def create_business_account(
 	# اجازه نوشتن در بخش حسابداری لازم است
 	if not ctx.can_write_section("accounting"):
 		raise ApiError("FORBIDDEN", "Missing write permission for accounting", http_status=403)
+	# والد اجباری است
+	if body.parent_id is None:
+		raise ApiError("PARENT_REQUIRED", "Parent account is required", http_status=400)
+	# اگر والد عمومی است باید قبلا دارای زیرمجموعه باشد (اجازه ایجاد زیر شاخه برای برگ عمومی را نمی‌دهیم)
+	parent = db.get(Account, int(body.parent_id)) if body.parent_id is not None else None
+	if parent is None:
+		raise ApiError("PARENT_NOT_FOUND", "Parent account not found", http_status=400)
+	if parent.business_id is None:
+		# lazy-load children count
+		if not parent.children or len(parent.children) == 0:
+			raise ApiError("INVALID_PUBLIC_PARENT", "Cannot add child under a public leaf account", http_status=400)
 	try:
 		created = create_account(
 			db,
@@ -238,7 +277,7 @@ def create_business_account(
 @router.put(
 	"/account/{account_id}",
 	summary="ویرایش حساب",
-	description="ویرایش حساب عمومی (فقط سوپرادمین) یا حساب اختصاصی بیزنس (دارای دسترسی write).",
+	description="ویرایش حساب اختصاصی بیزنس (دارای دسترسی write). حساب‌های عمومی غیرقابل‌ویرایش هستند.",
 )
 def update_account_endpoint(
 	request: Request,
@@ -251,9 +290,9 @@ def update_account_endpoint(
 	if not data:
 		raise ApiError("ACCOUNT_NOT_FOUND", "Account not found", http_status=404)
 	acc_business_id = data.get("business_id")
-	# اگر عمومی است، فقط سوپرادمین
-	if acc_business_id is None and not ctx.is_superadmin():
-		raise ApiError("FORBIDDEN", "Only superadmin can edit public accounts", http_status=403)
+	# حساب‌های عمومی غیرقابل‌ویرایش هستند
+	if acc_business_id is None:
+		raise ApiError("FORBIDDEN", "Public accounts are immutable", http_status=403)
 	# اگر متعلق به بیزنس است باید دسترسی داشته باشد و write accounting داشته باشد
 	if acc_business_id is not None:
 		if not ctx.can_access_business(int(acc_business_id)):
@@ -280,13 +319,15 @@ def update_account_endpoint(
 			raise ApiError("PARENT_NOT_FOUND", "Parent account not found", http_status=400)
 		if code == "INVALID_PARENT_BUSINESS":
 			raise ApiError("INVALID_PARENT_BUSINESS", "Parent must be public or within the same business", http_status=400)
+		if code == "PUBLIC_IMMUTABLE":
+			raise ApiError("FORBIDDEN", "Public accounts are immutable", http_status=403)
 		raise
 
 
 @router.delete(
 	"/account/{account_id}",
 	summary="حذف حساب",
-	description="حذف حساب عمومی (فقط سوپرادمین) یا حساب اختصاصی بیزنس (دارای دسترسی write).",
+	description="حذف حساب اختصاصی بیزنس (دارای دسترسی write). حساب‌های عمومی غیرقابل‌حذف هستند.",
 )
 def delete_account_endpoint(
 	request: Request,
@@ -298,16 +339,25 @@ def delete_account_endpoint(
 	if not data:
 		raise ApiError("ACCOUNT_NOT_FOUND", "Account not found", http_status=404)
 	acc_business_id = data.get("business_id")
-	if acc_business_id is None and not ctx.is_superadmin():
-		raise ApiError("FORBIDDEN", "Only superadmin can delete public accounts", http_status=403)
+	# حساب‌های عمومی غیرقابل‌حذف هستند
+	if acc_business_id is None:
+		raise ApiError("FORBIDDEN", "Public accounts are immutable", http_status=403)
 	if acc_business_id is not None:
 		if not ctx.can_access_business(int(acc_business_id)):
 			raise ApiError("FORBIDDEN", "No access to business", http_status=403)
 		if not ctx.can_write_section("accounting"):
 			raise ApiError("FORBIDDEN", "Missing write permission for accounting", http_status=403)
-	ok = delete_account(db, account_id)
-	if not ok:
-		raise ApiError("ACCOUNT_NOT_FOUND", "Account not found", http_status=404)
-	return success_response(None, request, message="ACCOUNT_DELETED")
+	try:
+		ok = delete_account(db, account_id)
+		if not ok:
+			raise ApiError("ACCOUNT_NOT_FOUND", "Account not found", http_status=404)
+		return success_response(None, request, message="ACCOUNT_DELETED")
+	except ValueError as e:
+		code = str(e)
+		if code == "ACCOUNT_HAS_CHILDREN":
+			raise ApiError("ACCOUNT_HAS_CHILDREN", "Cannot delete account with children", http_status=400)
+		if code == "ACCOUNT_IN_USE":
+			raise ApiError("ACCOUNT_IN_USE", "Cannot delete account that is referenced by documents", http_status=400)
+		raise
 
 

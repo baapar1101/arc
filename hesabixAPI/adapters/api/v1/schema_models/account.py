@@ -10,6 +10,11 @@ class AccountTreeNode(BaseModel):
 	name: str = Field(..., description="نام حساب")
 	account_type: Optional[str] = Field(default=None, description="نوع حساب")
 	parent_id: Optional[int] = Field(default=None, description="شناسه والد")
+	business_id: Optional[int] = Field(default=None, description="شناسه کسب‌وکار؛ اگر تهی باشد حساب عمومی است")
+	is_public: Optional[bool] = Field(default=None, description="True اگر حساب عمومی باشد")
+	has_children: Optional[bool] = Field(default=None, description="دارای فرزند")
+	can_edit: Optional[bool] = Field(default=None, description="آیا کاربر فعلی می‌تواند ویرایش کند")
+	can_delete: Optional[bool] = Field(default=None, description="آیا کاربر فعلی می‌تواند حذف کند")
 	level: Optional[int] = Field(default=None, description="سطح حساب در درخت")
 	children: List["AccountTreeNode"] = Field(default_factory=list, description="فرزندان")
 

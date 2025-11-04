@@ -26,6 +26,8 @@ class _ColumnSettingsDialogState extends State<ColumnSettingsDialog> {
   late List<String> _columnOrder;
   late Map<String, double> _columnWidths;
   late List<DataTableColumn> _columns; // Local copy of columns
+  late Set<String> _pinnedLeft;
+  late Set<String> _pinnedRight;
 
   @override
   void initState() {
@@ -34,6 +36,8 @@ class _ColumnSettingsDialogState extends State<ColumnSettingsDialog> {
     _columnOrder = List.from(widget.currentSettings.columnOrder);
     _columnWidths = Map.from(widget.currentSettings.columnWidths);
     _columns = List.from(widget.columns); // Create local copy
+    _pinnedLeft = Set<String>.from(widget.currentSettings.pinnedLeft);
+    _pinnedRight = Set<String>.from(widget.currentSettings.pinnedRight);
   }
 
   @override
@@ -173,6 +177,13 @@ class _ColumnSettingsDialogState extends State<ColumnSettingsDialog> {
                 ),
                 const SizedBox(width: 8),
                 Text(
+                  'پین',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
                   t.order,
                   style: theme.textTheme.titleSmall?.copyWith(
                     fontWeight: FontWeight.w600,
@@ -269,6 +280,52 @@ class _ColumnSettingsDialogState extends State<ColumnSettingsDialog> {
                           ),
                         ),
                         const SizedBox(width: 8),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Tooltip(
+                              message: 'پین چپ',
+                              child: IconButton(
+                                icon: Icon(Icons.push_pin,
+                                    size: 16,
+                                    color: _pinnedLeft.contains(column.key)
+                                        ? theme.colorScheme.primary
+                                        : theme.colorScheme.onSurfaceVariant),
+                                onPressed: () {
+                                  setState(() {
+                                    _pinnedRight.remove(column.key);
+                                    if (_pinnedLeft.contains(column.key)) {
+                                      _pinnedLeft.remove(column.key);
+                                    } else {
+                                      _pinnedLeft.add(column.key);
+                                    }
+                                  });
+                                },
+                              ),
+                            ),
+                            Tooltip(
+                              message: 'پین راست',
+                              child: IconButton(
+                                icon: Icon(Icons.push_pin_outlined,
+                                    size: 16,
+                                    color: _pinnedRight.contains(column.key)
+                                        ? theme.colorScheme.primary
+                                        : theme.colorScheme.onSurfaceVariant),
+                                onPressed: () {
+                                  setState(() {
+                                    _pinnedLeft.remove(column.key);
+                                    if (_pinnedRight.contains(column.key)) {
+                                      _pinnedRight.remove(column.key);
+                                    } else {
+                                      _pinnedRight.add(column.key);
+                                    }
+                                  });
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(width: 8),
                         Icon(
                           Icons.drag_handle,
                           size: 16,
@@ -312,6 +369,8 @@ class _ColumnSettingsDialogState extends State<ColumnSettingsDialog> {
       visibleColumns: _visibleColumns,
       columnOrder: _columnOrder,
       columnWidths: _columnWidths,
+      pinnedLeft: _pinnedLeft.toList(),
+      pinnedRight: _pinnedRight.toList(),
     );
     
     Navigator.of(context).pop(newSettings);

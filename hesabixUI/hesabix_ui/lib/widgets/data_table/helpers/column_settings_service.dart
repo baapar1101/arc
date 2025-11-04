@@ -7,11 +7,15 @@ class ColumnSettings {
   final List<String> visibleColumns;
   final List<String> columnOrder;
   final Map<String, double> columnWidths;
+  final List<String> pinnedLeft;
+  final List<String> pinnedRight;
 
   const ColumnSettings({
     required this.visibleColumns,
     required this.columnOrder,
     this.columnWidths = const {},
+    this.pinnedLeft = const [],
+    this.pinnedRight = const [],
   });
 
   Map<String, dynamic> toJson() {
@@ -19,6 +23,8 @@ class ColumnSettings {
       'visibleColumns': visibleColumns,
       'columnOrder': columnOrder,
       'columnWidths': columnWidths,
+      'pinnedLeft': pinnedLeft,
+      'pinnedRight': pinnedRight,
     };
   }
 
@@ -27,6 +33,8 @@ class ColumnSettings {
       visibleColumns: List<String>.from(json['visibleColumns'] ?? []),
       columnOrder: List<String>.from(json['columnOrder'] ?? []),
       columnWidths: Map<String, double>.from(json['columnWidths'] ?? {}),
+      pinnedLeft: List<String>.from(json['pinnedLeft'] ?? []),
+      pinnedRight: List<String>.from(json['pinnedRight'] ?? []),
     );
   }
 
@@ -34,11 +42,15 @@ class ColumnSettings {
     List<String>? visibleColumns,
     List<String>? columnOrder,
     Map<String, double>? columnWidths,
+    List<String>? pinnedLeft,
+    List<String>? pinnedRight,
   }) {
     return ColumnSettings(
       visibleColumns: visibleColumns ?? this.visibleColumns,
       columnOrder: columnOrder ?? this.columnOrder,
       columnWidths: columnWidths ?? this.columnWidths,
+      pinnedLeft: pinnedLeft ?? this.pinnedLeft,
+      pinnedRight: pinnedRight ?? this.pinnedRight,
     );
   }
 }
@@ -92,6 +104,8 @@ class ColumnSettingsService {
     return ColumnSettings(
       visibleColumns: List.from(columnKeys),
       columnOrder: List.from(columnKeys),
+      pinnedLeft: const [],
+      pinnedRight: const [],
     );
   }
   
@@ -142,11 +156,22 @@ class ColumnSettingsService {
         validColumnWidths[entry.key] = entry.value;
       }
     }
+    // Sanitize pins to only include visible columns
+    final leftPins = <String>[];
+    for (final key in userSettings.pinnedLeft) {
+      if (visibleColumns.contains(key)) leftPins.add(key);
+    }
+    final rightPins = <String>[];
+    for (final key in userSettings.pinnedRight) {
+      if (visibleColumns.contains(key)) rightPins.add(key);
+    }
     
     return userSettings.copyWith(
       visibleColumns: visibleColumns,
       columnOrder: columnOrder,
       columnWidths: validColumnWidths,
+      pinnedLeft: leftPins,
+      pinnedRight: rightPins,
     );
   }
 }

@@ -8,6 +8,7 @@ class AccountNode {
 	final String code;
 	final String name;
 	final String? accountType;
+	final int? businessId;
 	final List<AccountNode> children;
 	final bool hasChildren;
 
@@ -16,6 +17,7 @@ class AccountNode {
 		required this.code,
 		required this.name,
 		this.accountType,
+		this.businessId,
 		this.children = const [],
 		this.hasChildren = false,
 	});
@@ -30,6 +32,9 @@ class AccountNode {
 			code: json['code']?.toString() ?? '',
 			name: json['name']?.toString() ?? '',
 			accountType: json['account_type']?.toString(),
+			businessId: json['business_id'] is int
+				? (json['business_id'] as int)
+				: (json['business_id'] != null ? int.tryParse(json['business_id'].toString()) : null),
 			children: parsedChildren,
 			hasChildren: (json['has_children'] == true) || parsedChildren.isNotEmpty,
 		);
@@ -86,6 +91,8 @@ class _AccountsPageState extends State<AccountsPage> {
 			items.add({
 				"id": n.id,
 				"title": ("\u200f" * level) + n.code + " - " + n.name,
+				"business_id": n.businessId?.toString() ?? "",
+				"has_children": n.hasChildren ? "1" : "0",
 			});
 			for (final c in n.children) {
 				dfs(c, level + 1);
@@ -97,46 +104,115 @@ class _AccountsPageState extends State<AccountsPage> {
 		return items;
 	}
 
-	Future<void> _openCreateDialog() async {
+	String? _suggestNextCode({String? parentId}) {
+		List<String> codes = <String>[];
+		if (parentId == null || parentId.isEmpty) {
+			codes = _roots.map((e) => e.code).toList();
+		} else {
+			AccountNode? find(AccountNode n) {
+				if (n.id == parentId) return n;
+				for (final c in n.children) {
+					final x = find(c);
+					if (x != null) return x;
+				}
+				return null;
+			}
+			AccountNode? parent;
+			for (final r in _roots) {
+				parent = find(r);
+				if (parent != null) break;
+			}
+			if (parent != null) codes = parent.children.map((e) => e.code).toList();
+		}
+		final numeric = codes.map((c) => int.tryParse(c)).whereType<int>().toList();
+		if (numeric.isEmpty) return null;
+		final next = (numeric..sort()).last + 1;
+		return next.toString();
+	}
+
+	Future<void> _openCreateDialog({AccountNode? parent}) async {
 		final t = AppLocalizations.of(context);
 		final codeCtrl = TextEditingController();
 		final nameCtrl = TextEditingController();
-		final typeCtrl = TextEditingController();
-		String? selectedParentId;
+		String? selectedType;
+		String? selectedParentId = parent?.id;
 		final parents = _flattenNodes();
 		final result = await showDialog<bool>(
 			context: context,
 			builder: (ctx) {
 				return AlertDialog(
 					title: Text(t.addAccount),
-					content: SingleChildScrollView(
-						child: Column(
-							mainAxisSize: MainAxisSize.min,
-							children: [
-								TextField(
-									controller: codeCtrl,
-									decoration: InputDecoration(labelText: t.code),
-								),
-								TextField(
-									controller: nameCtrl,
-									decoration: InputDecoration(labelText: t.title),
-								),
-								TextField(
-									controller: typeCtrl,
-									decoration: InputDecoration(labelText: t.type),
-								),
-								DropdownButtonFormField<String>(
-									value: selectedParentId,
-									items: [
-										DropdownMenuItem<String>(value: null, child: Text('بدون والد')),
-										...parents.map((p) => DropdownMenuItem<String>(value: p["id"], child: Text(p["title"]!))).toList(),
-									],
-									onChanged: (v) {
-										selectedParentId = v;
-									},
-									decoration: const InputDecoration(labelText: 'حساب والد'),
-								),
-							],
+					content: ConstrainedBox(
+						constraints: const BoxConstraints(maxWidth: 460),
+						child: SingleChildScrollView(
+							child: Column(
+								mainAxisSize: MainAxisSize.min,
+								children: [
+									Row(children: [
+										Expanded(child: TextField(
+											controller: codeCtrl,
+											decoration: InputDecoration(labelText: t.code, prefixIcon: const Icon(Icons.numbers)),
+										)),
+										const SizedBox(width: 8),
+										OutlinedButton.icon(
+											onPressed: () {
+												final s = _suggestNextCode(parentId: selectedParentId);
+												if (s != null) codeCtrl.text = s;
+											},
+											icon: const Icon(Icons.auto_fix_high, size: 18),
+											label: const Text('پیشنهاد کد'),
+										),
+									]),
+									const SizedBox(height: 10),
+									TextField(
+										controller: nameCtrl,
+										decoration: InputDecoration(labelText: t.title, prefixIcon: const Icon(Icons.title)),
+									),
+									const SizedBox(height: 10),
+									DropdownButtonFormField<String>(
+										value: selectedType,
+										items: const [
+											DropdownMenuItem(value: 'bank', child: Text('بانک')),
+											DropdownMenuItem(value: 'cash_register', child: Text('صندوق')),
+											DropdownMenuItem(value: 'petty_cash', child: Text('تنخواه')),
+											DropdownMenuItem(value: 'check', child: Text('چک')),
+											DropdownMenuItem(value: 'person', child: Text('شخص')),
+											DropdownMenuItem(value: 'product', child: Text('کالا')),
+											DropdownMenuItem(value: 'service', child: Text('خدمت')),
+											DropdownMenuItem(value: 'accounting_document', child: Text('سند حسابداری')),
+										],
+										onChanged: (v) { selectedType = v; },
+										decoration: InputDecoration(labelText: t.type, prefixIcon: const Icon(Icons.category)),
+									),
+									const SizedBox(height: 10),
+									DropdownButtonFormField<String>(
+										value: selectedParentId,
+										items: [
+											...(() {
+												List<Map<String, String>> src = parents;
+												if (parent != null) {
+													return src.where((p) => p['id'] == parent.id).map((p) => DropdownMenuItem<String>(value: p["id"], child: Text(p["title"]!))).toList();
+												}
+												return src.where((p) {
+													final bid = p['business_id'];
+													final hc = p['has_children'];
+													final isPublic = (bid == null || bid.isEmpty);
+													final isSameBusiness = bid == widget.businessId.toString();
+													return (isPublic && hc == '1') || isSameBusiness;
+												}).map((p) => DropdownMenuItem<String>(value: p["id"], child: Text(p["title"]!))).toList();
+											})(),
+										],
+										onChanged: parent != null ? null : (v) {
+											selectedParentId = v;
+											if ((codeCtrl.text).trim().isEmpty) {
+												final s = _suggestNextCode(parentId: selectedParentId);
+												if (s != null) codeCtrl.text = s;
+											}
+										},
+										decoration: const InputDecoration(labelText: 'حساب والد', prefixIcon: Icon(Icons.account_tree)),
+									),
+								],
+							),
 						),
 					),
 					actions: [
@@ -145,8 +221,8 @@ class _AccountsPageState extends State<AccountsPage> {
 							onPressed: () async {
 								final name = nameCtrl.text.trim();
 								final code = codeCtrl.text.trim();
-								final atype = typeCtrl.text.trim();
-								if (name.isEmpty || code.isEmpty || atype.isEmpty) {
+								final atype = (selectedType ?? '').trim();
+								if (name.isEmpty || code.isEmpty || atype.isEmpty || selectedParentId == null || selectedParentId!.isEmpty) {
 									return;
 								}
 								final Map<String, dynamic> payload = {
@@ -158,24 +234,24 @@ class _AccountsPageState extends State<AccountsPage> {
 									final pid = int.tryParse(selectedParentId!);
 									if (pid != null) payload["parent_id"] = pid;
 								}
-									try {
-										final api = ApiClient();
-										await api.post(
-											'/api/v1/accounts/business/${widget.businessId}/create',
-											data: payload,
+								try {
+									final api = ApiClient();
+									await api.post(
+										'/api/v1/accounts/business/${widget.businessId}/create',
+										data: payload,
+									);
+									if (context.mounted) Navigator.of(ctx).pop(true);
+								} catch (e) {
+									if (context.mounted) {
+										ScaffoldMessenger.of(context).showSnackBar(
+											SnackBar(content: Text('خطا در ایجاد حساب: $e')),
 										);
-										if (context.mounted) Navigator.of(ctx).pop(true);
-									} catch (e) {
-										if (context.mounted) {
-											ScaffoldMessenger.of(context).showSnackBar(
-												SnackBar(content: Text('خطا در ایجاد حساب: $e')),
-											);
 										}
-									}
-							},
+								}
+								},
 								child: Text(t.add),
 						),
-					],
+				],
 				);
 			},
 		);
@@ -216,7 +292,7 @@ class _AccountsPageState extends State<AccountsPage> {
 		final t = AppLocalizations.of(context);
 		final codeCtrl = TextEditingController(text: node.code);
 		final nameCtrl = TextEditingController(text: node.name);
-		final typeCtrl = TextEditingController(text: node.accountType ?? '');
+		String? selectedType = node.accountType;
 		final parents = _flattenNodes();
 		String? selectedParentId;
 		final result = await showDialog<bool>(
@@ -230,12 +306,29 @@ class _AccountsPageState extends State<AccountsPage> {
 							children: [
 								TextField(controller: codeCtrl, decoration: InputDecoration(labelText: t.code)),
 								TextField(controller: nameCtrl, decoration: InputDecoration(labelText: t.title)),
-								TextField(controller: typeCtrl, decoration: InputDecoration(labelText: t.type)),
+								DropdownButtonFormField<String>(
+									value: selectedType,
+									items: const [
+										DropdownMenuItem(value: 'bank', child: Text('بانک')),
+										DropdownMenuItem(value: 'cash_register', child: Text('صندوق')),
+										DropdownMenuItem(value: 'petty_cash', child: Text('تنخواه')),
+										DropdownMenuItem(value: 'check', child: Text('چک')),
+										DropdownMenuItem(value: 'person', child: Text('شخص')),
+										DropdownMenuItem(value: 'product', child: Text('کالا')),
+										DropdownMenuItem(value: 'service', child: Text('خدمت')),
+										DropdownMenuItem(value: 'accounting_document', child: Text('سند حسابداری')),
+									],
+									onChanged: (v) { selectedType = v; },
+									decoration: InputDecoration(labelText: t.type),
+								),
 								DropdownButtonFormField<String>(
 									value: selectedParentId,
 									items: [
 										DropdownMenuItem<String>(value: null, child: Text('بدون والد')),
-										...parents.map((p) => DropdownMenuItem<String>(value: p["id"], child: Text(p["title"]!))).toList(),
+										...parents.where((p) {
+											final bid = p['business_id'];
+											return (bid == null || bid.isEmpty) || bid == widget.businessId.toString();
+										}).map((p) => DropdownMenuItem<String>(value: p["id"], child: Text(p["title"]!))).toList(),
 									],
 									onChanged: (v) { selectedParentId = v; },
 									decoration: const InputDecoration(labelText: 'حساب والد'),
@@ -249,7 +342,7 @@ class _AccountsPageState extends State<AccountsPage> {
 							onPressed: () async {
 								final name = nameCtrl.text.trim();
 								final code = codeCtrl.text.trim();
-								final atype = typeCtrl.text.trim();
+								final atype = (selectedType ?? '').trim();
 								if (name.isEmpty || code.isEmpty || atype.isEmpty) return;
 								final Map<String, dynamic> payload = {"name": name, "code": code, "account_type": atype};
 								if (selectedParentId != null && selectedParentId!.isNotEmpty) {
@@ -412,26 +505,44 @@ class _AccountsPageState extends State<AccountsPage> {
 																padding: EdgeInsets.zero,
 																iconSize: 20,
 																visualDensity: VisualDensity.compact,
-																icon: Icon(isExpanded ? Icons.expand_more : Icons.chevron_right),
+												icon: Icon(isExpanded ? Icons.expand_more : Icons.chevron_right),
 																onPressed: () => _toggleExpand(node),
 															)
 														: const SizedBox.shrink(),
 													),
-													Expanded(flex: 2, child: Text(node.code, style: const TextStyle(fontFeatures: []))),
+										if (node.businessId == null) const SizedBox(width: 20, child: Icon(Icons.lock_outline, size: 16)),
+										Expanded(flex: 2, child: Text(node.code, style: const TextStyle(fontFeatures: []))),
 													Expanded(flex: 5, child: Text(node.name)),
 												Expanded(flex: 3, child: Text(_localizedAccountType(t, node.accountType))),
 												SizedBox(
 													width: 40,
 													child: PopupMenuButton<String>(
 														padding: EdgeInsets.zero,
-														onSelected: (v) {
-															if (v == 'edit') _openEditDialog(node);
-															if (v == 'delete') _confirmDelete(node);
-														},
-														itemBuilder: (context) => [
-															const PopupMenuItem<String>(value: 'edit', child: Text('ویرایش')),
-															const PopupMenuItem<String>(value: 'delete', child: Text('حذف')),
-														],
+									onSelected: (v) {
+										if (v == 'add_child') _openCreateDialog(parent: node);
+										if (v == 'edit') _openEditDialog(node);
+										if (v == 'delete') _confirmDelete(node);
+									},
+								itemBuilder: (context) {
+									final bool isOwned = node.businessId != null && node.businessId == widget.businessId;
+									final bool canEdit = isOwned;
+									final bool canDelete = isOwned && !node.hasChildren;
+									final bool canAddChild = widget.authStore.canWriteSection('accounting') && ((node.businessId == null && node.hasChildren) || isOwned);
+									final List<PopupMenuEntry<String>> items = <PopupMenuEntry<String>>[];
+									if (canAddChild) {
+										items.add(const PopupMenuItem<String>(value: 'add_child', child: Text('افزودن ریز حساب')));
+									}
+									if (canEdit) {
+										items.add(const PopupMenuItem<String>(value: 'edit', child: Text('ویرایش')));
+									}
+									if (canDelete) {
+										items.add(const PopupMenuItem<String>(value: 'delete', child: Text('حذف')));
+									}
+									if (items.isEmpty) {
+										return [const PopupMenuItem<String>(value: 'noop', enabled: false, child: Text('غیرقابل ویرایش'))];
+									}
+									return items;
+								},
 													),
 												),
 												],

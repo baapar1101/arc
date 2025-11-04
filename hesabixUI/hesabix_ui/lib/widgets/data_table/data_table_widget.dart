@@ -1,9 +1,12 @@
 import 'dart:async';
 import 'dart:math' as math;
 import 'dart:typed_data';
+import 'dart:ui' show FontFeature;
 import 'package:flutter/foundation.dart';
 import 'package:file_saver/file_saver.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:data_table_2/data_table_2.dart';
 import 'package:dio/dio.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
@@ -76,6 +79,14 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
   // Scroll controller for horizontal scrolling
   late ScrollController _horizontalScrollController;
   
+  // Density (row height)
+  bool _dense = false;
+  
+  // Keyboard focus and navigation
+  final FocusNode _tableFocusNode = FocusNode(debugLabel: 'DataTableFocus');
+  int _activeRowIndex = -1;
+  int? _lastSelectedRowIndex;
+  
   @override
   void initState() {
     super.initState();
@@ -83,6 +94,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     _limit = widget.config.defaultPageSize;
     _setupSearchListener();
     _loadColumnSettings();
+    _loadDensityPreference();
     _fetchData();
   }
 
@@ -112,6 +124,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     _searchCtrl.dispose();
     _searchDebounce?.cancel();
     _horizontalScrollController.dispose();
+    _tableFocusNode.dispose();
     for (var controller in _columnSearchControllers.values) {
       controller.dispose();
     }
@@ -126,6 +139,23 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
         _fetchData();
       });
     });
+  }
+
+  Future<void> _loadDensityPreference() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final key = 'data_table_density_${widget.config.effectiveTableId}';
+      final dense = prefs.getBool(key) ?? false;
+      if (mounted) setState(() => _dense = dense);
+    } catch (_) {}
+  }
+
+  Future<void> _saveDensityPreference() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final key = 'data_table_density_${widget.config.effectiveTableId}';
+      await prefs.setBool(key, _dense);
+    } catch (_) {}
   }
 
   Future<void> _loadColumnSettings() async {
@@ -227,6 +257,8 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
             _total = response.total;
             _totalPages = response.totalPages;
             _selectedRows.clear(); // Clear selection when data changes
+            _activeRowIndex = _items.isNotEmpty ? 0 : -1;
+            _lastSelectedRowIndex = null;
           });
         }
         
@@ -411,15 +443,27 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     if (!widget.config.enableRowSelection) return;
     
     setState(() {
-      if (widget.config.enableMultiRowSelection) {
-        if (_selectedRows.contains(rowIndex)) {
-          _selectedRows.remove(rowIndex);
-        } else {
-          _selectedRows.add(rowIndex);
+      final bool isShift = HardwareKeyboard.instance.logicalKeysPressed.contains(LogicalKeyboardKey.shiftLeft) ||
+          HardwareKeyboard.instance.logicalKeysPressed.contains(LogicalKeyboardKey.shiftRight);
+
+      if (widget.config.enableMultiRowSelection && isShift && _lastSelectedRowIndex != null) {
+        final int start = math.min(_lastSelectedRowIndex!, rowIndex);
+        final int end = math.max(_lastSelectedRowIndex!, rowIndex);
+        for (int i = start; i <= end; i++) {
+          _selectedRows.add(i);
         }
       } else {
-        _selectedRows.clear();
-        _selectedRows.add(rowIndex);
+        if (widget.config.enableMultiRowSelection) {
+          if (_selectedRows.contains(rowIndex)) {
+            _selectedRows.remove(rowIndex);
+          } else {
+            _selectedRows.add(rowIndex);
+          }
+        } else {
+          _selectedRows.clear();
+          _selectedRows.add(rowIndex);
+        }
+        _lastSelectedRowIndex = rowIndex;
       }
     });
     
@@ -762,7 +806,51 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
       shape: RoundedRectangleBorder(
         borderRadius: widget.config.borderRadius ?? BorderRadius.circular(12),
       ),
-      child: Container(
+      child: Shortcuts(
+        shortcuts: <LogicalKeySet, Intent>{
+          LogicalKeySet(LogicalKeyboardKey.keyJ): const MoveRowIntent(1),
+          LogicalKeySet(LogicalKeyboardKey.keyK): const MoveRowIntent(-1),
+          LogicalKeySet(LogicalKeyboardKey.arrowDown): const MoveRowIntent(1),
+          LogicalKeySet(LogicalKeyboardKey.arrowUp): const MoveRowIntent(-1),
+          LogicalKeySet(LogicalKeyboardKey.enter): const ActivateRowIntent(),
+          LogicalKeySet(LogicalKeyboardKey.space): const ToggleSelectionIntent(),
+          LogicalKeySet(LogicalKeyboardKey.escape): const ClearSelectionIntent(),
+          LogicalKeySet(LogicalKeyboardKey.keyA, LogicalKeyboardKey.control): const SelectAllIntent(),
+        },
+        child: Actions(
+          actions: <Type, Action<Intent>>{
+            MoveRowIntent: CallbackAction<MoveRowIntent>(onInvoke: (intent) {
+              if (_items.isEmpty) return null;
+              setState(() {
+                final next = (_activeRowIndex == -1 ? 0 : _activeRowIndex) + intent.delta;
+                _activeRowIndex = next.clamp(0, _items.length - 1);
+              });
+              return null;
+            }),
+            ActivateRowIntent: CallbackAction<ActivateRowIntent>(onInvoke: (intent) {
+              if (_activeRowIndex >= 0 && _activeRowIndex < _items.length && widget.config.onRowTap != null) {
+                widget.config.onRowTap!(_items[_activeRowIndex]);
+              }
+              return null;
+            }),
+            ToggleSelectionIntent: CallbackAction<ToggleSelectionIntent>(onInvoke: (intent) {
+              if (widget.config.enableRowSelection && _activeRowIndex >= 0 && _activeRowIndex < _items.length) {
+                _toggleRowSelection(_activeRowIndex);
+              }
+              return null;
+            }),
+            ClearSelectionIntent: CallbackAction<ClearSelectionIntent>(onInvoke: (intent) {
+              _clearRowSelection();
+              return null;
+            }),
+            SelectAllIntent: CallbackAction<SelectAllIntent>(onInvoke: (intent) {
+              _selectAllRows();
+              return null;
+            }),
+          },
+          child: Focus(
+            focusNode: _tableFocusNode,
+            child: Container(
         padding: widget.config.padding ?? const EdgeInsets.all(16),
         margin: widget.config.margin,
         decoration: BoxDecoration(
@@ -818,6 +906,53 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
               const SizedBox(height: 10),
             ],
             
+            // Selection toolbar
+            if (widget.config.enableRowSelection && _selectedRows.isNotEmpty) ...[
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: theme.colorScheme.primary.withValues(alpha: 0.2)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.check_box, size: 18, color: theme.colorScheme.primary),
+                    const SizedBox(width: 8),
+                    Text('${_selectedRows.length} مورد انتخاب شده',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: theme.colorScheme.onPrimaryContainer,
+                      ),
+                    ),
+                    const Spacer(),
+                    TextButton.icon(
+                      onPressed: _clearRowSelection,
+                      icon: const Icon(Icons.clear),
+                      label: const Text('لغو انتخاب'),
+                    ),
+                    if (widget.config.excelEndpoint != null) ...[
+                      const SizedBox(width: 8),
+                      FilledButton.icon(
+                        onPressed: () => _exportData('excel', true),
+                        icon: const Icon(Icons.table_chart),
+                        label: const Text('خروجی اکسل انتخاب‌ها'),
+                      ),
+                    ],
+                    if (widget.config.pdfEndpoint != null) ...[
+                      const SizedBox(width: 8),
+                      OutlinedButton.icon(
+                        onPressed: () => _exportData('pdf', true),
+                        icon: const Icon(Icons.picture_as_pdf),
+                        label: const Text('PDF انتخاب‌ها'),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(height: 10),
+            ],
+            
             // Data Table
             Expanded(
               child: _buildDataTable(t, theme),
@@ -829,6 +964,9 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
               _buildFooter(t, theme),
             ],
           ],
+        ),
+            ),
+          ),
         ),
       ),
     );
@@ -922,6 +1060,12 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
               case 'columnSettings':
                 _openColumnSettingsDialog();
                 break;
+              case 'toggleDensity':
+                setState(() {
+                  _dense = !_dense;
+                });
+                _saveDensityPreference();
+                break;
             }
           },
           itemBuilder: (context) => [
@@ -954,6 +1098,17 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                   ],
                 ),
               ),
+            const PopupMenuDivider(),
+            PopupMenuItem(
+              value: 'toggleDensity',
+              child: Row(
+                children: [
+                  Icon(_dense ? Icons.check_box : Icons.check_box_outline_blank, size: 20),
+                  const SizedBox(width: 8),
+                  const Text('حالت فشرده'),
+                ],
+              ),
+            ),
           ],
         ),
       ],
@@ -1253,21 +1408,36 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
 
   Widget _buildDataTable(AppLocalizations t, ThemeData theme) {
     if (_loadingList) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            if (widget.config.loadingWidget != null)
-              widget.config.loadingWidget!
-            else
-              const CircularProgressIndicator(),
-            const SizedBox(height: 16),
-            Text(
-              widget.config.loadingMessage ?? t.loading,
-              style: theme.textTheme.bodyMedium,
+      return Column(
+        children: [
+          Expanded(
+            child: ListView.builder(
+              itemCount: 8,
+              itemBuilder: (context, index) {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 6.0),
+                  child: Row(
+                    children: List.generate(5, (i) {
+                      return Expanded(
+                        child: Container(
+                          height: _dense ? 28 : 36,
+                          margin: const EdgeInsets.symmetric(horizontal: 6),
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                        ),
+                      );
+                    }),
+                  ),
+                );
+              },
             ),
-          ],
-        ),
+          ),
+          const SizedBox(height: 12),
+          Text(widget.config.loadingMessage ?? t.loading, style: theme.textTheme.bodyMedium),
+          const SizedBox(height: 8),
+        ],
       );
     }
 
@@ -1321,6 +1491,23 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
               ),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              children: [
+                FilledButton.icon(
+                  onPressed: _fetchData,
+                  icon: const Icon(Icons.refresh),
+                  label: Text(t.refresh),
+                ),
+                if (_hasActiveFilters())
+                  OutlinedButton.icon(
+                    onPressed: _clearAllFilters,
+                    icon: const Icon(Icons.filter_alt_off),
+                    label: Text(t.clear),
+                  ),
+              ],
             ),
           ],
         ),
@@ -1395,7 +1582,19 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     final columnsToShow = widget.config.enableColumnSettings && _visibleColumns.isNotEmpty
         ? _visibleColumns
         : widget.config.columns;
-    final dataColumnsToShow = columnsToShow.where((c) => c is! ActionColumn).toList();
+    List<DataTableColumn> dataColumnsToShow = columnsToShow.where((c) => c is! ActionColumn).toList();
+    // Reorder by pinning if settings available
+    if (widget.config.enableColumnSettings && _columnSettings != null) {
+      final visibleKeys = _columnSettings!.visibleColumns.toSet();
+      final order = _columnSettings!.columnOrder;
+      List<String> middleKeys = order.where((k) => visibleKeys.contains(k)).toList();
+      final leftKeys = _columnSettings!.pinnedLeft.where((k) => middleKeys.contains(k)).toList();
+      final rightKeys = _columnSettings!.pinnedRight.where((k) => middleKeys.contains(k)).toList();
+      middleKeys.removeWhere((k) => leftKeys.contains(k) || rightKeys.contains(k));
+      List<String> finalOrder = [...leftKeys, ...middleKeys, ...rightKeys];
+      final mapByKey = {for (final c in dataColumnsToShow) c.key: c};
+      dataColumnsToShow = finalOrder.map((k) => mapByKey[k]).whereType<DataTableColumn>().toList();
+    }
     
     columns.addAll(dataColumnsToShow.map((column) {
       final headerTextStyle = theme.textTheme.titleSmall?.copyWith(
@@ -1403,9 +1602,12 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
         color: theme.colorScheme.onSurface,
       ) ?? const TextStyle(fontSize: 14, fontWeight: FontWeight.w600);
       final double baseWidth = DataTableUtils.getColumnWidth(column.width);
-      final double affordancePadding = 48.0;
+      final double affordancePadding = 64.0; // space for icons + resize handle
       final double headerTextWidth = _measureTextWidth(column.label, headerTextStyle) + affordancePadding;
-      final double computedWidth = math.max(baseWidth, headerTextWidth);
+      final double minWidth = 96.0;
+      final double defaultWidth = math.max(baseWidth, headerTextWidth);
+      final double savedWidth = _columnSettings?.columnWidths[column.key] ?? defaultWidth;
+      final double computedWidth = math.max(savedWidth, minWidth);
 
       return DataColumn2(
         label: _ColumnHeaderWithSearch(
@@ -1419,6 +1621,74 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
               : () { },
           hasActiveFilter: _columnSearchValues.containsKey(column.key),
           enabled: widget.config.enableSorting && column.sortable,
+          onResizeDrag: widget.config.enableColumnSettings ? (dx) {
+            if (_columnSettings == null) return;
+            final current = _columnSettings!.columnWidths[column.key] ?? savedWidth;
+            final next = math.max(minWidth, current + dx);
+            final updated = _columnSettings!.copyWith(
+              columnWidths: {
+                ..._columnSettings!.columnWidths,
+                column.key: next,
+              },
+            );
+            setState(() {
+              _columnSettings = updated;
+            });
+            ColumnSettingsService.saveColumnSettings(widget.config.effectiveTableId, updated);
+          } : null,
+          onPinLeft: widget.config.enableColumnSettings ? () {
+            if (_columnSettings == null) return;
+            final updated = _columnSettings!.copyWith(
+              pinnedLeft: {
+                ..._columnSettings!.pinnedLeft,
+                column.key,
+              }.toList(),
+              pinnedRight: _columnSettings!.pinnedRight.where((k) => k != column.key).toList(),
+            );
+            setState(() {
+              _columnSettings = updated;
+              _visibleColumns = _getVisibleColumnsFromSettings(updated);
+            });
+            ColumnSettingsService.saveColumnSettings(widget.config.effectiveTableId, updated);
+          } : null,
+          onPinRight: widget.config.enableColumnSettings ? () {
+            if (_columnSettings == null) return;
+            final updated = _columnSettings!.copyWith(
+              pinnedRight: {
+                ..._columnSettings!.pinnedRight,
+                column.key,
+              }.toList(),
+              pinnedLeft: _columnSettings!.pinnedLeft.where((k) => k != column.key).toList(),
+            );
+            setState(() {
+              _columnSettings = updated;
+              _visibleColumns = _getVisibleColumnsFromSettings(updated);
+            });
+            ColumnSettingsService.saveColumnSettings(widget.config.effectiveTableId, updated);
+          } : null,
+          onUnpin: widget.config.enableColumnSettings ? () {
+            if (_columnSettings == null) return;
+            final updated = _columnSettings!.copyWith(
+              pinnedLeft: _columnSettings!.pinnedLeft.where((k) => k != column.key).toList(),
+              pinnedRight: _columnSettings!.pinnedRight.where((k) => k != column.key).toList(),
+            );
+            setState(() {
+              _columnSettings = updated;
+              _visibleColumns = _getVisibleColumnsFromSettings(updated);
+            });
+            ColumnSettingsService.saveColumnSettings(widget.config.effectiveTableId, updated);
+          } : null,
+          onHide: widget.config.enableColumnSettings ? () {
+            if (_columnSettings == null) return;
+            final updated = _columnSettings!.copyWith(
+              visibleColumns: _columnSettings!.visibleColumns.where((k) => k != column.key).toList(),
+            );
+            setState(() {
+              _columnSettings = updated;
+              _visibleColumns = _getVisibleColumnsFromSettings(updated);
+            });
+            ColumnSettingsService.saveColumnSettings(widget.config.effectiveTableId, updated);
+          } : null,
         ),
         size: DataTableUtils.getColumnSize(column.width),
         fixedWidth: computedWidth,
@@ -1444,7 +1714,8 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
           horizontalMargin: 8,
           minWidth: widget.config.minTableWidth ?? 600,
           horizontalScrollController: _horizontalScrollController,
-          headingRowHeight: 44,
+          headingRowHeight: _dense ? 40 : 44,
+          dataRowHeight: _dense ? 38 : 48,
           columns: columns,
       rows: _items.asMap().entries.map((entry) {
         final index = entry.key;
@@ -1510,6 +1781,21 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
         }
         
         return DataRow2(
+          color: WidgetStateProperty.resolveWith<Color?>((states) {
+            if (states.contains(WidgetState.selected)) {
+              return theme.colorScheme.primary.withValues(alpha: 0.08);
+            }
+            if (states.contains(WidgetState.hovered)) {
+              return theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3);
+            }
+            if (index == _activeRowIndex && _tableFocusNode.hasFocus) {
+              return theme.colorScheme.primary.withValues(alpha: 0.06);
+            }
+            final Color? base = widget.config.rowBackgroundColor;
+            final Color? alt = widget.config.alternateRowBackgroundColor ??
+                theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.15);
+            return (index % 2 == 1) ? alt : base;
+          }),
           selected: isSelected,
           onTap: widget.config.onRowTap != null 
               ? () => widget.config.onRowTap!(item)
@@ -1540,41 +1826,101 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     // This allows working with strongly-typed objects (not just Map)
     if (column is TextColumn && column.formatter != null) {
       final text = column.formatter!(item) ?? '';
-      return Text(
+      final overflow = _getOverflow(column);
+      final textWidget = Text(
         text,
         textAlign: _getTextAlign(column),
         maxLines: _getMaxLines(column),
-        overflow: _getOverflow(column),
+        overflow: overflow,
       );
+      final wrapped = GestureDetector(
+        onLongPress: () {
+          Clipboard.setData(ClipboardData(text: text));
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('متن کپی شد')),
+          );
+        },
+        child: textWidget,
+      );
+      return (overflow == TextOverflow.ellipsis && text.isNotEmpty)
+          ? Tooltip(message: text, child: wrapped)
+          : wrapped;
     }
     if (column is NumberColumn && column.formatter != null) {
       final text = column.formatter!(item) ?? '';
-      return Text(
+      final overflow = _getOverflow(column);
+      final textWidget = Text(
         text,
         textAlign: _getTextAlign(column),
         maxLines: _getMaxLines(column),
-        overflow: _getOverflow(column),
+        overflow: overflow,
+        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+          fontFeatures: const [FontFeature.tabularFigures()],
+        ),
       );
+      final wrapped = GestureDetector(
+        onLongPress: () {
+          Clipboard.setData(ClipboardData(text: text));
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('عدد کپی شد')),
+          );
+        },
+        child: textWidget,
+      );
+      return (overflow == TextOverflow.ellipsis && text.isNotEmpty)
+          ? Tooltip(message: text, child: wrapped)
+          : wrapped;
     }
     if (column is DateColumn && column.formatter != null) {
       final text = column.formatter!(item) ?? '';
-      return Text(
+      final overflow = _getOverflow(column);
+      final textWidget = Text(
         text,
         textAlign: _getTextAlign(column),
         maxLines: _getMaxLines(column),
-        overflow: _getOverflow(column),
+        overflow: overflow,
       );
+      final wrapped = GestureDetector(
+        onLongPress: () {
+          Clipboard.setData(ClipboardData(text: text));
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('تاریخ کپی شد')),
+          );
+        },
+        child: textWidget,
+      );
+      return (overflow == TextOverflow.ellipsis && text.isNotEmpty)
+          ? Tooltip(message: text, child: wrapped)
+          : wrapped;
     }
 
     // 4) Fallback: get property value from Map items by key
     final value = DataTableUtils.getCellValue(item, column.key);
     final formattedValue = DataTableUtils.formatCellValue(value, column);
-    return Text(
+    final overflow = _getOverflow(column);
+    final textWidget = Text(
       formattedValue,
       textAlign: _getTextAlign(column),
       maxLines: _getMaxLines(column),
-      overflow: _getOverflow(column),
+      overflow: overflow,
+      style: column is NumberColumn
+          ? Theme.of(context).textTheme.bodyMedium?.copyWith(
+              fontFeatures: const [FontFeature.tabularFigures()],
+            )
+          : null,
     );
+    final wrapped = GestureDetector(
+      onLongPress: () {
+        Clipboard.setData(ClipboardData(text: formattedValue));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('مقدار کپی شد')),
+        );
+      },
+      child: textWidget,
+    );
+    return (overflow == TextOverflow.ellipsis && formattedValue.isNotEmpty)
+        ? Tooltip(message: formattedValue, child: wrapped)
+        : wrapped;
   }
 
   Widget _buildActionButtons(dynamic item, ActionColumn column) {
@@ -1642,6 +1988,11 @@ class _ColumnHeaderWithSearch extends StatelessWidget {
   final VoidCallback onSearch;
   final bool hasActiveFilter;
   final bool enabled;
+  final void Function(double dx)? onResizeDrag;
+  final VoidCallback? onPinLeft;
+  final VoidCallback? onPinRight;
+  final VoidCallback? onUnpin;
+  final VoidCallback? onHide;
 
   const _ColumnHeaderWithSearch({
     required this.text,
@@ -1652,6 +2003,11 @@ class _ColumnHeaderWithSearch extends StatelessWidget {
     required this.onSearch,
     required this.hasActiveFilter,
     this.enabled = true,
+    this.onResizeDrag,
+    this.onPinLeft,
+    this.onPinRight,
+    this.onUnpin,
+    this.onHide,
   });
 
   @override
@@ -1726,10 +2082,81 @@ class _ColumnHeaderWithSearch extends StatelessWidget {
                   ),
                 ),
               ),
+              if (onResizeDrag != null) ...[
+                const SizedBox(width: 6),
+                MouseRegion(
+                  cursor: SystemMouseCursors.resizeLeftRight,
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onHorizontalDragUpdate: (details) => onResizeDrag!(details.delta.dx),
+                    child: Container(
+                      width: 8,
+                      height: 28,
+                    ),
+                  ),
+                ),
+              ],
+              if (onPinLeft != null || onPinRight != null || onUnpin != null || onHide != null) ...[
+                const SizedBox(width: 4),
+                PopupMenuButton<String>(
+                  padding: EdgeInsets.zero,
+                  tooltip: 'تنظیمات ستون',
+                  icon: Icon(Icons.more_vert, size: 16, color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7)),
+                  onSelected: (value) {
+                    switch (value) {
+                      case 'pinLeft':
+                        onPinLeft?.call();
+                        break;
+                      case 'pinRight':
+                        onPinRight?.call();
+                        break;
+                      case 'unpin':
+                        onUnpin?.call();
+                        break;
+                      case 'hide':
+                        onHide?.call();
+                        break;
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    if (onPinLeft != null)
+                      const PopupMenuItem(value: 'pinLeft', child: Text('پین چپ')),
+                    if (onPinRight != null)
+                      const PopupMenuItem(value: 'pinRight', child: Text('پین راست')),
+                    if (onUnpin != null)
+                      const PopupMenuItem(value: 'unpin', child: Text('برداشتن پین')),
+                    const PopupMenuDivider(),
+                    if (onHide != null)
+                      const PopupMenuItem(value: 'hide', child: Text('مخفی کردن ستون')),
+                  ],
+                ),
+              ],
             ],
           ),
         ),
       ),
     );
   }
+}
+
+// Keyboard intents
+class MoveRowIntent extends Intent {
+  final int delta;
+  const MoveRowIntent(this.delta);
+}
+
+class ActivateRowIntent extends Intent {
+  const ActivateRowIntent();
+}
+
+class ToggleSelectionIntent extends Intent {
+  const ToggleSelectionIntent();
+}
+
+class ClearSelectionIntent extends Intent {
+  const ClearSelectionIntent();
+}
+
+class SelectAllIntent extends Intent {
+  const SelectAllIntent();
 }

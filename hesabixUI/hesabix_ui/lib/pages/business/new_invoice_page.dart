@@ -42,6 +42,8 @@ class NewInvoicePage extends StatefulWidget {
 }
 
 class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProviderStateMixin {
+  // تنظیمات انبار
+  bool _postInventory = true; // ثبت اسناد انبار
   late TabController _tabController;
   
   InvoiceType? _selectedInvoiceType;
@@ -360,13 +362,17 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                                       _selectedSeller = seller;
                                       // تنظیم خودکار نوع کارمزد و مقادیر بر اساس فروشنده
                                       if (seller != null) {
-                                        if (seller.commissionSalePercent != null) {
+                                        final isSales = _selectedInvoiceType == InvoiceType.sales;
+                                        final isSalesReturn = _selectedInvoiceType == InvoiceType.salesReturn;
+                                        final percent = isSales ? seller.commissionSalePercent : (isSalesReturn ? seller.commissionSalesReturnPercent : null);
+                                        final amount = isSales ? seller.commissionSalesAmount : (isSalesReturn ? seller.commissionSalesReturnAmount : null);
+                                        if (percent != null) {
                                           _commissionType = CommissionType.percentage;
-                                          _commissionPercentage = seller.commissionSalePercent;
+                                          _commissionPercentage = percent;
                                           _commissionAmount = null;
-                                        } else if (seller.commissionSalesAmount != null) {
+                                        } else if (amount != null) {
                                           _commissionType = CommissionType.amount;
-                                          _commissionAmount = seller.commissionSalesAmount;
+                                          _commissionAmount = amount;
                                           _commissionPercentage = null;
                                         }
                                       } else {
@@ -678,13 +684,17 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                                       _selectedSeller = seller;
                                       // تنظیم خودکار نوع کارمزد و مقادیر بر اساس فروشنده
                                       if (seller != null) {
-                                        if (seller.commissionSalePercent != null) {
+                                        final isSales = _selectedInvoiceType == InvoiceType.sales;
+                                        final isSalesReturn = _selectedInvoiceType == InvoiceType.salesReturn;
+                                        final percent = isSales ? seller.commissionSalePercent : (isSalesReturn ? seller.commissionSalesReturnPercent : null);
+                                        final amount = isSales ? seller.commissionSalesAmount : (isSalesReturn ? seller.commissionSalesReturnAmount : null);
+                                        if (percent != null) {
                                           _commissionType = CommissionType.percentage;
-                                          _commissionPercentage = seller.commissionSalePercent;
+                                          _commissionPercentage = percent;
                                           _commissionAmount = null;
-                                        } else if (seller.commissionSalesAmount != null) {
+                                        } else if (amount != null) {
                                           _commissionType = CommissionType.amount;
-                                          _commissionAmount = seller.commissionSalesAmount;
+                                          _commissionAmount = amount;
                                           _commissionPercentage = null;
                                         }
                                       } else {
@@ -837,6 +847,18 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
       if (r.taxRate < 0 || r.taxRate > 100) {
         return 'درصد مالیات ردیف ${i + 1} باید بین 0 تا 100 باشد';
       }
+      // الزام انبار در حالت ثبت اسناد انبار و کالاهای تحت کنترل موجودی
+      if (_postInventory && r.trackInventory) {
+        final isOut = _selectedInvoiceType == InvoiceType.sales ||
+                      _selectedInvoiceType == InvoiceType.purchaseReturn ||
+                      _selectedInvoiceType == InvoiceType.directConsumption ||
+                      _selectedInvoiceType == InvoiceType.waste;
+        final isIn = _selectedInvoiceType == InvoiceType.purchase ||
+                     _selectedInvoiceType == InvoiceType.salesReturn;
+        if ((isOut || isIn) && r.warehouseId == null) {
+          return 'انبار ردیف ${i + 1} الزامی است';
+        }
+      }
     }
 
     final isSalesOrReturn = _selectedInvoiceType == InvoiceType.sales || _selectedInvoiceType == InvoiceType.salesReturn;
@@ -877,6 +899,8 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
         'net': _sumTotal,
       },
     };
+    // سوییچ ثبت اسناد انبار
+    extraInfo['post_inventory'] = _postInventory;
     
     // افزودن person_id بر اساس نوع فاکتور
     if (isSalesOrReturn && _selectedCustomer != null) {
@@ -947,6 +971,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
         'tax_amount': taxAmount,
         'line_total': lineTotal,
         if (movement != null) 'movement': movement,
+        if (_postInventory && e.warehouseId != null) 'warehouse_id': e.warehouseId,
         // اطلاعات اضافی برای ردیابی
         'unit': e.selectedUnit ?? e.mainUnit,
         'unit_price_source': e.unitPriceSource,
@@ -979,6 +1004,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                 businessId: widget.businessId,
                 selectedCurrencyId: _selectedCurrencyId,
                 invoiceType: (_selectedInvoiceType?.value ?? 'sales'),
+                postInventory: _postInventory,
                 onChanged: (rows) {
                   setState(() {
                     _lineItems = rows;
@@ -1056,6 +1082,30 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                   fontWeight: FontWeight.bold,
                 ),
               ),
+              const SizedBox(height: 24),
+
+              // تنظیمات انبار
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SwitchListTile(
+                        title: const Text('ثبت اسناد انبار'),
+                        subtitle: const Text('در صورت غیرفعال‌سازی، حرکات موجودی ثبت نمی‌شوند و کنترل کسری انجام نمی‌گردد'),
+                        value: _postInventory,
+                        onChanged: (value) {
+                          setState(() {
+                            _postInventory = value;
+                          });
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
               const SizedBox(height: 24),
               
               // چاپ فاکتور بعد از صدور

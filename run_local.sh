@@ -33,8 +33,13 @@ case "$CMD" in
   serve)
     uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
     ;;
+  serve-workers)
+    # اجرای uvicorn با چند worker (بدون reload)
+    WORKERS=${WORKERS:-4}
+    uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers "$WORKERS"
+    ;;
   *)
-    echo "Usage: $0 [serve|migrate|test]"
+    echo "Usage: $0 [serve|serve-workers|migrate|test]"
     exit 1
     ;;
 esac

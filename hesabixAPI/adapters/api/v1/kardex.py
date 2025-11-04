@@ -53,6 +53,7 @@ async def list_kardex_lines_endpoint(
                 "petty_cash_ids",
                 "account_ids",
                 "check_ids",
+                "warehouse_ids",
                 "match_mode",
                 "result_scope",
             ):
@@ -113,6 +114,7 @@ async def export_kardex_excel_endpoint(
         "petty_cash_ids": body.get("petty_cash_ids"),
         "account_ids": body.get("account_ids"),
         "check_ids": body.get("check_ids"),
+        "warehouse_ids": body.get("warehouse_ids"),
         "match_mode": body.get("match_mode") or "any",
         "result_scope": body.get("result_scope") or "lines_matching",
         "include_running_balance": bool(body.get("include_running_balance", False)),
@@ -130,7 +132,7 @@ async def export_kardex_excel_endpoint(
     ws = wb.active
     ws.title = "Kardex"
     headers = [
-        "document_date", "document_code", "document_type", "description",
+        "document_date", "document_code", "document_type", "warehouse", "movement", "description",
         "debit", "credit", "quantity", "running_amount", "running_quantity",
     ]
     ws.append(headers)
@@ -139,6 +141,8 @@ async def export_kardex_excel_endpoint(
             it.get("document_date"),
             it.get("document_code"),
             it.get("document_type"),
+            it.get("warehouse_name") or it.get("warehouse_id"),
+            it.get("movement"),
             it.get("description"),
             it.get("debit"),
             it.get("credit"),
@@ -205,6 +209,7 @@ async def export_kardex_pdf_endpoint(
         "petty_cash_ids": body.get("petty_cash_ids"),
         "account_ids": body.get("account_ids"),
         "check_ids": body.get("check_ids"),
+        "warehouse_ids": body.get("warehouse_ids"),
         "match_mode": body.get("match_mode") or "any",
         "result_scope": body.get("result_scope") or "lines_matching",
         "include_running_balance": bool(body.get("include_running_balance", False)),
@@ -223,6 +228,8 @@ async def export_kardex_pdf_endpoint(
         f"<td>{cell(it.get('document_date'))}</td>"
         f"<td>{cell(it.get('document_code'))}</td>"
         f"<td>{cell(it.get('document_type'))}</td>"
+        f"<td>{cell(it.get('warehouse_name') or it.get('warehouse_id'))}</td>"
+        f"<td>{cell(it.get('movement'))}</td>"
         f"<td>{cell(it.get('description'))}</td>"
         f"<td style='text-align:right'>{cell(it.get('debit'))}</td>"
         f"<td style='text-align:right'>{cell(it.get('credit'))}</td>"
@@ -252,6 +259,8 @@ async def export_kardex_pdf_endpoint(
               <th>تاریخ سند</th>
               <th>کد سند</th>
               <th>نوع سند</th>
+              <th>انبار</th>
+              <th>جهت حرکت</th>
               <th>شرح</th>
               <th>بدهکار</th>
               <th>بستانکار</th>
