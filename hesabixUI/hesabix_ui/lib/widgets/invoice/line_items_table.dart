@@ -13,6 +13,7 @@ class InvoiceLineItemsTable extends StatefulWidget {
   final ValueChanged<List<InvoiceLineItem>>? onChanged;
   final String invoiceType; // sales | purchase | sales_return | purchase_return | ...
   final bool postInventory;
+  final List<InvoiceLineItem>? initialRows; // برای مقداردهی اولیه (ویرایش فاکتور)
 
   const InvoiceLineItemsTable({
     super.key,
@@ -21,6 +22,7 @@ class InvoiceLineItemsTable extends StatefulWidget {
     this.onChanged,
     this.invoiceType = 'sales',
     this.postInventory = true,
+    this.initialRows,
   });
 
   @override
@@ -73,6 +75,11 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
   @override
   void initState() {
     super.initState();
+    if ((widget.initialRows ?? const <InvoiceLineItem>[]).isNotEmpty) {
+      _rows.clear();
+      _rows.addAll(widget.initialRows!);
+      _notify();
+    }
   }
 
   @override
@@ -83,6 +90,13 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
       _recalculateAllUnitPrices();
       // invalidate inline price list cache if currency changed
       _inlinePriceList = null;
+    }
+
+    // اگر والد پس از لود اولیه، ردیف‌های اولیه را فراهم کرد و جدول خالی است، آن‌ها را ست کن
+    if (_rows.isEmpty && (widget.initialRows ?? const <InvoiceLineItem>[]).isNotEmpty) {
+      _rows.clear();
+      _rows.addAll(widget.initialRows!);
+      _notify();
     }
   }
 

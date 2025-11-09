@@ -70,6 +70,14 @@ class _SettingsPageState extends State<SettingsPage> {
                   icon: Icons.print,
                   onTap: () => _showPrintDocumentsDialog(context),
                 ),
+                // Report Builder - Templates access
+                _buildSettingItem(
+                  context,
+                  title: t.templates,
+                  subtitle: t.printDocumentsDescription,
+                  icon: Icons.picture_as_pdf,
+                  onTap: () => context.go('/business/${widget.businessId}/report-templates'),
+                ),
               ],
             ),
             

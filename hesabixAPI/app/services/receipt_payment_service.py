@@ -406,6 +406,11 @@ def create_receipt_payment(
             account_code = "20201"  # حساب‌های پرداختنی
             logger.info(f"انتخاب حساب شخص با کد: {account_code}")
             account = _get_fixed_account_by_code(db, account_code)
+        elif transaction_type == "wallet":
+            # کیف‌پول (حساب نزد پرداخت‌یار)
+            account_code = "10204"
+            logger.info(f"انتخاب حساب کیف‌پول با کد: {account_code}")
+            account = _get_fixed_account_by_code(db, account_code)
         elif account_id:
             # اگر account_id مشخص باشد، از آن استفاده کن
             logger.info(f"استفاده از account_id مشخص: {account_id}")

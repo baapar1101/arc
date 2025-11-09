@@ -31,6 +31,20 @@ class _SystemSettingsPageState extends State<SystemSettingsPage> {
         route: '/user/profile/system-settings/configuration',
       ),
       SettingsItem(
+        title: 'تنظیمات کیف‌پول',
+        description: 'تعیین ارز پایه و سیاست‌ها',
+        icon: Icons.account_balance_wallet_outlined,
+        color: const Color(0xFF009688),
+        route: '/user/profile/system-settings/wallet',
+      ),
+      SettingsItem(
+        title: 'درگاه‌های پرداخت',
+        description: 'مدیریت و پیکربندی درگاه‌ها',
+        icon: Icons.payment_outlined,
+        color: const Color(0xFF3F51B5),
+        route: '/user/profile/system-settings/payment-gateways',
+      ),
+      SettingsItem(
         title: 'userManagement',
         description: 'userManagementDescription',
         icon: Icons.people_outlined,

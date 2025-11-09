@@ -236,6 +236,9 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
       title: t.receiptsAndPayments,
       excelEndpoint: '/businesses/${widget.businessId}/receipts-payments/export/excel',
       pdfEndpoint: '/businesses/${widget.businessId}/receipts-payments/export/pdf',
+      businessId: widget.businessId,
+      reportModuleKey: 'receipts_payments',
+      reportSubtype: 'list',
       // دکمه حذف گروهی در هدر جدول
       customHeaderActions: [
         Tooltip(
@@ -1601,7 +1604,7 @@ class _ReceiptPaymentViewDialogState extends State<ReceiptPaymentViewDialog> {
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
               : const Icon(Icons.picture_as_pdf),
-            label: Text(_isGeneratingPdf ? 'در حال تولید...' : 'خروجی PDF'),
+            label: Text(_isGeneratingPdf ? AppLocalizations.of(context).generating : AppLocalizations.of(context).exportToPdf),
           ),
         ],
       ),
@@ -1625,7 +1628,7 @@ class _ReceiptPaymentViewDialogState extends State<ReceiptPaymentViewDialog> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('فایل PDF با موفقیت تولید شد'),
+            content: Text(AppLocalizations.of(context).pdfSuccess),
             backgroundColor: Colors.green,
           ),
         );
@@ -1634,7 +1637,7 @@ class _ReceiptPaymentViewDialogState extends State<ReceiptPaymentViewDialog> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('خطا در تولید PDF: $e'),
+            content: Text('${AppLocalizations.of(context).pdfError}: $e'),
             backgroundColor: Colors.red,
           ),
         );

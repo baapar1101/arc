@@ -261,35 +261,179 @@ async def export_expense_income_pdf_endpoint(
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
 ):
-    """خروجی PDF"""
-    from app.services.expense_income_service import export_expense_income_pdf
+    """خروجی PDF (با پشتیبانی قالب سفارشی expense_income/list)"""
     from fastapi.responses import Response
-    
-    # دریافت پارامترهای فیلتر
-    query_dict = {}
+    from weasyprint import HTML
+    from weasyprint.text.fonts import FontConfiguration
+    from app.core.i18n import negotiate_locale
+    from html import escape
+    import datetime, json
+    # دریافت پارامترهای فیلتر و تنظیمات
     try:
-        body_json = await request.json()
-        if isinstance(body_json, dict):
-            for key in ["document_type", "from_date", "to_date"]:
-                if key in body_json:
-                    query_dict[key] = body_json[key]
+        body = await request.json()
     except Exception:
-        pass
-    
+        body = {}
+    # ساخت query برای لیست
+    query_dict = {
+        "take": int(body.get("take", 1000)),
+        "skip": int(body.get("skip", 0)),
+        "sort_by": body.get("sort_by"),
+        "sort_desc": bool(body.get("sort_desc", False)),
+        "search": body.get("search"),
+        "search_fields": body.get("search_fields"),
+        "filters": body.get("filters"),
+        "document_type": body.get("document_type"),
+        "from_date": body.get("from_date"),
+        "to_date": body.get("to_date"),
+    }
     # سال مالی از هدر
     try:
         fy_header = request.headers.get("X-Fiscal-Year-ID")
         if fy_header:
             query_dict["fiscal_year_id"] = int(fy_header)
+        elif body.get("fiscal_year_id") is not None:
+            query_dict["fiscal_year_id"] = int(body.get("fiscal_year_id"))
     except Exception:
         pass
-    
-    pdf_data = export_expense_income_pdf(db, business_id, query_dict)
-    
+    # دریافت داده‌ها
+    from app.services.expense_income_service import list_expense_income
+    from adapters.db.models.business import Business
+    from app.core.responses import format_datetime_fields
+    result = list_expense_income(db, business_id, query_dict)
+    items = result.get("items", [])
+    items = [format_datetime_fields(item, request) for item in items]
+    # ستون‌ها
+    headers: list[str] = []
+    keys: list[str] = []
+    export_columns = body.get("export_columns")
+    if export_columns:
+        for col in export_columns:
+            key = col.get("key")
+            label = col.get("label", key)
+            if key:
+                keys.append(str(key))
+                headers.append(str(label))
+    else:
+        default_columns = [
+            ("code", "کد سند"),
+            ("document_type_name", "نوع سند"),
+            ("document_date", "تاریخ سند"),
+            ("total_amount", "مبلغ کل"),
+            ("created_by_name", "ایجادکننده"),
+            ("registered_at", "تاریخ ثبت"),
+        ]
+        for key, label in default_columns:
+            if items and key in items[0]:
+                keys.append(key)
+                headers.append(label)
+    # اطلاعات کسب‌وکار
+    business_name = ""
+    try:
+        b = db.query(Business).filter(Business.id == business_id).first()
+        if b is not None:
+            business_name = b.name or ""
+    except Exception:
+        business_name = ""
+    # Locale
+    locale = negotiate_locale(request.headers.get("Accept-Language"))
+    is_fa = locale == "fa"
+    now = datetime.datetime.now().strftime('%Y/%m/%d %H:%M')
+    title_text = "لیست اسناد هزینه/درآمد" if is_fa else "Expense/Income List"
+    label_biz = "کسب و کار" if is_fa else "Business"
+    label_date = "تاریخ تولید" if is_fa else "Generated Date"
+    footer_text = f"تولید شده در {now}" if is_fa else f"Generated at {now}"
+    headers_html = ''.join(f'<th>{escape(header)}</th>' for header in headers)
+    rows_html = []
+    for item in items:
+        row_cells = []
+        for key in keys:
+            value = item.get(key, "")
+            if isinstance(value, list):
+                value = ", ".join(str(v) for v in value)
+            elif isinstance(value, dict):
+                value = json.dumps(value, ensure_ascii=False)
+            row_cells.append(f'<td>{escape(str(value))}</td>')
+        rows_html.append(f'<tr>{"".join(row_cells)}</tr>')
+    # کانتکست برای قالب سفارشی
+    template_context = {
+        "title_text": title_text,
+        "business_name": business_name,
+        "generated_at": now,
+        "is_fa": is_fa,
+        "headers": headers,
+        "keys": keys,
+        "items": items,
+        "table_headers_html": headers_html,
+        "table_rows_html": "".join(rows_html),
+    }
+    # تلاش برای رندر با قالب سفارشی
+    resolved_html = None
+    try:
+        from app.services.report_template_service import ReportTemplateService
+        explicit_template_id = None
+        try:
+            if body.get("template_id") is not None:
+                explicit_template_id = int(body.get("template_id"))
+        except Exception:
+            explicit_template_id = None
+        resolved_html = ReportTemplateService.try_render_resolved(
+            db=db,
+            business_id=business_id,
+            module_key="expense_income",
+            subtype="list",
+            context=template_context,
+            explicit_template_id=explicit_template_id,
+        )
+    except Exception:
+        resolved_html = None
+    # HTML پیش‌فرض
+    table_html = f"""
+    <!DOCTYPE html>
+    <html dir="{{'rtl' if is_fa else 'ltr'}}">
+      <head>
+        <meta charset="utf-8">
+        <title>{title_text}</title>
+        <style>
+          @page {{ margin: 1cm; size: A4; }}
+          body {{
+            font-family: {'Tahoma, Arial' if is_fa else 'Arial, sans-serif'};
+            font-size: 12px; line-height: 1.4; color: #333; direction: {'rtl' if is_fa else 'ltr'};
+          }}
+          .header {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #366092; }}
+          .title {{ font-size: 18px; font-weight: bold; color: #366092; }}
+          .meta {{ font-size: 11px; color: #666; }}
+          table {{ width: 100%; border-collapse: collapse; margin-top: 12px; }}
+          th, td {{ border: 1px solid #d7dde6; padding: 6px; text-align: {'right' if is_fa else 'left'}; }}
+          thead {{ background: #f6f6f6; }}
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div>
+            <div class="title">{title_text}</div>
+            <div class="meta">{label_biz}: {escape(business_name)}</div>
+          </div>
+          <div class="meta">{label_date}: {escape(now)}</div>
+        </div>
+        <table>
+          <thead><tr>{headers_html}</tr></thead>
+          <tbody>{''.join(rows_html)}</tbody>
+        </table>
+        <div class="meta" style="margin-top: 8px; text-align: {'left' if is_fa else 'right'};">{footer_text}</div>
+      </body>
+    </html>
+    """
+    final_html = resolved_html or table_html
+    pdf_bytes = HTML(string=final_html).write_pdf(font_config=FontConfiguration())
+    filename = f"expense_income_{business_id}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
     return Response(
-        content=pdf_data,
+        content=pdf_bytes,
         media_type="application/pdf",
-        headers={"Content-Disposition": f"attachment; filename=expense_income_{business_id}.pdf"}
+        headers={
+            "Content-Disposition": f"attachment; filename={filename}",
+            "Content-Length": str(len(pdf_bytes)),
+            "Access-Control-Expose-Headers": "Content-Disposition",
+        },
     )
 
 

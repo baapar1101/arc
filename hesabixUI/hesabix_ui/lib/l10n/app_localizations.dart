@@ -5767,6 +5767,186 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Accounting Document'**
   String get accountTypeAccountingDocument;
+
+  /// No description provided for @printTemplatePublished.
+  ///
+  /// In en, this message translates to:
+  /// **'Print template (Published)'**
+  String get printTemplatePublished;
+
+  /// No description provided for @noCustomTemplate.
+  ///
+  /// In en, this message translates to:
+  /// **'— No custom template —'**
+  String get noCustomTemplate;
+
+  /// No description provided for @reload.
+  ///
+  /// In en, this message translates to:
+  /// **'Reload'**
+  String get reload;
+
+  /// No description provided for @presetInvoicesList.
+  ///
+  /// In en, this message translates to:
+  /// **'Invoices/List'**
+  String get presetInvoicesList;
+
+  /// No description provided for @presetInvoicesDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Invoices/Detail'**
+  String get presetInvoicesDetail;
+
+  /// No description provided for @presetReceiptsPaymentsList.
+  ///
+  /// In en, this message translates to:
+  /// **'ReceiptsPayments/List'**
+  String get presetReceiptsPaymentsList;
+
+  /// No description provided for @presetReceiptsPaymentsDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'ReceiptsPayments/Detail'**
+  String get presetReceiptsPaymentsDetail;
+
+  /// No description provided for @presetExpenseIncomeList.
+  ///
+  /// In en, this message translates to:
+  /// **'ExpenseIncome/List'**
+  String get presetExpenseIncomeList;
+
+  /// No description provided for @presetDocumentsList.
+  ///
+  /// In en, this message translates to:
+  /// **'Documents/List'**
+  String get presetDocumentsList;
+
+  /// No description provided for @presetDocumentsDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Documents/Detail'**
+  String get presetDocumentsDetail;
+
+  /// No description provided for @printPdf.
+  ///
+  /// In en, this message translates to:
+  /// **'Print PDF'**
+  String get printPdf;
+
+  /// No description provided for @generating.
+  ///
+  /// In en, this message translates to:
+  /// **'Generating...'**
+  String get generating;
+
+  /// No description provided for @pdfSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'PDF generated successfully'**
+  String get pdfSuccess;
+
+  /// No description provided for @pdfError.
+  ///
+  /// In en, this message translates to:
+  /// **'Error generating PDF'**
+  String get pdfError;
+
+  /// No description provided for @printTemplate.
+  ///
+  /// In en, this message translates to:
+  /// **'Print template'**
+  String get printTemplate;
+
+  /// No description provided for @templateStandard.
+  ///
+  /// In en, this message translates to:
+  /// **'Standard template'**
+  String get templateStandard;
+
+  /// No description provided for @templateCompact.
+  ///
+  /// In en, this message translates to:
+  /// **'Compact template'**
+  String get templateCompact;
+
+  /// No description provided for @templateDetailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Detailed template'**
+  String get templateDetailed;
+
+  /// No description provided for @templateCustom.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom template'**
+  String get templateCustom;
+
+  /// No description provided for @paymentGateways.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment Gateways'**
+  String get paymentGateways;
+
+  /// No description provided for @addPaymentGateway.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Payment Gateway'**
+  String get addPaymentGateway;
+
+  /// No description provided for @editPaymentGateway.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Payment Gateway'**
+  String get editPaymentGateway;
+
+  /// No description provided for @provider.
+  ///
+  /// In en, this message translates to:
+  /// **'Provider'**
+  String get provider;
+
+  /// No description provided for @displayName.
+  ///
+  /// In en, this message translates to:
+  /// **'Display name'**
+  String get displayName;
+
+  /// No description provided for @useSuggestedCallback.
+  ///
+  /// In en, this message translates to:
+  /// **'Use suggested callback'**
+  String get useSuggestedCallback;
+
+  /// No description provided for @successRedirectOptional.
+  ///
+  /// In en, this message translates to:
+  /// **'success_redirect (optional)'**
+  String get successRedirectOptional;
+
+  /// No description provided for @failureRedirectOptional.
+  ///
+  /// In en, this message translates to:
+  /// **'failure_redirect (optional)'**
+  String get failureRedirectOptional;
+
+  /// No description provided for @operationSuccessful.
+  ///
+  /// In en, this message translates to:
+  /// **'Operation completed successfully'**
+  String get operationSuccessful;
+
+  /// No description provided for @callbackNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Note: tx_id will be appended to callback automatically. If success/failure redirects are set, user will be redirected accordingly.'**
+  String get callbackNote;
+
+  /// No description provided for @create.
+  ///
+  /// In en, this message translates to:
+  /// **'Create'**
+  String get create;
 }
 
 class _AppLocalizationsDelegate

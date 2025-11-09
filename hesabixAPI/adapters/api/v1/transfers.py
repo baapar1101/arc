@@ -299,6 +299,38 @@ async def export_transfers_pdf(
         rows_html.append(f'<tr>{"".join(row_cells)}</tr>')
 
     now = datetime.datetime.now().strftime('%Y/%m/%d %H:%M')
+    # تلاش برای رندر با قالب سفارشی (transfers/list)
+    resolved_html = None
+    try:
+        from app.services.report_template_service import ReportTemplateService
+        explicit_template_id = None
+        try:
+            if body.get("template_id") is not None:
+                explicit_template_id = int(body.get("template_id"))
+        except Exception:
+            explicit_template_id = None
+        template_context = {
+            "title_text": "لیست انتقال‌ها",
+            "business_name": "",
+            "generated_at": now,
+            "is_fa": True,
+            "headers": headers,
+            "keys": keys,
+            "items": items,
+            "table_headers_html": header_html,
+            "table_rows_html": "".join(rows_html),
+        }
+        resolved_html = ReportTemplateService.try_render_resolved(
+            db=db,
+            business_id=business_id,
+            module_key="transfers",
+            subtype="list",
+            context=template_context,
+            explicit_template_id=explicit_template_id,
+        )
+    except Exception:
+        resolved_html = None
+
     html = f"""
     <!DOCTYPE html>
     <html dir='rtl'>
@@ -329,8 +361,9 @@ async def export_transfers_pdf(
       </body>
     </html>
     """
+    final_html = resolved_html or html
     font_config = FontConfiguration()
-    pdf_bytes = HTML(string=html).write_pdf(font_config=font_config)
+    pdf_bytes = HTML(string=final_html).write_pdf(font_config=font_config)
     filename = f"transfers_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
     return Response(
         content=pdf_bytes,

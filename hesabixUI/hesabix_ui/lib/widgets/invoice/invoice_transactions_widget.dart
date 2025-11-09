@@ -16,6 +16,7 @@ import 'bank_account_combobox_widget.dart';
 import 'cash_register_combobox_widget.dart';
 import 'petty_cash_combobox_widget.dart';
 import 'account_tree_combobox_widget.dart';
+import 'check_combobox_widget.dart';
 import '../../models/invoice_type_model.dart';
 
 class InvoiceTransactionsWidget extends StatefulWidget {
@@ -24,6 +25,7 @@ class InvoiceTransactionsWidget extends StatefulWidget {
   final int businessId;
   final CalendarController calendarController;
   final InvoiceType invoiceType;
+  final int? selectedCurrencyId;
 
   const InvoiceTransactionsWidget({
     super.key,
@@ -32,6 +34,7 @@ class InvoiceTransactionsWidget extends StatefulWidget {
     required this.businessId,
     required this.calendarController,
     required this.invoiceType,
+    this.selectedCurrencyId,
   });
 
   @override
@@ -327,6 +330,7 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
         businessId: widget.businessId,
         calendarController: widget.calendarController,
         invoiceType: widget.invoiceType,
+        selectedCurrencyId: widget.selectedCurrencyId,
         onSave: (newTransaction) {
           if (index != null) {
             // ویرایش تراکنش موجود
@@ -351,6 +355,7 @@ class TransactionDialog extends StatefulWidget {
   final CalendarController calendarController;
   final ValueChanged<InvoiceTransaction> onSave;
   final InvoiceType invoiceType;
+  final int? selectedCurrencyId;
 
   const TransactionDialog({
     super.key,
@@ -358,6 +363,7 @@ class TransactionDialog extends StatefulWidget {
     required this.businessId,
     required this.calendarController,
     required this.invoiceType,
+    this.selectedCurrencyId,
     required this.onSave,
   });
 
@@ -387,6 +393,7 @@ class _TransactionDialogState extends State<TransactionDialog> {
   String? _selectedCashRegisterId;
   String? _selectedPettyCashId;
   String? _selectedCheckId;
+  int? _selectedCheckCurrencyId;
   String? _selectedPersonId;
   AccountTreeNode? _selectedAccount;
   
@@ -728,6 +735,7 @@ class _TransactionDialogState extends State<TransactionDialog> {
     return BankAccountComboboxWidget(
       businessId: widget.businessId,
       selectedAccountId: _selectedBankId,
+      filterCurrencyId: widget.selectedCurrencyId,
       onChanged: (opt) {
         setState(() {
           _selectedBankId = opt?.id;
@@ -743,6 +751,7 @@ class _TransactionDialogState extends State<TransactionDialog> {
     return CashRegisterComboboxWidget(
       businessId: widget.businessId,
       selectedRegisterId: _selectedCashRegisterId,
+      filterCurrencyId: widget.selectedCurrencyId,
       onChanged: (opt) {
         setState(() {
           _selectedCashRegisterId = opt?.id;
@@ -758,6 +767,7 @@ class _TransactionDialogState extends State<TransactionDialog> {
     return PettyCashComboboxWidget(
       businessId: widget.businessId,
       selectedPettyCashId: _selectedPettyCashId,
+      filterCurrencyId: widget.selectedCurrencyId,
       onChanged: (opt) {
         setState(() {
           _selectedPettyCashId = opt?.id;
@@ -770,21 +780,18 @@ class _TransactionDialogState extends State<TransactionDialog> {
   }
 
   Widget _buildCheckFields() {
-    return DropdownButtonFormField<String>(
-      initialValue: _selectedCheckId,
-      decoration: const InputDecoration(
-        labelText: 'چک *',
-        border: OutlineInputBorder(),
-      ),
-      items: const [
-        DropdownMenuItem(value: 'check1', child: Text('چک شماره 123456')),
-        DropdownMenuItem(value: 'check2', child: Text('چک شماره 789012')),
-      ],
-      onChanged: (value) {
+    return CheckComboboxWidget(
+      businessId: widget.businessId,
+      selectedCheckId: _selectedCheckId,
+      filterCurrencyId: widget.selectedCurrencyId,
+      onChanged: (opt) {
         setState(() {
-          _selectedCheckId = value;
+          _selectedCheckId = opt?.id;
+          _selectedCheckCurrencyId = opt?.currencyId;
         });
       },
+      label: 'چک *',
+      hintText: 'جست‌وجو و انتخاب چک',
     );
   }
 
@@ -884,6 +891,58 @@ class _TransactionDialogState extends State<TransactionDialog> {
     final commission = _commissionController.text.isNotEmpty 
         ? double.parse(_commissionController.text) 
         : null;
+    // اعتبارسنجی هم‌خوانی ارز با ارز فاکتور برای انواع دارای ارز
+    final invoiceCurrencyId = widget.selectedCurrencyId;
+    if (invoiceCurrencyId != null) {
+      if (_selectedType == TransactionType.bank && _selectedBankId != null) {
+        final bank = _banks.firstWhere(
+          (b) => b['id']?.toString() == _selectedBankId,
+          orElse: () => <String, dynamic>{},
+        );
+        final bankCurrencyId = int.tryParse('${bank['currency_id'] ?? bank['currencyId'] ?? ''}');
+        if (bankCurrencyId != null && bankCurrencyId != invoiceCurrencyId) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('ارز بانک انتخابی با ارز فاکتور هم‌خوانی ندارد')),
+          );
+          return;
+        }
+      }
+      if (_selectedType == TransactionType.cashRegister && _selectedCashRegisterId != null) {
+        final cr = _cashRegisters.firstWhere(
+          (c) => c['id']?.toString() == _selectedCashRegisterId,
+          orElse: () => <String, dynamic>{},
+        );
+        final crCurrencyId = int.tryParse('${cr['currency_id'] ?? cr['currencyId'] ?? ''}');
+        if (crCurrencyId != null && crCurrencyId != invoiceCurrencyId) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('ارز صندوق انتخابی با ارز فاکتور هم‌خوانی ندارد')),
+          );
+          return;
+        }
+      }
+      if (_selectedType == TransactionType.pettyCash && _selectedPettyCashId != null) {
+        final pc = _pettyCashList.firstWhere(
+          (p) => p['id']?.toString() == _selectedPettyCashId,
+          orElse: () => <String, dynamic>{},
+        );
+        final pcCurrencyId = int.tryParse('${pc['currency_id'] ?? pc['currencyId'] ?? ''}');
+        if (pcCurrencyId != null && pcCurrencyId != invoiceCurrencyId) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('ارز تنخواه‌گردان انتخابی با ارز فاکتور هم‌خوانی ندارد')),
+          );
+          return;
+        }
+      }
+      if (_selectedType == TransactionType.check && _selectedCheckId != null) {
+        final chkCurrencyId = _selectedCheckCurrencyId;
+        if (chkCurrencyId != null && chkCurrencyId != invoiceCurrencyId) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('ارز چک انتخابی با ارز فاکتور هم‌خوانی ندارد')),
+          );
+          return;
+        }
+      }
+    }
     
     final transaction = InvoiceTransaction(
       id: widget.transaction?.id ?? _uuid.v4(),

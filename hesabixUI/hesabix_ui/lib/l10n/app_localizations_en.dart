@@ -2921,4 +2921,95 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get accountTypeAccountingDocument => 'Accounting Document';
+
+  @override
+  String get printTemplatePublished => 'Print template (Published)';
+
+  @override
+  String get noCustomTemplate => '— No custom template —';
+
+  @override
+  String get reload => 'Reload';
+
+  @override
+  String get presetInvoicesList => 'Invoices/List';
+
+  @override
+  String get presetInvoicesDetail => 'Invoices/Detail';
+
+  @override
+  String get presetReceiptsPaymentsList => 'ReceiptsPayments/List';
+
+  @override
+  String get presetReceiptsPaymentsDetail => 'ReceiptsPayments/Detail';
+
+  @override
+  String get presetExpenseIncomeList => 'ExpenseIncome/List';
+
+  @override
+  String get presetDocumentsList => 'Documents/List';
+
+  @override
+  String get presetDocumentsDetail => 'Documents/Detail';
+
+  @override
+  String get printPdf => 'Print PDF';
+
+  @override
+  String get generating => 'Generating...';
+
+  @override
+  String get pdfSuccess => 'PDF generated successfully';
+
+  @override
+  String get pdfError => 'Error generating PDF';
+
+  @override
+  String get printTemplate => 'Print template';
+
+  @override
+  String get templateStandard => 'Standard template';
+
+  @override
+  String get templateCompact => 'Compact template';
+
+  @override
+  String get templateDetailed => 'Detailed template';
+
+  @override
+  String get templateCustom => 'Custom template';
+
+  @override
+  String get paymentGateways => 'Payment Gateways';
+
+  @override
+  String get addPaymentGateway => 'Add Payment Gateway';
+
+  @override
+  String get editPaymentGateway => 'Edit Payment Gateway';
+
+  @override
+  String get provider => 'Provider';
+
+  @override
+  String get displayName => 'Display name';
+
+  @override
+  String get useSuggestedCallback => 'Use suggested callback';
+
+  @override
+  String get successRedirectOptional => 'success_redirect (optional)';
+
+  @override
+  String get failureRedirectOptional => 'failure_redirect (optional)';
+
+  @override
+  String get operationSuccessful => 'Operation completed successfully';
+
+  @override
+  String get callbackNote =>
+      'Note: tx_id will be appended to callback automatically. If success/failure redirects are set, user will be redirected accordingly.';
+
+  @override
+  String get create => 'Create';
 }

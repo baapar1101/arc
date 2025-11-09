@@ -12,6 +12,7 @@ import 'package:dio/dio.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
+import 'package:hesabix_ui/services/report_template_service.dart';
 import 'data_table_config.dart';
 import 'data_table_search_dialog.dart';
 import 'column_settings_dialog.dart';
@@ -70,6 +71,12 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
   // Row selection state
   final Set<int> _selectedRows = <int>{};
   bool _isExporting = false;
+  int? _templateIdForExport;
+  final TextEditingController _templateIdCtrl = TextEditingController();
+  // Report templates (for PDF export)
+  List<Map<String, dynamic>> _availableTemplates = const [];
+  bool _loadingTemplates = false;
+  int? _selectedTemplateIdFromList;
   
   // Column settings state
   ColumnSettings? _columnSettings;
@@ -125,6 +132,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     _searchDebounce?.cancel();
     _horizontalScrollController.dispose();
     _tableFocusNode.dispose();
+    _templateIdCtrl.dispose();
     for (var controller in _columnSearchControllers.values) {
       controller.dispose();
     }
@@ -630,6 +638,10 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
       // Add selected row indices if exporting selected only
       if (selectedOnly && _selectedRows.isNotEmpty) {
         params['selected_indices'] = _selectedRows.toList();
+      }
+      // Optional report template for PDF
+      if (format == 'pdf' && _templateIdForExport != null) {
+        params['template_id'] = _templateIdForExport;
       }
 
       // Add export columns in current visible order (excluding ActionColumn)
@@ -1161,6 +1173,34 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     AppLocalizations t,
     ThemeData theme,
   ) {
+    Future<void> _ensureTemplatesLoaded() async {
+      if (widget.config.pdfEndpoint == null) return;
+      if (widget.config.businessId == null || widget.config.reportModuleKey == null) return;
+      setState(() => _loadingTemplates = true);
+      try {
+        final service = ReportTemplateService(ApiClient());
+        final list = await service.listTemplates(
+          businessId: widget.config.businessId!,
+          moduleKey: widget.config.reportModuleKey,
+          subtype: widget.config.reportSubtype,
+          status: 'published',
+        );
+        if (mounted) {
+          setState(() {
+            _availableTemplates = list;
+          });
+        }
+      } catch (_) {
+        if (mounted) {
+          setState(() {
+            _availableTemplates = const [];
+          });
+        }
+      } finally {
+        if (mounted) setState(() => _loadingTemplates = false);
+      }
+    }
+    _ensureTemplatesLoaded();
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -1201,6 +1241,109 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
             ),
             
             const Divider(height: 1),
+            
+            if (widget.config.pdfEndpoint != null) ...[
+              if (widget.config.businessId != null && widget.config.reportModuleKey != null) ...[
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.description_outlined, size: 18),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _loadingTemplates
+                            ? const LinearProgressIndicator(minHeight: 2)
+                            : DropdownButtonFormField<int>(
+                                value: _selectedTemplateIdFromList,
+                                isExpanded: true,
+                                decoration: InputDecoration(
+                                  labelText: AppLocalizations.of(context).printTemplatePublished,
+                                  isDense: true,
+                                  border: const OutlineInputBorder(),
+                                ),
+                                items: [
+                                  DropdownMenuItem<int>(
+                                    value: null,
+                                    child: Text(AppLocalizations.of(context).noCustomTemplate),
+                                  ),
+                                  ..._availableTemplates.map((tpl) {
+                                    final id = (tpl['id'] as num).toInt();
+                                    final name = (tpl['name'] ?? 'Template').toString();
+                                    final isDefault = tpl['is_default'] == true;
+                                    return DropdownMenuItem<int>(
+                                      value: id,
+                                      child: Row(
+                                        children: [
+                                          if (isDefault) const Icon(Icons.star, size: 16),
+                                          if (isDefault) const SizedBox(width: 6),
+                                          Expanded(child: Text(name)),
+                                        ],
+                                      ),
+                                    );
+                                  }),
+                                ],
+                                onChanged: (val) {
+                                  setState(() {
+                                    _selectedTemplateIdFromList = val;
+                                    _templateIdForExport = val;
+                                    if (val != null) {
+                                      _templateIdCtrl.text = val.toString();
+                                    }
+                                  });
+                                },
+                              ),
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        tooltip: AppLocalizations.of(context).reload,
+                        onPressed: _loadingTemplates ? null : _ensureTemplatesLoaded,
+                        icon: const Icon(Icons.refresh),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1),
+              ],
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Row(
+                  children: [
+                    const Icon(Icons.tune, size: 18),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: TextField(
+                        controller: _templateIdCtrl,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: 'template_id (اختیاری برای PDF سفارشی)',
+                          hintText: 'مثلاً 101',
+                          isDense: true,
+                        ),
+                        onChanged: (v) {
+                          final n = int.tryParse(v.trim());
+                          setState(() {
+                            _templateIdForExport = n;
+                          });
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    if (_templateIdForExport != null)
+                      IconButton(
+                        tooltip: 'پاک‌کردن قالب سفارشی',
+                        onPressed: () {
+                          setState(() {
+                            _templateIdForExport = null;
+                            _templateIdCtrl.clear();
+                          });
+                        },
+                        icon: const Icon(Icons.clear),
+                      ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+            ],
             
             // Excel options
             if (widget.config.excelEndpoint != null) ...[

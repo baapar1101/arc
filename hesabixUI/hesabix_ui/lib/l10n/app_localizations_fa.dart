@@ -2900,4 +2900,95 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get accountTypeAccountingDocument => 'سند حسابداری';
+
+  @override
+  String get printTemplatePublished => 'قالب چاپ (منتشرشده)';
+
+  @override
+  String get noCustomTemplate => '— بدون قالب سفارشی —';
+
+  @override
+  String get reload => 'بارگذاری مجدد';
+
+  @override
+  String get presetInvoicesList => 'Invoices/List';
+
+  @override
+  String get presetInvoicesDetail => 'Invoices/Detail';
+
+  @override
+  String get presetReceiptsPaymentsList => 'ReceiptsPayments/List';
+
+  @override
+  String get presetReceiptsPaymentsDetail => 'ReceiptsPayments/Detail';
+
+  @override
+  String get presetExpenseIncomeList => 'ExpenseIncome/List';
+
+  @override
+  String get presetDocumentsList => 'Documents/List';
+
+  @override
+  String get presetDocumentsDetail => 'Documents/Detail';
+
+  @override
+  String get printPdf => 'چاپ PDF';
+
+  @override
+  String get generating => 'در حال تولید...';
+
+  @override
+  String get pdfSuccess => 'فایل PDF با موفقیت تولید شد';
+
+  @override
+  String get pdfError => 'خطا در تولید PDF';
+
+  @override
+  String get printTemplate => 'قالب چاپ';
+
+  @override
+  String get templateStandard => 'قالب استاندارد';
+
+  @override
+  String get templateCompact => 'قالب فشرده';
+
+  @override
+  String get templateDetailed => 'قالب تفصیلی';
+
+  @override
+  String get templateCustom => 'قالب سفارشی';
+
+  @override
+  String get paymentGateways => 'درگاه‌های پرداخت';
+
+  @override
+  String get addPaymentGateway => 'ایجاد درگاه پرداخت';
+
+  @override
+  String get editPaymentGateway => 'ویرایش درگاه پرداخت';
+
+  @override
+  String get provider => 'ارائه‌دهنده';
+
+  @override
+  String get displayName => 'نام نمایشی';
+
+  @override
+  String get useSuggestedCallback => 'استفاده از کال‌بک پیشنهادی';
+
+  @override
+  String get successRedirectOptional => 'success_redirect (اختیاری)';
+
+  @override
+  String get failureRedirectOptional => 'failure_redirect (اختیاری)';
+
+  @override
+  String get operationSuccessful => 'عملیات با موفقیت انجام شد';
+
+  @override
+  String get callbackNote =>
+      'نکته: پارامتر tx_id به‌صورت خودکار به callback اضافه می‌شود. پس از بازگشت، در صورت تنظیم success/failure redirect، کاربر به آدرس‌های مربوطه هدایت می‌شود.';
+
+  @override
+  String get create => 'ایجاد';
 }

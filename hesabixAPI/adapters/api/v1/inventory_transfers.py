@@ -160,6 +160,54 @@ def export_inventory_transfers_pdf(
         f"</tr>" for d in rows
     ])
 
+    # تلاش برای رندر با قالب سفارشی (inventory_transfers/list)
+    resolved_html = None
+    try:
+        from app.services.report_template_service import ReportTemplateService
+        explicit_template_id = None
+        try:
+            if body.get("template_id") is not None:
+                explicit_template_id = int(body.get("template_id"))
+        except Exception:
+            explicit_template_id = None
+        # نام کسب‌وکار
+        business_name = ""
+        try:
+            from adapters.db.models.business import Business
+            biz = db.query(Business).filter(Business.id == business_id).first()
+            if biz is not None:
+                business_name = biz.name or ""
+        except Exception:
+            business_name = ""
+        # Locale
+        from app.core.i18n import negotiate_locale
+        locale = negotiate_locale(request.headers.get("Accept-Language"))
+        is_fa = (locale == 'fa')
+        headers = ["کد سند", "تاریخ سند", "شرح"]
+        keys = ["code", "document_date", "description"]
+        headers_html = "<th>کد سند</th><th>تاریخ سند</th><th>شرح</th>"
+        template_context = {
+            "title_text": "لیست انتقال‌ها" if is_fa else "Transfers List",
+            "business_name": business_name,
+            "generated_at": datetime.datetime.now().strftime('%Y/%m/%d %H:%M'),
+            "is_fa": is_fa,
+            "headers": headers,
+            "keys": keys,
+            "items": [ {"code": d.code, "document_date": d.document_date, "description": d.description} for d in rows ],
+            "table_headers_html": headers_html,
+            "table_rows_html": rows_html,
+        }
+        resolved_html = ReportTemplateService.try_render_resolved(
+            db=db,
+            business_id=business_id,
+            module_key="inventory_transfers",
+            subtype="list",
+            context=template_context,
+            explicit_template_id=explicit_template_id,
+        )
+    except Exception:
+        resolved_html = None
+
     html = f"""
     <html>
       <head>
@@ -189,8 +237,9 @@ def export_inventory_transfers_pdf(
     </html>
     """
 
+    final_html = resolved_html or html
     font_config = FontConfiguration()
-    pdf_bytes = HTML(string=html).write_pdf(stylesheets=[CSS(string="@page { size: A4 portrait; margin: 12mm; }")], font_config=font_config)
+    pdf_bytes = HTML(string=final_html).write_pdf(stylesheets=[CSS(string="@page { size: A4 portrait; margin: 12mm; }")], font_config=font_config)
     filename = f"inventory_transfers_{business_id}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
     return Response(
         content=pdf_bytes,

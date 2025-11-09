@@ -366,6 +366,9 @@ class _KardexPageState extends State<KardexPage> {
       endpoint: '/api/v1/kardex/businesses/${widget.businessId}/lines',
       excelEndpoint: '/api/v1/kardex/businesses/${widget.businessId}/lines/export/excel',
       pdfEndpoint: '/api/v1/kardex/businesses/${widget.businessId}/lines/export/pdf',
+      businessId: widget.businessId,
+      reportModuleKey: 'kardex',
+      reportSubtype: 'list',
       columns: [
         DateColumn('document_date', 'تاریخ سند',
             formatter: (item) => (item as Map<String, dynamic>)['document_date']?.toString()),

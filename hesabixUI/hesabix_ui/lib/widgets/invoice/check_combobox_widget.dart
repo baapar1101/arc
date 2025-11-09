@@ -8,12 +8,14 @@ class CheckOption {
   final String? personName;
   final String? bankName;
   final String? sayadCode;
+  final int? currencyId;
   const CheckOption({
     required this.id,
     required this.number,
     this.personName,
     this.bankName,
     this.sayadCode,
+    this.currencyId,
   });
 }
 
@@ -23,6 +25,7 @@ class CheckComboboxWidget extends StatefulWidget {
   final ValueChanged<CheckOption?> onChanged;
   final String label;
   final String hintText;
+  final int? filterCurrencyId;
 
   const CheckComboboxWidget({
     super.key,
@@ -31,6 +34,7 @@ class CheckComboboxWidget extends StatefulWidget {
     this.selectedCheckId,
     this.label = 'چک',
     this.hintText = 'جست‌وجو و انتخاب چک',
+    this.filterCurrencyId,
   });
 
   @override
@@ -101,7 +105,7 @@ class _CheckComboboxWidgetState extends State<CheckComboboxWidget> {
       final dynamic itemsRaw = (res['data'] != null && res['data'] is Map && (res['data'] as Map)['items'] != null)
           ? (res['data'] as Map)['items']
           : res['items'];
-      final items = ((itemsRaw as List<dynamic>? ?? const <dynamic>[])).map((e) {
+      var items = ((itemsRaw as List<dynamic>? ?? const <dynamic>[])).map((e) {
         final m = Map<String, dynamic>.from(e as Map);
         return CheckOption(
           id: '${m['id']}',
@@ -109,8 +113,14 @@ class _CheckComboboxWidgetState extends State<CheckComboboxWidget> {
           personName: (m['person_name'] ?? m['holder_name'])?.toString(),
           bankName: (m['bank_name'] ?? '').toString(),
           sayadCode: (m['sayad_code'] ?? '').toString(),
+          currencyId: (m['currency_id'] ?? m['currencyId']) is int
+              ? (m['currency_id'] ?? m['currencyId']) as int
+              : int.tryParse('${m['currency_id'] ?? m['currencyId'] ?? ''}'),
         );
       }).toList();
+      if (widget.filterCurrencyId != null) {
+        items = items.where((it) => it.currencyId == widget.filterCurrencyId).toList();
+      }
       if (!mounted) return;
       setState(() {
         _items = items;

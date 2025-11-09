@@ -407,7 +407,11 @@ class _DocumentsPageState extends State<DocumentsPage> {
       enableMultiRowSelection: true,
       showExportButtons: true,
       showExcelExport: true,
-      showPdfExport: false,
+      pdfEndpoint: '/businesses/${widget.businessId}/documents/export/pdf',
+      showPdfExport: true,
+      businessId: widget.businessId,
+      reportModuleKey: 'documents',
+      reportSubtype: 'list',
       defaultPageSize: 50,
       pageSizeOptions: [20, 50, 100, 200],
       onRowSelectionChanged: (rows) {

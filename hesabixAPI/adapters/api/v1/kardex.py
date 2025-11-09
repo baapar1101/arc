@@ -240,6 +240,47 @@ async def export_kardex_pdf_endpoint(
         for it in items
     ])
 
+    # تلاش برای رندر با قالب سفارشی (kardex/list)
+    resolved_html = None
+    try:
+        from app.services.report_template_service import ReportTemplateService
+        explicit_template_id = None
+        try:
+            if body.get("template_id") is not None:
+                explicit_template_id = int(body.get("template_id"))
+        except Exception:
+            explicit_template_id = None
+        headers = [
+            "تاریخ سند","کد سند","نوع سند","انبار","جهت حرکت","شرح",
+            "بدهکار","بستانکار","تعداد","مانده مبلغ","مانده تعداد"
+        ]
+        keys = [
+            "document_date","document_code","document_type","warehouse_name",
+            "movement","description","debit","credit","quantity","running_amount","running_quantity"
+        ]
+        headers_html = "".join(f"<th>{h}</th>" for h in headers)
+        template_context = {
+            "title_text": "گزارش کاردکس",
+            "business_name": "",
+            "generated_at": datetime.datetime.now().strftime('%Y/%m/%d %H:%M'),
+            "is_fa": True,
+            "headers": headers,
+            "keys": keys,
+            "items": items,
+            "table_headers_html": headers_html,
+            "table_rows_html": rows_html,
+        }
+        resolved_html = ReportTemplateService.try_render_resolved(
+            db=db,
+            business_id=business_id,
+            module_key="kardex",
+            subtype="list",
+            context=template_context,
+            explicit_template_id=explicit_template_id,
+        )
+    except Exception:
+        resolved_html = None
+
     html = f"""
     <html>
       <head>
@@ -277,8 +318,9 @@ async def export_kardex_pdf_endpoint(
     </html>
     """
 
+    final_html = resolved_html or html
     font_config = FontConfiguration()
-    pdf_bytes = HTML(string=html).write_pdf(stylesheets=[CSS(string="@page { size: A4 landscape; margin: 12mm; }")], font_config=font_config)
+    pdf_bytes = HTML(string=final_html).write_pdf(stylesheets=[CSS(string="@page { size: A4 landscape; margin: 12mm; }")], font_config=font_config)
 
     filename = f"kardex_{business_id}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
     return Response(

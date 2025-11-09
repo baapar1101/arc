@@ -249,6 +249,10 @@ class DataTableConfig<T> {
   final bool showExportButtons;
   final bool showExcelExport;
   final bool showPdfExport;
+  // Report templates scope (for PDF custom templates)
+  final int? businessId; // needed to fetch templates
+  final String? reportModuleKey;
+  final String? reportSubtype;
   
   // Column settings configuration
   final String? tableId;
@@ -327,6 +331,9 @@ class DataTableConfig<T> {
     this.showExportButtons = false,
     this.showExcelExport = true,
     this.showPdfExport = true,
+    this.businessId,
+    this.reportModuleKey,
+    this.reportSubtype,
     this.tableId,
     this.enableColumnSettings = true,
     this.showColumnSettingsButton = true,

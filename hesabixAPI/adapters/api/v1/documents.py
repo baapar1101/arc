@@ -96,6 +96,173 @@ async def list_documents_endpoint(
     )
 
 
+@router.post(
+    "/businesses/{business_id}/documents/export/pdf",
+    summary="خروجی PDF لیست اسناد حسابداری",
+    description="دریافت فایل PDF لیست اسناد حسابداری با پشتیبانی از قالب سفارشی (documents/list)",
+)
+@require_business_access("business_id")
+async def export_documents_pdf_endpoint(
+    request: Request,
+    business_id: int,
+    body: Dict[str, Any] = Body(default={}),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    """خروجی PDF لیست اسناد حسابداری"""
+    from fastapi.responses import Response
+    from weasyprint import HTML
+    from weasyprint.text.fonts import FontConfiguration
+    from app.core.i18n import negotiate_locale
+    from html import escape
+    import datetime, json
+    # فیلترهایی مشابه export_documents_excel
+    filters = {}
+    for key in ["document_type", "from_date", "to_date", "currency_id", "is_proforma"]:
+        if key in body:
+            filters[key] = body[key]
+    # سال مالی از header یا body
+    try:
+        fy_header = request.headers.get("X-Fiscal-Year-ID")
+        if fy_header:
+            filters["fiscal_year_id"] = int(fy_header)
+        elif "fiscal_year_id" in body:
+            filters["fiscal_year_id"] = body["fiscal_year_id"]
+    except Exception:
+        pass
+    # دریافت داده‌ها
+    result = list_documents(db, business_id, {**filters, "take": body.get("take", 1000), "skip": body.get("skip", 0)})
+    items = result.get("items", [])
+    items = [format_datetime_fields(item, request) for item in items]
+    # ستون‌ها
+    headers: list[str] = []
+    keys: list[str] = []
+    export_columns = body.get("export_columns")
+    if export_columns:
+        for col in export_columns:
+            key = col.get("key")
+            label = col.get("label", key)
+            if key:
+                keys.append(str(key))
+                headers.append(str(label))
+    else:
+        default_columns = [
+            ("code", "کد سند"),
+            ("document_type_name", "نوع سند"),
+            ("document_date", "تاریخ سند"),
+            ("total_debit", "جمع بدهکار"),
+            ("total_credit", "جمع بستانکار"),
+            ("created_by_name", "ایجادکننده"),
+            ("registered_at", "تاریخ ثبت"),
+        ]
+        for key, label in default_columns:
+            if items and key in items[0]:
+                keys.append(key)
+                headers.append(label)
+    # اطلاعات کسب‌وکار
+    business_name = ""
+    try:
+        from adapters.db.models.business import Business
+        b = db.query(Business).filter(Business.id == business_id).first()
+        if b is not None:
+            business_name = b.name or ""
+    except Exception:
+        business_name = ""
+    # Locale
+    locale = negotiate_locale(request.headers.get("Accept-Language"))
+    is_fa = locale == "fa"
+    now = datetime.datetime.now().strftime('%Y/%m/%d %H:%M')
+    title_text = "لیست اسناد حسابداری" if is_fa else "Documents List"
+    label_biz = "کسب و کار" if is_fa else "Business"
+    label_date = "تاریخ تولید" if is_fa else "Generated Date"
+    footer_text = f"تولید شده در {now}" if is_fa else f"Generated at {now}"
+    headers_html = ''.join(f'<th>{escape(header)}</th>' for header in headers)
+    rows_html = []
+    for item in items:
+        row_cells = []
+        for key in keys:
+            value = item.get(key, "")
+            if isinstance(value, list):
+                value = ", ".join(str(v) for v in value)
+            elif isinstance(value, dict):
+                value = json.dumps(value, ensure_ascii=False)
+            row_cells.append(f'<td>{escape(str(value))}</td>')
+        rows_html.append(f'<tr>{"".join(row_cells)}</tr>')
+    # کانتکست قالب
+    template_context = {
+        "title_text": title_text,
+        "business_name": business_name,
+        "generated_at": now,
+        "is_fa": is_fa,
+        "headers": headers,
+        "keys": keys,
+        "items": items,
+        "table_headers_html": headers_html,
+        "table_rows_html": "".join(rows_html),
+    }
+    # تلاش برای رندر با قالب سفارشی
+    resolved_html = None
+    try:
+        from app.services.report_template_service import ReportTemplateService
+        explicit_template_id = None
+        try:
+            if body.get("template_id") is not None:
+                explicit_template_id = int(body.get("template_id"))
+        except Exception:
+            explicit_template_id = None
+        resolved_html = ReportTemplateService.try_render_resolved(
+            db=db,
+            business_id=business_id,
+            module_key="documents",
+            subtype="list",
+            context=template_context,
+            explicit_template_id=explicit_template_id,
+        )
+    except Exception:
+        resolved_html = None
+    # HTML پیش‌فرض
+    default_html = f"""
+    <!DOCTYPE html>
+    <html dir='{"rtl" if is_fa else "ltr"}'>
+      <head>
+        <meta charset="utf-8" />
+        <style>
+          @page {{ margin: 1cm; size: A4; }}
+          body {{ font-family: {'Tahoma, Arial' if is_fa else 'Arial, sans-serif'}; font-size: 12px; color: #222; }}
+          table {{ width: 100%; border-collapse: collapse; margin-top: 12px; }}
+          th, td {{ border: 1px solid #ccc; padding: 6px; text-align: {"right" if is_fa else "left"}; }}
+          thead {{ background: #f6f6f6; }}
+          .meta {{ font-size: 11px; color: #666; }}
+        </style>
+      </head>
+      <body>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;border-bottom:2px solid #366092;padding-bottom:8px">
+          <div>
+            <div style="font-size:18px;font-weight:bold;color:#366092">{title_text}</div>
+            <div class="meta">{label_biz}: {escape(business_name)}</div>
+          </div>
+          <div class="meta">{label_date}: {escape(now)}</div>
+        </div>
+        <table>
+          <thead><tr>{headers_html}</tr></thead>
+          <tbody>{''.join(rows_html)}</tbody>
+        </table>
+        <div class="meta" style="margin-top:8px;text-align:{'left' if is_fa else 'right'}">{footer_text}</div>
+      </body>
+    </html>
+    """
+    html_content = resolved_html or default_html
+    pdf_bytes = HTML(string=html_content).write_pdf(font_config=FontConfiguration())
+    filename = f"documents_{business_id}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f"attachment; filename={filename}",
+            "Content-Length": str(len(pdf_bytes)),
+            "Access-Control-Expose-Headers": "Content-Disposition",
+        },
+    )
 @router.get(
     "/documents/{document_id}",
     summary="جزئیات سند حسابداری",
@@ -283,6 +450,7 @@ async def get_document_pdf_endpoint(
     document_id: int,
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
+    template_id: int | None = None,
 ):
     """
     PDF یک سند
@@ -298,11 +466,119 @@ async def get_document_pdf_endpoint(
     if business_id and not ctx.can_access_business(business_id):
         raise ApiError("FORBIDDEN", "Access denied", http_status=403)
     
-    # TODO: تولید PDF
-    raise ApiError(
-        "NOT_IMPLEMENTED",
-        "PDF generation is not implemented yet",
-        http_status=501
+    # رندر با قالب سفارشی (documents/detail) یا خروجی پیش‌فرض
+    from weasyprint import HTML
+    from weasyprint.text.fonts import FontConfiguration
+    from app.core.i18n import negotiate_locale
+    from html import escape
+    import datetime, re
+
+    # اطلاعات کسب‌وکار
+    business_name = ""
+    try:
+        from adapters.db.models.business import Business
+        b = db.query(Business).filter(Business.id == business_id).first()
+        if b is not None:
+            business_name = b.name or ""
+    except Exception:
+        business_name = ""
+
+    # Locale
+    locale = negotiate_locale(request.headers.get("Accept-Language"))
+    is_fa = locale == "fa"
+    now = datetime.datetime.now().strftime("%Y/%m/%d %H:%M")
+
+    # کانتکست قالب
+    template_context = {
+        "business_id": business_id,
+        "business_name": business_name,
+        "document": doc,
+        "lines": doc.get("lines", []),
+        "code": doc.get("code"),
+        "document_type": doc.get("document_type"),
+        "document_date": doc.get("document_date"),
+        "description": doc.get("description"),
+        "generated_at": now,
+        "is_fa": is_fa,
+    }
+
+    # تلاش برای رندر
+    resolved_html = None
+    try:
+        from app.services.report_template_service import ReportTemplateService
+        explicit_template_id = None
+        try:
+            if template_id is not None:
+                explicit_template_id = int(template_id)
+        except Exception:
+            explicit_template_id = None
+        resolved_html = ReportTemplateService.try_render_resolved(
+            db=db,
+            business_id=business_id,
+            module_key="documents",
+            subtype="detail",
+            context=template_context,
+            explicit_template_id=explicit_template_id,
+        )
+    except Exception:
+        resolved_html = None
+
+    # پیش‌فرض
+    default_html = f"""
+    <!DOCTYPE html>
+    <html dir='{"rtl" if is_fa else "ltr"}'>
+      <head>
+        <meta charset="utf-8" />
+        <style>
+          body {{ font-family: Tahoma, Arial, sans-serif; font-size: 12px; color: #222; }}
+          h1 {{ font-size: 18px; margin: 0 0 12px; }}
+          table {{ width: 100%; border-collapse: collapse; margin-top: 12px; }}
+          th, td {{ border: 1px solid #ccc; padding: 6px; text-align: {"right" if is_fa else "left"}; }}
+          th {{ background: #f6f6f6; }}
+          .meta .label {{ color: #666; }}
+        </style>
+      </head>
+      <body>
+        <h1>{escape(doc.get("document_type_name") or ("سند" if is_fa else "Document"))}</h1>
+        <div class="meta">
+          <div><span class="label">{'کسب‌وکار' if is_fa else 'Business'}:</span> {escape(business_name or "-")}</div>
+          <div><span class="label">{'کد' if is_fa else 'Code'}:</span> {escape(doc.get("code") or "-")}</div>
+          <div><span class="label">{'تاریخ' if is_fa else 'Date'}:</span> {escape(doc.get("document_date") or "-")}</div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>{'شرح' if is_fa else 'Description'}</th>
+              <th>{'بدهکار' if is_fa else 'Debit'}</th>
+              <th>{'بستانکار' if is_fa else 'Credit'}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {''.join([
+              f"<tr><td>{escape(str(line.get('description') or '-'))}</td><td>{escape(str(line.get('debit') or ''))}</td><td>{escape(str(line.get('credit') or ''))}</td></tr>"
+              for line in (doc.get('lines') or [])
+            ])}
+          </tbody>
+        </table>
+      </body>
+    </html>
+    """
+    html_content = resolved_html or default_html
+
+    pdf_bytes = HTML(string=html_content).write_pdf(font_config=FontConfiguration())
+
+    def _slugify(text: str) -> str:
+        return re.sub(r"[^A-Za-z0-9_-]+", "_", (text or "")).strip("_") or "document"
+    filename = f"document_{_slugify(doc.get('code'))}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f"attachment; filename={filename}",
+            "Content-Length": str(len(pdf_bytes)),
+            "Access-Control-Expose-Headers": "Content-Disposition",
+        },
     )
 
 

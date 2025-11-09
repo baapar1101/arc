@@ -971,7 +971,6 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
         'tax_amount': taxAmount,
         'line_total': lineTotal,
         if (movement != null) 'movement': movement,
-        if (_postInventory && e.warehouseId != null) 'warehouse_id': e.warehouseId,
         // اطلاعات اضافی برای ردیابی
         'unit': e.selectedUnit ?? e.mainUnit,
         'unit_price_source': e.unitPriceSource,
@@ -1048,6 +1047,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
             businessId: widget.businessId,
             calendarController: widget.calendarController,
             invoiceType: _selectedInvoiceType ?? InvoiceType.sales,
+            selectedCurrencyId: _selectedCurrencyId,
             onChanged: (transactions) {
               setState(() {
                 _transactions = transactions;
@@ -1188,15 +1188,15 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                         // انتخاب قالب چاپ
                         DropdownButtonFormField<String>(
                           initialValue: _selectedPrintTemplate,
-                          decoration: const InputDecoration(
-                            labelText: 'قالب چاپ',
-                            border: OutlineInputBorder(),
+                          decoration: InputDecoration(
+                            labelText: AppLocalizations.of(context).printTemplate,
+                            border: const OutlineInputBorder(),
                           ),
-                          items: const [
-                            DropdownMenuItem(value: 'standard', child: Text('قالب استاندارد')),
-                            DropdownMenuItem(value: 'compact', child: Text('قالب فشرده')),
-                            DropdownMenuItem(value: 'detailed', child: Text('قالب تفصیلی')),
-                            DropdownMenuItem(value: 'custom', child: Text('قالب سفارشی')),
+                          items: [
+                            DropdownMenuItem(value: 'standard', child: Text(AppLocalizations.of(context).templateStandard)),
+                            DropdownMenuItem(value: 'compact', child: Text(AppLocalizations.of(context).templateCompact)),
+                            DropdownMenuItem(value: 'detailed', child: Text(AppLocalizations.of(context).templateDetailed)),
+                            DropdownMenuItem(value: 'custom', child: Text(AppLocalizations.of(context).templateCustom)),
                           ],
                           onChanged: (value) {
                             setState(() {

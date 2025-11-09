@@ -30,6 +30,8 @@ from adapters.api.v1.support.priorities import router as support_priorities_rout
 from adapters.api.v1.support.statuses import router as support_statuses_router
 from adapters.api.v1.admin.file_storage import router as admin_file_storage_router
 from adapters.api.v1.admin.email_config import router as admin_email_config_router
+from adapters.api.v1.admin.system_settings import router as admin_system_settings_router
+from adapters.api.v1.admin.wallet_admin import router as admin_wallet_router
 from adapters.api.v1.receipts_payments import router as receipts_payments_router
 from adapters.api.v1.transfers import router as transfers_router
 from adapters.api.v1.fiscal_years import router as fiscal_years_router
@@ -37,6 +39,10 @@ from adapters.api.v1.expense_income import router as expense_income_router
 from adapters.api.v1.documents import router as documents_router
 from adapters.api.v1.kardex import router as kardex_router
 from adapters.api.v1.inventory_transfers import router as inventory_transfers_router
+from adapters.api.v1.opening_balance import router as opening_balance_router
+from adapters.api.v1.report_templates import router as report_templates_router
+from adapters.api.v1.wallet import router as wallet_router
+from adapters.api.v1.wallet_webhook import router as wallet_webhook_router
 from app.core.i18n import negotiate_locale, Translator
 from app.core.error_handlers import register_error_handlers
 from app.core.smart_normalizer import smart_normalize_json, SmartNormalizerConfig
@@ -301,6 +307,8 @@ def create_app() -> FastAPI:
     application.include_router(categories_router, prefix=settings.api_v1_prefix)
     application.include_router(product_attributes_router, prefix=settings.api_v1_prefix)
     application.include_router(products_router, prefix=settings.api_v1_prefix)
+    from adapters.api.v1.warehouse_docs import router as warehouse_docs_router
+    application.include_router(warehouse_docs_router, prefix=settings.api_v1_prefix)
     from adapters.api.v1.warehouses import router as warehouses_router
     application.include_router(warehouses_router, prefix=settings.api_v1_prefix)
     from adapters.api.v1.boms import router as boms_router
@@ -323,6 +331,14 @@ def create_app() -> FastAPI:
     application.include_router(fiscal_years_router, prefix=settings.api_v1_prefix)
     application.include_router(kardex_router, prefix=settings.api_v1_prefix)
     application.include_router(inventory_transfers_router, prefix=settings.api_v1_prefix)
+    application.include_router(opening_balance_router, prefix=settings.api_v1_prefix)
+    application.include_router(report_templates_router, prefix=settings.api_v1_prefix)
+    application.include_router(wallet_router, prefix=settings.api_v1_prefix)
+    application.include_router(wallet_webhook_router, prefix=settings.api_v1_prefix)
+    from adapters.api.v1.payment_gateways import router as payment_gateways_router
+    application.include_router(payment_gateways_router, prefix=settings.api_v1_prefix)
+    from adapters.api.v1.payment_callbacks import router as payment_callbacks_router
+    application.include_router(payment_callbacks_router, prefix=settings.api_v1_prefix)
     
     # Support endpoints
     application.include_router(support_tickets_router, prefix=f"{settings.api_v1_prefix}/support")
@@ -334,6 +350,10 @@ def create_app() -> FastAPI:
     # Admin endpoints
     application.include_router(admin_file_storage_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_email_config_router, prefix=settings.api_v1_prefix)
+    application.include_router(admin_system_settings_router, prefix=settings.api_v1_prefix)
+    application.include_router(admin_wallet_router, prefix=settings.api_v1_prefix)
+    from adapters.api.v1.admin.payment_gateways import router as admin_payment_gateways_router
+    application.include_router(admin_payment_gateways_router, prefix=settings.api_v1_prefix)
 
     register_error_handlers(application)
 

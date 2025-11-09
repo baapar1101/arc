@@ -228,6 +228,9 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
       title: 'هزینه و درآمد',
       excelEndpoint: '/businesses/${widget.businessId}/expense-income/export/excel',
       pdfEndpoint: '/businesses/${widget.businessId}/expense-income/export/pdf',
+      businessId: widget.businessId,
+      reportModuleKey: 'expense_income',
+      reportSubtype: 'list',
       // دکمه حذف گروهی در هدر جدول
       customHeaderActions: [
         Tooltip(

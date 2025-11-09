@@ -447,6 +447,7 @@ async def export_single_receipt_payment_pdf(
     request: Request,
     auth_context: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
+    template_id: int | None = None,
 ):
     """خروجی PDF تک سند دریافت/پرداخت"""
     from weasyprint import HTML, CSS
@@ -497,8 +498,43 @@ async def export_single_receipt_payment_pdf(
     label_date = "تاریخ تولید" if is_fa else "Generated Date"
     footer_text = f"تولید شده در {now}" if is_fa else f"Generated at {now}"
 
-    # ایجاد HTML برای PDF
-    html_content = f"""
+    # تلاش برای رندر با قالب سفارشی (receipts_payments/detail)
+    resolved_html = None
+    try:
+        from app.services.report_template_service import ReportTemplateService
+        explicit_template_id = None
+        try:
+            if template_id is not None:
+                explicit_template_id = int(template_id)
+        except Exception:
+            explicit_template_id = None
+        template_context = {
+            "business_id": business_id,
+            "business_name": business_name,
+            "document": result,
+            "person_lines": person_lines,
+            "account_lines": account_lines,
+            "code": doc_code,
+            "document_date": doc_date,
+            "total_amount": total_amount,
+            "description": description,
+            "title_text": title_text,
+            "generated_at": now,
+            "is_fa": is_fa,
+        }
+        resolved_html = ReportTemplateService.try_render_resolved(
+            db=db,
+            business_id=business_id,
+            module_key="receipts_payments",
+            subtype="detail",
+            context=template_context,
+            explicit_template_id=explicit_template_id,
+        )
+    except Exception:
+        resolved_html = None
+
+    # ایجاد HTML پیش‌فرض در نبود قالب
+    html_content = resolved_html or f"""
     <!DOCTYPE html>
     <html dir="{'rtl' if is_fa else 'ltr'}">
       <head>
@@ -810,7 +846,41 @@ async def export_receipts_payments_pdf(
             row_cells.append(f'<td>{escape(str(value))}</td>')
         rows_html.append(f'<tr>{"".join(row_cells)}</tr>')
 
-    # Create HTML table
+    # کانتکست برای قالب سفارشی لیست
+    template_context: Dict[str, Any] = {
+        "title_text": title_text,
+        "business_name": business_name,
+        "generated_at": now,
+        "is_fa": is_fa,
+        "headers": headers,
+        "keys": keys,
+        "items": items,
+        "table_headers_html": headers_html,
+        "table_rows_html": "".join(rows_html),
+    }
+
+    # تلاش برای رندر با قالب سفارشی (receipts_payments/list)
+    resolved_html = None
+    try:
+        from app.services.report_template_service import ReportTemplateService
+        explicit_template_id = None
+        try:
+            if body.get("template_id") is not None:
+                explicit_template_id = int(body.get("template_id"))
+        except Exception:
+            explicit_template_id = None
+        resolved_html = ReportTemplateService.try_render_resolved(
+            db=db,
+            business_id=business_id,
+            module_key="receipts_payments",
+            subtype="list",
+            context=template_context,
+            explicit_template_id=explicit_template_id,
+        )
+    except Exception:
+        resolved_html = None
+
+    # HTML پیش‌فرض جدول
     table_html = f"""
     <!DOCTYPE html>
     <html dir="{'rtl' if is_fa else 'ltr'}">
@@ -914,8 +984,10 @@ async def export_receipts_payments_pdf(
     </html>
     """
 
+    final_html = resolved_html or table_html
+
     font_config = FontConfiguration()
-    pdf_bytes = HTML(string=table_html).write_pdf(font_config=font_config)
+    pdf_bytes = HTML(string=final_html).write_pdf(font_config=font_config)
 
     # Build meaningful filename
     def slugify(text: str) -> str:

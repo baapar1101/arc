@@ -172,6 +172,9 @@ class _TransfersPageState extends State<TransfersPage> {
       title: t.transfers,
       excelEndpoint: '/businesses/${widget.businessId}/transfers/export/excel',
       pdfEndpoint: '/businesses/${widget.businessId}/transfers/export/pdf',
+      businessId: widget.businessId,
+      reportModuleKey: 'transfers',
+      reportSubtype: 'list',
       getExportParams: () => {
         if (_fromDate != null) 'from_date': _fromDate!.toUtc().toIso8601String(),
         if (_toDate != null) 'to_date': _toDate!.toUtc().toIso8601String(),

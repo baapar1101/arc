@@ -189,23 +189,35 @@ class AuthStore with ChangeNotifier {
       final response = await apiClient.get('/api/v1/auth/me');
       
       if (response.statusCode == 200) {
-        final data = response.data;
-        if (data is Map<String, dynamic>) {
-          final user = data['user'] as Map<String, dynamic>?;
+        final root = response.data;
+        if (root is Map<String, dynamic>) {
+          // پاسخ API در فیلد data قرار دارد
+          final payload = (root['data'] is Map<String, dynamic>)
+              ? root['data'] as Map<String, dynamic>
+              : root;
+          final user = payload['user'] as Map<String, dynamic>?;
+          final permsObj = payload['permissions'] as Map<String, dynamic>?;
+          Map<String, dynamic>? appPermissions;
+          bool isSuperAdmin = false;
+          int? userId;
+
           if (user != null) {
-            final appPermissions = user['app_permissions'] as Map<String, dynamic>?;
-            final isSuperAdmin = appPermissions?['superadmin'] == true;
-            final userId = user['id'] as int?;
-            
-            if (appPermissions != null) {
-              await saveAppPermissions(appPermissions, isSuperAdmin);
-            }
-            
-            if (userId != null) {
-              _currentUserId = userId;
-              notifyListeners();
+            appPermissions = user['app_permissions'] as Map<String, dynamic>?;
+            userId = user['id'] as int?;
+          }
+          // fallback: اگر در permissions هم مقدار باشد از آن بخوان
+          if (!isSuperAdmin && permsObj != null) {
+            final pIs = permsObj['is_superadmin'];
+            if (pIs is bool) {
+              isSuperAdmin = pIs;
             }
           }
+          if (!isSuperAdmin && appPermissions != null) {
+            isSuperAdmin = appPermissions['superadmin'] == true;
+          }
+
+          // ذخیره در استور و لوکال
+          await saveAppPermissions(appPermissions, isSuperAdmin, userId: userId);
         }
       }
     } catch (e) {
@@ -504,5 +516,6 @@ class AuthStore with ChangeNotifier {
     }
   }
 }
+
 
 

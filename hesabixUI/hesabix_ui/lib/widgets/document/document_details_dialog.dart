@@ -4,6 +4,9 @@ import 'package:hesabix_ui/services/document_service.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/utils/number_formatters.dart' show formatWithThousands;
+import 'package:hesabix_ui/services/warehouse_service.dart';
+import 'dart:html' as html;
+import 'package:hesabix_ui/l10n/app_localizations.dart';
 
 /// دیالوگ نمایش جزئیات کامل سند حسابداری
 class DocumentDetailsDialog extends StatefulWidget {
@@ -25,12 +28,62 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> {
   DocumentModel? _document;
   bool _isLoading = true;
   String? _errorMessage;
+  bool _isGeneratingPdf = false;
+  final _warehouseService = WarehouseService();
+  List<dynamic> _relatedWhDocs = const [];
 
   @override
   void initState() {
     super.initState();
     _service = DocumentService(ApiClient());
     _loadDocument();
+  }
+
+  Future<void> _generatePdf() async {
+    if (_document == null) return;
+    setState(() => _isGeneratingPdf = true);
+    try {
+      final api = ApiClient();
+      final doc = _document!;
+      String path;
+      // اگر فاکتور است، از endpoint اختصاصی فاکتور استفاده کنیم تا قالب invoices/detail اعمال شود
+      if (doc.documentType.startsWith('invoice')) {
+        path = '/invoices/business/${doc.businessId}/${doc.id}/pdf';
+      } else {
+        // سایر اسناد: endpoint عمومی با قالب documents/detail
+        path = '/documents/${doc.id}/pdf';
+      }
+      final bytes = await api.downloadPdf(path);
+      await _savePdfFile(bytes, doc.code);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppLocalizations.of(context).pdfSuccess)),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${AppLocalizations.of(context).pdfError}: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _isGeneratingPdf = false);
+    }
+  }
+
+  Future<void> _savePdfFile(List<int> bytes, String filename) async {
+    try {
+      final name = filename.endsWith('.pdf') ? filename : '$filename.pdf';
+      final blob = html.Blob([bytes], 'application/pdf');
+      final url = html.Url.createObjectUrlFromBlob(blob);
+      html.AnchorElement(href: url)
+        ..setAttribute('download', name)
+        ..click();
+      html.Url.revokeObjectUrl(url);
+      // ignore: avoid_print
+      print('✅ PDF downloaded successfully: $name');
+    } catch (e) {
+      // ignore: avoid_print
+      print('❌ Error downloading PDF: $e');
+    }
   }
 
   Future<void> _loadDocument() async {
@@ -47,6 +100,22 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> {
           _isLoading = false;
         });
       }
+      // load related warehouse docs
+      try {
+        final data = await _warehouseService.search(
+          businessId: doc.businessId,
+          limit: 50,
+          filters: {
+            'source_type': 'invoice',
+            'source_document_id': widget.documentId,
+          },
+        );
+        if (mounted) {
+          setState(() {
+            _relatedWhDocs = List<dynamic>.from(data['items'] ?? const []);
+          });
+        }
+      } catch (_) {}
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -62,27 +131,77 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> {
     final theme = Theme.of(context);
 
     return Dialog(
-      child: Container(
-        width: MediaQuery.of(context).size.width * 0.9,
-        height: MediaQuery.of(context).size.height * 0.85,
-        constraints: const BoxConstraints(maxWidth: 1200),
-        child: Column(
-          children: [
-            // هدر
-            _buildHeader(theme),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 1100),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: _isLoading
+              ? const SizedBox(height: 240, child: Center(child: CircularProgressIndicator()))
+              : _errorMessage != null
+                  ? SizedBox(height: 240, child: Center(child: Text(_errorMessage!)))
+                  : SingleChildScrollView(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          // هدر
+                          _buildHeader(theme),
 
-            // محتوای اصلی
-            Expanded(
-              child: _isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : _errorMessage != null
-                      ? _buildError()
-                      : _buildContent(theme),
-            ),
+                          // محتوای اصلی
+                          Expanded(
+                            child: _isLoading
+                                ? const Center(child: CircularProgressIndicator())
+                                : _errorMessage != null
+                                    ? _buildError()
+                                    : _buildContent(theme),
+                          ),
 
-            // فوتر
-            _buildFooter(),
-          ],
+                          // فوتر
+                          _buildFooter(),
+                          const SizedBox(height: 16),
+                          if (_relatedWhDocs.isNotEmpty) ...[
+                            Text('حواله‌های مرتبط', style: Theme.of(context).textTheme.titleMedium),
+                            const SizedBox(height: 8),
+                            Card(
+                              child: ListView.separated(
+                                shrinkWrap: true,
+                                physics: const NeverScrollableScrollPhysics(),
+                                itemCount: _relatedWhDocs.length,
+                                separatorBuilder: (_, __) => const Divider(height: 1),
+                                itemBuilder: (context, index) {
+                                  final it = _relatedWhDocs[index] as Map<String, dynamic>;
+                                  return ListTile(
+                                    dense: true,
+                                    title: Text('${it['code'] ?? '-'} • ${it['doc_type'] ?? ''} • ${it['status'] ?? ''}'),
+                                    subtitle: Text(it['document_date'] ?? ''),
+                                    trailing: IconButton(
+                                      icon: const Icon(Icons.publish),
+                                      onPressed: (it['status'] == 'draft') ? () async {
+                                        try {
+                                          await _warehouseService.postDoc(
+                                            businessId: _document!.businessId,
+                                            docId: it['id'],
+                                          );
+                                          if (!mounted) return;
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            const SnackBar(content: Text('حواله پست شد')),
+                                          );
+                                          _loadDocument();
+                                        } catch (e) {
+                                          if (!mounted) return;
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(content: Text('خطا در پست حواله: $e')),
+                                          );
+                                        }
+                                      } : null,
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
         ),
       ),
     );
@@ -447,14 +566,12 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> {
         children: [
           // دکمه چاپ PDF
           OutlinedButton.icon(
-            onPressed: () {
-              // TODO: پیاده‌سازی چاپ PDF
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('چاپ PDF در حال پیاده‌سازی است')),
-              );
-            },
-            icon: const Icon(Icons.picture_as_pdf),
-            label: const Text('چاپ PDF'),
+            onPressed: _isGeneratingPdf ? null : _generatePdf,
+            icon: _isGeneratingPdf
+                ? const SizedBox(
+                    width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                : const Icon(Icons.picture_as_pdf),
+            label: Text(_isGeneratingPdf ? AppLocalizations.of(context).generating : AppLocalizations.of(context).printPdf),
           ),
           const SizedBox(width: 12),
           // دکمه بستن

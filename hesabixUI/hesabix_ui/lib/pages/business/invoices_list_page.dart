@@ -219,6 +219,9 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
       title: 'فاکتورها',
       excelEndpoint: '/invoices/business/${widget.businessId}/export/excel',
       pdfEndpoint: '/invoices/business/${widget.businessId}/export/pdf',
+      businessId: widget.businessId,
+      reportModuleKey: 'invoices',
+      reportSubtype: 'list',
       columns: [
         // عملیات
         ActionColumn(
@@ -230,6 +233,12 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
               label: 'مشاهده',
               onTap: (item) => _onView(item as InvoiceListItem),
             ),
+            if (widget.authStore.canWriteSection('invoices'))
+              DataTableAction(
+                icon: Icons.edit,
+                label: 'ویرایش',
+                onTap: (item) => _onEdit(item as InvoiceListItem),
+              ),
           ],
         ),
         // کد سند
@@ -304,6 +313,19 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
         calendarController: widget.calendarController,
       ),
     );
+  }
+
+  Future<void> _onEdit(InvoiceListItem item) async {
+    if (!mounted) return;
+    await context.pushNamed(
+      'business_edit_invoice',
+      pathParameters: {
+        'business_id': widget.businessId.toString(),
+        'invoice_id': item.id.toString(),
+      },
+    );
+    if (!mounted) return;
+    _refreshData();
   }
 }
 

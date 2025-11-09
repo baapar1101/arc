@@ -77,7 +77,7 @@ class _ProfileShellState extends State<ProfileShell> {
     final allDestinations = <_Dest>[
       ...destinations,
       if (widget.authStore.canAccessSupportOperator) ...operatorDestinations,
-      if (widget.authStore.isSuperAdmin) ...adminDestinations,
+      if (widget.authStore.isSuperAdmin || widget.authStore.hasAppPermission('system_settings')) ...adminDestinations,
     ];
 
     int selectedIndex = 0;

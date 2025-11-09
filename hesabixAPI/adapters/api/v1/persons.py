@@ -538,6 +538,38 @@ async def export_persons_pdf(
     page_label_left = "صفحه " if is_fa else "Page "
     page_label_of = " از " if is_fa else " of "
 
+    # تلاش برای رندر با قالب سفارشی (persons/list)
+    resolved_html = None
+    try:
+        from app.services.report_template_service import ReportTemplateService
+        explicit_template_id = None
+        try:
+            if body.get("template_id") is not None:
+                explicit_template_id = int(body.get("template_id"))
+        except Exception:
+            explicit_template_id = None
+        template_context = {
+            "title_text": title_text,
+            "business_name": business_name,
+            "generated_at": now,
+            "is_fa": is_fa,
+            "headers": headers,
+            "keys": keys,
+            "items": items,
+            "table_headers_html": headers_html,
+            "table_rows_html": "".join(rows_html),
+        }
+        resolved_html = ReportTemplateService.try_render_resolved(
+            db=db,
+            business_id=business_id,
+            module_key="persons",
+            subtype="list",
+            context=template_context,
+            explicit_template_id=explicit_template_id,
+        )
+    except Exception:
+        resolved_html = None
+
     table_html = f"""
     <html lang=\"{html_lang}\" dir=\"{html_dir}\"> 
       <head>
@@ -629,8 +661,9 @@ async def export_persons_pdf(
     </html>
     """
 
+    final_html = resolved_html or table_html
     font_config = FontConfiguration()
-    pdf_bytes = HTML(string=table_html).write_pdf(font_config=font_config)
+    pdf_bytes = HTML(string=final_html).write_pdf(font_config=font_config)
 
     # Build meaningful filename
     biz_name = ""

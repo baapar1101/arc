@@ -25,8 +25,12 @@ import 'pages/business/users_permissions_page.dart';
 import 'pages/business/accounts_page.dart';
 import 'pages/business/bank_accounts_page.dart';
 import 'pages/business/wallet_page.dart';
+import 'pages/business/wallet_payment_result_page.dart';
+import 'pages/admin/wallet_settings_page.dart';
+import 'pages/admin/payment_gateways_page.dart';
 import 'pages/business/invoices_list_page.dart';
 import 'pages/business/new_invoice_page.dart';
+import 'pages/business/edit_invoice_page.dart';
 import 'pages/business/settings_page.dart';
 import 'pages/business/business_info_settings_page.dart';
 import 'pages/business/reports_page.dart';
@@ -56,6 +60,8 @@ import 'core/auth_store.dart';
 import 'core/permission_guard.dart';
 import 'widgets/simple_splash_screen.dart';
 import 'widgets/url_tracker.dart';
+import 'pages/business/opening_balance_page.dart';
+import 'pages/business/report_templates_page.dart';
 
 void main() {
   // Use path-based routing instead of hash routing
@@ -372,6 +378,11 @@ class _MyAppState extends State<MyApp> {
             authStore: _authStore!,
           ),
         ),
+        GoRoute(
+          path: '/wallet/payment-result',
+          name: 'wallet_payment_result',
+          builder: (context, state) => WalletPaymentResultPage(authStore: _authStore!),
+        ),
         ShellRoute(
           builder: (context, state, child) => ProfileShell(
             authStore: _authStore!,
@@ -430,22 +441,54 @@ class _MyAppState extends State<MyApp> {
               path: '/user/profile/system-settings',
               name: 'profile_system_settings',
               builder: (context, state) {
-                // بررسی دسترسی SuperAdmin
+                // بررسی دسترسی تنظیمات سیستم (SuperAdmin یا مجوز system_settings)
                 if (_authStore == null) {
                   return PermissionGuard.buildAccessDeniedPage();
                 }
-                
-                if (!_authStore!.isSuperAdmin) {
+                final allowed = _authStore!.isSuperAdmin || _authStore!.hasAppPermission('system_settings');
+                if (!allowed) {
                   return PermissionGuard.buildAccessDeniedPage();
                 }
                 return const SystemSettingsPage();
               },
               routes: [
                 GoRoute(
+                  path: 'wallet',
+                  name: 'system_settings_wallet',
+                  builder: (context, state) {
+                    if (_authStore == null) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    final allowed = _authStore!.isSuperAdmin || _authStore!.hasAppPermission('system_settings');
+                    if (!allowed) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    return const WalletSettingsPage();
+                  },
+                ),
+                GoRoute(
+                  path: 'payment-gateways',
+                  name: 'system_settings_payment_gateways',
+                  builder: (context, state) {
+                    if (_authStore == null) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    final allowed = _authStore!.isSuperAdmin || _authStore!.hasAppPermission('system_settings');
+                    if (!allowed) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    return const PaymentGatewaysPage();
+                  },
+                ),
+                GoRoute(
                   path: 'storage',
                   name: 'system_settings_storage',
                   builder: (context, state) {
-                    if (_authStore == null || !_authStore!.isSuperAdmin) {
+                    if (_authStore == null) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    final allowed = _authStore!.isSuperAdmin || _authStore!.hasAppPermission('system_settings');
+                    if (!allowed) {
                       return PermissionGuard.buildAccessDeniedPage();
                     }
                     return const AdminStorageManagementPage();
@@ -455,7 +498,11 @@ class _MyAppState extends State<MyApp> {
                   path: 'configuration',
                   name: 'system_settings_configuration',
                   builder: (context, state) {
-                    if (_authStore == null || !_authStore!.isSuperAdmin) {
+                    if (_authStore == null) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    final allowed = _authStore!.isSuperAdmin || _authStore!.hasAppPermission('system_settings');
+                    if (!allowed) {
                       return PermissionGuard.buildAccessDeniedPage();
                     }
                     return const SystemConfigurationPage();
@@ -465,7 +512,11 @@ class _MyAppState extends State<MyApp> {
                   path: 'users',
                   name: 'system_settings_users',
                   builder: (context, state) {
-                    if (_authStore == null || !_authStore!.isSuperAdmin) {
+                    if (_authStore == null) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    final allowed = _authStore!.isSuperAdmin || _authStore!.hasAppPermission('system_settings');
+                    if (!allowed) {
                       return PermissionGuard.buildAccessDeniedPage();
                     }
                     return const UserManagementPage();
@@ -475,7 +526,11 @@ class _MyAppState extends State<MyApp> {
                   path: 'logs',
                   name: 'system_settings_logs',
                   builder: (context, state) {
-                    if (_authStore == null || !_authStore!.isSuperAdmin) {
+                    if (_authStore == null) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    final allowed = _authStore!.isSuperAdmin || _authStore!.hasAppPermission('system_settings');
+                    if (!allowed) {
                       return PermissionGuard.buildAccessDeniedPage();
                     }
                     return const SystemLogsPage();
@@ -485,7 +540,11 @@ class _MyAppState extends State<MyApp> {
                   path: 'email',
                   name: 'system_settings_email',
                   builder: (context, state) {
-                    if (_authStore == null || !_authStore!.isSuperAdmin) {
+                    if (_authStore == null) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    final allowed = _authStore!.isSuperAdmin || _authStore!.hasAppPermission('system_settings');
+                    if (!allowed) {
                       return PermissionGuard.buildAccessDeniedPage();
                     }
                     return const EmailSettingsPage();
@@ -527,6 +586,19 @@ class _MyAppState extends State<MyApp> {
                     businessId: businessId.toString(),
                     authStore: _authStore!,
                     calendarController: _calendarController!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/opening-balance',
+              name: 'business_opening_balance',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return NoTransitionPage(
+                  child: OpeningBalancePage(
+                    businessId: businessId,
+                    authStore: _authStore!,
                   ),
                 );
               },
@@ -594,6 +666,13 @@ class _MyAppState extends State<MyApp> {
               },
             ),
             GoRoute(
+              path: '/user/profile/system-settings/wallet',
+              name: 'system_wallet_settings',
+              pageBuilder: (context, state) => const NoTransitionPage(
+                child: WalletSettingsPage(),
+              ),
+            ),
+            GoRoute(
               path: '/business/:business_id/invoice',
               name: 'business_invoice',
               pageBuilder: (context, state) {
@@ -616,6 +695,22 @@ class _MyAppState extends State<MyApp> {
                 return NoTransitionPage(
                   child: NewInvoicePage(
                     businessId: businessId,
+                    authStore: _authStore!,
+                    calendarController: _calendarController!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/invoice/:invoice_id/edit',
+              name: 'business_edit_invoice',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                final invoiceId = int.parse(state.pathParameters['invoice_id']!);
+                return NoTransitionPage(
+                  child: EditInvoicePage(
+                    businessId: businessId,
+                    invoiceId: invoiceId,
                     authStore: _authStore!,
                     calendarController: _calendarController!,
                   ),
@@ -860,6 +955,19 @@ class _MyAppState extends State<MyApp> {
                     calendarController: _calendarController!,
                     authStore: _authStore!,
                     apiClient: ApiClient(),
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/report-templates',
+              name: 'business_report_templates',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return NoTransitionPage(
+                  child: ReportTemplatesPage(
+                    businessId: businessId,
+                    authStore: _authStore!,
                   ),
                 );
               },

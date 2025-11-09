@@ -130,13 +130,22 @@ def require_business_access(business_id_param: str = "business_id"):
                 result = await result
             return result
         # Preserve original signature so FastAPI sees correct parameters (including Request)
-        wrapper.__signature__ = inspect.signature(func)  # type: ignore[attr-defined]
-        # Also preserve evaluated type annotations to avoid ForwardRef issues under __future__.annotations
+        sig = inspect.signature(func)
+        wrapper.__signature__ = sig  # type: ignore[attr-defined]
+        # Preserve/evaluate annotations; ensure 'request' is explicitly FastAPI Request
         try:
-            wrapper.__annotations__ = get_type_hints(func, globalns=getattr(func, "__globals__", None))  # type: ignore[attr-defined]
+            evaluated = get_type_hints(func, globalns=getattr(func, "__globals__", None))  # type: ignore[attr-defined]
         except Exception:
-            # Fallback to original annotations (may be string-based) if evaluation fails
-            wrapper.__annotations__ = getattr(func, "__annotations__", {})
+            evaluated = getattr(func, "__annotations__", {})
+        # Force request annotation if present in params
+        if 'request' in sig.parameters:
+            try:
+                from fastapi import Request as _FastapiRequest  # local import to avoid cycles
+                evaluated = dict(evaluated or {})
+                evaluated['request'] = _FastapiRequest
+            except Exception:
+                pass
+        wrapper.__annotations__ = evaluated  # type: ignore[attr-defined]
         return wrapper
     return decorator
 

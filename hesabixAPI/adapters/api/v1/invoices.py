@@ -89,6 +89,152 @@ def get_invoice_endpoint(
     result = invoice_document_to_dict(db, doc)
     return success_response(data={"item": result}, request=request, message="INVOICE")
 
+@router.get(
+    "/business/{business_id}/{invoice_id}/pdf",
+    summary="PDF یک فاکتور",
+    description="دریافت فایل PDF یک فاکتور با پشتیبانی از قالب سفارشی (invoices/detail)",
+)
+@require_business_access("business_id")
+async def export_single_invoice_pdf(
+    business_id: int,
+    invoice_id: int,
+    request: Request,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    template_id: int | None = None,
+):
+    """
+    خروجی PDF تک‌سند فاکتور با پشتیبانی از قالب سفارشی:
+    - اگر template_id داده شود و منتشرشده باشد، همان استفاده می‌شود.
+    - در غیر این صورت اگر قالب پیش‌فرض منتشرشده برای invoices/detail موجود باشد، استفاده می‌شود.
+    - در نبود قالب، خروجی HTML پیش‌فرض تولید می‌شود.
+    """
+    from weasyprint import HTML
+    from weasyprint.text.fonts import FontConfiguration
+    from app.core.i18n import negotiate_locale
+    from html import escape
+    import datetime
+
+    # دریافت سند و اعتبارسنجی
+    doc = db.query(Document).filter(Document.id == invoice_id).first()
+    if not doc or doc.business_id != business_id or doc.document_type not in SUPPORTED_INVOICE_TYPES:
+        from app.core.responses import ApiError
+        raise ApiError("DOCUMENT_NOT_FOUND", "Invoice document not found", http_status=404)
+
+    # جزئیات کامل فاکتور
+    item = invoice_document_to_dict(db, doc)
+
+    # اطلاعات کسب‌وکار (اختیاری)
+    business_name = ""
+    try:
+        b = db.query(Business).filter(Business.id == business_id).first()
+        if b is not None:
+            business_name = b.name or ""
+    except Exception:
+        business_name = ""
+
+    # Locale
+    locale = negotiate_locale(request.headers.get("Accept-Language"))
+    is_fa = locale == "fa"
+
+    # کانتکست قالب
+    template_context = {
+        "business_id": business_id,
+        "business_name": business_name,
+        "invoice": item,
+        "lines": item.get("lines", []),
+        "generated_at": datetime.datetime.now().strftime("%Y/%m/%d %H:%M"),
+        "is_fa": is_fa,
+    }
+
+    # تلاش برای رندر با قالب سفارشی
+    resolved_html = None
+    try:
+        from app.services.report_template_service import ReportTemplateService
+        explicit_template_id = None
+        try:
+            if template_id is not None:
+                explicit_template_id = int(template_id)
+        except Exception:
+            explicit_template_id = None
+        resolved_html = ReportTemplateService.try_render_resolved(
+            db=db,
+            business_id=business_id,
+            module_key="invoices",
+            subtype="detail",
+            context=template_context,
+            explicit_template_id=explicit_template_id,
+        )
+    except Exception:
+        resolved_html = None
+
+    # HTML پیش‌فرض در نبود قالب
+    html_content = resolved_html or f"""
+    <!DOCTYPE html>
+    <html dir='{"rtl" if is_fa else "ltr"}'>
+      <head>
+        <meta charset="utf-8" />
+        <style>
+          body {{ font-family: Tahoma, Arial, sans-serif; font-size: 12px; color: #222; }}
+          h1 {{ font-size: 18px; margin: 0 0 12px; }}
+          .meta {{ margin: 6px 0; }}
+          table {{ width: 100%; border-collapse: collapse; margin-top: 12px; }}
+          th, td {{ border: 1px solid #ccc; padding: 6px; text-align: {"right" if is_fa else "left"}; }}
+          th {{ background: #f6f6f6; }}
+          .totals {{ margin-top: 12px; float: {"left" if is_fa else "right"}; min-width: 260px; }}
+          .label {{ color: #666; }}
+        </style>
+      </head>
+      <body>
+        <h1>{escape(item.get("title") or ("فاکتور" if is_fa else "Invoice"))}</h1>
+        <div class="meta">
+          <div><span class="label">{'کسب‌وکار' if is_fa else 'Business'}:</span> {escape(business_name or "-")}</div>
+          <div><span class="label">{'کد' if is_fa else 'Code'}:</span> {escape(item.get("code") or "-")}</div>
+          <div><span class="label">{'تاریخ' if is_fa else 'Date'}:</span> {escape(item.get("issue_date") or "-")}</div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>{'ردیف' if is_fa else 'No.'}</th>
+              <th>{'شرح کالا/خدمت' if is_fa else 'Item'}</th>
+              <th>{'تعداد' if is_fa else 'Qty'}</th>
+              <th>{'فی' if is_fa else 'Price'}</th>
+              <th>{'مبلغ' if is_fa else 'Amount'}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {''.join([
+              f"<tr><td>{i+1}</td><td>{escape(str(line.get('product_name') or line.get('description') or '-'))}</td><td>{escape(str(line.get('quantity') or ''))}</td><td>{escape(str(line.get('unit_price') or ''))}</td><td>{escape(str(line.get('line_total') or ''))}</td></tr>"
+              for i, line in enumerate(item.get('lines') or [])
+            ])}
+          </tbody>
+        </table>
+        <div class="totals">
+          <div><span class="label">{'جمع جزء' if is_fa else 'Subtotal'}:</span> {escape(str(item.get('subtotal') or ''))}</div>
+          <div><span class="label">{'مالیات' if is_fa else 'Tax'}:</span> {escape(str(item.get('tax_total') or ''))}</div>
+          <div><strong>{'قابل پرداخت' if is_fa else 'Payable'}:</strong> {escape(str(item.get('payable_total') or ''))}</div>
+        </div>
+      </body>
+    </html>
+    """
+
+    font_config = FontConfiguration()
+    pdf_bytes = HTML(string=html_content).write_pdf(font_config=font_config)
+
+    # نام فایل
+    def _slugify(text: str) -> str:
+        return re.sub(r"[^A-Za-z0-9_-]+", "_", (text or "")).strip("_") or "invoice"
+    filename = f"invoice_{_slugify(item.get('code'))}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f"attachment; filename={filename}",
+            "Content-Length": str(len(pdf_bytes)),
+            "Access-Control-Expose-Headers": "Content-Disposition",
+        },
+    )
 
 @router.post("/business/{business_id}/search")
 @require_business_access("business_id")
@@ -741,7 +887,41 @@ async def export_invoices_pdf(
             row_cells.append(f'<td>{escape(str(value))}</td>')
         rows_html.append(f'<tr>{"".join(row_cells)}</tr>')
 
-    html_content = f"""
+    # کانتکست مشترک برای قالب‌های سفارشی
+    template_context: Dict[str, Any] = {
+        "title_text": title_text,
+        "business_name": business_name,
+        "generated_at": now,
+        "is_fa": is_fa,
+        "headers": headers,
+        "keys": keys,
+        "items": items,
+        # خروجی‌های HTML آماده برای استفاده سریع در قالب
+        "table_headers_html": headers_html,
+        "table_rows_html": "".join(rows_html),
+    }
+
+    # تلاش برای رندر با قالب سفارشی (explicit یا پیش‌فرض)
+    try:
+        from app.services.report_template_service import ReportTemplateService
+        explicit_template_id = None
+        try:
+            if "template_id" in body and body.get("template_id") is not None:
+                explicit_template_id = int(body.get("template_id"))
+        except Exception:
+            explicit_template_id = None
+        resolved_html = ReportTemplateService.try_render_resolved(
+            db=db,
+            business_id=business_id,
+            module_key="invoices",
+            subtype="list",
+            context=template_context,
+            explicit_template_id=explicit_template_id,
+        )
+    except Exception:
+        resolved_html = None
+
+    html_content = resolved_html or f"""
     <!DOCTYPE html>
     <html dir='{ 'rtl' if is_fa else 'ltr' }'>
       <head>

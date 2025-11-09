@@ -425,6 +425,13 @@ class _BusinessShellState extends State<BusinessShell> {
         type: _MenuItemType.simple,
       ),
       _MenuItem(
+        label: t.templates,
+        icon: Icons.picture_as_pdf,
+        selectedIcon: Icons.picture_as_pdf,
+        path: '/business/${widget.businessId}/report-templates',
+        type: _MenuItemType.simple,
+      ),
+      _MenuItem(
         label: t.pluginMarketplace,
         icon: Icons.store,
         selectedIcon: Icons.store,
