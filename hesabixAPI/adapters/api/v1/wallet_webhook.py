@@ -1,13 +1,18 @@
 from __future__ import annotations
 
 from typing import Dict, Any
+import os
+import hmac
+import hashlib
+import json
 
 from fastapi import APIRouter, Depends, Request, Body
 from sqlalchemy.orm import Session
 
 from adapters.db.session import get_db
-from app.core.responses import success_response
+from app.core.responses import success_response, ApiError
 from app.services.wallet_service import confirm_top_up
+from adapters.db.models.wallet import WalletTransaction
 
 
 router = APIRouter(prefix="/wallet", tags=["wallet-webhook"])
@@ -23,11 +28,46 @@ def wallet_webhook_endpoint(
 	payload: Dict[str, Any] = Body(...),
 	db: Session = Depends(get_db),
 ) -> dict:
-	# توجه: در محیط واقعی باید امضای وبهوک و ضد تکرار بودن بررسی شود
+	# امضای وبهوک (اختیاری بر اساس تنظیم محیط)
+	secret = os.getenv("WALLET_WEBHOOK_SECRET", "").strip()
+	if secret:
+		signature = request.headers.get("x-signature") or request.headers.get("X-Signature")
+		if not signature:
+			raise ApiError("INVALID_SIGNATURE", "امضای وبهوک ارسال نشده است", http_status=403)
+		try:
+			body_str = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+			digest = hmac.new(secret.encode("utf-8"), body_str.encode("utf-8"), hashlib.sha256).hexdigest()
+			if not hmac.compare_digest(digest, str(signature).strip()):
+				raise ApiError("INVALID_SIGNATURE", "امضای وبهوک نامعتبر است", http_status=403)
+		except ApiError:
+			raise
+		except Exception:
+			raise ApiError("INVALID_SIGNATURE", "خطا در اعتبارسنجی امضا", http_status=403)
+
 	tx_id = int(payload.get("transaction_id") or 0)
 	status = str(payload.get("status") or "").lower()
 	success = status in ("success", "succeeded", "ok")
 	external_ref = str(payload.get("external_ref") or "")
+	nonce = str(payload.get("nonce") or "")
+
+	# ضد تکرار ساده: ذخیره آخرین nonce در extra_info تراکنش و رد تکراری
+	try:
+		tx = db.query(WalletTransaction).filter(WalletTransaction.id == int(tx_id)).first()
+		if tx and nonce:
+			try:
+				extra = json.loads(tx.extra_info or "{}") if tx.extra_info else {}
+			except Exception:
+				extra = {}
+			prev_nonce = str(extra.get("last_webhook_nonce") or "")
+			if prev_nonce and prev_nonce == nonce:
+				# تراکنش تکراری؛ بدون تغییر وضعیت پاسخ می‌دهیم
+				return success_response({"transaction_id": tx_id, "status": tx.status}, request, message="DUPLICATE_WEBHOOK_IGNORED")
+			extra["last_webhook_nonce"] = nonce
+			tx.extra_info = json.dumps(extra, ensure_ascii=False)
+			db.flush()
+	except Exception:
+		# عدم موفقیت در ضدتکرار نباید مانع مسیر اصلی شود؛ confirm_top_up ایدم‌پوتنت است
+		pass
 	# اختیاری: دریافت کارمزد از وبهوک و نگهداری در تراکنش (fee_amount)
 	try:
 		fee_value = payload.get("fee_amount")

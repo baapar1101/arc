@@ -11,6 +11,14 @@ from app.core.permissions import require_business_access
 from app.services.business_dashboard_service import (
     get_business_dashboard_data, get_business_members, get_business_statistics
 )
+from app.services.dashboard_widgets_service import (
+    get_widget_definitions,
+    get_dashboard_layout_profile,
+    save_dashboard_layout_profile,
+    get_widgets_batch_data,
+    get_business_default_layout,
+    save_business_default_layout,
+)
 
 router = APIRouter(prefix="/business", tags=["business-dashboard"])
 
@@ -366,3 +374,132 @@ def get_business_info_with_permissions(
     
     formatted_data = format_datetime_fields(response_data, request)
     return success_response(formatted_data, request)
+
+
+# === Dashboard Widgets (Responsive/Per-User) ===
+@router.get("/{business_id}/dashboard/widgets/definitions",
+    summary="تعاریف ویجت‌های داشبورد",
+    description="لیست ویجت‌های قابل استفاده برای کاربر فعلی (بر اساس مجوزها) + ستون‌بندی رسپانسیو",
+    response_model=SuccessResponse,
+)
+@require_business_access("business_id")
+def list_dashboard_widget_definitions(
+    request: Request,
+    business_id: int,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    data = get_widget_definitions(db=db, business_id=business_id, user_id=ctx.get_user_id())
+    return success_response(data, request)
+
+
+@router.get("/{business_id}/dashboard/layout",
+    summary="دریافت چیدمان داشبورد (پروفایل رسپانسیو)",
+    description="چیدمان کاربر برای یک breakpoint مشخص را برمی‌گرداند. در نبود، از پیش‌فرض سیستم استفاده می‌کند.",
+    response_model=SuccessResponse,
+)
+@require_business_access("business_id")
+def get_dashboard_layout(
+    request: Request,
+    business_id: int,
+    breakpoint: str = "md",
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    profile = get_dashboard_layout_profile(
+        db=db,
+        business_id=business_id,
+        user_id=ctx.get_user_id(),
+        breakpoint=breakpoint,
+    )
+    return success_response(profile, request)
+
+
+@router.put("/{business_id}/dashboard/layout",
+    summary="ذخیره چیدمان داشبورد (پروفایل رسپانسیو)",
+    description="چیدمان کاربر برای breakpoint مشخص را ذخیره می‌کند.",
+    response_model=SuccessResponse,
+)
+@require_business_access("business_id")
+def put_dashboard_layout(
+    request: Request,
+    business_id: int,
+    payload: dict,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    breakpoint = str(payload.get("breakpoint") or "md")
+    items = payload.get("items") or []
+    result = save_dashboard_layout_profile(
+        db=db,
+        business_id=business_id,
+        user_id=ctx.get_user_id(),
+        breakpoint=breakpoint,
+        items=items,
+    )
+    return success_response(result, request)
+
+
+@router.post("/{business_id}/dashboard/data",
+    summary="دریافت داده‌ی ویجت‌ها (Batch)",
+    description="کلیدهای ویجت را می‌گیرد و داده‌ی هر ویجت را در یک پاسخ برمی‌گرداند.",
+    response_model=SuccessResponse,
+)
+@require_business_access("business_id")
+def post_dashboard_widgets_data(
+    request: Request,
+    business_id: int,
+    payload: dict,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    widget_keys = payload.get("widget_keys") or []
+    filters = payload.get("filters") or {}
+    data = get_widgets_batch_data(
+        db=db,
+        business_id=business_id,
+        user_id=ctx.get_user_id(),
+        widget_keys=[str(k) for k in widget_keys],
+        filters=filters,
+    )
+    formatted = format_datetime_fields(data, request)
+    return success_response(formatted, request)
+
+
+@router.get("/{business_id}/dashboard/layout/default",
+    summary="پیش‌فرض چیدمان کسب‌وکار (GET)",
+    description="چیدمان پیش‌فرض منتشر شده توسط مالک کسب‌وکار را برمی‌گرداند (در صورت وجود).",
+    response_model=SuccessResponse,
+)
+@require_business_access("business_id")
+def get_business_default_dashboard_layout(
+    request: Request,
+    business_id: int,
+    breakpoint: str = "md",
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    profile = get_business_default_layout(db=db, business_id=business_id, breakpoint=breakpoint)
+    return success_response(profile or {}, request)
+
+
+@router.put("/{business_id}/dashboard/layout/default",
+    summary="انتشار چیدمان پیش‌فرض کسب‌وکار (PUT)",
+    description="مالک کسب‌وکار می‌تواند چیدمان پیش‌فرض را برای breakpoint مشخص منتشر کند.",
+    response_model=SuccessResponse,
+)
+@require_business_access("business_id")
+def put_business_default_dashboard_layout(
+    request: Request,
+    business_id: int,
+    payload: dict,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    # فقط مالک کسب‌وکار
+    if not ctx.is_business_owner(business_id):
+        raise HTTPException(status_code=403, detail="Only business owner can publish default layout")
+    breakpoint = str(payload.get("breakpoint") or "md")
+    items = payload.get("items") or []
+    result = save_business_default_layout(db=db, business_id=business_id, breakpoint=breakpoint, items=items)
+    return success_response(result, request)

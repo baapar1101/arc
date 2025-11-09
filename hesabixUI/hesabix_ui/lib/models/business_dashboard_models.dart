@@ -276,3 +276,145 @@ class BusinessWithPermission {
     );
   }
 }
+
+// ===== Dashboard V2 (Responsive Widgets) =====
+
+class DashboardWidgetDefinition {
+  final String key;
+  final String title;
+  final String icon;
+  final int version;
+  final List<String> permissionsRequired;
+  final Map<String, Map<String, int>> defaults; // breakpoint -> { colSpan,rowSpan }
+
+  DashboardWidgetDefinition({
+    required this.key,
+    required this.title,
+    required this.icon,
+    required this.version,
+    required this.permissionsRequired,
+    required this.defaults,
+  });
+
+  factory DashboardWidgetDefinition.fromJson(Map<String, dynamic> json) {
+    final defaultsRaw = json['defaults'] as Map<String, dynamic>? ?? const {};
+    final defaults = <String, Map<String, int>>{};
+    defaultsRaw.forEach((bp, v) {
+      final m = Map<String, dynamic>.from(v as Map);
+      defaults[bp] = {
+        'colSpan': (m['colSpan'] ?? 1) is int ? m['colSpan'] as int : int.tryParse('${m['colSpan']}') ?? 1,
+        'rowSpan': (m['rowSpan'] ?? 1) is int ? m['rowSpan'] as int : int.tryParse('${m['rowSpan']}') ?? 1,
+      };
+    });
+    return DashboardWidgetDefinition(
+      key: json['key'] as String,
+      title: json['title'] as String? ?? json['key'] as String,
+      icon: json['icon'] as String? ?? 'widgets',
+      version: (json['version'] ?? 1) as int,
+      permissionsRequired: (json['permissions_required'] as List?)?.map((e) => '$e').toList() ?? const <String>[],
+      defaults: defaults,
+    );
+  }
+}
+
+class DashboardLayoutItem {
+  final String key;
+  final int order;
+  final int colSpan;
+  final int rowSpan;
+  final bool hidden;
+
+  DashboardLayoutItem({
+    required this.key,
+    required this.order,
+    required this.colSpan,
+    required this.rowSpan,
+    required this.hidden,
+  });
+
+  factory DashboardLayoutItem.fromJson(Map<String, dynamic> json) {
+    return DashboardLayoutItem(
+      key: json['key'] as String,
+      order: (json['order'] ?? 1) as int,
+      colSpan: (json['colSpan'] ?? 1) as int,
+      rowSpan: (json['rowSpan'] ?? 1) as int,
+      hidden: (json['hidden'] ?? false) as bool,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'key': key,
+        'order': order,
+        'colSpan': colSpan,
+        'rowSpan': rowSpan,
+        'hidden': hidden,
+      };
+
+  DashboardLayoutItem copyWith({
+    String? key,
+    int? order,
+    int? colSpan,
+    int? rowSpan,
+    bool? hidden,
+  }) {
+    return DashboardLayoutItem(
+      key: key ?? this.key,
+      order: order ?? this.order,
+      colSpan: colSpan ?? this.colSpan,
+      rowSpan: rowSpan ?? this.rowSpan,
+      hidden: hidden ?? this.hidden,
+    );
+  }
+}
+
+class DashboardLayoutProfile {
+  final String breakpoint;
+  final int columns;
+  final List<DashboardLayoutItem> items;
+  final int version;
+  final String updatedAt;
+
+  DashboardLayoutProfile({
+    required this.breakpoint,
+    required this.columns,
+    required this.items,
+    required this.version,
+    required this.updatedAt,
+  });
+
+  factory DashboardLayoutProfile.fromJson(Map<String, dynamic> json) {
+    return DashboardLayoutProfile(
+      breakpoint: json['breakpoint'] as String? ?? 'md',
+      columns: (json['columns'] ?? 8) as int,
+      items: (json['items'] as List? ?? const <dynamic>[])
+          .map((e) => DashboardLayoutItem.fromJson(Map<String, dynamic>.from(e as Map)))
+          .toList(),
+      version: (json['version'] ?? 2) as int,
+      updatedAt: json['updated_at'] as String? ?? '',
+    );
+  }
+}
+
+class DashboardDefinitionsResponse {
+  final Map<String, int> columns;
+  final List<DashboardWidgetDefinition> items;
+
+  DashboardDefinitionsResponse({
+    required this.columns,
+    required this.items,
+  });
+
+  factory DashboardDefinitionsResponse.fromJson(Map<String, dynamic> json) {
+    final colsRaw = Map<String, dynamic>.from(json['columns'] as Map? ?? const {});
+    final cols = <String, int>{};
+    colsRaw.forEach((k, v) {
+      cols[k] = (v is int) ? v : int.tryParse('$v') ?? 0;
+    });
+    return DashboardDefinitionsResponse(
+      columns: cols,
+      items: (json['items'] as List? ?? const <dynamic>[])
+          .map((e) => DashboardWidgetDefinition.fromJson(Map<String, dynamic>.from(e as Map)))
+          .toList(),
+    );
+  }
+}

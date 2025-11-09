@@ -35,6 +35,33 @@ def _ensure_wallet_account(db: Session, business_id: int) -> WalletAccount:
 	return obj
 
 
+def _get_wallet_account_for_update(db: Session, business_id: int) -> WalletAccount:
+	"""
+	قفل ردیفی روی حساب کیف‌پول برای جلوگیری از رقابت در به‌روزرسانی مانده‌ها
+	"""
+	acc = (
+		db.query(WalletAccount)
+		.filter(WalletAccount.business_id == int(business_id))
+		.with_for_update()
+		.first()
+	)
+	if acc:
+		return acc
+	# اگر وجود ندارد، ایجاد سپس تلاش مجدد برای قفل
+	acc = _ensure_wallet_account(db, business_id)
+	db.flush()
+	try:
+		acc = (
+			db.query(WalletAccount)
+			.filter(WalletAccount.business_id == int(business_id))
+			.with_for_update()
+			.first()
+		) or acc
+	except Exception:
+		pass
+	return acc
+
+
 def get_wallet_overview(db: Session, business_id: int) -> Dict[str, Any]:
 	_ = db.query(Business).filter(Business.id == int(business_id)).first() or None
 	if _ is None:
@@ -170,13 +197,13 @@ def create_payout_request(
 	if not bank_acc.is_active:
 		raise ApiError("BANK_ACCOUNT_INACTIVE", "حساب بانکی غیرفعال است", http_status=400)
 
-	account = _ensure_wallet_account(db, business_id)
+	account = _get_wallet_account_for_update(db, business_id)
 	available = Decimal(str(account.available_balance or 0))
 	if amount > available:
 		raise ApiError("INSUFFICIENT_FUNDS", "موجودی کافی نیست", http_status=400)
 
 	# قفل مبلغ: کسر از مانده قابل برداشت
-	account.available_balance = float(available - amount)
+	account.available_balance = available - amount
 	db.flush()
 
 	payout = WalletPayout(
@@ -234,8 +261,8 @@ def cancel_payout_request(db: Session, payout_id: int, canceller_user_id: int) -
 		raise ApiError("INVALID_STATE", "فقط درخواست‌های requested/approved قابل لغو هستند", http_status=400)
 
 	# بازگردانی مبلغ به مانده قابل برداشت
-	account = _ensure_wallet_account(db, payout.business_id)
-	account.available_balance = float(Decimal(str(account.available_balance or 0)) + Decimal(str(payout.gross_amount or 0)))
+	account = _get_wallet_account_for_update(db, payout.business_id)
+	account.available_balance = Decimal(str(account.available_balance or 0)) + Decimal(str(payout.gross_amount or 0))
 	db.flush()
 
 	payout.status = "canceled"
@@ -331,7 +358,7 @@ def run_auto_settlement(db: Session, business_id: int, user_id: int) -> Dict[str
 	default_bank_account_id = settings.get("default_bank_account_id")
 	if not default_bank_account_id:
 		return {"executed": False, "reason": "NO_DEFAULT_BANK_ACCOUNT"}
-	account = _ensure_wallet_account(db, business_id)
+	account = _get_wallet_account_for_update(db, business_id)
 	available = Decimal(str(account.available_balance or 0))
 	cand = available - min_reserve
 	if cand <= 0 or cand < threshold:
@@ -361,8 +388,8 @@ def create_top_up_request(db: Session, business_id: int, user_id: int, payload: 
 	if not gateway_id:
 		# اجازه می‌دهیم بدون gateway_id نیز ساخته شود، اما برای پرداخت آنلاین لازم است
 		pass
-	account = _ensure_wallet_account(db, business_id)
-	account.pending_balance = float(Decimal(str(account.pending_balance or 0)) + amount)
+	account = _get_wallet_account_for_update(db, business_id)
+	account.pending_balance = Decimal(str(account.pending_balance or 0)) + amount
 	db.flush()
 	tx = WalletTransaction(
 		business_id=int(business_id),
@@ -390,10 +417,17 @@ def create_top_up_request(db: Session, business_id: int, user_id: int, payload: 
 			)
 			payment_url = init_res.payment_url
 		except Exception as ex:
-			# اگر ایجاد لینک شکست بخورد، تراکنش پابرجاست ولی لینک ندارد
-			from app.core.logging import get_logger
-			logger = get_logger()
-			logger.warning("gateway_initiate_failed", error=str(ex))
+			# اگر ایجاد لینک شکست بخورد، مانده pending به حالت قبل برگردد و تراکنش failed شود
+			try:
+				account.pending_balance = Decimal(str(account.pending_balance or 0)) - amount
+				if account.pending_balance < 0:
+					account.pending_balance = Decimal("0")
+				tx.status = "failed"
+				db.flush()
+			finally:
+				import structlog
+				logger = structlog.get_logger()
+				logger.warning("gateway_initiate_failed", error=str(ex))
 	return {"transaction_id": tx.id, "status": tx.status, **({"payment_url": payment_url} if payment_url else {})}
 
 
@@ -406,7 +440,12 @@ def confirm_top_up(db: Session, tx_id: int, success: bool, external_ref: str | N
 	tx = db.query(WalletTransaction).filter(WalletTransaction.id == int(tx_id)).first()
 	if not tx or tx.type != "top_up":
 		raise ApiError("TX_NOT_FOUND", "تراکنش افزایش اعتبار یافت نشد", http_status=404)
-	account = _ensure_wallet_account(db, tx.business_id)
+	# Idempotency guard: if already finalized, do nothing
+	if (tx.status or "").lower() in ("succeeded", "failed"):
+		tx.external_ref = external_ref or tx.external_ref
+		db.flush()
+		return {"transaction_id": tx.id, "status": tx.status}
+	account = _get_wallet_account_for_update(db, tx.business_id)
 	if success:
 		# move pending -> available
 		gross = Decimal(str(tx.amount or 0))
@@ -416,8 +455,10 @@ def confirm_top_up(db: Session, tx_id: int, success: bool, external_ref: str | N
 		if fee > gross:
 			fee = gross
 		net = gross - fee
-		account.pending_balance = float(Decimal(str(account.pending_balance or 0)) - gross)
-		account.available_balance = float(Decimal(str(account.available_balance or 0)) + net)
+		# Prevent negative pending due to duplicate webhook/callback
+		current_pending = Decimal(str(account.pending_balance or 0))
+		account.pending_balance = current_pending - gross if current_pending >= gross else Decimal("0")
+		account.available_balance = Decimal(str(account.available_balance or 0)) + net
 		tx.status = "succeeded"
 		# create accounting document
 		try:
@@ -428,7 +469,9 @@ def confirm_top_up(db: Session, tx_id: int, success: bool, external_ref: str | N
 			pass
 	else:
 		# rollback pending
-		account.pending_balance = float(Decimal(str(account.pending_balance or 0)) - Decimal(str(tx.amount or 0)))
+		current_pending = Decimal(str(account.pending_balance or 0))
+		dec_amt = Decimal(str(tx.amount or 0))
+		account.pending_balance = current_pending - dec_amt if current_pending >= dec_amt else Decimal("0")
 		tx.status = "failed"
 	tx.external_ref = external_ref
 	db.flush()

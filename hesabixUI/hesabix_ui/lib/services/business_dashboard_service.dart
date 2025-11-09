@@ -1,7 +1,8 @@
 import 'package:dio/dio.dart';
 import '../core/api_client.dart';
-import '../models/business_dashboard_models.dart';
+// duplicate removed
 import '../core/fiscal_year_controller.dart';
+import '../models/business_dashboard_models.dart';
 
 class BusinessDashboardService {
   final ApiClient _apiClient;
@@ -243,5 +244,106 @@ class BusinessDashboardService {
       print('General Exception: $e');
       throw Exception('خطا در بارگذاری اطلاعات کسب و کار: $e');
     }
+  }
+
+  // ===== Dashboard V2 (Responsive Widgets) =====
+
+  Future<DashboardDefinitionsResponse> getWidgetDefinitions(int businessId) async {
+    final res = await _apiClient.get<Map<String, dynamic>>(
+      '/api/v1/business/$businessId/dashboard/widgets/definitions',
+    );
+    final data = res.data?['data'] as Map<String, dynamic>? ?? const {};
+    return DashboardDefinitionsResponse.fromJson(data);
+  }
+
+  Future<DashboardLayoutProfile> getLayoutProfile({
+    required int businessId,
+    required String breakpoint,
+  }) async {
+    final res = await _apiClient.get<Map<String, dynamic>>(
+      '/api/v1/business/$businessId/dashboard/layout',
+      query: {'breakpoint': breakpoint},
+    );
+    final data = res.data?['data'] as Map<String, dynamic>? ?? const {};
+    return DashboardLayoutProfile.fromJson(data);
+  }
+
+  Future<DashboardLayoutProfile> putLayoutProfile({
+    required int businessId,
+    required String breakpoint,
+    required List<DashboardLayoutItem> items,
+  }) async {
+    final body = {
+      'breakpoint': breakpoint,
+      'items': items.map((e) => e.toJson()).toList(),
+    };
+    final res = await _apiClient.put<Map<String, dynamic>>(
+      '/api/v1/business/$businessId/dashboard/layout',
+      data: body,
+    );
+    final data = res.data?['data'] as Map<String, dynamic>? ?? const {};
+    return DashboardLayoutProfile.fromJson(data);
+  }
+
+  Future<Map<String, dynamic>> getWidgetsBatchData({
+    required int businessId,
+    required List<String> widgetKeys,
+    Map<String, dynamic>? filters,
+  }) async {
+    final res = await _api_client_postJson(
+      '/api/v1/business/$businessId/dashboard/data',
+      {
+        'widget_keys': widgetKeys,
+        'filters': filters ?? const <String, dynamic>{},
+      },
+    );
+    final data = (res['data'] as Map?) ?? const {};
+    return Map<String, dynamic>.from(data);
+  }
+
+  // Business default layout (owner can publish)
+  Future<DashboardLayoutProfile?> getBusinessDefaultLayout({
+    required int businessId,
+    required String breakpoint,
+  }) async {
+    final res = await _apiClient.get<Map<String, dynamic>>(
+      '/api/v1/business/$businessId/dashboard/layout/default',
+      query: {'breakpoint': breakpoint},
+    );
+    final data = res.data?['data'] as Map<String, dynamic>? ?? const {};
+    if (data.isEmpty) return null;
+    return DashboardLayoutProfile.fromJson(data);
+  }
+
+  Future<DashboardLayoutProfile> putBusinessDefaultLayout({
+    required int businessId,
+    required String breakpoint,
+    required List<DashboardLayoutItem> items,
+  }) async {
+    final body = {
+      'breakpoint': breakpoint,
+      'items': items.map((e) => e.toJson()).toList(),
+    };
+    final res = await _apiClient.put<Map<String, dynamic>>(
+      '/api/v1/business/$businessId/dashboard/layout/default',
+      data: body,
+    );
+    final data = res.data?['data'] as Map<String, dynamic>? ?? const {};
+    return DashboardLayoutProfile.fromJson(data);
+  }
+
+  Future<Map<String, dynamic>> _api_client_postJson(String path, Map<String, dynamic> body) async {
+    final response = await _apiClient.post<Map<String, dynamic>>(
+      path,
+      data: body,
+      options: Options(headers: {
+        if (fiscalYearController?.fiscalYearId != null)
+          'X-Fiscal-Year-ID': fiscalYearController!.fiscalYearId.toString(),
+      }),
+    );
+    if (response.data?['success'] == true) {
+      return Map<String, dynamic>.from(response.data!);
+    }
+    throw Exception(response.data?['message'] ?? 'API error');
   }
 }

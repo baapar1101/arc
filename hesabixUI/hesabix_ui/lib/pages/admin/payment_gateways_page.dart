@@ -3,6 +3,7 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../core/api_client.dart';
 import '../../config/app_config.dart';
 import '../../services/payment_gateway_service.dart';
+import 'package:uuid/uuid.dart';
 
 class PaymentGatewaysPage extends StatefulWidget {
   const PaymentGatewaysPage({super.key});
@@ -30,6 +31,18 @@ class _PaymentGatewaysPageState extends State<PaymentGatewaysPage> {
   final _successRedirectCtrl = TextEditingController();
   final _failureRedirectCtrl = TextEditingController();
   bool _useSuggestedCallback = true;
+  final _uuid = const Uuid();
+
+  void _maybeGenerateSandboxMerchantId() {
+    if (_provider == 'zarinpal' && _isSandbox) {
+      final current = _merchantIdCtrl.text.trim();
+      // اگر خالی است یا UUID معتبر نیست، یک UUID تولید کن
+      final isUuid = RegExp(r'^[0-9a-fA-F\-]{32,36}$').hasMatch(current);
+      if (current.isEmpty || !isUuid) {
+        _merchantIdCtrl.text = _uuid.v4();
+      }
+    }
+  }
 
   @override
   void initState() {
@@ -175,6 +188,7 @@ class _PaymentGatewaysPageState extends State<PaymentGatewaysPage> {
                       setState(() {
                         _provider = v ?? 'zarinpal';
                         _applySuggestedCallback();
+                        _maybeGenerateSandboxMerchantId();
                       });
                     },
                   ),
@@ -191,7 +205,13 @@ class _PaymentGatewaysPageState extends State<PaymentGatewaysPage> {
                   SwitchListTile(
                     title: const Text('Sandbox'),
                     value: _isSandbox,
-                    onChanged: (v) => setState(() => _isSandbox = v),
+                    onChanged: (v) {
+                      setState(() {
+                        _isSandbox = v;
+                        _applySuggestedCallback();
+                        _maybeGenerateSandboxMerchantId();
+                      });
+                    },
                   ),
                   Row(
                     children: [

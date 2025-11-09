@@ -16,6 +16,9 @@ import '../../core/api_client.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'receipts_payments_list_page.dart' show BulkSettlementDialog;
 import '../../widgets/document/document_form_dialog.dart';
+import '../../services/wallet_service.dart';
+import '../../services/payment_gateway_service.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class BusinessShell extends StatefulWidget {
   final int businessId;
@@ -95,6 +98,102 @@ class _BusinessShellState extends State<BusinessShell> {
       // and if it's PettyCashPage, it will refresh its data
     });
   }
+
+    Future<void> showWalletTopUpDialog() async {
+      final t = AppLocalizations.of(context);
+      final formKey = GlobalKey<FormState>();
+      final amountCtrl = TextEditingController();
+      final descCtrl = TextEditingController();
+      final pgService = PaymentGatewayService(ApiClient());
+      List<Map<String, dynamic>> gateways = const <Map<String, dynamic>>[];
+      int? gatewayId;
+      try {
+        gateways = await pgService.listBusinessGateways(widget.businessId);
+        if (gateways.isNotEmpty) {
+          gatewayId = int.tryParse('${gateways.first['id']}');
+        }
+      } catch (_) {}
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('افزایش اعتبار'),
+          content: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  controller: amountCtrl,
+                  decoration: const InputDecoration(labelText: 'مبلغ'),
+                  keyboardType: TextInputType.number,
+                  validator: (v) => (v == null || v.isEmpty) ? 'الزامی' : null,
+                ),
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: descCtrl,
+                  decoration: const InputDecoration(labelText: 'توضیحات (اختیاری)'),
+                ),
+                const SizedBox(height: 8),
+                if (gateways.isNotEmpty)
+                  DropdownButtonFormField<int>(
+                    value: gatewayId,
+                    decoration: const InputDecoration(labelText: 'درگاه پرداخت'),
+                    items: gateways
+                        .map((g) => DropdownMenuItem<int>(
+                              value: int.tryParse('${g['id']}'),
+                              child: Text('${g['display_name']} (${g['provider']})'),
+                            ))
+                        .toList(),
+                    onChanged: (v) => gatewayId = v,
+                    validator: (v) => (gateways.isNotEmpty && v == null) ? 'انتخاب درگاه الزامی است' : null,
+                  ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(t.cancel)),
+            FilledButton(
+              onPressed: () {
+                if (formKey.currentState?.validate() == true && (gateways.isEmpty || gatewayId != null)) {
+                  Navigator.of(ctx).pop(true);
+                }
+              },
+              child: Text(t.confirm),
+            ),
+          ],
+        ),
+      );
+      if (confirmed == true) {
+        try {
+          final amount = double.tryParse(amountCtrl.text.replaceAll(',', '')) ?? 0;
+          final data = await WalletService(ApiClient()).topUp(
+            businessId: widget.businessId,
+            amount: amount,
+            description: descCtrl.text,
+            gatewayId: gatewayId,
+          );
+          final paymentUrl = (data['payment_url'] ?? '').toString();
+          if (paymentUrl.isNotEmpty) {
+            try {
+              await launchUrl(Uri.parse(paymentUrl), mode: LaunchMode.externalApplication);
+            } catch (_) {
+              // اگر باز نشد، فقط لینک را کپی کند/نمایش دهد
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('لینک پرداخت: $paymentUrl')));
+              }
+            }
+          } else {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('لینک پرداخت دریافت نشد')));
+            }
+          }
+        } catch (e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطا در افزایش اعتبار: $e')));
+          }
+        }
+      }
+    }
 
   Future<void> _loadBusinessInfo() async {
     print('=== _loadBusinessInfo START ===');
@@ -850,7 +949,8 @@ class _BusinessShellState extends State<BusinessShell> {
                                         // Open add cash register dialog
                                         showAddCashBoxDialog();
                                       } else if (child.label == t.wallet) {
-                                        // Navigate to add wallet
+                                        // Show wallet top-up dialog
+                                        showWalletTopUpDialog();
                                       } else if (child.label == t.checks) {
                                         // Navigate to add check
                                       } else if (child.label == t.invoice) {
@@ -1175,7 +1275,8 @@ class _BusinessShellState extends State<BusinessShell> {
                               // Open add cash register dialog
                               showAddCashBoxDialog();
                             } else if (child.label == t.wallet) {
-                              // Navigate to add wallet
+                              // Show wallet top-up dialog
+                              showWalletTopUpDialog();
                             } else if (child.label == t.checks) {
                               // Navigate to add check
                             } else if (child.label == t.invoice) {

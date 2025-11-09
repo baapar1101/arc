@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from adapters.db.session import get_db
 from app.core.auth_dependency import get_current_user, AuthContext
-from app.core.permissions import require_business_access
+from app.core.permissions import require_business_access_dep
 from app.core.responses import success_response, ApiError
 from app.services.wallet_service import (
 	get_wallet_overview,
@@ -22,6 +22,8 @@ from app.services.wallet_service import (
 	update_business_wallet_settings,
 	run_auto_settlement,
 )
+from adapters.db.models.wallet import WalletPayout
+from fastapi import Query
 
 
 router = APIRouter(prefix="/businesses/{business_id}/wallet", tags=["wallet"])
@@ -35,6 +37,7 @@ router = APIRouter(prefix="/businesses/{business_id}/wallet", tags=["wallet"])
 def get_wallet_overview_endpoint(
 	request: Request,
 	business_id: int,
+	_: None = Depends(require_business_access_dep),
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
@@ -50,6 +53,7 @@ def create_top_up_endpoint(
 	request: Request,
 	business_id: int,
 	payload: Dict[str, Any] = Body(...),
+	_: None = Depends(require_business_access_dep),
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
@@ -69,6 +73,7 @@ def list_wallet_transactions_endpoint(
 	limit: int = 50,
 	from_date: str | None = None,
 	to_date: str | None = None,
+	_: None = Depends(require_business_access_dep),
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
@@ -86,6 +91,66 @@ def list_wallet_transactions_endpoint(
 	return success_response(data, request)
 
 
+@router.post(
+	"/transactions/table",
+	summary="لیست تراکنش‌ها برای جدول عمومی (پگینیشن استاندارد)",
+	description="سازگار با DataTableWidget: ورودی QueryInfo و خروجی items/total/page/limit",
+)
+def list_wallet_transactions_table_endpoint(
+	request: Request,
+	business_id: int,
+	payload: Dict[str, Any] = Body(default_factory=dict),
+	_: None = Depends(require_business_access_dep),
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	# Extract pagination params
+	take = int(payload.get("take") or 20)
+	skip = int(payload.get("skip") or 0)
+	# Optional date range via additional params or filters (best-effort)
+	from_dt = None
+	to_dt = None
+	try:
+		filters = payload.get("filters") or []
+		# Try to detect date range filters by common keys
+		for f in filters:
+			prop = str(f.get("property") or "").lower()
+			op = str(f.get("operator") or "")
+			val = f.get("value")
+			if prop in ("created_at", "date", "transaction_date"):
+				if op == ">=" and val:
+					from_dt = datetime.fromisoformat(str(val))
+				elif op == "<=" and val:
+					to_dt = datetime.fromisoformat(str(val))
+	except Exception:
+		from_dt = None
+		to_dt = None
+	items = list_wallet_transactions(db, business_id, limit=take, skip=skip, from_date=from_dt, to_date=to_dt)
+	# Compute total (simple count for business)
+	try:
+		from adapters.db.models.wallet import WalletTransaction
+		q = db.query(WalletTransaction).filter(WalletTransaction.business_id == int(business_id))
+		if from_dt is not None:
+			from adapters.db.models.wallet import WalletTransaction as WT
+			q = q.filter(WT.created_at >= from_dt)
+		if to_dt is not None:
+			from adapters.db.models.wallet import WalletTransaction as WT2
+			q = q.filter(WT2.created_at <= to_dt)
+		total = q.count()
+	except Exception:
+		total = len(items)
+	page = (skip // take) + 1 if take > 0 else 1
+	total_pages = (total + take - 1) // take if take > 0 else 1
+	resp = {
+		"items": items,
+		"total": total,
+		"page": page,
+		"limit": take,
+		"total_pages": total_pages,
+	}
+	return success_response(resp, request)
+
+
 @router.get(
 	"/transactions/export",
 	summary="خروجی CSV تراکنش‌های کیف‌پول",
@@ -95,6 +160,7 @@ def export_wallet_transactions_csv_endpoint(
 	business_id: int,
 	from_date: str | None = None,
 	to_date: str | None = None,
+	_: None = Depends(require_business_access_dep),
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
 ):
@@ -131,6 +197,7 @@ def export_wallet_metrics_csv_endpoint(
 	business_id: int,
 	from_date: str | None = None,
 	to_date: str | None = None,
+	_: None = Depends(require_business_access_dep),
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
 ):
@@ -174,6 +241,7 @@ def create_payout_request_endpoint(
 	request: Request,
 	business_id: int,
 	payload: Dict[str, Any] = Body(...),
+	_: None = Depends(require_business_access_dep),
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
@@ -191,6 +259,7 @@ def get_wallet_metrics_endpoint(
 	business_id: int,
 	from_date: str | None = None,
 	to_date: str | None = None,
+	_: None = Depends(require_business_access_dep),
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
@@ -215,6 +284,7 @@ def get_wallet_metrics_endpoint(
 def get_wallet_settings_business_endpoint(
 	request: Request,
 	business_id: int,
+	_: None = Depends(require_business_access_dep),
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
@@ -230,6 +300,7 @@ def update_wallet_settings_business_endpoint(
 	request: Request,
 	business_id: int,
 	payload: Dict[str, Any] = Body(...),
+	_: None = Depends(require_business_access_dep),
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
@@ -244,6 +315,7 @@ def update_wallet_settings_business_endpoint(
 def run_auto_settle_endpoint(
 	request: Request,
 	business_id: int,
+	_: None = Depends(require_business_access_dep),
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
@@ -259,10 +331,16 @@ def approve_payout_request_endpoint(
 	request: Request,
 	business_id: int,
 	payout_id: int = Path(...),
+	_: None = Depends(require_business_access_dep),
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
-	# Permission check could be refined (e.g., wallet.approve)
+	# Ensure payout belongs to the same business
+	payout = db.query(WalletPayout).filter(WalletPayout.id == int(payout_id)).first()
+	if not payout:
+		raise ApiError("PAYOUT_NOT_FOUND", "درخواست تسویه یافت نشد", http_status=404)
+	if int(payout.business_id) != int(business_id):
+		raise ApiError("FORBIDDEN", "دسترسی به این درخواست تسویه مجاز نیست", http_status=403)
 	data = approve_payout_request(db, payout_id, ctx.get_user_id())
 	return success_response(data, request, message="PAYOUT_APPROVED")
 
@@ -276,9 +354,16 @@ def cancel_payout_request_endpoint(
 	request: Request,
 	business_id: int,
 	payout_id: int = Path(...),
+	_: None = Depends(require_business_access_dep),
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
+	# Ensure payout belongs to the same business
+	payout = db.query(WalletPayout).filter(WalletPayout.id == int(payout_id)).first()
+	if not payout:
+		raise ApiError("PAYOUT_NOT_FOUND", "درخواست تسویه یافت نشد", http_status=404)
+	if int(payout.business_id) != int(business_id):
+		raise ApiError("FORBIDDEN", "دسترسی به این درخواست تسویه مجاز نیست", http_status=403)
 	data = cancel_payout_request(db, payout_id, ctx.get_user_id())
 	return success_response(data, request, message="PAYOUT_CANCELED")
 

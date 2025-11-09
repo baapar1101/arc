@@ -5,6 +5,8 @@ import inspect
 from fastapi import Depends
 from app.core.auth_dependency import get_current_user, AuthContext
 from app.core.responses import ApiError
+from adapters.db.session import get_db
+from fastapi import Request
 
 
 def require_app_permission(permission: str):
@@ -232,8 +234,16 @@ def require_business_management_dep(auth_context: AuthContext = Depends(get_curr
         raise ApiError("FORBIDDEN", "Missing app permission: business_management", http_status=403)
 
 
-def require_business_access_dep(auth_context: AuthContext = Depends(get_current_user)) -> None:
-    """FastAPI dependency برای بررسی دسترسی به کسب و کار."""
-    # در اینجا می‌توانید منطق بررسی دسترسی به کسب و کار را پیاده‌سازی کنید
-    # برای مثال: بررسی اینکه آیا کاربر دسترسی به کسب و کار دارد
-    pass
+def require_business_access_dep(request: Request, db=Depends(get_db)) -> None:
+    """FastAPI dependency برای بررسی دسترسی به کسب‌وکار در مسیرهای دارای business_id."""
+    ctx = get_current_user(request, db)
+    business_id = None
+    try:
+        business_id = request.path_params.get("business_id")
+    except Exception:
+        business_id = None
+    if business_id is None:
+        # اگر مسیر business_id ندارد، عبور می‌کنیم
+        return
+    if not ctx.can_access_business(int(business_id)):
+        raise ApiError("FORBIDDEN", f"No access to business {business_id}", http_status=403)

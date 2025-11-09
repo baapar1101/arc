@@ -573,6 +573,8 @@ class _MyAppState extends State<MyApp> {
               pageBuilder: (context, state) => NoTransitionPage(
                 child: BusinessDashboardPage(
                   businessId: int.parse(state.pathParameters['business_id']!),
+                  authStore: _authStore!,
+                  calendarController: _calendarController!,
                 ),
               ),
             ),

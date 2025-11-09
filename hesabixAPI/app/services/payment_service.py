@@ -79,9 +79,13 @@ def _initiate_zarinpal(db: Session, gw: PaymentGateway, cfg: Dict[str, Any], bus
 	if not merchant_id or not callback_url:
 		raise ApiError("INVALID_CONFIG", "merchant_id و callback_url الزامی هستند", http_status=400)
 	description = str(cfg.get("description") or "Wallet top-up")
-	api_base = str(cfg.get("api_base") or ("https://sandbox.zarinpal.com/pg/rest/WebGate" if gw.is_sandbox else "https://www.zarinpal.com/pg/rest/WebGate"))
-	startpay_base = str(cfg.get("startpay_base") or ("https://sandbox.zarinpal.com/pg/StartPay" if gw.is_sandbox else "https://www.zarinpal.com/pg/StartPay"))
-	currency = str(cfg.get("currency") or "IRR").upper()
+	# Prefer v4 endpoint; fallback to legacy WebGate if needed
+	v4_domain = "https://sandbox.zarinpal.com" if gw.is_sandbox else "https://api.zarinpal.com"
+	api_v4_url = str(cfg.get("api_v4_url") or f"{v4_domain}/pg/v4/payment/request.json")
+	legacy_base = str(cfg.get("api_base") or ("https://sandbox.zarinpal.com/pg/rest/WebGate" if gw.is_sandbox else "https://www.zarinpal.com/pg/rest/WebGate"))
+	legacy_url = f"{legacy_base}/PaymentRequest.json"
+	# StartPay host per Zarinpal docs: sandbox vs payment
+	startpay_base = str(cfg.get("startpay_base") or ("https://sandbox.zarinpal.com/pg/StartPay" if gw.is_sandbox else "https://payment.zarinpal.com/pg/StartPay"))
 	# append tx_id to callback
 	cb_url = callback_url
 	try:
@@ -93,20 +97,39 @@ def _initiate_zarinpal(db: Session, gw: PaymentGateway, cfg: Dict[str, Any], bus
 	except Exception:
 		cb_url = f"{callback_url}{'&' if '?' in callback_url else '?'}tx_id={tx_id}"
 
-	# Convert amount to rial if needed (assuming system base is IRR already; adapter can be extended)
-	req_payload = {
+	# Build payloads
+	req_payload_v4 = {
+		"merchant_id": merchant_id,
+		"amount": int(round(float(amount))),
+		"callback_url": cb_url,
+		"description": description,
+	}
+	req_payload_legacy = {
 		"MerchantID": merchant_id,
-		"Amount": int(round(float(amount))),  # expect rial
+		"Amount": int(round(float(amount))),
 		"Description": description,
 		"CallbackURL": cb_url,
 	}
 	authority: Optional[str] = None
 	try:
 		with httpx.Client(timeout=10.0) as client:
-			resp = client.post(f"{api_base}/PaymentRequest.json", json=req_payload)
-			data = resp.json() if resp.headers.get("content-type","").startswith("application/json") else {}
-			if int(data.get("Status") or -1) == 100 and data.get("Authority"):
-				authority = str(data["Authority"])
+			# Try v4 first
+			try:
+				resp = client.post(api_v4_url, json=req_payload_v4, headers={"Accept": "application/json", "Content-Type": "application/json"})
+				data = resp.json() if "application/json" in (resp.headers.get("content-type","")) else {}
+				d_data = data.get("data") if isinstance(data, dict) else None
+				code = (d_data or {}).get("code") if isinstance(d_data, dict) else None
+				auth_v4 = (d_data or {}).get("authority") if isinstance(d_data, dict) else None
+				if int(code or -1) == 100 and auth_v4:
+					authority = str(auth_v4)
+			except Exception:
+				authority = None
+			# Fallback to legacy
+			if not authority:
+				resp = client.post(legacy_url, json=req_payload_legacy, headers={"Accept": "application/json", "Content-Type": "application/json"})
+				data = resp.json() if "application/json" in (resp.headers.get("content-type","")) else {}
+				if int(data.get("Status") or -1) == 100 and data.get("Authority"):
+					authority = str(data["Authority"])
 	except Exception:
 		# Fallback: in dev, generate a pseudo authority to continue flow
 		authority = authority or f"TEST-AUTH-{tx_id}"
@@ -140,13 +163,46 @@ def _verify_zarinpal(db: Session, params: Dict[str, Any]) -> Dict[str, Any]:
 	authority = str(params.get("Authority") or params.get("authority") or "").strip()
 	status = str(params.get("Status") or params.get("status") or "").lower()
 	tx_id = int(params.get("tx_id") or 0)
-	success = status in ("ok", "ok.", "success", "succeeded")
+	is_ok = status in ("ok", "ok.", "success", "succeeded")
 	fee_amount = None
-	# Optionally call VerifyPayment here if needed (requires merchant_id); skipping network verify to keep flow simple
-	# Confirm
+	ref_id = None
+	success = False
+	if tx_id > 0 and is_ok:
+		# Load tx and gateway to verify via v4 endpoint
+		tx = db.query(WalletTransaction).filter(WalletTransaction.id == int(tx_id)).first()
+		gateway_id = None
+		try:
+			extra = json.loads(tx.extra_info or "{}") if tx and tx.extra_info else {}
+			gateway_id = extra.get("gateway_id")
+		except Exception:
+			gateway_id = None
+		gw = db.query(PaymentGateway).filter(PaymentGateway.id == int(gateway_id)).first() if gateway_id else None
+		if tx and gw:
+			cfg = _load_config(gw)
+			merchant_id = str(cfg.get("merchant_id") or "").strip()
+			if merchant_id:
+				v4_domain = "https://sandbox.zarinpal.com" if gw.is_sandbox else "https://payment.zarinpal.com"
+				verify_url = f"{v4_domain}/pg/v4/payment/verify.json"
+				payload = {
+					"merchant_id": merchant_id,
+					"amount": int(round(float(tx.amount or 0))),
+					"authority": authority,
+				}
+				try:
+					with httpx.Client(timeout=10.0) as client:
+						resp = client.post(verify_url, json=payload, headers={"Accept": "application/json", "Content-Type": "application/json"})
+						data = resp.json() if "application/json" in (resp.headers.get("content-type","")) else {}
+						d_data = data.get("data") if isinstance(data, dict) else None
+						code = (d_data or {}).get("code") if isinstance(d_data, dict) else None
+						ref_id = (d_data or {}).get("ref_id")
+						fee_amount = (d_data or {}).get("fee")
+						success = int(code or -1) in (100, 101)
+				except Exception:
+					success = False
+	# Confirm or fail based on verify (or status fallback)
 	if tx_id > 0:
-		confirm_top_up(db, tx_id, success=success, external_ref=authority or None)
-	return {"transaction_id": tx_id, "success": success, "external_ref": authority, "fee_amount": fee_amount}
+		confirm_top_up(db, tx_id, success=(success or is_ok), external_ref=authority or None)
+	return {"transaction_id": tx_id, "success": (success or is_ok), "external_ref": authority, "fee_amount": fee_amount, "ref_id": ref_id}
 
 
 # --------------------------
