@@ -4172,6 +4172,24 @@ abstract class AppLocalizations {
   /// **'Restore data from previous backup'**
   String get dataRestoreDescription;
 
+  /// No description provided for @restoreModeNewBusiness.
+  ///
+  /// In en, this message translates to:
+  /// **'Create a new business'**
+  String get restoreModeNewBusiness;
+
+  /// No description provided for @restoreModeReplace.
+  ///
+  /// In en, this message translates to:
+  /// **'Replace existing data'**
+  String get restoreModeReplace;
+
+  /// No description provided for @selectBackupFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Select backup file (.hbx)'**
+  String get selectBackupFile;
+
   /// No description provided for @manage.
   ///
   /// In en, this message translates to:
@@ -5947,6 +5965,288 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Create'**
   String get create;
+
+  /// No description provided for @notificationsSettingsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Notification Settings'**
+  String get notificationsSettingsTitle;
+
+  /// No description provided for @notificationsSettingsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable delivery channels, send test messages, and maintain provider credentials.'**
+  String get notificationsSettingsSubtitle;
+
+  /// No description provided for @notificationsOverviewTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep your team informed'**
+  String get notificationsOverviewTitle;
+
+  /// No description provided for @notificationsOverviewDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose which channels deliver operational alerts and guide administrators on how notifications are routed.'**
+  String get notificationsOverviewDescription;
+
+  /// No description provided for @notificationsGuidanceItemChannels.
+  ///
+  /// In en, this message translates to:
+  /// **'Toggle channels to match each business unit\'\'s availability and compliance requirements.'**
+  String get notificationsGuidanceItemChannels;
+
+  /// No description provided for @notificationsGuidanceItemTemplates.
+  ///
+  /// In en, this message translates to:
+  /// **'Ensure notification templates exist and are published for every channel and language you enable.'**
+  String get notificationsGuidanceItemTemplates;
+
+  /// No description provided for @notificationsGuidanceItemTesting.
+  ///
+  /// In en, this message translates to:
+  /// **'Use test buttons after configuration changes to verify the end-to-end delivery path.'**
+  String get notificationsGuidanceItemTesting;
+
+  /// No description provided for @notificationsLearnMore.
+  ///
+  /// In en, this message translates to:
+  /// **'View documentation'**
+  String get notificationsLearnMore;
+
+  /// No description provided for @notificationsDocumentationUrl.
+  ///
+  /// In en, this message translates to:
+  /// **'https://docs.hesabix.com/notifications'**
+  String get notificationsDocumentationUrl;
+
+  /// No description provided for @notificationsChannelsSectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivery channels'**
+  String get notificationsChannelsSectionTitle;
+
+  /// No description provided for @notificationsChannelsSectionSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Activated channels are used whenever the system emits an announcement or operational alert.'**
+  String get notificationsChannelsSectionSubtitle;
+
+  /// No description provided for @notificationsChannelTelegram.
+  ///
+  /// In en, this message translates to:
+  /// **'Telegram'**
+  String get notificationsChannelTelegram;
+
+  /// No description provided for @notificationsChannelTelegramDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Send alerts through the connected Telegram bot to subscribed operators.'**
+  String get notificationsChannelTelegramDescription;
+
+  /// No description provided for @notificationsChannelEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'Email'**
+  String get notificationsChannelEmail;
+
+  /// No description provided for @notificationsChannelEmailDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Deliver messages via the default email gateway configured in system settings.'**
+  String get notificationsChannelEmailDescription;
+
+  /// No description provided for @notificationsChannelSms.
+  ///
+  /// In en, this message translates to:
+  /// **'SMS'**
+  String get notificationsChannelSms;
+
+  /// No description provided for @notificationsChannelSmsDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Send short messages via the configured SMS provider for high-priority events.'**
+  String get notificationsChannelSmsDescription;
+
+  /// No description provided for @notificationsChannelInApp.
+  ///
+  /// In en, this message translates to:
+  /// **'In-app'**
+  String get notificationsChannelInApp;
+
+  /// No description provided for @notificationsChannelInAppDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Display alerts inside the Hesabix web and mobile applications instantly.'**
+  String get notificationsChannelInAppDescription;
+
+  /// No description provided for @notificationsSaveSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Notification settings saved.'**
+  String get notificationsSaveSuccess;
+
+  /// No description provided for @notificationsSaveError.
+  ///
+  /// In en, this message translates to:
+  /// **'Unable to save notification settings.'**
+  String get notificationsSaveError;
+
+  /// No description provided for @notificationsTestSectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Send test messages'**
+  String get notificationsTestSectionTitle;
+
+  /// No description provided for @notificationsTestSectionSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Send a lightweight test over the selected channel to validate credentials and routing.'**
+  String get notificationsTestSectionSubtitle;
+
+  /// No description provided for @notificationsTestButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Test {channel}'**
+  String notificationsTestButton(String channel);
+
+  /// No description provided for @notificationsTestSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Test notification sent via {channel}.'**
+  String notificationsTestSuccess(String channel);
+
+  /// No description provided for @notificationsTestError.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to send test via {channel}.'**
+  String notificationsTestError(String channel);
+
+  /// No description provided for @notificationsWebsocketInfoTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Real-time in-app notifications'**
+  String get notificationsWebsocketInfoTitle;
+
+  /// No description provided for @notificationsWebsocketInfoDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Clients subscribe to the WebSocket endpoint {endpoint} with a valid API key. Web and mobile apps handle this automatically.'**
+  String notificationsWebsocketInfoDescription(String endpoint);
+
+  /// No description provided for @notificationsAdvancedSectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Advanced configuration (admin)'**
+  String get notificationsAdvancedSectionTitle;
+
+  /// No description provided for @notificationsAdvancedSectionSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage provider credentials for Telegram and SMS gateways. Requires the system_settings permission.'**
+  String get notificationsAdvancedSectionSubtitle;
+
+  /// No description provided for @notificationsAdvancedTelegramHeader.
+  ///
+  /// In en, this message translates to:
+  /// **'Telegram bot setup'**
+  String get notificationsAdvancedTelegramHeader;
+
+  /// No description provided for @notificationsFieldTelegramToken.
+  ///
+  /// In en, this message translates to:
+  /// **'Bot token'**
+  String get notificationsFieldTelegramToken;
+
+  /// No description provided for @notificationsFieldTelegramUsername.
+  ///
+  /// In en, this message translates to:
+  /// **'Bot username'**
+  String get notificationsFieldTelegramUsername;
+
+  /// No description provided for @notificationsFieldTelegramWebhookSecret.
+  ///
+  /// In en, this message translates to:
+  /// **'Webhook secret'**
+  String get notificationsFieldTelegramWebhookSecret;
+
+  /// No description provided for @notificationsFieldTelegramSecretHeader.
+  ///
+  /// In en, this message translates to:
+  /// **'Secret header name'**
+  String get notificationsFieldTelegramSecretHeader;
+
+  /// No description provided for @notificationsFieldTelegramTokenHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Obtain from BotFather (format: 123456789:ABC...).'**
+  String get notificationsFieldTelegramTokenHint;
+
+  /// No description provided for @notificationsFieldTelegramWebhookSecretHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Optional shared secret used to validate incoming webhook calls.'**
+  String get notificationsFieldTelegramWebhookSecretHint;
+
+  /// No description provided for @notificationsAdvancedSmsHeader.
+  ///
+  /// In en, this message translates to:
+  /// **'SMS gateway'**
+  String get notificationsAdvancedSmsHeader;
+
+  /// No description provided for @notificationsFieldSmsProvider.
+  ///
+  /// In en, this message translates to:
+  /// **'Provider name'**
+  String get notificationsFieldSmsProvider;
+
+  /// No description provided for @notificationsFieldSmsApiKey.
+  ///
+  /// In en, this message translates to:
+  /// **'API key'**
+  String get notificationsFieldSmsApiKey;
+
+  /// No description provided for @notificationsFieldSmsApiKeyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Issued by your SMS provider; consider rotating it periodically.'**
+  String get notificationsFieldSmsApiKeyHint;
+
+  /// No description provided for @notificationsFieldSmsSender.
+  ///
+  /// In en, this message translates to:
+  /// **'Sender number or ID'**
+  String get notificationsFieldSmsSender;
+
+  /// No description provided for @notificationsFieldSmsSenderHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Exact sender value registered with your provider.'**
+  String get notificationsFieldSmsSenderHint;
+
+  /// No description provided for @notificationsAdvancedRestartHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply changes during low traffic hours; background workers may require a restart.'**
+  String get notificationsAdvancedRestartHint;
+
+  /// No description provided for @notificationsAdvancedSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save advanced settings'**
+  String get notificationsAdvancedSave;
+
+  /// No description provided for @notificationsAdvancedSaveSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Advanced notification settings saved.'**
+  String get notificationsAdvancedSaveSuccess;
+
+  /// No description provided for @notificationsAdvancedSaveError.
+  ///
+  /// In en, this message translates to:
+  /// **'Unable to save advanced notification settings.'**
+  String get notificationsAdvancedSaveError;
 }
 
 class _AppLocalizationsDelegate

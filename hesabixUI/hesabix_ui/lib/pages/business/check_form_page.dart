@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../core/auth_store.dart';
 import '../../core/calendar_controller.dart';
@@ -7,6 +8,7 @@ import '../../widgets/date_input_field.dart';
 import '../../widgets/banking/currency_picker_widget.dart';
 import '../../widgets/permission/access_denied_page.dart';
 import '../../services/check_service.dart';
+import '../../utils/number_normalizer.dart';
 
 class CheckFormPage extends StatefulWidget {
   final int businessId;
@@ -311,6 +313,10 @@ class _CheckFormPageState extends State<CheckFormPage> {
                           child: TextFormField(
                             controller: _amountCtrl,
                             keyboardType: TextInputType.number,
+                            inputFormatters: [
+                              EnglishDigitsFormatter(),
+                              FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+                            ],
                             decoration: const InputDecoration(
                               labelText: 'مبلغ *',
                               border: OutlineInputBorder(),

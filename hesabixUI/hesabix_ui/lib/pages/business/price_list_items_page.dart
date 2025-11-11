@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:dio/dio.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../core/auth_store.dart';
 import '../../services/price_list_service.dart';
 import '../../core/api_client.dart';
+import '../../utils/number_normalizer.dart';
 
 class PriceListItemsPage extends StatefulWidget {
   final int businessId;
@@ -121,6 +123,10 @@ class _PriceListItemsPageState extends State<PriceListItemsPage> {
                     initialValue: productId?.toString(),
                     decoration: InputDecoration(labelText: t.productId),
                     keyboardType: TextInputType.number,
+                    inputFormatters: [
+                      EnglishDigitsFormatter(),
+                      FilteringTextInputFormatter.digitsOnly,
+                    ],
                     validator: (v) => (int.tryParse(v ?? '') == null) ? t.invalid : null,
                     onChanged: (v) => productId = int.tryParse(v),
                   ),
@@ -157,6 +163,10 @@ class _PriceListItemsPageState extends State<PriceListItemsPage> {
                     initialValue: minQty.toString(),
                     decoration: InputDecoration(labelText: t.minQty),
                     keyboardType: TextInputType.number,
+                    inputFormatters: [
+                      EnglishDigitsFormatter(),
+                      FilteringTextInputFormatter.allow(RegExp(r'[-0-9.,]')),
+                    ],
                     validator: (v) => (num.tryParse(v ?? '') == null) ? t.invalid : null,
                     onChanged: (v) => minQty = num.tryParse(v) ?? 0,
                   ),
@@ -164,6 +174,10 @@ class _PriceListItemsPageState extends State<PriceListItemsPage> {
                     initialValue: price.toString(),
                     decoration: InputDecoration(labelText: t.price),
                     keyboardType: TextInputType.number,
+                    inputFormatters: [
+                      EnglishDigitsFormatter(),
+                      FilteringTextInputFormatter.allow(RegExp(r'[-0-9.,]')),
+                    ],
                     validator: (v) => (num.tryParse(v ?? '') == null) ? t.invalid : null,
                     onChanged: (v) => price = num.tryParse(v) ?? 0,
                   ),

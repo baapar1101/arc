@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:flutter/services.dart';
+import 'package:hesabix_ui/l10n/app_localizations.dart';
+
 import '../../category/category_picker_field.dart';
 import '../../../models/product_form_data.dart';
+import '../../../utils/number_normalizer.dart';
 import '../../../utils/product_form_validator.dart';
 
 class ProductBasicInfoSection extends StatelessWidget {
@@ -198,6 +200,7 @@ class ProductBasicInfoSection extends StatelessWidget {
                 decoration: InputDecoration(labelText: t.unitConversionFactor),
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
                 inputFormatters: [
+                  const EnglishDigitsFormatter(),
                   FilteringTextInputFormatter.allow(RegExp(r'[0-9\.]')),
                 ],
                 validator: (value) {

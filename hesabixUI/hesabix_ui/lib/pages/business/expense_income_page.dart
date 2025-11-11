@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:uuid/uuid.dart';
 import '../../core/auth_store.dart';
 import '../../core/calendar_controller.dart';
@@ -7,10 +8,12 @@ import '../../widgets/invoice/invoice_transactions_widget.dart';
 import '../../widgets/invoice/account_tree_combobox_widget.dart';
 import '../../models/invoice_type_model.dart';
 import '../../models/invoice_transaction.dart';
-import '../../models/account_tree_node.dart';
+import '../../models/account_model.dart';
+import '../../models/expense_income_document.dart' as expense;
 import '../../utils/number_formatters.dart';
 import '../../services/expense_income_service.dart';
 import '../../core/api_client.dart';
+import '../../utils/number_normalizer.dart';
 
 class ExpenseIncomePage extends StatefulWidget {
   final int businessId;
@@ -167,12 +170,17 @@ class _ExpenseIncomePageState extends State<ExpenseIncomePage> {
     showDialog(context: context, barrierDismissible: false, builder: (_) => const Center(child: CircularProgressIndicator()));
     try {
       final service = ExpenseIncomeService(widget.apiClient);
-      final itemLinesData = _itemLines.map((e) => {
-            'account_id': e.account?.id,
-            'amount': e.amount,
-            if (e.description?.isNotEmpty == true) 'description': e.description,
-          }).toList();
-      final counterpartyLinesData = _txLines.map((e) => e.toApiMap()).toList();
+      final itemLinesData = _itemLines
+          .map(
+            (line) => expense.ItemLineData(
+              accountId: line.account?.id,
+              accountName: line.account?.displayName,
+              amount: line.amount,
+              description: line.description,
+            ),
+          )
+          .toList();
+      final counterpartyLinesData = _txLines.map((line) => line.toCounterpartyData()).toList();
       await service.create(
         businessId: widget.businessId,
         documentType: _docType,
@@ -303,6 +311,10 @@ class _ItemTileState extends State<_ItemTile> {
                     controller: _amountController,
                     decoration: const InputDecoration(labelText: 'مبلغ', hintText: '1,000,000'),
                     keyboardType: TextInputType.number,
+                    inputFormatters: [
+                      EnglishDigitsFormatter(),
+                      FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+                    ],
                     onChanged: (v) {
                       final val = double.tryParse(v.replaceAll(',', '')) ?? 0;
                       widget.onChanged(widget.line.copyWith(amount: val));
@@ -327,12 +339,12 @@ class _ItemTileState extends State<_ItemTile> {
 }
 
 class _ItemLine {
-  final AccountTreeNode? account;
+  final Account? account;
   final double amount;
   final String? description;
   const _ItemLine({this.account, required this.amount, this.description});
   factory _ItemLine.empty() => const _ItemLine(amount: 0);
-  _ItemLine copyWith({AccountTreeNode? account, double? amount, String? description}) => _ItemLine(
+  _ItemLine copyWith({Account? account, double? amount, String? description}) => _ItemLine(
         account: account ?? this.account,
         amount: amount ?? this.amount,
         description: description ?? this.description,
@@ -342,7 +354,7 @@ class _ItemLine {
 class _TxLine {
   final String id;
   final DateTime date;
-  final String type; // bank|cash_register|petty_cash|check|person|account
+  final String type; // bank|cash_register|petty_cash|check|check_expense|person|account
   final double amount;
   final double? commission;
   final String? description;
@@ -356,7 +368,8 @@ class _TxLine {
   final String? checkNumber;
   final String? personId;
   final String? personName;
-  final AccountTreeNode? account;
+  final String? accountId;
+  final String? accountName;
 
   _TxLine({
     required this.id,
@@ -375,31 +388,36 @@ class _TxLine {
     this.checkNumber,
     this.personId,
     this.personName,
-    this.account,
+    this.accountId,
+    this.accountName,
   });
 
-  Map<String, dynamic> toApiMap() => {
-        'transaction_type': type,
-        'transaction_date': date.toIso8601String(),
-        'amount': amount,
-        if (commission != null) 'commission': commission,
-        if (description?.isNotEmpty == true) 'description': description,
-        'bank_id': bankId,
-        'bank_name': bankName,
-        'cash_register_id': cashRegisterId,
-        'cash_register_name': cashRegisterName,
-        'petty_cash_id': pettyCashId,
-        'petty_cash_name': pettyCashName,
-        'check_id': checkId,
-        'check_number': checkNumber,
-        'person_id': personId,
-        'person_name': personName,
-        if (account != null) 'account_id': account!.id,
-      }..removeWhere((k, v) => v == null);
+  expense.CounterpartyLineData toCounterpartyData() {
+    final mappedType = expense.TransactionType.fromValue(type) ?? expense.TransactionType.person;
+    int? parseId(String? value) => value == null || value.isEmpty ? null : int.tryParse(value);
+    return expense.CounterpartyLineData(
+      transactionType: mappedType,
+      amount: amount,
+      transactionDate: date,
+      description: description,
+      commission: commission,
+      bankAccountId: parseId(bankId),
+      bankAccountName: bankName,
+      cashRegisterId: parseId(cashRegisterId),
+      cashRegisterName: cashRegisterName,
+      pettyCashId: parseId(pettyCashId),
+      pettyCashName: pettyCashName,
+      checkId: parseId(checkId),
+      checkNumber: checkNumber,
+      personId: parseId(personId),
+      personName: personName,
+      accountId: parseId(accountId),
+      accountName: accountName,
+    );
+  }
 
-  // اتصال به ویجت InvoiceTransactionsWidget
-  factory _TxLine.fromInvoiceTransaction(dynamic tx) => _TxLine(
-        id: tx.id ?? const Uuid().v4(),
+  factory _TxLine.fromInvoiceTransaction(InvoiceTransaction tx) => _TxLine(
+        id: tx.id.isNotEmpty ? tx.id : const Uuid().v4(),
         date: tx.transactionDate,
         type: tx.type.value,
         amount: tx.amount.toDouble(),
@@ -415,10 +433,9 @@ class _TxLine {
         checkNumber: tx.checkNumber,
         personId: tx.personId,
         personName: tx.personName,
-        account: null,
+        accountId: tx.accountId,
+        accountName: tx.accountName,
       );
-
-  // Not needed: we only consume transactions from widget
 }
 
 Widget _chip(String label, double value, {bool isError = false}) {

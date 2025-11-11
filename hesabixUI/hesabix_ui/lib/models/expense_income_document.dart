@@ -1,5 +1,3 @@
-import 'package:hesabix_ui/models/account_model.dart';
-
 /// مدل سند هزینه/درآمد
 class ExpenseIncomeDocument {
   final int id;
@@ -166,6 +164,8 @@ class CounterpartyLine {
   final String? checkNumber;
   final int? personId;
   final String? personName;
+  final int? accountId;
+  final String? accountName;
 
   const CounterpartyLine({
     required this.id,
@@ -185,6 +185,8 @@ class CounterpartyLine {
     this.checkNumber,
     this.personId,
     this.personName,
+    this.accountId,
+    this.accountName,
   });
 
   /// نام نمایشی طرف‌حساب
@@ -198,8 +200,12 @@ class CounterpartyLine {
         return pettyCashName ?? 'تنخواهگردان';
       case 'check':
         return checkNumber != null ? 'چک $checkNumber' : 'چک';
+      case 'check_expense':
+        return checkNumber != null ? 'خرج چک $checkNumber' : 'خرج چک';
       case 'person':
         return personName ?? 'شخص';
+      case 'account':
+        return accountName ?? 'حساب';
       default:
         return transactionTypeName;
     }
@@ -225,6 +231,8 @@ class CounterpartyLine {
       checkNumber: json['check_number'] as String?,
       personId: json['person_id'] as int?,
       personName: json['person_name'] as String?,
+      accountId: json['account_id'] as int?,
+      accountName: json['account_name'] as String?,
     );
   }
 
@@ -247,6 +255,8 @@ class CounterpartyLine {
       'check_number': checkNumber,
       'person_id': personId,
       'person_name': personName,
+      'account_id': accountId,
+      'account_name': accountName,
     };
   }
 
@@ -260,8 +270,12 @@ class CounterpartyLine {
         return 'تنخواهگردان';
       case 'check':
         return 'چک';
+      case 'check_expense':
+        return 'خرج چک';
       case 'person':
         return 'شخص';
+      case 'account':
+        return 'حساب';
       default:
         return type;
     }
@@ -274,7 +288,9 @@ enum TransactionType {
   cashRegister('cash_register', 'صندوق'),
   pettyCash('petty_cash', 'تنخواهگردان'),
   check('check', 'چک'),
-  person('person', 'شخص');
+  checkExpense('check_expense', 'خرج چک'),
+  person('person', 'شخص'),
+  account('account', 'حساب');
 
   const TransactionType(this.value, this.displayName);
   
@@ -337,6 +353,8 @@ class CounterpartyLineData {
   final String? checkNumber;
   final int? personId;
   final String? personName;
+  final int? accountId;
+  final String? accountName;
 
   const CounterpartyLineData({
     required this.transactionType,
@@ -354,6 +372,8 @@ class CounterpartyLineData {
     this.checkNumber,
     this.personId,
     this.personName,
+    this.accountId,
+    this.accountName,
   });
 
   CounterpartyLineData copyWith({
@@ -372,6 +392,8 @@ class CounterpartyLineData {
     String? checkNumber,
     int? personId,
     String? personName,
+    int? accountId,
+    String? accountName,
   }) {
     return CounterpartyLineData(
       transactionType: transactionType ?? this.transactionType,
@@ -389,6 +411,8 @@ class CounterpartyLineData {
       checkNumber: checkNumber ?? this.checkNumber,
       personId: personId ?? this.personId,
       personName: personName ?? this.personName,
+      accountId: accountId ?? this.accountId,
+      accountName: accountName ?? this.accountName,
     );
   }
 }

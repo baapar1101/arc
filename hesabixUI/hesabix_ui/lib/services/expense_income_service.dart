@@ -61,6 +61,7 @@ class ExpenseIncomeService {
             }
             break;
           case TransactionType.check:
+          case TransactionType.checkExpense:
             if (line.checkId != null) {
               data['check_id'] = line.checkId;
               data['check_number'] = line.checkNumber;
@@ -70,6 +71,12 @@ class ExpenseIncomeService {
             if (line.personId != null) {
               data['person_id'] = line.personId;
               data['person_name'] = line.personName;
+            }
+            break;
+          case TransactionType.account:
+            if (line.accountId != null) {
+              data['account_id'] = line.accountId;
+              data['account_name'] = line.accountName;
             }
             break;
         }
@@ -151,6 +158,7 @@ class ExpenseIncomeService {
             }
             break;
           case TransactionType.check:
+          case TransactionType.checkExpense:
             if (line.checkId != null) {
               data['check_id'] = line.checkId;
               data['check_number'] = line.checkNumber;
@@ -160,6 +168,12 @@ class ExpenseIncomeService {
             if (line.personId != null) {
               data['person_id'] = line.personId;
               data['person_name'] = line.personName;
+            }
+            break;
+          case TransactionType.account:
+            if (line.accountId != null) {
+              data['account_id'] = line.accountId;
+              data['account_name'] = line.accountName;
             }
             break;
         }
@@ -189,9 +203,21 @@ class ExpenseIncomeService {
   }
 
   /// دریافت فایل PDF یک سند
-  Future<List<int>> generatePdf(int documentId) async {
+  Future<List<int>> generatePdf(
+    int documentId, {
+    String paperSize = 'A4',
+    String orientation = 'portrait',
+    String disposition = 'attachment',
+  }) async {
     try {
-      return await _apiClient.downloadPdf('/expense-income/$documentId/pdf');
+      return await _apiClient.downloadPdf(
+        '/expense-income/$documentId/pdf',
+        query: {
+          'paper_size': paperSize,
+          'orientation': orientation,
+          'disposition': disposition,
+        },
+      );
     } catch (e) {
       throw _handleError(e);
     }

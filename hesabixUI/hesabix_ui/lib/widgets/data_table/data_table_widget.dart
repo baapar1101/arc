@@ -67,16 +67,19 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
   // Sorting state
   String? _sortBy;
   bool _sortDesc = false;
+  // Multi-sort: first item is primary sort
+  final List<_SortSpec> _multiSort = <_SortSpec>[];
 
   // Row selection state
   final Set<int> _selectedRows = <int>{};
   bool _isExporting = false;
   int? _templateIdForExport;
-  final TextEditingController _templateIdCtrl = TextEditingController();
   // Report templates (for PDF export)
   List<Map<String, dynamic>> _availableTemplates = const [];
   bool _loadingTemplates = false;
   int? _selectedTemplateIdFromList;
+  // Auto-fit
+  bool _autoFitApplied = false;
   
   // Column settings state
   ColumnSettings? _columnSettings;
@@ -99,6 +102,11 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     super.initState();
     _horizontalScrollController = ScrollController();
     _limit = widget.config.defaultPageSize;
+    // Initialize default sort if provided
+    if (widget.config.enableSorting) {
+      _sortBy = widget.config.defaultSortBy;
+      _sortDesc = widget.config.defaultSortDesc;
+    }
     _setupSearchListener();
     _loadColumnSettings();
     _loadDensityPreference();
@@ -132,7 +140,6 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     _searchDebounce?.cancel();
     _horizontalScrollController.dispose();
     _tableFocusNode.dispose();
-    _templateIdCtrl.dispose();
     for (var controller in _columnSearchControllers.values) {
       controller.dispose();
     }
@@ -240,6 +247,9 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
         skip: (_page - 1) * _limit,
         sortDesc: _sortDesc,
         sortBy: _sortBy,
+        sorts: _multiSort.isNotEmpty
+            ? _multiSort.map((s) => SortItem(by: s.by, desc: s.desc)).toList()
+            : null,
         search: _searchCtrl.text.trim().isNotEmpty ? _searchCtrl.text.trim() : null,
         searchFields: widget.config.searchFields.isNotEmpty ? widget.config.searchFields : null,
         filters: _buildFilters(),
@@ -270,6 +280,9 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
           });
         }
         
+        // Auto-fit columns on first load if configured
+        await _maybeAutoFitColumns();
+        
         // Call the refresh callback if provided
         if (widget.onRefresh != null) {
           widget.onRefresh!();
@@ -286,6 +299,79 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     } finally {
       if (mounted) {
         setState(() => _loadingList = false);
+      }
+    }
+  }
+  
+  Future<void> _maybeAutoFitColumns() async {
+    // Conditions:
+    // - Feature enabled
+    // - We have items to sample
+    // - Apply only once per widget lifecycle
+    if (!_autoFitApplied &&
+        widget.config.enableColumnSettings &&
+        widget.config.autoFitColumnsOnFirstLoad &&
+        _items.isNotEmpty) {
+      // Ensure we have column settings to update
+      ColumnSettings settings = _columnSettings ??
+          ColumnSettingsService.getDefaultSettings(widget.config.columnKeys);
+      // Respect user widths: only apply if no widths are set yet
+      if (settings.columnWidths.isNotEmpty) {
+        _autoFitApplied = true;
+        return;
+      }
+      // Build styles and parameters
+      final theme = Theme.of(context);
+      final headerTextStyle = theme.textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.w700,
+            color: theme.colorScheme.onSurface,
+          ) ??
+          const TextStyle(fontSize: 14, fontWeight: FontWeight.w700);
+      final cellTextStyle =
+          theme.textTheme.bodyMedium ?? const TextStyle(fontSize: 14);
+      final minWidth = 96.0;
+      // Columns to show (exclude action)
+      final columnsToShow = widget.config.enableColumnSettings && _visibleColumns.isNotEmpty
+          ? _visibleColumns
+          : widget.config.columns;
+      final dataColumns = columnsToShow.where((c) => c is! ActionColumn).toList();
+      // Compute widths
+      final Map<String, double> computed = {};
+      for (final column in dataColumns) {
+        final affordancePadding = _getHeaderAffordancePadding(column);
+        final width = _autoFitColumnWidth(
+          column,
+          headerTextStyle,
+          cellTextStyle,
+          minWidth,
+          affordancePadding,
+          sampleCountOverride: widget.config.autoFitSampleRows,
+        );
+        computed[column.key] = width;
+      }
+      // Update and save
+      final updated = settings.copyWith(
+        columnWidths: {
+          ...settings.columnWidths,
+          ...computed,
+        },
+      );
+      try {
+        await ColumnSettingsService.saveColumnSettings(
+          widget.config.effectiveTableId,
+          updated,
+        );
+        if (mounted) {
+          setState(() {
+            _columnSettings = updated;
+            _visibleColumns = _getVisibleColumnsFromSettings(updated);
+            _autoFitApplied = true;
+          });
+        } else {
+          _autoFitApplied = true;
+        }
+      } catch (_) {
+        _autoFitApplied = true;
       }
     }
   }
@@ -435,15 +521,33 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     }
   }
 
-  void _sortByColumn(String column) {
+  void _sortByColumnInternal(String column, {required bool additive}) {
     setState(() {
-      if (_sortBy == column) {
-        _sortDesc = !_sortDesc;
+      if (!additive) {
+        if (_sortBy == column) {
+          _sortDesc = !_sortDesc;
+        } else {
+          _sortBy = column;
+          _sortDesc = false;
+        }
+        _multiSort
+          ..clear()
+          ..add(_SortSpec(by: _sortBy!, desc: _sortDesc));
       } else {
-        _sortBy = column;
-        _sortDesc = false;
+        final existingIndex = _multiSort.indexWhere((s) => s.by == column);
+        if (existingIndex >= 0) {
+          final existing = _multiSort[existingIndex];
+          _multiSort[existingIndex] = existing.copyWith(desc: !existing.desc);
+        } else {
+          _multiSort.add(_SortSpec(by: column, desc: false));
+        }
+        if (_multiSort.isNotEmpty) {
+          _sortBy = _multiSort.first.by;
+          _sortDesc = _multiSort.first.desc;
+        }
       }
     });
+    _page = 1;
     _fetchData();
   }
 
@@ -796,15 +900,93 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     }
   }
 
+  // Cache for measured text widths to reduce TextPainter.layout calls
+  final Map<String, double> _textWidthCache = <String, double>{};
 
-  double _measureTextWidth(String text, TextStyle style) {
+  // Removed legacy _measureTextWidthDir (replaced with advanced API)
+
+  double _measureTextWidthAdvanced({
+    required String text,
+    required TextStyle style,
+    required TextDirection textDirection,
+    required double textScaleFactor,
+    required Locale locale,
+  }) {
+    final key = [
+      text,
+      style.fontFamily,
+      style.fontSize,
+      style.fontWeight?.index,
+      style.letterSpacing,
+      style.height,
+      style.fontStyle?.index,
+      textDirection.name,
+      textScaleFactor.toStringAsFixed(3),
+      locale.toLanguageTag(),
+    ].join('|');
+    final cached = _textWidthCache[key];
+    if (cached != null) return cached;
     final painter = TextPainter(
       text: TextSpan(text: text, style: style),
-      textDirection: TextDirection.ltr,
+      textDirection: textDirection,
+      textScaleFactor: textScaleFactor,
+      locale: locale,
       maxLines: 1,
-    )
-      ..layout(minWidth: 0, maxWidth: double.infinity);
-    return painter.width;
+    )..layout(minWidth: 0, maxWidth: double.infinity);
+    final width = painter.width;
+    if (_textWidthCache.length > 512) {
+      _textWidthCache.clear();
+    }
+    _textWidthCache[key] = width;
+    return width;
+  }
+
+  double _measureHeaderTextWidth(String text, TextStyle style) {
+    final dir = Directionality.of(context);
+    final scale = MediaQuery.maybeOf(context)?.textScaleFactor ?? 1.0;
+    final locale = Localizations.localeOf(context);
+    return _measureTextWidthAdvanced(
+      text: text,
+      style: style,
+      textDirection: dir,
+      textScaleFactor: scale,
+      locale: locale,
+    );
+  }
+
+  double _getHeaderAffordancePadding(DataTableColumn column) {
+    double padding = 0.0;
+    // Container padding (left + right)
+    padding += 16.0;
+    // Left group: sort icon spacing + icon (always shows when sortable)
+    final bool showSortIcon = widget.config.enableSorting && column.sortable;
+    if (showSortIcon) {
+      padding += 4.0;  // gap between text and icon
+      padding += 16.0; // icon width
+    }
+    // Gap between left group and search button
+    padding += 8.0;
+    // Search button chip
+    final bool showSearch = widget.config.showColumnSearch && column.searchable;
+    if (showSearch) {
+      padding += 4.0;   // left padding
+      padding += 13.0;  // icon
+      padding += 4.0;   // right padding
+      padding += 2.0;   // border thickness approx
+    }
+    // Resize handle (gap + handle width)
+    if (widget.config.enableColumnSettings) {
+      padding += 6.0;   // gap
+      padding += 12.0;  // handle
+    }
+    // Settings menu (gap + icon)
+    if (widget.config.enableColumnSettings) {
+      padding += 4.0;   // gap
+      padding += 16.0;  // icon
+    }
+    // Safety margin
+    padding += 8.0;
+    return padding;
   }
 
   @override
@@ -943,22 +1125,6 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                       icon: const Icon(Icons.clear),
                       label: const Text('لغو انتخاب'),
                     ),
-                    if (widget.config.excelEndpoint != null) ...[
-                      const SizedBox(width: 8),
-                      FilledButton.icon(
-                        onPressed: () => _exportData('excel', true),
-                        icon: const Icon(Icons.table_chart),
-                        label: const Text('خروجی اکسل انتخاب‌ها'),
-                      ),
-                    ],
-                    if (widget.config.pdfEndpoint != null) ...[
-                      const SizedBox(width: 8),
-                      OutlinedButton.icon(
-                        onPressed: () => _exportData('pdf', true),
-                        icon: const Icon(Icons.picture_as_pdf),
-                        label: const Text('PDF انتخاب‌ها'),
-                      ),
-                    ],
                   ],
                 ),
               ),
@@ -1253,7 +1419,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                       Expanded(
                         child: _loadingTemplates
                             ? const LinearProgressIndicator(minHeight: 2)
-                            : DropdownButtonFormField<int>(
+                            : DropdownButtonFormField<int?>(
                                 value: _selectedTemplateIdFromList,
                                 isExpanded: true,
                                 decoration: InputDecoration(
@@ -1262,7 +1428,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                                   border: const OutlineInputBorder(),
                                 ),
                                 items: [
-                                  DropdownMenuItem<int>(
+                                  DropdownMenuItem<int?>(
                                     value: null,
                                     child: Text(AppLocalizations.of(context).noCustomTemplate),
                                   ),
@@ -1270,7 +1436,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                                     final id = (tpl['id'] as num).toInt();
                                     final name = (tpl['name'] ?? 'Template').toString();
                                     final isDefault = tpl['is_default'] == true;
-                                    return DropdownMenuItem<int>(
+                                    return DropdownMenuItem<int?>(
                                       value: id,
                                       child: Row(
                                         children: [
@@ -1286,9 +1452,6 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                                   setState(() {
                                     _selectedTemplateIdFromList = val;
                                     _templateIdForExport = val;
-                                    if (val != null) {
-                                      _templateIdCtrl.text = val.toString();
-                                    }
                                   });
                                 },
                               ),
@@ -1304,45 +1467,6 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                 ),
                 const Divider(height: 1),
               ],
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: Row(
-                  children: [
-                    const Icon(Icons.tune, size: 18),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: TextField(
-                        controller: _templateIdCtrl,
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(
-                          labelText: 'template_id (اختیاری برای PDF سفارشی)',
-                          hintText: 'مثلاً 101',
-                          isDense: true,
-                        ),
-                        onChanged: (v) {
-                          final n = int.tryParse(v.trim());
-                          setState(() {
-                            _templateIdForExport = n;
-                          });
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    if (_templateIdForExport != null)
-                      IconButton(
-                        tooltip: 'پاک‌کردن قالب سفارشی',
-                        onPressed: () {
-                          setState(() {
-                            _templateIdForExport = null;
-                            _templateIdCtrl.clear();
-                          });
-                        },
-                        icon: const Icon(Icons.clear),
-                      ),
-                  ],
-                ),
-              ),
-              const Divider(height: 1),
             ],
             
             // Excel options
@@ -1414,6 +1538,65 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
       ),
       child: Row(
         children: [
+          // Footer totals for current page (optional)
+          if (widget.config.footerTotals != null && widget.config.footerTotals!.isNotEmpty && _items.isNotEmpty)
+            Flexible(
+              fit: FlexFit.loose,
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: widget.config.footerTotals!.entries.map((entry) {
+                    final colKey = entry.key;
+                    final label = entry.value;
+                    double sum = 0;
+                    for (final it in _items) {
+                      try {
+                        final v = DataTableUtils.getCellValue(it, colKey);
+                        if (v is num) {
+                          sum += v.toDouble();
+                        } else if (v != null) {
+                          final parsed = double.tryParse('$v');
+                          if (parsed != null) sum += parsed;
+                        }
+                      } catch (_) {}
+                    }
+                    final text = sum.toStringAsFixed(2).replaceAll(RegExp(r'\\.00$'), '');
+                    return Container(
+                      margin: const EdgeInsetsDirectional.only(end: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.surface,
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: theme.dividerColor.withValues(alpha: 0.3)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            '$label:',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            text,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              fontFeatures: const [FontFeature.tabularFigures()],
+                              color: theme.colorScheme.onSurface,
+                              fontWeight: FontWeight.w700,
+                            ),
+                            textDirection: TextDirection.ltr,
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+            ),
+          
           // Results info
           Text(
             '${t.showing} ${((_page - 1) * _limit) + 1} ${t.to} ${(_page * _limit).clamp(0, _total)} ${t.ofText} $_total ${t.results}',
@@ -1745,8 +1928,8 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
         color: theme.colorScheme.onSurface,
       ) ?? const TextStyle(fontSize: 14, fontWeight: FontWeight.w600);
       final double baseWidth = DataTableUtils.getColumnWidth(column.width);
-      final double affordancePadding = 64.0; // space for icons + resize handle
-      final double headerTextWidth = _measureTextWidth(column.label, headerTextStyle) + affordancePadding;
+      final double affordancePadding = _getHeaderAffordancePadding(column);
+      final double headerTextWidth = _measureHeaderTextWidth(column.label, headerTextStyle) + affordancePadding;
       final double minWidth = 96.0;
       final double defaultWidth = math.max(baseWidth, headerTextWidth);
       final double savedWidth = _columnSettings?.columnWidths[column.key] ?? defaultWidth;
@@ -1758,7 +1941,9 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
           sortBy: column.key,
           currentSort: _sortBy,
           sortDesc: _sortDesc,
-          onSort: widget.config.enableSorting ? _sortByColumn : (_) { },
+          onSort: widget.config.enableSorting
+              ? (key, additive) => _sortByColumnInternal(key, additive: additive)
+              : (_, __) {},
           onSearch: widget.config.showColumnSearch && column.searchable
               ? () => _openColumnSearchDialog(column.key, column.label)
               : () { },
@@ -1772,6 +1957,26 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
               columnWidths: {
                 ..._columnSettings!.columnWidths,
                 column.key: next,
+              },
+            );
+            setState(() {
+              _columnSettings = updated;
+            });
+            // Delay saving until drag end to reduce write frequency
+          } : null,
+          onResizeDragEnd: widget.config.enableColumnSettings ? () {
+            if (_columnSettings == null) return;
+            ColumnSettingsService.saveColumnSettings(widget.config.effectiveTableId, _columnSettings!);
+          } : null,
+          onAutoFit: widget.config.enableColumnSettings ? () {
+            if (_columnSettings == null) return;
+            final headerStyle = headerTextStyle;
+            final cellStyle = theme.textTheme.bodyMedium ?? const TextStyle(fontSize: 14);
+            final width = _autoFitColumnWidth(column, headerStyle, cellStyle, minWidth, affordancePadding);
+            final updated = _columnSettings!.copyWith(
+              columnWidths: {
+                ..._columnSettings!.columnWidths,
+                column.key: width,
               },
             );
             setState(() {
@@ -1832,6 +2037,14 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
             });
             ColumnSettingsService.saveColumnSettings(widget.config.effectiveTableId, updated);
           } : null,
+          onResetColumns: widget.config.enableColumnSettings ? () async {
+            final defaults = ColumnSettingsService.getDefaultSettings(widget.config.columnKeys);
+            setState(() {
+              _columnSettings = defaults;
+              _visibleColumns = _getVisibleColumnsFromSettings(defaults);
+            });
+            await ColumnSettingsService.saveColumnSettings(widget.config.effectiveTableId, defaults);
+          } : null,
         ),
         size: DataTableUtils.getColumnSize(column.width),
         fixedWidth: computedWidth,
@@ -1844,17 +2057,18 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
       child: DataTableTheme(
         data: DataTableThemeData(
           headingRowColor: WidgetStatePropertyAll(
+            widget.config.headerBackgroundColor ??
             theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
           ),
           headingTextStyle: theme.textTheme.titleSmall?.copyWith(
             fontWeight: FontWeight.w700,
             color: theme.colorScheme.onSurface,
           ),
-          dividerThickness: 0.6,
+          dividerThickness: 0.8,
         ),
         child: DataTable2(
-          columnSpacing: 8,
-          horizontalMargin: 8,
+          columnSpacing: 12,
+          horizontalMargin: 10,
           minWidth: widget.config.minTableWidth ?? 600,
           horizontalScrollController: _horizontalScrollController,
           headingRowHeight: _dense ? 40 : 44,
@@ -1934,6 +2148,13 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
             if (index == _activeRowIndex && _tableFocusNode.hasFocus) {
               return theme.colorScheme.primary.withValues(alpha: 0.06);
             }
+            // Custom per-row color if provided
+            if (widget.config.rowColorBuilder != null) {
+              try {
+                final c = widget.config.rowColorBuilder!(item, index);
+                if (c != null) return c;
+              } catch (_) {}
+            }
             final Color? base = widget.config.rowBackgroundColor;
             final Color? alt = widget.config.alternateRowBackgroundColor ??
                 theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.15);
@@ -1955,6 +2176,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
   }
 
   Widget _buildCellContent(dynamic item, DataTableColumn column, int index) {
+    final t = Localizations.of<AppLocalizations>(context, AppLocalizations)!;
     // 1) Custom widget builder takes precedence
     if (column is CustomColumn && column.builder != null) {
       return column.builder!(item, index);
@@ -1979,9 +2201,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
       final wrapped = GestureDetector(
         onLongPress: () {
           Clipboard.setData(ClipboardData(text: text));
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('متن کپی شد')),
-          );
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.copied)));
         },
         child: textWidget,
       );
@@ -2004,9 +2224,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
       final wrapped = GestureDetector(
         onLongPress: () {
           Clipboard.setData(ClipboardData(text: text));
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('عدد کپی شد')),
-          );
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.copied)));
         },
         child: textWidget,
       );
@@ -2026,9 +2244,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
       final wrapped = GestureDetector(
         onLongPress: () {
           Clipboard.setData(ClipboardData(text: text));
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('تاریخ کپی شد')),
-          );
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.copied)));
         },
         child: textWidget,
       );
@@ -2055,9 +2271,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     final wrapped = GestureDetector(
       onLongPress: () {
         Clipboard.setData(ClipboardData(text: formattedValue));
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('مقدار کپی شد')),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.copied)));
       },
       child: textWidget,
     );
@@ -2119,6 +2333,48 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     }
     return null;
   }
+
+  double _autoFitColumnWidth(
+    DataTableColumn column,
+    TextStyle headerTextStyle,
+    TextStyle cellTextStyle,
+    double minWidth,
+    double affordancePadding, {
+    int? sampleCountOverride,
+  }
+  ) {
+    final double headerWidth = _measureHeaderTextWidth(column.label, headerTextStyle) + affordancePadding;
+    final TextDirection dir = Directionality.of(context);
+    double maxCellWidth = 0;
+    final limit = sampleCountOverride ?? 50;
+    final sampleCount = math.min(_items.length, limit);
+    for (int i = 0; i < sampleCount; i++) {
+      final item = _items[i];
+      String text = '';
+      if (column is TextColumn && column.formatter != null) {
+        text = column.formatter!(item) ?? '';
+      } else if (column is NumberColumn && column.formatter != null) {
+        text = column.formatter!(item) ?? '';
+      } else if (column is DateColumn && column.formatter != null) {
+        text = column.formatter!(item) ?? '';
+      }
+      if (text.isEmpty) continue;
+      final scale = MediaQuery.maybeOf(context)?.textScaleFactor ?? 1.0;
+      final locale = Localizations.localeOf(context);
+      final w = _measureTextWidthAdvanced(
+        text: text,
+        style: cellTextStyle,
+        textDirection: dir,
+        textScaleFactor: scale,
+        locale: locale,
+      );
+      if (w > maxCellWidth) maxCellWidth = w;
+    }
+    // Padding for cell content
+    final cellPadding = 32.0;
+    final computed = math.max(minWidth, math.max(headerWidth, maxCellWidth + cellPadding));
+    return computed;
+  }
 }
 
 /// Column header with search functionality
@@ -2127,15 +2383,18 @@ class _ColumnHeaderWithSearch extends StatelessWidget {
   final String sortBy;
   final String? currentSort;
   final bool sortDesc;
-  final Function(String) onSort;
+  final void Function(String, bool additive) onSort;
   final VoidCallback onSearch;
   final bool hasActiveFilter;
   final bool enabled;
   final void Function(double dx)? onResizeDrag;
+  final VoidCallback? onResizeDragEnd;
   final VoidCallback? onPinLeft;
   final VoidCallback? onPinRight;
   final VoidCallback? onUnpin;
   final VoidCallback? onHide;
+  final VoidCallback? onResetColumns;
+  final VoidCallback? onAutoFit;
 
   const _ColumnHeaderWithSearch({
     required this.text,
@@ -2147,10 +2406,13 @@ class _ColumnHeaderWithSearch extends StatelessWidget {
     required this.hasActiveFilter,
     this.enabled = true,
     this.onResizeDrag,
+    this.onResizeDragEnd,
     this.onPinLeft,
     this.onPinRight,
     this.onUnpin,
     this.onHide,
+    this.onResetColumns,
+    this.onAutoFit,
   });
 
   @override
@@ -2158,12 +2420,29 @@ class _ColumnHeaderWithSearch extends StatelessWidget {
     final theme = Theme.of(context);
     final isActive = currentSort == sortBy;
     
-    return InkWell(
-      onTap: enabled ? () => onSort(sortBy) : null,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8.0),
-        child: SizedBox(
-          width: double.infinity,
+    return Tooltip(
+      message: 'کلیک برای مرتب‌سازی • آیکون ذره‌بین برای جستجو • درگ برای تغییر عرض',
+      child: InkWell(
+        onTap: enabled
+            ? () {
+                final keys = HardwareKeyboard.instance.logicalKeysPressed;
+                final additive = keys.contains(LogicalKeyboardKey.shiftLeft) || keys.contains(LogicalKeyboardKey.shiftRight);
+                onSort(sortBy, additive);
+              }
+            : null,
+        overlayColor: WidgetStatePropertyAll(theme.colorScheme.primary.withValues(alpha: 0.05)),
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 6.0, horizontal: 8.0),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: (isActive || hasActiveFilter)
+                  ? theme.colorScheme.primary.withValues(alpha: 0.25)
+                  : theme.dividerColor.withValues(alpha: 0.3),
+            ),
+          ),
           child: Row(
             mainAxisSize: MainAxisSize.max,
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -2173,13 +2452,17 @@ class _ColumnHeaderWithSearch extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Flexible(
-                      child: Text(
-                        text,
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w600,
-                          color: isActive ? theme.colorScheme.primary : theme.colorScheme.onSurface,
+                      child: Tooltip(
+                        message: text,
+                        waitDuration: const Duration(milliseconds: 400),
+                        child: Text(
+                          text,
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: isActive ? theme.colorScheme.primary : theme.colorScheme.onSurface,
+                          ),
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     if (enabled) ...[
@@ -2187,13 +2470,13 @@ class _ColumnHeaderWithSearch extends StatelessWidget {
                       if (isActive)
                         Icon(
                           sortDesc ? Icons.arrow_downward : Icons.arrow_upward,
-                          size: 16,
+                          size: 14,
                           color: theme.colorScheme.primary,
                         )
                       else
                         Icon(
                           Icons.unfold_more,
-                          size: 16,
+                          size: 14,
                           color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
                         ),
                     ],
@@ -2202,26 +2485,32 @@ class _ColumnHeaderWithSearch extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               // Search button
-              InkWell(
-                onTap: onSearch,
-                borderRadius: BorderRadius.circular(12),
-                child: Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(
-                    color: hasActiveFilter 
-                        ? theme.colorScheme.primaryContainer
-                        : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                    borderRadius: BorderRadius.circular(12),
-                    border: hasActiveFilter 
-                        ? Border.all(color: theme.colorScheme.primary.withValues(alpha: 0.3))
-                        : null,
-                  ),
-                  child: Icon(
-                    Icons.search,
-                    size: 14,
-                    color: hasActiveFilter 
-                        ? theme.colorScheme.onPrimaryContainer
-                        : theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+              Tooltip(
+                message: 'جست‌وجوی ستون',
+                waitDuration: const Duration(milliseconds: 400),
+                child: InkWell(
+                  onTap: onSearch,
+                  borderRadius: BorderRadius.circular(10),
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: hasActiveFilter 
+                          ? theme.colorScheme.primaryContainer
+                          : theme.colorScheme.surface.withValues(alpha: 0.7),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: hasActiveFilter 
+                            ? theme.colorScheme.primary.withValues(alpha: 0.35)
+                            : theme.dividerColor.withValues(alpha: 0.25),
+                      ),
+                    ),
+                    child: Icon(
+                      Icons.search,
+                      size: 13,
+                      color: hasActiveFilter 
+                          ? theme.colorScheme.onPrimaryContainer
+                          : theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.75),
+                    ),
                   ),
                 ),
               ),
@@ -2232,9 +2521,17 @@ class _ColumnHeaderWithSearch extends StatelessWidget {
                   child: GestureDetector(
                     behavior: HitTestBehavior.opaque,
                     onHorizontalDragUpdate: (details) => onResizeDrag!(details.delta.dx),
+                    onHorizontalDragEnd: (_) => onResizeDragEnd?.call(),
+                    onDoubleTap: onAutoFit,
                     child: Container(
-                      width: 8,
+                      width: 12,
                       height: 28,
+                      alignment: Alignment.center,
+                      child: Container(
+                        width: 2,
+                        height: 20,
+                        color: Theme.of(context).dividerColor.withValues(alpha: 0.4),
+                      ),
                     ),
                   ),
                 ),
@@ -2259,6 +2556,9 @@ class _ColumnHeaderWithSearch extends StatelessWidget {
                       case 'hide':
                         onHide?.call();
                         break;
+                      case 'reset':
+                        onResetColumns?.call();
+                        break;
                     }
                   },
                   itemBuilder: (context) => [
@@ -2271,6 +2571,10 @@ class _ColumnHeaderWithSearch extends StatelessWidget {
                     const PopupMenuDivider(),
                     if (onHide != null)
                       const PopupMenuItem(value: 'hide', child: Text('مخفی کردن ستون')),
+                    if (onResetColumns != null) ...[
+                      const PopupMenuDivider(),
+                      const PopupMenuItem(value: 'reset', child: Text('بازنشانی ستون‌ها')),
+                    ],
                   ],
                 ),
               ],
@@ -2302,4 +2606,11 @@ class ClearSelectionIntent extends Intent {
 
 class SelectAllIntent extends Intent {
   const SelectAllIntent();
+}
+
+class _SortSpec {
+  final String by;
+  final bool desc;
+  const _SortSpec({required this.by, required this.desc});
+  _SortSpec copyWith({String? by, bool? desc}) => _SortSpec(by: by ?? this.by, desc: desc ?? this.desc);
 }

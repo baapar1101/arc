@@ -206,6 +206,9 @@ class DataTableConfig<T> {
   final bool enableSorting;
   final bool enableGlobalSearch;
   final bool enableDateRangeFilter;
+  // Default sort configuration
+  final String? defaultSortBy;
+  final bool defaultSortDesc;
   final void Function(dynamic item)? onRowTap;
   final void Function(dynamic item)? onRowDoubleTap;
   final Widget? Function(dynamic item)? customRowBuilder;
@@ -254,6 +257,12 @@ class DataTableConfig<T> {
   final String? reportModuleKey;
   final String? reportSubtype;
   
+  // Row styling
+  final Color? Function(dynamic item, int index)? rowColorBuilder;
+
+  // Footer page totals: map from field key -> label to display
+  final Map<String, String>? footerTotals;
+
   // Column settings configuration
   final String? tableId;
   final bool enableColumnSettings;
@@ -269,6 +278,10 @@ class DataTableConfig<T> {
   
   // Refresh callback
   final VoidCallback? onRefresh;
+  
+  // Auto-fit configuration
+  final bool autoFitColumnsOnFirstLoad;
+  final int autoFitSampleRows;
 
   const DataTableConfig({
     required this.endpoint,
@@ -290,6 +303,8 @@ class DataTableConfig<T> {
     this.enableSorting = true,
     this.enableGlobalSearch = true,
     this.enableDateRangeFilter = false,
+    this.defaultSortBy,
+    this.defaultSortDesc = false,
     this.onRowTap,
     this.onRowDoubleTap,
     this.customRowBuilder,
@@ -334,6 +349,8 @@ class DataTableConfig<T> {
     this.businessId,
     this.reportModuleKey,
     this.reportSubtype,
+    this.rowColorBuilder,
+    this.footerTotals,
     this.tableId,
     this.enableColumnSettings = true,
     this.showColumnSettingsButton = true,
@@ -342,6 +359,8 @@ class DataTableConfig<T> {
     this.customHeaderActions,
     this.showFiltersButton = false,
     this.onRefresh,
+    this.autoFitColumnsOnFirstLoad = true,
+    this.autoFitSampleRows = 50,
   });
 
   /// Get column width as double
@@ -447,6 +466,7 @@ class QueryInfo {
   final List<FilterItem>? filters;
   final String? sortBy;
   final bool sortDesc;
+  final List<SortItem>? sorts;
   final int take;
   final int skip;
 
@@ -456,6 +476,7 @@ class QueryInfo {
     this.filters,
     this.sortBy,
     this.sortDesc = false,
+    this.sorts,
     this.take = 20,
     this.skip = 0,
   });
@@ -465,8 +486,13 @@ class QueryInfo {
       'take': take,
       'skip': skip,
       'sort_desc': sortDesc,
-      'sort_by': sortBy ?? 'document_date', // مقدار پیش‌فرض برای sort_by
     };
+    if (sortBy != null && sortBy!.isNotEmpty) {
+      json['sort_by'] = sortBy;
+    }
+    if (sorts != null && sorts!.isNotEmpty) {
+      json['sort'] = sorts!.map((s) => s.toJson()).toList();
+    }
 
     if (search != null && search!.isNotEmpty) {
       json['search'] = search;
@@ -502,4 +528,15 @@ class FilterItem {
       'value': value,
     };
   }
+}
+
+/// Sort item model (for multi-sort)
+class SortItem {
+  final String by;
+  final bool desc;
+  const SortItem({required this.by, this.desc = false});
+  Map<String, dynamic> toJson() => {
+        'by': by,
+        'desc': desc,
+      };
 }

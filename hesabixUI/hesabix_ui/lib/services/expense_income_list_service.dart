@@ -1,7 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/models/expense_income_document.dart';
-import 'package:hesabix_ui/models/paginated_response.dart';
 
 /// سرویس لیست اسناد هزینه/درآمد
 class ExpenseIncomeListService {

@@ -84,6 +84,21 @@ flutter:
         - asset: assets/fonts/Vazirmatn-Regular.ttf
         - asset: assets/fonts/Vazirmatn-Bold.ttf
           weight: 700
+    - family: YekanBakhFaNum
+      fonts:
+        - asset: assets/fonts/YekanBakhFaNum-Thin.ttf
+          weight: 100
+        - asset: assets/fonts/YekanBakhFaNum-Light.ttf
+          weight: 300
+        - asset: assets/fonts/YekanBakhFaNum-Regular.ttf
+        - asset: assets/fonts/YekanBakhFaNum-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/YekanBakhFaNum-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/YekanBakhFaNum-ExtraBold.ttf
+          weight: 800
+        - asset: assets/fonts/YekanBakhFaNum-Black.ttf
+          weight: 900
   assets:
     - assets/images/
 

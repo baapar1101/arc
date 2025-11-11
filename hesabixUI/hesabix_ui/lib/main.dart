@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'pages/profile/notifications_settings_page.dart';
+import 'pages/profile/notification_templates_admin_page.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
 import 'l10n/app_localizations.dart';
@@ -13,12 +15,14 @@ import 'pages/profile/support_page.dart';
 import 'pages/profile/change_password_page.dart';
 import 'pages/profile/marketing_page.dart';
 import 'pages/profile/operator/operator_tickets_page.dart';
+import 'pages/profile/announcements_page.dart';
 import 'pages/system_settings_page.dart';
 import 'pages/admin/storage_management_page.dart';
 import 'pages/admin/system_configuration_page.dart';
 import 'pages/admin/user_management_page.dart';
 import 'pages/admin/system_logs_page.dart';
 import 'pages/admin/email_settings_page.dart';
+import 'pages/admin/announcements_admin_page.dart';
 import 'pages/business/business_shell.dart';
 import 'pages/business/dashboard/business_dashboard_page.dart';
 import 'pages/business/users_permissions_page.dart';
@@ -43,6 +47,8 @@ import 'pages/business/price_list_items_page.dart';
 import 'pages/business/cash_registers_page.dart';
 import 'pages/business/petty_cash_page.dart';
 import 'pages/business/checks_page.dart';
+import 'pages/business/plugin_marketplace_page.dart';
+import 'pages/business/marketplace_invoices_page.dart';
 import 'pages/business/check_form_page.dart';
 import 'pages/business/receipts_payments_list_page.dart';
 import 'pages/business/expense_income_list_page.dart';
@@ -62,6 +68,8 @@ import 'widgets/simple_splash_screen.dart';
 import 'widgets/url_tracker.dart';
 import 'pages/business/opening_balance_page.dart';
 import 'pages/business/report_templates_page.dart';
+import 'pages/business/backup/backup_page.dart';
+import 'pages/business/backup/restore_page.dart';
 
 void main() {
   // Use path-based routing instead of hash routing
@@ -398,6 +406,11 @@ class _MyAppState extends State<MyApp> {
               builder: (context, state) => const ProfileDashboardPage(),
             ),
             GoRoute(
+              path: '/user/profile/announcements',
+              name: 'profile_announcements',
+              builder: (context, state) => const AnnouncementsPage(),
+            ),
+            GoRoute(
               path: '/user/profile/new-business',
               name: 'profile_new_business',
               builder: (context, state) => NewBusinessPage(calendarController: _calendarController!),
@@ -548,6 +561,48 @@ class _MyAppState extends State<MyApp> {
                       return PermissionGuard.buildAccessDeniedPage();
                     }
                     return const EmailSettingsPage();
+                  },
+                ),
+                GoRoute(
+                  path: 'announcements',
+                  name: 'system_settings_announcements',
+                  builder: (context, state) {
+                    if (_authStore == null) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    final allowed = _authStore!.isSuperAdmin || _authStore!.hasAppPermission('system_settings');
+                    if (!allowed) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    return const AnnouncementsAdminPage();
+                  },
+                ),
+                GoRoute(
+                  path: 'notifications',
+                  name: 'system_settings_notifications',
+                  builder: (context, state) {
+                    if (_authStore == null) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    final allowed = _authStore!.isSuperAdmin || _authStore!.hasAppPermission('system_settings');
+                    if (!allowed) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    return const NotificationsSettingsPage();
+                  },
+                ),
+                GoRoute(
+                  path: 'notification-templates',
+                  name: 'system_settings_notification_templates',
+                  builder: (context, state) {
+                    if (_authStore == null) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    final allowed = _authStore!.isSuperAdmin || _authStore!.hasAppPermission('system_settings');
+                    if (!allowed) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    return const NotificationTemplatesAdminPage();
                   },
                 ),
               ],
@@ -794,6 +849,28 @@ class _MyAppState extends State<MyApp> {
               },
             ),
             GoRoute(
+              path: '/business/:business_id/settings/backup',
+              name: 'business_settings_backup',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                if (!_authStore!.hasBusinessPermission('settings', 'join')) {
+                  return NoTransitionPage(child: PermissionGuard.buildAccessDeniedPage());
+                }
+                return NoTransitionPage(child: BusinessBackupPage(businessId: businessId));
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/settings/restore',
+              name: 'business_settings_restore',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                if (!_authStore!.hasBusinessPermission('settings', 'join')) {
+                  return NoTransitionPage(child: PermissionGuard.buildAccessDeniedPage());
+                }
+                return NoTransitionPage(child: BusinessRestorePage(businessId: businessId));
+              },
+            ),
+            GoRoute(
               path: '/business/:business_id/settings/business',
               name: 'business_settings_business',
               pageBuilder: (context, state) {
@@ -968,6 +1045,45 @@ class _MyAppState extends State<MyApp> {
                 final businessId = int.parse(state.pathParameters['business_id']!);
                 return NoTransitionPage(
                   child: ReportTemplatesPage(
+                    businessId: businessId,
+                    authStore: _authStore!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/plugin-marketplace',
+              name: 'business_plugin_marketplace',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                // گارد دسترسی مشاهده بازار
+                if (!_authStore!.hasBusinessPermission('marketplace', 'view')) {
+                  return NoTransitionPage(
+                    child: PermissionGuard.buildAccessDeniedPage(),
+                  );
+                }
+                return NoTransitionPage(
+                  child: PluginMarketplacePage(
+                    businessId: businessId,
+                    authStore: _authStore!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/plugin-marketplace/invoices',
+              name: 'business_plugin_marketplace_invoices',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                final allowed = _authStore!.hasBusinessPermission('marketplace', 'invoices') ||
+                    _authStore!.hasBusinessPermission('marketplace', 'view');
+                if (!allowed) {
+                  return NoTransitionPage(
+                    child: PermissionGuard.buildAccessDeniedPage(),
+                  );
+                }
+                return NoTransitionPage(
+                  child: MarketplaceInvoicesPage(
                     businessId: businessId,
                     authStore: _authStore!,
                   ),

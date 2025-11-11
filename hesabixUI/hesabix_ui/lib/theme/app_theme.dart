@@ -19,7 +19,7 @@ class AppTheme {
     return ThemeData(
       useMaterial3: true,
       colorScheme: scheme,
-      fontFamily: isFa ? 'Vazirmatn' : null,
+      fontFamily: isFa ? 'YekanBakhFaNum' : null,
       textTheme: textTheme,
       // در حالت تیره، کنتراست متن‌ها را کمی تقویت می‌کنیم
       scaffoldBackgroundColor: isDark ? scheme.surface : null,

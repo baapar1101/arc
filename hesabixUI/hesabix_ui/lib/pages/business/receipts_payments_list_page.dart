@@ -18,6 +18,7 @@ import 'package:hesabix_ui/utils/number_formatters.dart' show formatWithThousand
 import 'package:hesabix_ui/core/date_utils.dart' show HesabixDateUtils;
 import 'package:hesabix_ui/models/invoice_transaction.dart';
 import 'package:hesabix_ui/models/invoice_type_model.dart';
+import 'package:hesabix_ui/utils/number_normalizer.dart';
 import 'package:hesabix_ui/models/person_model.dart';
 import 'package:hesabix_ui/models/business_dashboard_models.dart';
 import 'dart:html' as html;
@@ -1170,6 +1171,10 @@ class _PersonLineTileState extends State<_PersonLineTile> {
                       hintText: '1,000,000',
                     ),
                     keyboardType: TextInputType.number,
+                    inputFormatters: [
+                      EnglishDigitsFormatter(),
+                      FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+                    ],
                     validator: (v) {
                       final val = double.tryParse((v ?? '').replaceAll(',', ''));
                       if (val == null || val <= 0) return t.mustBePositiveNumber;

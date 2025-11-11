@@ -133,14 +133,14 @@ class _SettingsPageState extends State<SettingsPage> {
                   title: t.dataBackup,
                   subtitle: t.dataBackupDescription,
                   icon: Icons.backup,
-                  onTap: () => _showDataBackupDialog(context),
+                  onTap: () => context.go('/business/${widget.businessId}/settings/backup'),
                 ),
                 _buildSettingItem(
                   context,
                   title: t.dataRestore,
                   subtitle: t.dataRestoreDescription,
                   icon: Icons.restore,
-                  onTap: () => _showDataRestoreDialog(context),
+                  onTap: () => context.go('/business/${widget.businessId}/settings/restore'),
                 ),
                 _buildSettingItem(
                   context,
@@ -249,7 +249,7 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
-
+  // ignore: unused_element
   void _showDataBackupDialog(BuildContext context) {
     final t = AppLocalizations.of(context);
     showDialog(
@@ -274,7 +274,7 @@ class _SettingsPageState extends State<SettingsPage> {
       ),
     );
   }
-
+  // ignore: unused_element
   void _showDataRestoreDialog(BuildContext context) {
     final t = AppLocalizations.of(context);
     showDialog(

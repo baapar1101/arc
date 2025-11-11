@@ -40,6 +40,16 @@ class Settings(BaseSettings):
 	# CORS
 	cors_allowed_origins: list[str] = ["*"]
 
+	# Telegram Bot
+	telegram_bot_token: str | None = None
+	telegram_bot_username: str | None = None  # optional, used to build deep-links
+	telegram_webhook_secret: str | None = None
+	telegram_secret_header: str | None = None  # optional header to validate Telegram webhook
+	# SMS (optional)
+	sms_provider_name: str | None = None  # e.g., "twilio" or custom
+	sms_api_key: str | None = None
+	sms_sender: str | None = None
+
 	@property
 	def mysql_dsn(self) -> str:
 		return (

@@ -65,6 +65,27 @@ class _SystemSettingsPageState extends State<SystemSettingsPage> {
         color: const Color(0xFFE91E63),
         route: '/user/profile/system-settings/email',
       ),
+      SettingsItem(
+        title: 'مدیریت اعلان‌ها',
+        description: 'ایجاد/ویرایش/انتشار اعلان‌های سیستمی',
+        icon: Icons.notifications_active_outlined,
+        color: const Color(0xFF795548),
+        route: '/user/profile/system-settings/announcements',
+      ),
+      SettingsItem(
+        title: 'تنظیمات نوتیفیکیشن',
+        description: 'فعال/غیرفعال‌سازی کانال‌ها و ارسال تست',
+        icon: Icons.notifications_outlined,
+        color: const Color(0xFF607D8B),
+        route: '/user/profile/system-settings/notifications',
+      ),
+      SettingsItem(
+        title: 'قالب‌های نوتیفیکیشن',
+        description: 'مدیریت قالب‌ها برای کانال‌ها و زبان‌ها',
+        icon: Icons.description_outlined,
+        color: const Color(0xFF455A64),
+        route: '/user/profile/system-settings/notification-templates',
+      ),
     ];
   }
 

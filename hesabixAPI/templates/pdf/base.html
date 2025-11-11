@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="{{ 'fa' if is_fa else 'en' }}" dir="{{ 'rtl' if is_fa else 'ltr' }}">
+  <head>
+    <meta charset="utf-8">
+    <title>{{ title_text or '' }}</title>
+    <style>
+      @page {
+        margin: 1cm;
+        size: {{ (paper_size or 'A4') ~ ' ' ~ (orientation or 'portrait') }};
+        @bottom-left {
+          color: #666;
+          font-size: 10px;
+          content: "Page " counter(page) " / " counter(pages);
+        }
+        @bottom-right {
+          color: #666;
+          font-size: 10px;
+          content: string(doc_footer);
+        }
+      }
+      :root {
+        --primary: #366092;
+        --border: #d7dde6;
+        --text: #333;
+        --muted: #666;
+        --zebra: #f8f9fa;
+      }
+      body {
+        font-family: {{ 'Tahoma, Arial' if is_fa else 'Arial, sans-serif' }};
+        font-size: 12px;
+        line-height: 1.4;
+        color: var(--text);
+        direction: {{ 'rtl' if is_fa else 'ltr' }};
+      }
+      .header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 16px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid var(--primary);
+      }
+      .title {
+        font-size: 18px;
+        font-weight: bold;
+        color: var(--primary);
+      }
+      .meta {
+        font-size: 11px;
+        color: var(--muted);
+      }
+      .table-wrapper { overflow-x: auto; margin: 12px 0; }
+      table { width: 100%; border-collapse: collapse; font-size: 11px; }
+      thead { background: var(--primary); color: #fff; display: table-header-group; }
+      tfoot { display: table-footer-group; }
+      th {
+        border: 1px solid var(--border);
+        padding: 8px 6px;
+        text-align: {{ 'right' if is_fa else 'left' }};
+        font-weight: bold;
+        white-space: nowrap;
+      }
+      tbody tr:nth-child(even) { background: var(--zebra); }
+      td {
+        border: 1px solid var(--border);
+        padding: 5px 4px;
+        vertical-align: top;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+        white-space: normal;
+        text-align: {{ 'right' if is_fa else 'left' }};
+        page-break-inside: avoid;
+      }
+      .summary {
+        page-break-inside: avoid;
+        margin-top: 12px;
+        min-width: 260px;
+        padding: 10px;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        background: #fbfbfd;
+      }
+      .footer {
+        font-size: 10px;
+        color: var(--muted);
+        string-set: doc_footer "{{ footer_text or '' }}";
+      }
+      .amount {
+        text-align: {{ 'left' if is_fa else 'right' }};
+        font-weight: bold;
+      }
+    </style>
+  </head>
+  <body>
+    {% block content %}{% endblock %}
+    <div class="footer"></div>
+  </body>
+</html>
+
+

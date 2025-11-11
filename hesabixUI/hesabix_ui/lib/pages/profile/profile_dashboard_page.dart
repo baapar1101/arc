@@ -3,6 +3,7 @@ import '../../core/api_client.dart';
 import '../../models/business_dashboard_models.dart';
 import '../../utils/date_formatters.dart';
 import '../../services/profile_dashboard_service.dart';
+import '../../services/announcements_service.dart';
 import 'package:go_router/go_router.dart';
 
 class ProfileDashboardPage extends StatefulWidget {
@@ -22,6 +23,9 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> {
   String? _error;
   bool _editMode = false;
   static const double _gridSpacingPx = 12.0;
+  // Announcements state
+  final Set<int> _annBusyIds = <int>{};
+  bool _annOnlyUnread = false;
 
   @override
   void initState() {
@@ -93,6 +97,21 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> {
         _data = data;
       });
     } catch (_) {}
+  }
+
+  Future<void> _reloadAnnouncements({required bool onlyUnread}) async {
+    try {
+      final ann = await AnnouncementsService(ApiClient()).listAnnouncements(page: 1, limit: 5, onlyUnread: onlyUnread);
+      final items = (ann['items'] as List? ?? const <dynamic>[]) 
+          .map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
+      if (!mounted) return;
+      setState(() {
+        _data['profile_announcements'] = {'items': items};
+      });
+    } catch (_) {
+      await _reloadDataOnly();
+    }
   }
 
   @override
@@ -408,27 +427,130 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> {
         ),
       );
     }
-    return ListView.separated(
-      physics: const NeverScrollableScrollPhysics(),
-      shrinkWrap: true,
-      itemCount: items.length,
-      separatorBuilder: (_, __) => const Divider(height: 1),
-      itemBuilder: (context, index) {
-        final it = items[index];
-        final title = '${it['title'] ?? '-'}';
-        final body = '${it['body'] ?? ''}';
-        final time = '${it['time'] ?? ''}';
-        return ListTile(
-          dense: true,
-          leading: const Icon(Icons.notifications),
-          title: Text(title),
-          subtitle: Text(body),
-          trailing: Text(
-            time.isNotEmpty ? DateFormatters.formatServerDateTime(time) : '',
-            style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              FilterChip(
+                label: const Text('فقط خوانده‌نشده'),
+                selected: _annOnlyUnread,
+                onSelected: (v) async {
+                  setState(() => _annOnlyUnread = v);
+                  await _reloadAnnouncements(onlyUnread: _annOnlyUnread);
+                },
+              ),
+              OutlinedButton.icon(
+                onPressed: () async {
+                  await _reloadAnnouncements(onlyUnread: _annOnlyUnread);
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('اعلان‌ها به‌روز شد')));
+                  }
+                },
+                icon: const Icon(Icons.refresh, size: 18),
+                label: const Text('بازخوانی'),
+              ),
+              TextButton.icon(
+                onPressed: () => context.go('/user/profile/announcements'),
+                icon: const Icon(Icons.open_in_new, size: 18),
+                label: const Text('مشاهده همه'),
+              ),
+            ],
           ),
-        );
-      },
+        ),
+        ListView.separated(
+          physics: const NeverScrollableScrollPhysics(),
+          shrinkWrap: true,
+          itemCount: items.length,
+          separatorBuilder: (_, __) => const Divider(height: 1),
+          itemBuilder: (context, index) {
+            final it = items[index];
+            final id = it['id'];
+            final title = '${it['title'] ?? '-'}';
+            final body = '${it['body'] ?? ''}';
+            final pinned = (it['is_pinned'] ?? false) == true;
+            final isRead = (it['is_read'] ?? false) == true;
+            final time = '${it['updated_at'] ?? it['time'] ?? ''}';
+            final annId = (id is int) ? id : int.tryParse('$id');
+            final busy = annId != null && _annBusyIds.contains(annId);
+            return ListTile(
+              dense: true,
+              leading: Icon(pinned ? Icons.push_pin : Icons.notifications, color: pinned ? theme.colorScheme.primary : null),
+              title: Row(
+                children: [
+                  if (!isRead)
+                    Container(width: 8, height: 8, margin: const EdgeInsetsDirectional.only(end: 8), decoration: BoxDecoration(color: theme.colorScheme.primary, shape: BoxShape.circle)),
+                  Expanded(child: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis)),
+                ],
+              ),
+              subtitle: Text(body, maxLines: 2, overflow: TextOverflow.ellipsis),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (time.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsetsDirectional.only(end: 8),
+                      child: Text(
+                        DateFormatters.formatServerDateTime(time),
+                        style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                      ),
+                    ),
+                  IconButton(
+                    tooltip: 'خوانده شد',
+                    icon: busy ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.done_all, size: 20),
+                    onPressed: busy
+                        ? null
+                        : () async {
+                            try {
+                              if (annId == null) return;
+                              setState(() => _annBusyIds.add(annId));
+                              await _markAnnouncementRead(annId);
+                              await _reloadAnnouncements(onlyUnread: _annOnlyUnread);
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('به‌عنوان خوانده‌شده علامت خورد')));
+                              }
+                            } catch (e) {
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطا: $e')));
+                              }
+                            } finally {
+                              if (mounted && annId != null) setState(() => _annBusyIds.remove(annId));
+                            }
+                          },
+                  ),
+                  IconButton(
+                    tooltip: 'پنهان کردن',
+                    icon: busy ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.close, size: 20),
+                    onPressed: busy
+                        ? null
+                        : () async {
+                            try {
+                              if (annId == null) return;
+                              setState(() => _annBusyIds.add(annId));
+                              await _dismissAnnouncement(annId);
+                              await _reloadAnnouncements(onlyUnread: _annOnlyUnread);
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('اعلان پنهان شد')));
+                              }
+                            } catch (e) {
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطا: $e')));
+                              }
+                            } finally {
+                              if (mounted && annId != null) setState(() => _annBusyIds.remove(annId));
+                            }
+                          },
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      ],
     );
   }
 
@@ -541,6 +663,19 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> {
         ],
       ),
     );
+  }
+
+  // --- Announcement actions ---
+  Future<void> _markAnnouncementRead(int id) async {
+    try {
+      await AnnouncementsService(ApiClient()).markRead(id);
+    } catch (_) {}
+  }
+
+  Future<void> _dismissAnnouncement(int id) async {
+    try {
+      await AnnouncementsService(ApiClient()).dismiss(id);
+    } catch (_) {}
   }
 }
 

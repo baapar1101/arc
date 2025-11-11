@@ -9,6 +9,7 @@ from jinja2 import StrictUndefined, BaseLoader
 
 from adapters.db.models.report_template import ReportTemplate
 from app.core.responses import ApiError
+from app.services.template_builder_compiler import compile_design_to_jinja_html
 
 
 class ReportTemplateService:
@@ -163,6 +164,27 @@ class ReportTemplateService:
 		template: ReportTemplate,
 		context: Dict[str, Any],
 	) -> str:
+		# اگر engine=builder باشد، ابتدا از design داخل assets خروجی HTML/CSS/Header/Footer تولید می‌کنیم
+		try:
+			if str(getattr(template, "engine", "") or "").lower() == "builder":
+				assets = getattr(template, "assets", None) or {}
+				design = assets.get("builder_design") or assets.get("design") or {}
+				html, css, header_html, footer_html = compile_design_to_jinja_html(design)
+				# یک نمونه موقت با مقادیر تولیدی
+				class _Temp:
+					pass
+				tmp = _Temp()
+				tmp.content_html = html
+				tmp.content_css = css or template.content_css
+				tmp.header_html = header_html or template.header_html
+				tmp.footer_html = footer_html or template.footer_html
+				tmp.paper_size = template.paper_size
+				tmp.orientation = template.orientation
+				tmp.margins = template.margins
+				template = tmp  # type: ignore[assignment]
+		except Exception:
+			# مشکلی در کامپایل: اجازه می‌دهیم مسیر معمول اجرا شود تا خطا در مرحله رندر گزارش گردد
+			pass
 		"""رندر امن Jinja2"""
 		if not template or not template.content_html:
 			raise ApiError("INVALID_TEMPLATE", "Template HTML is empty", http_status=400)
@@ -176,9 +198,52 @@ class ReportTemplateService:
 		env.filters["default"] = lambda v, d="": v if v not in (None, "") else d
 		env.filters["upper"] = lambda v: str(v).upper()
 		env.filters["lower"] = lambda v: str(v).lower()
+		def _money(v, decimals: int = 0, sep: str = ","):
+			try:
+				n = float(v)
+			except Exception:
+				return str(v)
+			if decimals <= 0:
+				s = f"{int(round(n)):,}"
+			else:
+				s = f"{n:,.{decimals}f}"
+			return s.replace(",", sep)
+		env.filters["money"] = _money
+		def _date(v, fmt: str = "%Y/%m/%d"):
+			try:
+				import datetime
+				if isinstance(v, (int, float)):
+					dt = datetime.datetime.fromtimestamp(v)
+				elif isinstance(v, str):
+					# تلاش ساده: ISO یا yyyy-mm-dd
+					try:
+						dt = datetime.datetime.fromisoformat(v.replace("Z", "+00:00"))
+					except Exception:
+						try:
+							parts = v.split("-")
+							dt = datetime.datetime(int(parts[0]), int(parts[1]), int(parts[2][:2]))
+						except Exception:
+							return v
+				elif hasattr(v, "strftime"):
+					dt = v  # type: ignore[assignment]
+				else:
+					return str(v)
+				return dt.strftime(fmt)
+			except Exception:
+				return str(v)
+		env.filters["date"] = _date
 
+		# تزریق assets به context برای دسترسی در قالب‌ها (مثلاً assets.images['logo'])
+		try:
+			if hasattr(template, "assets") and getattr(template, "assets"):
+				ctx = dict(context or {})
+				ctx.setdefault("assets", getattr(template, "assets"))
+			else:
+				ctx = context
+		except Exception:
+			ctx = context
 		template_obj = env.from_string(template.content_html)
-		html = template_obj.render(**context)
+		html = template_obj.render(**ctx)
 
 		# تنظیمات صفحه (@page) از روی ویژگی‌های قالب
 		try:
@@ -205,8 +270,18 @@ class ReportTemplateService:
 				except Exception:
 					return None
 			mt, mr, mb, ml = _mm(mt), _mm(mr), _mm(mb), _mm(ml)
+			# اگر هر چهار مقدار موجود بود از shorthand استفاده کن؛ در غیر این صورت هرکدام جداگانه
 			if all(x is not None for x in (mt, mr, mb, ml)):
 				page_css_parts.append(f"margin: {mt} {mr} {mb} {ml};")
+			else:
+				if mt is not None:
+					page_css_parts.append(f"margin-top: {mt};")
+				if mr is not None:
+					page_css_parts.append(f"margin-right: {mr};")
+				if mb is not None:
+					page_css_parts.append(f"margin-bottom: {mb};")
+				if ml is not None:
+					page_css_parts.append(f"margin-left: {ml};")
 			# اگر چیزی برای @page داریم، تزریق کنیم
 			if page_css_parts:
 				page_css = "@page { " + " ".join(page_css_parts) + " }"
@@ -226,6 +301,27 @@ class ReportTemplateService:
 				html = html.replace("</head>", f"<style>{css}</style></head>")
 			else:
 				html = f"<head><style>{css}</style></head>{html}"
+		# درج Header/Footer ساده در بدنه (در صورت وجود). طراح می‌تواند با CSS آن‌ها را به fixed تبدیل کند.
+		try:
+			header_html = (template.header_html or "").strip()
+			footer_html = (template.footer_html or "").strip()
+			if header_html:
+				insertion = f'<div class="__tpl-header">{header_html}</div>'
+				if "<body" in html and "</body>" in html:
+					html = html.replace("<body", "<body", 1)  # no-op anchor
+					body_start = html.find(">") + 1 if html.startswith("<body") else html.find("<body")
+					# ساده: دقیقا بعد از تگ <body> درج می‌کنیم
+					html = html.replace("<body>", f"<body>{insertion}", 1)
+				else:
+					html = f"{insertion}{html}"
+			if footer_html:
+				insertion = f'<div class="__tpl-footer">{footer_html}</div>'
+				if "</body>" in html:
+					html = html.replace("</body>", f"{insertion}</body>", 1)
+				else:
+					html = f"{html}{insertion}"
+		except Exception:
+			pass
 		return html
 
 	@staticmethod

@@ -7,12 +7,13 @@ import 'package:dio/dio.dart';
 
 import '../core/api_client.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
-import '../core/locale_controller.dart';
 import '../core/calendar_controller.dart';
-import '../theme/theme_controller.dart';
-import '../widgets/auth_footer.dart';
 import '../core/auth_store.dart';
+import '../core/locale_controller.dart';
 import '../core/referral_store.dart';
+import '../theme/theme_controller.dart';
+import '../utils/number_normalizer.dart';
+import '../widgets/auth_footer.dart';
 
 class LoginPage extends StatefulWidget {
   final LocaleController localeController;
@@ -503,7 +504,10 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                                         decoration: InputDecoration(labelText: t.captcha),
                                                         validator: (v) => (v == null || v.trim().isEmpty) ? '${t.captcha} ${t.requiredField}' : null,
                                                         keyboardType: TextInputType.number,
-                                                        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                                                        inputFormatters: [
+                                                          const EnglishDigitsFormatter(),
+                                                          FilteringTextInputFormatter.digitsOnly,
+                                                        ],
                                                       ),
                                                     ),
                                                     const SizedBox(width: 8),
@@ -609,7 +613,10 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                                         decoration: InputDecoration(labelText: t.captcha),
                                                         validator: (v) => (v == null || v.trim().isEmpty) ? '${t.captcha} ${t.requiredField}' : null,
                                                         keyboardType: TextInputType.number,
-                                                        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                                                        inputFormatters: [
+                                                          const EnglishDigitsFormatter(),
+                                                          FilteringTextInputFormatter.digitsOnly,
+                                                        ],
                                                       ),
                                                     ),
                                                     const SizedBox(width: 8),
@@ -682,7 +689,10 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                                         decoration: InputDecoration(labelText: t.captcha),
                                                         validator: (v) => (v == null || v.trim().isEmpty) ? '${t.captcha} ${t.requiredField}' : null,
                                                         keyboardType: TextInputType.number,
-                                                        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                                                        inputFormatters: [
+                                                          const EnglishDigitsFormatter(),
+                                                          FilteringTextInputFormatter.digitsOnly,
+                                                        ],
                                                       ),
                                                     ),
                                                     const SizedBox(width: 8),

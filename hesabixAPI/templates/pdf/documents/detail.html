@@ -1,0 +1,46 @@
+{% extends "pdf/base.html" %}
+{% block content %}
+  <div class="header">
+    <div>
+      <div class="title">{{ document.document_type_name or ('سند' if is_fa else 'Document') }}</div>
+      <div class="meta">
+        {{ 'کسب‌وکار' if is_fa else 'Business' }}: {{ business_name or '-' }}
+      </div>
+    </div>
+    <div class="meta">
+      {{ 'تاریخ تولید' if is_fa else 'Generated' }}: {{ generated_at }}
+    </div>
+  </div>
+
+  <div class="meta" style="margin: 8px 0;">
+    <span style="margin-inline-end: 12px;">
+      {{ 'کد' if is_fa else 'Code' }}: {{ code or '-' }}
+    </span>
+    <span>
+      {{ 'تاریخ' if is_fa else 'Date' }}: {{ document_date or '-' }}
+    </span>
+  </div>
+
+  <div class="table-wrapper">
+    <table>
+      <thead>
+        <tr>
+          <th>{{ 'شرح' if is_fa else 'Description' }}</th>
+          <th>{{ 'بدهکار' if is_fa else 'Debit' }}</th>
+          <th>{{ 'بستانکار' if is_fa else 'Credit' }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for line in lines or [] %}
+          <tr>
+            <td>{{ line.description or '-' }}</td>
+            <td class="amount">{{ line.debit | default('') | ltr | safe }}</td>
+            <td class="amount">{{ line.credit | default('') | ltr | safe }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endblock %}
+
+

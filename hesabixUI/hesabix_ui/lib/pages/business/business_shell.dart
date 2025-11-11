@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'dart:math' as math;
 import 'package:go_router/go_router.dart';
 import '../../core/auth_store.dart';
 import '../../core/locale_controller.dart';
@@ -17,8 +19,11 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'receipts_payments_list_page.dart' show BulkSettlementDialog;
 import '../../widgets/document/document_form_dialog.dart';
 import '../../services/wallet_service.dart';
+import '../../utils/number_normalizer.dart';
 import '../../services/payment_gateway_service.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../services/announcements_service.dart';
+import '../../services/notifications_ws_client.dart';
 
 class BusinessShell extends StatefulWidget {
   final int businessId;
@@ -49,6 +54,10 @@ class _BusinessShellState extends State<BusinessShell> {
   bool _isAccountingMenuExpanded = false;
   bool _isWarehouseManagementExpanded = false;
   final BusinessDashboardService _businessService = BusinessDashboardService(ApiClient());
+  final List<Map<String, dynamic>> _notifications = <Map<String, dynamic>>[];
+  int _unreadCount = 0;
+  final Set<int> _busyAnnIds = <int>{};
+  NotificationsWsClient? _ws;
 
   @override
   void initState() {
@@ -66,10 +75,14 @@ class _BusinessShellState extends State<BusinessShell> {
     
     // بارگذاری اطلاعات کسب و کار و دسترسی‌ها
     _loadBusinessInfo();
+    _initNotifications();
   }
 
   @override
   void dispose() {
+    try {
+      _ws?.disconnect();
+    } catch (_) {}
     super.dispose();
   }
 
@@ -126,6 +139,10 @@ class _BusinessShellState extends State<BusinessShell> {
                   controller: amountCtrl,
                   decoration: const InputDecoration(labelText: 'مبلغ'),
                   keyboardType: TextInputType.number,
+                  inputFormatters: [
+                    EnglishDigitsFormatter(),
+                    FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+                  ],
                   validator: (v) => (v == null || v.isEmpty) ? 'الزامی' : null,
                 ),
                 const SizedBox(height: 8),
@@ -812,6 +829,39 @@ class _BusinessShellState extends State<BusinessShell> {
               ),
       ),
       actions: [
+        // Notification Center
+        Padding(
+          padding: const EdgeInsetsDirectional.only(end: 4),
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              IconButton(
+                tooltip: 'اعلان‌ها',
+                onPressed: _openNotificationCenter,
+                icon: const Icon(Icons.notifications_none),
+                color: appBarFg,
+              ),
+              if (_unreadCount > 0)
+                Positioned(
+                  right: 4,
+                  top: 6,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                    decoration: BoxDecoration(
+                      color: Colors.redAccent,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    constraints: const BoxConstraints(minWidth: 18),
+                    child: Text(
+                      _unreadCount > 9 ? '9+' : '$_unreadCount',
+                      style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
         CombinedUserMenuButton(
           authStore: widget.authStore,
           localeController: widget.localeController,
@@ -1462,6 +1512,212 @@ class _BusinessShellState extends State<BusinessShell> {
     if (label == t.settings) return 'settings';
     if (label == t.pluginMarketplace) return 'marketplace';
     return null;
+  }
+
+  // ==== Notifications (shared simplified with profile) ====
+  Future<void> _initNotifications() async {
+    // Load unread announcements for badge
+    try {
+      final data = await AnnouncementsService(ApiClient()).listAnnouncements(page: 1, limit: 5, onlyUnread: true);
+      final items = (data['items'] as List? ?? const <dynamic>[])
+          .map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
+      if (!mounted) return;
+      setState(() {
+        _notifications.clear();
+        for (final it in items) {
+          _notifications.add(<String, dynamic>{
+            'title': '${it['title'] ?? 'اعلان'}',
+            'body': '${it['body'] ?? ''}',
+            'level': '${it['level'] ?? 'info'}',
+            'id': it['id'],
+          });
+        }
+        _unreadCount = _notifications.length.clamp(0, 99);
+      });
+    } catch (_) {}
+    // Optional: connect WS (reuse existing apiKey)
+    final apiKey = widget.authStore.apiKey;
+    if (apiKey != null && apiKey.isNotEmpty) {
+      _ws = createNotificationsWsClient();
+      _ws!.connect(
+        apiKey: apiKey,
+        onMessage: (msg) {
+          try {
+            final type = '${msg['type'] ?? ''}';
+            if (type == 'notification') {
+              final title = '${msg['title'] ?? 'پیام'}';
+              final body = '${msg['body'] ?? ''}';
+              if (!mounted) return;
+              setState(() {
+                _notifications.insert(0, <String, dynamic>{
+                  'title': title,
+                  'body': body,
+                  'level': '${msg['level'] ?? 'info'}',
+                });
+                _unreadCount = (_unreadCount + 1).clamp(0, 99);
+              });
+            }
+          } catch (_) {}
+        },
+      );
+    }
+  }
+
+  void _openNotificationCenter() {
+    setState(() {
+      _unreadCount = 0;
+    });
+    final items = _notifications.take(10).toList();
+    final cs = Theme.of(context).colorScheme;
+    showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        titlePadding: EdgeInsets.zero,
+        title: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(colors: [cs.primary, cs.primary.withValues(alpha: 0.8)]),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+          ),
+          child: Row(
+            children: const [
+              Icon(Icons.notifications_active, color: Colors.white),
+              SizedBox(width: 8),
+              Text('مرکز اعلان‌ها', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            ],
+          ),
+        ),
+        content: LayoutBuilder(
+          builder: (ctx, _) {
+            final double dialogWidth = math.min(MediaQuery.of(ctx).size.width - 96, 720);
+            return ConstrainedBox(
+              constraints: BoxConstraints(minWidth: dialogWidth, maxWidth: dialogWidth, maxHeight: 420),
+              child: items.isEmpty
+                  ? const SizedBox(height: 140, child: Center(child: Text('اعلانی وجود ندارد')))
+                  : ListView.separated(
+                      padding: EdgeInsets.zero,
+                      shrinkWrap: true,
+                      itemBuilder: (_, i) {
+                    final it = items[i];
+                    final level = '${it['level'] ?? 'info'}';
+                    IconData icon;
+                    Color levelColor;
+                    switch (level) {
+                      case 'warning':
+                        icon = Icons.warning_amber_rounded;
+                        levelColor = Colors.orange;
+                        break;
+                      case 'critical':
+                        icon = Icons.error_outline;
+                        levelColor = Colors.red;
+                        break;
+                      default:
+                        icon = Icons.notifications_none;
+                        levelColor = cs.primary;
+                    }
+                    final int? annId = it['id'] is int ? it['id'] as int : int.tryParse('${it['id']}');
+                    final bool busy = annId != null && _busyAnnIds.contains(annId);
+                    return Container(
+                      decoration: BoxDecoration(
+                        color: cs.surface,
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [BoxShadow(color: cs.shadow.withValues(alpha: 0.05), blurRadius: 6, offset: const Offset(0, 2))],
+                        border: Border(left: BorderSide(color: levelColor, width: 3)),
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            width: 36,
+                            height: 36,
+                            decoration: BoxDecoration(color: levelColor.withOpacity(0.12), shape: BoxShape.circle),
+                            child: Icon(icon, color: levelColor),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('${it['title'] ?? 'اعلان'}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600)),
+                                const SizedBox(height: 4),
+                                Text('${it['body'] ?? ''}', maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: cs.onSurfaceVariant)),
+                              ],
+                            ),
+                          ),
+                          if (annId != null)
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  tooltip: 'خوانده شد',
+                                  icon: busy
+                                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                                      : const Icon(Icons.done_all, size: 20),
+                                  onPressed: busy
+                                      ? null
+                                      : () async {
+                                          setState(() => _busyAnnIds.add(annId));
+                                          try {
+                                            await AnnouncementsService(ApiClient()).markRead(annId);
+                                            setState(() {
+                                              _notifications.removeWhere((e) => (e['id'] is int ? e['id'] == annId : int.tryParse('${e['id']}') == annId));
+                                            });
+                                          } catch (_) {} finally {
+                                            if (mounted) setState(() => _busyAnnIds.remove(annId));
+                                          }
+                                        },
+                                ),
+                                IconButton(
+                                  tooltip: 'پنهان کردن',
+                                  icon: busy
+                                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                                      : const Icon(Icons.close, size: 20),
+                                  onPressed: busy
+                                      ? null
+                                      : () async {
+                                          setState(() => _busyAnnIds.add(annId));
+                                          try {
+                                            await AnnouncementsService(ApiClient()).dismiss(annId);
+                                            setState(() {
+                                              _notifications.removeWhere((e) => (e['id'] is int ? e['id'] == annId : int.tryParse('${e['id']}') == annId));
+                                            });
+                                          } catch (_) {} finally {
+                                            if (mounted) setState(() => _busyAnnIds.remove(annId));
+                                          }
+                                        },
+                                ),
+                              ],
+                            ),
+                        ],
+                      ),
+                    );
+                  },
+                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                  itemCount: items.length,
+                ),
+            );
+          },
+        ),
+        actionsPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('بستن'),
+          ),
+          FilledButton.icon(
+            onPressed: () {
+              Navigator.of(context).pop();
+              context.go('/user/profile/announcements');
+            },
+            icon: const Icon(Icons.notifications, size: 18),
+            label: const Text('مشاهده همه اعلان‌ها'),
+          ),
+        ],
+      ),
+    );
   }
 }
 

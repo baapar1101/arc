@@ -23,6 +23,9 @@ class User(Base):
 	referred_by_user_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 	# App permissions
 	app_permissions: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+	# Telegram linking
+	telegram_chat_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+	telegram_connected_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 	created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 	updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 	

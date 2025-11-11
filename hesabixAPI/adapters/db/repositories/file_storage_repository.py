@@ -55,10 +55,11 @@ class FileStorageRepository(BaseRepository[FileStorage]):
         self.db.refresh(file_storage)
         return file_storage
 
-    async def get_file_by_id(self, file_id: UUID) -> Optional[FileStorage]:
+    async def get_file_by_id(self, file_id: UUID | str) -> Optional[FileStorage]:
+        file_id_str = str(file_id)
         return self.db.query(FileStorage).filter(
             and_(
-                FileStorage.id == file_id,
+                FileStorage.id == file_id_str,
                 FileStorage.deleted_at.is_(None)
             )
         ).first()
@@ -121,7 +122,7 @@ class FileStorageRepository(BaseRepository[FileStorage]):
         self.db.commit()
         return True
 
-    async def soft_delete_file(self, file_id: UUID) -> bool:
+    async def soft_delete_file(self, file_id: UUID | str) -> bool:
         file_storage = await self.get_file_by_id(file_id)
         if not file_storage:
             return False

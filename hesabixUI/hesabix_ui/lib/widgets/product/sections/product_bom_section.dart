@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../../services/bom_service.dart';
 import '../../../models/bom_models.dart';
 import '../../product/bom_editor_dialog.dart';
@@ -11,6 +12,7 @@ import '../../../services/account_service.dart';
 import '../../../models/account_model.dart';
 import '../production_settings_dialog.dart';
 import '../../../services/production_settings_service.dart';
+import '../../../utils/number_normalizer.dart';
 
 class ProductBomSection extends StatefulWidget {
   final int businessId;
@@ -165,6 +167,10 @@ class _ProductBomSectionState extends State<ProductBomSection> {
             controller: qtyController,
             decoration: const InputDecoration(labelText: 'مقدار تولید', hintText: 'مثلاً 10'),
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            inputFormatters: [
+              EnglishDigitsFormatter(),
+              FilteringTextInputFormatter.allow(RegExp(r'[-0-9.,]')),
+            ],
           ),
           actions: [
             TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('انصراف')),

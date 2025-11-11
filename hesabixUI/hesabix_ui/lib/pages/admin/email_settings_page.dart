@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/models/email_models.dart';
 import 'package:hesabix_ui/services/email_service.dart';
+import 'package:hesabix_ui/utils/number_normalizer.dart';
 
 class EmailSettingsPage extends StatefulWidget {
   const EmailSettingsPage({super.key});
@@ -430,6 +432,10 @@ class _EmailSettingsPageState extends State<EmailSettingsPage> {
                         border: const OutlineInputBorder(),
                       ),
                       keyboardType: TextInputType.number,
+                      inputFormatters: [
+                        EnglishDigitsFormatter(),
+                        FilteringTextInputFormatter.digitsOnly,
+                      ],
                       validator: (value) {
                         if (value == null || value.isEmpty) {
                           return t.requiredField;

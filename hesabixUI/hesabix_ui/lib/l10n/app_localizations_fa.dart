@@ -2086,6 +2086,15 @@ class AppLocalizationsFa extends AppLocalizations {
   String get dataRestoreDescription => 'بازیابی اطلاعات از نسخه پشتیبان';
 
   @override
+  String get restoreModeNewBusiness => 'ایجاد کسب‌وکار جدید';
+
+  @override
+  String get restoreModeReplace => 'جایگزینی کامل';
+
+  @override
+  String get selectBackupFile => 'انتخاب فایل بکاپ (.hbx)';
+
+  @override
   String get manage => 'مدیریت';
 
   @override
@@ -2991,4 +3000,174 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get create => 'ایجاد';
+
+  @override
+  String get notificationsSettingsTitle => 'تنظیمات اعلان و نوتیفیکیشن';
+
+  @override
+  String get notificationsSettingsSubtitle =>
+      'کانال‌های ارسال را فعال کنید، پیام تست بفرستید و اطلاعات اتصال سرویس‌ها را مدیریت کنید.';
+
+  @override
+  String get notificationsOverviewTitle => 'اطمینان از رسیدن پیام‌ها به تیم';
+
+  @override
+  String get notificationsOverviewDescription =>
+      'مشخص کنید هشدارهای عملیاتی از چه مسیرهایی ارسال شوند و مدیر سیستم بداند سازوکار ارسال چیست.';
+
+  @override
+  String get notificationsGuidanceItemChannels =>
+      'کانال‌ها را بر اساس دسترس‌پذیری و الزامات هر واحد فعال یا غیرفعال کنید.';
+
+  @override
+  String get notificationsGuidanceItemTemplates =>
+      'برای هر کانال و هر زبان، قالب فعال منتشر شده داشته باشید.';
+
+  @override
+  String get notificationsGuidanceItemTesting =>
+      'بعد از تغییرات، با دکمه‌های تست مسیر ارسال را بررسی کنید.';
+
+  @override
+  String get notificationsLearnMore => 'مطالعهٔ راهنما';
+
+  @override
+  String get notificationsDocumentationUrl =>
+      'https://docs.hesabix.com/notifications';
+
+  @override
+  String get notificationsChannelsSectionTitle => 'کانال‌های ارسال';
+
+  @override
+  String get notificationsChannelsSectionSubtitle =>
+      'هر کانالی که فعال باشد برای اعلان‌های سیستمی و هشدارهای عملیاتی استفاده می‌شود.';
+
+  @override
+  String get notificationsChannelTelegram => 'تلگرام';
+
+  @override
+  String get notificationsChannelTelegramDescription =>
+      'ارسال پیام از طریق ربات تلگرام متصل برای اپراتورها.';
+
+  @override
+  String get notificationsChannelEmail => 'ایمیل';
+
+  @override
+  String get notificationsChannelEmailDescription =>
+      'ارسال رایانامه با استفاده از سرور ایمیلی که در تنظیمات سیستم تعریف شده است.';
+
+  @override
+  String get notificationsChannelSms => 'پیامک';
+
+  @override
+  String get notificationsChannelSmsDescription =>
+      'ارسال پیامک از طریق سرویس‌دهندهٔ پیکربندی‌شده برای رویدادهای حساس.';
+
+  @override
+  String get notificationsChannelInApp => 'داخل برنامه';
+
+  @override
+  String get notificationsChannelInAppDescription =>
+      'نمایش اعلان داخل وب و موبایل حسابیکس در لحظه.';
+
+  @override
+  String get notificationsSaveSuccess => 'تنظیمات اعلان ذخیره شد.';
+
+  @override
+  String get notificationsSaveError => 'ذخیرهٔ تنظیمات اعلان ممکن نشد.';
+
+  @override
+  String get notificationsTestSectionTitle => 'ارسال پیام تست';
+
+  @override
+  String get notificationsTestSectionSubtitle =>
+      'بعد از هر تغییر می‌توانید از طریق کانال انتخابی پیام آزمایشی بفرستید.';
+
+  @override
+  String notificationsTestButton(String channel) {
+    return 'تست $channel';
+  }
+
+  @override
+  String notificationsTestSuccess(String channel) {
+    return 'پیام تست از کانال $channel ارسال شد.';
+  }
+
+  @override
+  String notificationsTestError(String channel) {
+    return 'ارسال پیام تست از کانال $channel با خطا روبه‌رو شد.';
+  }
+
+  @override
+  String get notificationsWebsocketInfoTitle =>
+      'اعلان‌های درون‌برنامه‌ای لحظه‌ای';
+
+  @override
+  String notificationsWebsocketInfoDescription(String endpoint) {
+    return 'کاربرها با کلید API معتبر به مسیر وب‌سوکت $endpoint متصل می‌شوند. نسخهٔ وب و موبایل این اتصال را به صورت خودکار برقرار می‌کنند.';
+  }
+
+  @override
+  String get notificationsAdvancedSectionTitle => 'پیکربندی پیشرفته (ادمین)';
+
+  @override
+  String get notificationsAdvancedSectionSubtitle =>
+      'اعتبارسنجی کانال‌های تلگرام و پیامک را اینجا مدیریت کنید. دسترسی system_settings لازم است.';
+
+  @override
+  String get notificationsAdvancedTelegramHeader => 'راه‌اندازی ربات تلگرام';
+
+  @override
+  String get notificationsFieldTelegramToken => 'توکن ربات';
+
+  @override
+  String get notificationsFieldTelegramUsername => 'نام کاربری ربات';
+
+  @override
+  String get notificationsFieldTelegramWebhookSecret => 'رمز وب‌هوک';
+
+  @override
+  String get notificationsFieldTelegramSecretHeader => 'نام هدر محرمانه';
+
+  @override
+  String get notificationsFieldTelegramTokenHint =>
+      'از BotFather دریافت می‌شود (فرمت: 123456789:ABC...).';
+
+  @override
+  String get notificationsFieldTelegramWebhookSecretHint =>
+      'اختیاری؛ برای تطبیق درخواست‌های ورودی استفاده می‌شود.';
+
+  @override
+  String get notificationsAdvancedSmsHeader => 'درگاه پیامک';
+
+  @override
+  String get notificationsFieldSmsProvider => 'نام سرویس‌دهنده';
+
+  @override
+  String get notificationsFieldSmsApiKey => 'کلید API';
+
+  @override
+  String get notificationsFieldSmsApiKeyHint =>
+      'از سرویس‌دهنده دریافت می‌شود؛ بهتر است دوره‌ای تعویض شود.';
+
+  @override
+  String get notificationsFieldSmsSender => 'فرستنده/شماره';
+
+  @override
+  String get notificationsFieldSmsSenderHint =>
+      'دقیقاً همان مقداری که در پنل سرویس‌دهنده ثبت شده است.';
+
+  @override
+  String get notificationsAdvancedRestartHint =>
+      'پس از تغییر، در صورت نیاز سرویس ارسال اعلان را در زمان کم‌ترافیک ریستارت کنید.';
+
+  @override
+  String get notificationsAdvancedSave => 'ذخیرهٔ تنظیمات پیشرفته';
+
+  @override
+  String get notificationsAdvancedSaveSuccess =>
+      'تنظیمات پیشرفتهٔ اعلان ذخیره شد.';
+
+  @override
+  String get notificationsAdvancedSaveError =>
+      'ذخیرهٔ تنظیمات پیشرفتهٔ اعلان انجام نشد.';
 }

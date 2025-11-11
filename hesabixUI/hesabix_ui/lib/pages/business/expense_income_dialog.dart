@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../core/calendar_controller.dart';
 import '../../core/api_client.dart';
 import '../../core/auth_store.dart';
@@ -7,8 +8,10 @@ import '../../widgets/invoice/invoice_transactions_widget.dart';
 import '../../widgets/invoice/account_tree_combobox_widget.dart';
 import '../../models/invoice_type_model.dart';
 import '../../models/invoice_transaction.dart';
-import '../../models/account_tree_node.dart';
+import '../../models/account_model.dart';
+import '../../models/expense_income_document.dart' as expense;
 import '../../services/expense_income_service.dart';
+import '../../utils/number_normalizer.dart';
 
 class ExpenseIncomeDialog extends StatefulWidget {
   final int businessId;
@@ -156,34 +159,25 @@ class _ExpenseIncomeDialogState extends State<ExpenseIncomeDialog> {
     showDialog(context: context, barrierDismissible: false, builder: (_) => const Center(child: CircularProgressIndicator()));
     try {
       final service = ExpenseIncomeService(widget.apiClient);
-      final itemsData = _items.map((e) => {'account_id': e.account?.id, 'amount': e.amount, if (e.description?.isNotEmpty == true) 'description': e.description}).toList();
-      final txData = _transactions.map((tx) => {
-            'transaction_type': tx.type.value,
-            'transaction_date': tx.transactionDate.toIso8601String(),
-            'amount': tx.amount.toDouble(),
-            if (tx.commission != null) 'commission': tx.commission?.toDouble(),
-            if (tx.description != null && tx.description!.isNotEmpty) 'description': tx.description,
-            'bank_id': tx.bankId,
-            'bank_name': tx.bankName,
-            'cash_register_id': tx.cashRegisterId,
-            'cash_register_name': tx.cashRegisterName,
-            'petty_cash_id': tx.pettyCashId,
-            'petty_cash_name': tx.pettyCashName,
-            'check_id': tx.checkId,
-            'check_number': tx.checkNumber,
-            'person_id': tx.personId,
-            'person_name': tx.personName,
-            'account_id': tx.accountId,
-            'account_name': tx.accountName,
-          }..removeWhere((k, v) => v == null)).toList();
+      final itemLines = _items
+          .map(
+            (line) => expense.ItemLineData(
+              accountId: line.account?.id,
+              accountName: line.account?.displayName,
+              amount: line.amount,
+              description: line.description,
+            ),
+          )
+          .toList();
+      final counterpartyLines = _transactions.map(_mapTransaction).toList();
       await service.create(
         businessId: widget.businessId,
         documentType: _docType,
         documentDate: _docDate,
         currencyId: _currencyId!,
         description: _descCtrl.text.trim(),
-        itemLines: itemsData,
-        counterpartyLines: txData,
+        itemLines: itemLines,
+        counterpartyLines: counterpartyLines,
       );
       if (!mounted) return;
       Navigator.pop(context); // loading
@@ -194,6 +188,34 @@ class _ExpenseIncomeDialogState extends State<ExpenseIncomeDialog> {
       Navigator.pop(context); // loading
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطا: $e'), backgroundColor: Colors.red));
     }
+  }
+
+  expense.CounterpartyLineData _mapTransaction(InvoiceTransaction tx) {
+    final mappedType = expense.TransactionType.fromValue(tx.type.value) ?? expense.TransactionType.person;
+    return expense.CounterpartyLineData(
+      transactionType: mappedType,
+      amount: tx.amount.toDouble(),
+      transactionDate: tx.transactionDate,
+      description: tx.description,
+      commission: tx.commission?.toDouble(),
+      bankAccountId: _parseId(tx.bankId),
+      bankAccountName: tx.bankName,
+      cashRegisterId: _parseId(tx.cashRegisterId),
+      cashRegisterName: tx.cashRegisterName,
+      pettyCashId: _parseId(tx.pettyCashId),
+      pettyCashName: tx.pettyCashName,
+      checkId: _parseId(tx.checkId),
+      checkNumber: tx.checkNumber,
+      personId: _parseId(tx.personId),
+      personName: tx.personName,
+      accountId: _parseId(tx.accountId),
+      accountName: tx.accountName,
+    );
+  }
+
+  int? _parseId(String? value) {
+    if (value == null || value.isEmpty) return null;
+    return int.tryParse(value);
   }
 }
 
@@ -292,6 +314,10 @@ class _ItemTileState extends State<_ItemTile> {
                     controller: _amountCtrl,
                     decoration: const InputDecoration(labelText: 'مبلغ', hintText: '1,000,000'),
                     keyboardType: TextInputType.number,
+                    inputFormatters: [
+                      EnglishDigitsFormatter(),
+                      FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+                    ],
                     onChanged: (v) {
                       final val = double.tryParse(v.replaceAll(',', '')) ?? 0;
                       widget.onChanged(widget.line.copyWith(amount: val));
@@ -316,12 +342,12 @@ class _ItemTileState extends State<_ItemTile> {
 }
 
 class _ItemLine {
-  final AccountTreeNode? account;
+  final Account? account;
   final double amount;
   final String? description;
   const _ItemLine({this.account, required this.amount, this.description});
   factory _ItemLine.empty() => const _ItemLine(amount: 0);
-  _ItemLine copyWith({AccountTreeNode? account, double? amount, String? description}) => _ItemLine(
+  _ItemLine copyWith({Account? account, double? amount, String? description}) => _ItemLine(
         account: account ?? this.account,
         amount: amount ?? this.amount,
         description: description ?? this.description,

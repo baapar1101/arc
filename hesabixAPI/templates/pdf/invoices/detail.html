@@ -1,0 +1,70 @@
+{% extends "pdf/base.html" %}
+{% block content %}
+  <div class="header">
+    <div>
+      <div class="title">{{ invoice.title or ('فاکتور' if is_fa else 'Invoice') }}</div>
+      <div class="meta">
+        {{ 'کسب‌وکار' if is_fa else 'Business' }}:
+        {{ business_name or '-' }}
+      </div>
+    </div>
+    <div class="meta">
+      {{ 'تاریخ تولید' if is_fa else 'Generated' }}:
+      {{ generated_at }}
+    </div>
+  </div>
+
+  <div class="meta" style="margin: 8px 0;">
+    <span style="margin-inline-end: 12px;">
+      {{ 'کد' if is_fa else 'Code' }}: {{ invoice.code or '-' }}
+    </span>
+    <span>
+      {{ 'تاریخ' if is_fa else 'Date' }}: {{ invoice.issue_date or '-' }}
+    </span>
+  </div>
+
+  <div class="table-wrapper">
+    <table>
+      <thead>
+        <tr>
+          <th>{{ 'ردیف' if is_fa else 'No.' }}</th>
+          <th>{{ 'شرح کالا/خدمت' if is_fa else 'Item' }}</th>
+          <th>{{ 'تعداد' if is_fa else 'Qty' }}</th>
+          <th>{{ 'فی' if is_fa else 'Price' }}</th>
+          <th>{{ 'مبلغ' if is_fa else 'Amount' }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for line in lines or [] %}
+          <tr>
+            <td>{{ loop.index }}</td>
+            <td>{{ line.product_name or line.description or '-' }}</td>
+            <td>{{ line.quantity | default('') | ltr | safe }}</td>
+            <td>{{ line.unit_price | default('') | ltr | safe }}</td>
+            <td class="amount">{{ line.line_total | default('') | ltr | safe }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="summary" style="float: {{ 'left' if is_fa else 'right' }};">
+    <div class="meta" style="margin-bottom: 6px;">{{ 'جمع کل' if is_fa else 'Totals' }}</div>
+    <div>
+      <div style="display:flex; justify-content: space-between;">
+        <span class="meta">{{ 'جمع جزء' if is_fa else 'Subtotal' }}:</span>
+        <span class="amount">{{ (invoice.subtotal or '') | ltr | safe }}</span>
+      </div>
+      <div style="display:flex; justify-content: space-between;">
+        <span class="meta">{{ 'مالیات' if is_fa else 'Tax' }}:</span>
+        <span class="amount">{{ (invoice.tax_total or '') | ltr | safe }}</span>
+      </div>
+      <div style="display:flex; justify-content: space-between; font-weight: bold; margin-top: 6px;">
+        <span>{{ 'قابل پرداخت' if is_fa else 'Payable' }}:</span>
+        <span class="amount">{{ (invoice.payable_total or '') | ltr | safe }}</span>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+
+

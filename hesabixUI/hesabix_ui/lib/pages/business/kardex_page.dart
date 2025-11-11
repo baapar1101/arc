@@ -24,6 +24,8 @@ import 'package:hesabix_ui/services/account_service.dart';
 import 'package:hesabix_ui/services/check_service.dart';
 import 'package:hesabix_ui/services/warehouse_service.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hesabix_ui/widgets/document/document_details_dialog.dart';
+import 'dart:ui' show FontFeature;
 import 'dart:async';
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -369,38 +371,163 @@ class _KardexPageState extends State<KardexPage> {
       businessId: widget.businessId,
       reportModuleKey: 'kardex',
       reportSubtype: 'list',
+      title: 'کاردکس اسناد',
+      showRowNumbers: true,
       columns: [
-        DateColumn('document_date', 'تاریخ سند',
-            formatter: (item) => (item as Map<String, dynamic>)['document_date']?.toString()),
-        TextColumn('document_code', 'کد سند',
-            formatter: (item) => (item as Map<String, dynamic>)['document_code']?.toString()),
-        TextColumn('document_type', 'نوع سند',
-            formatter: (item) => (item as Map<String, dynamic>)['document_type']?.toString()),
-        TextColumn('warehouse_name', 'انبار',
-            formatter: (item) {
-              final m = (item as Map<String, dynamic>);
-              return (m['warehouse_name'] ?? m['warehouse_id'])?.toString();
-            }),
-        TextColumn('movement', 'جهت حرکت',
-            formatter: (item) => (item as Map<String, dynamic>)['movement']?.toString()),
-        TextColumn('description', 'شرح',
-            formatter: (item) => (item as Map<String, dynamic>)['description']?.toString()),
-        NumberColumn('debit', 'بدهکار',
-            formatter: (item) => ((item as Map<String, dynamic>)['debit'])?.toString()),
-        NumberColumn('credit', 'بستانکار',
-            formatter: (item) => ((item as Map<String, dynamic>)['credit'])?.toString()),
-        NumberColumn('quantity', 'تعداد',
-            formatter: (item) => ((item as Map<String, dynamic>)['quantity'])?.toString()),
-        NumberColumn('running_amount', 'مانده مبلغ',
-            formatter: (item) => ((item as Map<String, dynamic>)['running_amount'])?.toString()),
-        NumberColumn('running_quantity', 'مانده تعداد',
-            formatter: (item) => ((item as Map<String, dynamic>)['running_quantity'])?.toString()),
+        DateColumn(
+          'document_date',
+          'تاریخ سند',
+          formatter: (item) => (item as Map<String, dynamic>)['document_date']?.toString(),
+          filterType: ColumnFilterType.dateRange,
+        ),
+        TextColumn(
+          'document_code',
+          'کد سند',
+          formatter: (item) => (item as Map<String, dynamic>)['document_code']?.toString(),
+        ),
+        TextColumn(
+          'document_type',
+          'نوع سند',
+          formatter: (item) => (item as Map<String, dynamic>)['document_type']?.toString(),
+          filterType: ColumnFilterType.multiSelect,
+          filterOptions: const [
+            FilterOption(value: 'invoice_sales', label: 'فاکتور فروش'),
+            FilterOption(value: 'invoice_purchase', label: 'فاکتور خرید'),
+            FilterOption(value: 'invoice_sales_return', label: 'مرجوعی فروش'),
+            FilterOption(value: 'invoice_purchase_return', label: 'مرجوعی خرید'),
+            FilterOption(value: 'inventory_transfer', label: 'انتقال انبار'),
+            FilterOption(value: 'invoice_direct_consumption', label: 'مصرف مستقیم'),
+            FilterOption(value: 'invoice_waste', label: 'ضایعات'),
+            FilterOption(value: 'production', label: 'تولید'),
+            FilterOption(value: 'opening_balance', label: 'تراز افتتاحیه'),
+          ],
+        ),
+        TextColumn(
+          'warehouse_name',
+          'انبار',
+          formatter: (item) {
+            final m = (item as Map<String, dynamic>);
+            return (m['warehouse_name'] ?? m['warehouse_id'])?.toString();
+          },
+        ),
+        TextColumn(
+          'movement',
+          'جهت حرکت',
+          formatter: (item) => (item as Map<String, dynamic>)['movement']?.toString(),
+          filterType: ColumnFilterType.multiSelect,
+          filterOptions: const [
+            FilterOption(value: 'in', label: 'ورودی'),
+            FilterOption(value: 'out', label: 'خروجی'),
+          ],
+        ),
+        TextColumn(
+          'description',
+          'شرح',
+          formatter: (item) => (item as Map<String, dynamic>)['description']?.toString(),
+        ),
+        NumberColumn(
+          'debit',
+          'بدهکار',
+          formatter: (item) => ((item as Map<String, dynamic>)['debit'])?.toString(),
+        ),
+        NumberColumn(
+          'credit',
+          'بستانکار',
+          formatter: (item) => ((item as Map<String, dynamic>)['credit'])?.toString(),
+        ),
+        NumberColumn(
+          'quantity',
+          'تعداد',
+          formatter: (item) => ((item as Map<String, dynamic>)['quantity'])?.toString(),
+        ),
+        // Custom colored running amount
+        CustomColumn(
+          'running_amount',
+          'مانده مبلغ',
+          builder: (item, _) {
+            final m = (item as Map<String, dynamic>);
+            final v = (m['running_amount']);
+            final d = (v is num) ? v.toDouble() : double.tryParse('${v ?? ''}') ?? 0.0;
+            final color = d > 0 ? Colors.green[700] : (d < 0 ? Colors.red[700] : null);
+            return Text(
+              d == d.roundToDouble() ? d.toStringAsFixed(0) : d.toStringAsFixed(2),
+              textDirection: TextDirection.ltr,
+              style: TextStyle(
+                color: color,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
+            );
+          },
+        ),
+        CustomColumn(
+          'running_quantity',
+          'مانده تعداد',
+          builder: (item, _) {
+            final m = (item as Map<String, dynamic>);
+            final v = (m['running_quantity']);
+            final d = (v is num) ? v.toDouble() : double.tryParse('${v ?? ''}') ?? 0.0;
+            final color = d > 0 ? Colors.green[700] : (d < 0 ? Colors.red[700] : null);
+            return Text(
+              d == d.roundToDouble() ? d.toStringAsFixed(0) : d.toStringAsFixed(2),
+              textDirection: TextDirection.ltr,
+              style: TextStyle(
+                color: color,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
+            );
+          },
+        ),
+        // Action column to open document details
+        ActionColumn(
+          'actions',
+          'عملیات',
+          actions: [
+            DataTableAction(
+              icon: Icons.open_in_new,
+              label: 'مشاهده سند',
+              onTap: (item) {
+                final m = item as Map<String, dynamic>;
+                final docId = (m['document_id'] as num?)?.toInt();
+                if (docId == null) return;
+                showDialog(
+                  context: context,
+                  builder: (_) => DocumentDetailsDialog(
+                    documentId: docId,
+                    calendarController: widget.calendarController,
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
       ],
-      searchFields: const [],
+      searchFields: const ['document_code', 'document_type', 'warehouse_name', 'description'],
       defaultPageSize: 20,
       additionalParams: _additionalParams(),
       showExportButtons: true,
       getExportParams: () => _additionalParams(),
+      // Row highlight based on movement
+      rowColorBuilder: (item, index) {
+        try {
+          final m = item as Map<String, dynamic>;
+          final mv = (m['movement'] ?? '').toString().toLowerCase();
+          if (mv == 'in') {
+            return Colors.green.withOpacity(0.06);
+          }
+          if (mv == 'out') {
+            return Colors.red.withOpacity(0.06);
+          }
+        } catch (_) {}
+        return null;
+      },
+      // Footer totals on current page
+      footerTotals: const {
+        'debit': 'جمع بدهکار',
+        'credit': 'جمع بستانکار',
+        'quantity': 'جمع تعداد',
+        'running_amount': 'مانده مبلغ',
+        'running_quantity': 'مانده تعداد',
+      },
     );
   }
 
@@ -824,212 +951,232 @@ class _KardexPageState extends State<KardexPage> {
               },
             ),
           ),
-          _chipsSection(
-            label: 'اشخاص',
-            chips: _selectedPersons.map((p) => _ChipData(id: p.id!, label: p.displayName)).toList(),
-            onRemove: (id) {
-              setState(() => _selectedPersons.removeWhere((p) => p.id == id));
-              _scheduleApply();
-            },
-            picker: _activePicker == FilterType.person ? SizedBox(
-              width: 260,
-              child: PersonComboboxWidget(
-                businessId: widget.businessId,
-                selectedPerson: _personToAdd,
-                onChanged: (person) {
-                  if (person == null) return;
-                  final exists = _selectedPersons.any((p) => p.id == person.id);
-                  setState(() {
-                    if (!exists) _selectedPersons.add(person);
-                    _personToAdd = null;
-                    _activePicker = null;
-                  });
-                  _scheduleApply();
-                },
-                hintText: 'افزودن شخص',
-              ),
-            ) : const SizedBox.shrink(),
-            type: FilterType.person,
-          ),
-          _chipsSection(
-            label: 'کالا/خدمت',
-            chips: _selectedProducts.map((m) {
-              final id = int.tryParse('${m['id']}') ?? 0;
-              final code = (m['code'] ?? '').toString();
-              final name = (m['name'] ?? '').toString();
-              return _ChipData(id: id, label: code.isNotEmpty ? '$code - $name' : name);
-            }).toList(),
-            onRemove: (id) {
-              setState(() => _selectedProducts.removeWhere((m) => int.tryParse('${m['id']}') == id));
-              _scheduleApply();
-            },
-            picker: _activePicker == FilterType.product ? SizedBox(
-              width: 260,
-              child: ProductComboboxWidget(
-                businessId: widget.businessId,
-                selectedProduct: _productToAdd,
-                onChanged: (prod) {
-                  if (prod == null) return;
-                  final pid = int.tryParse('${prod['id']}');
-                  final exists = _selectedProducts.any((m) => int.tryParse('${m['id']}') == pid);
-                  setState(() {
-                    if (!exists) _selectedProducts.add(prod);
-                    _productToAdd = null;
-                    _activePicker = null;
-                  });
-                  _scheduleApply();
-                },
-              ),
-            ) : const SizedBox.shrink(),
-            type: FilterType.product,
-          ),
-          _chipsSection(
-            label: 'بانک',
-            chips: _selectedBankAccounts.map((b) => _ChipData(id: int.tryParse(b.id) ?? 0, label: b.name)).toList(),
-            onRemove: (id) {
-              setState(() => _selectedBankAccounts.removeWhere((b) => int.tryParse(b.id) == id));
-              _scheduleApply();
-            },
-            picker: _activePicker == FilterType.bank ? SizedBox(
-              width: 260,
-              child: BankAccountComboboxWidget(
-                businessId: widget.businessId,
-                selectedAccountId: _bankToAdd?.id,
-                onChanged: (opt) {
-                  if (opt == null) return;
-                  final exists = _selectedBankAccounts.any((b) => b.id == opt.id);
-                  setState(() {
-                    if (!exists) _selectedBankAccounts.add(opt);
-                    _bankToAdd = null;
-                    _activePicker = null;
-                  });
-                  _scheduleApply();
-                },
-                hintText: 'افزودن حساب بانکی',
-              ),
-            ) : const SizedBox.shrink(),
-            type: FilterType.bank,
-          ),
-          _chipsSection(
-            label: 'صندوق',
-            chips: _selectedCashRegisters.map((c) => _ChipData(id: int.tryParse(c.id) ?? 0, label: c.name)).toList(),
-            onRemove: (id) {
-              setState(() => _selectedCashRegisters.removeWhere((c) => int.tryParse(c.id) == id));
-              _scheduleApply();
-            },
-            picker: _activePicker == FilterType.cash ? SizedBox(
-              width: 260,
-              child: CashRegisterComboboxWidget(
-                businessId: widget.businessId,
-                selectedRegisterId: _cashToAdd?.id,
-                onChanged: (opt) {
-                  if (opt == null) return;
-                  final exists = _selectedCashRegisters.any((c) => c.id == opt.id);
-                  setState(() {
-                    if (!exists) _selectedCashRegisters.add(opt);
-                    _cashToAdd = null;
-                    _activePicker = null;
-                  });
-                  _scheduleApply();
-                },
-                hintText: 'افزودن صندوق',
-              ),
-            ) : const SizedBox.shrink(),
-            type: FilterType.cash,
-          ),
-          _chipsSection(
-            label: 'تنخواه',
-            chips: _selectedPettyCash.map((p) => _ChipData(id: int.tryParse(p.id) ?? 0, label: p.name)).toList(),
-            onRemove: (id) {
-              setState(() => _selectedPettyCash.removeWhere((p) => int.tryParse(p.id) == id));
-              _scheduleApply();
-            },
-            picker: _activePicker == FilterType.petty ? SizedBox(
-              width: 260,
-              child: PettyCashComboboxWidget(
-                businessId: widget.businessId,
-                selectedPettyCashId: _pettyToAdd?.id,
-                onChanged: (opt) {
-                  if (opt == null) return;
-                  final exists = _selectedPettyCash.any((p) => p.id == opt.id);
-                  setState(() {
-                    if (!exists) _selectedPettyCash.add(opt);
-                    _pettyToAdd = null;
-                    _activePicker = null;
-                  });
-                  _scheduleApply();
-                },
-                hintText: 'افزودن تنخواه',
-              ),
-            ) : const SizedBox.shrink(),
-            type: FilterType.petty,
-          ),
-          _chipsSection(
-            label: 'حساب دفتری',
-            chips: _selectedAccounts.map((a) => _ChipData(id: a.id!, label: '${a.code} - ${a.name}')).toList(),
-            onRemove: (id) {
-              setState(() => _selectedAccounts.removeWhere((a) => a.id == id));
-              _scheduleApply();
-            },
-            picker: _activePicker == FilterType.account ? SizedBox(
-              width: 260,
-              child: AccountTreeComboboxWidget(
-                businessId: widget.businessId,
-                selectedAccount: _accountToAdd,
-                onChanged: (acc) {
-                  if (acc == null) return;
-                  final exists = _selectedAccounts.any((a) => a.id == acc.id);
-                  setState(() {
-                    if (!exists) _selectedAccounts.add(acc);
-                    _accountToAdd = null;
-                    _activePicker = null;
-                  });
-                  _scheduleApply();
-                },
-                hintText: 'افزودن حساب',
-              ),
-            ) : const SizedBox.shrink(),
-            type: FilterType.account,
-          ),
-          _chipsSection(
-            label: 'چک',
-            chips: _selectedChecks.map((c) => _ChipData(id: int.tryParse(c.id) ?? 0, label: c.number.isNotEmpty ? c.number : 'چک #${c.id}')).toList(),
-            onRemove: (id) {
-              setState(() => _selectedChecks.removeWhere((c) => int.tryParse(c.id) == id));
-              _scheduleApply();
-            },
-            picker: _activePicker == FilterType.check ? SizedBox(
-              width: 260,
-              child: CheckComboboxWidget(
-                businessId: widget.businessId,
-                selectedCheckId: _checkToAdd?.id,
-                onChanged: (opt) {
-                  if (opt == null) return;
-                  final exists = _selectedChecks.any((c) => c.id == opt.id);
-                  setState(() {
-                    if (!exists) _selectedChecks.add(opt);
-                    _checkToAdd = null;
-                    _activePicker = null;
-                  });
-                  _scheduleApply();
-                },
-              ),
-            ) : const SizedBox.shrink(),
-            type: FilterType.check,
-          ),
-          _chipsSection(
-            label: 'انبار',
-            chips: _selectedWarehouses.map((w) {
-              final id = int.tryParse('${w['id']}') ?? 0;
-              final code = (w['code'] ?? '').toString();
-              final name = (w['name'] ?? '').toString();
-              return _ChipData(id: id, label: code.isNotEmpty ? '$code - $name' : name);
-            }).toList(),
-            onRemove: (id) {
-              setState(() => _selectedWarehouses.removeWhere((w) => int.tryParse('${w['id']}') == id));
-              _scheduleApply();
-            },
-            picker: _activePicker == null ? const SizedBox.shrink() : const SizedBox.shrink(),
+          // Unified filter chips bar
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1200),
+            child: Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                // Persons
+                ..._selectedPersons.map((p) => InputChip(
+                      label: Text('شخص: ${p.displayName}'),
+                      onDeleted: () {
+                        setState(() => _selectedPersons.removeWhere((it) => it.id == p.id));
+                        _scheduleApply();
+                      },
+                      onPressed: () => setState(() => _activePicker = FilterType.person),
+                    )),
+                // Products
+                ..._selectedProducts.map((m) {
+                  final id = int.tryParse('${m['id']}') ?? 0;
+                  final code = (m['code'] ?? '').toString();
+                  final name = (m['name'] ?? '').toString();
+                  final label = code.isNotEmpty ? '$code - $name' : name;
+                  return InputChip(
+                    label: Text('کالا: $label'),
+                    onDeleted: () {
+                      setState(() => _selectedProducts.removeWhere((x) => int.tryParse('${x['id']}') == id));
+                      _scheduleApply();
+                    },
+                    onPressed: () => setState(() => _activePicker = FilterType.product),
+                  );
+                }),
+                // Bank accounts
+                ..._selectedBankAccounts.map((b) => InputChip(
+                      label: Text('بانک: ${b.name}'),
+                      onDeleted: () {
+                        setState(() => _selectedBankAccounts.removeWhere((x) => x.id == b.id));
+                        _scheduleApply();
+                      },
+                      onPressed: () => setState(() => _activePicker = FilterType.bank),
+                    )),
+                // Cash registers
+                ..._selectedCashRegisters.map((c) => InputChip(
+                      label: Text('صندوق: ${c.name}'),
+                      onDeleted: () {
+                        setState(() => _selectedCashRegisters.removeWhere((x) => x.id == c.id));
+                        _scheduleApply();
+                      },
+                      onPressed: () => setState(() => _activePicker = FilterType.cash),
+                    )),
+                // Petty cash
+                ..._selectedPettyCash.map((p) => InputChip(
+                      label: Text('تنخواه: ${p.name}'),
+                      onDeleted: () {
+                        setState(() => _selectedPettyCash.removeWhere((x) => x.id == p.id));
+                        _scheduleApply();
+                      },
+                      onPressed: () => setState(() => _activePicker = FilterType.petty),
+                    )),
+                // Accounts
+                ..._selectedAccounts.map((a) => InputChip(
+                      label: Text('حساب: ${a.code} - ${a.name}'),
+                      onDeleted: () {
+                        setState(() => _selectedAccounts.removeWhere((x) => x.id == a.id));
+                        _scheduleApply();
+                      },
+                      onPressed: () => setState(() => _activePicker = FilterType.account),
+                    )),
+                // Checks
+                ..._selectedChecks.map((c) => InputChip(
+                      label: Text('چک: ${c.number.isNotEmpty ? c.number : 'چک #${c.id}'}'),
+                      onDeleted: () {
+                        setState(() => _selectedChecks.removeWhere((x) => x.id == c.id));
+                        _scheduleApply();
+                      },
+                      onPressed: () => setState(() => _activePicker = FilterType.check),
+                    )),
+                // Warehouses (no picker yet)
+                ..._selectedWarehouses.map((w) {
+                  final id = int.tryParse('${w['id']}') ?? 0;
+                  final code = (w['code'] ?? '').toString();
+                  final name = (w['name'] ?? '').toString();
+                  final label = code.isNotEmpty ? '$code - $name' : name;
+                  return InputChip(
+                    label: Text('انبار: $label'),
+                    onDeleted: () {
+                      setState(() => _selectedWarehouses.removeWhere((x) => int.tryParse('${x['id']}') == id));
+                      _scheduleApply();
+                    },
+                  );
+                }),
+                // Active picker inline
+                if (_activePicker == FilterType.person)
+                  SizedBox(
+                    width: 260,
+                    child: PersonComboboxWidget(
+                      businessId: widget.businessId,
+                      selectedPerson: _personToAdd,
+                      onChanged: (person) {
+                        if (person == null) return;
+                        final exists = _selectedPersons.any((p) => p.id == person.id);
+                        setState(() {
+                          if (!exists) _selectedPersons.add(person);
+                          _personToAdd = null;
+                          _activePicker = null;
+                        });
+                        _scheduleApply();
+                      },
+                      hintText: 'افزودن شخص',
+                    ),
+                  ),
+                if (_activePicker == FilterType.product)
+                  SizedBox(
+                    width: 260,
+                    child: ProductComboboxWidget(
+                      businessId: widget.businessId,
+                      selectedProduct: _productToAdd,
+                      onChanged: (prod) {
+                        if (prod == null) return;
+                        final pid = int.tryParse('${prod['id']}');
+                        final exists = _selectedProducts.any((m) => int.tryParse('${m['id']}') == pid);
+                        setState(() {
+                          if (!exists) _selectedProducts.add(prod);
+                          _productToAdd = null;
+                          _activePicker = null;
+                        });
+                        _scheduleApply();
+                      },
+                    ),
+                  ),
+                if (_activePicker == FilterType.bank)
+                  SizedBox(
+                    width: 260,
+                    child: BankAccountComboboxWidget(
+                      businessId: widget.businessId,
+                      selectedAccountId: _bankToAdd?.id,
+                      onChanged: (opt) {
+                        if (opt == null) return;
+                        final exists = _selectedBankAccounts.any((b) => b.id == opt.id);
+                        setState(() {
+                          if (!exists) _selectedBankAccounts.add(opt);
+                          _bankToAdd = null;
+                          _activePicker = null;
+                        });
+                        _scheduleApply();
+                      },
+                      hintText: 'افزودن حساب بانکی',
+                    ),
+                  ),
+                if (_activePicker == FilterType.cash)
+                  SizedBox(
+                    width: 260,
+                    child: CashRegisterComboboxWidget(
+                      businessId: widget.businessId,
+                      selectedRegisterId: _cashToAdd?.id,
+                      onChanged: (opt) {
+                        if (opt == null) return;
+                        final exists = _selectedCashRegisters.any((c) => c.id == opt.id);
+                        setState(() {
+                          if (!exists) _selectedCashRegisters.add(opt);
+                          _cashToAdd = null;
+                          _activePicker = null;
+                        });
+                        _scheduleApply();
+                      },
+                      hintText: 'افزودن صندوق',
+                    ),
+                  ),
+                if (_activePicker == FilterType.petty)
+                  SizedBox(
+                    width: 260,
+                    child: PettyCashComboboxWidget(
+                      businessId: widget.businessId,
+                      selectedPettyCashId: _pettyToAdd?.id,
+                      onChanged: (opt) {
+                        if (opt == null) return;
+                        final exists = _selectedPettyCash.any((p) => p.id == opt.id);
+                        setState(() {
+                          if (!exists) _selectedPettyCash.add(opt);
+                          _pettyToAdd = null;
+                          _activePicker = null;
+                        });
+                        _scheduleApply();
+                      },
+                      hintText: 'افزودن تنخواه',
+                    ),
+                  ),
+                if (_activePicker == FilterType.account)
+                  SizedBox(
+                    width: 260,
+                    child: AccountTreeComboboxWidget(
+                      businessId: widget.businessId,
+                      selectedAccount: _accountToAdd,
+                      onChanged: (acc) {
+                        if (acc == null) return;
+                        final exists = _selectedAccounts.any((a) => a.id == acc.id);
+                        setState(() {
+                          if (!exists) _selectedAccounts.add(acc);
+                          _accountToAdd = null;
+                          _activePicker = null;
+                        });
+                        _scheduleApply();
+                      },
+                      hintText: 'افزودن حساب',
+                    ),
+                  ),
+                if (_activePicker == FilterType.check)
+                  SizedBox(
+                    width: 260,
+                    child: CheckComboboxWidget(
+                      businessId: widget.businessId,
+                      selectedCheckId: _checkToAdd?.id,
+                      onChanged: (opt) {
+                        if (opt == null) return;
+                        final exists = _selectedChecks.any((c) => c.id == opt.id);
+                        setState(() {
+                          if (!exists) _selectedChecks.add(opt);
+                          _checkToAdd = null;
+                          _activePicker = null;
+                        });
+                        _scheduleApply();
+                      },
+                    ),
+                  ),
+              ],
+            ),
           ),
           DropdownButton<String>(
             value: _matchMode,
@@ -1107,82 +1254,4 @@ class _KardexPageState extends State<KardexPage> {
     );
   }
 
-  // Chips helpers
-  Widget _chipsSection({
-    required String label,
-    required List<_ChipData> chips,
-    required void Function(int id) onRemove,
-    required Widget picker,
-    FilterType? type,
-  }) {
-    return ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 900),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 90,
-            child: Padding(
-              padding: const EdgeInsets.only(top: 10),
-              child: Text(label, textAlign: TextAlign.right),
-            ),
-          ),
-          Expanded(
-            child: Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: [
-                _chips(items: chips, onRemove: onRemove, type: type),
-                picker,
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _chips({
-    required List<_ChipData> items,
-    required void Function(int id) onRemove,
-    FilterType? type,
-  }) {
-    if (items.isEmpty) return const SizedBox.shrink();
-    const int maxToShow = 5;
-    final List<_ChipData> visible = (items.length > maxToShow)
-        ? items.sublist(0, maxToShow - 1)
-        : items;
-    final int remaining = items.length - visible.length;
-    return Wrap(
-      spacing: 6,
-      runSpacing: 6,
-      children: [
-        ...visible.map((it) => InputChip(
-              label: Text(it.label),
-              onDeleted: () => onRemove(it.id),
-              onPressed: () {
-                if (type != null) setState(() => _activePicker = type);
-              },
-            )),
-        if (remaining > 0)
-          InputChip(
-            label: Text('+$remaining مورد دیگر'),
-            onPressed: () {
-              if (type != null) setState(() => _activePicker = type);
-            },
-          ),
-      ],
-    );
-  }
-
 }
-
-class _ChipData {
-  final int id;
-  final String label;
-  _ChipData({required this.id, required this.label});
-}
-
-// _DateBox حذف شد و با DateInputField جایگزین شد
-
-

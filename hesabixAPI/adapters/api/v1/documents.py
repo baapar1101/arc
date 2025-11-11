@@ -21,6 +21,7 @@ from app.services.document_service import (
     create_manual_document,
     update_manual_document,
 )
+from app.services.pdf.template_renderer import render_template
 from adapters.api.v1.schema_models.document import (
     CreateManualDocumentRequest,
     UpdateManualDocumentRequest,
@@ -220,45 +221,36 @@ async def export_documents_pdf_endpoint(
         )
     except Exception:
         resolved_html = None
-    # HTML پیش‌فرض
-    default_html = f"""
-    <!DOCTYPE html>
-    <html dir='{"rtl" if is_fa else "ltr"}'>
-      <head>
-        <meta charset="utf-8" />
-        <style>
-          @page {{ margin: 1cm; size: A4; }}
-          body {{ font-family: {'Tahoma, Arial' if is_fa else 'Arial, sans-serif'}; font-size: 12px; color: #222; }}
-          table {{ width: 100%; border-collapse: collapse; margin-top: 12px; }}
-          th, td {{ border: 1px solid #ccc; padding: 6px; text-align: {"right" if is_fa else "left"}; }}
-          thead {{ background: #f6f6f6; }}
-          .meta {{ font-size: 11px; color: #666; }}
-        </style>
-      </head>
-      <body>
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;border-bottom:2px solid #366092;padding-bottom:8px">
-          <div>
-            <div style="font-size:18px;font-weight:bold;color:#366092">{title_text}</div>
-            <div class="meta">{label_biz}: {escape(business_name)}</div>
-          </div>
-          <div class="meta">{label_date}: {escape(now)}</div>
-        </div>
-        <table>
-          <thead><tr>{headers_html}</tr></thead>
-          <tbody>{''.join(rows_html)}</tbody>
-        </table>
-        <div class="meta" style="margin-top:8px;text-align:{'left' if is_fa else 'right'}">{footer_text}</div>
-      </body>
-    </html>
-    """
-    html_content = resolved_html or default_html
+    # HTML پیش‌فرض با قالب فایل + پارامترها
+    disposition = "attachment"
+    try:
+        disposition = str(body.get("disposition") or "attachment")
+    except Exception:
+        disposition = "attachment"
+    paper_size = None
+    orientation = None
+    try:
+        paper_size = body.get("paper_size")
+        orientation = body.get("orientation")
+    except Exception:
+        pass
+    html_content = resolved_html or render_template(
+        "pdf/documents/list.html",
+        {
+            **template_context,
+            "title_text": title_text,
+            "paper_size": paper_size,
+            "orientation": orientation,
+            "footer_text": footer_text,
+        },
+    )
     pdf_bytes = HTML(string=html_content).write_pdf(font_config=FontConfiguration())
     filename = f"documents_{business_id}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
         headers={
-            "Content-Disposition": f"attachment; filename={filename}",
+            "Content-Disposition": f"{disposition}; filename={filename}",
             "Content-Length": str(len(pdf_bytes)),
             "Access-Control-Expose-Headers": "Content-Disposition",
         },
@@ -523,47 +515,26 @@ async def get_document_pdf_endpoint(
     except Exception:
         resolved_html = None
 
-    # پیش‌فرض
-    default_html = f"""
-    <!DOCTYPE html>
-    <html dir='{"rtl" if is_fa else "ltr"}'>
-      <head>
-        <meta charset="utf-8" />
-        <style>
-          body {{ font-family: Tahoma, Arial, sans-serif; font-size: 12px; color: #222; }}
-          h1 {{ font-size: 18px; margin: 0 0 12px; }}
-          table {{ width: 100%; border-collapse: collapse; margin-top: 12px; }}
-          th, td {{ border: 1px solid #ccc; padding: 6px; text-align: {"right" if is_fa else "left"}; }}
-          th {{ background: #f6f6f6; }}
-          .meta .label {{ color: #666; }}
-        </style>
-      </head>
-      <body>
-        <h1>{escape(doc.get("document_type_name") or ("سند" if is_fa else "Document"))}</h1>
-        <div class="meta">
-          <div><span class="label">{'کسب‌وکار' if is_fa else 'Business'}:</span> {escape(business_name or "-")}</div>
-          <div><span class="label">{'کد' if is_fa else 'Code'}:</span> {escape(doc.get("code") or "-")}</div>
-          <div><span class="label">{'تاریخ' if is_fa else 'Date'}:</span> {escape(doc.get("document_date") or "-")}</div>
-        </div>
-        <table>
-          <thead>
-            <tr>
-              <th>{'شرح' if is_fa else 'Description'}</th>
-              <th>{'بدهکار' if is_fa else 'Debit'}</th>
-              <th>{'بستانکار' if is_fa else 'Credit'}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {''.join([
-              f"<tr><td>{escape(str(line.get('description') or '-'))}</td><td>{escape(str(line.get('debit') or ''))}</td><td>{escape(str(line.get('credit') or ''))}</td></tr>"
-              for line in (doc.get('lines') or [])
-            ])}
-          </tbody>
-        </table>
-      </body>
-    </html>
-    """
-    html_content = resolved_html or default_html
+    # پیش‌فرض: قالب فایل + پارامترها
+    try:
+        qp = request.query_params
+        paper_size = qp.get("paper_size")
+        orientation = qp.get("orientation")
+        disposition = qp.get("disposition") or "attachment"
+    except Exception:
+        paper_size = None
+        orientation = None
+        disposition = "attachment"
+    html_content = resolved_html or render_template(
+        "pdf/documents/detail.html",
+        {
+            **template_context,
+            "title_text": doc.get("document_type_name") or ("سند" if is_fa else "Document"),
+            "paper_size": paper_size,
+            "orientation": orientation,
+            "footer_text": "",
+        },
+    )
 
     pdf_bytes = HTML(string=html_content).write_pdf(font_config=FontConfiguration())
 
@@ -575,7 +546,7 @@ async def get_document_pdf_endpoint(
         content=pdf_bytes,
         media_type="application/pdf",
         headers={
-            "Content-Disposition": f"attachment; filename={filename}",
+            "Content-Disposition": f"{disposition}; filename={filename}",
             "Content-Length": str(len(pdf_bytes)),
             "Access-Control-Expose-Headers": "Content-Disposition",
         },

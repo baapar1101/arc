@@ -803,6 +803,9 @@
   "dataBackupDescription": "ایجاد نسخه پشتیبان از اطلاعات",
   "dataRestore": "بازیابی اطلاعات",
   "dataRestoreDescription": "بازیابی اطلاعات از نسخه پشتیبان",
+  "restoreModeNewBusiness": "ایجاد کسب‌وکار جدید",
+  "restoreModeReplace": "جایگزینی کامل",
+  "selectBackupFile": "انتخاب فایل بکاپ (.hbx)",
   "systemLogs": "گزارش‌های سیستم",
   "systemLogsDescription": "مشاهده گزارش‌ها و لاگ‌های سیستم",
   "close": "بستن",
@@ -1112,6 +1115,85 @@
   "accountTypePerson": "شخص",
   "accountTypeProduct": "کالا",
   "accountTypeService": "خدمات",
-  "accountTypeAccountingDocument": "سند حسابداری"
+  "accountTypeAccountingDocument": "سند حسابداری",
+  "notificationsSettingsTitle": "تنظیمات اعلان و نوتیفیکیشن",
+  "notificationsSettingsSubtitle": "کانال‌های ارسال را فعال کنید، پیام تست بفرستید و اطلاعات اتصال سرویس‌ها را مدیریت کنید.",
+  "notificationsOverviewTitle": "اطمینان از رسیدن پیام‌ها به تیم",
+  "notificationsOverviewDescription": "مشخص کنید هشدارهای عملیاتی از چه مسیرهایی ارسال شوند و مدیر سیستم بداند سازوکار ارسال چیست.",
+  "notificationsGuidanceItemChannels": "کانال‌ها را بر اساس دسترس‌پذیری و الزامات هر واحد فعال یا غیرفعال کنید.",
+  "notificationsGuidanceItemTemplates": "برای هر کانال و هر زبان، قالب فعال منتشر شده داشته باشید.",
+  "notificationsGuidanceItemTesting": "بعد از تغییرات، با دکمه‌های تست مسیر ارسال را بررسی کنید.",
+  "notificationsLearnMore": "مطالعهٔ راهنما",
+  "notificationsDocumentationUrl": "https://docs.hesabix.com/notifications",
+  "notificationsChannelsSectionTitle": "کانال‌های ارسال",
+  "notificationsChannelsSectionSubtitle": "هر کانالی که فعال باشد برای اعلان‌های سیستمی و هشدارهای عملیاتی استفاده می‌شود.",
+  "notificationsChannelTelegram": "تلگرام",
+  "notificationsChannelTelegramDescription": "ارسال پیام از طریق ربات تلگرام متصل برای اپراتورها.",
+  "notificationsChannelEmail": "ایمیل",
+  "notificationsChannelEmailDescription": "ارسال رایانامه با استفاده از سرور ایمیلی که در تنظیمات سیستم تعریف شده است.",
+  "notificationsChannelSms": "پیامک",
+  "notificationsChannelSmsDescription": "ارسال پیامک از طریق سرویس‌دهندهٔ پیکربندی‌شده برای رویدادهای حساس.",
+  "notificationsChannelInApp": "داخل برنامه",
+  "notificationsChannelInAppDescription": "نمایش اعلان داخل وب و موبایل حسابیکس در لحظه.",
+  "notificationsSaveSuccess": "تنظیمات اعلان ذخیره شد.",
+  "notificationsSaveError": "ذخیرهٔ تنظیمات اعلان ممکن نشد.",
+  "notificationsTestSectionTitle": "ارسال پیام تست",
+  "notificationsTestSectionSubtitle": "بعد از هر تغییر می‌توانید از طریق کانال انتخابی پیام آزمایشی بفرستید.",
+  "notificationsTestButton": "تست {channel}",
+  "notificationsTestSuccess": "پیام تست از کانال {channel} ارسال شد.",
+  "notificationsTestError": "ارسال پیام تست از کانال {channel} با خطا روبه‌رو شد.",
+  "notificationsWebsocketInfoTitle": "اعلان‌های درون‌برنامه‌ای لحظه‌ای",
+  "notificationsWebsocketInfoDescription": "کاربرها با کلید API معتبر به مسیر وب‌سوکت {endpoint} متصل می‌شوند. نسخهٔ وب و موبایل این اتصال را به صورت خودکار برقرار می‌کنند.",
+  "notificationsAdvancedSectionTitle": "پیکربندی پیشرفته (ادمین)",
+  "notificationsAdvancedSectionSubtitle": "اعتبارسنجی کانال‌های تلگرام و پیامک را اینجا مدیریت کنید. دسترسی system_settings لازم است.",
+  "notificationsAdvancedTelegramHeader": "راه‌اندازی ربات تلگرام",
+  "notificationsFieldTelegramToken": "توکن ربات",
+  "notificationsFieldTelegramUsername": "نام کاربری ربات",
+  "notificationsFieldTelegramWebhookSecret": "رمز وب‌هوک",
+  "notificationsFieldTelegramSecretHeader": "نام هدر محرمانه",
+  "notificationsFieldTelegramTokenHint": "از BotFather دریافت می‌شود (فرمت: 123456789:ABC...).",
+  "notificationsFieldTelegramWebhookSecretHint": "اختیاری؛ برای تطبیق درخواست‌های ورودی استفاده می‌شود.",
+  "notificationsAdvancedSmsHeader": "درگاه پیامک",
+  "notificationsFieldSmsProvider": "نام سرویس‌دهنده",
+  "notificationsFieldSmsApiKey": "کلید API",
+  "notificationsFieldSmsApiKeyHint": "از سرویس‌دهنده دریافت می‌شود؛ بهتر است دوره‌ای تعویض شود.",
+  "notificationsFieldSmsSender": "فرستنده/شماره",
+  "notificationsFieldSmsSenderHint": "دقیقاً همان مقداری که در پنل سرویس‌دهنده ثبت شده است.",
+  "notificationsAdvancedRestartHint": "پس از تغییر، در صورت نیاز سرویس ارسال اعلان را در زمان کم‌ترافیک ریستارت کنید.",
+  "notificationsAdvancedSave": "ذخیرهٔ تنظیمات پیشرفته",
+  "notificationsAdvancedSaveSuccess": "تنظیمات پیشرفتهٔ اعلان ذخیره شد.",
+  "notificationsAdvancedSaveError": "ذخیرهٔ تنظیمات پیشرفتهٔ اعلان انجام نشد.",
+  "@notificationsTestButton": {
+    "placeholders": {
+      "channel": {
+        "type": "String",
+        "description": "عنوان محلی‌سازی‌شدهٔ کانال."
+      }
+    }
+  },
+  "@notificationsTestSuccess": {
+    "placeholders": {
+      "channel": {
+        "type": "String",
+        "description": "عنوان محلی‌سازی‌شدهٔ کانال."
+      }
+    }
+  },
+  "@notificationsTestError": {
+    "placeholders": {
+      "channel": {
+        "type": "String",
+        "description": "عنوان محلی‌سازی‌شدهٔ کانال."
+      }
+    }
+  },
+  "@notificationsWebsocketInfoDescription": {
+    "placeholders": {
+      "endpoint": {
+        "type": "String",
+        "description": "آدرس وب‌سوکت."
+      }
+    }
+  }
 }
 

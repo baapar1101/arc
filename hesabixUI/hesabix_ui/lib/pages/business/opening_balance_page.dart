@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/core/auth_store.dart';
 import 'package:hesabix_ui/core/permission_guard.dart';
@@ -14,6 +15,7 @@ import 'package:hesabix_ui/widgets/invoice/account_combobox_widget.dart';
 import 'package:hesabix_ui/models/account_model.dart';
 import 'package:hesabix_ui/services/account_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:hesabix_ui/utils/number_normalizer.dart';
 
 class OpeningBalancePage extends StatefulWidget {
   final int businessId;
@@ -327,6 +329,10 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
                 subtitle: TextField(
                   decoration: const InputDecoration(isDense: true, labelText: 'مبلغ'),
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  inputFormatters: [
+                    EnglishDigitsFormatter(),
+                    FilteringTextInputFormatter.allow(RegExp(r'[-0-9.,]')),
+                  ],
                   onChanged: (v) {
                     m['amount'] = double.tryParse(v.replaceAll(',', '')) ?? 0.0;
                     setState(() {});
@@ -369,9 +375,35 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
                 title: Text('شخص #${m['personId']}'),
                 subtitle: Row(
                   children: [
-                    Expanded(child: TextField(decoration: const InputDecoration(isDense: true, labelText: 'بدهکار'), keyboardType: const TextInputType.numberWithOptions(decimal: true), onChanged: (v) { m['debit'] = double.tryParse(v) ?? 0.0; setState(() {}); })),
+                    Expanded(
+                      child: TextField(
+                        decoration: const InputDecoration(isDense: true, labelText: 'بدهکار'),
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        inputFormatters: [
+                          EnglishDigitsFormatter(),
+                          FilteringTextInputFormatter.allow(RegExp(r'[-0-9.,]')),
+                        ],
+                        onChanged: (v) {
+                          m['debit'] = double.tryParse(v) ?? 0.0;
+                          setState(() {});
+                        },
+                      ),
+                    ),
                     const SizedBox(width: 8),
-                    Expanded(child: TextField(decoration: const InputDecoration(isDense: true, labelText: 'بستانکار'), keyboardType: const TextInputType.numberWithOptions(decimal: true), onChanged: (v) { m['credit'] = double.tryParse(v) ?? 0.0; setState(() {}); })),
+                    Expanded(
+                      child: TextField(
+                        decoration: const InputDecoration(isDense: true, labelText: 'بستانکار'),
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        inputFormatters: [
+                          EnglishDigitsFormatter(),
+                          FilteringTextInputFormatter.allow(RegExp(r'[-0-9.,]')),
+                        ],
+                        onChanged: (v) {
+                          m['credit'] = double.tryParse(v) ?? 0.0;
+                          setState(() {});
+                        },
+                      ),
+                    ),
                   ],
                 ),
                 trailing: IconButton(icon: const Icon(Icons.delete_outline), onPressed: () { _personLines.removeAt(index); setState(() {}); }),
@@ -429,11 +461,46 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
                 title: Text('${m['product']?['code'] ?? ''} - ${m['product']?['name'] ?? ''}'),
                 subtitle: Row(
                   children: [
-                    Expanded(child: WarehouseComboboxWidget(businessId: widget.businessId, selectedWarehouseId: m['warehouseId'] as int?, onChanged: (wid) { m['warehouseId'] = wid; setState(() {}); })),
+                    Expanded(
+                      child: WarehouseComboboxWidget(
+                        businessId: widget.businessId,
+                        selectedWarehouseId: m['warehouseId'] as int?,
+                        onChanged: (wid) {
+                          m['warehouseId'] = wid;
+                          setState(() {});
+                        },
+                      ),
+                    ),
                     const SizedBox(width: 8),
-                    Expanded(child: TextField(decoration: const InputDecoration(isDense: true, labelText: 'تعداد'), keyboardType: const TextInputType.numberWithOptions(decimal: true), onChanged: (v) { m['quantity'] = double.tryParse(v) ?? 0.0; setState(() {}); })),
+                    Expanded(
+                      child: TextField(
+                        decoration: const InputDecoration(isDense: true, labelText: 'تعداد'),
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        inputFormatters: [
+                          EnglishDigitsFormatter(),
+                          FilteringTextInputFormatter.allow(RegExp(r'[-0-9.,]')),
+                        ],
+                        onChanged: (v) {
+                          m['quantity'] = double.tryParse(v) ?? 0.0;
+                          setState(() {});
+                        },
+                      ),
+                    ),
                     const SizedBox(width: 8),
-                    Expanded(child: TextField(decoration: const InputDecoration(isDense: true, labelText: 'بهای واحد'), keyboardType: const TextInputType.numberWithOptions(decimal: true), onChanged: (v) { m['cost_price'] = double.tryParse(v) ?? 0.0; setState(() {}); })),
+                    Expanded(
+                      child: TextField(
+                        decoration: const InputDecoration(isDense: true, labelText: 'بهای واحد'),
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        inputFormatters: [
+                          EnglishDigitsFormatter(),
+                          FilteringTextInputFormatter.allow(RegExp(r'[-0-9.,]')),
+                        ],
+                        onChanged: (v) {
+                          m['cost_price'] = double.tryParse(v) ?? 0.0;
+                          setState(() {});
+                        },
+                      ),
+                    ),
                   ],
                 ),
                 trailing: IconButton(icon: const Icon(Icons.delete_outline), onPressed: () { _inventoryLines.removeAt(index); setState(() {}); }),
@@ -491,9 +558,35 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
                 title: Text(m['account'] != null ? (m['account'] as Account).displayName : 'حساب'),
                 subtitle: Row(
                   children: [
-                    Expanded(child: TextField(decoration: const InputDecoration(isDense: true, labelText: 'بدهکار'), keyboardType: const TextInputType.numberWithOptions(decimal: true), onChanged: (v) { m['debit'] = double.tryParse(v) ?? 0.0; setState(() {}); })),
+                    Expanded(
+                      child: TextField(
+                        decoration: const InputDecoration(isDense: true, labelText: 'بدهکار'),
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        inputFormatters: [
+                          EnglishDigitsFormatter(),
+                          FilteringTextInputFormatter.allow(RegExp(r'[-0-9.,]')),
+                        ],
+                        onChanged: (v) {
+                          m['debit'] = double.tryParse(v) ?? 0.0;
+                          setState(() {});
+                        },
+                      ),
+                    ),
                     const SizedBox(width: 8),
-                    Expanded(child: TextField(decoration: const InputDecoration(isDense: true, labelText: 'بستانکار'), keyboardType: const TextInputType.numberWithOptions(decimal: true), onChanged: (v) { m['credit'] = double.tryParse(v) ?? 0.0; setState(() {}); })),
+                    Expanded(
+                      child: TextField(
+                        decoration: const InputDecoration(isDense: true, labelText: 'بستانکار'),
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        inputFormatters: [
+                          EnglishDigitsFormatter(),
+                          FilteringTextInputFormatter.allow(RegExp(r'[-0-9.,]')),
+                        ],
+                        onChanged: (v) {
+                          m['credit'] = double.tryParse(v) ?? 0.0;
+                          setState(() {});
+                        },
+                      ),
+                    ),
                   ],
                 ),
                 trailing: IconButton(icon: const Icon(Icons.delete_outline), onPressed: () { _otherAccountLines.removeAt(index); setState(() {}); }),

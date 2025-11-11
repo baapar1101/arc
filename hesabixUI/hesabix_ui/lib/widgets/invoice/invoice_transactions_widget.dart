@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:uuid/uuid.dart';
 import '../../models/invoice_transaction.dart';
 import '../../models/person_model.dart';
@@ -18,6 +19,7 @@ import 'petty_cash_combobox_widget.dart';
 import 'account_tree_combobox_widget.dart';
 import 'check_combobox_widget.dart';
 import '../../models/invoice_type_model.dart';
+import '../../utils/number_normalizer.dart';
 
 class InvoiceTransactionsWidget extends StatefulWidget {
   final List<InvoiceTransaction> transactions;
@@ -631,6 +633,10 @@ class _TransactionDialogState extends State<TransactionDialog> {
                                 suffixText: 'ریال',
                               ),
                               keyboardType: TextInputType.number,
+                              inputFormatters: [
+                                EnglishDigitsFormatter(),
+                                FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+                              ],
                               validator: (value) {
                                 if (value == null || value.isEmpty) {
                                   return 'مبلغ الزامی است';
@@ -652,6 +658,10 @@ class _TransactionDialogState extends State<TransactionDialog> {
                                 suffixText: 'ریال',
                               ),
                               keyboardType: TextInputType.number,
+                              inputFormatters: [
+                                EnglishDigitsFormatter(),
+                                FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+                              ],
                             ),
                           ),
                         ],

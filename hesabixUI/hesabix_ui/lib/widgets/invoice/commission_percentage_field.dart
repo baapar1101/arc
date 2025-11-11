@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../utils/number_normalizer.dart';
+
 class CommissionPercentageField extends StatefulWidget {
   final double? initialValue;
   final Function(double?) onChanged;
@@ -75,6 +77,7 @@ class _CommissionPercentageFieldState extends State<CommissionPercentageField> {
       controller: _controller,
       keyboardType: const TextInputType.numberWithOptions(decimal: true),
       inputFormatters: [
+        const EnglishDigitsFormatter(),
         FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
       ],
       decoration: InputDecoration(

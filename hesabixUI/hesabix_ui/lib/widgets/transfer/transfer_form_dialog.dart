@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../core/calendar_controller.dart';
 import '../date_input_field.dart';
 import '../invoice/bank_account_combobox_widget.dart';
@@ -8,6 +9,7 @@ import '../../core/auth_store.dart';
 import '../../core/api_client.dart';
 import '../../services/transfer_service.dart';
 import '../../widgets/banking/currency_picker_widget.dart';
+import '../../utils/number_normalizer.dart';
 
 class TransferFormDialog extends StatefulWidget {
   final int businessId;
@@ -409,6 +411,7 @@ class _TransferFormDialogState extends State<TransferFormDialog> {
     TextInputType? keyboardType,
     int maxLines = 1,
     String? Function(String?)? validator,
+    List<TextInputFormatter>? inputFormatters,
   }) {
     return Container(
       decoration: BoxDecoration(
@@ -433,6 +436,7 @@ class _TransferFormDialogState extends State<TransferFormDialog> {
           keyboardType: keyboardType,
           maxLines: maxLines,
           validator: validator,
+          inputFormatters: inputFormatters,
           decoration: InputDecoration(
             labelText: labelText,
             labelStyle: TextStyle(
@@ -728,6 +732,10 @@ class _TransferFormDialogState extends State<TransferFormDialog> {
                                       icon: Icons.attach_money,
                                       suffixText: 'ریال',
                                       keyboardType: TextInputType.number,
+                                  inputFormatters: [
+                                    EnglishDigitsFormatter(),
+                                    FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+                                  ],
                                       validator: (value) {
                                         if (value == null || value.isEmpty) {
                                           return 'لطفاً مبلغ را وارد کنید';
@@ -751,6 +759,10 @@ class _TransferFormDialogState extends State<TransferFormDialog> {
                                       suffixText: 'ریال',
                                       helperText: 'اختیاری',
                                       keyboardType: TextInputType.number,
+                                  inputFormatters: [
+                                    EnglishDigitsFormatter(),
+                                    FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+                                  ],
                                       validator: (value) {
                                         if (value != null && value.isNotEmpty) {
                                           if (double.tryParse(value) == null) {
@@ -857,6 +869,10 @@ class _TransferFormDialogState extends State<TransferFormDialog> {
                                 icon: Icons.attach_money,
                                 suffixText: 'ریال',
                                 keyboardType: TextInputType.number,
+                                inputFormatters: [
+                                  EnglishDigitsFormatter(),
+                                  FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+                                ],
                                 validator: (value) {
                                   if (value == null || value.isEmpty) {
                                     return 'لطفاً مبلغ را وارد کنید';
@@ -881,6 +897,10 @@ class _TransferFormDialogState extends State<TransferFormDialog> {
                                 suffixText: 'ریال',
                                 helperText: 'اختیاری',
                                 keyboardType: TextInputType.number,
+                                inputFormatters: [
+                                  EnglishDigitsFormatter(),
+                                  FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+                                ],
                                 validator: (value) {
                                   if (value != null && value.isNotEmpty) {
                                     if (double.tryParse(value) == null) {

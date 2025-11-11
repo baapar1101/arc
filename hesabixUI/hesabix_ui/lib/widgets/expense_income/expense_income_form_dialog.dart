@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/core/api_client.dart';
@@ -12,6 +13,7 @@ import 'package:hesabix_ui/widgets/banking/currency_picker_widget.dart';
 import 'package:hesabix_ui/widgets/invoice/person_combobox_widget.dart';
 import 'package:hesabix_ui/widgets/invoice/account_combobox_widget.dart';
 import 'package:hesabix_ui/utils/number_formatters.dart' show formatWithThousands;
+import 'package:hesabix_ui/utils/number_normalizer.dart';
 
 /// دیالوگ ایجاد/ویرایش سند هزینه/درآمد
 class ExpenseIncomeFormDialog extends StatefulWidget {
@@ -548,6 +550,10 @@ class _ItemLineTileState extends State<_ItemLineTile> {
                       hintText: '1,000,000',
                     ),
                     keyboardType: TextInputType.number,
+                    inputFormatters: [
+                      EnglishDigitsFormatter(),
+                      FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+                    ],
                     validator: (v) {
                       final val = double.tryParse((v ?? '').replaceAll(',', ''));
                       if (val == null || val <= 0) return t.mustBePositiveNumber;
@@ -729,6 +735,10 @@ class _CounterpartyLineTileState extends State<_CounterpartyLineTile> {
                       labelText: t.amount,
                     ),
                     keyboardType: TextInputType.number,
+                    inputFormatters: [
+                      EnglishDigitsFormatter(),
+                      FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+                    ],
                     onChanged: (v) {
                       final val = double.tryParse(v.replaceAll(',', '')) ?? 0;
                       widget.onChanged(widget.line.copyWith(amount: val));

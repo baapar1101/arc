@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
 import '../config/app_config.dart';
+import '../utils/number_normalizer.dart';
 import 'auth_store.dart';
 import 'calendar_controller.dart';
 
@@ -119,6 +120,12 @@ class ApiClient {
           } catch (_) {
             // ignore header injection failures
           }
+          if (options.data != null) {
+            options.data = _normalizeRequestData(options.data);
+          }
+          if (options.queryParameters.isNotEmpty) {
+            options.queryParameters = normalizeQueryParameters(options.queryParameters);
+          }
           if (kDebugMode) {
             // ignore: avoid_print
             print('[API][REQ] ${options.method} ${options.uri}');
@@ -195,9 +202,10 @@ class ApiClient {
   }
 
   // Download PDF API
-  Future<List<int>> downloadPdf(String path) async {
+  Future<List<int>> downloadPdf(String path, {Map<String, dynamic>? query}) async {
     final response = await get<List<int>>(
       path,
+      query: query,
       responseType: ResponseType.bytes,
       options: Options(
         headers: {
@@ -238,5 +246,27 @@ String _resolveApiPath(String path) {
   }
   // Auto-prefix with api version
   return '/api/v1$p'.replaceAll(RegExp(r'//+'), '/');
+}
+
+dynamic _normalizeRequestData(dynamic data) {
+  if (data is FormData) {
+    _normalizeFormDataFields(data);
+    return data;
+  }
+  if (data is Map || data is List || data is String) {
+    return normalizeDynamic(data);
+  }
+  return data;
+}
+
+void _normalizeFormDataFields(FormData formData) {
+  final fields = formData.fields;
+  for (var i = 0; i < fields.length; i++) {
+    final entry = fields[i];
+    final normalized = toEnglishDigits(entry.value);
+    if (normalized != entry.value) {
+      fields[i] = MapEntry(entry.key, normalized);
+    }
+  }
 }
 

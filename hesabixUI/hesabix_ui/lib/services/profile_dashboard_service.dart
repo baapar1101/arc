@@ -3,6 +3,7 @@ import '../core/api_client.dart';
 import '../models/business_dashboard_models.dart';
 import 'business_dashboard_service.dart';
 import 'support_service.dart';
+import 'announcements_service.dart';
 
 /// سرویس داشبورد پروفایل کاربر
 ///
@@ -320,6 +321,18 @@ class ProfileDashboardService {
             };
           }).toList(),
         };
+      } catch (_) {
+        // fallback باقی می‌ماند
+      }
+    }
+    if (keys.contains('profile_announcements')) {
+      try {
+        final ann = AnnouncementsService(_apiClient);
+        final res = await ann.listAnnouncements(page: 1, limit: 5);
+        final items = (res['items'] as List? ?? const <dynamic>[])
+            .map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e as Map))
+            .toList();
+        out['profile_announcements'] = {'items': items};
       } catch (_) {
         // fallback باقی می‌ماند
       }

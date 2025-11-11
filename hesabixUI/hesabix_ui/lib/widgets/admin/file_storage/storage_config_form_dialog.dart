@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../../core/api_client.dart';
+import '../../../utils/number_normalizer.dart';
 
 class StorageConfigFormDialog extends StatefulWidget {
   final Map<String, dynamic>? config;
@@ -463,6 +465,10 @@ class _StorageConfigFormDialogState extends State<StorageConfigFormDialog> {
             ),
           ),
           keyboardType: TextInputType.number,
+          inputFormatters: [
+            EnglishDigitsFormatter(),
+            FilteringTextInputFormatter.digitsOnly,
+          ],
           validator: (value) {
             if (value == null || value.trim().isEmpty) {
               return 'لطفاً پورت را وارد کنید';

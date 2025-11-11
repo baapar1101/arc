@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../core/calendar_controller.dart';
 import '../../core/date_utils.dart' show HesabixDateUtils;
@@ -14,6 +15,7 @@ import '../../widgets/banking/currency_picker_widget.dart';
 import '../../core/auth_store.dart';
 import '../../core/api_client.dart';
 import '../../services/receipt_payment_service.dart';
+import '../../utils/number_normalizer.dart';
 
 class ReceiptsPaymentsPage extends StatefulWidget {
   final int businessId;
@@ -627,6 +629,10 @@ class _PersonLineTileState extends State<_PersonLineTile> {
                       hintText: '1,000,000',
                     ),
                     keyboardType: TextInputType.number,
+                    inputFormatters: [
+                      EnglishDigitsFormatter(),
+                      FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+                    ],
                     validator: (v) {
                       final val = double.tryParse((v ?? '').replaceAll(',', ''));
                       if (val == null || val <= 0) return t.mustBePositiveNumber;

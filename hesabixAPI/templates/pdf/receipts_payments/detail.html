@@ -1,0 +1,70 @@
+{% extends "pdf/base.html" %}
+{% block content %}
+  <div class="header">
+    <div>
+      <div class="title">{{ title_text }}</div>
+      <div class="meta">{{ 'کسب و کار' if is_fa else 'Business' }}: {{ business_name }}</div>
+    </div>
+    <div class="meta">{{ 'تاریخ تولید' if is_fa else 'Generated' }}: {{ generated_at }}</div>
+  </div>
+
+  <div class="summary">
+    <div style="display:flex; gap: 16px; flex-wrap: wrap;">
+      <div><span class="meta">{{ 'کد سند' if is_fa else 'Code' }}:</span> {{ code }}</div>
+      <div><span class="meta">{{ 'تاریخ سند' if is_fa else 'Date' }}:</span> {{ document_date }}</div>
+      <div><span class="meta">{{ 'مبلغ کل' if is_fa else 'Total' }}:</span> <span class="amount">{{ total_amount | ltr | safe }}</span></div>
+    </div>
+    {% if description %}
+      <div style="margin-top: 8px;"><span class="meta">{{ 'توضیحات' if is_fa else 'Description' }}:</span> {{ description }}</div>
+    {% endif %}
+  </div>
+
+  <div class="section" style="margin-top:14px;">
+    <div class="meta" style="font-weight:bold; margin-bottom: 6px;">{{ 'خطوط اشخاص' if is_fa else 'Person Lines' }}</div>
+    <table>
+      <thead>
+        <tr>
+          <th>{{ 'نام شخص' if is_fa else 'Person' }}</th>
+          <th>{{ 'مبلغ' if is_fa else 'Amount' }}</th>
+          <th>{{ 'توضیحات' if is_fa else 'Description' }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for line in person_lines or [] %}
+          <tr>
+            <td>{{ line.person_name or '' }}</td>
+            <td class="amount">{{ line.amount | default(0) | ltr | safe }}</td>
+            <td>{{ line.description or '' }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="section" style="margin-top:14px;">
+    <div class="meta" style="font-weight:bold; margin-bottom: 6px;">{{ 'خطوط حساب‌ها' if is_fa else 'Account Lines' }}</div>
+    <table>
+      <thead>
+        <tr>
+          <th>{{ 'نام حساب' if is_fa else 'Account' }}</th>
+          <th>{{ 'کد حساب' if is_fa else 'Code' }}</th>
+          <th>{{ 'نوع تراکنش' if is_fa else 'Type' }}</th>
+          <th>{{ 'مبلغ' if is_fa else 'Amount' }}</th>
+          <th>{{ 'توضیحات' if is_fa else 'Description' }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for line in account_lines or [] %}
+          <tr class="{{ 'commission-row' if (line.extra_info or {}).get('is_commission_line') else '' }}">
+            <td>{{ line.account_name or '' }}</td>
+            <td>{{ line.account_code or '' }}</td>
+            <td>{{ line.transaction_type or '' }}</td>
+            <td class="amount">{{ line.amount | default(0) | ltr | safe }}</td>
+            <td>{{ line.description or '' }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endblock %}
+

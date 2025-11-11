@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../models/bom_models.dart';
 import '../../services/bom_service.dart';
 import '../invoice/product_combobox_widget.dart';
+import '../../utils/number_normalizer.dart';
 
 class BomEditorDialog extends StatefulWidget {
   final int businessId;
@@ -121,6 +123,10 @@ class _BomEditorDialogState extends State<BomEditorDialog> with SingleTickerProv
                 child: TextField(
                   controller: _yieldController,
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  inputFormatters: [
+                    const EnglishDigitsFormatter(),
+                    FilteringTextInputFormatter.allow(RegExp(r'[-0-9.,]')),
+                  ],
                   decoration: const InputDecoration(labelText: 'بازده کل (%)', border: OutlineInputBorder()),
                 ),
               ),
@@ -129,6 +135,10 @@ class _BomEditorDialogState extends State<BomEditorDialog> with SingleTickerProv
                 child: TextField(
                   controller: _wastageController,
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  inputFormatters: [
+                    const EnglishDigitsFormatter(),
+                    FilteringTextInputFormatter.allow(RegExp(r'[-0-9.,]')),
+                  ],
                   decoration: const InputDecoration(labelText: 'پرت کل (%)', border: OutlineInputBorder()),
                 ),
               ),
@@ -395,6 +405,10 @@ class _BomEditorDialogState extends State<BomEditorDialog> with SingleTickerProv
       child: TextField(
         controller: c,
         keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        inputFormatters: [
+          EnglishDigitsFormatter(),
+          FilteringTextInputFormatter.allow(RegExp(r'[-0-9.,]')),
+        ],
         decoration: InputDecoration(labelText: label, border: const OutlineInputBorder()),
         onChanged: onChanged,
       ),

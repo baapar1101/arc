@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:flutter/services.dart';
+
 import '../../../models/product_form_data.dart';
+import '../../../utils/number_normalizer.dart';
 import '../../../utils/product_form_validator.dart';
 
 class ProductTaxSection extends StatefulWidget {
@@ -74,8 +76,13 @@ class _ProductTaxSectionState extends State<ProductTaxSection> {
     return TextFormField(
       initialValue: widget.formData.taxCode,
       decoration: InputDecoration(labelText: t.taxCode),
+      keyboardType: TextInputType.number,
+      inputFormatters: [
+        const EnglishDigitsFormatter(),
+        FilteringTextInputFormatter.digitsOnly,
+      ],
       onChanged: (value) => widget.onChanged(
-        widget.formData.copyWith(taxCode: value.trim().isEmpty ? null : value),
+        widget.formData.copyWith(taxCode: value.trim().isEmpty ? null : toEnglishDigits(value)),
       ),
     );
   }
@@ -97,6 +104,7 @@ class _ProductTaxSectionState extends State<ProductTaxSection> {
             decoration: InputDecoration(labelText: t.salesTaxRate),
             keyboardType: TextInputType.number,
             inputFormatters: [
+              const EnglishDigitsFormatter(),
               FilteringTextInputFormatter.digitsOnly,
             ],
             validator: (value) => ProductFormValidator.validateTaxRate(value, fieldName: t.salesTaxRate),
@@ -124,6 +132,7 @@ class _ProductTaxSectionState extends State<ProductTaxSection> {
             decoration: InputDecoration(labelText: t.purchaseTaxRate),
             keyboardType: TextInputType.number,
             inputFormatters: [
+              const EnglishDigitsFormatter(),
               FilteringTextInputFormatter.digitsOnly,
             ],
             validator: (value) => ProductFormValidator.validateTaxRate(value, fieldName: t.purchaseTaxRate),

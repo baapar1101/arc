@@ -9,6 +9,9 @@ from app.core.responses import success_response, format_datetime_fields
 from app.core.permissions import require_business_access
 from adapters.api.v1.schemas import QueryInfo
 from app.services.kardex_service import list_kardex_lines
+from app.services.pdf.template_renderer import render_template
+from app.core.i18n import negotiate_locale
+from adapters.db.models.business import Business
 
 
 router = APIRouter(prefix="/kardex", tags=["kardex"])
@@ -240,7 +243,7 @@ async def export_kardex_pdf_endpoint(
         for it in items
     ])
 
-    # تلاش برای رندر با قالب سفارشی (kardex/list)
+    # تلاش برای رندر با قالب سفارشی (kardex/list) و سپس قالب پیش‌فرض فایل
     resolved_html = None
     try:
         from app.services.report_template_service import ReportTemplateService
@@ -250,25 +253,38 @@ async def export_kardex_pdf_endpoint(
                 explicit_template_id = int(body.get("template_id"))
         except Exception:
             explicit_template_id = None
-        headers = [
-            "تاریخ سند","کد سند","نوع سند","انبار","جهت حرکت","شرح",
-            "بدهکار","بستانکار","تعداد","مانده مبلغ","مانده تعداد"
-        ]
-        keys = [
-            "document_date","document_code","document_type","warehouse_name",
-            "movement","description","debit","credit","quantity","running_amount","running_quantity"
-        ]
-        headers_html = "".join(f"<th>{h}</th>" for h in headers)
+        # اطلاعات کسب‌وکار
+        business_name = ""
+        try:
+            b = db.query(Business).filter(Business.id == business_id).first()
+            if b is not None:
+                business_name = b.name or ""
+        except Exception:
+            business_name = ""
+        # Locale و جهت
+        locale = negotiate_locale(request.headers.get("Accept-Language"))
+        is_fa = (locale == "fa")
+        # پارامترهای صفحه از کوئری (اختیاری)
+        try:
+            qp = request.query_params
+            paper_size = qp.get("paper_size")
+            orientation = qp.get("orientation") or "landscape"
+            disposition = qp.get("disposition") or "attachment"
+        except Exception:
+            paper_size = None
+            orientation = "landscape"
+            disposition = "attachment"
+        # کانتکست مشترک
         template_context = {
-            "title_text": "گزارش کاردکس",
-            "business_name": "",
-            "generated_at": datetime.datetime.now().strftime('%Y/%m/%d %H:%M'),
-            "is_fa": True,
-            "headers": headers,
-            "keys": keys,
+            "title_text": "گزارش کاردکس" if is_fa else "Kardex Report",
+            "business_name": business_name,
+            "generated_at": datetime.datetime.now().strftime("%Y/%m/%d %H:%M"),
+            "is_fa": is_fa,
+            "locale": locale,
+            "paper_size": paper_size,
+            "orientation": orientation,
+            "show_running": bool(query_dict.get("include_running_balance", False)),
             "items": items,
-            "table_headers_html": headers_html,
-            "table_rows_html": rows_html,
         }
         resolved_html = ReportTemplateService.try_render_resolved(
             db=db,
@@ -318,7 +334,24 @@ async def export_kardex_pdf_endpoint(
     </html>
     """
 
-    final_html = resolved_html or html
+    # در صورت نبود قالب سفارشی، از قالب فایل استفاده کن
+    if not resolved_html:
+        try:
+            final_html = render_template("pdf/kardex/list.html", {
+                "title_text": "گزارش کاردکس",
+                "business_name": "",
+                "generated_at": datetime.datetime.now().strftime("%Y/%m/%d %H:%M"),
+                "is_fa": True,
+                "locale": "fa",
+                "paper_size": "A4",
+                "orientation": "landscape",
+                "show_running": bool(query_dict.get("include_running_balance", False)),
+                "items": items,
+            })
+        except Exception:
+            final_html = html
+    else:
+        final_html = resolved_html
     font_config = FontConfiguration()
     pdf_bytes = HTML(string=final_html).write_pdf(stylesheets=[CSS(string="@page { size: A4 landscape; margin: 12mm; }")], font_config=font_config)
 

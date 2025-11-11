@@ -177,7 +177,7 @@ class DocumentService {
         if (isProforma != null) 'is_proforma': isProforma,
       };
 
-      final response = await _apiClient.post(
+      await _apiClient.post(
         '/businesses/$businessId/documents/export/excel',
         data: body,
         options: Options(
@@ -200,7 +200,7 @@ class DocumentService {
   /// دریافت PDF یک سند
   Future<void> downloadPdf(int documentId) async {
     try {
-      final response = await _apiClient.get(
+      await _apiClient.get(
         '/documents/$documentId/pdf',
         options: Options(
           responseType: ResponseType.bytes,

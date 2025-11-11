@@ -5,7 +5,7 @@ TextTheme faTextTheme({required bool isDark}) {
   final base = isDark
       ? Typography.material2021(platform: TargetPlatform.android).white
       : Typography.material2021(platform: TargetPlatform.android).black;
-  return base.apply(fontFamily: 'Vazirmatn');
+  return base.apply(fontFamily: 'YekanBakhFaNum');
 }
 
 TextTheme enTextTheme({required bool isDark}) {

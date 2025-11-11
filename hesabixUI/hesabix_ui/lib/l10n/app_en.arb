@@ -789,6 +789,9 @@
   "dataBackupDescription": "Create backup of all business data",
   "dataRestore": "Data Restore",
   "dataRestoreDescription": "Restore data from previous backup",
+  "restoreModeNewBusiness": "Create a new business",
+  "restoreModeReplace": "Replace existing data",
+  "selectBackupFile": "Select backup file (.hbx)",
   "systemLogs": "System Logs",
   "systemLogsDescription": "View system reports and user activity logs",
   "close": "Close",
@@ -1131,6 +1134,85 @@
   "operationSuccessful": "Operation completed successfully",
   "callbackNote": "Note: tx_id will be appended to callback automatically. If success/failure redirects are set, user will be redirected accordingly.",
   "create": "Create",
-  "deletedSuccessfully": "Deleted successfully"
+  "deletedSuccessfully": "Deleted successfully",
+  "notificationsSettingsTitle": "Notification Settings",
+  "notificationsSettingsSubtitle": "Enable delivery channels, send test messages, and maintain provider credentials.",
+  "notificationsOverviewTitle": "Keep your team informed",
+  "notificationsOverviewDescription": "Choose which channels deliver operational alerts and guide administrators on how notifications are routed.",
+  "notificationsGuidanceItemChannels": "Toggle channels to match each business unit''s availability and compliance requirements.",
+  "notificationsGuidanceItemTemplates": "Ensure notification templates exist and are published for every channel and language you enable.",
+  "notificationsGuidanceItemTesting": "Use test buttons after configuration changes to verify the end-to-end delivery path.",
+  "notificationsLearnMore": "View documentation",
+  "notificationsDocumentationUrl": "https://docs.hesabix.com/notifications",
+  "notificationsChannelsSectionTitle": "Delivery channels",
+  "notificationsChannelsSectionSubtitle": "Activated channels are used whenever the system emits an announcement or operational alert.",
+  "notificationsChannelTelegram": "Telegram",
+  "notificationsChannelTelegramDescription": "Send alerts through the connected Telegram bot to subscribed operators.",
+  "notificationsChannelEmail": "Email",
+  "notificationsChannelEmailDescription": "Deliver messages via the default email gateway configured in system settings.",
+  "notificationsChannelSms": "SMS",
+  "notificationsChannelSmsDescription": "Send short messages via the configured SMS provider for high-priority events.",
+  "notificationsChannelInApp": "In-app",
+  "notificationsChannelInAppDescription": "Display alerts inside the Hesabix web and mobile applications instantly.",
+  "notificationsSaveSuccess": "Notification settings saved.",
+  "notificationsSaveError": "Unable to save notification settings.",
+  "notificationsTestSectionTitle": "Send test messages",
+  "notificationsTestSectionSubtitle": "Send a lightweight test over the selected channel to validate credentials and routing.",
+  "notificationsTestButton": "Test {channel}",
+  "notificationsTestSuccess": "Test notification sent via {channel}.",
+  "notificationsTestError": "Failed to send test via {channel}.",
+  "notificationsWebsocketInfoTitle": "Real-time in-app notifications",
+  "notificationsWebsocketInfoDescription": "Clients subscribe to the WebSocket endpoint {endpoint} with a valid API key. Web and mobile apps handle this automatically.",
+  "notificationsAdvancedSectionTitle": "Advanced configuration (admin)",
+  "notificationsAdvancedSectionSubtitle": "Manage provider credentials for Telegram and SMS gateways. Requires the system_settings permission.",
+  "notificationsAdvancedTelegramHeader": "Telegram bot setup",
+  "notificationsFieldTelegramToken": "Bot token",
+  "notificationsFieldTelegramUsername": "Bot username",
+  "notificationsFieldTelegramWebhookSecret": "Webhook secret",
+  "notificationsFieldTelegramSecretHeader": "Secret header name",
+  "notificationsFieldTelegramTokenHint": "Obtain from BotFather (format: 123456789:ABC...).",
+  "notificationsFieldTelegramWebhookSecretHint": "Optional shared secret used to validate incoming webhook calls.",
+  "notificationsAdvancedSmsHeader": "SMS gateway",
+  "notificationsFieldSmsProvider": "Provider name",
+  "notificationsFieldSmsApiKey": "API key",
+  "notificationsFieldSmsApiKeyHint": "Issued by your SMS provider; consider rotating it periodically.",
+  "notificationsFieldSmsSender": "Sender number or ID",
+  "notificationsFieldSmsSenderHint": "Exact sender value registered with your provider.",
+  "notificationsAdvancedRestartHint": "Apply changes during low traffic hours; background workers may require a restart.",
+  "notificationsAdvancedSave": "Save advanced settings",
+  "notificationsAdvancedSaveSuccess": "Advanced notification settings saved.",
+  "notificationsAdvancedSaveError": "Unable to save advanced notification settings.",
+  "@notificationsTestButton": {
+    "placeholders": {
+      "channel": {
+        "type": "String",
+        "description": "Localized channel label."
+      }
+    }
+  },
+  "@notificationsTestSuccess": {
+    "placeholders": {
+      "channel": {
+        "type": "String",
+        "description": "Localized channel label."
+      }
+    }
+  },
+  "@notificationsTestError": {
+    "placeholders": {
+      "channel": {
+        "type": "String",
+        "description": "Localized channel label."
+      }
+    }
+  },
+  "@notificationsWebsocketInfoDescription": {
+    "placeholders": {
+      "endpoint": {
+        "type": "String",
+        "description": "WebSocket endpoint URL."
+      }
+    }
+  }
 }
 

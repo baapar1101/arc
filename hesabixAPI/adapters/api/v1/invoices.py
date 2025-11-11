@@ -25,6 +25,7 @@ from app.services.invoice_service import (
     invoice_document_to_dict,
     SUPPORTED_INVOICE_TYPES,
 )
+from app.services.pdf.template_renderer import render_template
 
 
 router = APIRouter(prefix="/invoices", tags=["invoices"])  # Stubs only
@@ -168,55 +169,25 @@ async def export_single_invoice_pdf(
     except Exception:
         resolved_html = None
 
-    # HTML پیش‌فرض در نبود قالب
-    html_content = resolved_html or f"""
-    <!DOCTYPE html>
-    <html dir='{"rtl" if is_fa else "ltr"}'>
-      <head>
-        <meta charset="utf-8" />
-        <style>
-          body {{ font-family: Tahoma, Arial, sans-serif; font-size: 12px; color: #222; }}
-          h1 {{ font-size: 18px; margin: 0 0 12px; }}
-          .meta {{ margin: 6px 0; }}
-          table {{ width: 100%; border-collapse: collapse; margin-top: 12px; }}
-          th, td {{ border: 1px solid #ccc; padding: 6px; text-align: {"right" if is_fa else "left"}; }}
-          th {{ background: #f6f6f6; }}
-          .totals {{ margin-top: 12px; float: {"left" if is_fa else "right"}; min-width: 260px; }}
-          .label {{ color: #666; }}
-        </style>
-      </head>
-      <body>
-        <h1>{escape(item.get("title") or ("فاکتور" if is_fa else "Invoice"))}</h1>
-        <div class="meta">
-          <div><span class="label">{'کسب‌وکار' if is_fa else 'Business'}:</span> {escape(business_name or "-")}</div>
-          <div><span class="label">{'کد' if is_fa else 'Code'}:</span> {escape(item.get("code") or "-")}</div>
-          <div><span class="label">{'تاریخ' if is_fa else 'Date'}:</span> {escape(item.get("issue_date") or "-")}</div>
-        </div>
-        <table>
-          <thead>
-            <tr>
-              <th>{'ردیف' if is_fa else 'No.'}</th>
-              <th>{'شرح کالا/خدمت' if is_fa else 'Item'}</th>
-              <th>{'تعداد' if is_fa else 'Qty'}</th>
-              <th>{'فی' if is_fa else 'Price'}</th>
-              <th>{'مبلغ' if is_fa else 'Amount'}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {''.join([
-              f"<tr><td>{i+1}</td><td>{escape(str(line.get('product_name') or line.get('description') or '-'))}</td><td>{escape(str(line.get('quantity') or ''))}</td><td>{escape(str(line.get('unit_price') or ''))}</td><td>{escape(str(line.get('line_total') or ''))}</td></tr>"
-              for i, line in enumerate(item.get('lines') or [])
-            ])}
-          </tbody>
-        </table>
-        <div class="totals">
-          <div><span class="label">{'جمع جزء' if is_fa else 'Subtotal'}:</span> {escape(str(item.get('subtotal') or ''))}</div>
-          <div><span class="label">{'مالیات' if is_fa else 'Tax'}:</span> {escape(str(item.get('tax_total') or ''))}</div>
-          <div><strong>{'قابل پرداخت' if is_fa else 'Payable'}:</strong> {escape(str(item.get('payable_total') or ''))}</div>
-        </div>
-      </body>
-    </html>
-    """
+    # HTML پیش‌فرض در نبود قالب: استفاده از قالب فایل
+    # پارامترهای صفحه از کوئری (اختیاری)
+    try:
+        qp = request.query_params
+        paper_size = qp.get("paper_size")
+        orientation = qp.get("orientation")
+        disposition = qp.get("disposition") or "attachment"
+    except Exception:
+        paper_size = None
+        orientation = None
+        disposition = "attachment"
+    default_ctx = {
+        **template_context,
+        "title_text": item.get("title") or ("فاکتور" if is_fa else "Invoice"),
+        "paper_size": paper_size,
+        "orientation": orientation,
+        "footer_text": "",
+    }
+    html_content = resolved_html or render_template("pdf/invoices/detail.html", default_ctx)
 
     font_config = FontConfiguration()
     pdf_bytes = HTML(string=html_content).write_pdf(font_config=font_config)
@@ -230,7 +201,7 @@ async def export_single_invoice_pdf(
         content=pdf_bytes,
         media_type="application/pdf",
         headers={
-            "Content-Disposition": f"attachment; filename={filename}",
+            "Content-Disposition": f"{disposition}; filename={filename}",
             "Content-Length": str(len(pdf_bytes)),
             "Access-Control-Expose-Headers": "Content-Disposition",
         },
@@ -921,46 +892,29 @@ async def export_invoices_pdf(
     except Exception:
         resolved_html = None
 
-    html_content = resolved_html or f"""
-    <!DOCTYPE html>
-    <html dir='{ 'rtl' if is_fa else 'ltr' }'>
-      <head>
-        <meta charset='utf-8'>
-        <title>{title_text}</title>
-        <style>
-          @page {{ margin: 1cm; size: A4; }}
-          body {{ font-family: {'Tahoma, Arial' if is_fa else 'Arial, sans-serif'}; font-size: 12px; line-height: 1.4; color: #333; direction: {'rtl' if is_fa else 'ltr'}; }}
-          .header {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #366092; }}
-          .title {{ font-size: 18px; font-weight: bold; color: #366092; }}
-          .meta {{ font-size: 11px; color: #666; }}
-          .table-wrapper {{ overflow-x: auto; margin: 20px 0; }}
-          table {{ width: 100%; border-collapse: collapse; font-size: 11px; }}
-          thead {{ background-color: #366092; color: #fff; }}
-          th {{ border: 1px solid #d7dde6; padding: 8px 6px; text-align: {'right' if is_fa else 'left'}; font-weight: bold; white-space: nowrap; }}
-          tbody tr:nth-child(even) {{ background-color: #f8f9fa; }}
-          tbody tr:hover {{ background-color: #e9ecef; }}
-          tbody td {{ border: 1px solid #d7dde6; padding: 5px 4px; vertical-align: top; overflow-wrap: anywhere; word-break: break-word; white-space: normal; text-align: {'right' if is_fa else 'left'}; }}
-          .footer {{ position: running(footer); font-size: 10px; color: #666; margin-top: 8px; text-align: {'left' if is_fa else 'right'}; }}
-        </style>
-      </head>
-      <body>
-        <div class='header'>
-          <div>
-            <div class='title'>{title_text}</div>
-            <div class='meta'>{label_biz}: {escape(business_name)}</div>
-          </div>
-          <div class='meta'>{label_date}: {escape(now)}</div>
-        </div>
-        <div class='table-wrapper'>
-          <table>
-            <thead><tr>{headers_html}</tr></thead>
-            <tbody>{''.join(rows_html)}</tbody>
-          </table>
-        </div>
-        <div class='footer'>{footer_text}</div>
-      </body>
-    </html>
-    """
+    # HTML پیش‌فرض در نبود قالب: استفاده از فایل قالب
+    disposition = "attachment"
+    try:
+        disposition = str(body.get("disposition") or "attachment")
+    except Exception:
+        disposition = "attachment"
+    paper_size = None
+    orientation = None
+    try:
+        paper_size = body.get("paper_size")
+        orientation = body.get("orientation")
+    except Exception:
+        pass
+    html_content = resolved_html or render_template(
+        "pdf/invoices/list.html",
+        {
+            **template_context,
+            "title_text": title_text,
+            "paper_size": paper_size,
+            "orientation": orientation,
+            "footer_text": footer_text,
+        },
+    )
 
     font_config = FontConfiguration()
     pdf_bytes = HTML(string=html_content).write_pdf(font_config=font_config)
@@ -979,7 +933,7 @@ async def export_invoices_pdf(
         content=pdf_bytes,
         media_type="application/pdf",
         headers={
-            "Content-Disposition": f"attachment; filename={filename}",
+            "Content-Disposition": f"{disposition}; filename={filename}",
             "Content-Length": str(len(pdf_bytes)),
             "Access-Control-Expose-Headers": "Content-Disposition",
         },

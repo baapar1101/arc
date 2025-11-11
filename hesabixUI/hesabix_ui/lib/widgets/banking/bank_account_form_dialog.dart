@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
+
 import '../../models/bank_account_model.dart';
 import '../../services/bank_account_service.dart';
+import '../../utils/number_normalizer.dart';
 import 'currency_picker_widget.dart';
 
 class BankAccountFormDialog extends StatefulWidget {
@@ -430,7 +432,10 @@ class _BankAccountFormDialogState extends State<BankAccountFormDialog> {
                   hintText: t.accountNumber,
                 ),
                 keyboardType: TextInputType.number,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                inputFormatters: [
+                  const EnglishDigitsFormatter(),
+                  FilteringTextInputFormatter.digitsOnly,
+                ],
               ),
             ),
             const SizedBox(width: 16),
@@ -442,7 +447,10 @@ class _BankAccountFormDialogState extends State<BankAccountFormDialog> {
                   hintText: t.cardNumber,
                 ),
                 keyboardType: TextInputType.number,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                inputFormatters: [
+                  const EnglishDigitsFormatter(),
+                  FilteringTextInputFormatter.digitsOnly,
+                ],
               ),
             ),
           ],
@@ -456,6 +464,7 @@ class _BankAccountFormDialogState extends State<BankAccountFormDialog> {
           ),
           keyboardType: TextInputType.text,
           inputFormatters: [
+            const EnglishDigitsFormatter(),
             FilteringTextInputFormatter.allow(RegExp(r'[0-9A-Za-z]')),
             LengthLimitingTextInputFormatter(24),
           ],
@@ -471,7 +480,10 @@ class _BankAccountFormDialogState extends State<BankAccountFormDialog> {
                   hintText: (t.localeName == 'fa') ? 'شماره پوز' : 'POS Number',
                 ),
                 keyboardType: TextInputType.number,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                inputFormatters: [
+                  const EnglishDigitsFormatter(),
+                  FilteringTextInputFormatter.digitsOnly,
+                ],
               ),
             ),
             const SizedBox(width: 16),

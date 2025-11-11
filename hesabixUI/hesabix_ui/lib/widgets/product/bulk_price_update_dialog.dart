@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:flutter/services.dart';
+import 'package:hesabix_ui/l10n/app_localizations.dart';
+
+import '../../core/api_client.dart';
 import '../../models/bulk_price_update_data.dart';
 import '../../services/bulk_price_update_service.dart';
 import '../../services/category_service.dart';
 import '../../services/currency_service.dart';
 import '../../services/price_list_service.dart';
-import '../../widgets/category/category_picker_field.dart';
-import '../../core/api_client.dart';
 import '../../utils/number_formatters.dart';
+import '../../utils/number_normalizer.dart';
+import '../../widgets/category/category_picker_field.dart';
 
 class BulkPriceUpdateDialog extends StatefulWidget {
   final int businessId;
@@ -500,8 +502,16 @@ class _BulkPriceUpdateDialogState extends State<BulkPriceUpdateDialog> {
           ),
           keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: false),
           inputFormatters: _updateType == BulkPriceUpdateType.percentage
-              ? [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')), ThousandsSeparatorInputFormatter()]
-              : [FilteringTextInputFormatter.allow(RegExp(r'^[\d,]*\.?\d*')), ThousandsSeparatorInputFormatter()],
+              ? [
+                  const EnglishDigitsFormatter(),
+                  FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                  ThousandsSeparatorInputFormatter(),
+                ]
+              : [
+                  const EnglishDigitsFormatter(),
+                  FilteringTextInputFormatter.allow(RegExp(r'^[\d,]*\.?\d*')),
+                  ThousandsSeparatorInputFormatter(),
+                ],
           validator: (value) {
             if (value == null || value.isEmpty) {
               return 'مقدار تغییر ضروری است';

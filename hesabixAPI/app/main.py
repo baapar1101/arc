@@ -32,6 +32,8 @@ from adapters.api.v1.admin.file_storage import router as admin_file_storage_rout
 from adapters.api.v1.admin.email_config import router as admin_email_config_router
 from adapters.api.v1.admin.system_settings import router as admin_system_settings_router
 from adapters.api.v1.admin.wallet_admin import router as admin_wallet_router
+from adapters.api.v1.announcements import router as announcements_router
+from adapters.api.v1.admin.announcements import router as admin_announcements_router
 from adapters.api.v1.receipts_payments import router as receipts_payments_router
 from adapters.api.v1.transfers import router as transfers_router
 from adapters.api.v1.fiscal_years import router as fiscal_years_router
@@ -43,6 +45,14 @@ from adapters.api.v1.opening_balance import router as opening_balance_router
 from adapters.api.v1.report_templates import router as report_templates_router
 from adapters.api.v1.wallet import router as wallet_router
 from adapters.api.v1.wallet_webhook import router as wallet_webhook_router
+from adapters.api.v1.marketplace import router as marketplace_router
+from adapters.api.v1.integrations.telegram import router as telegram_integration_router
+from adapters.api.v1.notifications import router as notifications_router
+from adapters.api.v1.admin.notification_templates import router as admin_notification_templates_router
+from adapters.api.v1.notifications_ws import router as notifications_ws_router
+from adapters.api.v1.business_backups import router as business_backups_router
+from adapters.api.v1.jobs import router as jobs_router
+from app.services.notification_processor import background_loop as notifications_background_loop
 from app.core.i18n import negotiate_locale, Translator
 from app.core.error_handlers import register_error_handlers
 from app.core.smart_normalizer import smart_normalize_json, SmartNormalizerConfig
@@ -335,10 +345,22 @@ def create_app() -> FastAPI:
     application.include_router(report_templates_router, prefix=settings.api_v1_prefix)
     application.include_router(wallet_router, prefix=settings.api_v1_prefix)
     application.include_router(wallet_webhook_router, prefix=settings.api_v1_prefix)
+    application.include_router(marketplace_router, prefix=settings.api_v1_prefix)
+    # Integrations
+    application.include_router(telegram_integration_router, prefix=settings.api_v1_prefix)
+    # Notifications
+    application.include_router(notifications_router, prefix=settings.api_v1_prefix)
+    application.include_router(notifications_ws_router)
+    # Business backups
+    application.include_router(business_backups_router, prefix=settings.api_v1_prefix)
+    # Jobs
+    application.include_router(jobs_router, prefix=settings.api_v1_prefix)
     from adapters.api.v1.payment_gateways import router as payment_gateways_router
     application.include_router(payment_gateways_router, prefix=settings.api_v1_prefix)
     from adapters.api.v1.payment_callbacks import router as payment_callbacks_router
     application.include_router(payment_callbacks_router, prefix=settings.api_v1_prefix)
+    # Announcements
+    application.include_router(announcements_router, prefix=settings.api_v1_prefix)
     
     # Support endpoints
     application.include_router(support_tickets_router, prefix=f"{settings.api_v1_prefix}/support")
@@ -354,8 +376,16 @@ def create_app() -> FastAPI:
     application.include_router(admin_wallet_router, prefix=settings.api_v1_prefix)
     from adapters.api.v1.admin.payment_gateways import router as admin_payment_gateways_router
     application.include_router(admin_payment_gateways_router, prefix=settings.api_v1_prefix)
+    application.include_router(admin_announcements_router, prefix=settings.api_v1_prefix)
+    application.include_router(admin_notification_templates_router, prefix=settings.api_v1_prefix)
 
     register_error_handlers(application)
+
+    # Start background notification outbox processor
+    import asyncio
+    @application.on_event("startup")
+    async def _start_notification_processor():
+        asyncio.create_task(notifications_background_loop(30))
 
     @application.middleware("http")
     async def log_slow_requests(request: Request, call_next):

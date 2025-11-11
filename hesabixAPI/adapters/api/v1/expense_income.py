@@ -19,6 +19,7 @@ from app.services.expense_income_service import (
     delete_expense_income,
     delete_multiple_expense_income,
 )
+from app.services.pdf.template_renderer import render_template
 
 
 router = APIRouter(tags=["expense-income"])
@@ -386,51 +387,36 @@ async def export_expense_income_pdf_endpoint(
         )
     except Exception:
         resolved_html = None
-    # HTML پیش‌فرض
-    table_html = f"""
-    <!DOCTYPE html>
-    <html dir="{{'rtl' if is_fa else 'ltr'}}">
-      <head>
-        <meta charset="utf-8">
-        <title>{title_text}</title>
-        <style>
-          @page {{ margin: 1cm; size: A4; }}
-          body {{
-            font-family: {'Tahoma, Arial' if is_fa else 'Arial, sans-serif'};
-            font-size: 12px; line-height: 1.4; color: #333; direction: {'rtl' if is_fa else 'ltr'};
-          }}
-          .header {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #366092; }}
-          .title {{ font-size: 18px; font-weight: bold; color: #366092; }}
-          .meta {{ font-size: 11px; color: #666; }}
-          table {{ width: 100%; border-collapse: collapse; margin-top: 12px; }}
-          th, td {{ border: 1px solid #d7dde6; padding: 6px; text-align: {'right' if is_fa else 'left'}; }}
-          thead {{ background: #f6f6f6; }}
-        </style>
-      </head>
-      <body>
-        <div class="header">
-          <div>
-            <div class="title">{title_text}</div>
-            <div class="meta">{label_biz}: {escape(business_name)}</div>
-          </div>
-          <div class="meta">{label_date}: {escape(now)}</div>
-        </div>
-        <table>
-          <thead><tr>{headers_html}</tr></thead>
-          <tbody>{''.join(rows_html)}</tbody>
-        </table>
-        <div class="meta" style="margin-top: 8px; text-align: {'left' if is_fa else 'right'};">{footer_text}</div>
-      </body>
-    </html>
-    """
-    final_html = resolved_html or table_html
+    # HTML پیش‌فرض با قالب فایل
+    disposition = "attachment"
+    try:
+        disposition = str(body.get("disposition") or "attachment")
+    except Exception:
+        disposition = "attachment"
+    paper_size = None
+    orientation = None
+    try:
+        paper_size = body.get("paper_size")
+        orientation = body.get("orientation")
+    except Exception:
+        pass
+    final_html = resolved_html or render_template(
+        "pdf/expense_income/list.html",
+        {
+            **template_context,
+            "title_text": title_text,
+            "paper_size": paper_size,
+            "orientation": orientation,
+            "footer_text": footer_text,
+        },
+    )
     pdf_bytes = HTML(string=final_html).write_pdf(font_config=FontConfiguration())
     filename = f"expense_income_{business_id}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
         headers={
-            "Content-Disposition": f"attachment; filename={filename}",
+            "Content-Disposition": f"{disposition}; filename={filename}",
             "Content-Length": str(len(pdf_bytes)),
             "Access-Control-Expose-Headers": "Content-Disposition",
         },

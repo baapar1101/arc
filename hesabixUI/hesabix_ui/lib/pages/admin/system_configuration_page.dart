@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
+import 'package:hesabix_ui/utils/number_normalizer.dart';
 
 class SystemConfigurationPage extends StatefulWidget {
   const SystemConfigurationPage({super.key});
@@ -285,6 +287,10 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
                 border: const OutlineInputBorder(),
               ),
               keyboardType: TextInputType.number,
+        inputFormatters: [
+          EnglishDigitsFormatter(),
+          FilteringTextInputFormatter.digitsOnly,
+        ],
               onChanged: (value) {
                 final intValue = int.tryParse(value);
                 if (intValue != null && intValue >= min && intValue <= max) {

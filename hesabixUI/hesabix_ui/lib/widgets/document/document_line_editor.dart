@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hesabix_ui/models/account_model.dart';
 import 'package:hesabix_ui/models/document_model.dart';
+import 'package:hesabix_ui/utils/number_formatters.dart';
+import 'package:hesabix_ui/utils/number_normalizer.dart';
 import 'package:hesabix_ui/widgets/document/detail_selector_widget.dart';
 import 'package:hesabix_ui/widgets/invoice/account_tree_combobox_widget.dart';
-import 'package:hesabix_ui/utils/number_formatters.dart';
 
 /// مدل داخلی برای نگهداری اطلاعات یک سطر سند در حین ویرایش
 class DocumentLineEdit {
@@ -366,6 +367,7 @@ class _DocumentLinesEditorState extends State<DocumentLinesEditor> {
               keyboardType: TextInputType.number,
               textAlign: TextAlign.left,
               inputFormatters: [
+                const EnglishDigitsFormatter(),
                 FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
               ],
               onChanged: (value) {
@@ -394,6 +396,7 @@ class _DocumentLinesEditorState extends State<DocumentLinesEditor> {
               keyboardType: TextInputType.number,
               textAlign: TextAlign.left,
               inputFormatters: [
+                const EnglishDigitsFormatter(),
                 FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
               ],
               onChanged: (value) {

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
+
 import '../../models/cash_register.dart';
 import '../../services/cash_register_service.dart';
+import '../../utils/number_normalizer.dart';
 import 'currency_picker_widget.dart';
 
 class CashRegisterFormDialog extends StatefulWidget {
@@ -315,7 +317,10 @@ class _CashRegisterFormDialogState extends State<CashRegisterFormDialog> {
 									hintText: (t.localeName == 'fa') ? 'شماره سویچ پرداخت' : 'Payment Switch Number',
 								),
 								keyboardType: TextInputType.number,
-								inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+								inputFormatters: [
+									const EnglishDigitsFormatter(),
+									FilteringTextInputFormatter.digitsOnly,
+								],
 							),
 						),
 						const SizedBox(width: 16),
@@ -327,7 +332,10 @@ class _CashRegisterFormDialogState extends State<CashRegisterFormDialog> {
 									hintText: (t.localeName == 'fa') ? 'شماره ترمینال' : 'Terminal Number',
 								),
 								keyboardType: TextInputType.number,
-								inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+								inputFormatters: [
+									const EnglishDigitsFormatter(),
+									FilteringTextInputFormatter.digitsOnly,
+								],
 							),
 						),
 					],

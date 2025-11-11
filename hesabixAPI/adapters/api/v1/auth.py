@@ -320,6 +320,15 @@ def login(request: Request, payload: LoginRequest, db: Session = Depends(get_db)
 def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(get_db)) -> dict:
 	# In production do not return token; send via email/SMS. Here we return for dev/testing.
 	token = create_password_reset(db=db, identifier=payload.identifier, captcha_id=payload.captcha_id, captcha_code=payload.captcha_code)
+	# Send notification via preferred channels
+	if token:
+		from adapters.db.repositories.user_repo import UserRepository
+		from app.services.notification_service import NotificationService
+		repo = UserRepository(db)
+		user = repo.get_by_email(payload.identifier) or repo.get_by_mobile(payload.identifier)
+		if user:
+			svc = NotificationService(db)
+			svc.send(user_id=user.id, event_key="auth.password_reset", context={"token": token})
 	return success_response({"ok": True, "token": token if token else None})
 
 

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:shamsi_date/shamsi_date.dart';
@@ -7,6 +8,7 @@ import '../../services/business_api_service.dart';
 import '../../core/calendar_controller.dart';
 import '../../widgets/date_input_field.dart';
 import '../../core/date_utils.dart';
+import '../../utils/number_normalizer.dart';
 
 class NewBusinessPage extends StatefulWidget {
   final CalendarController calendarController;
@@ -1086,9 +1088,13 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
                     ),
                   ),
                   keyboardType: TextInputType.number,
+                inputFormatters: [
+                  EnglishDigitsFormatter(),
+                  FilteringTextInputFormatter.digitsOnly,
+                ],
                   onChanged: (value) {
                     setState(() {
-                      _businessData.postalCode = value;
+                    _businessData.postalCode = toEnglishDigits(value);
                     });
                   },
                 ),
@@ -1423,9 +1429,13 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
                               helperText: '${t.example}: ${t.nationalIdExample}',
                             ),
                             keyboardType: TextInputType.number,
+                            inputFormatters: [
+                              EnglishDigitsFormatter(),
+                              FilteringTextInputFormatter.digitsOnly,
+                            ],
                             onChanged: (value) {
                               setState(() {
-                                _businessData.nationalId = value;
+                                _businessData.nationalId = toEnglishDigits(value);
                               });
                             },
                           ),

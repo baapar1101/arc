@@ -14,11 +14,24 @@ class ExpenseIncomeTestPage extends StatelessWidget {
       appBar: AppBar(
         title: const Text('تست لیست هزینه و درآمد'),
       ),
-      body: ExpenseIncomeListPage(
-        businessId: 1, // ID کسب و کار تست
-        calendarController: CalendarController(),
-        authStore: AuthStore(),
-        apiClient: ApiClient(),
+      body: FutureBuilder<CalendarController>(
+        future: CalendarController.load(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState != ConnectionState.done) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError || !snapshot.hasData) {
+            return Center(
+              child: Text('خطا در بارگذاری تقویم: ${snapshot.error ?? 'CalendarController'}'),
+            );
+          }
+          return ExpenseIncomeListPage(
+            businessId: 1, // ID کسب و کار تست
+            calendarController: snapshot.data!,
+            authStore: AuthStore(),
+            apiClient: ApiClient(),
+          );
+        },
       ),
     );
   }

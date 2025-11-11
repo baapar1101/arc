@@ -36,6 +36,7 @@ class ReportTemplateService {
     String? orientation,
     Map<String, dynamic>? margins,
     Map<String, dynamic>? assets,
+    String? engine,
   }) async {
     final res = await _api.post<Map<String, dynamic>>(
       '/report-templates/business/$businessId',
@@ -52,6 +53,7 @@ class ReportTemplateService {
         if (orientation != null) 'orientation': orientation,
         if (margins != null) 'margins': margins,
         if (assets != null) 'assets': assets,
+        if (engine != null) 'engine': engine,
       },
     );
     return (res.data?['id'] as num).toInt();
@@ -119,16 +121,41 @@ class ReportTemplateService {
 
   Future<Map<String, dynamic>> preview({
     required int businessId,
-    required String contentHtml,
+    String? contentHtml,
     String? contentCss,
+    String? headerHtml,
+    String? footerHtml,
+    String? engine,
+    Map<String, dynamic>? design,
+    Map<String, dynamic>? assets,
     Map<String, dynamic>? context,
   }) async {
     final res = await _api.post<Map<String, dynamic>>(
       '/report-templates/business/$businessId/preview',
       data: {
-        'content_html': contentHtml,
+        if (contentHtml != null) 'content_html': contentHtml,
         if (contentCss != null) 'content_css': contentCss,
+        if (headerHtml != null) 'header_html': headerHtml,
+        if (footerHtml != null) 'footer_html': footerHtml,
+        if (engine != null) 'engine': engine,
+        if (design != null) 'design': design,
+        if (assets != null) 'assets': assets,
         'context': context ?? const <String, dynamic>{},
+      },
+    );
+    return res.data ?? const <String, dynamic>{};
+  }
+
+  Future<Map<String, dynamic>> schema({
+    required int businessId,
+    required String moduleKey,
+    String? subtype,
+  }) async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '/report-templates/business/$businessId/schema',
+      query: {
+        'module_key': moduleKey,
+        if (subtype != null && subtype.isNotEmpty) 'subtype': subtype,
       },
     );
     return res.data ?? const <String, dynamic>{};

@@ -24,6 +24,7 @@ from app.services.receipt_payment_service import (
     update_receipt_payment,
 )
 from adapters.db.models.business import Business
+from app.services.pdf.template_renderer import render_template
 
 
 router = APIRouter(tags=["receipts-payments"])
@@ -533,178 +534,36 @@ async def export_single_receipt_payment_pdf(
     except Exception:
         resolved_html = None
 
-    # ایجاد HTML پیش‌فرض در نبود قالب
-    html_content = resolved_html or f"""
-    <!DOCTYPE html>
-    <html dir="{'rtl' if is_fa else 'ltr'}">
-      <head>
-        <meta charset="utf-8">
-        <title>{title_text}</title>
-        <style>
-          @page {{
-            margin: 1cm;
-            size: A4;
-          }}
-          body {{
-            font-family: {'Tahoma, Arial' if is_fa else 'Arial, sans-serif'};
-            font-size: 12px;
-            line-height: 1.4;
-            color: #333;
-            direction: {'rtl' if is_fa else 'ltr'};
-          }}
-          .header {{
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-            padding-bottom: 10px;
-            border-bottom: 2px solid #366092;
-          }}
-          .title {{
-            font-size: 18px;
-            font-weight: bold;
-            color: #366092;
-          }}
-          .meta {{
-            font-size: 11px;
-            color: #666;
-          }}
-          .document-info {{
-            margin: 20px 0;
-            padding: 15px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            background-color: #f9f9f9;
-          }}
-          .info-row {{
-            display: flex;
-            margin-bottom: 8px;
-          }}
-          .info-label {{
-            font-weight: bold;
-            width: 150px;
-            flex-shrink: 0;
-          }}
-          .info-value {{
-            flex: 1;
-          }}
-          .section {{
-            margin: 20px 0;
-          }}
-          .section-title {{
-            font-size: 14px;
-            font-weight: bold;
-            margin-bottom: 10px;
-            padding: 8px;
-            background-color: #366092;
-            color: white;
-            border-radius: 3px;
-          }}
-          .lines-table {{
-            width: 100%;
-            border-collapse: collapse;
-            margin: 10px 0;
-            font-size: 11px;
-          }}
-          .lines-table th {{
-            background-color: #f0f0f0;
-            border: 1px solid #ddd;
-            padding: 8px;
-            text-align: {'right' if is_fa else 'left'};
-            font-weight: bold;
-          }}
-          .lines-table td {{
-            border: 1px solid #ddd;
-            padding: 6px;
-            text-align: {'right' if is_fa else 'left'};
-          }}
-          .lines-table tr:nth-child(even) {{
-            background-color: #f9f9f9;
-          }}
-          .amount {{
-            text-align: {'left' if is_fa else 'right'};
-            font-weight: bold;
-          }}
-          .commission-row {{
-            background-color: #ffe6e6 !important;
-            font-style: italic;
-          }}
-          .footer {{
-            position: running(footer);
-            font-size: 10px;
-            color: #666;
-            margin-top: 8px;
-            text-align: {'left' if is_fa else 'right'};
-          }}
-        </style>
-      </head>
-      <body>
-        <div class="header">
-          <div>
-            <div class="title">{title_text}</div>
-            <div class="meta">{label_biz}: {escape(business_name)}</div>
-          </div>
-          <div class="meta">{label_date}: {escape(now)}</div>
-        </div>
-        
-        <div class="document-info">
-          <div class="info-row">
-            <div class="info-label">کد سند:</div>
-            <div class="info-value">{escape(doc_code)}</div>
-          </div>
-          <div class="info-row">
-            <div class="info-label">نوع سند:</div>
-            <div class="info-value">{escape(doc_type_name)}</div>
-          </div>
-          <div class="info-row">
-            <div class="info-label">تاریخ سند:</div>
-            <div class="info-value">{escape(doc_date)}</div>
-          </div>
-          <div class="info-row">
-            <div class="info-label">مبلغ کل:</div>
-            <div class="info-value">{escape(str(total_amount))} ریال</div>
-          </div>
-          {f'<div class="info-row"><div class="info-label">توضیحات:</div><div class="info-value">{escape(description or "")}</div></div>' if description else ''}
-        </div>
-        
-        <div class="section">
-          <div class="section-title">خطوط اشخاص</div>
-          <table class="lines-table">
-            <thead>
-              <tr>
-                <th>نام شخص</th>
-                <th>مبلغ</th>
-                <th>توضیحات</th>
-              </tr>
-            </thead>
-            <tbody>
-              {''.join([f'<tr><td>{escape(line.get("person_name") or "نامشخص")}</td><td class="amount">{escape(str(line.get("amount", 0)))} ریال</td><td>{escape(line.get("description") or "")}</td></tr>' for line in person_lines])}
-            </tbody>
-          </table>
-        </div>
-        
-        <div class="section">
-          <div class="section-title">خطوط حساب‌ها</div>
-          <table class="lines-table">
-            <thead>
-              <tr>
-                <th>نام حساب</th>
-                <th>کد حساب</th>
-                <th>نوع تراکنش</th>
-                <th>مبلغ</th>
-                <th>توضیحات</th>
-              </tr>
-            </thead>
-            <tbody>
-              {''.join([f'<tr class="{"commission-row" if line.get("extra_info", {}).get("is_commission_line") else ""}"><td>{escape(line.get("account_name") or "")}</td><td>{escape(line.get("account_code") or "")}</td><td>{escape(line.get("transaction_type") or "")}</td><td class="amount">{escape(str(line.get("amount", 0)))} ریال</td><td>{escape(line.get("description") or "")}</td></tr>' for line in account_lines])}
-            </tbody>
-          </table>
-        </div>
-        
-        <div class="footer">{footer_text}</div>
-      </body>
-    </html>
-    """
+    # HTML پیش‌فرض در نبود قالب: فایل قالب + پارامترها
+    try:
+        qp = request.query_params
+        paper_size = qp.get("paper_size")
+        orientation = qp.get("orientation")
+        disposition = qp.get("disposition") or "attachment"
+    except Exception:
+        paper_size = None
+        orientation = None
+        disposition = "attachment"
+    html_content = resolved_html or render_template(
+        "pdf/receipts_payments/detail.html",
+        {
+            "business_id": business_id,
+            "business_name": business_name,
+            "document": result,
+            "person_lines": person_lines,
+            "account_lines": account_lines,
+            "code": doc_code,
+            "document_date": doc_date,
+            "total_amount": total_amount,
+            "description": description,
+            "title_text": title_text,
+            "generated_at": now,
+            "is_fa": is_fa,
+            "paper_size": paper_size,
+            "orientation": orientation,
+            "footer_text": footer_text,
+        },
+    )
 
     font_config = FontConfiguration()
     pdf_bytes = HTML(string=html_content).write_pdf(font_config=font_config)
@@ -719,7 +578,7 @@ async def export_single_receipt_payment_pdf(
         content=pdf_bytes,
         media_type="application/pdf",
         headers={
-            "Content-Disposition": f"attachment; filename={filename}",
+            "Content-Disposition": f"{disposition}; filename={filename}",
             "Content-Length": str(len(pdf_bytes)),
             "Access-Control-Expose-Headers": "Content-Disposition",
         },
@@ -880,111 +739,29 @@ async def export_receipts_payments_pdf(
     except Exception:
         resolved_html = None
 
-    # HTML پیش‌فرض جدول
-    table_html = f"""
-    <!DOCTYPE html>
-    <html dir="{'rtl' if is_fa else 'ltr'}">
-      <head>
-        <meta charset="utf-8">
-        <title>{title_text}</title>
-        <style>
-          @page {{
-            margin: 1cm;
-            size: A4;
-          }}
-          body {{
-            font-family: {'Tahoma, Arial' if is_fa else 'Arial, sans-serif'};
-            font-size: 12px;
-            line-height: 1.4;
-            color: #333;
-            direction: {'rtl' if is_fa else 'ltr'};
-          }}
-          .header {{
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-            padding-bottom: 10px;
-            border-bottom: 2px solid #366092;
-          }}
-          .title {{
-            font-size: 18px;
-            font-weight: bold;
-            color: #366092;
-          }}
-          .meta {{
-            font-size: 11px;
-            color: #666;
-          }}
-          .table-wrapper {{
-            overflow-x: auto;
-            margin: 20px 0;
-          }}
-          .report-table {{
-            width: 100%;
-            border-collapse: collapse;
-            margin: 0;
-            font-size: 11px;
-          }}
-          .report-table thead {{
-            background-color: #366092;
-            color: white;
-          }}
-          .report-table th {{
-            border: 1px solid #d7dde6;
-            padding: 8px 6px;
-            text-align: {'right' if is_fa else 'left'};
-            font-weight: bold;
-            white-space: nowrap;
-          }}
-          .report-table tbody tr:nth-child(even) {{
-            background-color: #f8f9fa;
-          }}
-          .report-table tbody tr:hover {{
-            background-color: #e9ecef;
-          }}
-          tbody td {{
-            border: 1px solid #d7dde6;
-            padding: 5px 4px;
-            vertical-align: top;
-            overflow-wrap: anywhere;
-            word-break: break-word;
-            white-space: normal;
-            text-align: {'right' if is_fa else 'left'};
-          }}
-          .footer {{
-            position: running(footer);
-            font-size: 10px;
-            color: #666;
-            margin-top: 8px;
-            text-align: {'left' if is_fa else 'right'};
-          }}
-        </style>
-      </head>
-      <body>
-        <div class="header">
-          <div>
-            <div class="title">{title_text}</div>
-            <div class="meta">{label_biz}: {escape(business_name)}</div>
-          </div>
-          <div class="meta">{label_date}: {escape(now)}</div>
-        </div>
-        <div class="table-wrapper">
-          <table class="report-table">
-            <thead>
-              <tr>{headers_html}</tr>
-            </thead>
-            <tbody>
-              {''.join(rows_html)}
-            </tbody>
-          </table>
-        </div>
-        <div class="footer">{footer_text}</div>
-      </body>
-    </html>
-    """
-
-    final_html = resolved_html or table_html
+    # HTML پیش‌فرض جدول با قالب فایل
+    disposition = "attachment"
+    try:
+        disposition = str(body.get("disposition") or "attachment")
+    except Exception:
+        disposition = "attachment"
+    paper_size = None
+    orientation = None
+    try:
+        paper_size = body.get("paper_size")
+        orientation = body.get("orientation")
+    except Exception:
+        pass
+    final_html = resolved_html or render_template(
+        "pdf/receipts_payments/list.html",
+        {
+            **template_context,
+            "title_text": title_text,
+            "paper_size": paper_size,
+            "orientation": orientation,
+            "footer_text": footer_text,
+        },
+    )
 
     font_config = FontConfiguration()
     pdf_bytes = HTML(string=final_html).write_pdf(font_config=font_config)
@@ -1004,7 +781,7 @@ async def export_receipts_payments_pdf(
         content=pdf_bytes,
         media_type="application/pdf",
         headers={
-            "Content-Disposition": f"attachment; filename={filename}",
+            "Content-Disposition": f"{disposition}; filename={filename}",
             "Content-Length": str(len(pdf_bytes)),
             "Access-Control-Expose-Headers": "Content-Disposition",
         },

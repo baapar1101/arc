@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:flutter/services.dart';
-import '../../../utils/number_formatters.dart';
+
 import '../../../models/product_form_data.dart';
+import '../../../utils/number_formatters.dart';
+import '../../../utils/number_normalizer.dart';
 import '../../../utils/product_form_validator.dart';
 
 class ProductPricingInventorySection extends StatelessWidget {
@@ -60,6 +62,7 @@ class ProductPricingInventorySection extends StatelessWidget {
                   decoration: InputDecoration(labelText: t.reorderPointRepeat),
                   keyboardType: TextInputType.number,
                   inputFormatters: [
+                    const EnglishDigitsFormatter(),
                     FilteringTextInputFormatter.digitsOnly,
                   ],
                   validator: (value) => ProductFormValidator.validateQuantity(value, fieldName: t.reorderPointRepeat),
@@ -73,6 +76,7 @@ class ProductPricingInventorySection extends StatelessWidget {
                   decoration: InputDecoration(labelText: t.minOrderQty),
                   keyboardType: TextInputType.number,
                   inputFormatters: [
+                    const EnglishDigitsFormatter(),
                     FilteringTextInputFormatter.digitsOnly,
                   ],
                   validator: (value) => ProductFormValidator.validateQuantity(value, fieldName: t.minOrderQty),
@@ -86,6 +90,7 @@ class ProductPricingInventorySection extends StatelessWidget {
                   decoration: InputDecoration(labelText: t.leadTimeDays),
                   keyboardType: TextInputType.number,
                   inputFormatters: [
+                    const EnglishDigitsFormatter(),
                     FilteringTextInputFormatter.digitsOnly,
                   ],
                   validator: ProductFormValidator.validateLeadTime,
@@ -110,7 +115,10 @@ class ProductPricingInventorySection extends StatelessWidget {
           initialValue: formData.baseSalesPrice?.toString(),
           decoration: InputDecoration(labelText: t.salesPrice),
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          inputFormatters: [ThousandsSeparatorInputFormatter()],
+          inputFormatters: [
+            const EnglishDigitsFormatter(),
+            ThousandsSeparatorInputFormatter(),
+          ],
           validator: (value) => ProductFormValidator.validatePrice(value, fieldName: t.salesPrice),
           onChanged: (value) => _updateFormData(formData.copyWith(baseSalesPrice: num.tryParse(value.replaceAll(',', '')))),
         ),
@@ -126,7 +134,10 @@ class ProductPricingInventorySection extends StatelessWidget {
           initialValue: formData.basePurchasePrice?.toString(),
           decoration: InputDecoration(labelText: t.purchasePrice),
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          inputFormatters: [ThousandsSeparatorInputFormatter()],
+          inputFormatters: [
+            const EnglishDigitsFormatter(),
+            ThousandsSeparatorInputFormatter(),
+          ],
           validator: (value) => ProductFormValidator.validatePrice(value, fieldName: t.purchasePrice),
           onChanged: (value) => _updateFormData(formData.copyWith(basePurchasePrice: num.tryParse(value.replaceAll(',', '')))),
         ),
@@ -319,7 +330,10 @@ class ProductPricingInventorySection extends StatelessWidget {
                   initialValue: price.toString(),
                   decoration: InputDecoration(labelText: t.price),
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  inputFormatters: [ThousandsSeparatorInputFormatter()],
+                  inputFormatters: [
+                    const EnglishDigitsFormatter(),
+                    ThousandsSeparatorInputFormatter(),
+                  ],
                   validator: (v) => (num.tryParse((v ?? '').replaceAll(',', '')) == null) ? t.invalid : null,
                   onChanged: (v) => price = num.tryParse((v).replaceAll(',', '')) ?? 0,
                 ),

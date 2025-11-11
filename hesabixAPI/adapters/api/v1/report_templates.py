@@ -200,6 +200,10 @@ async def set_default_template(
 	template_id = int((body or {}).get("template_id") or 0)
 	if template_id <= 0:
 		raise ApiError("VALIDATION_ERROR", "template_id is required", http_status=400)
+	# فقط اجازه پیش‌فرض کردن قالب منتشرشده
+	entity_check = ReportTemplateService.get_template(db=db, template_id=template_id, business_id=business_id)
+	if not entity_check or entity_check.status != "published":
+		raise ApiError("VALIDATION_ERROR", "Only published templates can be set as default", http_status=400)
 	entity = ReportTemplateService.set_default(
 		db=db,
 		business_id=business_id,
@@ -227,15 +231,83 @@ async def preview_report_template(
 	from weasyprint.text.fonts import FontConfiguration
 	if not ctx.can_write_section("report_templates"):
 		raise ApiError("FORBIDDEN", "Missing permission: report_templates.write", http_status=403)
+	engine = str((body or {}).get("engine") or "").lower() or "jinja2"
 	content_html = (body or {}).get("content_html") or ""
 	content_css = (body or {}).get("content_css") or ""
 	context = (body or {}).get("context") or {}
-	temp = type("T", (), {"content_html": content_html, "content_css": content_css})()  # شیء موقت شبیه ReportTemplate
-	html = ReportTemplateService.render_with_template(temp, context)
-	pdf_bytes = HTML(string=html).write_pdf(font_config=FontConfiguration())
-	return {
-		"content_length": len(pdf_bytes),
-		"ok": True,
-	}
+	# محدودیت ساده روی اندازه ورودی‌ها
+	max_len = 1_000_000  # 1MB
+	if len(content_html) > max_len or len(content_css) > max_len:
+		raise ApiError("PAYLOAD_TOO_LARGE", "HTML/CSS too large for preview", http_status=413)
+	temp = type("T", (), {
+		"engine": engine,
+		"content_html": content_html,
+		"content_css": content_css,
+		"header_html": (body or {}).get("header_html") or "",
+		"footer_html": (body or {}).get("footer_html") or "",
+		"paper_size": None,
+		"orientation": None,
+		"margins": None,
+		"assets": (body or {}).get("assets") or ({"builder_design": (body or {}).get("design")} if engine == "builder" else None),
+	})()  # شیء موقت شبیه ReportTemplate
+	try:
+		html = ReportTemplateService.render_with_template(temp, context)
+	except Exception as e:
+		raise ApiError("TEMPLATE_ERROR", f"Render error: {e}", http_status=400)
+	try:
+		pdf_bytes = HTML(string=html).write_pdf(font_config=FontConfiguration())
+		return {
+			"content_length": len(pdf_bytes),
+			"ok": True,
+			"html": html,
+		}
+	except Exception as e:
+		raise ApiError("PDF_ERROR", f"PDF generation error: {e}", http_status=400)
+
+@router.get(
+	"/business/{business_id}/schema",
+	summary="Schema متغیرهای قابل‌استفاده در قالب برای ماژول/زیرنوع",
+	description="لیست کلیدها/توضیحات و نمونه context برای کمک به سازندگان قالب",
+)
+@require_business_access("business_id")
+async def report_template_schema(
+	request: Request,
+	business_id: int,
+	module_key: str,
+	subtype: Optional[str] = None,
+	ctx: AuthContext = Depends(get_current_user),
+	db: Session = Depends(get_db),
+):
+	# نمونه ساده بر اساس ماژول‌های رایج
+	def base():
+		return {
+			"keys": [
+				{"name": "title_text", "desc": "عنوان گزارش"},
+				{"name": "date_now", "desc": "تاریخ/زمان فعلی"},
+			],
+			"sample_context": {
+				"title_text": "گزارش نمونه",
+				"date_now": "1403/01/01 12:00",
+			},
+		}
+	data = base()
+	if module_key == "invoices" and (subtype or "") == "list":
+		data["keys"] += [
+			{"name": "items", "desc": "لیست فاکتورها"},
+			{"name": "table_headers_html", "desc": "HTML آماده هدر جدول"},
+			{"name": "table_rows_html", "desc": "HTML آماده ردیف‌های جدول"},
+		]
+	elif module_key == "invoices" and (subtype or "") == "detail":
+		data["keys"] += [
+			{"name": "invoice", "desc": "شیء فاکتور"},
+			{"name": "items", "desc": "آیتم‌های فاکتور"},
+		]
+	elif module_key in ("documents", "receipts_payments", "expense_income"):
+		data["keys"] += [
+			{"name": "items", "desc": "لیست رکوردها"},
+			{"name": "table_headers_html", "desc": "HTML هدر جدول"},
+			{"name": "table_rows_html", "desc": "HTML ردیف‌های جدول"},
+		]
+	return data
 
 

@@ -997,7 +997,7 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
                                   ? const SizedBox.shrink()
                                   : ElevatedButton(
                                       onPressed: () async {
-                                        if (isHidden && existingItem != null) {
+                                        if (isHidden) {
                                           _hideItem(existingItem, hidden: false);
                                         } else {
                                           _addWidgets([d.key]);

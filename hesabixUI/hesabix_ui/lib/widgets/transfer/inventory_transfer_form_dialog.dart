@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/widgets/date_input_field.dart';
 import 'package:hesabix_ui/widgets/invoice/product_combobox_widget.dart';
 import 'package:hesabix_ui/widgets/invoice/warehouse_combobox_widget.dart';
 import 'package:hesabix_ui/widgets/banking/currency_picker_widget.dart';
 import 'package:hesabix_ui/services/inventory_transfer_service.dart';
+import 'package:hesabix_ui/utils/number_normalizer.dart';
 
 class InventoryTransferFormDialog extends StatefulWidget {
   final int businessId;
@@ -181,6 +183,10 @@ class _InventoryTransferFormDialogState extends State<InventoryTransferFormDialo
             child: TextFormField(
               initialValue: (row.quantity ?? 0).toString(),
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: [
+                EnglishDigitsFormatter(),
+                FilteringTextInputFormatter.allow(RegExp(r'[-0-9.,]')),
+              ],
               decoration: const InputDecoration(isDense: true, border: OutlineInputBorder(), labelText: 'تعداد'),
               onChanged: (v) => row.quantity = num.tryParse(v.replaceAll(',', '')) ?? 0,
             ),

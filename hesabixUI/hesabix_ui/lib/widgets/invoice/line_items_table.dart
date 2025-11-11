@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../models/invoice_line_item.dart';
 import '../../utils/number_formatters.dart';
 import './product_combobox_widget.dart';
@@ -6,6 +7,7 @@ import './product_combobox_widget.dart';
 import '../../services/price_list_service.dart';
 import '../../core/api_client.dart';
 import './warehouse_combobox_widget.dart';
+import '../../utils/number_normalizer.dart';
 
 class InvoiceLineItemsTable extends StatefulWidget {
   final int businessId;
@@ -665,6 +667,10 @@ class _DiscountCellState extends State<_DiscountCell> {
       child: TextFormField(
         controller: _ctrl,
         keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        inputFormatters: [
+          EnglishDigitsFormatter(),
+          FilteringTextInputFormatter.allow(RegExp(r'[-0-9.,]')),
+        ],
         onChanged: (v) => widget.onChanged(_type, num.tryParse(v) ?? 0),
         decoration: InputDecoration(
           isDense: true,
@@ -766,6 +772,10 @@ class _TaxCellState extends State<_TaxCell> {
           child: TextFormField(
             controller: _controller,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          inputFormatters: [
+            EnglishDigitsFormatter(),
+            FilteringTextInputFormatter.allow(RegExp(r'[-0-9.,]')),
+          ],
             onChanged: (v) {
               _isUserTyping = true;
               widget.onRateChanged(num.tryParse(v) ?? 0);
@@ -870,6 +880,10 @@ class _UnitPriceCellState extends State<_UnitPriceCell> {
             controller: _ctrl,
             focusNode: _focusNode,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        inputFormatters: [
+          EnglishDigitsFormatter(),
+          FilteringTextInputFormatter.allow(RegExp(r'[-0-9.,]')),
+        ],
             onChanged: (v) {
               final cleaned = v.replaceAll(',', '');
               final price = num.tryParse(cleaned) ?? 0;
@@ -1076,6 +1090,10 @@ class _QuantityWithUnitFieldState extends State<_QuantityWithUnitField> {
       child: TextFormField(
         controller: _controller,
         keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        inputFormatters: [
+          EnglishDigitsFormatter(),
+          FilteringTextInputFormatter.allow(RegExp(r'[-0-9.,]')),
+        ],
         onChanged: (v) {
           // فقط عدد ورودی کاربر را می‌خوانیم
           final cleaned = v.replaceAll(',', '');

@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../models/account_model.dart';
 import '../../services/account_service.dart';
@@ -28,11 +27,9 @@ class AccountComboboxWidget extends StatefulWidget {
 class _AccountComboboxWidgetState extends State<AccountComboboxWidget> {
   final AccountService _accountService = AccountService();
   final TextEditingController _searchController = TextEditingController();
-  Timer? _debounceTimer;
   
   List<Account> _accounts = [];
   bool _isLoading = false;
-  bool _isSearching = false;
 
   @override
   void initState() {
@@ -43,7 +40,6 @@ class _AccountComboboxWidgetState extends State<AccountComboboxWidget> {
 
   @override
   void dispose() {
-    _debounceTimer?.cancel();
     _searchController.dispose();
     super.dispose();
   }
@@ -74,52 +70,6 @@ class _AccountComboboxWidgetState extends State<AccountComboboxWidget> {
     }
   }
 
-  void _onQueryChanged(String query) {
-    _debounceTimer?.cancel();
-    _debounceTimer = Timer(const Duration(milliseconds: 300), () {
-      _performSearch(query);
-    });
-  }
-
-  Future<void> _performSearch(String query) async {
-    if (_isSearching) return;
-    
-    setState(() {
-      _isSearching = true;
-    });
-
-    try {
-      final response = await _accountService.searchAccounts(
-        businessId: widget.businessId,
-        searchQuery: query.isEmpty ? null : query,
-        limit: 50,
-      );
-      
-      final items = (response['items'] as List<dynamic>?)
-          ?.map((item) => Account.fromJson(item as Map<String, dynamic>))
-          .toList() ?? [];
-      
-      if (mounted) {
-        setState(() {
-          _accounts = items;
-        });
-      }
-    } catch (e) {
-      print('خطا در جستجوی حساب‌ها: $e');
-      if (mounted) {
-        setState(() {
-          _accounts = [];
-        });
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isSearching = false;
-        });
-      }
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return TextFormField(
@@ -127,7 +77,7 @@ class _AccountComboboxWidgetState extends State<AccountComboboxWidget> {
       decoration: InputDecoration(
         labelText: widget.label,
         hintText: widget.hintText,
-        suffixIcon: _isLoading || _isSearching
+        suffixIcon: _isLoading
             ? const SizedBox(
                 width: 20,
                 height: 20,

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:flutter/services.dart';
+import 'package:hesabix_ui/l10n/app_localizations.dart';
+
 import '../../models/person_model.dart';
 import '../../services/person_service.dart';
+import '../../utils/number_normalizer.dart';
 
 class PersonFormDialog extends StatefulWidget {
   final int businessId;
@@ -488,7 +490,10 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
                   suffixText: '%',
                 ),
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
+                inputFormatters: [
+                  const EnglishDigitsFormatter(),
+                  FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+                ],
                 validator: (v) {
                   if ((isMarketer || isSeller) && (v != null && v.isNotEmpty)) {
                     final num? val = num.tryParse(v);
@@ -507,7 +512,10 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
                   suffixText: '%',
                 ),
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
+                inputFormatters: [
+                  const EnglishDigitsFormatter(),
+                  FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+                ],
                 validator: (v) {
                   if ((isMarketer || isSeller) && (v != null && v.isNotEmpty)) {
                     final num? val = num.tryParse(v);
@@ -529,7 +537,10 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
                   labelText: t.salesAmount,
                 ),
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
+                inputFormatters: [
+                  const EnglishDigitsFormatter(),
+                  FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+                ],
                 validator: (v) {
                   if (v != null && v.isNotEmpty) {
                     final num? val = num.tryParse(v);
@@ -547,7 +558,10 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
                   labelText: t.salesReturnAmount,
                 ),
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
+                inputFormatters: [
+                  const EnglishDigitsFormatter(),
+                  FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+                ],
                 validator: (v) {
                   if (v != null && v.isNotEmpty) {
                     final num? val = num.tryParse(v);
@@ -631,6 +645,10 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
                     ),
                   ),
                 ),
+                inputFormatters: [
+                  const EnglishDigitsFormatter(),
+                  FilteringTextInputFormatter.digitsOnly,
+                ],
                 keyboardType: TextInputType.number,
                 validator: (value) {
                   if (!_autoGenerateCode) {
@@ -680,6 +698,10 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
                     labelText: t.shareCount,
                     hintText: t.integerNoDecimal,
                   ),
+                  inputFormatters: [
+                    const EnglishDigitsFormatter(),
+                    FilteringTextInputFormatter.digitsOnly,
+                  ],
                   keyboardType: TextInputType.number,
                   validator: (value) {
                     if (_selectedPersonTypes.contains(PersonType.shareholder)) {

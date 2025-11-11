@@ -6,6 +6,7 @@ from uuid import UUID
 from fastapi import UploadFile, HTTPException
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
+import logging
 
 from adapters.db.repositories.file_storage_repository import (
     FileStorageRepository, 
@@ -21,6 +22,7 @@ class FileStorageService:
         self.file_repo = FileStorageRepository(db)
         self.config_repo = StorageConfigRepository(db)
         self.verification_repo = FileVerificationRepository(db)
+        self.logger = logging.getLogger(__name__)
 
     async def upload_file(
         self,
@@ -74,7 +76,7 @@ class FileStorageService:
                 file_path=file_path,
                 file_size=file_size,
                 mime_type=file.content_type or "application/octet-stream",
-                storage_type=storage_config.storage_type,
+                storage_type=(storage_config.storage_type or "local").lower(),
                 uploaded_by=user_id,
                 module_context=module_context,
                 context_id=context_id,
@@ -145,10 +147,36 @@ class FileStorageService:
             return False
 
         # حذف فایل از storage
+        try:
+            self.logger.info(
+                "file_delete_attempt",
+                extra={
+                    "file_id": str(file_id),
+                    "path": file_storage.file_path,
+                    "storage_type": file_storage.storage_type,
+                },
+            )
+        except Exception:
+            pass
         await self._delete_file_from_storage(file_storage.file_path, file_storage.storage_type)
         
         # حذف نرم از دیتابیس
-        return await self.file_repo.soft_delete_file(file_id)
+        try:
+            ok = await self.file_repo.soft_delete_file(file_id)
+            try:
+                self.logger.info(
+                    "file_soft_deleted",
+                    extra={"file_id": str(file_id), "ok": ok},
+                )
+            except Exception:
+                pass
+            return ok
+        except Exception as e:
+            try:
+                self.logger.exception("file_soft_delete_failed")
+            except Exception:
+                pass
+            raise
 
     async def verify_file_usage(self, file_id: UUID, verification_data: Dict) -> bool:
         return await self.file_repo.verify_file(file_id, verification_data)
@@ -210,18 +238,84 @@ class FileStorageService:
             pass
 
     async def _read_file_from_storage(self, file_path: str, storage_type: str) -> bytes:
-        if storage_type == "local":
+        st = (storage_type or "").lower()
+        if st == "local":
             with open(file_path, "rb") as f:
                 return f.read()
-        elif storage_type == "ftp":
+        elif st == "ftp":
             # TODO: پیاده‌سازی FTP download
             pass
         return b""
 
     async def _delete_file_from_storage(self, file_path: str, storage_type: str):
-        if storage_type == "local":
-            if os.path.exists(file_path):
-                os.remove(file_path)
-        elif storage_type == "ftp":
-            # TODO: پیاده‌سازی FTP delete
+        st = (storage_type or "").lower()
+        try:
+            self.logger.info(
+                "storage_delete_start",
+                extra={
+                    "storage_type": st,
+                    "path": file_path,
+                    "exists_before": os.path.exists(file_path),
+                },
+            )
+        except Exception:
             pass
+        if st == "local":
+            try:
+                path = file_path
+                existed = os.path.exists(path)
+                # اگر مسیر موجود نیست، یک مسیر جایگزین بر اساس default storage_config امتحان کن
+                alt_path = None
+                if not existed:
+                    try:
+                        default_cfg = await self.config_repo.get_default_config()
+                        if default_cfg and isinstance(default_cfg.config_data, dict):
+                            base_path = default_cfg.config_data.get("base_path")
+                            if base_path:
+                                alt_path = os.path.join(str(base_path), os.path.basename(file_path))
+                    except Exception:
+                        alt_path = None
+                # حذف مسیر اصلی یا جایگزین
+                target_path = path
+                if not existed and alt_path and os.path.exists(alt_path):
+                    target_path = alt_path
+                if os.path.exists(target_path):
+                    os.remove(file_path)
+                    try:
+                        self.logger.info(
+                            "storage_delete_done",
+                            extra={
+                                "storage_type": st,
+                                "path": target_path,
+                                "exists_after": os.path.exists(target_path),
+                                "used_alt_path": target_path != path,
+                                "alt_path": alt_path,
+                            },
+                        )
+                    except Exception:
+                        pass
+                else:
+                    try:
+                        self.logger.warning(
+                            "storage_delete_path_not_found",
+                            extra={"storage_type": st, "path": path, "alt_path": alt_path},
+                        )
+                    except Exception:
+                        pass
+            except Exception as e:
+                try:
+                    self.logger.exception(
+                        "storage_delete_failed",
+                        extra={"storage_type": st, "path": file_path},
+                    )
+                except Exception:
+                    pass
+        elif st == "ftp":
+            # TODO: پیاده‌سازی FTP delete
+            try:
+                self.logger.warning(
+                    "storage_delete_unimplemented",
+                    extra={"storage_type": st, "path": file_path},
+                )
+            except Exception:
+                pass

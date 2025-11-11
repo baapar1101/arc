@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="{{ 'fa' if is_fa else 'en' }}" dir="{{ 'rtl' if is_fa else 'ltr' }}">
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      @page {
+        size: {{ paper_size or 'A4' }} {{ orientation or 'landscape' }};
+        margin: 12mm 12mm 16mm 12mm;
+        @bottom-center { 
+          content: "{{ 'صفحه' if is_fa else 'Page' }} " counter(page) " / " counter(pages); 
+          font-size: 10px; 
+          color: #777; 
+        }
+      }
+      html[dir="rtl"] body { font-family: sans-serif; }
+      html[dir="ltr"] body { font-family: sans-serif; }
+      body { font-size: 12px; color: #222; }
+      .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+      .title { font-weight: 700; font-size: 16px; }
+      .meta { font-size: 11px; color: #666; }
+      table { width: 100%; border-collapse: collapse; }
+      thead th { 
+        background: #f8fafc; 
+        border-bottom: 1px solid #e5e7eb; 
+        padding: 6px; 
+        text-align: {{ 'right' if is_fa else 'left' }}; 
+      }
+      tbody td { border-bottom: 1px solid #f1f5f9; padding: 6px; }
+      tbody tr:nth-child(even) { background: #fcfcfd; }
+      .num { text-align: {{ 'left' if is_fa else 'right' }}; font-variant-numeric: tabular-nums; }
+      tfoot td { padding: 8px 6px; border-top: 2px solid #e5e7eb; font-weight: 600; background: #fafafa; }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <div class="title">{{ title_text }}</div>
+      <div class="meta">
+        {{ business_name }} • {{ generated_at }}
+      </div>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>{{ 'تاریخ سند' if is_fa else 'Date' }}</th>
+          <th>{{ 'کد سند' if is_fa else 'Code' }}</th>
+          <th>{{ 'نوع سند' if is_fa else 'Type' }}</th>
+          <th>{{ 'انبار' if is_fa else 'Warehouse' }}</th>
+          <th>{{ 'جهت' if is_fa else 'Movement' }}</th>
+          <th>{{ 'شرح' if is_fa else 'Description' }}</th>
+          <th class="num">{{ 'بدهکار' if is_fa else 'Debit' }}</th>
+          <th class="num">{{ 'بستانکار' if is_fa else 'Credit' }}</th>
+          <th class="num">{{ 'تعداد' if is_fa else 'Qty' }}</th>
+          {% if show_running %}
+          <th class="num">{{ 'مانده مبلغ' if is_fa else 'Balance Amt' }}</th>
+          <th class="num">{{ 'مانده تعداد' if is_fa else 'Balance Qty' }}</th>
+          {% endif %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for it in items %}
+        <tr>
+          <td>{{ it.document_date }}</td>
+          <td>{{ it.document_code }}</td>
+          <td>{{ it.document_type }}</td>
+          <td>{{ it.warehouse_name or it.warehouse_id }}</td>
+          <td>{{ it.movement }}</td>
+          <td>{{ it.description }}</td>
+          <td class="num">{{ it.debit | format_amount(0) }}</td>
+          <td class="num">{{ it.credit | format_amount(0) }}</td>
+          <td class="num">{{ it.quantity }}</td>
+          {% if show_running %}
+          <td class="num">{{ it.running_amount | format_amount(0) }}</td>
+          <td class="num">{{ it.running_quantity }}</td>
+          {% endif %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </body>
+  </html>
+*** End Patch*** }``` ***!
+

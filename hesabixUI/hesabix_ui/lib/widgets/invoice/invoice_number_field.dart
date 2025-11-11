@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../utils/number_normalizer.dart';
+
 class InvoiceNumberField extends StatefulWidget {
   final String? initialValue;
   final ValueChanged<String?> onChanged;
@@ -168,6 +170,7 @@ class _InvoiceNumberFieldState extends State<InvoiceNumberField> {
                 widget.onChanged(value.isEmpty ? null : value);
               },
               inputFormatters: [
+                const EnglishDigitsFormatter(),
                 // فقط اعداد و حروف انگلیسی و خط تیره و زیرخط
                 FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9\-_]')),
               ],

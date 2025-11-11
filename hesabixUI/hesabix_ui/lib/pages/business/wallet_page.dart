@@ -18,6 +18,7 @@ import 'package:dio/dio.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_widget.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
 import '../../core/calendar_controller.dart';
+import 'package:hesabix_ui/utils/number_normalizer.dart';
 
 class WalletPage extends StatefulWidget {
   final int businessId;
@@ -147,6 +148,10 @@ class _WalletPageState extends State<WalletPage> {
                   controller: amountCtrl,
                   decoration: const InputDecoration(labelText: 'مبلغ'),
                   keyboardType: TextInputType.number,
+                  inputFormatters: [
+                    EnglishDigitsFormatter(),
+                    FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+                  ],
                   validator: (v) => (v == null || v.isEmpty) ? 'الزامی' : null,
                 ),
                 const SizedBox(height: 8),
@@ -220,6 +225,10 @@ class _WalletPageState extends State<WalletPage> {
                   controller: amountCtrl,
                   decoration: const InputDecoration(labelText: 'مبلغ'),
                   keyboardType: TextInputType.number,
+                  inputFormatters: [
+                    EnglishDigitsFormatter(),
+                    FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+                  ],
                   validator: (v) => (v == null || v.isEmpty) ? 'الزامی' : null,
                 ),
                 const SizedBox(height: 8),

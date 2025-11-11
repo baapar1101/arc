@@ -2100,6 +2100,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dataRestoreDescription => 'Restore data from previous backup';
 
   @override
+  String get restoreModeNewBusiness => 'Create a new business';
+
+  @override
+  String get restoreModeReplace => 'Replace existing data';
+
+  @override
+  String get selectBackupFile => 'Select backup file (.hbx)';
+
+  @override
   String get manage => 'Manage';
 
   @override
@@ -3012,4 +3021,175 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get create => 'Create';
+
+  @override
+  String get notificationsSettingsTitle => 'Notification Settings';
+
+  @override
+  String get notificationsSettingsSubtitle =>
+      'Enable delivery channels, send test messages, and maintain provider credentials.';
+
+  @override
+  String get notificationsOverviewTitle => 'Keep your team informed';
+
+  @override
+  String get notificationsOverviewDescription =>
+      'Choose which channels deliver operational alerts and guide administrators on how notifications are routed.';
+
+  @override
+  String get notificationsGuidanceItemChannels =>
+      'Toggle channels to match each business unit\'s availability and compliance requirements.';
+
+  @override
+  String get notificationsGuidanceItemTemplates =>
+      'Ensure notification templates exist and are published for every channel and language you enable.';
+
+  @override
+  String get notificationsGuidanceItemTesting =>
+      'Use test buttons after configuration changes to verify the end-to-end delivery path.';
+
+  @override
+  String get notificationsLearnMore => 'View documentation';
+
+  @override
+  String get notificationsDocumentationUrl =>
+      'https://docs.hesabix.com/notifications';
+
+  @override
+  String get notificationsChannelsSectionTitle => 'Delivery channels';
+
+  @override
+  String get notificationsChannelsSectionSubtitle =>
+      'Activated channels are used whenever the system emits an announcement or operational alert.';
+
+  @override
+  String get notificationsChannelTelegram => 'Telegram';
+
+  @override
+  String get notificationsChannelTelegramDescription =>
+      'Send alerts through the connected Telegram bot to subscribed operators.';
+
+  @override
+  String get notificationsChannelEmail => 'Email';
+
+  @override
+  String get notificationsChannelEmailDescription =>
+      'Deliver messages via the default email gateway configured in system settings.';
+
+  @override
+  String get notificationsChannelSms => 'SMS';
+
+  @override
+  String get notificationsChannelSmsDescription =>
+      'Send short messages via the configured SMS provider for high-priority events.';
+
+  @override
+  String get notificationsChannelInApp => 'In-app';
+
+  @override
+  String get notificationsChannelInAppDescription =>
+      'Display alerts inside the Hesabix web and mobile applications instantly.';
+
+  @override
+  String get notificationsSaveSuccess => 'Notification settings saved.';
+
+  @override
+  String get notificationsSaveError => 'Unable to save notification settings.';
+
+  @override
+  String get notificationsTestSectionTitle => 'Send test messages';
+
+  @override
+  String get notificationsTestSectionSubtitle =>
+      'Send a lightweight test over the selected channel to validate credentials and routing.';
+
+  @override
+  String notificationsTestButton(String channel) {
+    return 'Test $channel';
+  }
+
+  @override
+  String notificationsTestSuccess(String channel) {
+    return 'Test notification sent via $channel.';
+  }
+
+  @override
+  String notificationsTestError(String channel) {
+    return 'Failed to send test via $channel.';
+  }
+
+  @override
+  String get notificationsWebsocketInfoTitle =>
+      'Real-time in-app notifications';
+
+  @override
+  String notificationsWebsocketInfoDescription(String endpoint) {
+    return 'Clients subscribe to the WebSocket endpoint $endpoint with a valid API key. Web and mobile apps handle this automatically.';
+  }
+
+  @override
+  String get notificationsAdvancedSectionTitle =>
+      'Advanced configuration (admin)';
+
+  @override
+  String get notificationsAdvancedSectionSubtitle =>
+      'Manage provider credentials for Telegram and SMS gateways. Requires the system_settings permission.';
+
+  @override
+  String get notificationsAdvancedTelegramHeader => 'Telegram bot setup';
+
+  @override
+  String get notificationsFieldTelegramToken => 'Bot token';
+
+  @override
+  String get notificationsFieldTelegramUsername => 'Bot username';
+
+  @override
+  String get notificationsFieldTelegramWebhookSecret => 'Webhook secret';
+
+  @override
+  String get notificationsFieldTelegramSecretHeader => 'Secret header name';
+
+  @override
+  String get notificationsFieldTelegramTokenHint =>
+      'Obtain from BotFather (format: 123456789:ABC...).';
+
+  @override
+  String get notificationsFieldTelegramWebhookSecretHint =>
+      'Optional shared secret used to validate incoming webhook calls.';
+
+  @override
+  String get notificationsAdvancedSmsHeader => 'SMS gateway';
+
+  @override
+  String get notificationsFieldSmsProvider => 'Provider name';
+
+  @override
+  String get notificationsFieldSmsApiKey => 'API key';
+
+  @override
+  String get notificationsFieldSmsApiKeyHint =>
+      'Issued by your SMS provider; consider rotating it periodically.';
+
+  @override
+  String get notificationsFieldSmsSender => 'Sender number or ID';
+
+  @override
+  String get notificationsFieldSmsSenderHint =>
+      'Exact sender value registered with your provider.';
+
+  @override
+  String get notificationsAdvancedRestartHint =>
+      'Apply changes during low traffic hours; background workers may require a restart.';
+
+  @override
+  String get notificationsAdvancedSave => 'Save advanced settings';
+
+  @override
+  String get notificationsAdvancedSaveSuccess =>
+      'Advanced notification settings saved.';
+
+  @override
+  String get notificationsAdvancedSaveError =>
+      'Unable to save advanced notification settings.';
 }
