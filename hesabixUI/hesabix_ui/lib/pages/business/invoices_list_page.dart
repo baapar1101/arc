@@ -11,6 +11,7 @@ import 'package:hesabix_ui/widgets/date_input_field.dart';
 import 'package:hesabix_ui/core/date_utils.dart' show HesabixDateUtils;
 import 'package:hesabix_ui/utils/number_formatters.dart' show formatWithThousands;
 import 'package:hesabix_ui/widgets/document/document_details_dialog.dart';
+import 'package:hesabix_ui/services/invoice_service.dart';
 
 /// صفحه لیست فاکتورها با ویجت جدول عمومی
 class InvoicesListPage extends StatefulWidget {
@@ -33,6 +34,7 @@ class InvoicesListPage extends StatefulWidget {
 
 class _InvoicesListPageState extends State<InvoicesListPage> {
   final GlobalKey _tableKey = GlobalKey();
+  final InvoiceService _invoiceService = InvoiceService();
 
   String? _selectedInvoiceType;
   DateTime? _fromDate;
@@ -89,17 +91,9 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'فاکتورها',
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
+                Text(t.invoices, style: Theme.of(context).textTheme.titleLarge),
                 const SizedBox(height: 4),
-                Text(
-                  'مدیریت لیست فاکتورها',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                ),
+                Text(t.invoicesListManage, style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant)),
               ],
             ),
           ),
@@ -124,15 +118,15 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
             children: [
               Expanded(
                 child: SegmentedButton<String?>(
-                  segments: const [
-                    ButtonSegment<String?>(value: null, label: Text('همه'), icon: Icon(Icons.all_inclusive)),
-                    ButtonSegment<String?>(value: 'invoice_sales', label: Text('فروش'), icon: Icon(Icons.sell_outlined)),
-                    ButtonSegment<String?>(value: 'invoice_purchase', label: Text('خرید'), icon: Icon(Icons.shopping_cart_outlined)),
-                    ButtonSegment<String?>(value: 'invoice_sales_return', label: Text('برگشت فروش'), icon: Icon(Icons.undo_outlined)),
-                    ButtonSegment<String?>(value: 'invoice_purchase_return', label: Text('برگشت خرید'), icon: Icon(Icons.undo)),
-                    ButtonSegment<String?>(value: 'invoice_production', label: Text('تولید'), icon: Icon(Icons.factory_outlined)),
-                    ButtonSegment<String?>(value: 'invoice_direct_consumption', label: Text('مصرف مستقیم'), icon: Icon(Icons.dining_outlined)),
-                    ButtonSegment<String?>(value: 'invoice_waste', label: Text('ضایعات'), icon: Icon(Icons.delete_outline)),
+                  segments: [
+                    ButtonSegment<String?>(value: null, label: Text(t.all), icon: const Icon(Icons.all_inclusive)),
+                    ButtonSegment<String?>(value: 'invoice_sales', label: Text(t.invoiceTypeSales), icon: const Icon(Icons.sell_outlined)),
+                    ButtonSegment<String?>(value: 'invoice_purchase', label: Text(t.invoiceTypePurchase), icon: const Icon(Icons.shopping_cart_outlined)),
+                    ButtonSegment<String?>(value: 'invoice_sales_return', label: Text(t.invoiceTypeSalesReturn), icon: const Icon(Icons.undo_outlined)),
+                    ButtonSegment<String?>(value: 'invoice_purchase_return', label: Text(t.invoiceTypePurchaseReturn), icon: const Icon(Icons.undo)),
+                    ButtonSegment<String?>(value: 'invoice_production', label: Text(t.invoiceTypeProduction), icon: const Icon(Icons.factory_outlined)),
+                    ButtonSegment<String?>(value: 'invoice_direct_consumption', label: Text(t.invoiceTypeDirectConsumption), icon: const Icon(Icons.dining_outlined)),
+                    ButtonSegment<String?>(value: 'invoice_waste', label: Text(t.invoiceTypeWaste), icon: const Icon(Icons.delete_outline)),
                   ],
                   selected: _selectedInvoiceType != null ? {_selectedInvoiceType} : <String?>{},
                   onSelectionChanged: (set) {
@@ -158,8 +152,8 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
                           setState(() => _fromDate = date);
                           _refreshData();
                         },
-                        labelText: 'از تاریخ',
-                        hintText: 'انتخاب تاریخ شروع',
+                        labelText: t.dateFrom,
+                        hintText: t.selectDate,
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -171,8 +165,8 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
                           setState(() => _toDate = date);
                           _refreshData();
                         },
-                        labelText: 'تا تاریخ',
-                        hintText: 'انتخاب تاریخ پایان',
+                        labelText: t.dateTo,
+                        hintText: t.selectDate,
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -185,7 +179,7 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
                         _refreshData();
                       },
                       icon: const Icon(Icons.clear),
-                      tooltip: 'پاک کردن فیلتر تاریخ',
+                      tooltip: t.clearDateFilter,
                     ),
                   ],
                 ),
@@ -194,10 +188,10 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
               Expanded(
                 flex: 2,
                 child: SegmentedButton<bool?>(
-                  segments: const [
-                    ButtonSegment<bool?>(value: null, label: Text('همه')),
-                    ButtonSegment<bool?>(value: true, label: Text('پیشفاکتور')),
-                    ButtonSegment<bool?>(value: false, label: Text('قطعی')),
+                  segments: [
+                    ButtonSegment<bool?>(value: null, label: Text(t.all)),
+                    ButtonSegment<bool?>(value: true, label: Text(t.proforma)),
+                    ButtonSegment<bool?>(value: false, label: Text(t.finalized)),
                   ],
                   selected: {_isProforma},
                   onSelectionChanged: (set) {
@@ -216,7 +210,7 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
   DataTableConfig<InvoiceListItem> _buildTableConfig(AppLocalizations t) {
     return DataTableConfig<InvoiceListItem>(
       endpoint: '/invoices/business/${widget.businessId}/search',
-      title: 'فاکتورها',
+      title: t.invoices,
       excelEndpoint: '/invoices/business/${widget.businessId}/export/excel',
       pdfEndpoint: '/invoices/business/${widget.businessId}/export/pdf',
       businessId: widget.businessId,
@@ -226,46 +220,53 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
         // عملیات
         ActionColumn(
           'actions',
-          'عملیات',
+          t.actions,
           actions: [
             DataTableAction(
               icon: Icons.visibility,
-              label: 'مشاهده',
+              label: t.view,
               onTap: (item) => _onView(item as InvoiceListItem),
             ),
             if (widget.authStore.canWriteSection('invoices'))
               DataTableAction(
                 icon: Icons.edit,
-                label: 'ویرایش',
+                label: t.edit,
                 onTap: (item) => _onEdit(item as InvoiceListItem),
+              ),
+            if (widget.authStore.canWriteSection('invoices'))
+              DataTableAction(
+                icon: Icons.delete,
+                label: t.delete,
+                onTap: (item) => _onDelete(item as InvoiceListItem),
+                isDestructive: true,
               ),
           ],
         ),
         // کد سند
-        TextColumn('code', 'کد', formatter: (item) => item.code, width: ColumnWidth.small),
+        TextColumn('code', t.code, formatter: (item) => item.code, width: ColumnWidth.small),
         // نوع
-        TextColumn('document_type', 'نوع', formatter: (item) => item.documentTypeName, width: ColumnWidth.medium),
+        TextColumn('document_type', t.type, formatter: (item) => item.documentTypeName, width: ColumnWidth.medium),
         // تاریخ سند
         DateColumn(
           'document_date',
-          'تاریخ',
+          t.documentDate,
           width: ColumnWidth.medium,
           formatter: (item) => HesabixDateUtils.formatForDisplay(item.documentDate, widget.calendarController.isJalali),
         ),
         // مبلغ کل
         NumberColumn(
           'total_amount',
-          'مبلغ کل',
+          t.totalAmount,
           width: ColumnWidth.large,
           formatter: (item) => item.totalAmount != null ? formatWithThousands(item.totalAmount!) : '-',
           suffix: ' ریال',
         ),
         // ارز
-        TextColumn('currency_code', 'ارز', formatter: (item) => item.currencyCode ?? 'نامشخص', width: ColumnWidth.small),
+        TextColumn('currency_code', t.currency, formatter: (item) => item.currencyCode ?? t.unknown, width: ColumnWidth.small),
         // ایجادکننده
-        TextColumn('created_by_name', 'ایجادکننده', formatter: (item) => item.createdByName ?? 'نامشخص', width: ColumnWidth.medium),
+        TextColumn('created_by_name', t.createdBy, formatter: (item) => item.createdByName ?? t.unknown, width: ColumnWidth.medium),
         // وضعیت
-        TextColumn('is_proforma', 'وضعیت', formatter: (item) => item.isProforma ? 'پیشفاکتور' : 'قطعی', width: ColumnWidth.small),
+        TextColumn('is_proforma', t.status, formatter: (item) => item.isProforma ? t.proforma : t.finalized, width: ColumnWidth.small),
       ],
       searchFields: const ['code', 'description'],
       filterFields: const ['document_type'],
@@ -287,9 +288,9 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
         if (_isProforma != null) 'is_proforma': _isProforma,
       },
       onRowTap: (item) => _onView(item as InvoiceListItem),
-      emptyStateMessage: 'هیچ فاکتوری یافت نشد',
-      loadingMessage: 'در حال بارگذاری فاکتورها...',
-      errorMessage: 'خطا در بارگذاری فاکتورها',
+      emptyStateMessage: t.noInvoicesFound,
+      loadingMessage: t.loadingInvoices,
+      errorMessage: t.errorLoadingInvoices,
     );
   }
 
@@ -326,6 +327,83 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
     );
     if (!mounted) return;
     _refreshData();
+  }
+
+  Future<void> _onDelete(InvoiceListItem item) async {
+    final t = AppLocalizations.of(context);
+    // نمایش dialog تأیید
+    final confirmed = await showDialog<bool>(
+      context: context,
+      useRootNavigator: true,
+      builder: (context) => AlertDialog(
+        title: Text(t.deleteConfirmTitle),
+        content: Text(t.deleteInvoiceConfirm(item.code)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(t.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: Text(t.delete),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    // نمایش لودینگ
+    final navigator = Navigator.of(context, rootNavigator: true);
+    showDialog<void>(
+      context: context,
+      useRootNavigator: true,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      final success = await _invoiceService.deleteInvoice(
+        businessId: widget.businessId,
+        invoiceId: item.id,
+      );
+
+      // همیشه ابتدا لودینگ را ببندیم (حتی اگر mounted=false شده باشد)
+      // از navigator از پیش گرفته‌شده استفاده می‌کنیم تا pop روی route درست انجام شود
+      if (navigator.canPop()) {
+        navigator.pop();
+      }
+
+      if (!mounted) return;
+
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(t.deletedInvoiceSuccess(item.code)),
+            backgroundColor: Colors.green,
+          ),
+        );
+        _refreshData();
+      } else {
+        throw Exception(t.deleteInvoiceError);
+      }
+    } catch (e) {
+      // اطمینان از بسته شدن لودینگ در صورت بروز خطا
+      if (navigator.canPop()) {
+        navigator.pop();
+      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(t.deleteInvoiceErrorWithMessage(e.toString())),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 }
 

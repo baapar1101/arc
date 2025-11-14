@@ -479,6 +479,27 @@ async def get_document_pdf_endpoint(
     locale = negotiate_locale(request.headers.get("Accept-Language"))
     is_fa = locale == "fa"
     now = datetime.datetime.now().strftime("%Y/%m/%d %H:%M")
+    
+    # تبدیل تاریخ سند به تقویم شمسی
+    document_date_jalali = None
+    if doc.get("document_date"):
+        try:
+            from app.core.calendar import CalendarConverter
+            dt = datetime.datetime.fromisoformat(str(doc.get("document_date")).replace("Z", "+00:00"))
+            formatted = CalendarConverter.format_datetime(dt, "jalali")
+            document_date_jalali = formatted.get('formatted', formatted.get('date_only', ''))
+        except Exception:
+            pass
+    
+    # جمع‌آوری اطلاعات assets (مثلاً لوگو کسب‌وکار)
+    business_logo = None
+    try:
+        from adapters.db.models.business import Business
+        b = db.query(Business).filter(Business.id == business_id).first()
+        if b and hasattr(b, 'logo_url') and b.logo_url:
+            business_logo = b.logo_url
+    except Exception:
+        pass
 
     # کانتکست قالب
     template_context = {
@@ -489,12 +510,18 @@ async def get_document_pdf_endpoint(
         "code": doc.get("code"),
         "document_type": doc.get("document_type"),
         "document_date": doc.get("document_date"),
+        "document_date_jalali": document_date_jalali,
         "description": doc.get("description"),
         "generated_at": now,
         "is_fa": is_fa,
+        "assets": {
+            "images": {
+                "logo": business_logo or "",
+            }
+        },
     }
 
-    # تلاش برای رندر
+    # تلاش برای رندر با قالب سفارشی
     resolved_html = None
     try:
         from app.services.report_template_service import ReportTemplateService
@@ -502,8 +529,12 @@ async def get_document_pdf_endpoint(
         try:
             if template_id is not None:
                 explicit_template_id = int(template_id)
-        except Exception:
+            # همچنین می‌توان از query parameter استفاده کرد
+            elif request.query_params.get("template_id"):
+                explicit_template_id = int(request.query_params.get("template_id"))
+        except (ValueError, TypeError):
             explicit_template_id = None
+        
         resolved_html = ReportTemplateService.try_render_resolved(
             db=db,
             business_id=business_id,
@@ -512,7 +543,11 @@ async def get_document_pdf_endpoint(
             context=template_context,
             explicit_template_id=explicit_template_id,
         )
-    except Exception:
+    except Exception as e:
+        # اگر خطای قالب باشد، لاگ می‌کنیم اما به قالب پیش‌فرض می‌رویم
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.warning(f"Custom template rendering failed, using default: {e}", exc_info=True)
         resolved_html = None
 
     # پیش‌فرض: قالب فایل + پارامترها
@@ -536,7 +571,18 @@ async def get_document_pdf_endpoint(
         },
     )
 
-    pdf_bytes = HTML(string=html_content).write_pdf(font_config=FontConfiguration())
+    # تولید PDF با پیکربندی فونت
+    def get_font_config():
+        """پیکربندی فونت برای PDF فارسی"""
+        return FontConfiguration()
+    
+    try:
+        pdf_bytes = HTML(string=html_content).write_pdf(font_config=get_font_config())
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"PDF generation failed: {e}", exc_info=True)
+        raise ApiError("PDF_GENERATION_ERROR", "خطا در تولید فایل PDF", http_status=500)
 
     def _slugify(text: str) -> str:
         return re.sub(r"[^A-Za-z0-9_-]+", "_", (text or "")).strip("_") or "document"

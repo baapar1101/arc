@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/models/document_model.dart';
@@ -198,18 +199,35 @@ class DocumentService {
   }
 
   /// دریافت PDF یک سند
-  Future<void> downloadPdf(int documentId) async {
+  /// 
+  /// Parameters:
+  /// - [documentId]: شناسه سند
+  /// - [templateId]: شناسه قالب سفارشی (اختیاری)
+  /// - [paperSize]: اندازه کاغذ (A4, Letter, ...)
+  /// - [orientation]: جهت صفحه (portrait, landscape)
+  /// 
+  /// Returns: بایت‌های فایل PDF
+  Future<Uint8List> downloadPdf({
+    required int documentId,
+    int? templateId,
+    String? paperSize,
+    String? orientation,
+  }) async {
     try {
-      await _apiClient.get(
+      final queryParams = <String, dynamic>{};
+      if (templateId != null) queryParams['template_id'] = templateId;
+      if (paperSize != null) queryParams['paper_size'] = paperSize;
+      if (orientation != null) queryParams['orientation'] = orientation;
+
+      final response = await _apiClient.get(
         '/documents/$documentId/pdf',
+        query: queryParams.isNotEmpty ? queryParams : null,
         options: Options(
           responseType: ResponseType.bytes,
         ),
       );
 
-      // ذخیره فایل
-      // TODO: پیاده‌سازی ذخیره فایل
-      throw UnimplementedError('PDF download is not implemented yet');
+      return response.data as Uint8List;
     } catch (e) {
       if (e is DioException) {
         throw Exception(e.response?.data['message'] ?? 'خطا در دریافت فایل PDF');

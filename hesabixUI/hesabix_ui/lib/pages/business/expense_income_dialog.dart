@@ -277,7 +277,7 @@ class _ItemTileState extends State<_ItemTile> {
   @override
   void initState() {
     super.initState();
-    _amountCtrl.text = widget.line.amount == 0 ? '' : widget.line.amount.toStringAsFixed(0);
+    _amountCtrl.text = widget.line.amount == 0 ? '' : formatNumberForInput(widget.line.amount);
     _descCtrl.text = widget.line.description ?? '';
   }
 
@@ -316,10 +316,10 @@ class _ItemTileState extends State<_ItemTile> {
                     keyboardType: TextInputType.number,
                     inputFormatters: [
                       EnglishDigitsFormatter(),
-                      FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+                      ThousandsSeparatorInputFormatter(allowDecimal: false),
                     ],
                     onChanged: (v) {
-                      final val = double.tryParse(v.replaceAll(',', '')) ?? 0;
+                      final val = parseFormattedDouble(v) ?? 0;
                       widget.onChanged(widget.line.copyWith(amount: val));
                     },
                   ),

@@ -192,22 +192,67 @@ def create_expense_income(
     for line in counterparty_lines:
         amount = Decimal(str(line.get("amount", 0)))
         description = (line.get("description") or "").strip() or None
+        commission = Decimal(str(line.get("commission", 0))) if line.get("commission") else Decimal(0)
         transaction_type: Optional[str] = line.get("transaction_type")
 
         # انتخاب حساب طرف‌حساب
         account: Optional[Account] = None
+        # شناسه‌های موجود برای نگاشت به فیلدهای خط سند
+        resolved_bank_account_id = None
+        cash_register_id_val = line.get("cash_register_id")
+        petty_cash_id_val = line.get("petty_cash_id")
+        check_id_val = line.get("check_id")
+        person_id_val = line.get("person_id")
+
         if transaction_type == "bank":
-            account = _get_fixed_account_by_code(db, "10203")
+            # سازگاری: bank_account_id یا bank_id
+            bank_account_id = line.get("bank_account_id") or line.get("bank_id")
+            if bank_account_id:
+                try:
+                    from adapters.db.models.bank_account import BankAccount
+                    bank_account = db.query(BankAccount).filter(BankAccount.id == int(bank_account_id)).first()
+                    if bank_account and bank_account.account:
+                        account = bank_account.account
+                        resolved_bank_account_id = int(bank_account_id)
+                except Exception:
+                    resolved_bank_account_id = None
+            if account is None:
+                # fallback به حساب ثابت بانک
+                account = _get_fixed_account_by_code(db, "10203")
         elif transaction_type == "cash_register":
-            account = _get_fixed_account_by_code(db, "10202")
+            if cash_register_id_val:
+                try:
+                    from adapters.db.models.cash_register import CashRegister
+                    cash_register = db.query(CashRegister).filter(CashRegister.id == int(cash_register_id_val)).first()
+                    if cash_register and cash_register.account:
+                        account = cash_register.account
+                except Exception:
+                    pass
+            if account is None:
+                account = _get_fixed_account_by_code(db, "10202")
         elif transaction_type == "petty_cash":
-            account = _get_fixed_account_by_code(db, "10201")
+            if petty_cash_id_val:
+                try:
+                    from adapters.db.models.petty_cash import PettyCash
+                    petty_cash = db.query(PettyCash).filter(PettyCash.id == int(petty_cash_id_val)).first()
+                    if petty_cash and petty_cash.account:
+                        account = petty_cash.account
+                except Exception:
+                    pass
+            if account is None:
+                account = _get_fixed_account_by_code(db, "10201")
         elif transaction_type == "check":
             # برای چک‌ها از کدهای اسناد دریافتنی/پرداختنی استفاده شود
             account = _get_fixed_account_by_code(db, "10403" if is_income else "20202")
         elif transaction_type == "person":
-            # پرداخت/دریافت با شخص عمومی پرداختنی
-            account = _get_fixed_account_by_code(db, "20201")
+            # حساب شخص بر اساس نوع (دریافتنی در درآمد / پرداختنی در هزینه)
+            if person_id_val:
+                try:
+                    account = _get_person_account(db, business_id, int(person_id_val), is_income)
+                except Exception:
+                    account = _get_fixed_account_by_code(db, "20201" if not is_income else "1211")
+            else:
+                account = _get_fixed_account_by_code(db, "20201" if not is_income else "1211")
         elif line.get("account_id"):
             account = db.query(Account).filter(
                 and_(
@@ -223,13 +268,18 @@ def create_expense_income(
             extra_info["transaction_type"] = transaction_type
         if line.get("transaction_date"):
             extra_info["transaction_date"] = line.get("transaction_date")
-        if line.get("commission"):
-            extra_info["commission"] = float(line.get("commission"))
+        if commission and commission > 0:
+            extra_info["commission"] = float(commission)
         if transaction_type == "bank":
+            # همواره هر دو کلید را برای سازگاری نگه داریم
             if line.get("bank_id"):
                 extra_info["bank_id"] = line.get("bank_id")
+            if line.get("bank_account_id"):
+                extra_info["bank_account_id"] = line.get("bank_account_id")
             if line.get("bank_name"):
                 extra_info["bank_name"] = line.get("bank_name")
+            if line.get("bank_account_name"):
+                extra_info["bank_account_name"] = line.get("bank_account_name")
         elif transaction_type == "cash_register":
             if line.get("cash_register_id"):
                 extra_info["cash_register_id"] = line.get("cash_register_id")
@@ -257,18 +307,28 @@ def create_expense_income(
         db.add(DocumentLine(
             document_id=document.id,
             account_id=account.id,
-            person_id=(int(line["person_id"]) if transaction_type == "person" and line.get("person_id") else None),
-            bank_account_id=(int(line["bank_id"]) if transaction_type == "bank" and line.get("bank_id") else None),
-            cash_register_id=line.get("cash_register_id"),
-            petty_cash_id=line.get("petty_cash_id"),
-            check_id=line.get("check_id"),
+            person_id=(int(person_id_val) if transaction_type == "person" and person_id_val else None),
+            bank_account_id=(int(resolved_bank_account_id) if transaction_type == "bank" and resolved_bank_account_id else None),
+            cash_register_id=cash_register_id_val,
+            petty_cash_id=petty_cash_id_val,
+            check_id=check_id_val,
             debit=debit_amount,
             credit=credit_amount,
             description=description,
             extra_info=extra_info or None,
         ))
 
-    # توجه: خطوط کارمزد در این نسخه پیاده‌سازی نمی‌شود (می‌توان مشابه سرویس دریافت/پرداخت اضافه کرد)
+        # اگر کارمزد وجود دارد، یک خط کارمزد اضافه کن (هماهنگ با update_expense_income)
+        if commission > 0:
+            commission_account = _get_fixed_account_by_code(db, "5111")  # کارمزد
+            db.add(DocumentLine(
+                document_id=document.id,
+                account_id=commission_account.id,
+                debit=commission if is_income else Decimal(0),
+                credit=commission if not is_income else Decimal(0),
+                description=f"کارمزد {description or ''}".strip(),
+                extra_info={"is_commission_line": True}
+            ))
 
     db.commit()
     db.refresh(document)

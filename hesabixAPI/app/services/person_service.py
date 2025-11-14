@@ -5,6 +5,7 @@ from app.core.responses import ApiError
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_, func
 from adapters.db.models.person import Person, PersonBankAccount, PersonType
+from adapters.db.models.business import Business
 from adapters.db.models.document import Document
 from adapters.db.models.document_line import DocumentLine
 from adapters.api.v1.schema_models.person import (
@@ -63,6 +64,11 @@ def create_person(db: Session, business_id: int, person_data: PersonCreateReques
         except Exception:
             mapped_single_type = None
 
+    # بارگذاری تنظیمات اعتبار پیش‌فرض کسب‌وکار
+    business_defaults = db.query(Business).filter(Business.id == business_id).first()
+    default_credit_limit = getattr(business_defaults, "default_credit_limit", None) if business_defaults else None
+    default_check_enabled = bool(getattr(business_defaults, "check_credit_enabled_by_default", False)) if business_defaults else False
+
     person = Person(
         business_id=business_id,
         code=code,
@@ -94,6 +100,9 @@ def create_person(db: Session, business_id: int, person_data: PersonCreateReques
         commission_exclude_discounts=bool(getattr(person_data, 'commission_exclude_discounts', False)),
         commission_exclude_additions_deductions=bool(getattr(person_data, 'commission_exclude_additions_deductions', False)),
         commission_post_in_invoice_document=bool(getattr(person_data, 'commission_post_in_invoice_document', False)),
+        # اعتبار: اگر کاربر مقدار نداد، از تنظیمات کسب‌وکار استفاده شود
+        credit_limit=(getattr(person_data, 'credit_limit', None) if getattr(person_data, 'credit_limit', None) is not None else default_credit_limit),
+        credit_check_enabled=(getattr(person_data, 'credit_check_enabled', None) if getattr(person_data, 'credit_check_enabled', None) is not None else default_check_enabled),
     )
     
     db.add(person)
@@ -560,6 +569,8 @@ def _person_to_dict(person: Person) -> Dict[str, Any]:
         'fax': person.fax,
         'email': person.email,
         'website': person.website,
+        'credit_limit': float(person.credit_limit) if getattr(person, 'credit_limit', None) is not None else None,
+        'credit_check_enabled': getattr(person, 'credit_check_enabled', None),
         'created_at': person.created_at.isoformat(),
         'updated_at': person.updated_at.isoformat(),
         'bank_accounts': [

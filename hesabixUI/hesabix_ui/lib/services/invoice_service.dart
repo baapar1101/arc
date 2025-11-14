@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+import 'package:dio/dio.dart';
 import '../core/api_client.dart';
 
 class InvoiceService {
@@ -38,6 +40,15 @@ class InvoiceService {
     return Map<String, dynamic>.from(res.data?['data'] ?? const {});
   }
 
+  Future<Map<String, dynamic>> getInstallmentPlan({
+    required int businessId,
+    required int invoiceId,
+  }) async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/invoices/business/$businessId/$invoiceId/installments',
+    );
+    return Map<String, dynamic>.from(res.data?['data'] ?? const {});
+  }
   Future<Map<String, dynamic>> searchInvoices({
     required int businessId,
     int page = 1,
@@ -57,6 +68,56 @@ class InvoiceService {
     );
     return Map<String, dynamic>.from(res.data?['data'] ?? const {});
   }
+
+  Future<bool> deleteInvoice({
+    required int businessId,
+    required int invoiceId,
+  }) async {
+    try {
+      final response = await _api.delete<Map<String, dynamic>>(
+        '/api/v1/invoices/business/$businessId/$invoiceId',
+      );
+
+      if (response.data?['success'] == true) {
+        return true;
+      }
+
+      throw Exception(response.data?['message'] ?? 'خطا در حذف فاکتور');
+    } catch (e) {
+      if (e is DioException) {
+        final errorMessage = e.response?.data?['message'] ?? 'خطا در ارتباط با سرور';
+        throw Exception(errorMessage);
+      }
+      rethrow;
+    }
+  }
+
+  Future<Map<String, dynamic>> searchInstallments({
+    required int businessId,
+    Map<String, dynamic>? query,
+  }) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/invoices/business/$businessId/installments/search',
+      data: query ?? const <String, dynamic>{},
+    );
+    return Map<String, dynamic>.from(res.data?['data'] ?? const {});
+  }
+
+  Future<Uint8List> exportInstallmentsCsv({
+    required int businessId,
+    Map<String, dynamic>? query,
+  }) async {
+    final res = await _api.post<dynamic>(
+      '/api/v1/invoices/business/$businessId/installments/export/excel',
+      data: query ?? const <String, dynamic>{},
+      options: Options(responseType: ResponseType.bytes),
+    );
+    final data = res.data;
+    if (data is Uint8List) return data;
+    if (data is List<int>) return Uint8List.fromList(data);
+    throw Exception('Invalid CSV response');
+  }
+
 }
 
 

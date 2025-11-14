@@ -12,6 +12,8 @@ class AccountTreeComboboxWidget extends StatefulWidget {
   final String label;
   final String hintText;
   final bool isRequired;
+  /// 'expense' یا 'income' برای فیلتر کردن درخت حساب‌ها
+  final String? documentTypeFilter;
 
   const AccountTreeComboboxWidget({
     super.key,
@@ -21,6 +23,7 @@ class AccountTreeComboboxWidget extends StatefulWidget {
     this.label = 'حساب',
     this.hintText = 'انتخاب حساب',
     this.isRequired = false,
+    this.documentTypeFilter,
   });
 
   @override
@@ -111,6 +114,7 @@ class _AccountTreeComboboxWidgetState extends State<AccountTreeComboboxWidget> {
       builder: (context) => _AccountTreeDialog(
         accountTree: _accountTree,
         selectedAccount: widget.selectedAccount,
+        documentTypeFilter: widget.documentTypeFilter,
         onAccountSelected: (account) {
           widget.onChanged(account);
           _searchController.text = account?.displayName ?? '';
@@ -126,11 +130,13 @@ class _AccountTreeDialog extends StatefulWidget {
   final List<AccountTreeNode> accountTree;
   final Account? selectedAccount;
   final ValueChanged<Account?> onAccountSelected;
+  final String? documentTypeFilter;
 
   const _AccountTreeDialog({
     required this.accountTree,
     this.selectedAccount,
     required this.onAccountSelected,
+    this.documentTypeFilter,
   });
 
   @override
@@ -177,14 +183,16 @@ class _AccountTreeDialogState extends State<_AccountTreeDialog> {
 
   /// فیلتر کردن درخت بر اساس جستجو
   List<AccountTreeNode> _filterTree(List<AccountTreeNode> nodes) {
+    // ابتدا بر اساس نوع سند (expense/income) هرس می‌کنیم
+    final prunedByType = _pruneByDocumentType(nodes, widget.documentTypeFilter);
     if (_searchQuery.isEmpty) {
-      return nodes;
+      return prunedByType;
     }
 
     final List<AccountTreeNode> filtered = [];
     final query = _searchQuery.toLowerCase();
 
-    for (final node in nodes) {
+    for (final node in prunedByType) {
       final matchesSearch = node.name.toLowerCase().contains(query) ||
           node.code.toLowerCase().contains(query);
       
@@ -208,6 +216,45 @@ class _AccountTreeDialogState extends State<_AccountTreeDialog> {
     }
 
     return filtered;
+  }
+
+  List<AccountTreeNode> _pruneByDocumentType(List<AccountTreeNode> nodes, String? docType) {
+    if (docType != 'expense' && docType != 'income') return nodes;
+    final List<AccountTreeNode> result = [];
+    for (final node in nodes) {
+      // ابتدا فرزندان را هرس کن
+      final prunedChildren = _pruneByDocumentType(node.children, docType);
+      final isLeaf = prunedChildren.isEmpty && node.children.isEmpty || (node.children.isEmpty);
+      bool leafAllowed = true;
+      if (isLeaf) {
+        leafAllowed = _isLeafAllowedForDocType(node, docType!);
+      }
+      // نگه‌داشتن نود اگر خودش (به عنوان برگ) مجاز است یا فرزند مجاز دارد
+      if ((isLeaf && leafAllowed) || (!isLeaf && prunedChildren.isNotEmpty)) {
+        result.add(AccountTreeNode(
+          id: node.id,
+          code: node.code,
+          name: node.name,
+          accountType: node.accountType,
+          parentId: node.parentId,
+          level: node.level,
+          children: prunedChildren,
+        ));
+      }
+    }
+    return result;
+  }
+
+  bool _isLeafAllowedForDocType(AccountTreeNode node, String docType) {
+    final t = (node.accountType ?? '').toLowerCase();
+    if (docType == 'expense') {
+      // اولویت با accountType، سپس الگوی کد 7xxxx
+      if (t.contains('expense')) return true;
+      return node.code.startsWith('7');
+    } else {
+      if (t.contains('income') || t.contains('revenue')) return true;
+      return node.code.startsWith('6');
+    }
   }
 
   void _toggleExpanded(int nodeId) {

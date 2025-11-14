@@ -45,40 +45,42 @@ class _WalletPageState extends State<WalletPage> {
   CalendarController? _calendarCtrl;
 
   String _typeLabel(String? t) {
+    final l = AppLocalizations.of(context);
     switch ((t ?? '').toLowerCase()) {
       case 'top_up':
-        return 'افزایش اعتبار';
+        return l.walletTypeTopUp;
       case 'customer_payment':
-        return 'پرداخت مشتری';
+        return l.walletTypeCustomerPayment;
       case 'payout_request':
-        return 'درخواست تسویه';
+        return l.walletTypePayoutRequest;
       case 'payout_settlement':
-        return 'تسویه';
+        return l.walletTypePayoutSettlement;
       case 'refund':
-        return 'استرداد';
+        return l.walletTypeRefund;
       case 'fee':
-        return 'کارمزد';
+        return l.walletTypeFee;
       default:
-        return t ?? 'نامشخص';
+        return l.unknown;
     }
   }
 
   String _statusLabel(String? s) {
+    final l = AppLocalizations.of(context);
     switch ((s ?? '').toLowerCase()) {
       case 'pending':
-        return 'در انتظار';
+        return l.pending;
       case 'approved':
-        return 'تایید شده';
+        return l.statusApproved;
       case 'processing':
-        return 'در حال پردازش';
+        return l.statusProcessing;
       case 'succeeded':
-        return 'موفق';
+        return l.statusSucceeded;
       case 'failed':
-        return 'ناموفق';
+        return l.statusFailed;
       case 'canceled':
-        return 'لغو شده';
+        return l.statusCanceled;
       default:
-        return s ?? 'نامشخص';
+        return l.unknown;
     }
   }
 
@@ -131,7 +133,7 @@ class _WalletPageState extends State<WalletPage> {
       context: context,
       builder: (ctx) {
         return AlertDialog(
-          title: Text('درخواست تسویه'),
+          title: Text(t.walletPayoutRequestTitle),
           content: Form(
             key: formKey,
             child: Column(
@@ -141,23 +143,23 @@ class _WalletPageState extends State<WalletPage> {
                   businessId: widget.businessId,
                   selectedAccountId: bankId?.toString(),
                   onChanged: (opt) => bankId = int.tryParse(opt?.id ?? ''),
-                  hintText: 'انتخاب حساب بانکی',
+                  hintText: t.walletSelectBankAccountHint,
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: amountCtrl,
-                  decoration: const InputDecoration(labelText: 'مبلغ'),
+                  decoration: InputDecoration(labelText: t.moneyAmount),
                   keyboardType: TextInputType.number,
                   inputFormatters: [
                     EnglishDigitsFormatter(),
                     FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
                   ],
-                  validator: (v) => (v == null || v.isEmpty) ? 'الزامی' : null,
+                  validator: (v) => (v == null || v.isEmpty) ? t.required : null,
                 ),
                 const SizedBox(height: 8),
                 TextFormField(
                   controller: descCtrl,
-                  decoration: const InputDecoration(labelText: 'توضیحات (اختیاری)'),
+                  decoration: InputDecoration(labelText: t.descriptionOptional),
                 ),
               ],
             ),
@@ -186,12 +188,12 @@ class _WalletPageState extends State<WalletPage> {
           description: descCtrl.text,
         );
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('درخواست تسویه ثبت شد')));
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.walletPayoutRequested)));
         }
         await _load();
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطا: $e')));
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${t.error}: $e')));
         }
       }
     }
@@ -215,7 +217,7 @@ class _WalletPageState extends State<WalletPage> {
       context: context,
       builder: (ctx) {
         return AlertDialog(
-          title: const Text('افزایش اعتبار'),
+          title: Text(t.walletTopUpTitle),
           content: Form(
             key: formKey,
             child: Column(
@@ -223,24 +225,24 @@ class _WalletPageState extends State<WalletPage> {
               children: [
                 TextFormField(
                   controller: amountCtrl,
-                  decoration: const InputDecoration(labelText: 'مبلغ'),
+                  decoration: InputDecoration(labelText: t.moneyAmount),
                   keyboardType: TextInputType.number,
                   inputFormatters: [
                     EnglishDigitsFormatter(),
                     FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
                   ],
-                  validator: (v) => (v == null || v.isEmpty) ? 'الزامی' : null,
+                  validator: (v) => (v == null || v.isEmpty) ? t.required : null,
                 ),
                 const SizedBox(height: 8),
                 TextFormField(
                   controller: descCtrl,
-                  decoration: const InputDecoration(labelText: 'توضیحات (اختیاری)'),
+                  decoration: InputDecoration(labelText: t.descriptionOptional),
                 ),
                 const SizedBox(height: 8),
                 if (gateways.isNotEmpty)
                   DropdownButtonFormField<int>(
                     value: gatewayId,
-                    decoration: const InputDecoration(labelText: 'درگاه پرداخت'),
+                    decoration: InputDecoration(labelText: t.walletPaymentGateway),
                     items: gateways
                         .map((g) => DropdownMenuItem<int>(
                               value: int.tryParse('${g['id']}'),
@@ -269,7 +271,7 @@ class _WalletPageState extends State<WalletPage> {
     if (result == true) {
       try {
         final amount = double.tryParse(amountCtrl.text.replaceAll(',', '')) ?? 0;
-        _showLoadingDialog('در حال ثبت درخواست و آماده‌سازی درگاه...');
+        _showLoadingDialog(t.walletTopUpInitializing);
         final data = await _service.topUp(
           businessId: widget.businessId,
           amount: amount,
@@ -279,12 +281,12 @@ class _WalletPageState extends State<WalletPage> {
         if (mounted) Navigator.of(context).pop(); // close loading
         final paymentUrl = (data['payment_url'] ?? '').toString();
         if (paymentUrl.isNotEmpty) {
-          _showLoadingDialog('در حال انتقال به درگاه پرداخت...');
+          _showLoadingDialog(t.walletRedirectingToGateway);
           await _openPaymentUrlWithFallback(paymentUrl);
           if (mounted) Navigator.of(context).pop(); // close loading
         } else {
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('درخواست افزایش اعتبار ثبت شد، اما لینک پرداخت دریافت نشد. لطفاً بعداً دوباره تلاش کنید یا تنظیمات درگاه را بررسی کنید.')));
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.walletTopUpNoPaymentLink)));
           }
         }
         await _load();
@@ -293,22 +295,22 @@ class _WalletPageState extends State<WalletPage> {
           // ensure loading dialog is closed if open
           Navigator.of(context, rootNavigator: true).maybePop();
         }
-        String friendly = 'خطا در ثبت درخواست افزایش اعتبار';
+        String friendly = t.walletGatewayServerError;
         if (e is DioException) {
           final status = e.response?.statusCode;
           final body = e.response?.data;
           final serverMsg = (body is Map && body['message'] is String) ? (body['message'] as String) : null;
           final errorCode = (body is Map && body['error_code'] is String) ? (body['error_code'] as String) : null;
           if (errorCode == 'GATEWAY_INIT_FAILED') {
-            friendly = 'خطا در اتصال به درگاه. لطفاً تنظیمات درگاه را بررسی کنید یا بعداً تلاش کنید.';
+            friendly = t.walletGatewayInitFailed;
           } else if (errorCode == 'INVALID_CONFIG') {
-            friendly = 'پیکربندی درگاه ناقص است. لطفاً مرچنت آی‌دی و آدرس بازگشت را بررسی کنید.';
+            friendly = t.walletInvalidGatewayConfig;
           } else if (errorCode == 'GATEWAY_DISABLED') {
-            friendly = 'این درگاه غیرفعال است.';
+            friendly = t.walletGatewayDisabled;
           } else if (errorCode == 'GATEWAY_NOT_FOUND') {
-            friendly = 'درگاه پرداخت یافت نشد.';
+            friendly = t.walletGatewayNotFound;
           } else if (status != null && status >= 500) {
-            friendly = 'خطای سرور هنگام اتصال به درگاه. لطفاً بعداً تلاش کنید.';
+            friendly = t.walletGatewayServerError;
           } else if (serverMsg != null && serverMsg.isNotEmpty) {
             friendly = serverMsg;
           }
@@ -368,12 +370,12 @@ class _WalletPageState extends State<WalletPage> {
     await showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('انتقال به درگاه پرداخت'),
+        title: Text(AppLocalizations.of(context).walletOpenGatewayDialogTitle),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('برای ادامه پرداخت، لینک زیر را باز کنید:'),
+            Text(AppLocalizations.of(context).walletOpenGatewayDialogInstructions),
             const SizedBox(height: 8),
             SelectableText(url),
           ],
@@ -383,10 +385,10 @@ class _WalletPageState extends State<WalletPage> {
             onPressed: () async {
               await Clipboard.setData(ClipboardData(text: url));
               if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('لینک کپی شد')));
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(AppLocalizations.of(context).copied)));
               }
             },
-            child: const Text('کپی لینک'),
+            child: Text(AppLocalizations.of(context).copyLink),
           ),
           if (kIsWeb)
             Link(
@@ -397,7 +399,7 @@ class _WalletPageState extends State<WalletPage> {
                   followLink?.call();
                   Navigator.of(ctx).pop();
                 },
-                child: const Text('باز کردن'),
+                child: Text(AppLocalizations.of(context).open),
               ),
             )
           else
@@ -409,7 +411,7 @@ class _WalletPageState extends State<WalletPage> {
                   if (mounted) Navigator.of(ctx).pop();
                 }
               },
-              child: const Text('باز کردن'),
+              child: Text(AppLocalizations.of(context).open),
             ),
         ],
       ),
@@ -450,7 +452,7 @@ class _WalletPageState extends State<WalletPage> {
                             children: [
                               Icon(Icons.wallet, size: 32, color: theme.colorScheme.primary),
                               const SizedBox(width: 12),
-                              Text('کیف‌پول کسب‌وکار', style: theme.textTheme.titleLarge),
+                              Text(t.walletBusinessTitle, style: theme.textTheme.titleLarge),
                               const Spacer(),
                               Chip(label: Text(currency)),
                             ],
@@ -465,7 +467,7 @@ class _WalletPageState extends State<WalletPage> {
                                     child: Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        Text('مانده قابل برداشت', style: theme.textTheme.labelLarge),
+                                        Text(t.walletAvailableBalance, style: theme.textTheme.labelLarge),
                                         const SizedBox(height: 8),
                                         Text('${formatWithThousands((overview?['available_balance'] ?? 0) is num ? (overview?['available_balance'] ?? 0) : double.tryParse('${overview?['available_balance']}') ?? 0)}', style: theme.textTheme.headlineSmall),
                                       ],
@@ -481,7 +483,7 @@ class _WalletPageState extends State<WalletPage> {
                                     child: Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        Text('مانده در انتظار تایید', style: theme.textTheme.labelLarge),
+                                        Text(t.walletPendingBalance, style: theme.textTheme.labelLarge),
                                         const SizedBox(height: 8),
                                         Text('${formatWithThousands((overview?['pending_balance'] ?? 0) is num ? (overview?['pending_balance'] ?? 0) : double.tryParse('${overview?['pending_balance']}') ?? 0)}', style: theme.textTheme.headlineSmall),
                                       ],
@@ -498,13 +500,13 @@ class _WalletPageState extends State<WalletPage> {
                               FilledButton.icon(
                                 onPressed: _openPayoutDialog,
                                 icon: const Icon(Icons.account_balance),
-                                label: const Text('درخواست تسویه'),
+                                label: Text(t.walletRequestPayout),
                               ),
                               const SizedBox(width: 8),
                               OutlinedButton.icon(
                                 onPressed: _openTopUpDialog,
                                 icon: const Icon(Icons.add),
-                                label: const Text('افزایش اعتبار'),
+                                label: Text(t.walletTopUp),
                               ),
                             ],
                           ),
@@ -516,18 +518,18 @@ class _WalletPageState extends State<WalletPage> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text('گزارش ۳۰ روز اخیر', style: theme.textTheme.titleMedium),
+                                    Text(t.walletLast30Days, style: theme.textTheme.titleMedium),
                                     const SizedBox(height: 8),
                                     Wrap(
                                       spacing: 12,
                                       runSpacing: 8,
                                       children: [
-                                        Chip(label: Text('ورودی ناخالص: ${formatWithThousands((_metrics?['totals']?['gross_in'] ?? 0) is num ? (_metrics?['totals']?['gross_in'] ?? 0) : double.tryParse('${_metrics?['totals']?['gross_in']}') ?? 0)}')),
-                                        Chip(label: Text('کارمزد ورودی: ${formatWithThousands((_metrics?['totals']?['fees_in'] ?? 0) is num ? (_metrics?['totals']?['fees_in'] ?? 0) : double.tryParse('${_metrics?['totals']?['fees_in']}') ?? 0)}')),
-                                        Chip(label: Text('ورودی خالص: ${formatWithThousands((_metrics?['totals']?['net_in'] ?? 0) is num ? (_metrics?['totals']?['net_in'] ?? 0) : double.tryParse('${_metrics?['totals']?['net_in']}') ?? 0)}')),
-                                        Chip(label: Text('خروجی ناخالص: ${formatWithThousands((_metrics?['totals']?['gross_out'] ?? 0) is num ? (_metrics?['totals']?['gross_out'] ?? 0) : double.tryParse('${_metrics?['totals']?['gross_out']}') ?? 0)}')),
-                                        Chip(label: Text('کارمزد خروجی: ${formatWithThousands((_metrics?['totals']?['fees_out'] ?? 0) is num ? (_metrics?['totals']?['fees_out'] ?? 0) : double.tryParse('${_metrics?['totals']?['fees_out']}') ?? 0)}')),
-                                        Chip(label: Text('خروجی خالص: ${formatWithThousands((_metrics?['totals']?['net_out'] ?? 0) is num ? (_metrics?['totals']?['net_out'] ?? 0) : double.tryParse('${_metrics?['totals']?['net_out']}') ?? 0)}')),
+                                        Chip(label: Text('${t.walletGrossIn}: ${formatWithThousands((_metrics?['totals']?['gross_in'] ?? 0) is num ? (_metrics?['totals']?['gross_in'] ?? 0) : double.tryParse('${_metrics?['totals']?['gross_in']}') ?? 0)}')),
+                                        Chip(label: Text('${t.walletFeesIn}: ${formatWithThousands((_metrics?['totals']?['fees_in'] ?? 0) is num ? (_metrics?['totals']?['fees_in'] ?? 0) : double.tryParse('${_metrics?['totals']?['fees_in']}') ?? 0)}')),
+                                        Chip(label: Text('${t.walletNetIn}: ${formatWithThousands((_metrics?['totals']?['net_in'] ?? 0) is num ? (_metrics?['totals']?['net_in'] ?? 0) : double.tryParse('${_metrics?['totals']?['net_in']}') ?? 0)}')),
+                                        Chip(label: Text('${t.walletGrossOut}: ${formatWithThousands((_metrics?['totals']?['gross_out'] ?? 0) is num ? (_metrics?['totals']?['gross_out'] ?? 0) : double.tryParse('${_metrics?['totals']?['gross_out']}') ?? 0)}')),
+                                        Chip(label: Text('${t.walletFeesOut}: ${formatWithThousands((_metrics?['totals']?['fees_out'] ?? 0) is num ? (_metrics?['totals']?['fees_out'] ?? 0) : double.tryParse('${_metrics?['totals']?['fees_out']}') ?? 0)}')),
+                                        Chip(label: Text('${t.walletNetOut}: ${formatWithThousands((_metrics?['totals']?['net_out'] ?? 0) is num ? (_metrics?['totals']?['net_out'] ?? 0) : double.tryParse('${_metrics?['totals']?['net_out']}') ?? 0)}')),
                                       ],
                                     ),
                                   ],
@@ -537,14 +539,14 @@ class _WalletPageState extends State<WalletPage> {
                           const SizedBox(height: 16),
                           // دکمه‌های خروجی CSV در پایین جدول موجود هستند؛ این بخش حذف شد تا فیلتر تاریخ از طریق جدول انجام شود
                           const SizedBox(height: 16),
-                          Text('تراکنش‌های اخیر', style: theme.textTheme.titleMedium),
+                          Text(t.walletRecentTransactions, style: theme.textTheme.titleMedium),
                           const SizedBox(height: 8),
                           SizedBox(
                             height: tableHeight,
                             child: DataTableWidget<Map<String, dynamic>>(
                               config: DataTableConfig<Map<String, dynamic>>(
                                 endpoint: '/businesses/${widget.businessId}/wallet/transactions/table',
-                                title: 'تراکنش‌ها',
+                                title: t.walletTransactions,
                                 showTableIcon: true,
                                 showSearch: false,
                                 showActiveFilters: false,
@@ -553,24 +555,24 @@ class _WalletPageState extends State<WalletPage> {
                                 pageSizeOptions: const [10, 20, 50, 100],
                                 enableColumnSettings: true,
                                 columns: [
-                              DateColumn('created_at', 'تاریخ', filterType: ColumnFilterType.dateRange, formatter: (it) {
+                              DateColumn('created_at', t.createdAt, filterType: ColumnFilterType.dateRange, formatter: (it) {
                                     final v = (it['created_at'] ?? '').toString();
                                     return v.split('T').first;
                                   }),
-                                  TextColumn('type', 'نوع', formatter: (it) => _typeLabel((it['type'] ?? '').toString())),
-                                  TextColumn('status', 'وضعیت', formatter: (it) => _statusLabel((it['status'] ?? '').toString())),
-                                  TextColumn('description', 'توضیحات', searchable: false, overflow: true, maxLines: 1),
-                                  NumberColumn('amount', 'مبلغ', formatter: (it) {
+                                  TextColumn('type', t.type, formatter: (it) => _typeLabel((it['type'] ?? '').toString())),
+                                  TextColumn('status', t.status, formatter: (it) => _statusLabel((it['status'] ?? '').toString())),
+                                  TextColumn('description', t.description, searchable: false, overflow: true, maxLines: 1),
+                                  NumberColumn('amount', t.moneyAmount, formatter: (it) {
                                     final amount = it['amount'];
                                     final n = (amount is num) ? amount.toDouble() : double.tryParse('$amount') ?? 0;
                                     return formatWithThousands(n);
                                   }),
-                                  NumberColumn('fee_amount', 'کارمزد', formatter: (it) {
+                                  NumberColumn('fee_amount', t.feeAmount, formatter: (it) {
                                     final fee = it['fee_amount'];
                                     final n = (fee is num) ? fee.toDouble() : double.tryParse('$fee') ?? 0;
                                     return formatWithThousands(n);
                                   }),
-                                  TextColumn('document_id', 'سند', formatter: (it) {
+                                  TextColumn('document_id', t.document, formatter: (it) {
                                     final d = it['document_id'];
                                     return (d == null || '$d' == 'null') ? '-' : '$d';
                                   }),

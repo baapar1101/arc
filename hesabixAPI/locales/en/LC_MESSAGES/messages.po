@@ -431,3 +431,19 @@ msgstr "This document has dependencies (e.g., check) and cannot be deleted"
 
 msgid "RECEIPT_PAYMENT_UPDATED"
 msgstr "Receipt/Payment updated successfully"
+
+# Invoices
+msgid "INVOICE_CREATED"
+msgstr "Invoice created successfully"
+
+msgid "INVOICE_UPDATED"
+msgstr "Invoice updated successfully"
+
+msgid "INVOICE_DELETED"
+msgstr "Invoice deleted successfully"
+
+msgid "INVOICE_LIST"
+msgstr "Invoices list"
+
+msgid "INVOICE"
+msgstr "Invoice"

@@ -7,11 +7,14 @@ import 'package:hesabix_ui/core/auth_store.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/models/receipt_payment_document.dart';
 import 'package:hesabix_ui/services/receipt_payment_list_service.dart';
+import 'package:hesabix_ui/services/invoice_service.dart';
+import 'package:hesabix_ui/widgets/invoice/person_combobox_widget.dart';
+import 'package:hesabix_ui/models/person_model.dart';
 import 'package:hesabix_ui/services/receipt_payment_service.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_widget.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
 import 'package:hesabix_ui/widgets/date_input_field.dart';
-import 'package:hesabix_ui/widgets/invoice/person_combobox_widget.dart';
+// removed duplicate import
 import 'package:hesabix_ui/widgets/invoice/invoice_transactions_widget.dart';
 import 'package:hesabix_ui/widgets/banking/currency_picker_widget.dart';
 import 'package:hesabix_ui/utils/number_formatters.dart' show formatWithThousands;
@@ -19,7 +22,7 @@ import 'package:hesabix_ui/core/date_utils.dart' show HesabixDateUtils;
 import 'package:hesabix_ui/models/invoice_transaction.dart';
 import 'package:hesabix_ui/models/invoice_type_model.dart';
 import 'package:hesabix_ui/utils/number_normalizer.dart';
-import 'package:hesabix_ui/models/person_model.dart';
+// removed duplicate import
 import 'package:hesabix_ui/models/business_dashboard_models.dart';
 import 'dart:html' as html;
 
@@ -703,6 +706,11 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog> {
   final TextEditingController _descriptionController = TextEditingController();
   final List<_PersonLine> _personLines = <_PersonLine>[];
   final List<InvoiceTransaction> _centerTransactions = <InvoiceTransaction>[];
+  // اقساط
+  int? _installmentInvoiceId;
+  List<Map<String, dynamic>> _installmentSchedule = <Map<String, dynamic>>[];
+  final Map<int, double> _allocationsBySeq = <int, double>{};
+  Person? _installmentPerson;
 
   @override
   void initState() {
@@ -875,6 +883,102 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog> {
                 ),
               ),
               const Divider(height: 1),
+              // تخصیص به اقساط (اختیاری)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Row(
+                          children: [
+                            const Text('تخصیص به اقساط (اختیاری)'),
+                            const Spacer(),
+                            SizedBox(
+                              width: 260,
+                              child: PersonComboboxWidget(
+                                businessId: widget.businessId,
+                                selectedPerson: _installmentPerson,
+                                label: 'مشتری',
+                                hintText: 'انتخاب مشتری',
+                                onChanged: (p) => setState(() {
+                                  _installmentPerson = p;
+                                  // پاک‌سازی انتخاب فاکتور
+                                  _installmentInvoiceId = null;
+                                  _installmentSchedule = [];
+                                  _allocationsBySeq.clear();
+                                }),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            FilledButton(
+                              onPressed: _pickInvoiceForInstallments,
+                              child: Text(_installmentInvoiceId == null ? 'انتخاب فاکتور' : 'تغییر فاکتور'),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        if (_installmentSchedule.isNotEmpty)
+                          Column(
+                            children: [
+                              Row(
+                                children: const [
+                                  Expanded(child: Text('قسط')),
+                                  Expanded(child: Text('سررسید')),
+                                  Expanded(child: Text('باقیمانده')),
+                                  SizedBox(width: 120, child: Text('مبلغ تخصیص', textAlign: TextAlign.end)),
+                                ],
+                              ),
+                              const Divider(),
+                              ..._installmentSchedule.map((it) {
+                                final seq = (it['seq'] as num?)?.toInt() ?? 0;
+                                final due = (it['due_date'] as String?) ?? '-';
+                                final remaining = (it['remaining'] as num?)?.toDouble() ??
+                                    (((it['total'] as num?)?.toDouble() ?? 0) - ((it['paid_amount'] as num?)?.toDouble() ?? 0));
+                                final current = _allocationsBySeq[seq] ?? 0.0;
+                                return Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 6),
+                                  child: Row(
+                                    children: [
+                                      Expanded(child: Text('#$seq')),
+                                      Expanded(child: Text(due)),
+                                      Expanded(child: Text(remaining.toStringAsFixed(0))),
+                                      SizedBox(
+                                        width: 120,
+                                        child: TextFormField(
+                                          textAlign: TextAlign.end,
+                                          initialValue: current > 0 ? current.toStringAsFixed(0) : '',
+                                          decoration: const InputDecoration(
+                                            isDense: true,
+                                            border: OutlineInputBorder(),
+                                          ),
+                                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                          onChanged: (v) {
+                                            final val = double.tryParse(v.replaceAll(',', '')) ?? 0;
+                                            setState(() {
+                                              if (val <= 0) {
+                                                _allocationsBySeq.remove(seq);
+                                              } else {
+                                                _allocationsBySeq[seq] = val;
+                                              }
+                                            });
+                                          },
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              }).toList(),
+                            ],
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const Divider(height: 1),
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                 child: Row(
@@ -968,6 +1072,24 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog> {
         },
       }).toList();
       
+      // ساخت extra_info (تخصیص اقساط در صورت وجود)
+      Map<String, dynamic>? extraInfo;
+      if (_installmentInvoiceId != null && _allocationsBySeq.isNotEmpty) {
+        final allocations = _allocationsBySeq.entries
+            .where((e) => (e.value) > 0)
+            .map((e) => {'seq': e.key, 'amount': e.value})
+            .toList();
+        if (allocations.isNotEmpty) {
+          extraInfo = {
+            'settlements': [
+              {
+                'invoice_id': _installmentInvoiceId,
+                'allocations': allocations,
+              }
+            ],
+          };
+        }
+      }
       // اگر initialDocument وجود دارد، حالت ویرایش
       if (widget.initialDocument != null) {
         await service.updateReceiptPayment(
@@ -977,6 +1099,7 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog> {
           description: _descriptionController.text.trim().isNotEmpty ? _descriptionController.text.trim() : null,
           personLines: personLinesData,
           accountLines: accountLinesData,
+          extraInfo: extraInfo,
         );
       } else {
         // ایجاد سند جدید
@@ -988,6 +1111,7 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog> {
           description: _descriptionController.text.trim().isNotEmpty ? _descriptionController.text.trim() : null,
           personLines: personLinesData,
           accountLines: accountLinesData,
+          extraInfo: extraInfo,
         );
       }
       
@@ -1024,6 +1148,155 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog> {
         ),
       );
     }
+  }
+
+  Future<void> _loadInstallmentPlan() async {
+    if (_installmentInvoiceId == null) return;
+    try {
+      final svc = InvoiceService(apiClient: widget.apiClient);
+      final data = await svc.getInstallmentPlan(
+        businessId: widget.businessId,
+        invoiceId: _installmentInvoiceId!,
+      );
+      // بررسی هم‌ارزی ارز سند دریافت با ارز فاکتور اقساطی
+      final planCurrencyId = (data['currency_id'] as num?)?.toInt();
+      if (_selectedCurrencyId != null && planCurrencyId != null && _selectedCurrencyId != planCurrencyId) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('ارز فاکتور اقساط با ارز سند دریافت متفاوت است. لطفاً ارزی همسان انتخاب کنید.'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        setState(() {
+          _installmentSchedule = const <Map<String, dynamic>>[];
+          _allocationsBySeq.clear();
+        });
+        return;
+      }
+      final plan = (data['plan'] as Map<String, dynamic>?) ?? const <String, dynamic>{};
+      final schedule = (plan['schedule'] as List?)?.cast<Map<String, dynamic>>() ?? const <Map<String, dynamic>>[];
+      setState(() {
+        _installmentSchedule = schedule;
+        _allocationsBySeq.clear();
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('خطا در دریافت اقساط: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _pickInvoiceForInstallments() async {
+    final svc = InvoiceService(apiClient: widget.apiClient);
+    final TextEditingController searchCtrl = TextEditingController();
+    List<Map<String, dynamic>> results = <Map<String, dynamic>>[];
+    bool loading = false;
+    await showDialog(
+      context: context,
+      builder: (ctx) {
+        Future<void> doSearch() async {
+          loading = true;
+          (ctx as Element).markNeedsBuild();
+          try {
+            final bodyFilters = <String, dynamic>{};
+            if (_installmentPerson != null) {
+              bodyFilters['person_id'] = _installmentPerson!.id;
+            }
+            if (_selectedCurrencyId != null) {
+              bodyFilters['currency_id'] = _selectedCurrencyId;
+            }
+            final data = await svc.searchInvoices(
+              businessId: widget.businessId,
+              page: 1,
+              limit: 20,
+              search: searchCtrl.text.trim().isEmpty ? null : searchCtrl.text.trim(),
+              filters: bodyFilters.isEmpty ? null : bodyFilters,
+            );
+            final items = (data['items'] as List?)?.cast<Map<String, dynamic>>() ?? const <Map<String, dynamic>>[];
+            results = items;
+          } catch (e) {
+            results = <Map<String, dynamic>>[];
+          } finally {
+            loading = false;
+            (ctx).markNeedsBuild();
+          }
+        }
+
+        return AlertDialog(
+          title: const Text('انتخاب فاکتور'),
+          content: SizedBox(
+            width: 600,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: searchCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'جستجو (کد/شرح/...)',
+                    border: OutlineInputBorder(),
+                  ),
+                  onSubmitted: (_) => doSearch(),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    ElevatedButton.icon(
+                      onPressed: doSearch,
+                      icon: const Icon(Icons.search),
+                      label: const Text('جستجو'),
+                    ),
+                    const SizedBox(width: 8),
+                    if (_installmentPerson != null)
+                      Chip(label: Text('مشتری: ${_installmentPerson!.displayName}')),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                if (loading) const LinearProgressIndicator(),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: 350),
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: results.length,
+                    itemBuilder: (c, i) {
+                      final it = results[i];
+                      return ListTile(
+                        leading: const Icon(Icons.receipt_long),
+                        title: Text(it['code']?.toString() ?? '-'),
+                        subtitle: Text(it['description']?.toString() ?? ''),
+                        onTap: () {
+                          Navigator.pop(ctx, it);
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('انصراف'),
+            ),
+          ],
+        );
+      },
+    ).then((picked) async {
+      if (picked is Map<String, dynamic>) {
+        final id = picked['id'] as int?;
+        if (id != null) {
+          setState(() {
+            _installmentInvoiceId = id;
+          });
+          await _loadInstallmentPlan();
+        }
+      }
+    });
   }
 }
 

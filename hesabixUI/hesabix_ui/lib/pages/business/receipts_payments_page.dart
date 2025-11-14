@@ -577,7 +577,7 @@ class _PersonLineTileState extends State<_PersonLineTile> {
   @override
   void initState() {
     super.initState();
-    _amountController.text = widget.line.amount == 0 ? '' : widget.line.amount.toStringAsFixed(0);
+    _amountController.text = widget.line.amount == 0 ? '' : formatNumberForInput(widget.line.amount);
     _descController.text = widget.line.description ?? '';
   }
 
@@ -631,15 +631,15 @@ class _PersonLineTileState extends State<_PersonLineTile> {
                     keyboardType: TextInputType.number,
                     inputFormatters: [
                       EnglishDigitsFormatter(),
-                      FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+                      ThousandsSeparatorInputFormatter(allowDecimal: false),
                     ],
                     validator: (v) {
-                      final val = double.tryParse((v ?? '').replaceAll(',', ''));
+                      final val = parseFormattedDouble(v);
                       if (val == null || val <= 0) return t.mustBePositiveNumber;
                       return null;
                     },
                     onChanged: (v) {
-                      final val = double.tryParse(v.replaceAll(',', '')) ?? 0;
+                      final val = parseFormattedDouble(v) ?? 0;
                       widget.onChanged(widget.line.copyWith(amount: val));
                     },
                   ),

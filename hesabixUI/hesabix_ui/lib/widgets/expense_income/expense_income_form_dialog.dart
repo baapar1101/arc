@@ -11,7 +11,11 @@ import 'package:hesabix_ui/services/expense_income_service.dart';
 import 'package:hesabix_ui/widgets/date_input_field.dart';
 import 'package:hesabix_ui/widgets/banking/currency_picker_widget.dart';
 import 'package:hesabix_ui/widgets/invoice/person_combobox_widget.dart';
-import 'package:hesabix_ui/widgets/invoice/account_combobox_widget.dart';
+import 'package:hesabix_ui/widgets/invoice/account_tree_combobox_widget.dart';
+import 'package:hesabix_ui/widgets/invoice/bank_account_combobox_widget.dart';
+import 'package:hesabix_ui/widgets/invoice/cash_register_combobox_widget.dart';
+import 'package:hesabix_ui/widgets/invoice/petty_cash_combobox_widget.dart';
+import 'package:hesabix_ui/widgets/invoice/check_combobox_widget.dart';
 import 'package:hesabix_ui/utils/number_formatters.dart' show formatWithThousands;
 import 'package:hesabix_ui/utils/number_normalizer.dart';
 
@@ -188,6 +192,7 @@ class _ExpenseIncomeFormDialogState extends State<ExpenseIncomeFormDialog> {
                     Expanded(
                       child: _ItemLinesPanel(
                         businessId: widget.businessId,
+                        isIncome: _isIncome,
                         lines: _itemLines,
                         onChanged: (ls) => setState(() {
                           _itemLines.clear();
@@ -402,11 +407,13 @@ class _ExpenseIncomeFormDialogState extends State<ExpenseIncomeFormDialog> {
 
 class _ItemLinesPanel extends StatefulWidget {
   final int businessId;
+  final bool isIncome;
   final List<_ItemLine> lines;
   final ValueChanged<List<_ItemLine>> onChanged;
   
   const _ItemLinesPanel({
     required this.businessId,
+    required this.isIncome,
     required this.lines,
     required this.onChanged,
   });
@@ -449,6 +456,7 @@ class _ItemLinesPanelState extends State<_ItemLinesPanel> {
                       final line = widget.lines[i];
                       return _ItemLineTile(
                         businessId: widget.businessId,
+                        isIncome: widget.isIncome,
                         line: line,
                         onChanged: (l) {
                           final newLines = List<_ItemLine>.from(widget.lines);
@@ -472,12 +480,14 @@ class _ItemLinesPanelState extends State<_ItemLinesPanel> {
 
 class _ItemLineTile extends StatefulWidget {
   final int businessId;
+  final bool isIncome;
   final _ItemLine line;
   final ValueChanged<_ItemLine> onChanged;
   final VoidCallback onDelete;
   
   const _ItemLineTile({
     required this.businessId,
+    required this.isIncome,
     required this.line,
     required this.onChanged,
     required this.onDelete,
@@ -494,7 +504,7 @@ class _ItemLineTileState extends State<_ItemLineTile> {
   @override
   void initState() {
     super.initState();
-    _amountController.text = widget.line.amount == 0 ? '' : widget.line.amount.toStringAsFixed(0);
+    _amountController.text = widget.line.amount == 0 ? '' : formatNumberForInput(widget.line.amount);
     _descController.text = widget.line.description ?? '';
   }
 
@@ -516,9 +526,10 @@ class _ItemLineTileState extends State<_ItemLineTile> {
             Row(
               children: [
                 Expanded(
-                  child: AccountComboboxWidget(
+                  child: AccountTreeComboboxWidget(
                     businessId: widget.businessId,
-                    selectedAccount: widget.line.accountId != null 
+                    documentTypeFilter: widget.isIncome ? 'income' : 'expense',
+                    selectedAccount: widget.line.accountId != null
                         ? Account(
                             id: int.tryParse(widget.line.accountId!),
                             businessId: widget.businessId,
@@ -529,10 +540,10 @@ class _ItemLineTileState extends State<_ItemLineTile> {
                             updatedAt: DateTime.now(),
                           )
                         : null,
-                    onChanged: (opt) {
+                    onChanged: (acc) {
                       widget.onChanged(widget.line.copyWith(
-                        accountId: opt?.id?.toString(), 
-                        accountName: opt?.name
+                        accountId: acc?.id?.toString(),
+                        accountName: acc?.displayName ?? acc?.name,
                       ));
                     },
                     label: 'حساب',
@@ -552,15 +563,15 @@ class _ItemLineTileState extends State<_ItemLineTile> {
                     keyboardType: TextInputType.number,
                     inputFormatters: [
                       EnglishDigitsFormatter(),
-                      FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+                      ThousandsSeparatorInputFormatter(allowDecimal: false),
                     ],
                     validator: (v) {
-                      final val = double.tryParse((v ?? '').replaceAll(',', ''));
+                      final val = parseFormattedDouble(v);
                       if (val == null || val <= 0) return t.mustBePositiveNumber;
                       return null;
                     },
                     onChanged: (v) {
-                      final val = double.tryParse(v.replaceAll(',', '')) ?? 0;
+                      final val = parseFormattedDouble(v) ?? 0;
                       widget.onChanged(widget.line.copyWith(amount: val));
                     },
                   ),
@@ -683,7 +694,7 @@ class _CounterpartyLineTileState extends State<_CounterpartyLineTile> {
   @override
   void initState() {
     super.initState();
-    _amountController.text = widget.line.amount == 0 ? '' : widget.line.amount.toStringAsFixed(0);
+    _amountController.text = widget.line.amount == 0 ? '' : formatNumberForInput(widget.line.amount);
     _descController.text = widget.line.description ?? '';
   }
 
@@ -737,10 +748,10 @@ class _CounterpartyLineTileState extends State<_CounterpartyLineTile> {
                     keyboardType: TextInputType.number,
                     inputFormatters: [
                       EnglishDigitsFormatter(),
-                      FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+                      ThousandsSeparatorInputFormatter(allowDecimal: false),
                     ],
                     onChanged: (v) {
-                      final val = double.tryParse(v.replaceAll(',', '')) ?? 0;
+                      final val = parseFormattedDouble(v) ?? 0;
                       widget.onChanged(widget.line.copyWith(amount: val));
                     },
                   ),
@@ -779,6 +790,85 @@ class _CounterpartyLineTileState extends State<_CounterpartyLineTile> {
   
   Widget _buildTransactionTypeFields() {
     switch (widget.line.transactionType) {
+      case TransactionType.bank:
+        return Row(
+          children: [
+            Expanded(
+              child: BankAccountComboboxWidget(
+                businessId: widget.businessId,
+                selectedAccountId: widget.line.bankAccountId,
+                onChanged: (opt) {
+                  widget.onChanged(widget.line.copyWith(
+                    bankAccountId: opt?.id,
+                    bankAccountName: opt?.name,
+                  ));
+                },
+                label: 'بانک',
+                hintText: 'انتخاب حساب بانکی',
+                isRequired: true,
+              ),
+            ),
+          ],
+        );
+      case TransactionType.cashRegister:
+        return Row(
+          children: [
+            Expanded(
+              child: CashRegisterComboboxWidget(
+                businessId: widget.businessId,
+                selectedRegisterId: widget.line.cashRegisterId,
+                onChanged: (opt) {
+                  widget.onChanged(widget.line.copyWith(
+                    cashRegisterId: opt?.id,
+                    cashRegisterName: opt?.name,
+                  ));
+                },
+                label: 'صندوق',
+                hintText: 'انتخاب صندوق',
+                isRequired: true,
+              ),
+            ),
+          ],
+        );
+      case TransactionType.pettyCash:
+        return Row(
+          children: [
+            Expanded(
+              child: PettyCashComboboxWidget(
+                businessId: widget.businessId,
+                selectedPettyCashId: widget.line.pettyCashId,
+                onChanged: (opt) {
+                  widget.onChanged(widget.line.copyWith(
+                    pettyCashId: opt?.id,
+                    pettyCashName: opt?.name,
+                  ));
+                },
+                label: 'تنخواهگردان',
+                hintText: 'انتخاب تنخواهگردان',
+                isRequired: true,
+              ),
+            ),
+          ],
+        );
+      case TransactionType.check:
+        return Row(
+          children: [
+            Expanded(
+              child: CheckComboboxWidget(
+                businessId: widget.businessId,
+                selectedCheckId: widget.line.checkId,
+                onChanged: (opt) {
+                  widget.onChanged(widget.line.copyWith(
+                    checkId: opt?.id,
+                    checkNumber: opt?.number,
+                  ));
+                },
+                label: 'چک',
+                hintText: 'انتخاب چک',
+              ),
+            ),
+          ],
+        );
       case TransactionType.person:
         return Row(
           children: [

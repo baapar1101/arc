@@ -58,6 +58,20 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
                 _buildSettingItem(
                   context,
+                  title: 'اعتبار کاربران',
+                  subtitle: 'تنظیم سقف اعتبار و سیاست‌های تاخیر',
+                  icon: Icons.credit_score_outlined,
+                  onTap: () => context.go('/business/${widget.businessId}/settings/credit'),
+                ),
+                _buildSettingItem(
+                  context,
+                  title: 'فروش اقساطی',
+                  subtitle: 'مدیریت پلن‌های اقساط و شرایط فروش',
+                  icon: Icons.dashboard_customize_outlined,
+                  onTap: () => context.go('/business/${widget.businessId}/settings/installments'),
+                ),
+                _buildSettingItem(
+                  context,
                   title: t.usersAndPermissions,
                   subtitle: t.usersAndPermissionsDescription,
                   icon: Icons.people_outline,

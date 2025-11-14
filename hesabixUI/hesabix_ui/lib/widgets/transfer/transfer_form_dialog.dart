@@ -63,7 +63,7 @@ class _TransferFormDialogState extends State<TransferFormDialog> {
         _descriptionController.text = (init['description'] as String?) ?? '';
         final amount = (init['total_amount'] as num?)?.toDouble();
         if (amount != null && amount > 0) {
-          _amountController.text = amount.toStringAsFixed(0);
+          _amountController.text = formatNumberForInput(amount);
         }
         _currencyId = (init['currency_id'] as int?);
         // Infer commission from lines
@@ -74,7 +74,7 @@ class _TransferFormDialogState extends State<TransferFormDialog> {
         );
         final commissionVal = (commissionLine['amount'] as num?)?.toDouble();
         if (commissionVal != null && commissionVal > 0) {
-          _commissionController.text = commissionVal.toStringAsFixed(0);
+          _commissionController.text = formatNumberForInput(commissionVal);
         }
         // Detect source/destination lines
         final src = lines.firstWhere(
@@ -157,10 +157,10 @@ class _TransferFormDialogState extends State<TransferFormDialog> {
       final currencyId = _currencyId;
       if (currencyId == null) throw Exception('ارز انتخاب نشده است');
 
-      final double amount = double.parse(_amountController.text.replaceAll(',', ''));
+      final double amount = parseFormattedDouble(_amountController.text) ?? 0;
       final double? commission = _commissionController.text.trim().isEmpty
           ? null
-          : double.parse(_commissionController.text.replaceAll(',', ''));
+          : parseFormattedDouble(_commissionController.text);
 
       final src = {
         'type': _fromType,
@@ -734,16 +734,17 @@ class _TransferFormDialogState extends State<TransferFormDialog> {
                                       keyboardType: TextInputType.number,
                                   inputFormatters: [
                                     EnglishDigitsFormatter(),
-                                    FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+                                    ThousandsSeparatorInputFormatter(allowDecimal: false),
                                   ],
                                       validator: (value) {
                                         if (value == null || value.isEmpty) {
                                           return 'لطفاً مبلغ را وارد کنید';
                                         }
-                                        if (double.tryParse(value) == null) {
+                                        final val = parseFormattedDouble(value);
+                                        if (val == null) {
                                           return 'لطفاً مبلغ معتبر وارد کنید';
                                         }
-                                        if (double.parse(value) <= 0) {
+                                        if (val <= 0) {
                                           return 'مبلغ باید بزرگتر از صفر باشد';
                                         }
                                         return null;
@@ -761,14 +762,15 @@ class _TransferFormDialogState extends State<TransferFormDialog> {
                                       keyboardType: TextInputType.number,
                                   inputFormatters: [
                                     EnglishDigitsFormatter(),
-                                    FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+                                    ThousandsSeparatorInputFormatter(allowDecimal: false),
                                   ],
                                       validator: (value) {
                                         if (value != null && value.isNotEmpty) {
-                                          if (double.tryParse(value) == null) {
+                                          final val = parseFormattedDouble(value);
+                                          if (val == null) {
                                             return 'لطفاً مبلغ معتبر وارد کنید';
                                           }
-                                          if (double.parse(value) < 0) {
+                                          if (val < 0) {
                                             return 'کارمزد نمی‌تواند منفی باشد';
                                           }
                                         }
@@ -871,16 +873,17 @@ class _TransferFormDialogState extends State<TransferFormDialog> {
                                 keyboardType: TextInputType.number,
                                 inputFormatters: [
                                   EnglishDigitsFormatter(),
-                                  FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+                                  ThousandsSeparatorInputFormatter(allowDecimal: false),
                                 ],
                                 validator: (value) {
                                   if (value == null || value.isEmpty) {
                                     return 'لطفاً مبلغ را وارد کنید';
                                   }
-                                  if (double.tryParse(value) == null) {
+                                  final val = parseFormattedDouble(value);
+                                  if (val == null) {
                                     return 'لطفاً مبلغ معتبر وارد کنید';
                                   }
-                                  if (double.parse(value) <= 0) {
+                                  if (val <= 0) {
                                     return 'مبلغ باید بزرگتر از صفر باشد';
                                   }
                                   return null;
@@ -899,14 +902,15 @@ class _TransferFormDialogState extends State<TransferFormDialog> {
                                 keyboardType: TextInputType.number,
                                 inputFormatters: [
                                   EnglishDigitsFormatter(),
-                                  FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+                                  ThousandsSeparatorInputFormatter(allowDecimal: false),
                                 ],
                                 validator: (value) {
                                   if (value != null && value.isNotEmpty) {
-                                    if (double.tryParse(value) == null) {
+                                    final val = parseFormattedDouble(value);
+                                    if (val == null) {
                                       return 'لطفاً مبلغ معتبر وارد کنید';
                                     }
-                                    if (double.parse(value) < 0) {
+                                    if (val < 0) {
                                       return 'کارمزد نمی‌تواند منفی باشد';
                                     }
                                   }

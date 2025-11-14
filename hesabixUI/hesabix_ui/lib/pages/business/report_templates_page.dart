@@ -95,8 +95,9 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
           List<Map<String, dynamic>> hdr = List<Map<String, dynamic>>.from(design['header'] as List);
           List<Map<String, dynamic>> body = List<Map<String, dynamic>>.from(design['blocks'] as List);
           List<Map<String, dynamic>> ftr = List<Map<String, dynamic>>.from(design['footer'] as List);
+          final t = AppLocalizations.of(context);
           return AlertDialog(
-            title: Text(existingTemplateId == null ? 'سازنده بصری (جدید)' : 'سازنده بصری (ویرایش)'),
+            title: Text(existingTemplateId == null ? t.templateBuilderNew : t.templateBuilderEdit),
             content: SizedBox(
               width: 860,
               child: SingleChildScrollView(
@@ -108,7 +109,7 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                         OutlinedButton.icon(
                           onPressed: () => _undo(setSt),
                           icon: const Icon(Icons.undo),
-                          label: const Text('Undo'),
+                          label: Text(t.undo),
                         ),
                         const SizedBox(width: 8),
                         OutlinedButton.icon(
@@ -117,7 +118,7 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                             setSt(() {});
                           },
                           icon: const Icon(Icons.redo),
-                          label: const Text('Redo'),
+                          label: Text(t.redo),
                         ),
                       ],
                     ),
@@ -126,10 +127,10 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                       length: 3,
                       child: Column(
                         children: [
-                          const TabBar(tabs: [
-                            Tab(text: 'Header'),
-                            Tab(text: 'Body'),
-                            Tab(text: 'Footer'),
+                          TabBar(tabs: [
+                            Tab(text: t.header),
+                            Tab(text: t.body),
+                            Tab(text: t.footer),
                           ]),
                           SizedBox(
                             height: 420,
@@ -154,7 +155,7 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    Text('CSS کلی (اختیاری)', style: Theme.of(context).textTheme.titleSmall),
+                    Text(t.globalCssOptional, style: Theme.of(context).textTheme.titleSmall),
                     TextField(
                       controller: cssCtrl,
                       maxLines: 4,
@@ -179,33 +180,36 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                           final html = (res['html'] ?? '').toString();
                           await showDialog(
                             context: context,
-                            builder: (pvCtx) => AlertDialog(
-                              title: const Text('پیش‌نمایش HTML (خروجی رندر)'),
-                              content: SizedBox(
-                                width: 800,
-                                child: SingleChildScrollView(
-                                  child: SelectableText(html.isEmpty ? '(خالی)' : html),
+                            builder: (pvCtx) {
+                              final t2 = AppLocalizations.of(context);
+                              return AlertDialog(
+                                title: Text(t2.previewHtmlOutput),
+                                content: SizedBox(
+                                  width: 800,
+                                  child: SingleChildScrollView(
+                                    child: SelectableText(html.isEmpty ? t2.empty : html),
+                                  ),
                                 ),
-                              ),
-                              actions: [
-                                TextButton(onPressed: () => Navigator.pop(pvCtx), child: const Text('بستن')),
-                              ],
-                            ),
+                                actions: [
+                                  TextButton(onPressed: () => Navigator.pop(pvCtx), child: Text(t2.close)),
+                                ],
+                              );
+                            },
                           );
                         } catch (e) {
                           if (!mounted) return;
-                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطا در پیش‌نمایش: $e')));
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.previewError(e.toString()))));
                         }
                       },
                       icon: const Icon(Icons.visibility),
-                      label: const Text('پیش‌نمایش PDF'),
+                      label: Text(t.previewPdf),
                     ),
                   ],
                 ),
               ),
             ),
             actions: [
-              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('بستن')),
+              TextButton(onPressed: () => Navigator.pop(ctx), child: Text(t.close)),
               FilledButton(
                 onPressed: () async {
                   try {
@@ -224,7 +228,7 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                       );
                       if (!mounted) return;
                       Navigator.pop(ctx);
-                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('ایجاد شد (ID: $id)')));
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.createdWithId(id))));
                     } else {
                       await _service.updateTemplate(
                         businessId: widget.businessId,
@@ -233,15 +237,15 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                       );
                       if (!mounted) return;
                       Navigator.pop(ctx);
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('به‌روزرسانی شد')));
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.updated)));
                     }
                     await _fetch();
                   } catch (e) {
                     if (!mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطا: $e')));
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${t.error}: $e')));
                   }
                 },
-                child: Text(existingTemplateId == null ? 'ایجاد قالب (Builder)' : 'ذخیره تغییرات'),
+                child: Text(existingTemplateId == null ? t.createTemplateBuilder : t.saveChanges),
               ),
             ],
           );
@@ -252,6 +256,7 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
   }
 
   Widget _builderBlocksTab(BuildContext context, void Function(void Function()) setSt, List<Map<String, dynamic>> blocks, {required VoidCallback onChanged}) {
+    final t = AppLocalizations.of(context);
     return Column(
       children: [
         Row(
@@ -263,7 +268,7 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                 setSt(() {});
               },
               icon: const Icon(Icons.text_fields, size: 18),
-              label: const Text('افزودن متن'),
+              label: Text(t.addText),
             ),
             const SizedBox(width: 8),
             OutlinedButton.icon(
@@ -273,7 +278,7 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                 setSt(() {});
               },
               icon: const Icon(Icons.horizontal_rule, size: 18),
-              label: const Text('Divider'),
+              label: Text(t.divider),
             ),
             const SizedBox(width: 8),
             OutlinedButton.icon(
@@ -283,7 +288,7 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                 setSt(() {});
               },
               icon: const Icon(Icons.space_bar, size: 18),
-              label: const Text('Spacer'),
+              label: Text(t.spacer),
             ),
             const SizedBox(width: 8),
             OutlinedButton.icon(
@@ -293,7 +298,7 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                 setSt(() {});
               },
               icon: const Icon(Icons.image_outlined, size: 18),
-              label: const Text('افزودن تصویر'),
+              label: Text(t.addImage),
             ),
             const SizedBox(width: 8),
             OutlinedButton.icon(
@@ -303,7 +308,7 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                 setSt(() {});
               },
               icon: const Icon(Icons.qr_code, size: 18),
-              label: const Text('افزودن QR'),
+              label: Text(t.addQr),
             ),
             const SizedBox(width: 8),
             OutlinedButton.icon(
@@ -317,7 +322,7 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                 setSt(() {});
               },
               icon: const Icon(Icons.people_alt_outlined, size: 18),
-              label: const Text('اطلاعات طرفین'),
+              label: Text(t.partyInfo),
             ),
             const SizedBox(width: 8),
             OutlinedButton.icon(
@@ -337,7 +342,7 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                 setSt(() {});
               },
               icon: const Icon(Icons.summarize, size: 18),
-              label: const Text('افزودن جمع‌ها'),
+              label: Text(t.addTotals),
             ),
             const SizedBox(width: 8),
             OutlinedButton.icon(
@@ -351,7 +356,7 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                 setSt(() {});
               },
               icon: const Icon(Icons.edit, size: 18),
-              label: const Text('مهر/امضا'),
+              label: Text(t.stampSignature),
             ),
             const SizedBox(width: 8),
             OutlinedButton.icon(
@@ -369,7 +374,7 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                 setSt(() {});
               },
               icon: const Icon(Icons.water_damage_outlined, size: 18),
-              label: const Text('واترمارک'),
+              label: Text(t.watermark),
             ),
             OutlinedButton.icon(
               onPressed: () {
@@ -390,7 +395,7 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                 setSt(() {});
               },
               icon: const Icon(Icons.table_chart, size: 18),
-              label: const Text('افزودن جدول'),
+              label: Text(t.addTable),
             ),
           ],
         ),
@@ -425,7 +430,7 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                             Expanded(
                               child: TextField(
                                 controller: textCtrl,
-                                decoration: const InputDecoration(labelText: 'متن ({{ variable }})'),
+                                decoration: InputDecoration(labelText: t.textWithVariable),
                                 onChanged: (v) {
                                   b['props'] ??= <String, dynamic>{};
                                   b['props']['text'] = v;
@@ -478,23 +483,23 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                               width: 160,
                               child: DropdownButtonFormField<String>(
                                 value: (align.isEmpty ? null : align),
-                                items: const [
-                                  DropdownMenuItem(value: 'left', child: Text('Left')),
-                                  DropdownMenuItem(value: 'center', child: Text('Center')),
-                                  DropdownMenuItem(value: 'right', child: Text('Right')),
+                                items: [
+                                  DropdownMenuItem(value: 'left', child: Text(t.left)),
+                                  DropdownMenuItem(value: 'center', child: Text(t.center)),
+                                  DropdownMenuItem(value: 'right', child: Text(t.right)),
                                 ],
                                 onChanged: (v) {
                                   b['props'] ??= <String, dynamic>{};
                                   b['props']['align'] = v ?? '';
                                 },
-                                decoration: const InputDecoration(labelText: 'Align'),
+                                decoration: InputDecoration(labelText: t.alignment),
                               ),
                             ),
                             const SizedBox(width: 8),
                             Expanded(
                               child: TextField(
                                 controller: showIfCtrl,
-                                decoration: const InputDecoration(labelText: 'showIf (اختیاری، Jinja condition)'),
+                                decoration: InputDecoration(labelText: t.showIfCondition),
                                 onChanged: (v) {
                                   b['props'] ??= <String, dynamic>{};
                                   b['props']['showIf'] = v;
@@ -1021,7 +1026,7 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                   ),
                 );
               }
-              return ListTile(key: ValueKey('blk_$i'), title: Text('Block $type'));
+              return ListTile(key: ValueKey('blk_$i'), title: Text(t.blockType(type)));
             },
           ),
         ),
@@ -1082,10 +1087,10 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                         width: 140,
                         child: DropdownButtonFormField<String>(
                           value: _paperSize,
-                          decoration: const InputDecoration(
-                            labelText: 'سایز صفحه',
+                          decoration: InputDecoration(
+                            labelText: t.pageSize,
                             isDense: true,
-                            border: OutlineInputBorder(),
+                            border: const OutlineInputBorder(),
                           ),
                           items: const [
                             DropdownMenuItem(value: 'A4', child: Text('A4')),
@@ -1099,14 +1104,14 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                         width: 140,
                         child: DropdownButtonFormField<String>(
                           value: _orientation,
-                          decoration: const InputDecoration(
-                            labelText: 'جهت',
+                          decoration: InputDecoration(
+                            labelText: t.orientation,
                             isDense: true,
-                            border: OutlineInputBorder(),
+                            border: const OutlineInputBorder(),
                           ),
-                          items: const [
-                            DropdownMenuItem(value: 'portrait', child: Text('Portrait')),
-                            DropdownMenuItem(value: 'landscape', child: Text('Landscape')),
+                          items: [
+                            DropdownMenuItem(value: 'portrait', child: Text(t.portrait)),
+                            DropdownMenuItem(value: 'landscape', child: Text(t.landscape)),
                           ],
                           onChanged: (v) => setState(() => _orientation = v),
                         ),
@@ -1119,10 +1124,10 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                               width: 90,
                               child: TextField(
                                 controller: _marginTopCtrl,
-                                decoration: const InputDecoration(
-                                  labelText: 'حاشیه بالا (mm)',
+                                decoration: InputDecoration(
+                                  labelText: t.marginTop,
                                   isDense: true,
-                                  border: OutlineInputBorder(),
+                                  border: const OutlineInputBorder(),
                                 ),
                                 keyboardType: TextInputType.number,
                                 inputFormatters: [
@@ -1249,7 +1254,7 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('انصراف')),
+            TextButton(onPressed: () => Navigator.pop(ctx), child: Text(t.cancel)),
             FilledButton(
               onPressed: () async {
                 try {
@@ -1289,16 +1294,16 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                   );
                   if (mounted) Navigator.pop(ctx);
                   if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('قالب ایجاد شد (ID: $id)')));
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.templateCreatedWithId(id))));
                   }
                   await _fetch();
                 } catch (e) {
                   if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطا در ایجاد: $e')));
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.createError(e.toString()))));
                   }
                 }
               },
-              child: const Text('ایجاد'),
+              child: Text(t.create),
             ),
           ],
         );

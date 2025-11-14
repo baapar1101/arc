@@ -45,6 +45,7 @@ from adapters.api.v1.opening_balance import router as opening_balance_router
 from adapters.api.v1.report_templates import router as report_templates_router
 from adapters.api.v1.wallet import router as wallet_router
 from adapters.api.v1.wallet_webhook import router as wallet_webhook_router
+from adapters.api.v1.credit import router as credit_router
 from adapters.api.v1.marketplace import router as marketplace_router
 from adapters.api.v1.integrations.telegram import router as telegram_integration_router
 from adapters.api.v1.notifications import router as notifications_router
@@ -345,6 +346,7 @@ def create_app() -> FastAPI:
     application.include_router(report_templates_router, prefix=settings.api_v1_prefix)
     application.include_router(wallet_router, prefix=settings.api_v1_prefix)
     application.include_router(wallet_webhook_router, prefix=settings.api_v1_prefix)
+    application.include_router(credit_router, prefix=settings.api_v1_prefix)
     application.include_router(marketplace_router, prefix=settings.api_v1_prefix)
     # Integrations
     application.include_router(telegram_integration_router, prefix=settings.api_v1_prefix)

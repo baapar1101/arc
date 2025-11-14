@@ -10,7 +10,7 @@ import re
 
 from adapters.db.session import get_db
 from app.core.auth_dependency import get_current_user, AuthContext
-from app.core.permissions import require_business_access
+from app.core.permissions import require_business_access, require_business_management_dep
 from app.core.responses import success_response, format_datetime_fields
 from adapters.api.v1.schemas import QueryInfo
 from adapters.db.models.document import Document
@@ -22,8 +22,12 @@ from adapters.db.models.business import Business
 from app.services.invoice_service import (
     create_invoice,
     update_invoice,
+    delete_invoice,
     invoice_document_to_dict,
     SUPPORTED_INVOICE_TYPES,
+    get_invoice_installment_plan,
+    search_installments,
+    export_installments_csv,
 )
 from app.services.pdf.template_renderer import render_template
 
@@ -49,6 +53,66 @@ def create_invoice_endpoint(
     return success_response(data=result, request=request, message="INVOICE_CREATED")
 
 
+@router.get("/business/{business_id}/{invoice_id}/installments")
+@require_business_access("business_id")
+def get_invoice_installments_endpoint(
+    request: Request,
+    business_id: int,
+    invoice_id: int,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    data = get_invoice_installment_plan(db=db, business_id=business_id, invoice_id=invoice_id)
+    return success_response(data=data, request=request, message="INSTALLMENT_PLAN_FETCHED")
+
+
+@router.post("/business/{business_id}/installments/search")
+@require_business_access("business_id")
+def search_installments_endpoint(
+    request: Request,
+    business_id: int,
+    payload: Dict[str, Any] = Body(...),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    جستجوی اقساط با فیلترهای:
+    {
+      "fiscal_year_id": int?,
+      "due_from": "YYYY-MM-DD"?,
+      "due_to": "YYYY-MM-DD"?,
+      "status": "pending|partial|paid|overdue"?,
+      "person_id": int?,
+      "invoice_id": int?,
+      "take": 200,
+      "skip": 0
+    }
+    """
+    result = search_installments(db=db, business_id=business_id, query=payload or {})
+    return success_response(data=result, request=request, message="INSTALLMENTS_LIST_FETCHED")
+
+
+@router.post("/business/{business_id}/installments/export/excel")
+@require_business_access("business_id")
+def export_installments_excel_endpoint(
+    request: Request,
+    business_id: int,
+    payload: Dict[str, Any] = Body(...),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Response:
+    """
+    خروجی XLSX از اقساط (در صورت نبودن کتابخانه، CSV بازگردانده می‌شود).
+    """
+    content, mime, ext = export_installments_xlsx(db=db, business_id=business_id, query=payload or {})
+    filename = f"installments_{business_id}.{ext}"
+    headers = {
+        "Content-Disposition": f'attachment; filename="{filename}"',
+        "Content-Type": mime,
+    }
+    return Response(content=content, media_type=mime, headers=headers)
+
+
 @router.put("/business/{business_id}/{invoice_id}")
 @require_business_access("business_id")
 def update_invoice_endpoint(
@@ -72,6 +136,41 @@ def update_invoice_endpoint(
         data=payload,
     )
     return success_response(data=result, request=request, message="INVOICE_UPDATED")
+
+
+@router.delete(
+    "/business/{business_id}/{invoice_id}",
+    summary="حذف فاکتور",
+    description="حذف یک فاکتور",
+)
+@require_business_access("business_id")
+def delete_invoice_endpoint(
+    request: Request,
+    business_id: int,
+    invoice_id: int,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_management_dep),
+) -> Dict[str, Any]:
+    """حذف یک فاکتور"""
+    # بررسی مالکیت
+    doc = db.query(Document).filter(Document.id == invoice_id).first()
+    if not doc or doc.business_id != business_id or doc.document_type not in SUPPORTED_INVOICE_TYPES:
+        from app.core.responses import ApiError
+        raise ApiError("DOCUMENT_NOT_FOUND", "Invoice document not found", http_status=404)
+    
+    # حذف فاکتور
+    success = delete_invoice(db, invoice_id)
+    
+    if not success:
+        from app.core.responses import ApiError
+        raise ApiError("DELETE_FAILED", "Failed to delete invoice", http_status=500)
+    
+    return success_response(
+        data={"deleted": True, "invoice_id": invoice_id},
+        request=request,
+        message="INVOICE_DELETED"
+    )
 
 
 @router.get("/business/{business_id}/{invoice_id}")
@@ -218,6 +317,11 @@ async def search_invoices_endpoint(
 ) -> Dict[str, Any]:
     """لیست فاکتورها با فیلتر، جست‌وجو، مرتب‌سازی و صفحه‌بندی استاندارد"""
 
+    # Locale for labels
+    from app.core.i18n import negotiate_locale
+    locale = negotiate_locale(request.headers.get("Accept-Language"))
+    is_fa = locale == "fa"
+
     # Base query
     q = db.query(Document).filter(
         and_(
@@ -336,13 +440,13 @@ async def search_invoices_endpoint(
     # Helpers for display fields
     def _type_name(tp: str) -> str:
         mapping = {
-            'invoice_sales': 'فروش',
-            'invoice_sales_return': 'برگشت از فروش',
-            'invoice_purchase': 'خرید',
-            'invoice_purchase_return': 'برگشت از خرید',
-            'invoice_direct_consumption': 'مصرف مستقیم',
-            'invoice_production': 'تولید',
-            'invoice_waste': 'ضایعات',
+            'invoice_sales': ('فروش' if is_fa else 'Sales'),
+            'invoice_sales_return': ('برگشت از فروش' if is_fa else 'Sales return'),
+            'invoice_purchase': ('خرید' if is_fa else 'Purchase'),
+            'invoice_purchase_return': ('برگشت از خرید' if is_fa else 'Purchase return'),
+            'invoice_direct_consumption': ('مصرف مستقیم' if is_fa else 'Direct consumption'),
+            'invoice_production': ('تولید' if is_fa else 'Production'),
+            'invoice_waste': ('ضایعات' if is_fa else 'Waste'),
         }
         return mapping.get(str(tp), str(tp))
 
@@ -423,6 +527,7 @@ async def export_invoices_excel(
 ):
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from app.core.i18n import negotiate_locale
 
     # Build base query similar to search endpoint
     take_value = min(int(body.get("take", 1000)), 10000)
@@ -496,15 +601,18 @@ async def export_invoices_excel(
     docs: List[Document] = q.offset(skip_value).limit(take_value).all()
 
     # Build items like list endpoint
+    locale = negotiate_locale(request.headers.get("Accept-Language"))
+    is_fa = locale == 'fa'
+
     def _type_name(tp: str) -> str:
         mapping = {
-            'invoice_sales': 'فروش',
-            'invoice_sales_return': 'برگشت از فروش',
-            'invoice_purchase': 'خرید',
-            'invoice_purchase_return': 'برگشت از خرید',
-            'invoice_direct_consumption': 'مصرف مستقیم',
-            'invoice_production': 'تولید',
-            'invoice_waste': 'ضایعات',
+            'invoice_sales': ('فروش' if is_fa else 'Sales'),
+            'invoice_sales_return': ('برگشت از فروش' if is_fa else 'Sales return'),
+            'invoice_purchase': ('خرید' if is_fa else 'Purchase'),
+            'invoice_purchase_return': ('برگشت از خرید' if is_fa else 'Purchase return'),
+            'invoice_direct_consumption': ('مصرف مستقیم' if is_fa else 'Direct consumption'),
+            'invoice_production': ('تولید' if is_fa else 'Production'),
+            'invoice_waste': ('ضایعات' if is_fa else 'Waste'),
         }
         return mapping.get(str(tp), str(tp))
 
@@ -569,14 +677,14 @@ async def export_invoices_excel(
                 headers.append(str(label))
     else:
         default_columns = [
-            ('code', 'کد سند'),
-            ('document_type_name', 'نوع فاکتور'),
-            ('document_date', 'تاریخ سند'),
-            ('total_amount', 'مبلغ کل'),
-            ('currency_code', 'ارز'),
-            ('created_by_name', 'ایجادکننده'),
-            ('is_proforma', 'وضعیت'),
-            ('registered_at', 'تاریخ ثبت'),
+            ('code', 'کد سند' if is_fa else 'Code'),
+            ('document_type_name', 'نوع فاکتور' if is_fa else 'Invoice type'),
+            ('document_date', 'تاریخ سند' if is_fa else 'Document date'),
+            ('total_amount', 'مبلغ کل' if is_fa else 'Total amount'),
+            ('currency_code', 'ارز' if is_fa else 'Currency'),
+            ('created_by_name', 'ایجادکننده' if is_fa else 'Created by'),
+            ('is_proforma', 'وضعیت' if is_fa else 'Status'),
+            ('registered_at', 'تاریخ ثبت' if is_fa else 'Registered at'),
         ]
         for key, label in default_columns:
             if items and key in items[0]:
@@ -742,15 +850,18 @@ async def export_invoices_pdf(
 
     docs: List[Document] = q.offset(skip_value).limit(take_value).all()
 
+    locale = negotiate_locale(request.headers.get("Accept-Language"))
+    is_fa = locale == 'fa'
+
     def _type_name(tp: str) -> str:
         mapping = {
-            'invoice_sales': 'فروش',
-            'invoice_sales_return': 'برگشت از فروش',
-            'invoice_purchase': 'خرید',
-            'invoice_purchase_return': 'برگشت از خرید',
-            'invoice_direct_consumption': 'مصرف مستقیم',
-            'invoice_production': 'تولید',
-            'invoice_waste': 'ضایعات',
+            'invoice_sales': ('فروش' if is_fa else 'Sales'),
+            'invoice_sales_return': ('برگشت از فروش' if is_fa else 'Sales return'),
+            'invoice_purchase': ('خرید' if is_fa else 'Purchase'),
+            'invoice_purchase_return': ('برگشت از خرید' if is_fa else 'Purchase return'),
+            'invoice_direct_consumption': ('مصرف مستقیم' if is_fa else 'Direct consumption'),
+            'invoice_production': ('تولید' if is_fa else 'Production'),
+            'invoice_waste': ('ضایعات' if is_fa else 'Waste'),
         }
         return mapping.get(str(tp), str(tp))
 
@@ -813,14 +924,14 @@ async def export_invoices_pdf(
                 headers.append(str(label))
     else:
         default_columns = [
-            ('code', 'کد سند'),
-            ('document_type_name', 'نوع فاکتور'),
-            ('document_date', 'تاریخ سند'),
-            ('total_amount', 'مبلغ کل'),
-            ('currency_code', 'ارز'),
-            ('created_by_name', 'ایجادکننده'),
-            ('is_proforma', 'وضعیت'),
-            ('registered_at', 'تاریخ ثبت'),
+            ('code', 'کد سند' if is_fa else 'Code'),
+            ('document_type_name', 'نوع فاکتور' if is_fa else 'Invoice type'),
+            ('document_date', 'تاریخ سند' if is_fa else 'Document date'),
+            ('total_amount', 'مبلغ کل' if is_fa else 'Total amount'),
+            ('currency_code', 'ارز' if is_fa else 'Currency'),
+            ('created_by_name', 'ایجادکننده' if is_fa else 'Created by'),
+            ('is_proforma', 'وضعیت' if is_fa else 'Status'),
+            ('registered_at', 'تاریخ ثبت' if is_fa else 'Registered at'),
         ]
         for key, label in default_columns:
             if items and key in items[0]:

@@ -180,6 +180,9 @@ class BusinessCreateRequest(BaseModel):
 	fiscal_years: Optional[List["FiscalYearCreate"]] = Field(default=None, description="آرایه سال‌های مالی برای ایجاد اولیه")
 	default_currency_id: Optional[int] = Field(default=None, description="شناسه ارز پیشفرض")
 	currency_ids: Optional[List[int]] = Field(default=None, description="لیست شناسه ارزهای قابل استفاده")
+	# تنظیمات اعتبار مشتریان
+	default_credit_limit: Optional[float] = Field(default=None, description="سقف اعتبار پیشفرض اشخاص")
+	check_credit_enabled_by_default: Optional[bool] = Field(default=False, description="بررسی اعتبار مشتریان به صورت پیشفرض (خاموش)")
 
 
 class BusinessUpdateRequest(BaseModel):
@@ -196,6 +199,9 @@ class BusinessUpdateRequest(BaseModel):
 	province: Optional[str] = Field(default=None, max_length=100, description="استان")
 	city: Optional[str] = Field(default=None, max_length=100, description="شهر")
 	postal_code: Optional[str] = Field(default=None, max_length=20, description="کد پستی")
+	# تنظیمات اعتبار مشتریان
+	default_credit_limit: Optional[float] = Field(default=None, description="سقف اعتبار پیشفرض اشخاص")
+	check_credit_enabled_by_default: Optional[bool] = Field(default=None, description="بررسی اعتبار مشتریان به صورت پیشفرض")
 
 
 class BusinessResponse(BaseModel):
@@ -214,6 +220,9 @@ class BusinessResponse(BaseModel):
 	province: Optional[str] = Field(default=None, description="استان")
 	city: Optional[str] = Field(default=None, description="شهر")
 	postal_code: Optional[str] = Field(default=None, description="کد پستی")
+	# تنظیمات اعتبار مشتریان
+	default_credit_limit: Optional[float] = Field(default=None, description="سقف اعتبار پیشفرض اشخاص")
+	check_credit_enabled_by_default: bool = Field(default=False, description="بررسی اعتبار مشتریان به صورت پیشفرض")
 	created_at: str = Field(..., description="تاریخ ایجاد")
 	updated_at: str = Field(..., description="تاریخ آخرین بروزرسانی")
 	default_currency: Optional[dict] = Field(default=None, description="ارز پیشفرض")

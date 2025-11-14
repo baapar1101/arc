@@ -332,6 +332,8 @@ def _business_to_dict(business: Business) -> Dict[str, Any]:
         "province": business.province,
         "city": business.city,
         "postal_code": business.postal_code,
+        "default_credit_limit": float(business.default_credit_limit) if getattr(business, "default_credit_limit", None) is not None else None,
+        "check_credit_enabled_by_default": bool(getattr(business, "check_credit_enabled_by_default", False)),
         "created_at": business.created_at,  # datetime object بماند
         "updated_at": business.updated_at   # datetime object بماند
     }

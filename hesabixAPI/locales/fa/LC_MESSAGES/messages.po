@@ -454,3 +454,19 @@ msgstr "این سند دارای وابستگی (مانند چک) است و قا
 msgid "RECEIPT_PAYMENT_UPDATED"
 msgstr "سند دریافت/پرداخت با موفقیت ویرایش شد"
 
+# Invoices
+msgid "INVOICE_CREATED"
+msgstr "فاکتور ایجاد شد"
+
+msgid "INVOICE_UPDATED"
+msgstr "فاکتور ویرایش شد"
+
+msgid "INVOICE_DELETED"
+msgstr "فاکتور حذف شد"
+
+msgid "INVOICE_LIST"
+msgstr "لیست فاکتورها"
+
+msgid "INVOICE"
+msgstr "فاکتور"
+

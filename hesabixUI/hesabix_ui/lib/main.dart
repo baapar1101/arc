@@ -56,6 +56,9 @@ import 'pages/business/transfers_page.dart';
 import 'pages/business/documents_page.dart';
 import 'pages/business/warehouses_page.dart';
 import 'pages/business/inventory_transfers_page.dart';
+import 'pages/business/installments_report_page.dart';
+import 'pages/business/credit_settings_page.dart';
+import 'pages/business/installment_plans_page.dart';
 import 'pages/error_404_page.dart';
 import 'core/locale_controller.dart';
 import 'core/calendar_controller.dart';
@@ -886,6 +889,36 @@ class _MyAppState extends State<MyApp> {
               },
             ),
             GoRoute(
+              path: '/business/:business_id/settings/credit',
+              name: 'business_settings_credit',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                if (!_authStore!.hasBusinessPermission('settings', 'join')) {
+                  return NoTransitionPage(
+                    child: PermissionGuard.buildAccessDeniedPage(),
+                  );
+                }
+                return NoTransitionPage(
+                  child: CreditSettingsPage(businessId: businessId),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/settings/installments',
+              name: 'business_settings_installments',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                if (!_authStore!.hasBusinessPermission('settings', 'join')) {
+                  return NoTransitionPage(
+                    child: PermissionGuard.buildAccessDeniedPage(),
+                  );
+                }
+                return NoTransitionPage(
+                  child: InstallmentPlansPage(businessId: businessId),
+                );
+              },
+            ),
+            GoRoute(
               path: '/business/:business_id/product-attributes',
               name: 'business_product_attributes',
               pageBuilder: (context, state) {
@@ -963,6 +996,21 @@ class _MyAppState extends State<MyApp> {
                     businessId: businessId,
                     calendarController: _calendarController!,
                     authStore: _authStore!,
+                    apiClient: ApiClient(),
+                  ),
+                );
+              },
+            ),
+            // Installments report
+            GoRoute(
+              path: '/business/:business_id/installments-report',
+              name: 'business_installments_report',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return NoTransitionPage(
+                  child: InstallmentsReportPage(
+                    businessId: businessId,
+                    calendarController: _calendarController!,
                     apiClient: ApiClient(),
                   ),
                 );

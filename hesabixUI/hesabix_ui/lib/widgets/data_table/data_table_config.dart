@@ -97,7 +97,7 @@ class NumberColumn extends DataTableColumn {
     super.filterType,
     super.filterOptions,
     this.formatter,
-    this.textAlign = TextAlign.end,
+    this.textAlign = TextAlign.center,
     this.decimalPlaces,
     this.prefix,
     this.suffix,
@@ -276,6 +276,10 @@ class DataTableConfig<T> {
   // Show individual action buttons
   final bool showFiltersButton;
   
+  // Alignment configuration
+  final TextAlign? cellTextAlign;       // If set, overrides all cell text alignment
+  final TextAlign? headerTextAlign;     // If set, overrides all header text alignment
+  
   // Refresh callback
   final VoidCallback? onRefresh;
   
@@ -358,6 +362,8 @@ class DataTableConfig<T> {
     this.onColumnSettingsChanged,
     this.customHeaderActions,
     this.showFiltersButton = false,
+    this.cellTextAlign,
+    this.headerTextAlign,
     this.onRefresh,
     this.autoFitColumnsOnFirstLoad = true,
     this.autoFitSampleRows = 50,

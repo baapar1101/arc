@@ -1391,7 +1391,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get receiptsAndPayments => 'Receipts and Payments';
 
   @override
-  String get productsAndServices => 'Products and Services';
+  String get productsAndServices => 'Products/Services';
 
   @override
   String get products => 'Products and Services';
@@ -2989,67 +2989,529 @@ class AppLocalizationsEn extends AppLocalizations {
   String get templateCustom => 'Custom template';
 
   @override
-  String get paymentGateways => 'Payment Gateways';
+  String get invoicesListManage => 'Manage invoices list';
 
   @override
-  String get addPaymentGateway => 'Add Payment Gateway';
+  String get all => 'All';
 
   @override
-  String get editPaymentGateway => 'Edit Payment Gateway';
+  String get invoiceTypeSales => 'Sales';
 
   @override
-  String get provider => 'Provider';
+  String get invoiceTypePurchase => 'Purchase';
 
   @override
-  String get displayName => 'Display name';
+  String get invoiceTypeSalesReturn => 'Sales return';
 
   @override
-  String get useSuggestedCallback => 'Use suggested callback';
+  String get invoiceTypePurchaseReturn => 'Purchase return';
 
   @override
-  String get successRedirectOptional => 'success_redirect (optional)';
+  String get invoiceTypeProduction => 'Production';
 
   @override
-  String get failureRedirectOptional => 'failure_redirect (optional)';
+  String get invoiceTypeDirectConsumption => 'Direct consumption';
 
   @override
-  String get operationSuccessful => 'Operation completed successfully';
+  String get invoiceTypeWaste => 'Waste';
 
   @override
-  String get callbackNote =>
-      'Note: tx_id will be appended to callback automatically. If success/failure redirects are set, user will be redirected accordingly.';
+  String get documentDate => 'Document date';
 
   @override
-  String get create => 'Create';
+  String get totalAmount => 'Total amount';
+
+  @override
+  String get unknown => 'Unknown';
+
+  @override
+  String get noInvoicesFound => 'No invoices found';
+
+  @override
+  String get loadingInvoices => 'Loading invoices...';
+
+  @override
+  String get errorLoadingInvoices => 'Error loading invoices';
+
+  @override
+  String get proforma => 'Proforma';
+
+  @override
+  String get finalized => 'Finalized';
+
+  @override
+  String get clearDateFilter => 'Clear date filter';
+
+  @override
+  String get deleteConfirmTitle => 'Confirm delete';
+
+  @override
+  String deleteInvoiceConfirm(String code) {
+    return 'Are you sure you want to delete invoice $code? This action is irreversible.';
+  }
+
+  @override
+  String deletedInvoiceSuccess(String code) {
+    return 'Invoice $code deleted successfully';
+  }
+
+  @override
+  String get deleteInvoiceError => 'Failed to delete invoice';
+
+  @override
+  String deleteInvoiceErrorWithMessage(String error) {
+    return 'Failed to delete invoice: $error';
+  }
+
+  @override
+  String get saveInvoice => 'Save invoice';
+
+  @override
+  String get invoiceInfoTab => 'Invoice info';
+
+  @override
+  String get productsServicesTab => 'Products & services';
+
+  @override
+  String get transactionsTab => 'Transactions';
+
+  @override
+  String get settingsTab => 'Settings';
+
+  @override
+  String get invoiceCreatedSuccess => 'Invoice created successfully';
+
+  @override
+  String saveInvoiceErrorWithMessage(String error) {
+    return 'Failed to save invoice: $error';
+  }
+
+  @override
+  String get noRowsAdded => 'No rows added';
+
+  @override
+  String get quantityUnit => 'Quantity/Unit';
+
+  @override
+  String get unitPrice => 'Unit price';
+
+  @override
+  String get installmentsTitle => 'Installment sale';
+
+  @override
+  String get installmentsSubtitle =>
+      'If enabled, an installment plan will be saved with the invoice';
+
+  @override
+  String get installmentsCount => 'Number of installments';
+
+  @override
+  String get downPayment => 'Down payment';
+
+  @override
+  String get interestRatePercent => 'Total period interest (%)';
+
+  @override
+  String get installmentsPeriod => 'Installment period';
+
+  @override
+  String get installmentsMonthly => 'Monthly (30 days)';
+
+  @override
+  String get installmentsDaysBased => 'By days';
+
+  @override
+  String get installmentDaysLength => 'Length of each installment (days)';
+
+  @override
+  String get firstInstallmentDueDate => 'First due date';
+
+  @override
+  String get invalidInstallmentsCount => 'Invalid number of installments';
+
+  @override
+  String get unitPricePickHint =>
+      'Unit price (pick from list or enter manually)';
+
+  @override
+  String get lineTotalAmount => 'Line total amount';
+
+  @override
+  String get lineDescription => 'Line description';
+
+  @override
+  String get descriptionOptional => 'Description (optional)';
+
+  @override
+  String get discountTypeAndValue => 'Discount (type and value)';
+
+  @override
+  String get taxPercentAndAmount => 'Tax (percent and amount)';
+
+  @override
+  String get selectUnitTitle => 'Select unit';
+
+  @override
+  String get mainUnitLabel => 'Main unit';
+
+  @override
+  String get secondaryUnitLabel => 'Secondary unit';
+
+  @override
+  String get noUnitsDefined => 'No units defined for this product';
+
+  @override
+  String get discountType => 'Discount type';
+
+  @override
+  String get percent => 'Percent';
+
+  @override
+  String get pricePickFromList => 'Pick from price list';
+
+  @override
+  String get noPricesFound => 'No prices to show';
+
+  @override
+  String get baseEstimatedPrice => 'Estimated base price';
+
+  @override
+  String get priceListLabel => 'Price list';
+
+  @override
+  String get kardexDocuments => 'Kardex documents';
+
+  @override
+  String get documentCode => 'Document code';
+
+  @override
+  String get documentType => 'Document type';
+
+  @override
+  String get movementDirection => 'Movement';
+
+  @override
+  String get movementIn => 'Incoming';
+
+  @override
+  String get movementOut => 'Outgoing';
+
+  @override
+  String get debit => 'Debit';
+
+  @override
+  String get credit => 'Credit';
+
+  @override
+  String get quantity => 'Quantity';
+
+  @override
+  String get runningAmount => 'Running amount';
+
+  @override
+  String get runningQuantity => 'Running quantity';
+
+  @override
+  String get viewDocument => 'View document';
+
+  @override
+  String get totalsDebit => 'Total debit';
+
+  @override
+  String get totalsCredit => 'Total credit';
+
+  @override
+  String get totalsQuantity => 'Total quantity';
+
+  @override
+  String get totalsRunningAmount => 'Running amount';
+
+  @override
+  String get totalsRunningQuantity => 'Running quantity';
+
+  @override
+  String get addFilter => 'Add filter';
+
+  @override
+  String get presetsTitle => 'Presets';
+
+  @override
+  String get applyPreset => 'Apply preset';
+
+  @override
+  String get deleteSelectedPreset => 'Delete selected preset';
+
+  @override
+  String get savePreset => 'Save preset';
+
+  @override
+  String get savePresetTitle => 'Save preset';
+
+  @override
+  String get presetNameHint => 'Enter preset name';
+
+  @override
+  String get presetSaved => 'Preset saved';
+
+  @override
+  String presetSaveError(String error) {
+    return 'Error saving preset: $error';
+  }
+
+  @override
+  String presetDeleteError(String error) {
+    return 'Error deleting preset: $error';
+  }
+
+  @override
+  String presetApplyError(String error) {
+    return 'Error applying preset: $error';
+  }
+
+  @override
+  String get fiscalYear => 'Fiscal year';
+
+  @override
+  String get addFilterPersons => 'Add filter: People';
+
+  @override
+  String get addFilterProduct => 'Add filter: Product/Service';
+
+  @override
+  String get addFilterBank => 'Add filter: Bank';
+
+  @override
+  String get addFilterCash => 'Add filter: Cash register';
+
+  @override
+  String get addFilterPetty => 'Add filter: Petty cash';
+
+  @override
+  String get addFilterAccount => 'Add filter: Ledger account';
+
+  @override
+  String get addFilterCheck => 'Add filter: Check';
+
+  @override
+  String get matchModeAny => 'Any';
+
+  @override
+  String get matchModeSameLine => 'Same line';
+
+  @override
+  String get matchModeDocumentAnd => 'Same document';
+
+  @override
+  String get resultScopeLinesMatching => 'Only matching lines';
+
+  @override
+  String get resultScopeLinesOfDocument => 'All lines of document';
+
+  @override
+  String get includeRunningBalance => 'Include running balance';
+
+  @override
+  String get applyManually => 'Apply manually';
+
+  @override
+  String get ledgerAccount => 'Account';
+
+  @override
+  String get reportsGeneralSection => 'General reports';
+
+  @override
+  String get reportsPeopleSection => 'People reports';
+
+  @override
+  String get reportsProductsSection => 'Products & services reports';
+
+  @override
+  String get reportsBankingSection => 'Banking & cash reports';
+
+  @override
+  String get reportsSalesSection => 'Sales reports';
+
+  @override
+  String get reportsPurchasesSection => 'Purchase reports';
+
+  @override
+  String get reportsProductionSection => 'Production reports';
+
+  @override
+  String get reportsBasicAccountingSection => 'Basic accounting';
+
+  @override
+  String get reportsProfitLossSection => 'Profit & loss';
+
+  @override
+  String get reportsKardexSubtitle =>
+      'Detailed transactions by person/product/bank/account/check with date filters';
+
+  @override
+  String get reportsDebtorsTitle => 'Debtors list';
+
+  @override
+  String get reportsDebtorsSubtitle => 'People with debit balances';
+
+  @override
+  String get reportsCreditorsTitle => 'Creditors list';
+
+  @override
+  String get reportsCreditorsSubtitle => 'People with credit balances';
+
+  @override
+  String get reportsPeopleTransactionsTitle => 'People transactions';
+
+  @override
+  String get reportsPeopleTransactionsSubtitle =>
+      'Detailed receipts and payments by person';
+
+  @override
+  String get reportsItemMovementsTitle => 'Item movements';
+
+  @override
+  String get reportsItemMovementsSubtitle =>
+      'In, out and balance over a period';
+
+  @override
+  String get reportsInventoryKardexTitle => 'Inventory kardex';
+
+  @override
+  String get reportsInventoryKardexSubtitle =>
+      'Per-item movement details (FIFO/LIFO/average)';
+
+  @override
+  String get reportsSalesByProductTitle => 'Sales by product';
+
+  @override
+  String get reportsSalesByProductSubtitle =>
+      'Performance of each product in time range';
+
+  @override
+  String get reportsBankAccountsTurnoverTitle => 'Bank accounts turnover';
+
+  @override
+  String get reportsBankAccountsTurnoverSubtitle =>
+      'Withdrawals and deposits by account';
+
+  @override
+  String get reportsCashPettyTurnoverTitle => 'Cash and petty cash turnover';
+
+  @override
+  String get reportsCashPettyTurnoverSubtitle => 'Detailed cash in/out';
+
+  @override
+  String get reportsChecksTitle => 'Checks';
+
+  @override
+  String get reportsChecksSubtitle =>
+      'Receivable, payable, due dates and statuses';
+
+  @override
+  String get reportsDailySalesTitle => 'Daily sales';
+
+  @override
+  String get reportsDailySalesSubtitle => 'Daily sales performance and trends';
+
+  @override
+  String get reportsMonthlySalesTitle => 'Monthly sales';
+
+  @override
+  String get reportsMonthlySalesSubtitle =>
+      'Monthly comparison and sales growth';
+
+  @override
+  String get reportsTopCustomersTitle => 'Top customers';
+
+  @override
+  String get reportsTopCustomersSubtitle => 'Ranking by amount or count';
+
+  @override
+  String get reportsDailyPurchasesTitle => 'Daily purchases';
+
+  @override
+  String get reportsDailyPurchasesSubtitle =>
+      'Daily purchase performance and trends';
+
+  @override
+  String get reportsTopSuppliersTitle => 'Top suppliers';
+
+  @override
+  String get reportsTopSuppliersSubtitle => 'Suppliers ranked by purchases';
+
+  @override
+  String get reportsMaterialsConsumptionTitle => 'Materials consumption';
+
+  @override
+  String get reportsMaterialsConsumptionSubtitle =>
+      'Raw material consumption per product';
+
+  @override
+  String get reportsProductionTitle => 'Production report';
+
+  @override
+  String get reportsProductionSubtitle => 'Production volume and waste';
+
+  @override
+  String get reportsTrialBalanceTitle => 'Trial balance';
+
+  @override
+  String get reportsTrialBalanceSubtitle => '2/4/6/8-column balance';
+
+  @override
+  String get reportsGeneralLedgerTitle => 'General ledger';
+
+  @override
+  String get reportsGeneralLedgerSubtitle => 'Account movements over a period';
+
+  @override
+  String get reportsPnlPeriodTitle => 'Period profit and loss';
+
+  @override
+  String get reportsPnlPeriodSubtitle =>
+      'Revenue, expenses, and net profit/loss';
+
+  @override
+  String get reportsPnlCumulativeTitle => 'Cumulative profit and loss';
+
+  @override
+  String get reportsPnlCumulativeSubtitle =>
+      'Periodical comparison and cumulative view';
+
+  @override
+  String get reportsComingSoonMessage => 'This report will be available soon.';
+
+  @override
+  String get operationSuccessful => 'Operation successful';
 
   @override
   String get notificationsSettingsTitle => 'Notification Settings';
 
   @override
   String get notificationsSettingsSubtitle =>
-      'Enable delivery channels, send test messages, and maintain provider credentials.';
+      'Enable delivery channels, send test messages, and manage service credentials.';
 
   @override
-  String get notificationsOverviewTitle => 'Keep your team informed';
+  String get notificationsOverviewTitle => 'Ensure messages reach your team';
 
   @override
   String get notificationsOverviewDescription =>
-      'Choose which channels deliver operational alerts and guide administrators on how notifications are routed.';
+      'Decide which channels deliver operational alerts so administrators know how messages are sent.';
 
   @override
   String get notificationsGuidanceItemChannels =>
-      'Toggle channels to match each business unit\'s availability and compliance requirements.';
+      'Enable or disable channels based on availability and team requirements.';
 
   @override
   String get notificationsGuidanceItemTemplates =>
-      'Ensure notification templates exist and are published for every channel and language you enable.';
+      'Publish an active template for each channel and language.';
 
   @override
   String get notificationsGuidanceItemTesting =>
-      'Use test buttons after configuration changes to verify the end-to-end delivery path.';
+      'After changes, verify delivery paths with the test buttons.';
 
   @override
-  String get notificationsLearnMore => 'View documentation';
+  String get notificationsLearnMore => 'Read the guide';
 
   @override
   String get notificationsDocumentationUrl =>
@@ -3060,48 +3522,48 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get notificationsChannelsSectionSubtitle =>
-      'Activated channels are used whenever the system emits an announcement or operational alert.';
+      'Any enabled channel may be used for system notifications and operational alerts.';
 
   @override
   String get notificationsChannelTelegram => 'Telegram';
 
   @override
   String get notificationsChannelTelegramDescription =>
-      'Send alerts through the connected Telegram bot to subscribed operators.';
+      'Send messages through a connected Telegram bot for operators.';
 
   @override
   String get notificationsChannelEmail => 'Email';
 
   @override
   String get notificationsChannelEmailDescription =>
-      'Deliver messages via the default email gateway configured in system settings.';
+      'Send emails using the server configured in system settings.';
 
   @override
   String get notificationsChannelSms => 'SMS';
 
   @override
   String get notificationsChannelSmsDescription =>
-      'Send short messages via the configured SMS provider for high-priority events.';
+      'Send SMS via your configured provider for sensitive events.';
 
   @override
   String get notificationsChannelInApp => 'In-app';
 
   @override
   String get notificationsChannelInAppDescription =>
-      'Display alerts inside the Hesabix web and mobile applications instantly.';
+      'Display notifications inside Hesabix web and mobile in real time.';
 
   @override
   String get notificationsSaveSuccess => 'Notification settings saved.';
 
   @override
-  String get notificationsSaveError => 'Unable to save notification settings.';
+  String get notificationsSaveError => 'Failed to save notification settings.';
 
   @override
-  String get notificationsTestSectionTitle => 'Send test messages';
+  String get notificationsTestSectionTitle => 'Send test message';
 
   @override
   String get notificationsTestSectionSubtitle =>
-      'Send a lightweight test over the selected channel to validate credentials and routing.';
+      'After any change, use the selected channel to send a test.';
 
   @override
   String notificationsTestButton(String channel) {
@@ -3110,21 +3572,20 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String notificationsTestSuccess(String channel) {
-    return 'Test notification sent via $channel.';
+    return 'Test message sent via $channel.';
   }
 
   @override
   String notificationsTestError(String channel) {
-    return 'Failed to send test via $channel.';
+    return 'Failed to send test message via $channel.';
   }
 
   @override
-  String get notificationsWebsocketInfoTitle =>
-      'Real-time in-app notifications';
+  String get notificationsWebsocketInfoTitle => 'Realtime in-app notifications';
 
   @override
   String notificationsWebsocketInfoDescription(String endpoint) {
-    return 'Clients subscribe to the WebSocket endpoint $endpoint with a valid API key. Web and mobile apps handle this automatically.';
+    return 'Users connect with a valid API key to the websocket endpoint $endpoint. Web and mobile apps establish this connection automatically.';
   }
 
   @override
@@ -3133,7 +3594,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get notificationsAdvancedSectionSubtitle =>
-      'Manage provider credentials for Telegram and SMS gateways. Requires the system_settings permission.';
+      'Manage Telegram and SMS validation here. Requires system_settings access.';
 
   @override
   String get notificationsAdvancedTelegramHeader => 'Telegram bot setup';
@@ -3152,11 +3613,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get notificationsFieldTelegramTokenHint =>
-      'Obtain from BotFather (format: 123456789:ABC...).';
+      'Issued by BotFather (format: 123456789:ABC...).';
 
   @override
   String get notificationsFieldTelegramWebhookSecretHint =>
-      'Optional shared secret used to validate incoming webhook calls.';
+      'Optional; used to validate incoming requests.';
 
   @override
   String get notificationsAdvancedSmsHeader => 'SMS gateway';
@@ -3169,18 +3630,18 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get notificationsFieldSmsApiKeyHint =>
-      'Issued by your SMS provider; consider rotating it periodically.';
+      'Provided by your SMS vendor; rotate periodically.';
 
   @override
-  String get notificationsFieldSmsSender => 'Sender number or ID';
+  String get notificationsFieldSmsSender => 'Sender/Number';
 
   @override
   String get notificationsFieldSmsSenderHint =>
-      'Exact sender value registered with your provider.';
+      'Exactly as registered in your vendor panel.';
 
   @override
   String get notificationsAdvancedRestartHint =>
-      'Apply changes during low traffic hours; background workers may require a restart.';
+      'After changes, restart the notification service during low traffic if needed.';
 
   @override
   String get notificationsAdvancedSave => 'Save advanced settings';
@@ -3191,5 +3652,441 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get notificationsAdvancedSaveError =>
-      'Unable to save advanced notification settings.';
+      'Failed to save advanced notification settings.';
+
+  @override
+  String get templateBuilderNew => 'Visual Builder (New)';
+
+  @override
+  String get templateBuilderEdit => 'Visual Builder (Edit)';
+
+  @override
+  String get undo => 'Undo';
+
+  @override
+  String get redo => 'Redo';
+
+  @override
+  String get header => 'Header';
+
+  @override
+  String get body => 'Body';
+
+  @override
+  String get footer => 'Footer';
+
+  @override
+  String get globalCssOptional => 'Global CSS (optional)';
+
+  @override
+  String get previewPdf => 'Preview PDF';
+
+  @override
+  String get previewHtmlOutput => 'Preview HTML (render output)';
+
+  @override
+  String get empty => '(empty)';
+
+  @override
+  String get createTemplateBuilder => 'Create template (Builder)';
+
+  @override
+  String get saveChanges => 'Save changes';
+
+  @override
+  String createdWithId(int id) {
+    return 'Created (ID: $id)';
+  }
+
+  @override
+  String previewError(String error) {
+    return 'Preview error: $error';
+  }
+
+  @override
+  String createError(String error) {
+    return 'Create error: $error';
+  }
+
+  @override
+  String templateCreatedWithId(int id) {
+    return 'Template created (ID: $id)';
+  }
+
+  @override
+  String get addText => 'Add text';
+
+  @override
+  String get divider => 'Divider';
+
+  @override
+  String get spacer => 'Spacer';
+
+  @override
+  String get addImage => 'Add image';
+
+  @override
+  String get addQr => 'Add QR';
+
+  @override
+  String get partyInfo => 'Party info';
+
+  @override
+  String get addTotals => 'Add totals';
+
+  @override
+  String get stampSignature => 'Stamp/Signature';
+
+  @override
+  String get watermark => 'Watermark';
+
+  @override
+  String get addTable => 'Add table';
+
+  @override
+  String get textWithVariable => 'Text (variable)';
+
+  @override
+  String get alignment => 'Alignment';
+
+  @override
+  String get left => 'Left';
+
+  @override
+  String get center => 'Center';
+
+  @override
+  String get right => 'Right';
+
+  @override
+  String get showIfCondition => 'Show if (condition)';
+
+  @override
+  String blockType(String type) {
+    return 'Block $type';
+  }
+
+  @override
+  String get pageSize => 'Page size';
+
+  @override
+  String get orientation => 'Orientation';
+
+  @override
+  String get portrait => 'Portrait';
+
+  @override
+  String get landscape => 'Landscape';
+
+  @override
+  String get marginTop => 'Top margin (mm)';
+
+  @override
+  String get marginRight => 'Right (mm)';
+
+  @override
+  String get marginBottom => 'Bottom (mm)';
+
+  @override
+  String get marginLeft => 'Left (mm)';
+
+  @override
+  String get create => 'Create';
+
+  @override
+  String get walletBusinessTitle => 'Business wallet';
+
+  @override
+  String get walletAvailableBalance => 'Available balance';
+
+  @override
+  String get walletPendingBalance => 'Pending balance';
+
+  @override
+  String get walletRequestPayout => 'Request payout';
+
+  @override
+  String get walletTopUp => 'Top up';
+
+  @override
+  String get walletLast30Days => 'Last 30 days report';
+
+  @override
+  String get walletGrossIn => 'Gross in';
+
+  @override
+  String get walletFeesIn => 'Fees in';
+
+  @override
+  String get walletNetIn => 'Net in';
+
+  @override
+  String get walletGrossOut => 'Gross out';
+
+  @override
+  String get walletFeesOut => 'Fees out';
+
+  @override
+  String get walletNetOut => 'Net out';
+
+  @override
+  String get walletRecentTransactions => 'Recent transactions';
+
+  @override
+  String get walletTransactions => 'Transactions';
+
+  @override
+  String get moneyAmount => 'Amount';
+
+  @override
+  String get feeAmount => 'Fee';
+
+  @override
+  String get document => 'Document';
+
+  @override
+  String get walletTypeTopUp => 'Top up';
+
+  @override
+  String get walletTypeCustomerPayment => 'Customer payment';
+
+  @override
+  String get walletTypePayoutRequest => 'Payout request';
+
+  @override
+  String get walletTypePayoutSettlement => 'Payout settlement';
+
+  @override
+  String get walletTypeRefund => 'Refund';
+
+  @override
+  String get walletTypeFee => 'Fee';
+
+  @override
+  String get statusApproved => 'Approved';
+
+  @override
+  String get statusProcessing => 'Processing';
+
+  @override
+  String get statusSucceeded => 'Succeeded';
+
+  @override
+  String get statusFailed => 'Failed';
+
+  @override
+  String get statusCanceled => 'Canceled';
+
+  @override
+  String get walletPayoutRequestTitle => 'Payout request';
+
+  @override
+  String get walletSelectBankAccountHint => 'Select bank account';
+
+  @override
+  String get walletPaymentGateway => 'Payment gateway';
+
+  @override
+  String get walletPayoutRequested => 'Payout request submitted';
+
+  @override
+  String get walletTopUpTitle => 'Top up';
+
+  @override
+  String get walletTopUpInitializing =>
+      'Submitting request and preparing payment gateway...';
+
+  @override
+  String get walletRedirectingToGateway => 'Redirecting to payment gateway...';
+
+  @override
+  String get walletTopUpNoPaymentLink =>
+      'Top-up request submitted, but no payment link received. Please try again later or check gateway settings.';
+
+  @override
+  String get walletGatewayInitFailed =>
+      'Error connecting to gateway. Please check settings or try again later.';
+
+  @override
+  String get walletInvalidGatewayConfig =>
+      'Gateway configuration is incomplete. Please check merchant ID and callback URL.';
+
+  @override
+  String get walletGatewayDisabled => 'This gateway is disabled.';
+
+  @override
+  String get walletGatewayNotFound => 'Payment gateway not found.';
+
+  @override
+  String get walletGatewayServerError =>
+      'Server error connecting to gateway. Please try again later.';
+
+  @override
+  String get walletOpenGatewayDialogTitle => 'Redirect to payment gateway';
+
+  @override
+  String get walletOpenGatewayDialogInstructions =>
+      'To continue, open the link below:';
+
+  @override
+  String get walletPaymentResultTitle => 'Wallet payment result';
+
+  @override
+  String get walletPaymentSuccess => 'Payment completed successfully';
+
+  @override
+  String get walletPaymentFailed => 'Payment failed';
+
+  @override
+  String get transactionId => 'Transaction ID';
+
+  @override
+  String get paymentReference => 'Payment reference';
+
+  @override
+  String get walletStatusCheckErrorPrefix => 'Error checking status:';
+
+  @override
+  String get walletBackToWallet => 'Back to wallet';
+
+  @override
+  String get walletSettingsTitle => 'Wallet settings';
+
+  @override
+  String get walletBaseCurrency => 'Wallet base currency';
+
+  @override
+  String get walletCurrencyRequired => 'Currency selection is required';
+
+  @override
+  String get saved => 'Saved';
+
+  @override
+  String get savedSuccessfully => 'Saved successfully';
+
+  @override
+  String get currencyToman => 'Toman';
+
+  @override
+  String get creditSettingsTitle => 'Customer credit';
+
+  @override
+  String get creditEnableTitle => 'Enable credit';
+
+  @override
+  String get creditEnableSubtitle => 'Check customer credit limit during sales';
+
+  @override
+  String get creditDefaultLimit => 'Default credit limit';
+
+  @override
+  String get creditGraceDays => 'Grace period (days)';
+
+  @override
+  String get creditLateFeeRatePercent => 'Late fee (%)';
+
+  @override
+  String get creditAutoBlockAfterDays => 'Auto block after (days)';
+
+  @override
+  String get creditStrategy => 'Strategy';
+
+  @override
+  String get creditStrategySingleDefault => 'Single default limit';
+
+  @override
+  String get creditStrategyByGroup => 'By group/role';
+
+  @override
+  String get creditStrategyPerUser => 'Per-user limit';
+
+  @override
+  String get installmentPlansTitle => 'Installment plans';
+
+  @override
+  String get newInstallmentPlan => 'New plan';
+
+  @override
+  String get editPlan => 'Edit';
+
+  @override
+  String get deletePlan => 'Delete';
+
+  @override
+  String deletePlanConfirm(String name) {
+    return 'Delete plan \"$name\"?';
+  }
+
+  @override
+  String get installmentPlanCreateTitle => 'New installment plan';
+
+  @override
+  String get installmentPlanEditTitle => 'Edit installment plan';
+
+  @override
+  String get planName => 'Plan name';
+
+  @override
+  String get planMethod => 'Calculation method';
+
+  @override
+  String get planMethodFlat => 'Flat';
+
+  @override
+  String get planMethodAmortized => 'Amortized';
+
+  @override
+  String get planNumInstallments => 'Number of installments';
+
+  @override
+  String get planPeriodDays => 'Interval (days)';
+
+  @override
+  String get planDownPaymentPercent => 'Down payment (%)';
+
+  @override
+  String get planInterestRate => 'Total interest (%)';
+
+  @override
+  String get planLateFeeRate => 'Late fee (%)';
+
+  @override
+  String get planIssueFee => 'Issue fee (toman)';
+
+  @override
+  String get planIsActive => 'Active';
+
+  @override
+  String get creditTabTitle => 'Credit';
+
+  @override
+  String get creditPersonPolicyTitle => 'Person credit policy';
+
+  @override
+  String get creditCheckModeLabel => 'Credit check mode';
+
+  @override
+  String get creditCheckModeInherit => 'Inherit from business settings';
+
+  @override
+  String get creditCheckModeEnabled => 'Credit check enabled';
+
+  @override
+  String get creditCheckModeDisabled => 'Credit check disabled';
+
+  @override
+  String get creditLimitLabel => 'Custom credit limit (toman)';
+
+  @override
+  String get creditLimitHint => 'Leave empty to use business default';
+
+  @override
+  String get creditTipText =>
+      'Leaving empty or choosing inherit uses the business default credit settings.';
+
+  @override
+  String get selectInstallmentPlan => 'Select installment plan';
+
+  @override
+  String get applyPlan => 'Apply plan';
 }

@@ -1,5 +1,3 @@
-import 'package:flutter/services.dart';
-
 String formatWithThousands(dynamic value, {int? decimalPlaces}) {
   if (value == null) return '-';
   num? n;
@@ -31,31 +29,4 @@ String formatWithThousands(dynamic value, {int? decimalPlaces}) {
   final grouped = intPart.replaceAllMapped(reg, (m) => ',');
   return decPart == null || decPart.isEmpty ? grouped : '$grouped.$decPart';
 }
-
-class ThousandsSeparatorInputFormatter extends TextInputFormatter {
-  @override
-  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
-    final text = newValue.text;
-    if (text.isEmpty) return newValue;
-    final selectionIndexFromTheRight = text.length - newValue.selection.end;
-    String cleaned = text.replaceAll(',', '');
-    // Keep decimal part
-    String integerPart = cleaned;
-    String decimalPart = '';
-    final dotIndex = cleaned.indexOf('.');
-    if (dotIndex >= 0) {
-      integerPart = cleaned.substring(0, dotIndex);
-      decimalPart = cleaned.substring(dotIndex); // includes '.'
-    }
-    final reg = RegExp(r'\B(?=(\d{3})+(?!\d))');
-    final formattedInt = integerPart.replaceAllMapped(reg, (m) => ',');
-    final formatted = formattedInt + decimalPart;
-    final newSelectionIndex = formatted.length - selectionIndexFromTheRight;
-    return TextEditingValue(
-      text: formatted,
-      selection: TextSelection.collapsed(offset: newSelectionIndex.clamp(0, formatted.length)),
-    );
-  }
-}
-
 

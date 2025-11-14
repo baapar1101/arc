@@ -15,6 +15,7 @@ adapters/api/v1/businesses.py
 adapters/api/v1/cash_registers.py
 adapters/api/v1/categories.py
 adapters/api/v1/checks.py
+adapters/api/v1/credit.py
 adapters/api/v1/currencies.py
 adapters/api/v1/customers.py
 adapters/api/v1/documents.py
@@ -89,6 +90,7 @@ adapters/db/models/captcha.py
 adapters/db/models/cash_register.py
 adapters/db/models/category.py
 adapters/db/models/check.py
+adapters/db/models/credit.py
 adapters/db/models/currency.py
 adapters/db/models/document.py
 adapters/db/models/document_line.py
@@ -177,6 +179,7 @@ app/services/business_service.py
 app/services/captcha_service.py
 app/services/cash_register_service.py
 app/services/check_service.py
+app/services/credit_service.py
 app/services/dashboard_widgets_service.py
 app/services/document_service.py
 app/services/email_service.py
@@ -284,6 +287,8 @@ migrations/versions/20251109_160001_merge_heads_announcements.py
 migrations/versions/20251110_090001_add_notifications_and_telegram.py
 migrations/versions/20251110_100001_add_notification_templates_and_settings.py
 migrations/versions/20251110_101500_add_marketplace_tables.py
+migrations/versions/20251112_170001_add_credit_fields.py
+migrations/versions/20251112_200001_add_credit_settings_and_installment_templates.py
 migrations/versions/4b2ea782bcb3_merge_heads.py
 migrations/versions/5553f8745c6e_add_support_tables.py
 migrations/versions/7891282548e9_merge_tax_types_and_unit_fields_heads.py

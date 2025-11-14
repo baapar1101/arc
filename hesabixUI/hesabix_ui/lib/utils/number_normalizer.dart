@@ -122,3 +122,167 @@ class EnglishDigitsFormatter extends TextInputFormatter {
   }
 }
 
+/// فرمت کردن عدد برای نمایش در فیلد ورودی با جداکننده هزارگان
+String formatNumberForInput(num? value, {int? decimalPlaces}) {
+  if (value == null) return '';
+  
+  String text;
+  if (decimalPlaces != null && decimalPlaces > 0) {
+    text = value.toStringAsFixed(decimalPlaces);
+  } else {
+    // اگر عدد اعشاری است اما بخش اعشاری صفر است، بدون اعشار نمایش بده
+    if (value % 1 == 0) {
+      text = value.toInt().toString();
+    } else {
+      text = value.toString();
+    }
+  }
+  
+  return _addThousandsSeparator(text);
+}
+
+/// تبدیل رشته فرمت‌شده با جداکننده هزارگان به عدد
+num? parseFormattedNumber(String? value) {
+  if (value == null || value.isEmpty) return null;
+  
+  // حذف جداکننده‌های هزارگان و تبدیل به عدد
+  final cleanValue = value.replaceAll(',', '').trim();
+  if (cleanValue.isEmpty) return null;
+  
+  return num.tryParse(cleanValue);
+}
+
+/// تبدیل رشته فرمت‌شده به double
+double? parseFormattedDouble(String? value) {
+  final numValue = parseFormattedNumber(value);
+  return numValue?.toDouble();
+}
+
+/// تبدیل رشته فرمت‌شده به int
+int? parseFormattedInt(String? value) {
+  final numValue = parseFormattedNumber(value);
+  return numValue?.toInt();
+}
+
+/// افزودن جداکننده هزارگان به رشته عددی
+String _addThousandsSeparator(String text) {
+  if (text.isEmpty) return text;
+  
+  // جدا کردن بخش صحیح و اعشاری
+  final parts = text.split('.');
+  String integerPart = parts[0];
+  String decimalPart = parts.length > 1 ? '.${parts[1]}' : '';
+  
+  // افزودن جداکننده هزارگان به بخش صحیح
+  if (integerPart.isEmpty) return text;
+  
+  // اگر عدد منفی است، علامت منفی را جدا کن
+  bool isNegative = integerPart.startsWith('-');
+  if (isNegative) {
+    integerPart = integerPart.substring(1);
+  }
+  
+  String reversed = integerPart.split('').reversed.join('');
+  String withCommas = reversed.replaceAllMapped(
+    RegExp(r'(\d{3})(?=\d)'),
+    (Match match) => '${match.group(1)},',
+  );
+  String formattedInteger = withCommas.split('').reversed.join('');
+  
+  if (isNegative) {
+    formattedInteger = '-$formattedInteger';
+  }
+  
+  return formattedInteger + decimalPart;
+}
+
+/// TextInputFormatter برای افزودن جداکننده هزارگان به اعداد
+class ThousandsSeparatorInputFormatter extends TextInputFormatter {
+  final bool allowDecimal;
+  
+  const ThousandsSeparatorInputFormatter({this.allowDecimal = true});
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    // اگر متن خالی است
+    if (newValue.text.isEmpty) {
+      return newValue;
+    }
+
+    // حذف کاراکترهای غیرمجاز (فقط اعداد، نقطه اعشار و علامت منفی)
+    String cleanText = newValue.text.replaceAll(RegExp(r'[^\d.\-]'), '');
+    
+    // اگر اعشار مجاز نیست، نقطه را حذف کن
+    if (!allowDecimal) {
+      cleanText = cleanText.replaceAll('.', '');
+    }
+    
+    // مدیریت نقطه اعشار (فقط یک نقطه)
+    final dotIndex = cleanText.indexOf('.');
+    if (dotIndex != -1) {
+      final beforeDot = cleanText.substring(0, dotIndex);
+      final afterDot = cleanText.substring(dotIndex + 1).replaceAll('.', '');
+      cleanText = '$beforeDot.$afterDot';
+    }
+    
+    // مدیریت علامت منفی (فقط در ابتدا)
+    bool isNegative = cleanText.startsWith('-');
+    if (isNegative) {
+      cleanText = cleanText.substring(1);
+    }
+    cleanText = cleanText.replaceAll('-', '');
+    if (isNegative) {
+      cleanText = '-$cleanText';
+    }
+
+    // فرمت کردن با جداکننده هزارگان
+    String formattedText = _addThousandsSeparator(cleanText);
+
+    // محاسبه موقعیت جدید مکان‌نما
+    int selectionOffset = _calculateCursorPosition(
+      oldValue.text,
+      newValue.text,
+      formattedText,
+      newValue.selection.baseOffset,
+    );
+
+    return TextEditingValue(
+      text: formattedText,
+      selection: TextSelection.collapsed(offset: selectionOffset),
+      composing: newValue.composing,
+    );
+  }
+
+  /// محاسبه موقعیت صحیح مکان‌نما بعد از فرمت کردن
+  int _calculateCursorPosition(
+    String oldText,
+    String newText,
+    String formattedText,
+    int oldCursorPosition,
+  ) {
+    // شمارش کاراکترهای عددی قبل از موقعیت مکان‌نما در متن جدید
+    int digitsBeforeCursor = 0;
+    for (int i = 0; i < oldCursorPosition && i < newText.length; i++) {
+      if (RegExp(r'[\d.\-]').hasMatch(newText[i])) {
+        digitsBeforeCursor++;
+      }
+    }
+    
+    // پیدا کردن موقعیت در متن فرمت‌شده
+    int digitsCounted = 0;
+    for (int i = 0; i < formattedText.length; i++) {
+      if (RegExp(r'[\d.\-]').hasMatch(formattedText[i])) {
+        digitsCounted++;
+        if (digitsCounted >= digitsBeforeCursor) {
+          return i + 1;
+        }
+      }
+    }
+    
+    return formattedText.length;
+  }
+}
+

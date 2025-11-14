@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../models/invoice_line_item.dart';
 import '../../utils/number_formatters.dart';
 import './product_combobox_widget.dart';
@@ -95,10 +96,20 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
     }
 
     // اگر والد پس از لود اولیه، ردیف‌های اولیه را فراهم کرد و جدول خالی است، آن‌ها را ست کن
-    if (_rows.isEmpty && (widget.initialRows ?? const <InvoiceLineItem>[]).isNotEmpty) {
-      _rows.clear();
-      _rows.addAll(widget.initialRows!);
-      _notify();
+    // یا اگر تعداد ردیف‌های initialRows بیشتر از ردیف‌های فعلی است (ردیف‌های جدید اضافه شده)
+    if (widget.initialRows != null && widget.initialRows!.isNotEmpty) {
+      if (_rows.isEmpty) {
+        // اگر جدول خالی است، همه ردیف‌ها را اضافه کن
+        _rows.clear();
+        _rows.addAll(widget.initialRows!);
+        _notify();
+      } else if (widget.initialRows!.length > _rows.length) {
+        // اگر ردیف‌های جدید اضافه شده، همه ردیف‌ها را جایگزین کن
+        // (کاربر می‌تواند بعداً ردیف‌ها را ویرایش کند)
+        _rows.clear();
+        _rows.addAll(widget.initialRows!);
+        _notify();
+      }
     }
   }
 
@@ -221,6 +232,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     return Column(
@@ -231,14 +243,14 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
             ElevatedButton.icon(
               onPressed: _addRow,
               icon: const Icon(Icons.add),
-              label: const Text('افزودن ردیف'),
+              label: Text(t.add),
             ),
             const SizedBox(width: 12),
             // لیست قیمت از بالای جدول حذف شد
             const Spacer(),
             // حالت فشرده به صورت پیش‌فرض و تنها حالت است
             if (widget.selectedCurrencyId != null)
-              Chip(label: Text('ارز: ${widget.selectedCurrencyId}')),
+              Chip(label: Text('${t.currency}: ${widget.selectedCurrencyId}')),
           ],
         ),
         const SizedBox(height: 12),
@@ -255,7 +267,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                 Padding(
                   padding: const EdgeInsets.all(16),
                   child: Text(
-                    'ردیفی افزوده نشده است',
+                    t.noRowsAdded,
                     style: theme.textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant),
                   ),
                 )
@@ -270,6 +282,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
 
   Widget _buildHeader(BuildContext context) {
     final style = Theme.of(context).textTheme.labelLarge;
+    final t = AppLocalizations.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       child: Row(
@@ -278,16 +291,16 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
           Expanded(
             flex: 4,
             child: Tooltip(
-              message: 'کالا/خدمت',
-              child: Text('کالا/خدمت', style: style),
+              message: t.productsAndServices,
+              child: Text(t.productsAndServices, style: style),
             ),
           ),
           const SizedBox(width: 8),
           Expanded(
             flex: 2,
             child: Tooltip(
-              message: 'تعداد/واحد',
-              child: Text('تعداد/واحد', style: style),
+              message: t.quantityUnit,
+              child: Text(t.quantityUnit, style: style),
             ),
           ),
           const SizedBox(width: 8),
@@ -295,16 +308,16 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
             Expanded(
               flex: 2,
               child: Tooltip(
-                message: 'انبار',
-                child: Text('انبار', style: style),
+                message: t.warehouse,
+                child: Text(t.warehouse, style: style),
               ),
             ),
           const SizedBox(width: 8),
           Expanded(
             flex: 3,
             child: Tooltip(
-              message: 'قیمت واحد',
-              child: Text('قیمت واحد', style: style),
+              message: t.unitPrice,
+              child: Text(t.unitPrice, style: style),
             ),
           ),
           const SizedBox(width: 8),
@@ -313,8 +326,8 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
             child: Align(
               alignment: Alignment.centerRight,
               child: Tooltip(
-                message: 'مبلغ کل',
-                child: Text('مبلغ کل', style: style, textAlign: TextAlign.end),
+                message: t.totalAmount,
+                child: Text(t.totalAmount, style: style, textAlign: TextAlign.end),
               ),
             ),
           ),
@@ -338,6 +351,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
 
   Widget _buildCompactRow(BuildContext context, int index, InvoiceLineItem item) {
     final theme = Theme.of(context);
+    final t = AppLocalizations.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       child: Column(
@@ -443,7 +457,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                 child: SizedBox(
                   height: 36,
                   child: Tooltip(
-                    message: 'قیمت واحد (انتخاب از لیست یا ورود دستی)',
+                    message: t.unitPricePickHint,
                     child: _UnitPriceCell(
                   businessId: widget.businessId,
                   invoiceType: widget.invoiceType,
@@ -465,7 +479,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                 child: SizedBox(
                   height: 36,
                   child: Tooltip(
-                    message: 'مبلغ کل این ردیف',
+                    message: t.lineTotalAmount,
                     child: InputDecorator(
                       decoration: const InputDecoration(
                         isDense: true,
@@ -497,17 +511,17 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                 child: SizedBox(
                   height: 36,
                   child: Tooltip(
-                    message: 'شرح ردیف',
+                    message: t.lineDescription,
                     child: TextFormField(
                   initialValue: item.description ?? '',
                   onChanged: (v) {
                     _updateRow(index, item.copyWith(description: v));
                   },
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         isDense: true,
-                        border: OutlineInputBorder(),
+                        border: const OutlineInputBorder(),
                         contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                        hintText: 'شرح (اختیاری)'
+                        hintText: t.descriptionOptional
                         ),
                   ),
                 ),
@@ -519,7 +533,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                 child: SizedBox(
                   height: 36,
                   child: Tooltip(
-                    message: 'تخفیف (نوع و مقدار)',
+                    message: t.discountTypeAndValue,
                     child: _DiscountCell(
                   value: item.discountValue,
                   type: item.discountType,
@@ -536,7 +550,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                 child: SizedBox(
                   height: 36,
                   child: Tooltip(
-                    message: 'مالیات (درصد و مبلغ)',
+                    message: t.taxPercentAndAmount,
                     child: _TaxCell(
                   rate: item.taxRate,
                   taxAmount: item.taxAmount,
@@ -570,7 +584,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('انتخاب واحد'),
+        title: Text(AppLocalizations.of(context).selectUnitTitle),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -578,7 +592,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
               ListTile(
                 leading: const Icon(Icons.straighten),
                 title: Text(item.mainUnit!),
-                subtitle: const Text('واحد اصلی'),
+                subtitle: Text(AppLocalizations.of(context).mainUnitLabel),
                 trailing: (item.selectedUnit == item.mainUnit) ? const Icon(Icons.check, color: Colors.green) : null,
                 onTap: () {
                   onChanged(item.mainUnit);
@@ -589,7 +603,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
               ListTile(
                 leading: const Icon(Icons.inventory_2),
                 title: Text(item.secondaryUnit!),
-                subtitle: const Text('واحد فرعی'),
+                subtitle: Text(AppLocalizations.of(context).secondaryUnitLabel),
                 trailing: (item.selectedUnit == item.secondaryUnit) ? const Icon(Icons.check, color: Colors.green) : null,
                 onTap: () {
                   onChanged(item.secondaryUnit);
@@ -597,16 +611,16 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                 },
               ),
             if (item.mainUnit?.isEmpty != false && item.secondaryUnit?.isEmpty != false)
-              const Padding(
+              Padding(
                 padding: EdgeInsets.all(16.0),
-                child: Text('واحدی برای این محصول تعریف نشده است'),
+                child: Text(AppLocalizations.of(context).noUnitsDefined),
               ),
           ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('انصراف'),
+            child: Text(AppLocalizations.of(context).cancel),
           ),
         ],
       ),
@@ -661,7 +675,8 @@ class _DiscountCellState extends State<_DiscountCell> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    String typeLabel(String t) => t == 'percent' ? 'درصد' : 'مبلغ';
+    final t = AppLocalizations.of(context);
+    String typeLabel(String tp) => tp == 'percent' ? t.percent : t.amount;
     return SizedBox(
       height: 36,
       child: TextFormField(
@@ -690,16 +705,16 @@ class _DiscountCellState extends State<_DiscountCell> {
                   child: Text(typeLabel(_type), style: theme.textTheme.bodySmall),
                 ),
               PopupMenuButton<String>(
-                tooltip: 'نوع تخفیف',
+                tooltip: t.discountType,
                 padding: EdgeInsets.zero,
                 itemBuilder: (c) => [
                   PopupMenuItem<String>(
                     value: 'amount',
-                    child: const Text('مبلغ'),
+                    child: Text(t.amount),
                   ),
                   PopupMenuItem<String>(
                     value: 'percent',
-                    child: const Text('درصد'),
+                    child: Text(t.percent),
                   ),
                 ],
                 onSelected: (nv) {
@@ -848,7 +863,7 @@ class _UnitPriceCellState extends State<_UnitPriceCell> {
   @override
   void initState() {
     super.initState();
-    _ctrl = TextEditingController(text: widget.item.unitPrice.toString());
+    _ctrl = TextEditingController(text: formatNumberForInput(widget.item.unitPrice, decimalPlaces: 0));
     _focusNode = FocusNode();
   }
 
@@ -858,7 +873,7 @@ class _UnitPriceCellState extends State<_UnitPriceCell> {
     // اگر مقدار از بیرون تغییر کرد و فیلد در فوکوس نیست، متن را همگام کن
     if ((oldWidget.item.unitPrice != widget.item.unitPrice || oldWidget.item.unitPriceSource != widget.item.unitPriceSource) &&
         !_focusNode.hasFocus) {
-      _ctrl.text = widget.item.unitPrice.toString();
+      _ctrl.text = formatNumberForInput(widget.item.unitPrice, decimalPlaces: 0);
     }
   }
 
@@ -873,6 +888,7 @@ class _UnitPriceCellState extends State<_UnitPriceCell> {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
     return Row(
       children: [
         Expanded(
@@ -880,13 +896,12 @@ class _UnitPriceCellState extends State<_UnitPriceCell> {
             controller: _ctrl,
             focusNode: _focusNode,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
-        inputFormatters: [
+        inputFormatters: const [
           EnglishDigitsFormatter(),
-          FilteringTextInputFormatter.allow(RegExp(r'[-0-9.,]')),
+          ThousandsSeparatorInputFormatter(allowDecimal: true),
         ],
             onChanged: (v) {
-              final cleaned = v.replaceAll(',', '');
-              final price = num.tryParse(cleaned) ?? 0;
+              final price = parseFormattedDouble(v) ?? 0;
               widget.onChanged('manual', price < 0 ? 0 : price);
             },
             decoration: InputDecoration(
@@ -896,7 +911,7 @@ class _UnitPriceCellState extends State<_UnitPriceCell> {
               suffixIcon: _loading
                   ? const Padding(padding: EdgeInsets.all(8), child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)))
                   : IconButton(
-                      tooltip: 'انتخاب از لیست قیمت',
+                      tooltip: t.pricePickFromList,
                       icon: const Icon(Icons.list_alt_outlined),
                       onPressed: () => _openPricePicker(context),
                     ),
@@ -912,6 +927,7 @@ class _UnitPriceCellState extends State<_UnitPriceCell> {
       context: context,
       isScrollControlled: true,
       builder: (ctx) {
+        final t = AppLocalizations.of(ctx);
         return SafeArea(
           child: Padding(
             padding: const EdgeInsets.all(16),
@@ -923,7 +939,7 @@ class _UnitPriceCellState extends State<_UnitPriceCell> {
                 }
                 final options = snapshot.data ?? const <Map<String, dynamic>>[];
                 if (options.isEmpty) {
-                  return const SizedBox(height: 200, child: Center(child: Text('قیمتی برای نمایش یافت نشد')));
+                  return SizedBox(height: 200, child: Center(child: Text(t.noPricesFound)));
                 }
                 return ConstrainedBox(
                   constraints: const BoxConstraints(maxHeight: 400),
@@ -962,7 +978,7 @@ class _UnitPriceCellState extends State<_UnitPriceCell> {
     try {
       final resolved = await widget.resolver();
       result.add(<String, dynamic>{
-        'label': 'قیمت پایه تخمینی',
+        'label': AppLocalizations.of(context).baseEstimatedPrice,
         'price': resolved.unitPrice,
       });
     } catch (_) {}
@@ -978,7 +994,7 @@ class _UnitPriceCellState extends State<_UnitPriceCell> {
         
         for (final pl in lists) {
           final plId = pl['id'] as int?;
-          final plName = pl['name']?.toString() ?? 'لیست قیمت';
+          final plName = pl['name']?.toString() ?? AppLocalizations.of(context).priceListLabel;
           if (plId == null) continue;
           
           try {
@@ -1003,7 +1019,7 @@ class _UnitPriceCellState extends State<_UnitPriceCell> {
               }
               
               if (price == null || price <= 0) continue;
-              final unitLabel = 'واحد اصلی'; // چون unit_id null است، یعنی واحد اصلی
+              final unitLabel = AppLocalizations.of(context).mainUnitLabel; // چون unit_id null است، یعنی واحد اصلی
               result.add(<String, dynamic>{
                 'label': '$plName - $unitLabel',
                 'price': price,

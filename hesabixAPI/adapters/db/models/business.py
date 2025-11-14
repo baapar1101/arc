@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from enum import Enum
 
-from sqlalchemy import String, DateTime, Integer, ForeignKey, Enum as SQLEnum, Text
+from sqlalchemy import String, DateTime, Integer, ForeignKey, Enum as SQLEnum, Text, Numeric, Boolean
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from adapters.db.session import Base
@@ -51,6 +51,10 @@ class Business(Base):
     province: Mapped[str | None] = mapped_column(String(100), nullable=True)
     city: Mapped[str | None] = mapped_column(String(100), nullable=True)
     postal_code: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    
+    # تنظیمات اعتبار مشتریان
+    default_credit_limit: Mapped[float | None] = mapped_column(Numeric(14, 2), nullable=True, comment="سقف اعتبار پیشفرض اشخاص")
+    check_credit_enabled_by_default: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="0", comment="بررسی اعتبار مشتریان به صورت پیشفرض")
     
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)

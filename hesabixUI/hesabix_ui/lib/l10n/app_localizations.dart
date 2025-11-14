@@ -2777,7 +2777,7 @@ abstract class AppLocalizations {
   /// No description provided for @productsAndServices.
   ///
   /// In en, this message translates to:
-  /// **'Products and Services'**
+  /// **'Products/Services'**
   String get productsAndServices;
 
   /// No description provided for @products.
@@ -5900,71 +5900,941 @@ abstract class AppLocalizations {
   /// **'Custom template'**
   String get templateCustom;
 
-  /// No description provided for @paymentGateways.
+  /// No description provided for @invoicesListManage.
   ///
   /// In en, this message translates to:
-  /// **'Payment Gateways'**
-  String get paymentGateways;
+  /// **'Manage invoices list'**
+  String get invoicesListManage;
 
-  /// No description provided for @addPaymentGateway.
+  /// No description provided for @all.
   ///
   /// In en, this message translates to:
-  /// **'Add Payment Gateway'**
-  String get addPaymentGateway;
+  /// **'All'**
+  String get all;
 
-  /// No description provided for @editPaymentGateway.
+  /// No description provided for @invoiceTypeSales.
   ///
   /// In en, this message translates to:
-  /// **'Edit Payment Gateway'**
-  String get editPaymentGateway;
+  /// **'Sales'**
+  String get invoiceTypeSales;
 
-  /// No description provided for @provider.
+  /// No description provided for @invoiceTypePurchase.
   ///
   /// In en, this message translates to:
-  /// **'Provider'**
-  String get provider;
+  /// **'Purchase'**
+  String get invoiceTypePurchase;
 
-  /// No description provided for @displayName.
+  /// No description provided for @invoiceTypeSalesReturn.
   ///
   /// In en, this message translates to:
-  /// **'Display name'**
-  String get displayName;
+  /// **'Sales return'**
+  String get invoiceTypeSalesReturn;
 
-  /// No description provided for @useSuggestedCallback.
+  /// No description provided for @invoiceTypePurchaseReturn.
   ///
   /// In en, this message translates to:
-  /// **'Use suggested callback'**
-  String get useSuggestedCallback;
+  /// **'Purchase return'**
+  String get invoiceTypePurchaseReturn;
 
-  /// No description provided for @successRedirectOptional.
+  /// No description provided for @invoiceTypeProduction.
   ///
   /// In en, this message translates to:
-  /// **'success_redirect (optional)'**
-  String get successRedirectOptional;
+  /// **'Production'**
+  String get invoiceTypeProduction;
 
-  /// No description provided for @failureRedirectOptional.
+  /// No description provided for @invoiceTypeDirectConsumption.
   ///
   /// In en, this message translates to:
-  /// **'failure_redirect (optional)'**
-  String get failureRedirectOptional;
+  /// **'Direct consumption'**
+  String get invoiceTypeDirectConsumption;
+
+  /// No description provided for @invoiceTypeWaste.
+  ///
+  /// In en, this message translates to:
+  /// **'Waste'**
+  String get invoiceTypeWaste;
+
+  /// No description provided for @documentDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Document date'**
+  String get documentDate;
+
+  /// No description provided for @totalAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Total amount'**
+  String get totalAmount;
+
+  /// No description provided for @unknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown'**
+  String get unknown;
+
+  /// No description provided for @noInvoicesFound.
+  ///
+  /// In en, this message translates to:
+  /// **'No invoices found'**
+  String get noInvoicesFound;
+
+  /// No description provided for @loadingInvoices.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading invoices...'**
+  String get loadingInvoices;
+
+  /// No description provided for @errorLoadingInvoices.
+  ///
+  /// In en, this message translates to:
+  /// **'Error loading invoices'**
+  String get errorLoadingInvoices;
+
+  /// No description provided for @proforma.
+  ///
+  /// In en, this message translates to:
+  /// **'Proforma'**
+  String get proforma;
+
+  /// No description provided for @finalized.
+  ///
+  /// In en, this message translates to:
+  /// **'Finalized'**
+  String get finalized;
+
+  /// No description provided for @clearDateFilter.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear date filter'**
+  String get clearDateFilter;
+
+  /// No description provided for @deleteConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm delete'**
+  String get deleteConfirmTitle;
+
+  /// No description provided for @deleteInvoiceConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to delete invoice {code}? This action is irreversible.'**
+  String deleteInvoiceConfirm(String code);
+
+  /// No description provided for @deletedInvoiceSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Invoice {code} deleted successfully'**
+  String deletedInvoiceSuccess(String code);
+
+  /// No description provided for @deleteInvoiceError.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to delete invoice'**
+  String get deleteInvoiceError;
+
+  /// No description provided for @deleteInvoiceErrorWithMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to delete invoice: {error}'**
+  String deleteInvoiceErrorWithMessage(String error);
+
+  /// No description provided for @saveInvoice.
+  ///
+  /// In en, this message translates to:
+  /// **'Save invoice'**
+  String get saveInvoice;
+
+  /// No description provided for @invoiceInfoTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Invoice info'**
+  String get invoiceInfoTab;
+
+  /// No description provided for @productsServicesTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Products & services'**
+  String get productsServicesTab;
+
+  /// No description provided for @transactionsTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Transactions'**
+  String get transactionsTab;
+
+  /// No description provided for @settingsTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get settingsTab;
+
+  /// No description provided for @invoiceCreatedSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Invoice created successfully'**
+  String get invoiceCreatedSuccess;
+
+  /// No description provided for @saveInvoiceErrorWithMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to save invoice: {error}'**
+  String saveInvoiceErrorWithMessage(String error);
+
+  /// No description provided for @noRowsAdded.
+  ///
+  /// In en, this message translates to:
+  /// **'No rows added'**
+  String get noRowsAdded;
+
+  /// No description provided for @quantityUnit.
+  ///
+  /// In en, this message translates to:
+  /// **'Quantity/Unit'**
+  String get quantityUnit;
+
+  /// No description provided for @unitPrice.
+  ///
+  /// In en, this message translates to:
+  /// **'Unit price'**
+  String get unitPrice;
+
+  /// No description provided for @installmentsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Installment sale'**
+  String get installmentsTitle;
+
+  /// No description provided for @installmentsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'If enabled, an installment plan will be saved with the invoice'**
+  String get installmentsSubtitle;
+
+  /// No description provided for @installmentsCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Number of installments'**
+  String get installmentsCount;
+
+  /// No description provided for @downPayment.
+  ///
+  /// In en, this message translates to:
+  /// **'Down payment'**
+  String get downPayment;
+
+  /// No description provided for @interestRatePercent.
+  ///
+  /// In en, this message translates to:
+  /// **'Total period interest (%)'**
+  String get interestRatePercent;
+
+  /// No description provided for @installmentsPeriod.
+  ///
+  /// In en, this message translates to:
+  /// **'Installment period'**
+  String get installmentsPeriod;
+
+  /// No description provided for @installmentsMonthly.
+  ///
+  /// In en, this message translates to:
+  /// **'Monthly (30 days)'**
+  String get installmentsMonthly;
+
+  /// No description provided for @installmentsDaysBased.
+  ///
+  /// In en, this message translates to:
+  /// **'By days'**
+  String get installmentsDaysBased;
+
+  /// No description provided for @installmentDaysLength.
+  ///
+  /// In en, this message translates to:
+  /// **'Length of each installment (days)'**
+  String get installmentDaysLength;
+
+  /// No description provided for @firstInstallmentDueDate.
+  ///
+  /// In en, this message translates to:
+  /// **'First due date'**
+  String get firstInstallmentDueDate;
+
+  /// No description provided for @invalidInstallmentsCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid number of installments'**
+  String get invalidInstallmentsCount;
+
+  /// No description provided for @unitPricePickHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Unit price (pick from list or enter manually)'**
+  String get unitPricePickHint;
+
+  /// No description provided for @lineTotalAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Line total amount'**
+  String get lineTotalAmount;
+
+  /// No description provided for @lineDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Line description'**
+  String get lineDescription;
+
+  /// No description provided for @descriptionOptional.
+  ///
+  /// In en, this message translates to:
+  /// **'Description (optional)'**
+  String get descriptionOptional;
+
+  /// No description provided for @discountTypeAndValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Discount (type and value)'**
+  String get discountTypeAndValue;
+
+  /// No description provided for @taxPercentAndAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Tax (percent and amount)'**
+  String get taxPercentAndAmount;
+
+  /// No description provided for @selectUnitTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Select unit'**
+  String get selectUnitTitle;
+
+  /// No description provided for @mainUnitLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Main unit'**
+  String get mainUnitLabel;
+
+  /// No description provided for @secondaryUnitLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Secondary unit'**
+  String get secondaryUnitLabel;
+
+  /// No description provided for @noUnitsDefined.
+  ///
+  /// In en, this message translates to:
+  /// **'No units defined for this product'**
+  String get noUnitsDefined;
+
+  /// No description provided for @discountType.
+  ///
+  /// In en, this message translates to:
+  /// **'Discount type'**
+  String get discountType;
+
+  /// No description provided for @percent.
+  ///
+  /// In en, this message translates to:
+  /// **'Percent'**
+  String get percent;
+
+  /// No description provided for @pricePickFromList.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick from price list'**
+  String get pricePickFromList;
+
+  /// No description provided for @noPricesFound.
+  ///
+  /// In en, this message translates to:
+  /// **'No prices to show'**
+  String get noPricesFound;
+
+  /// No description provided for @baseEstimatedPrice.
+  ///
+  /// In en, this message translates to:
+  /// **'Estimated base price'**
+  String get baseEstimatedPrice;
+
+  /// No description provided for @priceListLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Price list'**
+  String get priceListLabel;
+
+  /// No description provided for @kardexDocuments.
+  ///
+  /// In en, this message translates to:
+  /// **'Kardex documents'**
+  String get kardexDocuments;
+
+  /// No description provided for @documentCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Document code'**
+  String get documentCode;
+
+  /// No description provided for @documentType.
+  ///
+  /// In en, this message translates to:
+  /// **'Document type'**
+  String get documentType;
+
+  /// No description provided for @movementDirection.
+  ///
+  /// In en, this message translates to:
+  /// **'Movement'**
+  String get movementDirection;
+
+  /// No description provided for @movementIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Incoming'**
+  String get movementIn;
+
+  /// No description provided for @movementOut.
+  ///
+  /// In en, this message translates to:
+  /// **'Outgoing'**
+  String get movementOut;
+
+  /// No description provided for @debit.
+  ///
+  /// In en, this message translates to:
+  /// **'Debit'**
+  String get debit;
+
+  /// No description provided for @credit.
+  ///
+  /// In en, this message translates to:
+  /// **'Credit'**
+  String get credit;
+
+  /// No description provided for @quantity.
+  ///
+  /// In en, this message translates to:
+  /// **'Quantity'**
+  String get quantity;
+
+  /// No description provided for @runningAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Running amount'**
+  String get runningAmount;
+
+  /// No description provided for @runningQuantity.
+  ///
+  /// In en, this message translates to:
+  /// **'Running quantity'**
+  String get runningQuantity;
+
+  /// No description provided for @viewDocument.
+  ///
+  /// In en, this message translates to:
+  /// **'View document'**
+  String get viewDocument;
+
+  /// No description provided for @totalsDebit.
+  ///
+  /// In en, this message translates to:
+  /// **'Total debit'**
+  String get totalsDebit;
+
+  /// No description provided for @totalsCredit.
+  ///
+  /// In en, this message translates to:
+  /// **'Total credit'**
+  String get totalsCredit;
+
+  /// No description provided for @totalsQuantity.
+  ///
+  /// In en, this message translates to:
+  /// **'Total quantity'**
+  String get totalsQuantity;
+
+  /// No description provided for @totalsRunningAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Running amount'**
+  String get totalsRunningAmount;
+
+  /// No description provided for @totalsRunningQuantity.
+  ///
+  /// In en, this message translates to:
+  /// **'Running quantity'**
+  String get totalsRunningQuantity;
+
+  /// No description provided for @addFilter.
+  ///
+  /// In en, this message translates to:
+  /// **'Add filter'**
+  String get addFilter;
+
+  /// No description provided for @presetsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Presets'**
+  String get presetsTitle;
+
+  /// No description provided for @applyPreset.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply preset'**
+  String get applyPreset;
+
+  /// No description provided for @deleteSelectedPreset.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete selected preset'**
+  String get deleteSelectedPreset;
+
+  /// No description provided for @savePreset.
+  ///
+  /// In en, this message translates to:
+  /// **'Save preset'**
+  String get savePreset;
+
+  /// No description provided for @savePresetTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Save preset'**
+  String get savePresetTitle;
+
+  /// No description provided for @presetNameHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter preset name'**
+  String get presetNameHint;
+
+  /// No description provided for @presetSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Preset saved'**
+  String get presetSaved;
+
+  /// No description provided for @presetSaveError.
+  ///
+  /// In en, this message translates to:
+  /// **'Error saving preset: {error}'**
+  String presetSaveError(String error);
+
+  /// No description provided for @presetDeleteError.
+  ///
+  /// In en, this message translates to:
+  /// **'Error deleting preset: {error}'**
+  String presetDeleteError(String error);
+
+  /// No description provided for @presetApplyError.
+  ///
+  /// In en, this message translates to:
+  /// **'Error applying preset: {error}'**
+  String presetApplyError(String error);
+
+  /// No description provided for @fiscalYear.
+  ///
+  /// In en, this message translates to:
+  /// **'Fiscal year'**
+  String get fiscalYear;
+
+  /// No description provided for @addFilterPersons.
+  ///
+  /// In en, this message translates to:
+  /// **'Add filter: People'**
+  String get addFilterPersons;
+
+  /// No description provided for @addFilterProduct.
+  ///
+  /// In en, this message translates to:
+  /// **'Add filter: Product/Service'**
+  String get addFilterProduct;
+
+  /// No description provided for @addFilterBank.
+  ///
+  /// In en, this message translates to:
+  /// **'Add filter: Bank'**
+  String get addFilterBank;
+
+  /// No description provided for @addFilterCash.
+  ///
+  /// In en, this message translates to:
+  /// **'Add filter: Cash register'**
+  String get addFilterCash;
+
+  /// No description provided for @addFilterPetty.
+  ///
+  /// In en, this message translates to:
+  /// **'Add filter: Petty cash'**
+  String get addFilterPetty;
+
+  /// No description provided for @addFilterAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Add filter: Ledger account'**
+  String get addFilterAccount;
+
+  /// No description provided for @addFilterCheck.
+  ///
+  /// In en, this message translates to:
+  /// **'Add filter: Check'**
+  String get addFilterCheck;
+
+  /// No description provided for @matchModeAny.
+  ///
+  /// In en, this message translates to:
+  /// **'Any'**
+  String get matchModeAny;
+
+  /// No description provided for @matchModeSameLine.
+  ///
+  /// In en, this message translates to:
+  /// **'Same line'**
+  String get matchModeSameLine;
+
+  /// No description provided for @matchModeDocumentAnd.
+  ///
+  /// In en, this message translates to:
+  /// **'Same document'**
+  String get matchModeDocumentAnd;
+
+  /// No description provided for @resultScopeLinesMatching.
+  ///
+  /// In en, this message translates to:
+  /// **'Only matching lines'**
+  String get resultScopeLinesMatching;
+
+  /// No description provided for @resultScopeLinesOfDocument.
+  ///
+  /// In en, this message translates to:
+  /// **'All lines of document'**
+  String get resultScopeLinesOfDocument;
+
+  /// No description provided for @includeRunningBalance.
+  ///
+  /// In en, this message translates to:
+  /// **'Include running balance'**
+  String get includeRunningBalance;
+
+  /// No description provided for @applyManually.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply manually'**
+  String get applyManually;
+
+  /// No description provided for @ledgerAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Account'**
+  String get ledgerAccount;
+
+  /// No description provided for @reportsGeneralSection.
+  ///
+  /// In en, this message translates to:
+  /// **'General reports'**
+  String get reportsGeneralSection;
+
+  /// No description provided for @reportsPeopleSection.
+  ///
+  /// In en, this message translates to:
+  /// **'People reports'**
+  String get reportsPeopleSection;
+
+  /// No description provided for @reportsProductsSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Products & services reports'**
+  String get reportsProductsSection;
+
+  /// No description provided for @reportsBankingSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Banking & cash reports'**
+  String get reportsBankingSection;
+
+  /// No description provided for @reportsSalesSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Sales reports'**
+  String get reportsSalesSection;
+
+  /// No description provided for @reportsPurchasesSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Purchase reports'**
+  String get reportsPurchasesSection;
+
+  /// No description provided for @reportsProductionSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Production reports'**
+  String get reportsProductionSection;
+
+  /// No description provided for @reportsBasicAccountingSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Basic accounting'**
+  String get reportsBasicAccountingSection;
+
+  /// No description provided for @reportsProfitLossSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Profit & loss'**
+  String get reportsProfitLossSection;
+
+  /// No description provided for @reportsKardexSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Detailed transactions by person/product/bank/account/check with date filters'**
+  String get reportsKardexSubtitle;
+
+  /// No description provided for @reportsDebtorsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Debtors list'**
+  String get reportsDebtorsTitle;
+
+  /// No description provided for @reportsDebtorsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'People with debit balances'**
+  String get reportsDebtorsSubtitle;
+
+  /// No description provided for @reportsCreditorsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Creditors list'**
+  String get reportsCreditorsTitle;
+
+  /// No description provided for @reportsCreditorsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'People with credit balances'**
+  String get reportsCreditorsSubtitle;
+
+  /// No description provided for @reportsPeopleTransactionsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'People transactions'**
+  String get reportsPeopleTransactionsTitle;
+
+  /// No description provided for @reportsPeopleTransactionsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Detailed receipts and payments by person'**
+  String get reportsPeopleTransactionsSubtitle;
+
+  /// No description provided for @reportsItemMovementsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Item movements'**
+  String get reportsItemMovementsTitle;
+
+  /// No description provided for @reportsItemMovementsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'In, out and balance over a period'**
+  String get reportsItemMovementsSubtitle;
+
+  /// No description provided for @reportsInventoryKardexTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Inventory kardex'**
+  String get reportsInventoryKardexTitle;
+
+  /// No description provided for @reportsInventoryKardexSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Per-item movement details (FIFO/LIFO/average)'**
+  String get reportsInventoryKardexSubtitle;
+
+  /// No description provided for @reportsSalesByProductTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sales by product'**
+  String get reportsSalesByProductTitle;
+
+  /// No description provided for @reportsSalesByProductSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Performance of each product in time range'**
+  String get reportsSalesByProductSubtitle;
+
+  /// No description provided for @reportsBankAccountsTurnoverTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Bank accounts turnover'**
+  String get reportsBankAccountsTurnoverTitle;
+
+  /// No description provided for @reportsBankAccountsTurnoverSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Withdrawals and deposits by account'**
+  String get reportsBankAccountsTurnoverSubtitle;
+
+  /// No description provided for @reportsCashPettyTurnoverTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash and petty cash turnover'**
+  String get reportsCashPettyTurnoverTitle;
+
+  /// No description provided for @reportsCashPettyTurnoverSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Detailed cash in/out'**
+  String get reportsCashPettyTurnoverSubtitle;
+
+  /// No description provided for @reportsChecksTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Checks'**
+  String get reportsChecksTitle;
+
+  /// No description provided for @reportsChecksSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Receivable, payable, due dates and statuses'**
+  String get reportsChecksSubtitle;
+
+  /// No description provided for @reportsDailySalesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Daily sales'**
+  String get reportsDailySalesTitle;
+
+  /// No description provided for @reportsDailySalesSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Daily sales performance and trends'**
+  String get reportsDailySalesSubtitle;
+
+  /// No description provided for @reportsMonthlySalesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Monthly sales'**
+  String get reportsMonthlySalesTitle;
+
+  /// No description provided for @reportsMonthlySalesSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Monthly comparison and sales growth'**
+  String get reportsMonthlySalesSubtitle;
+
+  /// No description provided for @reportsTopCustomersTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Top customers'**
+  String get reportsTopCustomersTitle;
+
+  /// No description provided for @reportsTopCustomersSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Ranking by amount or count'**
+  String get reportsTopCustomersSubtitle;
+
+  /// No description provided for @reportsDailyPurchasesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Daily purchases'**
+  String get reportsDailyPurchasesTitle;
+
+  /// No description provided for @reportsDailyPurchasesSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Daily purchase performance and trends'**
+  String get reportsDailyPurchasesSubtitle;
+
+  /// No description provided for @reportsTopSuppliersTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Top suppliers'**
+  String get reportsTopSuppliersTitle;
+
+  /// No description provided for @reportsTopSuppliersSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Suppliers ranked by purchases'**
+  String get reportsTopSuppliersSubtitle;
+
+  /// No description provided for @reportsMaterialsConsumptionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Materials consumption'**
+  String get reportsMaterialsConsumptionTitle;
+
+  /// No description provided for @reportsMaterialsConsumptionSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Raw material consumption per product'**
+  String get reportsMaterialsConsumptionSubtitle;
+
+  /// No description provided for @reportsProductionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Production report'**
+  String get reportsProductionTitle;
+
+  /// No description provided for @reportsProductionSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Production volume and waste'**
+  String get reportsProductionSubtitle;
+
+  /// No description provided for @reportsTrialBalanceTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Trial balance'**
+  String get reportsTrialBalanceTitle;
+
+  /// No description provided for @reportsTrialBalanceSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'2/4/6/8-column balance'**
+  String get reportsTrialBalanceSubtitle;
+
+  /// No description provided for @reportsGeneralLedgerTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'General ledger'**
+  String get reportsGeneralLedgerTitle;
+
+  /// No description provided for @reportsGeneralLedgerSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Account movements over a period'**
+  String get reportsGeneralLedgerSubtitle;
+
+  /// No description provided for @reportsPnlPeriodTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Period profit and loss'**
+  String get reportsPnlPeriodTitle;
+
+  /// No description provided for @reportsPnlPeriodSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Revenue, expenses, and net profit/loss'**
+  String get reportsPnlPeriodSubtitle;
+
+  /// No description provided for @reportsPnlCumulativeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Cumulative profit and loss'**
+  String get reportsPnlCumulativeTitle;
+
+  /// No description provided for @reportsPnlCumulativeSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Periodical comparison and cumulative view'**
+  String get reportsPnlCumulativeSubtitle;
+
+  /// No description provided for @reportsComingSoonMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'This report will be available soon.'**
+  String get reportsComingSoonMessage;
 
   /// No description provided for @operationSuccessful.
   ///
   /// In en, this message translates to:
-  /// **'Operation completed successfully'**
+  /// **'Operation successful'**
   String get operationSuccessful;
-
-  /// No description provided for @callbackNote.
-  ///
-  /// In en, this message translates to:
-  /// **'Note: tx_id will be appended to callback automatically. If success/failure redirects are set, user will be redirected accordingly.'**
-  String get callbackNote;
-
-  /// No description provided for @create.
-  ///
-  /// In en, this message translates to:
-  /// **'Create'**
-  String get create;
 
   /// No description provided for @notificationsSettingsTitle.
   ///
@@ -5975,43 +6845,43 @@ abstract class AppLocalizations {
   /// No description provided for @notificationsSettingsSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Enable delivery channels, send test messages, and maintain provider credentials.'**
+  /// **'Enable delivery channels, send test messages, and manage service credentials.'**
   String get notificationsSettingsSubtitle;
 
   /// No description provided for @notificationsOverviewTitle.
   ///
   /// In en, this message translates to:
-  /// **'Keep your team informed'**
+  /// **'Ensure messages reach your team'**
   String get notificationsOverviewTitle;
 
   /// No description provided for @notificationsOverviewDescription.
   ///
   /// In en, this message translates to:
-  /// **'Choose which channels deliver operational alerts and guide administrators on how notifications are routed.'**
+  /// **'Decide which channels deliver operational alerts so administrators know how messages are sent.'**
   String get notificationsOverviewDescription;
 
   /// No description provided for @notificationsGuidanceItemChannels.
   ///
   /// In en, this message translates to:
-  /// **'Toggle channels to match each business unit\'\'s availability and compliance requirements.'**
+  /// **'Enable or disable channels based on availability and team requirements.'**
   String get notificationsGuidanceItemChannels;
 
   /// No description provided for @notificationsGuidanceItemTemplates.
   ///
   /// In en, this message translates to:
-  /// **'Ensure notification templates exist and are published for every channel and language you enable.'**
+  /// **'Publish an active template for each channel and language.'**
   String get notificationsGuidanceItemTemplates;
 
   /// No description provided for @notificationsGuidanceItemTesting.
   ///
   /// In en, this message translates to:
-  /// **'Use test buttons after configuration changes to verify the end-to-end delivery path.'**
+  /// **'After changes, verify delivery paths with the test buttons.'**
   String get notificationsGuidanceItemTesting;
 
   /// No description provided for @notificationsLearnMore.
   ///
   /// In en, this message translates to:
-  /// **'View documentation'**
+  /// **'Read the guide'**
   String get notificationsLearnMore;
 
   /// No description provided for @notificationsDocumentationUrl.
@@ -6029,7 +6899,7 @@ abstract class AppLocalizations {
   /// No description provided for @notificationsChannelsSectionSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Activated channels are used whenever the system emits an announcement or operational alert.'**
+  /// **'Any enabled channel may be used for system notifications and operational alerts.'**
   String get notificationsChannelsSectionSubtitle;
 
   /// No description provided for @notificationsChannelTelegram.
@@ -6041,7 +6911,7 @@ abstract class AppLocalizations {
   /// No description provided for @notificationsChannelTelegramDescription.
   ///
   /// In en, this message translates to:
-  /// **'Send alerts through the connected Telegram bot to subscribed operators.'**
+  /// **'Send messages through a connected Telegram bot for operators.'**
   String get notificationsChannelTelegramDescription;
 
   /// No description provided for @notificationsChannelEmail.
@@ -6053,7 +6923,7 @@ abstract class AppLocalizations {
   /// No description provided for @notificationsChannelEmailDescription.
   ///
   /// In en, this message translates to:
-  /// **'Deliver messages via the default email gateway configured in system settings.'**
+  /// **'Send emails using the server configured in system settings.'**
   String get notificationsChannelEmailDescription;
 
   /// No description provided for @notificationsChannelSms.
@@ -6065,7 +6935,7 @@ abstract class AppLocalizations {
   /// No description provided for @notificationsChannelSmsDescription.
   ///
   /// In en, this message translates to:
-  /// **'Send short messages via the configured SMS provider for high-priority events.'**
+  /// **'Send SMS via your configured provider for sensitive events.'**
   String get notificationsChannelSmsDescription;
 
   /// No description provided for @notificationsChannelInApp.
@@ -6077,7 +6947,7 @@ abstract class AppLocalizations {
   /// No description provided for @notificationsChannelInAppDescription.
   ///
   /// In en, this message translates to:
-  /// **'Display alerts inside the Hesabix web and mobile applications instantly.'**
+  /// **'Display notifications inside Hesabix web and mobile in real time.'**
   String get notificationsChannelInAppDescription;
 
   /// No description provided for @notificationsSaveSuccess.
@@ -6089,19 +6959,19 @@ abstract class AppLocalizations {
   /// No description provided for @notificationsSaveError.
   ///
   /// In en, this message translates to:
-  /// **'Unable to save notification settings.'**
+  /// **'Failed to save notification settings.'**
   String get notificationsSaveError;
 
   /// No description provided for @notificationsTestSectionTitle.
   ///
   /// In en, this message translates to:
-  /// **'Send test messages'**
+  /// **'Send test message'**
   String get notificationsTestSectionTitle;
 
   /// No description provided for @notificationsTestSectionSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Send a lightweight test over the selected channel to validate credentials and routing.'**
+  /// **'After any change, use the selected channel to send a test.'**
   String get notificationsTestSectionSubtitle;
 
   /// No description provided for @notificationsTestButton.
@@ -6113,25 +6983,25 @@ abstract class AppLocalizations {
   /// No description provided for @notificationsTestSuccess.
   ///
   /// In en, this message translates to:
-  /// **'Test notification sent via {channel}.'**
+  /// **'Test message sent via {channel}.'**
   String notificationsTestSuccess(String channel);
 
   /// No description provided for @notificationsTestError.
   ///
   /// In en, this message translates to:
-  /// **'Failed to send test via {channel}.'**
+  /// **'Failed to send test message via {channel}.'**
   String notificationsTestError(String channel);
 
   /// No description provided for @notificationsWebsocketInfoTitle.
   ///
   /// In en, this message translates to:
-  /// **'Real-time in-app notifications'**
+  /// **'Realtime in-app notifications'**
   String get notificationsWebsocketInfoTitle;
 
   /// No description provided for @notificationsWebsocketInfoDescription.
   ///
   /// In en, this message translates to:
-  /// **'Clients subscribe to the WebSocket endpoint {endpoint} with a valid API key. Web and mobile apps handle this automatically.'**
+  /// **'Users connect with a valid API key to the websocket endpoint {endpoint}. Web and mobile apps establish this connection automatically.'**
   String notificationsWebsocketInfoDescription(String endpoint);
 
   /// No description provided for @notificationsAdvancedSectionTitle.
@@ -6143,7 +7013,7 @@ abstract class AppLocalizations {
   /// No description provided for @notificationsAdvancedSectionSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Manage provider credentials for Telegram and SMS gateways. Requires the system_settings permission.'**
+  /// **'Manage Telegram and SMS validation here. Requires system_settings access.'**
   String get notificationsAdvancedSectionSubtitle;
 
   /// No description provided for @notificationsAdvancedTelegramHeader.
@@ -6179,13 +7049,13 @@ abstract class AppLocalizations {
   /// No description provided for @notificationsFieldTelegramTokenHint.
   ///
   /// In en, this message translates to:
-  /// **'Obtain from BotFather (format: 123456789:ABC...).'**
+  /// **'Issued by BotFather (format: 123456789:ABC...).'**
   String get notificationsFieldTelegramTokenHint;
 
   /// No description provided for @notificationsFieldTelegramWebhookSecretHint.
   ///
   /// In en, this message translates to:
-  /// **'Optional shared secret used to validate incoming webhook calls.'**
+  /// **'Optional; used to validate incoming requests.'**
   String get notificationsFieldTelegramWebhookSecretHint;
 
   /// No description provided for @notificationsAdvancedSmsHeader.
@@ -6209,25 +7079,25 @@ abstract class AppLocalizations {
   /// No description provided for @notificationsFieldSmsApiKeyHint.
   ///
   /// In en, this message translates to:
-  /// **'Issued by your SMS provider; consider rotating it periodically.'**
+  /// **'Provided by your SMS vendor; rotate periodically.'**
   String get notificationsFieldSmsApiKeyHint;
 
   /// No description provided for @notificationsFieldSmsSender.
   ///
   /// In en, this message translates to:
-  /// **'Sender number or ID'**
+  /// **'Sender/Number'**
   String get notificationsFieldSmsSender;
 
   /// No description provided for @notificationsFieldSmsSenderHint.
   ///
   /// In en, this message translates to:
-  /// **'Exact sender value registered with your provider.'**
+  /// **'Exactly as registered in your vendor panel.'**
   String get notificationsFieldSmsSenderHint;
 
   /// No description provided for @notificationsAdvancedRestartHint.
   ///
   /// In en, this message translates to:
-  /// **'Apply changes during low traffic hours; background workers may require a restart.'**
+  /// **'After changes, restart the notification service during low traffic if needed.'**
   String get notificationsAdvancedRestartHint;
 
   /// No description provided for @notificationsAdvancedSave.
@@ -6245,8 +7115,842 @@ abstract class AppLocalizations {
   /// No description provided for @notificationsAdvancedSaveError.
   ///
   /// In en, this message translates to:
-  /// **'Unable to save advanced notification settings.'**
+  /// **'Failed to save advanced notification settings.'**
   String get notificationsAdvancedSaveError;
+
+  /// No description provided for @templateBuilderNew.
+  ///
+  /// In en, this message translates to:
+  /// **'Visual Builder (New)'**
+  String get templateBuilderNew;
+
+  /// No description provided for @templateBuilderEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Visual Builder (Edit)'**
+  String get templateBuilderEdit;
+
+  /// No description provided for @undo.
+  ///
+  /// In en, this message translates to:
+  /// **'Undo'**
+  String get undo;
+
+  /// No description provided for @redo.
+  ///
+  /// In en, this message translates to:
+  /// **'Redo'**
+  String get redo;
+
+  /// No description provided for @header.
+  ///
+  /// In en, this message translates to:
+  /// **'Header'**
+  String get header;
+
+  /// No description provided for @body.
+  ///
+  /// In en, this message translates to:
+  /// **'Body'**
+  String get body;
+
+  /// No description provided for @footer.
+  ///
+  /// In en, this message translates to:
+  /// **'Footer'**
+  String get footer;
+
+  /// No description provided for @globalCssOptional.
+  ///
+  /// In en, this message translates to:
+  /// **'Global CSS (optional)'**
+  String get globalCssOptional;
+
+  /// No description provided for @previewPdf.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview PDF'**
+  String get previewPdf;
+
+  /// No description provided for @previewHtmlOutput.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview HTML (render output)'**
+  String get previewHtmlOutput;
+
+  /// No description provided for @empty.
+  ///
+  /// In en, this message translates to:
+  /// **'(empty)'**
+  String get empty;
+
+  /// No description provided for @createTemplateBuilder.
+  ///
+  /// In en, this message translates to:
+  /// **'Create template (Builder)'**
+  String get createTemplateBuilder;
+
+  /// No description provided for @saveChanges.
+  ///
+  /// In en, this message translates to:
+  /// **'Save changes'**
+  String get saveChanges;
+
+  /// No description provided for @createdWithId.
+  ///
+  /// In en, this message translates to:
+  /// **'Created (ID: {id})'**
+  String createdWithId(int id);
+
+  /// No description provided for @previewError.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview error: {error}'**
+  String previewError(String error);
+
+  /// No description provided for @createError.
+  ///
+  /// In en, this message translates to:
+  /// **'Create error: {error}'**
+  String createError(String error);
+
+  /// No description provided for @templateCreatedWithId.
+  ///
+  /// In en, this message translates to:
+  /// **'Template created (ID: {id})'**
+  String templateCreatedWithId(int id);
+
+  /// No description provided for @addText.
+  ///
+  /// In en, this message translates to:
+  /// **'Add text'**
+  String get addText;
+
+  /// No description provided for @divider.
+  ///
+  /// In en, this message translates to:
+  /// **'Divider'**
+  String get divider;
+
+  /// No description provided for @spacer.
+  ///
+  /// In en, this message translates to:
+  /// **'Spacer'**
+  String get spacer;
+
+  /// No description provided for @addImage.
+  ///
+  /// In en, this message translates to:
+  /// **'Add image'**
+  String get addImage;
+
+  /// No description provided for @addQr.
+  ///
+  /// In en, this message translates to:
+  /// **'Add QR'**
+  String get addQr;
+
+  /// No description provided for @partyInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Party info'**
+  String get partyInfo;
+
+  /// No description provided for @addTotals.
+  ///
+  /// In en, this message translates to:
+  /// **'Add totals'**
+  String get addTotals;
+
+  /// No description provided for @stampSignature.
+  ///
+  /// In en, this message translates to:
+  /// **'Stamp/Signature'**
+  String get stampSignature;
+
+  /// No description provided for @watermark.
+  ///
+  /// In en, this message translates to:
+  /// **'Watermark'**
+  String get watermark;
+
+  /// No description provided for @addTable.
+  ///
+  /// In en, this message translates to:
+  /// **'Add table'**
+  String get addTable;
+
+  /// No description provided for @textWithVariable.
+  ///
+  /// In en, this message translates to:
+  /// **'Text (variable)'**
+  String get textWithVariable;
+
+  /// No description provided for @alignment.
+  ///
+  /// In en, this message translates to:
+  /// **'Alignment'**
+  String get alignment;
+
+  /// No description provided for @left.
+  ///
+  /// In en, this message translates to:
+  /// **'Left'**
+  String get left;
+
+  /// No description provided for @center.
+  ///
+  /// In en, this message translates to:
+  /// **'Center'**
+  String get center;
+
+  /// No description provided for @right.
+  ///
+  /// In en, this message translates to:
+  /// **'Right'**
+  String get right;
+
+  /// No description provided for @showIfCondition.
+  ///
+  /// In en, this message translates to:
+  /// **'Show if (condition)'**
+  String get showIfCondition;
+
+  /// No description provided for @blockType.
+  ///
+  /// In en, this message translates to:
+  /// **'Block {type}'**
+  String blockType(String type);
+
+  /// No description provided for @pageSize.
+  ///
+  /// In en, this message translates to:
+  /// **'Page size'**
+  String get pageSize;
+
+  /// No description provided for @orientation.
+  ///
+  /// In en, this message translates to:
+  /// **'Orientation'**
+  String get orientation;
+
+  /// No description provided for @portrait.
+  ///
+  /// In en, this message translates to:
+  /// **'Portrait'**
+  String get portrait;
+
+  /// No description provided for @landscape.
+  ///
+  /// In en, this message translates to:
+  /// **'Landscape'**
+  String get landscape;
+
+  /// No description provided for @marginTop.
+  ///
+  /// In en, this message translates to:
+  /// **'Top margin (mm)'**
+  String get marginTop;
+
+  /// No description provided for @marginRight.
+  ///
+  /// In en, this message translates to:
+  /// **'Right (mm)'**
+  String get marginRight;
+
+  /// No description provided for @marginBottom.
+  ///
+  /// In en, this message translates to:
+  /// **'Bottom (mm)'**
+  String get marginBottom;
+
+  /// No description provided for @marginLeft.
+  ///
+  /// In en, this message translates to:
+  /// **'Left (mm)'**
+  String get marginLeft;
+
+  /// No description provided for @create.
+  ///
+  /// In en, this message translates to:
+  /// **'Create'**
+  String get create;
+
+  /// No description provided for @walletBusinessTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Business wallet'**
+  String get walletBusinessTitle;
+
+  /// No description provided for @walletAvailableBalance.
+  ///
+  /// In en, this message translates to:
+  /// **'Available balance'**
+  String get walletAvailableBalance;
+
+  /// No description provided for @walletPendingBalance.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending balance'**
+  String get walletPendingBalance;
+
+  /// No description provided for @walletRequestPayout.
+  ///
+  /// In en, this message translates to:
+  /// **'Request payout'**
+  String get walletRequestPayout;
+
+  /// No description provided for @walletTopUp.
+  ///
+  /// In en, this message translates to:
+  /// **'Top up'**
+  String get walletTopUp;
+
+  /// No description provided for @walletLast30Days.
+  ///
+  /// In en, this message translates to:
+  /// **'Last 30 days report'**
+  String get walletLast30Days;
+
+  /// No description provided for @walletGrossIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Gross in'**
+  String get walletGrossIn;
+
+  /// No description provided for @walletFeesIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Fees in'**
+  String get walletFeesIn;
+
+  /// No description provided for @walletNetIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Net in'**
+  String get walletNetIn;
+
+  /// No description provided for @walletGrossOut.
+  ///
+  /// In en, this message translates to:
+  /// **'Gross out'**
+  String get walletGrossOut;
+
+  /// No description provided for @walletFeesOut.
+  ///
+  /// In en, this message translates to:
+  /// **'Fees out'**
+  String get walletFeesOut;
+
+  /// No description provided for @walletNetOut.
+  ///
+  /// In en, this message translates to:
+  /// **'Net out'**
+  String get walletNetOut;
+
+  /// No description provided for @walletRecentTransactions.
+  ///
+  /// In en, this message translates to:
+  /// **'Recent transactions'**
+  String get walletRecentTransactions;
+
+  /// No description provided for @walletTransactions.
+  ///
+  /// In en, this message translates to:
+  /// **'Transactions'**
+  String get walletTransactions;
+
+  /// No description provided for @moneyAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Amount'**
+  String get moneyAmount;
+
+  /// No description provided for @feeAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Fee'**
+  String get feeAmount;
+
+  /// No description provided for @document.
+  ///
+  /// In en, this message translates to:
+  /// **'Document'**
+  String get document;
+
+  /// No description provided for @walletTypeTopUp.
+  ///
+  /// In en, this message translates to:
+  /// **'Top up'**
+  String get walletTypeTopUp;
+
+  /// No description provided for @walletTypeCustomerPayment.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer payment'**
+  String get walletTypeCustomerPayment;
+
+  /// No description provided for @walletTypePayoutRequest.
+  ///
+  /// In en, this message translates to:
+  /// **'Payout request'**
+  String get walletTypePayoutRequest;
+
+  /// No description provided for @walletTypePayoutSettlement.
+  ///
+  /// In en, this message translates to:
+  /// **'Payout settlement'**
+  String get walletTypePayoutSettlement;
+
+  /// No description provided for @walletTypeRefund.
+  ///
+  /// In en, this message translates to:
+  /// **'Refund'**
+  String get walletTypeRefund;
+
+  /// No description provided for @walletTypeFee.
+  ///
+  /// In en, this message translates to:
+  /// **'Fee'**
+  String get walletTypeFee;
+
+  /// No description provided for @statusApproved.
+  ///
+  /// In en, this message translates to:
+  /// **'Approved'**
+  String get statusApproved;
+
+  /// No description provided for @statusProcessing.
+  ///
+  /// In en, this message translates to:
+  /// **'Processing'**
+  String get statusProcessing;
+
+  /// No description provided for @statusSucceeded.
+  ///
+  /// In en, this message translates to:
+  /// **'Succeeded'**
+  String get statusSucceeded;
+
+  /// No description provided for @statusFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed'**
+  String get statusFailed;
+
+  /// No description provided for @statusCanceled.
+  ///
+  /// In en, this message translates to:
+  /// **'Canceled'**
+  String get statusCanceled;
+
+  /// No description provided for @walletPayoutRequestTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Payout request'**
+  String get walletPayoutRequestTitle;
+
+  /// No description provided for @walletSelectBankAccountHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Select bank account'**
+  String get walletSelectBankAccountHint;
+
+  /// No description provided for @walletPaymentGateway.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment gateway'**
+  String get walletPaymentGateway;
+
+  /// No description provided for @walletPayoutRequested.
+  ///
+  /// In en, this message translates to:
+  /// **'Payout request submitted'**
+  String get walletPayoutRequested;
+
+  /// No description provided for @walletTopUpTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Top up'**
+  String get walletTopUpTitle;
+
+  /// No description provided for @walletTopUpInitializing.
+  ///
+  /// In en, this message translates to:
+  /// **'Submitting request and preparing payment gateway...'**
+  String get walletTopUpInitializing;
+
+  /// No description provided for @walletRedirectingToGateway.
+  ///
+  /// In en, this message translates to:
+  /// **'Redirecting to payment gateway...'**
+  String get walletRedirectingToGateway;
+
+  /// No description provided for @walletTopUpNoPaymentLink.
+  ///
+  /// In en, this message translates to:
+  /// **'Top-up request submitted, but no payment link received. Please try again later or check gateway settings.'**
+  String get walletTopUpNoPaymentLink;
+
+  /// No description provided for @walletGatewayInitFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Error connecting to gateway. Please check settings or try again later.'**
+  String get walletGatewayInitFailed;
+
+  /// No description provided for @walletInvalidGatewayConfig.
+  ///
+  /// In en, this message translates to:
+  /// **'Gateway configuration is incomplete. Please check merchant ID and callback URL.'**
+  String get walletInvalidGatewayConfig;
+
+  /// No description provided for @walletGatewayDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'This gateway is disabled.'**
+  String get walletGatewayDisabled;
+
+  /// No description provided for @walletGatewayNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment gateway not found.'**
+  String get walletGatewayNotFound;
+
+  /// No description provided for @walletGatewayServerError.
+  ///
+  /// In en, this message translates to:
+  /// **'Server error connecting to gateway. Please try again later.'**
+  String get walletGatewayServerError;
+
+  /// No description provided for @walletOpenGatewayDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Redirect to payment gateway'**
+  String get walletOpenGatewayDialogTitle;
+
+  /// No description provided for @walletOpenGatewayDialogInstructions.
+  ///
+  /// In en, this message translates to:
+  /// **'To continue, open the link below:'**
+  String get walletOpenGatewayDialogInstructions;
+
+  /// No description provided for @walletPaymentResultTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Wallet payment result'**
+  String get walletPaymentResultTitle;
+
+  /// No description provided for @walletPaymentSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment completed successfully'**
+  String get walletPaymentSuccess;
+
+  /// No description provided for @walletPaymentFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment failed'**
+  String get walletPaymentFailed;
+
+  /// No description provided for @transactionId.
+  ///
+  /// In en, this message translates to:
+  /// **'Transaction ID'**
+  String get transactionId;
+
+  /// No description provided for @paymentReference.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment reference'**
+  String get paymentReference;
+
+  /// No description provided for @walletStatusCheckErrorPrefix.
+  ///
+  /// In en, this message translates to:
+  /// **'Error checking status:'**
+  String get walletStatusCheckErrorPrefix;
+
+  /// No description provided for @walletBackToWallet.
+  ///
+  /// In en, this message translates to:
+  /// **'Back to wallet'**
+  String get walletBackToWallet;
+
+  /// No description provided for @walletSettingsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Wallet settings'**
+  String get walletSettingsTitle;
+
+  /// No description provided for @walletBaseCurrency.
+  ///
+  /// In en, this message translates to:
+  /// **'Wallet base currency'**
+  String get walletBaseCurrency;
+
+  /// No description provided for @walletCurrencyRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Currency selection is required'**
+  String get walletCurrencyRequired;
+
+  /// No description provided for @saved.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved'**
+  String get saved;
+
+  /// No description provided for @savedSuccessfully.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved successfully'**
+  String get savedSuccessfully;
+
+  /// No description provided for @currencyToman.
+  ///
+  /// In en, this message translates to:
+  /// **'Toman'**
+  String get currencyToman;
+
+  /// No description provided for @creditSettingsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer credit'**
+  String get creditSettingsTitle;
+
+  /// No description provided for @creditEnableTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable credit'**
+  String get creditEnableTitle;
+
+  /// No description provided for @creditEnableSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Check customer credit limit during sales'**
+  String get creditEnableSubtitle;
+
+  /// No description provided for @creditDefaultLimit.
+  ///
+  /// In en, this message translates to:
+  /// **'Default credit limit'**
+  String get creditDefaultLimit;
+
+  /// No description provided for @creditGraceDays.
+  ///
+  /// In en, this message translates to:
+  /// **'Grace period (days)'**
+  String get creditGraceDays;
+
+  /// No description provided for @creditLateFeeRatePercent.
+  ///
+  /// In en, this message translates to:
+  /// **'Late fee (%)'**
+  String get creditLateFeeRatePercent;
+
+  /// No description provided for @creditAutoBlockAfterDays.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto block after (days)'**
+  String get creditAutoBlockAfterDays;
+
+  /// No description provided for @creditStrategy.
+  ///
+  /// In en, this message translates to:
+  /// **'Strategy'**
+  String get creditStrategy;
+
+  /// No description provided for @creditStrategySingleDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Single default limit'**
+  String get creditStrategySingleDefault;
+
+  /// No description provided for @creditStrategyByGroup.
+  ///
+  /// In en, this message translates to:
+  /// **'By group/role'**
+  String get creditStrategyByGroup;
+
+  /// No description provided for @creditStrategyPerUser.
+  ///
+  /// In en, this message translates to:
+  /// **'Per-user limit'**
+  String get creditStrategyPerUser;
+
+  /// No description provided for @installmentPlansTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Installment plans'**
+  String get installmentPlansTitle;
+
+  /// No description provided for @newInstallmentPlan.
+  ///
+  /// In en, this message translates to:
+  /// **'New plan'**
+  String get newInstallmentPlan;
+
+  /// No description provided for @editPlan.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit'**
+  String get editPlan;
+
+  /// No description provided for @deletePlan.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get deletePlan;
+
+  /// No description provided for @deletePlanConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete plan \"{name}\"?'**
+  String deletePlanConfirm(String name);
+
+  /// No description provided for @installmentPlanCreateTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'New installment plan'**
+  String get installmentPlanCreateTitle;
+
+  /// No description provided for @installmentPlanEditTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit installment plan'**
+  String get installmentPlanEditTitle;
+
+  /// No description provided for @planName.
+  ///
+  /// In en, this message translates to:
+  /// **'Plan name'**
+  String get planName;
+
+  /// No description provided for @planMethod.
+  ///
+  /// In en, this message translates to:
+  /// **'Calculation method'**
+  String get planMethod;
+
+  /// No description provided for @planMethodFlat.
+  ///
+  /// In en, this message translates to:
+  /// **'Flat'**
+  String get planMethodFlat;
+
+  /// No description provided for @planMethodAmortized.
+  ///
+  /// In en, this message translates to:
+  /// **'Amortized'**
+  String get planMethodAmortized;
+
+  /// No description provided for @planNumInstallments.
+  ///
+  /// In en, this message translates to:
+  /// **'Number of installments'**
+  String get planNumInstallments;
+
+  /// No description provided for @planPeriodDays.
+  ///
+  /// In en, this message translates to:
+  /// **'Interval (days)'**
+  String get planPeriodDays;
+
+  /// No description provided for @planDownPaymentPercent.
+  ///
+  /// In en, this message translates to:
+  /// **'Down payment (%)'**
+  String get planDownPaymentPercent;
+
+  /// No description provided for @planInterestRate.
+  ///
+  /// In en, this message translates to:
+  /// **'Total interest (%)'**
+  String get planInterestRate;
+
+  /// No description provided for @planLateFeeRate.
+  ///
+  /// In en, this message translates to:
+  /// **'Late fee (%)'**
+  String get planLateFeeRate;
+
+  /// No description provided for @planIssueFee.
+  ///
+  /// In en, this message translates to:
+  /// **'Issue fee (toman)'**
+  String get planIssueFee;
+
+  /// No description provided for @planIsActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Active'**
+  String get planIsActive;
+
+  /// No description provided for @creditTabTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Credit'**
+  String get creditTabTitle;
+
+  /// No description provided for @creditPersonPolicyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Person credit policy'**
+  String get creditPersonPolicyTitle;
+
+  /// No description provided for @creditCheckModeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Credit check mode'**
+  String get creditCheckModeLabel;
+
+  /// No description provided for @creditCheckModeInherit.
+  ///
+  /// In en, this message translates to:
+  /// **'Inherit from business settings'**
+  String get creditCheckModeInherit;
+
+  /// No description provided for @creditCheckModeEnabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Credit check enabled'**
+  String get creditCheckModeEnabled;
+
+  /// No description provided for @creditCheckModeDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Credit check disabled'**
+  String get creditCheckModeDisabled;
+
+  /// No description provided for @creditLimitLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom credit limit (toman)'**
+  String get creditLimitLabel;
+
+  /// No description provided for @creditLimitHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave empty to use business default'**
+  String get creditLimitHint;
+
+  /// No description provided for @creditTipText.
+  ///
+  /// In en, this message translates to:
+  /// **'Leaving empty or choosing inherit uses the business default credit settings.'**
+  String get creditTipText;
+
+  /// No description provided for @selectInstallmentPlan.
+  ///
+  /// In en, this message translates to:
+  /// **'Select installment plan'**
+  String get selectInstallmentPlan;
+
+  /// No description provided for @applyPlan.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply plan'**
+  String get applyPlan;
 }
 
 class _AppLocalizationsDelegate

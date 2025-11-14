@@ -24,6 +24,8 @@ import '../../services/payment_gateway_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../services/announcements_service.dart';
 import '../../services/notifications_ws_client.dart';
+import '../../widgets/transfer/transfer_form_dialog.dart';
+import '../../widgets/expense_income/expense_income_form_dialog.dart';
 
 class BusinessShell extends StatefulWidget {
   final int businessId;
@@ -100,6 +102,39 @@ class _BusinessShellState extends State<BusinessShell> {
       );
       if (result == true) {
         // Refresh the receipts payments page if it's currently open
+        _refreshCurrentPage();
+      }
+    }
+
+    Future<void> showAddTransferDialog() async {
+      final calendarController = widget.calendarController ?? await CalendarController.load();
+      final result = await showDialog<bool>(
+        context: context,
+        builder: (context) => TransferFormDialog(
+          businessId: widget.businessId,
+          calendarController: calendarController,
+          authStore: widget.authStore,
+          apiClient: ApiClient(),
+        ),
+      );
+      if (result == true) {
+        _refreshCurrentPage();
+      }
+    }
+
+    Future<void> showAddExpenseIncomeDialog() async {
+      final calendarController = widget.calendarController ?? await CalendarController.load();
+      final result = await showDialog<bool>(
+        context: context,
+        builder: (context) => ExpenseIncomeFormDialog(
+          businessId: widget.businessId,
+          calendarController: calendarController,
+          isIncome: false, // پیش‌فرض هزینه؛ قابل تغییر داخل دیالوگ
+          businessInfo: widget.authStore.currentBusiness,
+          apiClient: ApiClient(),
+        ),
+      );
+      if (result == true) {
         _refreshCurrentPage();
       }
     }
@@ -1010,7 +1045,8 @@ class _BusinessShellState extends State<BusinessShell> {
                                         // Show add receipt payment dialog
                                         showAddReceiptPaymentDialog();
                                       } else if (child.label == t.expenseAndIncome) {
-                                        // Navigate to add expense/income
+                                        // Show add expense/income dialog
+                                        showAddExpenseIncomeDialog();
                                       } else if (child.label == t.warehouses) {
                                         // Navigate to add warehouse
                                       } else if (child.label == t.shipments) {
@@ -1154,6 +1190,12 @@ class _BusinessShellState extends State<BusinessShell> {
                                           } else if (item.label == t.receiptsAndPayments) {
                                             // Show add receipt payment dialog
                                             showAddReceiptPaymentDialog();
+                                      } else if (item.label == t.expenseAndIncome) {
+                                        // Show add expense/income dialog
+                                        showAddExpenseIncomeDialog();
+                                      } else if (item.label == t.transfers) {
+                                        // Show add transfer dialog
+                                        showAddTransferDialog();
                                           } else if (item.label == t.checks) {
                                             // Navigate to add check
                                             context.go('/business/${widget.businessId}/checks/new');
@@ -1259,6 +1301,12 @@ class _BusinessShellState extends State<BusinessShell> {
                                 } else if (item.label == t.invoice) {
                                   // Navigate to add invoice
                                   context.go('/business/${widget.businessId}/invoice/new');
+                                } else if (item.label == t.expenseAndIncome) {
+                                  // Show add expense/income dialog
+                                  showAddExpenseIncomeDialog();
+                                } else if (item.label == t.transfers) {
+                                  // Show add transfer dialog
+                                  showAddTransferDialog();
                                 } else if (item.label == t.checks) {
                                   // Navigate to add check
                                   context.go('/business/${widget.businessId}/checks/new');
@@ -1336,7 +1384,8 @@ class _BusinessShellState extends State<BusinessShell> {
                               // Show add receipt payment dialog
                               showAddReceiptPaymentDialog();
                             } else if (child.label == t.expenseAndIncome) {
-                              // Navigate to add expense/income
+                              // Show add expense/income dialog
+                              showAddExpenseIncomeDialog();
                             } else if (child.label == t.warehouses) {
                               // Navigate to add warehouse
                             } else if (child.label == t.shipments) {

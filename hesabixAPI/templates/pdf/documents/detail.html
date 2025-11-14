@@ -1,46 +1,171 @@
 {% extends "pdf/base.html" %}
 {% block content %}
-  <div class="header">
-    <div>
-      <div class="title">{{ document.document_type_name or ('سند' if is_fa else 'Document') }}</div>
-      <div class="meta">
-        {{ 'کسب‌وکار' if is_fa else 'Business' }}: {{ business_name or '-' }}
+  <div class="document-header">
+    <div class="header-left">
+      <div class="document-type-badge">
+        {{ document.document_type_name or ('سند' if is_fa else 'Document') }}
+      </div>
+      <div class="document-info">
+        <div class="info-row">
+          <span class="info-label">{{ 'کد سند' if is_fa else 'Code' }}:</span>
+          <span class="info-value">{{ code or '-' }}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">{{ 'تاریخ' if is_fa else 'Date' }}:</span>
+          <span class="info-value">{{ document_date_jalali or document_date or '-' }}</span>
+        </div>
+        {% if description %}
+        <div class="info-row">
+          <span class="info-label">{{ 'توضیحات' if is_fa else 'Description' }}:</span>
+          <span class="info-value">{{ description | truncate(100) }}</span>
+        </div>
+        {% endif %}
       </div>
     </div>
-    <div class="meta">
-      {{ 'تاریخ تولید' if is_fa else 'Generated' }}: {{ generated_at }}
+    <div class="header-right">
+      <div class="business-info">
+        <div class="business-name">{{ business_name or '-' }}</div>
+        <div class="generated-at">
+          {{ 'تولید شده در' if is_fa else 'Generated at' }}: {{ generated_at }}
+        </div>
+      </div>
     </div>
   </div>
 
-  <div class="meta" style="margin: 8px 0;">
-    <span style="margin-inline-end: 12px;">
-      {{ 'کد' if is_fa else 'Code' }}: {{ code or '-' }}
-    </span>
-    <span>
-      {{ 'تاریخ' if is_fa else 'Date' }}: {{ document_date or '-' }}
-    </span>
-  </div>
-
-  <div class="table-wrapper">
-    <table>
+  {# Installment plan summary if available #}
+  {% set plan = (document.extra_info or {}).get('installment_plan') %}
+  {% if plan and plan.get('schedule') %}
+  <div class="table-container">
+    <h4 style="margin: 8px 0;">{{ 'خلاصه اقساط' if is_fa else 'Installment Summary' }}</h4>
+    <table class="document-lines">
       <thead>
         <tr>
-          <th>{{ 'شرح' if is_fa else 'Description' }}</th>
-          <th>{{ 'بدهکار' if is_fa else 'Debit' }}</th>
-          <th>{{ 'بستانکار' if is_fa else 'Credit' }}</th>
+          <th style="width: 10%;">#</th>
+          <th style="width: 25%;">{{ 'سررسید' if is_fa else 'Due Date' }}</th>
+          <th style="width: 20%;">{{ 'اصل' if is_fa else 'Principal' }}</th>
+          <th style="width: 20%;">{{ 'سود' if is_fa else 'Interest' }}</th>
+          <th style="width: 25%;">{{ 'باقیمانده' if is_fa else 'Remaining' }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for it in plan.get('schedule') %}
+        {% set total = (it.get('total') or 0) | float %}
+        {% set paid = (it.get('paid_amount') or 0) | float %}
+        {% set remaining = (it.get('remaining') or (total - paid)) | float %}
+        <tr>
+          <td>#{{ it.get('seq') }}</td>
+          <td>{{ it.get('due_date') }}</td>
+          <td class="amount">{{ (it.get('principal') or 0) | money(0) | ltr | safe }}</td>
+          <td class="amount">{{ (it.get('interest') or 0) | money(0) | ltr | safe }}</td>
+          <td class="amount">{{ remaining | money(0) | ltr | safe }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr class="totals-row">
+          <td colspan="2"><strong>{{ 'جمع کل' if is_fa else 'Totals' }}</strong></td>
+          <td class="amount"><strong>{{ (plan.get('principal_total') or 0) | money(0) | ltr | safe }}</strong></td>
+          <td class="amount"><strong>{{ (plan.get('interest_total') or 0) | money(0) | ltr | safe }}</strong></td>
+          <td class="amount"><strong>{{ (plan.get('remaining_total') or 0) | money(0) | ltr | safe }}</strong></td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+  {% endif %}
+
+  <div class="table-container">
+    <table class="document-lines">
+      <thead>
+        <tr>
+          <th style="width: 50%;">{{ 'شرح' if is_fa else 'Description' }}</th>
+          <th style="width: 25%;">{{ 'بدهکار' if is_fa else 'Debit' }}</th>
+          <th style="width: 25%;">{{ 'بستانکار' if is_fa else 'Credit' }}</th>
         </tr>
       </thead>
       <tbody>
         {% for line in lines or [] %}
           <tr>
             <td>{{ line.description or '-' }}</td>
-            <td class="amount">{{ line.debit | default('') | ltr | safe }}</td>
-            <td class="amount">{{ line.credit | default('') | ltr | safe }}</td>
+            <td class="amount">{{ line.debit | money(0) | ltr | safe if line.debit else '-' }}</td>
+            <td class="amount">{{ line.credit | money(0) | ltr | safe if line.credit else '-' }}</td>
           </tr>
         {% endfor %}
       </tbody>
+      <tfoot>
+        <tr class="totals-row">
+          <td><strong>{{ 'جمع' if is_fa else 'Total' }}</strong></td>
+          <td class="amount">
+            <strong>
+              {% set total_debit = lines | sum(attribute='debit') if lines else 0 %}
+              {{ total_debit | money(0) | ltr | safe }}
+            </strong>
+          </td>
+          <td class="amount">
+            <strong>
+              {% set total_credit = lines | sum(attribute='credit') if lines else 0 %}
+              {{ total_credit | money(0) | ltr | safe }}
+            </strong>
+          </td>
+        </tr>
+      </tfoot>
     </table>
   </div>
+
+  {% if document.notes %}
+  <div class="notes-section">
+    <h4>{{ 'یادداشت‌ها' if is_fa else 'Notes' }}</h4>
+    <p>{{ document.notes }}</p>
+  </div>
+  {% endif %}
+
+  <style>
+    .document-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 24px;
+      padding: 20px;
+      background: #f8f9fa;
+      border-radius: 8px;
+    }
+    .document-type-badge {
+      display: inline-block;
+      padding: 6px 12px;
+      background: var(--primary);
+      color: white;
+      border-radius: 4px;
+      font-weight: 600;
+      font-size: 14px;
+      margin-bottom: 12px;
+    }
+    .info-row {
+      margin: 6px 0;
+    }
+    .info-label {
+      font-weight: 600;
+      color: var(--muted);
+      margin-inline-end: 8px;
+    }
+    .info-value {
+      color: var(--text);
+    }
+    .table-container {
+      margin: 20px 0;
+      overflow-x: auto;
+    }
+    .totals-row {
+      background: #e9ecef;
+      font-weight: 600;
+      border-top: 2px solid var(--primary);
+    }
+    .notes-section {
+      margin-top: 24px;
+      padding: 16px;
+      background: #fff3cd;
+      border-right: 4px solid #ffc107;
+      border-radius: 4px;
+    }
+  </style>
 {% endblock %}
 
 

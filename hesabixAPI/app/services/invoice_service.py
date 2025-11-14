@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Tuple
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from decimal import Decimal
 import logging
 
@@ -23,6 +23,8 @@ from adapters.db.models.product import Product
 from adapters.db.models.invoice_item_line import InvoiceItemLine
 from app.core.responses import ApiError
 import jdatetime
+import io
+import csv
 
 
 logger = logging.getLogger(__name__)
@@ -445,6 +447,9 @@ def _resolve_accounts_for_invoice(db: Session, data: Dict[str, Any]) -> Dict[str
         "direct_consumption": _get_fixed_account_by_code(db, code("direct_consumption", "70406")),
         "wip": _get_fixed_account_by_code(db, code("wip", "10106")),
         "waste_expense": _get_fixed_account_by_code(db, code("waste_expense", "70407")),
+        # حساب‌های فروش اقساطی
+        "unearned_installment_profit": _get_fixed_account_by_code(db, code("unearned_installment_profit", "10405")),
+        "installment_profit": _get_fixed_account_by_code(db, code("installment_profit", "60205")),
         # طرف‌شخص بر اساس نوع فاکتور
         "person": _get_person_control_account(db, invoice_type),
     }
@@ -559,6 +564,131 @@ def _movement_from_type(invoice_type: str) -> Tuple[Optional[str], Optional[str]
     return (None, None)
 
 
+def _compute_installment_plan(
+    total_with_tax: Decimal,
+    header_extra: Dict[str, Any],
+    document_date: date,
+) -> Tuple[Optional[Dict[str, Any]], Decimal]:
+    """
+    ساخت طرح اقساط ساده (MVP) بر اساس ورودی فاکتور.
+    ورودی مورد انتظار در extra_info.installment_plan:
+      {
+        "down_payment": number,
+        "num_installments": int,
+        "first_due_date": "YYYY-MM-DD",
+        "period_days": int,              // اختیاری؛ پیش‌فرض 30
+        "period": "monthly" | "days",    // اختیاری؛ اگر monthly باشد 30 روزه در نظر می‌گیرد
+        "interest_total": number,        // اختیاری؛ اگر نبود از interest_rate محاسبه می‌شود
+        "interest_rate": number,         // درصد کل دوره (نه سالانه) - اختیاری
+        "method": "flat"                 // اختیاری
+      }
+    خروجی: (plan_dict | None, total_interest)
+    """
+    try:
+        plan_input = (header_extra or {}).get("installment_plan")
+        if not isinstance(plan_input, dict):
+            return (None, Decimal(0))
+        # اگر برنامه دستی ارسال شده باشد، همان را مبنا قرار بده
+        provided_schedule = plan_input.get("schedule")
+        if isinstance(provided_schedule, list) and len(provided_schedule) > 0:
+            # نرمال‌سازی مقادیر و محاسبه جمع‌ها
+            schedule: List[Dict[str, Any]] = []
+            total_interest = Decimal(0)
+            principal_total = Decimal(0)
+            for idx, it in enumerate(provided_schedule):
+                try:
+                    due = _parse_iso_date(it.get("due_date") or document_date.isoformat())
+                except Exception:
+                    due = document_date
+                principal = Decimal(str(it.get("principal", 0) or 0))
+                interest = Decimal(str(it.get("interest", 0) or 0))
+                total = Decimal(str(it.get("total", 0) or (principal + interest)))
+                principal_total += principal
+                total_interest += interest
+                schedule.append({
+                    "seq": int(it.get("seq") or (idx + 1)),
+                    "due_date": due.isoformat(),
+                    "principal": float(principal),
+                    "interest": float(interest),
+                    "total": float(total),
+                    "status": it.get("status") or "pending",
+                    "paid_amount": float(Decimal(str(it.get("paid_amount", 0) or 0))),
+                })
+            down_payment = Decimal(str(plan_input.get("down_payment", 0) or 0))
+            plan_dict: Dict[str, Any] = {
+                "method": plan_input.get("method") or "flat",
+                "down_payment": float(down_payment),
+                "num_installments": len(schedule),
+                "first_due_date": schedule[0]["due_date"],
+                "period_days": int(plan_input.get("period_days") or 30),
+                "principal_total": float(principal_total),
+                "interest_total": float(total_interest),
+                "schedule": schedule,
+            }
+            return (plan_dict, total_interest)
+        num_installments = int(plan_input.get("num_installments") or 0)
+        if num_installments <= 0:
+            return (None, Decimal(0))
+        down_payment = Decimal(str(plan_input.get("down_payment", 0) or 0))
+        if down_payment < 0:
+            down_payment = Decimal(0)
+        principal_total = total_with_tax - down_payment
+        if principal_total < 0:
+            principal_total = Decimal(0)
+        # محاسبه سود کل
+        total_interest = plan_input.get("interest_total")
+        if total_interest is not None:
+            total_interest = Decimal(str(total_interest))
+            if total_interest < 0:
+                total_interest = Decimal(0)
+        else:
+            rate = Decimal(str(plan_input.get("interest_rate", 0) or 0))
+            total_interest = (principal_total * rate) / Decimal(100) if rate > 0 else Decimal(0)
+        # زمان‌بندی
+        fd_raw = plan_input.get("first_due_date") or document_date.isoformat()
+        first_due_date = _parse_iso_date(fd_raw)
+        period_days = plan_input.get("period_days")
+        if period_days is None:
+            period = str(plan_input.get("period", "monthly")).strip().lower()
+            period_days = 30 if period == "monthly" else 30
+        try:
+            period_days = int(period_days)
+            if period_days <= 0:
+                period_days = 30
+        except Exception:
+            period_days = 30
+        # اقلام برنامه
+        per_principal = (principal_total / num_installments) if num_installments > 0 else Decimal(0)
+        per_interest = (total_interest / num_installments) if num_installments > 0 else Decimal(0)
+        schedule: List[Dict[str, Any]] = []
+        for i in range(num_installments):
+            due = first_due_date + timedelta(days=period_days * i)
+            item = {
+                "seq": i + 1,
+                "due_date": due.isoformat(),
+                "principal": float(per_principal),
+                "interest": float(per_interest),
+                "total": float(per_principal + per_interest),
+                "status": "pending",
+                "paid_amount": 0.0,
+            }
+            schedule.append(item)
+        plan_dict: Dict[str, Any] = {
+            "method": plan_input.get("method") or "flat",
+            "down_payment": float(down_payment),
+            "num_installments": num_installments,
+            "first_due_date": first_due_date.isoformat(),
+            "period_days": period_days,
+            "principal_total": float(principal_total),
+            "interest_total": float(total_interest),
+            "schedule": schedule,
+        }
+        return (plan_dict, total_interest)
+    except Exception:
+        # در صورت خطا، طرح نادیده گرفته می‌شود تا فاکتور قابل ثبت باشد
+        return (None, Decimal(0))
+
+
 def _build_invoice_code(db: Session, business_id: int, invoice_type: str) -> str:
     # INV-YYYYMMDD-NNNN (type agnostic); can be extended per-type later
     prefix = _build_doc_code("INV")
@@ -621,6 +751,86 @@ def create_invoice(
     # Inventory posting is decoupled; no stock validation here
     post_inventory: bool = _is_inventory_posting_enabled(data)
     movement_hint, _ = _movement_from_type(invoice_type)
+
+    # --- اعتبارسنجی اعتبار مشتری (قبل از ایجاد سند) ---
+    try:
+        is_proforma_req = bool(data.get("is_proforma", False))
+        # فقط برای فروش (افزایش دریافتنی) و غیر پروفرما
+        if not is_proforma_req and invoice_type == INVOICE_SALES and person_id:
+            # تنظیمات شخص و کسب‌وکار
+            from adapters.db.models.person import Person as _PersonModel
+            from adapters.db.models.business import Business as _BusinessModel
+            person_obj = db.query(_PersonModel).filter(_PersonModel.id == int(person_id)).first()
+            business_obj = db.query(_BusinessModel).filter(_BusinessModel.id == int(business_id)).first()
+            # تعیین محدودیت و فعال بودن بررسی
+            check_enabled = None
+            credit_limit_val = None
+            if person_obj:
+                check_enabled = getattr(person_obj, "credit_check_enabled", None)
+                credit_limit_val = getattr(person_obj, "credit_limit", None)
+            if (check_enabled is None) and business_obj:
+                check_enabled = bool(getattr(business_obj, "check_credit_enabled_by_default", False))
+            if (credit_limit_val is None) and business_obj:
+                credit_limit_val = getattr(business_obj, "default_credit_limit", None)
+            # اگر بررسی غیرفعال است یا سقف تعریف نشده، رد شو
+            if check_enabled and (credit_limit_val is not None):
+                # محاسبه بدهی فعلی
+                from app.services.person_service import calculate_person_balance
+                bal, _status = calculate_person_balance(db, int(person_id), fiscal_year_id=fiscal_year.id if fiscal_year else None)
+                # اگر balance منفی باشد یعنی بدهکار
+                current_debt = Decimal(str(0))
+                try:
+                    if bal is not None:
+                        bdec = Decimal(str(bal))
+                        current_debt = (-bdec) if bdec < 0 else Decimal(0)
+                except Exception:
+                    current_debt = Decimal(0)
+                # مبلغ کل فاکتور (با مالیات) که AR را افزایش می‌دهد
+                net_wo_tax = Decimal(str(totals.get("gross", 0))) - Decimal(str(totals.get("discount", 0)))
+                tax_amt = Decimal(str(totals.get("tax", 0)))
+                total_with_tax = net_wo_tax + tax_amt
+                # پرداخت‌های همزمان ارسالی با فاکتور
+                planned_paid = Decimal(0)
+                try:
+                    for p in (data.get("payments") or []):
+                        amt = Decimal(str(p.get("amount", 0) or 0))
+                        if amt > 0:
+                            planned_paid += amt
+                except Exception:
+                    planned_paid = Decimal(0)
+                invoice_effect = total_with_tax - planned_paid
+                if invoice_effect < 0:
+                    invoice_effect = Decimal(0)
+                new_debt = current_debt + invoice_effect
+                limit_dec = Decimal(str(credit_limit_val))
+                if new_debt > limit_dec:
+                    ignore_flag = bool((data.get("extra_info") or {}).get("ignore_credit_check", False))
+                    if not ignore_flag:
+                        # توقف با خطا
+                        raise ApiError(
+                            "CREDIT_LIMIT_EXCEEDED",
+                            f"اعتبار مشتری کافی نیست. مانده فعلی: {float(current_debt):.2f}، اثر فاکتور: {float(invoice_effect):.2f}، سقف: {float(limit_dec):.2f}",
+                            http_status=400
+                        )
+                    else:
+                        # اجازه ادامه؛ هشدار را در extra_info ذخیره خواهیم کرد (پس از ساخت سند)
+                        header_extra = dict(header_extra or {})
+                        warns = list((header_extra.get("warnings") or []))
+                        warns.append({
+                            "code": "CREDIT_LIMIT_EXCEEDED",
+                            "message": "اعتبار مشتری از سقف عبور کرده است اما نادیده گرفته شد",
+                            "current_debt": float(current_debt),
+                            "invoice_effect": float(invoice_effect),
+                            "new_debt": float(new_debt),
+                            "limit": float(limit_dec),
+                        })
+                        header_extra["warnings"] = warns
+                        data["extra_info"] = header_extra
+    except ApiError:
+        raise
+    except Exception:
+        # در صورت خطای غیرمنتظره، اعتبارسنجی را مسدود نکن
+        logger.exception("credit check failed silently")
 
     # Resolve inventory tracking per product and annotate lines
     all_product_ids = [int(ln.get("product_id")) for ln in lines_input if ln.get("product_id")]
@@ -731,6 +941,33 @@ def create_invoice(
                     description="مالیات بر ارزش افزوده خروجی",
                 ))
             # COGS/Inventory در پست حواله ثبت خواهد شد
+            # --- فروش اقساطی (ثبت سود تحقق‌نیافته و افزایش AR) ---
+            plan_dict, total_interest = _compute_installment_plan(total_with_tax, header_extra, document_date)
+            if plan_dict and total_interest > 0:
+                # افزایش بدهکار دریافتنی به میزان سود کل اقساط
+                if person_id:
+                    db.add(DocumentLine(
+                        document_id=document.id,
+                        account_id=accounts["person"].id,
+                        person_id=person_id,
+                        debit=total_interest,
+                        credit=Decimal(0),
+                        description="سود کل اقساط افزوده به دریافتنی",
+                        extra_info={"installment": True, "side": "person", "person_id": person_id},
+                    ))
+                # بستانکار سود تحقق‌نیافته
+                db.add(DocumentLine(
+                    document_id=document.id,
+                    account_id=accounts["unearned_installment_profit"].id,
+                    debit=Decimal(0),
+                    credit=total_interest,
+                    description="سود تحقق‌نیافته فروش اقساطی",
+                    extra_info={"installment": True},
+                ))
+                # ذخیره طرح در extra_info سند
+                extra = document.extra_info or {}
+                extra["installment_plan"] = plan_dict
+                document.extra_info = extra
 
 
         # Sales Return
@@ -1190,6 +1427,32 @@ def update_invoice(
             if tax > 0:
                 db.add(DocumentLine(document_id=document.id, account_id=accounts["vat_out"].id, debit=Decimal(0), credit=tax, description="مالیات خروجی"))
             # COGS/Inventory by warehouse posting
+            # فروش اقساطی (ثبت سود تحقق‌نیافته و افزایش AR)
+            plan_dict, total_interest = _compute_installment_plan(total_with_tax, header_extra, document.document_date)
+            if plan_dict and total_interest > 0:
+                if person_id:
+                    db.add(DocumentLine(
+                        document_id=document.id,
+                        account_id=accounts["person"].id,
+                        person_id=person_id,
+                        debit=total_interest,
+                        credit=Decimal(0),
+                        description="سود کل اقساط افزوده به دریافتنی",
+                        extra_info={"installment": True, "side": "person", "person_id": person_id},
+                    ))
+                db.add(DocumentLine(
+                    document_id=document.id,
+                    account_id=accounts["unearned_installment_profit"].id,
+                    debit=Decimal(0),
+                    credit=total_interest,
+                    description="سود تحقق‌نیافته فروش اقساطی",
+                    extra_info={"installment": True},
+                ))
+                # merge extra_info to include plan (preserve links)
+                ex_old = document.extra_info or {}
+                ex_new = dict(ex_old)
+                ex_new["installment_plan"] = plan_dict
+                document.extra_info = ex_new
         elif inv_type == INVOICE_SALES_RETURN:
             if person_id:
                 db.add(DocumentLine(document_id=document.id, account_id=accounts["person"].id, person_id=person_id, debit=Decimal(0), credit=total_with_tax, description=document.description))
@@ -1265,6 +1528,126 @@ def update_invoice(
     return invoice_document_to_dict(db, document)
 
 
+def delete_invoice(db: Session, document_id: int) -> bool:
+    """
+    حذف یک فاکتور
+    
+    Args:
+        db: جلسه دیتابیس
+        document_id: شناسه سند فاکتور
+    
+    Returns:
+        True در صورت موفقیت، False در غیر این صورت
+    
+    Raises:
+        ApiError: در صورت عدم وجود سند، عدم امکان حذف، یا خطاهای دیگر
+    """
+    try:
+        document = db.query(Document).filter(Document.id == document_id).first()
+        if not document:
+            raise ApiError("DOCUMENT_NOT_FOUND", "Invoice document not found", http_status=404)
+        
+        # بررسی نوع سند
+        if document.document_type not in SUPPORTED_INVOICE_TYPES:
+            raise ApiError("INVALID_DOCUMENT_TYPE", "Document is not an invoice", http_status=400)
+        
+        # 1) جلوگیری از حذف در سال مالی غیر جاری
+        try:
+            fiscal_year = db.query(FiscalYear).filter(FiscalYear.id == document.fiscal_year_id).first()
+            if fiscal_year is not None and getattr(fiscal_year, "is_last", False) is not True:
+                raise ApiError(
+                    "FISCAL_YEAR_LOCKED",
+                    "سند متعلق به سال مالی جاری نیست و قابل حذف نمی‌باشد",
+                    http_status=409,
+                )
+        except ApiError:
+            raise
+        except Exception:
+            pass
+        
+        # 2) جلوگیری از حذف در صورت قفل بودن سند
+        try:
+            locked_flags = []
+            if isinstance(document.extra_info, dict):
+                locked_flags.append(bool(document.extra_info.get("locked")))
+                locked_flags.append(bool(document.extra_info.get("is_locked")))
+            if isinstance(document.developer_settings, dict):
+                locked_flags.append(bool(document.developer_settings.get("locked")))
+                locked_flags.append(bool(document.developer_settings.get("is_locked")))
+            if any(locked_flags):
+                raise ApiError(
+                    "DOCUMENT_LOCKED",
+                    "این سند قفل است و قابل حذف نمی‌باشد",
+                    http_status=409,
+                )
+        except ApiError:
+            raise
+        except Exception:
+            pass
+        
+        # 3) بررسی حواله‌های انبار مرتبط و اسناد دریافت/پرداخت
+        try:
+            extra_info = document.extra_info or {}
+            links = extra_info.get("links") or {}
+            
+            # بررسی حواله‌های انبار
+            warehouse_document_ids = links.get("warehouse_document_ids") or []
+            if warehouse_document_ids:
+                # بررسی اینکه آیا حواله‌ها قطعی شده‌اند یا نه
+                try:
+                    from adapters.db.models.warehouse_document import WarehouseDocument
+                    warehouse_docs = db.query(WarehouseDocument).filter(
+                        WarehouseDocument.id.in_(warehouse_document_ids)
+                    ).all()
+                    finalized_warehouses = [wd for wd in warehouse_docs if getattr(wd, "status", None) == "finalized"]
+                    if finalized_warehouses:
+                        raise ApiError(
+                            "WAREHOUSE_DOCUMENTS_EXIST",
+                            "این فاکتور دارای حواله‌های قطعی شده است و قابل حذف نمی‌باشد",
+                            http_status=409,
+                        )
+                except ImportError:
+                    # اگر مدل WarehouseDocument وجود نداشت، از بررسی صرف‌نظر می‌کنیم
+                    pass
+            
+            # 4) بررسی اسناد دریافت/پرداخت مرتبط
+            receipt_payment_document_ids = links.get("receipt_payment_document_ids") or []
+            if receipt_payment_document_ids:
+                related_docs = db.query(Document).filter(
+                    Document.id.in_(receipt_payment_document_ids)
+                ).all()
+                if related_docs:
+                    # اگر اسناد دریافت/پرداخت وجود دارند، نمی‌توان فاکتور را حذف کرد
+                    raise ApiError(
+                        "RECEIPT_PAYMENT_DOCUMENTS_EXIST",
+                        "این فاکتور دارای اسناد دریافت/پرداخت مرتبط است و قابل حذف نمی‌باشد",
+                        http_status=409,
+                    )
+        except ApiError:
+            raise
+        except Exception:
+            pass
+        
+        # حذف خطوط سند حسابداری
+        db.query(DocumentLine).filter(DocumentLine.document_id == document_id).delete(synchronize_session=False)
+        
+        # حذف اقلام فاکتور
+        db.query(InvoiceItemLine).filter(InvoiceItemLine.document_id == document_id).delete(synchronize_session=False)
+        
+        # حذف سند
+        db.delete(document)
+        db.commit()
+        
+        return True
+    except ApiError:
+        db.rollback()
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting invoice document {document_id}: {e}")
+        db.rollback()
+        raise ApiError("DELETE_FAILED", f"Failed to delete invoice: {str(e)}", http_status=500)
+
+
 def invoice_document_to_dict(db: Session, document: Document) -> Dict[str, Any]:
     # اقلام فاکتور از جدول مجزا خوانده می‌شوند
     item_rows = db.query(InvoiceItemLine).filter(InvoiceItemLine.document_id == document.id).all()
@@ -1320,5 +1703,320 @@ def invoice_document_to_dict(db: Session, document: Document) -> Dict[str, Any]:
         "created_at": document.created_at.isoformat(),
         "updated_at": document.updated_at.isoformat(),
     }
+
+
+def get_invoice_installment_plan(
+    db: Session,
+    business_id: int,
+    invoice_id: int,
+) -> Dict[str, Any]:
+    """
+    بازگرداندن طرح اقساط ذخیره شده برای فاکتور فروش به‌همراه محاسبات مانده هر قسط.
+    """
+    document = db.query(Document).filter(
+        and_(
+            Document.id == int(invoice_id),
+            Document.business_id == int(business_id),
+        )
+    ).first()
+    if not document:
+        raise ApiError("DOCUMENT_NOT_FOUND", "Invoice document not found", http_status=404)
+    if document.document_type not in {INVOICE_SALES, INVOICE_SALES_RETURN, INVOICE_PURCHASE, INVOICE_PURCHASE_RETURN}:
+        # فقط برای فاکتورهای طرف شخص معنی‌دار است؛ ولی اگر طرح موجود باشد، برمی‌گردانیم
+        pass
+    extra = document.extra_info or {}
+    plan = extra.get("installment_plan")
+    if not isinstance(plan, dict):
+        raise ApiError("INSTALLMENT_PLAN_NOT_FOUND", "Installment plan not found on document", http_status=404)
+    schedule = plan.get("schedule") or []
+    # محاسبات مانده هر قسط
+    enriched_schedule: List[Dict[str, Any]] = []
+    total_principal = Decimal(str(plan.get("principal_total", 0) or 0))
+    total_interest = Decimal(str(plan.get("interest_total", 0) or 0))
+    sum_remaining = Decimal(0)
+    for item in schedule:
+        try:
+            total = Decimal(str(item.get("total", 0) or 0))
+            paid = Decimal(str(item.get("paid_amount", 0) or 0))
+        except Exception:
+            total, paid = Decimal(0), Decimal(0)
+        remaining = max(total - paid, Decimal(0))
+        sum_remaining += remaining
+        new_item = dict(item)
+        new_item["remaining"] = float(remaining)
+        enriched_schedule.append(new_item)
+    return {
+        "invoice_id": int(document.id),
+        "invoice_code": document.code,
+        "document_date": document.document_date.isoformat(),
+        "currency_id": int(document.currency_id),
+        "currency_code": getattr(document.currency, "code", None),
+        "person_id": (extra or {}).get("person_id"),
+        "plan": {
+            **plan,
+            "schedule": enriched_schedule,
+            "principal_total": float(total_principal),
+            "interest_total": float(total_interest),
+            "remaining_total": float(sum_remaining),
+        },
+    }
+
+
+def search_installments(
+    db: Session,
+    business_id: int,
+    query: Dict[str, Any],
+) -> Dict[str, Any]:
+    """
+    جستجوی اقساط به تفکیک ردیف‌های برنامه اقساط در فاکتورهای فروش.
+    فیلترها:
+      - fiscal_year_id (اختیاری): بازه سررسید در سال مالی انتخابی
+      - due_from, due_to (اختیاری): بازه تاریخ سررسید
+      - status: pending|partial|paid|overdue
+      - person_id: فیلتر بر اساس شخص
+      - invoice_id: فاکتور خاص
+      - take/skip: صفحه‌بندی ساده
+    """
+    # تاریخ امروز برای تشخیص overdue
+    today = datetime.utcnow().date()
+
+    # ورودی‌ها
+    fiscal_year_id = query.get("fiscal_year_id")
+    due_from = query.get("due_from")
+    due_to = query.get("due_to")
+    status_filter = (query.get("status") or "").strip().lower()
+    person_id_filter = query.get("person_id")
+    invoice_id_filter = query.get("invoice_id")
+    try:
+        take = int(query.get("take", 200))
+    except Exception:
+        take = 200
+    try:
+        skip = int(query.get("skip", 0))
+    except Exception:
+        skip = 0
+
+    fy_start: date | None = None
+    fy_end: date | None = None
+    if fiscal_year_id:
+        fy = db.query(FiscalYear).filter(
+            and_(
+                FiscalYear.id == int(fiscal_year_id),
+                FiscalYear.business_id == int(business_id),
+            )
+        ).first()
+        if fy:
+            fy_start = getattr(fy, "start_date", None)
+            fy_end = getattr(fy, "end_date", None)
+
+    def _parse_date(v: Any) -> date | None:
+        if not v:
+            return None
+        try:
+            return _parse_iso_date(v)
+        except Exception:
+            return None
+
+    due_from_dt = _parse_date(due_from)
+    due_to_dt = _parse_date(due_to)
+
+    # اسناد فروش دارای طرح اقساط
+    docs_q = db.query(Document).filter(
+        and_(
+            Document.business_id == business_id,
+            Document.document_type == INVOICE_SALES,
+            Document.is_proforma == False,  # noqa: E712
+        )
+    )
+    if invoice_id_filter:
+        try:
+            docs_q = docs_q.filter(Document.id == int(invoice_id_filter))
+        except Exception:
+            pass
+
+    docs = docs_q.order_by(Document.id.desc()).all()
+
+    items: List[Dict[str, Any]] = []
+    for doc in docs:
+        extra = doc.extra_info or {}
+        plan = extra.get("installment_plan") if isinstance(extra, dict) else None
+        if not isinstance(plan, dict):
+            continue
+        if person_id_filter is not None:
+            try:
+                if int(extra.get("person_id")) != int(person_id_filter):
+                    continue
+            except Exception:
+                continue
+        schedule = plan.get("schedule") or []
+        for it in schedule:
+            # استخراج تاریخ سررسید
+            try:
+                due = _parse_iso_date(it.get("due_date"))
+            except Exception:
+                continue
+            # فیلتر سال مالی (بر اساس تاریخ سررسید)
+            if fy_start and due < fy_start:
+                continue
+            if fy_end and due > fy_end:
+                continue
+            # فیلترهای تاریخ
+            if due_from_dt and due < due_from_dt:
+                continue
+            if due_to_dt and due > due_to_dt:
+                continue
+            # محاسبات
+            principal = Decimal(str(it.get("principal", 0) or 0))
+            interest = Decimal(str(it.get("interest", 0) or 0))
+            total = Decimal(str(it.get("total", 0) or 0))
+            paid = Decimal(str(it.get("paid_amount", 0) or 0))
+            remaining = max(total - paid, Decimal(0))
+            # وضعیت
+            if remaining <= Decimal("0.01"):
+                st = "paid"
+            elif paid > 0:
+                st = "partial"
+            else:
+                st = "pending"
+            if due < today and st != "paid":
+                st = "overdue"
+            # فیلتر وضعیت
+            if status_filter and st != status_filter:
+                continue
+            items.append({
+                "invoice_id": int(doc.id),
+                "invoice_code": doc.code,
+                "person_id": extra.get("person_id"),
+                "document_date": doc.document_date.isoformat(),
+                "seq": int(it.get("seq") or 0),
+                "due_date": due.isoformat(),
+                "principal": float(principal),
+                "interest": float(interest),
+                "total": float(total),
+                "paid_amount": float(paid),
+                "remaining": float(remaining),
+                "status": st,
+            })
+
+    total_count = len(items)
+    # صفحه‌بندی
+    page_items = items[skip: skip + take]
+    return {
+        "items": page_items,
+        "pagination": {
+            "total": total_count,
+            "take": take,
+            "skip": skip,
+            "page": (skip // take) + 1,
+            "has_next": skip + take < total_count,
+        },
+        "filters": {
+            "fiscal_year_id": fiscal_year_id,
+            "due_from": due_from,
+            "due_to": due_to,
+            "status": status_filter,
+            "person_id": person_id_filter,
+            "invoice_id": invoice_id_filter,
+        },
+    }
+
+
+def export_installments_csv(
+    db: Session,
+    business_id: int,
+    query: Dict[str, Any],
+) -> bytes:
+    """
+    خروجی CSV اقساط بر اساس همان فیلترهای search_installments.
+    """
+    data = search_installments(db, business_id, query)
+    items = data.get("items") or []
+    output = io.StringIO()
+    writer = csv.writer(output)
+    # header
+    writer.writerow([
+        "invoice_id",
+        "invoice_code",
+        "person_id",
+        "document_date",
+        "seq",
+        "due_date",
+        "status",
+        "principal",
+        "interest",
+        "total",
+        "paid_amount",
+        "remaining",
+    ])
+    for it in items:
+        writer.writerow([
+            it.get("invoice_id"),
+            it.get("invoice_code"),
+            it.get("person_id"),
+            it.get("document_date"),
+            it.get("seq"),
+            it.get("due_date"),
+            it.get("status"),
+            it.get("principal"),
+            it.get("interest"),
+            it.get("total"),
+            it.get("paid_amount"),
+            it.get("remaining"),
+        ])
+    return output.getvalue().encode("utf-8-sig")
+
+
+def export_installments_xlsx(
+    db: Session,
+    business_id: int,
+    query: Dict[str, Any],
+) -> tuple[bytes, str, str]:
+    """
+    تلاش برای ساخت فایل XLSX؛ اگر کتابخانه موجود نبود، به CSV برمی‌گردیم.
+    Returns: (content_bytes, mime_type, file_ext)
+    """
+    try:
+        from openpyxl import Workbook  # type: ignore
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Installments"
+        headers = [
+            "invoice_id",
+            "invoice_code",
+            "person_id",
+            "document_date",
+            "seq",
+            "due_date",
+            "status",
+            "principal",
+            "interest",
+            "total",
+            "paid_amount",
+            "remaining",
+        ]
+        ws.append(headers)
+        data = search_installments(db, business_id, query)
+        for it in data.get("items", []):
+            ws.append([
+                it.get("invoice_id"),
+                it.get("invoice_code"),
+                it.get("person_id"),
+                it.get("document_date"),
+                it.get("seq"),
+                it.get("due_date"),
+                it.get("status"),
+                it.get("principal"),
+                it.get("interest"),
+                it.get("total"),
+                it.get("paid_amount"),
+                it.get("remaining"),
+            ])
+        bio = io.BytesIO()
+        wb.save(bio)
+        return bio.getvalue(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "xlsx"
+    except Exception:
+        # Fallback: CSV
+        content = export_installments_csv(db, business_id, query)
+        return content, "text/csv; charset=utf-8", "csv"
 
 

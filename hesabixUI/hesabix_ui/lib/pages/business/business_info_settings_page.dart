@@ -37,6 +37,9 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
 
   BusinessType? _businessType;
   BusinessField? _businessField;
+  // تنظیمات اعتبار
+  bool _checkCreditEnabledByDefault = false;
+  final _defaultCreditLimitController = TextEditingController();
 
   late final ApiClient _apiClient;
 
@@ -60,6 +63,7 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
     _countryController.dispose();
     _provinceController.dispose();
     _cityController.dispose();
+    _defaultCreditLimitController.dispose();
     super.dispose();
   }
 
@@ -84,6 +88,8 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
       _cityController.text = resp.city ?? '';
       _businessType = _resolveBusinessType(resp.businessType);
       _businessField = _resolveBusinessField(resp.businessField);
+      _checkCreditEnabledByDefault = resp.checkCreditEnabledByDefault;
+      _defaultCreditLimitController.text = (resp.defaultCreditLimit ?? 0).toStringAsFixed(0);
     } catch (e) {
       _error = e.toString();
     } finally {
@@ -140,6 +146,15 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
     if ((orig.province ?? '') != province) payload['province'] = province.isEmpty ? null : province;
     final city = _cityController.text.trim();
     if ((orig.city ?? '') != city) payload['city'] = city.isEmpty ? null : city;
+    // تنظیمات اعتبار
+    final defaultCreditLimitStr = _defaultCreditLimitController.text.trim();
+    final parsedLimit = double.tryParse(defaultCreditLimitStr.replaceAll(',', ''));
+    if ((orig.defaultCreditLimit ?? 0) != (parsedLimit ?? 0)) {
+      payload['default_credit_limit'] = parsedLimit;
+    }
+    if (orig.checkCreditEnabledByDefault != _checkCreditEnabledByDefault) {
+      payload['check_credit_enabled_by_default'] = _checkCreditEnabledByDefault;
+    }
 
     return payload;
   }
@@ -276,6 +291,25 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
               ),
               const SizedBox(height: 12),
               _buildTextField(controller: _cityController, label: t.city),
+              
+              const SizedBox(height: 24),
+              _buildSectionTitle('تنظیمات اعتبار مشتریان', cs),
+              const SizedBox(height: 8),
+              SwitchListTile(
+                title: const Text('بررسی اعتبار مشتریان (پیش‌فرض)'),
+                subtitle: const Text('در صورت روشن بودن، به‌صورت پیش‌فرض اعتبار مشتریان بررسی می‌شود'),
+                value: _checkCreditEnabledByDefault,
+                onChanged: (v) => setState(() => _checkCreditEnabledByDefault = v),
+              ),
+              const SizedBox(height: 8),
+              TextFormField(
+                controller: _defaultCreditLimitController,
+                decoration: const InputDecoration(
+                  labelText: 'سقف اعتبار پیش‌فرض (ریال)',
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              ),
             ],
           ),
         ),

@@ -14,6 +14,7 @@ import '../../utils/number_formatters.dart';
 import '../../services/expense_income_service.dart';
 import '../../core/api_client.dart';
 import '../../utils/number_normalizer.dart';
+import '../../widgets/banking/currency_picker_widget.dart';
 
 class ExpenseIncomePage extends StatefulWidget {
   final int businessId;
@@ -81,6 +82,17 @@ class _ExpenseIncomePageState extends State<ExpenseIncomePage> {
                       hintText: 'انتخاب تاریخ',
                     ),
                   ),
+                  const SizedBox(width: 12),
+                  SizedBox(
+                    width: 220,
+                    child: CurrencyPickerWidget(
+                      businessId: widget.businessId,
+                      selectedCurrencyId: _currencyId,
+                      onChanged: (currencyId) => setState(() => _currencyId = currencyId),
+                      label: 'ارز',
+                      hintText: 'انتخاب ارز',
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -105,6 +117,7 @@ class _ExpenseIncomePageState extends State<ExpenseIncomePage> {
                     child: _ItemsPanel(
                       businessId: widget.businessId,
                       lines: _itemLines,
+                      documentType: _docType,
                       onChanged: (ls) => setState(() {
                         _itemLines
                           ..clear()
@@ -127,6 +140,7 @@ class _ExpenseIncomePageState extends State<ExpenseIncomePage> {
                         businessId: widget.businessId,
                         calendarController: widget.calendarController,
                         invoiceType: _docType == 'income' ? InvoiceType.sales : InvoiceType.purchase,
+                        selectedCurrencyId: _currencyId,
                       ),
                     ),
                   ),
@@ -205,7 +219,8 @@ class _ItemsPanel extends StatelessWidget {
   final int businessId;
   final List<_ItemLine> lines;
   final ValueChanged<List<_ItemLine>> onChanged;
-  const _ItemsPanel({required this.businessId, required this.lines, required this.onChanged});
+  final String documentType; // 'expense' | 'income'
+  const _ItemsPanel({required this.businessId, required this.lines, required this.onChanged, required this.documentType});
 
   @override
   Widget build(BuildContext context) {
@@ -236,6 +251,7 @@ class _ItemsPanel extends StatelessWidget {
                     separatorBuilder: (_, __) => const SizedBox(height: 8),
                     itemBuilder: (ctx, i) => _ItemTile(
                       businessId: businessId,
+                      documentType: documentType,
                       line: lines[i],
                       onChanged: (l) {
                         final newLines = List<_ItemLine>.from(lines);
@@ -258,10 +274,11 @@ class _ItemsPanel extends StatelessWidget {
 
 class _ItemTile extends StatefulWidget {
   final int businessId;
+  final String documentType; // 'expense' | 'income'
   final _ItemLine line;
   final ValueChanged<_ItemLine> onChanged;
   final VoidCallback onDelete;
-  const _ItemTile({required this.businessId, required this.line, required this.onChanged, required this.onDelete});
+  const _ItemTile({required this.businessId, required this.documentType, required this.line, required this.onChanged, required this.onDelete});
 
   @override
   State<_ItemTile> createState() => _ItemTileState();
@@ -298,6 +315,7 @@ class _ItemTileState extends State<_ItemTile> {
                   child: AccountTreeComboboxWidget(
                     businessId: widget.businessId,
                     selectedAccount: widget.line.account,
+                    documentTypeFilter: widget.documentType,
                     onChanged: (acc) => widget.onChanged(widget.line.copyWith(account: acc)),
                     label: 'حساب *',
                     hintText: 'انتخاب حساب هزینه/درآمد',

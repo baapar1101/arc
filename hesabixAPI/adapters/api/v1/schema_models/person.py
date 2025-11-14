@@ -87,6 +87,9 @@ class PersonCreateRequest(BaseModel):
     commission_exclude_discounts: Optional[bool] = Field(default=False, description="عدم محاسبه تخفیف")
     commission_exclude_additions_deductions: Optional[bool] = Field(default=False, description="عدم محاسبه اضافات و کسورات")
     commission_post_in_invoice_document: Optional[bool] = Field(default=False, description="ثبت پورسانت در سند فاکتور")
+    # اعتبار
+    credit_limit: Optional[float] = Field(default=None, ge=0, description="سقف اعتبار شخص")
+    credit_check_enabled: Optional[bool] = Field(default=None, description="فعال بودن بررسی اعتبار برای شخص (در صورت عدم ارسال، از تنظیمات کسب‌وکار تبعیت می‌کند)")
 
     @classmethod
     def __get_validators__(cls):
@@ -150,6 +153,9 @@ class PersonUpdateRequest(BaseModel):
     commission_exclude_discounts: Optional[bool] = Field(default=None, description="عدم محاسبه تخفیف")
     commission_exclude_additions_deductions: Optional[bool] = Field(default=None, description="عدم محاسبه اضافات و کسورات")
     commission_post_in_invoice_document: Optional[bool] = Field(default=None, description="ثبت پورسانت در سند فاکتور")
+    # اعتبار
+    credit_limit: Optional[float] = Field(default=None, ge=0, description="سقف اعتبار شخص")
+    credit_check_enabled: Optional[bool] = Field(default=None, description="فعال بودن بررسی اعتبار برای شخص (خالی یعنی تبعیت از تنظیمات کسب‌وکار)")
 
     @classmethod
     def __get_validators__(cls):
@@ -222,6 +228,9 @@ class PersonResponse(BaseModel):
     commission_exclude_discounts: Optional[bool] = Field(default=False, description="عدم محاسبه تخفیف")
     commission_exclude_additions_deductions: Optional[bool] = Field(default=False, description="عدم محاسبه اضافات و کسورات")
     commission_post_in_invoice_document: Optional[bool] = Field(default=False, description="ثبت پورسانت در سند فاکتور")
+    # اعتبار
+    credit_limit: Optional[float] = Field(default=None, description="سقف اعتبار شخص")
+    credit_check_enabled: Optional[bool] = Field(default=None, description="فعال بودن بررسی اعتبار برای شخص")
     
     # تراز و وضعیت مالی
     balance: Optional[float] = Field(default=None, description="تراز شخص (بستانکار - بدهکار)")

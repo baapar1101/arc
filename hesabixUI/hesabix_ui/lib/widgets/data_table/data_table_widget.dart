@@ -1941,6 +1941,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
           sortBy: column.key,
           currentSort: _sortBy,
           sortDesc: _sortDesc,
+          headerTextAlign: widget.config.headerTextAlign ?? TextAlign.center,
           onSort: widget.config.enableSorting
               ? (key, additive) => _sortByColumnInternal(key, additive: additive)
               : (_, __) {},
@@ -2177,6 +2178,17 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
 
   Widget _buildCellContent(dynamic item, DataTableColumn column, int index) {
     final t = Localizations.of<AppLocalizations>(context, AppLocalizations)!;
+    Alignment _alignmentFor(TextAlign align) {
+      switch (align) {
+        case TextAlign.left:
+          return Alignment.centerLeft;
+        case TextAlign.right:
+          return Alignment.centerRight;
+        case TextAlign.center:
+        default:
+          return Alignment.center;
+      }
+    }
     // 1) Custom widget builder takes precedence
     if (column is CustomColumn && column.builder != null) {
       return column.builder!(item, index);
@@ -2192,9 +2204,10 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     if (column is TextColumn && column.formatter != null) {
       final text = column.formatter!(item) ?? '';
       final overflow = _getOverflow(column);
+       final align = _getTextAlign(column);
       final textWidget = Text(
         text,
-        textAlign: _getTextAlign(column),
+        textAlign: align,
         maxLines: _getMaxLines(column),
         overflow: overflow,
       );
@@ -2203,7 +2216,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
           Clipboard.setData(ClipboardData(text: text));
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.copied)));
         },
-        child: textWidget,
+        child: Align(alignment: _alignmentFor(align), child: textWidget),
       );
       return (overflow == TextOverflow.ellipsis && text.isNotEmpty)
           ? Tooltip(message: text, child: wrapped)
@@ -2212,9 +2225,10 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     if (column is NumberColumn && column.formatter != null) {
       final text = column.formatter!(item) ?? '';
       final overflow = _getOverflow(column);
+      final align = _getTextAlign(column);
       final textWidget = Text(
         text,
-        textAlign: _getTextAlign(column),
+        textAlign: align,
         maxLines: _getMaxLines(column),
         overflow: overflow,
         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
@@ -2226,7 +2240,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
           Clipboard.setData(ClipboardData(text: text));
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.copied)));
         },
-        child: textWidget,
+        child: Align(alignment: _alignmentFor(align), child: textWidget),
       );
       return (overflow == TextOverflow.ellipsis && text.isNotEmpty)
           ? Tooltip(message: text, child: wrapped)
@@ -2235,9 +2249,10 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     if (column is DateColumn && column.formatter != null) {
       final text = column.formatter!(item) ?? '';
       final overflow = _getOverflow(column);
+      final align = _getTextAlign(column);
       final textWidget = Text(
         text,
-        textAlign: _getTextAlign(column),
+        textAlign: align,
         maxLines: _getMaxLines(column),
         overflow: overflow,
       );
@@ -2246,7 +2261,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
           Clipboard.setData(ClipboardData(text: text));
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.copied)));
         },
-        child: textWidget,
+        child: Align(alignment: _alignmentFor(align), child: textWidget),
       );
       return (overflow == TextOverflow.ellipsis && text.isNotEmpty)
           ? Tooltip(message: text, child: wrapped)
@@ -2257,9 +2272,10 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     final value = DataTableUtils.getCellValue(item, column.key);
     final formattedValue = DataTableUtils.formatCellValue(value, column);
     final overflow = _getOverflow(column);
+    final align = _getTextAlign(column);
     final textWidget = Text(
       formattedValue,
-      textAlign: _getTextAlign(column),
+      textAlign: align,
       maxLines: _getMaxLines(column),
       overflow: overflow,
       style: column is NumberColumn
@@ -2273,7 +2289,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
         Clipboard.setData(ClipboardData(text: formattedValue));
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.copied)));
       },
-      child: textWidget,
+      child: Align(alignment: _alignmentFor(align), child: textWidget),
     );
     return (overflow == TextOverflow.ellipsis && formattedValue.isNotEmpty)
         ? Tooltip(message: formattedValue, child: wrapped)
@@ -2316,10 +2332,15 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
   }
 
   TextAlign _getTextAlign(DataTableColumn column) {
+    // Global override if provided in config
+    if (widget.config.cellTextAlign != null) {
+      return widget.config.cellTextAlign!;
+    }
+    // Fallbacks to column-specific alignment, then default center
+    if (column is TextColumn && column.textAlign != null) return column.textAlign!;
     if (column is NumberColumn) return column.textAlign;
     if (column is DateColumn) return column.textAlign;
-    if (column is TextColumn && column.textAlign != null) return column.textAlign!;
-    return TextAlign.start;
+    return TextAlign.center;
   }
 
   int? _getMaxLines(DataTableColumn column) {
@@ -2383,6 +2404,7 @@ class _ColumnHeaderWithSearch extends StatelessWidget {
   final String sortBy;
   final String? currentSort;
   final bool sortDesc;
+  final TextAlign headerTextAlign;
   final void Function(String, bool additive) onSort;
   final VoidCallback onSearch;
   final bool hasActiveFilter;
@@ -2401,6 +2423,7 @@ class _ColumnHeaderWithSearch extends StatelessWidget {
     required this.sortBy,
     required this.currentSort,
     required this.sortDesc,
+    required this.headerTextAlign,
     required this.onSort,
     required this.onSearch,
     required this.hasActiveFilter,
@@ -2419,6 +2442,18 @@ class _ColumnHeaderWithSearch extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isActive = currentSort == sortBy;
+    
+    Alignment _mapTextAlign(TextAlign align) {
+      switch (align) {
+        case TextAlign.left:
+          return Alignment.centerLeft;
+        case TextAlign.right:
+          return Alignment.centerRight;
+        case TextAlign.center:
+        default:
+          return Alignment.center;
+      }
+    }
     
     return Tooltip(
       message: 'کلیک برای مرتب‌سازی • آیکون ذره‌بین برای جستجو • درگ برای تغییر عرض',
@@ -2448,39 +2483,43 @@ class _ColumnHeaderWithSearch extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Expanded(
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Flexible(
-                      child: Tooltip(
-                        message: text,
-                        waitDuration: const Duration(milliseconds: 400),
-                        child: Text(
-                          text,
-                          style: theme.textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.w700,
-                            color: isActive ? theme.colorScheme.primary : theme.colorScheme.onSurface,
+                child: Align(
+                  alignment: _mapTextAlign(headerTextAlign),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Flexible(
+                        child: Tooltip(
+                          message: text,
+                          waitDuration: const Duration(milliseconds: 400),
+                          child: Text(
+                            text,
+                            textAlign: headerTextAlign,
+                            style: theme.textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w700,
+                              color: isActive ? theme.colorScheme.primary : theme.colorScheme.onSurface,
+                            ),
+                            overflow: TextOverflow.ellipsis,
                           ),
-                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                    ),
-                    if (enabled) ...[
-                      const SizedBox(width: 4),
-                      if (isActive)
-                        Icon(
-                          sortDesc ? Icons.arrow_downward : Icons.arrow_upward,
-                          size: 14,
-                          color: theme.colorScheme.primary,
-                        )
-                      else
-                        Icon(
-                          Icons.unfold_more,
-                          size: 14,
-                          color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
-                        ),
+                      if (enabled) ...[
+                        const SizedBox(width: 4),
+                        if (isActive)
+                          Icon(
+                            sortDesc ? Icons.arrow_downward : Icons.arrow_upward,
+                            size: 14,
+                            color: theme.colorScheme.primary,
+                          )
+                        else
+                          Icon(
+                            Icons.unfold_more,
+                            size: 14,
+                            color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                          ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
               ),
               const SizedBox(width: 8),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/services/currency_service.dart';
+import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../core/api_client.dart';
 import '../../services/system_settings_service.dart';
 
@@ -53,19 +54,22 @@ class _WalletSettingsPageState extends State<WalletSettingsPage> {
     try {
       await _settingsService.setWalletBaseCurrencyCode(_selectedCurrencyCode ?? 'IRR');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('ذخیره شد')));
+        final t = AppLocalizations.of(context);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.saved)));
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطا: $e')));
+        final t = AppLocalizations.of(context);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${t.error}: $e')));
       }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('تنظیمات کیف‌پول')),
+      appBar: AppBar(title: Text(t.walletSettingsTitle)),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
@@ -79,7 +83,7 @@ class _WalletSettingsPageState extends State<WalletSettingsPage> {
                       children: [
                         DropdownButtonFormField<String>(
                           value: _selectedCurrencyCode,
-                          decoration: const InputDecoration(labelText: 'ارز پایه کیف‌پول'),
+                          decoration: InputDecoration(labelText: t.walletBaseCurrency),
                           items: _currencies
                               .map((c) => DropdownMenuItem<String>(
                                     value: (c['code'] ?? '').toString(),
@@ -87,13 +91,13 @@ class _WalletSettingsPageState extends State<WalletSettingsPage> {
                                   ))
                               .toList(),
                           onChanged: (v) => setState(() => _selectedCurrencyCode = v),
-                          validator: (v) => (v == null || v.isEmpty) ? 'انتخاب ارز الزامی است' : null,
+                          validator: (v) => (v == null || v.isEmpty) ? t.walletCurrencyRequired : null,
                         ),
                         const SizedBox(height: 20),
                         FilledButton.icon(
                           onPressed: _save,
                           icon: const Icon(Icons.save),
-                          label: const Text('ذخیره'),
+                          label: Text(t.save),
                         ),
                       ],
                     ),

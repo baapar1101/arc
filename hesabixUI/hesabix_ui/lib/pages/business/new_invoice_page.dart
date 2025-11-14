@@ -18,12 +18,17 @@ import '../../models/customer_model.dart';
 import '../../models/person_model.dart';
 import '../../widgets/invoice/line_items_table.dart';
 import '../../widgets/invoice/invoice_transactions_widget.dart';
+import '../../widgets/invoice/bom_explosion_widget.dart';
 import '../../utils/number_formatters.dart';
+import '../../utils/number_normalizer.dart';
 import '../../services/currency_service.dart';
 import '../../core/api_client.dart';
+import '../../services/person_service.dart';
 import '../../models/invoice_transaction.dart';
 import '../../models/invoice_line_item.dart';
 import '../../services/invoice_service.dart';
+import '../../services/credit_api_service.dart';
+import '../../models/credit_models.dart';
 
 class NewInvoicePage extends StatefulWidget {
   final int businessId;
@@ -45,6 +50,8 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
   // تنظیمات انبار
   bool _postInventory = true; // ثبت اسناد انبار
   late TabController _tabController;
+  // نادیده گرفتن اعتبار مشتری برای این فاکتور
+  bool _ignoreCreditCheck = false;
   
   InvoiceType? _selectedInvoiceType;
   bool _isDraft = false;
@@ -53,6 +60,8 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
   Customer? _selectedCustomer;
   Person? _selectedSeller;
   Person? _selectedSupplier; // برای فاکتورهای خرید
+  double? _customerBalance;
+  String? _customerStatus;
   double? _commissionPercentage;
   double? _commissionAmount;
   CommissionType? _commissionType;
@@ -79,11 +88,26 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
   List<InvoiceTransaction> _transactions = [];
   // ردیف‌های فاکتور برای ساخت payload
   List<InvoiceLineItem> _lineItems = <InvoiceLineItem>[];
+  
+  // فروش اقساطی (MVP)
+  bool _useInstallments = false;
+  int? _numInstallments;
+  double? _downPayment;
+  double? _interestRate; // درصد کل دوره
+  DateTime? _firstInstallmentDueDate;
+  String _installmentPeriod = 'monthly'; // monthly | days
+  int? _installmentPeriodDays; // در صورت انتخاب days
+  // برنامه اقساط دستی
+  List<Map<String, dynamic>> _installmentRows = <Map<String, dynamic>>[];
+  // پلن‌های اقساط
+  List<InstallmentPlan> _installmentPlans = <InstallmentPlan>[];
+  InstallmentPlan? _selectedInstallmentPlan;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 4, vsync: this); // شروع با 4 تب
+    _attachTabListener();
     // تنظیم نوع فاکتور پیش‌فرض
     _selectedInvoiceType = InvoiceType.sales;
     // تنظیم ارز پیش‌فرض از AuthStore
@@ -95,8 +119,479 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
     // تنظیم تاریخ‌های پیش‌فرض
     _invoiceDate = DateTime.now();
     _dueDate = DateTime.now();
+    // بارگذاری پلن‌های فعال اقساط
+    _loadInstallmentPlans();
   }
 
+  void _attachTabListener() {
+    _tabController.addListener(() {
+      try {
+        final isSettingsSelected = _tabController.index == (_tabController.length - 1);
+        if (isSettingsSelected) {
+          // بارگذاری تازه پلن‌ها هنگام ورود به تب تنظیمات
+          _loadInstallmentPlans();
+        }
+      } catch (_) {}
+    });
+  }
+
+  Future<void> _loadInstallmentPlans() async {
+    try {
+      final items = await CreditApiService.listInstallmentPlans(widget.businessId, onlyActive: true);
+      setState(() {
+        _installmentPlans = items;
+      });
+    } catch (_) {}
+  }
+
+  Widget _buildInstallmentsTab() {
+    // ابزارها: تولید خودکار، افزودن/حذف ردیف
+    void autoDistribute() {
+      final n = _numInstallments ?? 0;
+      if (n <= 0) return;
+      final start = _firstInstallmentDueDate ?? _invoiceDate ?? DateTime.now();
+      final periodDays = (_installmentPeriod == 'monthly') ? 30 : (_installmentPeriodDays ?? 30);
+      // محاسبه اصل با لحاظ پیش‌پرداخت، بدون اعشار
+      final totalNet = _sumTotal.toDouble();
+      final principalTarget = (totalNet - (_downPayment ?? 0)).clamp(0, double.infinity);
+      final principalTotal = principalTarget.round(); // کل اصل بدون اعشار
+      // توزیع یکنواخت اصل بدون اعشار
+      final basePrincipal = principalTotal ~/ n;
+      int remainderPrincipal = principalTotal - (basePrincipal * n);
+      // محاسبه سود کل و توزیع بدون اعشار
+      final rate = (_interestRate ?? 0.0);
+      final interestTotal = ((principalTotal * (rate / 100.0))).round();
+      final baseInterest = interestTotal ~/ n;
+      int remainderInterest = interestTotal - (baseInterest * n);
+      final rows = <Map<String, dynamic>>[];
+      for (int i = 0; i < n; i++) {
+        final due = start.add(Duration(days: periodDays * i));
+        final principal = basePrincipal + (remainderPrincipal > 0 ? 1 : 0);
+        if (remainderPrincipal > 0) remainderPrincipal -= 1;
+        final interest = baseInterest + (remainderInterest > 0 ? 1 : 0);
+        if (remainderInterest > 0) remainderInterest -= 1;
+        rows.add({
+          'seq': i + 1,
+          'due_date': due,
+          'principal': principal.toDouble(),
+          'interest': interest.toDouble(),
+          'total': (principal + interest).toDouble(),
+        });
+      }
+      setState(() => _installmentRows = rows);
+    }
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // انتخاب پلن اقساط و اعمال خودکار
+          Row(
+            children: [
+              Expanded(
+                child: DropdownButtonFormField<InstallmentPlan>(
+                  value: _selectedInstallmentPlan,
+                  items: _installmentPlans.map((p) {
+                    return DropdownMenuItem(
+                      value: p,
+                      child: Text('${p.name} • ${p.numInstallments} ${AppLocalizations.of(context).installmentsCount} / ${p.periodDays} ${AppLocalizations.of(context).installmentDaysLength}'),
+                    );
+                  }).toList(),
+                  onChanged: (v) {
+                    setState(() {
+                      _selectedInstallmentPlan = v;
+                      final plan = v;
+                      if (plan != null) {
+                        _useInstallments = true;
+                        _numInstallments = plan.numInstallments;
+                        _installmentPeriod = 'days';
+                        _installmentPeriodDays = plan.periodDays;
+                        _interestRate = plan.interestRate ?? 0.0;
+                        final dpPercent = plan.downPaymentPercent ?? 0.0;
+                        _downPayment = (_sumTotal.toDouble() * dpPercent / 100.0);
+                      }
+                    });
+                    autoDistribute();
+                  },
+                  decoration: InputDecoration(labelText: AppLocalizations.of(context).selectInstallmentPlan),
+                ),
+              ),
+              const SizedBox(width: 8),
+              ElevatedButton.icon(
+                onPressed: () {
+                  final plan = _selectedInstallmentPlan;
+                  if (plan == null) return;
+                  setState(() {
+                    _useInstallments = true;
+                    _numInstallments = plan.numInstallments;
+                    _installmentPeriod = 'days';
+                    _installmentPeriodDays = plan.periodDays;
+                    _interestRate = plan.interestRate ?? 0.0;
+                    // محاسبه پیش‌پرداخت از درصد پلن بر اساس جمع کنونی
+                    final dpPercent = plan.downPaymentPercent ?? 0.0;
+                    _downPayment = (_sumTotal.toDouble() * dpPercent / 100.0);
+                    _firstInstallmentDueDate = _invoiceDate ?? DateTime.now();
+                  });
+                  autoDistribute();
+                },
+                icon: const Icon(Icons.playlist_add_check),
+                label: Text(AppLocalizations.of(context).applyPlan),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // تنظیمات پلن و پارامترها (تجمیع‌شده)
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                children: [
+                  // تعداد اقساط و پیش‌پرداخت
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextFormField(
+                          key: ValueKey('num_${_numInstallments ?? 0}'),
+                          initialValue: formatNumberForInput(_numInstallments, decimalPlaces: 0),
+                          decoration: InputDecoration(labelText: AppLocalizations.of(context).installmentsCount, border: const OutlineInputBorder()),
+                          keyboardType: TextInputType.number,
+                          inputFormatters: const [
+                            EnglishDigitsFormatter(),
+                            ThousandsSeparatorInputFormatter(allowDecimal: false),
+                          ],
+                          onChanged: (v) {
+                            final n = parseFormattedInt(v);
+                            setState(() => _numInstallments = n);
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: TextFormField(
+                          key: ValueKey('down_${_downPayment ?? 0}'),
+                          initialValue: formatNumberForInput(_downPayment),
+                          decoration: InputDecoration(labelText: AppLocalizations.of(context).downPayment, border: const OutlineInputBorder()),
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          inputFormatters: const [
+                            EnglishDigitsFormatter(),
+                            ThousandsSeparatorInputFormatter(allowDecimal: true),
+                          ],
+                          onChanged: (v) {
+                            final d = parseFormattedDouble(v);
+                            setState(() => _downPayment = d);
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  // نرخ سود و دوره‌بندی
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextFormField(
+                          key: ValueKey('rate_${_interestRate ?? 0}'),
+                          initialValue: formatNumberForInput(_interestRate),
+                          decoration: InputDecoration(labelText: AppLocalizations.of(context).interestRatePercent, border: const OutlineInputBorder()),
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          inputFormatters: const [
+                            EnglishDigitsFormatter(),
+                            ThousandsSeparatorInputFormatter(allowDecimal: true),
+                          ],
+                          onChanged: (v) {
+                            final r = parseFormattedDouble(v);
+                            setState(() => _interestRate = r);
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          value: _installmentPeriod,
+                          decoration: InputDecoration(labelText: AppLocalizations.of(context).installmentsPeriod, border: const OutlineInputBorder()),
+                          items: [
+                            DropdownMenuItem(value: 'monthly', child: Text(AppLocalizations.of(context).installmentsMonthly)),
+                            DropdownMenuItem(value: 'days', child: Text(AppLocalizations.of(context).installmentsDaysBased)),
+                          ],
+                          onChanged: (v) {
+                            setState(() {
+                              _installmentPeriod = v ?? 'monthly';
+                            });
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  if (_installmentPeriod == 'days')
+                    TextFormField(
+                      key: ValueKey('days_${_installmentPeriodDays ?? 0}'),
+                      initialValue: formatNumberForInput(_installmentPeriodDays, decimalPlaces: 0),
+                      decoration: InputDecoration(labelText: AppLocalizations.of(context).installmentDaysLength, border: const OutlineInputBorder()),
+                      keyboardType: TextInputType.number,
+                      inputFormatters: const [
+                        EnglishDigitsFormatter(),
+                        ThousandsSeparatorInputFormatter(allowDecimal: false),
+                      ],
+                      onChanged: (v) {
+                        final d = parseFormattedInt(v);
+                        setState(() => _installmentPeriodDays = d);
+                      },
+                    ),
+                  if (_installmentPeriod == 'days') const SizedBox(height: 12),
+                  // تاریخ سررسید اولین قسط
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: SizedBox(
+                      width: 320,
+                      child: DateInputField(
+                        labelText: AppLocalizations.of(context).firstInstallmentDueDate,
+                        value: _firstInstallmentDueDate ?? _invoiceDate ?? DateTime.now(),
+                        onChanged: (d) {
+                          setState(() => _firstInstallmentDueDate = d);
+                        },
+                        calendarController: widget.calendarController,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          if (_selectedCustomer != null) ...[
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Row(
+                  children: [
+                    const Icon(Icons.person),
+                    const SizedBox(width: 8),
+                    Expanded(child: Text('مشتری: ${_selectedCustomer!.name}')),
+                    if (_customerBalance != null) Text('تراز: ${_customerBalance!.toStringAsFixed(0)}'),
+                    const SizedBox(width: 8),
+                    if (_customerStatus != null) Chip(label: Text(_customerStatus!)),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
+          Row(
+            children: [
+              ElevatedButton.icon(
+                onPressed: autoDistribute,
+                icon: const Icon(Icons.auto_fix_high),
+                label: const Text('تولید خودکار اقساط'),
+              ),
+              const SizedBox(width: 8),
+              ElevatedButton.icon(
+                onPressed: () {
+                  setState(() {
+                    final idx = _installmentRows.length + 1;
+                    _installmentRows.add({
+                      'seq': idx,
+                      'due_date': _firstInstallmentDueDate ?? _invoiceDate ?? DateTime.now(),
+                      'principal': 0.0,
+                      'interest': 0.0,
+                      'total': 0.0,
+                    });
+                  });
+                },
+                icon: const Icon(Icons.add),
+                label: const Text('افزودن قسط'),
+              ),
+              const SizedBox(width: 8),
+              OutlinedButton.icon(
+                onPressed: () {
+                  // تراز اختلاف
+                  final n = _installmentRows.length;
+                  if (n == 0) return;
+                  final totalNet = _sumTotal.toDouble();
+                  final principalTarget = (totalNet - (_downPayment ?? 0)).clamp(0, double.infinity);
+                  double sumPrincipal = 0;
+                  for (final r in _installmentRows) {
+                    sumPrincipal += (r['principal'] as num?)?.toDouble() ?? 0.0;
+                  }
+                  double remaining = sumPrincipal - principalTarget;
+                  for (int idx = n - 1; idx >= 0 && remaining.abs() > 0.0001; idx--) {
+                    final current = (_installmentRows[idx]['principal'] as num?)?.toDouble() ?? 0.0;
+                    double newPrincipal;
+                    if (remaining > 0) {
+                      final canReduce = current;
+                      final reduce = remaining > canReduce ? canReduce : remaining;
+                      newPrincipal = (current - reduce).clamp(0, double.infinity);
+                      remaining -= reduce;
+                    } else {
+                      newPrincipal = current + (-remaining);
+                      remaining = 0;
+                    }
+                    _installmentRows[idx]['principal'] = newPrincipal;
+                    _installmentRows[idx]['total'] =
+                        newPrincipal + ((_installmentRows[idx]['interest'] as num?)?.toDouble() ?? 0.0);
+                  }
+                  setState(() {});
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('اختلاف اصل اقساط تراز شد')),
+                  );
+                },
+                icon: const Icon(Icons.tune),
+                label: const Text('تراز اختلاف اصل'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                children: [
+                  Row(
+                    children: const [
+                      Expanded(child: Text('ردیف')),
+                      Expanded(child: Text('تاریخ سررسید')),
+                      Expanded(child: Text('اصل')),
+                      Expanded(child: Text('سود')),
+                      Expanded(child: Text('جمع')),
+                      SizedBox(width: 40),
+                    ],
+                  ),
+                  const Divider(),
+                  ..._installmentRows.asMap().entries.map((entry) {
+                    final i = entry.key;
+                    final r = entry.value;
+                    final seq = (r['seq'] as int?) ?? (i + 1);
+                    final due = (r['due_date'] as DateTime?) ?? DateTime.now();
+                    final principal = (r['principal'] as num?)?.toDouble() ?? 0.0;
+                    final interest = (r['interest'] as num?)?.toDouble() ?? 0.0;
+                    final total = (r['total'] as num?)?.toDouble() ?? (principal + interest);
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 6),
+                      child: Row(
+                        children: [
+                          Expanded(child: Text('#$seq')),
+                          Expanded(
+                            child: DateInputField(
+                              value: due,
+                              calendarController: widget.calendarController,
+                              labelText: 'تاریخ',
+                              onChanged: (d) {
+                                setState(() => _installmentRows[i]['due_date'] = d ?? due);
+                              },
+                            ),
+                          ),
+                          Expanded(
+                            child: TextFormField(
+                              initialValue: formatNumberForInput(principal, decimalPlaces: 0),
+                              keyboardType: TextInputType.number,
+                              inputFormatters: const [
+                                EnglishDigitsFormatter(),
+                                ThousandsSeparatorInputFormatter(allowDecimal: false),
+                              ],
+                              onChanged: (v) {
+                                final pInt = parseFormattedInt(v) ?? 0;
+                                final p = pInt.toDouble();
+                                setState(() {
+                                  _installmentRows[i]['principal'] = p;
+                                  _installmentRows[i]['total'] = p + (( _installmentRows[i]['interest'] as num?)?.toDouble() ?? 0.0);
+                                });
+                              },
+                              decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true),
+                            ),
+                          ),
+                          Expanded(
+                            child: TextFormField(
+                              initialValue: formatNumberForInput(interest, decimalPlaces: 0),
+                              keyboardType: TextInputType.number,
+                              inputFormatters: const [
+                                EnglishDigitsFormatter(),
+                                ThousandsSeparatorInputFormatter(allowDecimal: false),
+                              ],
+                              onChanged: (v) {
+                                final sInt = parseFormattedInt(v) ?? 0;
+                                final s = sInt.toDouble(); // سود بدون اعشار
+                                setState(() {
+                                  _installmentRows[i]['interest'] = s;
+                                  _installmentRows[i]['total'] = s + (( _installmentRows[i]['principal'] as num?)?.toDouble() ?? 0.0);
+                                });
+                              },
+                              decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true),
+                            ),
+                          ),
+                          Expanded(
+                            child: TextFormField(
+                              initialValue: formatNumberForInput(total, decimalPlaces: 0),
+                              keyboardType: TextInputType.number,
+                              inputFormatters: const [
+                                EnglishDigitsFormatter(),
+                                ThousandsSeparatorInputFormatter(allowDecimal: false),
+                              ],
+                              onChanged: (v) {
+                                final totInt = parseFormattedInt(v) ?? 0;
+                                final tot = totInt.toDouble();
+                                setState(() {
+                                  _installmentRows[i]['total'] = tot;
+                                });
+                              },
+                              decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true),
+                            ),
+                          ),
+                          IconButton(
+                            onPressed: () {
+                              setState(() {
+                                _installmentRows.removeAt(i);
+                              });
+                            },
+                            icon: const Icon(Icons.delete_outline),
+                            tooltip: 'حذف',
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
+                  const Divider(),
+                  // خلاصه اقساط
+                  Builder(
+                    builder: (context) {
+                      double sumPrincipal = 0;
+                      double sumInterest = 0;
+                      double sumTotal = 0;
+                      for (final r in _installmentRows) {
+                        sumPrincipal += (r['principal'] as num?)?.toDouble() ?? 0.0;
+                        sumInterest += (r['interest'] as num?)?.toDouble() ?? 0.0;
+                        sumTotal += (r['total'] as num?)?.toDouble() ?? 0.0;
+                      }
+                      final targetPrincipal = (_sumTotal.toDouble() - (_downPayment ?? 0)).clamp(0, double.infinity);
+                      final diff = sumPrincipal - targetPrincipal;
+                      final diffColor = diff.abs() <= 1 ? Colors.green : Colors.orange;
+                      return Align(
+                        alignment: Alignment.centerRight,
+                        child: Wrap(
+                          spacing: 12,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            Chip(label: Text('جمع اصل: ${formatWithThousands(sumPrincipal, decimalPlaces: 0)}')),
+                            Chip(label: Text('جمع سود: ${formatWithThousands(sumInterest, decimalPlaces: 0)}')),
+                            Chip(label: Text('جمع اقساط: ${formatWithThousands(sumTotal, decimalPlaces: 0)}')),
+                            Chip(
+                              label: Text('اختلاف اصل: ${formatWithThousands(diff, decimalPlaces: 0)}'),
+                              backgroundColor: diffColor.withOpacity(0.12),
+                              labelStyle: TextStyle(color: diffColor),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
   Future<void> _loadDefaultCurrency() async {
     try {
       final currencyService = CurrencyService(ApiClient());
@@ -125,7 +620,10 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
         type == InvoiceType.production) {
       return 3; // اطلاعات فاکتور، کالاها و خدمات، تنظیمات
     }
-    return 4; // همه تب‌ها
+    // اگر فروش اقساطی فعال باشد، تب اقساط اضافه می‌شود
+    final base = 4;
+    final addInstallmentsTab = (_useInstallments && (type == InvoiceType.sales || type == InvoiceType.salesReturn));
+    return base + (addInstallmentsTab ? 1 : 0);
   }
 
 
@@ -142,6 +640,20 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
     super.dispose();
   }
 
+  Future<void> _loadCustomerBalance() async {
+    try {
+      if (_selectedCustomer == null) return;
+      final svc = PersonService(apiClient: ApiClient());
+      final p = await svc.getPerson(_selectedCustomer!.id);
+      setState(() {
+        _customerBalance = p.balance;
+        _customerStatus = p.status;
+      });
+    } catch (_) {
+      // ignore failures silently
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
@@ -156,34 +668,24 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
         toolbarHeight: 56,
         actions: [
           Tooltip(
-            message: 'ذخیره فاکتور',
+            message: t.saveInvoice,
             child: IconButton(
               onPressed: _saveInvoice,
               icon: const Icon(Icons.save),
-              tooltip: 'ذخیره فاکتور',
+              tooltip: t.saveInvoice,
             ),
           ),
         ],
         bottom: TabBar(
           controller: _tabController,
           tabs: [
-            const Tab(
-              icon: Icon(Icons.info_outline),
-              text: 'اطلاعات فاکتور',
-            ),
-            const Tab(
-              icon: Icon(Icons.inventory_2_outlined),
-              text: 'کالاها و خدمات',
-            ),
+            Tab(icon: const Icon(Icons.info_outline), text: t.invoiceInfoTab),
+            Tab(icon: const Icon(Icons.inventory_2_outlined), text: t.productsServicesTab),
             if (_shouldShowTransactionsTab)
-              const Tab(
-                icon: Icon(Icons.receipt_long_outlined),
-                text: 'تراکنش‌ها',
-              ),
-            const Tab(
-              icon: Icon(Icons.settings_outlined),
-              text: 'تنظیمات',
-            ),
+              Tab(icon: const Icon(Icons.receipt_long_outlined), text: t.transactionsTab),
+            if (_useInstallments && (_selectedInvoiceType == InvoiceType.sales || _selectedInvoiceType == InvoiceType.salesReturn))
+              const Tab(icon: Icon(Icons.payments_outlined), text: 'اقساط'),
+            Tab(icon: const Icon(Icons.settings_outlined), text: t.settingsTab),
           ],
         ),
       ),
@@ -196,6 +698,8 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
           _buildProductsTab(),
           // تب تراکنش‌ها (فقط اگر باید نمایش داده شود)
           if (_shouldShowTransactionsTab) _buildTransactionsTab(),
+          // تب اقساط (در صورت فعال بودن)
+          if (_useInstallments && (_selectedInvoiceType == InvoiceType.sales || _selectedInvoiceType == InvoiceType.salesReturn)) _buildInstallmentsTab(),
           // تب تنظیمات
           _buildSettingsTab(),
         ],
@@ -241,6 +745,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                                     if (newTabCount != _tabController.length) {
                                       _tabController.dispose();
                                       _tabController = TabController(length: newTabCount, vsync: this);
+                                      _attachTabListener();
                                     }
                                   });
                                 },
@@ -307,7 +812,10 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                             onCustomerChanged: (customer) {
                               setState(() {
                                 _selectedCustomer = customer;
+                                _customerBalance = null;
+                                _customerStatus = null;
                               });
+                              _loadCustomerBalance();
                             },
                             businessId: widget.businessId,
                             authStore: widget.authStore,
@@ -512,6 +1020,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                                     if (newTabCount != _tabController.length) {
                                       _tabController.dispose();
                                       _tabController = TabController(length: newTabCount, vsync: this);
+                                      _attachTabListener();
                                     }
                                   });
                                 },
@@ -582,7 +1091,10 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                                           onCustomerChanged: (customer) {
                                             setState(() {
                                               _selectedCustomer = customer;
+                                              _customerBalance = null;
+                                              _customerStatus = null;
                                             });
+                                            _loadCustomerBalance();
                                           },
                                           businessId: widget.businessId,
                                           authStore: widget.authStore,
@@ -792,7 +1304,8 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
   }
 
   Future<void> _saveInvoice() async {
-    final validation = _validateAndBuildPayload();
+    final t = AppLocalizations.of(context);
+    final validation = _validateAndBuildPayload(t);
     if (validation is String) {
       _showError(validation);
       return;
@@ -805,17 +1318,17 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('فاکتور با موفقیت ثبت شد'),
+          content: Text(t.invoiceCreatedSuccess),
           backgroundColor: Theme.of(context).colorScheme.primary,
           duration: const Duration(seconds: 2),
         ),
       );
     } catch (e) {
-      _showError('خطا در ذخیره فاکتور: ${e.toString()}');
+      _showError(t.saveInvoiceErrorWithMessage(e.toString()));
     }
   }
 
-  dynamic _validateAndBuildPayload() {
+  dynamic _validateAndBuildPayload(AppLocalizations t) {
     // اعتبارسنجی‌های پایه
     if (_selectedInvoiceType == null) {
       return 'نوع فاکتور الزامی است';
@@ -901,6 +1414,8 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
     };
     // سوییچ ثبت اسناد انبار
     extraInfo['post_inventory'] = _postInventory;
+    // نادیده گرفتن اعتبار مشتری (فقط در فروش معنادار است؛ اما در payload همیشه ارسال می‌شود)
+    extraInfo['ignore_credit_check'] = _ignoreCreditCheck;
     
     // افزودن person_id بر اساس نوع فاکتور
     if (isSalesOrReturn && _selectedCustomer != null) {
@@ -921,6 +1436,64 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
             'value': _commissionAmount,
         };
       }
+    }
+    // افزودن طرح اقساط (در صورت فعال بودن)
+    if (isSalesOrReturn && _useInstallments) {
+      if ((_numInstallments ?? 0) <= 0) {
+        return t.invalidInstallmentsCount;
+      }
+      // اگر برنامه اقساط دستی است، مجموع اصل اقساط باید با (جمع فاکتور - پیش‌پرداخت) برابر باشد
+      if (_installmentRows.isNotEmpty) {
+        final totalNet = _sumTotal.toDouble();
+        final principalTarget = (totalNet - (_downPayment ?? 0)).clamp(0, double.infinity);
+        double sumPrincipal = 0;
+        for (final r in _installmentRows) {
+          sumPrincipal += (r['principal'] as num?)?.toDouble() ?? 0.0;
+        }
+        // تلورانس 1 ریال
+        if ((sumPrincipal - principalTarget).abs() > 1) {
+          return 'جمع اصل اقساط (${sumPrincipal.toStringAsFixed(0)}) با مبلغ قابل دریافت (${principalTarget.toStringAsFixed(0)}) برابر نیست';
+        }
+      }
+      final due0 = (_firstInstallmentDueDate ?? _invoiceDate ?? DateTime.now())
+          .toIso8601String()
+          .split('T')
+          .first;
+      final plan = <String, dynamic>{
+        'down_payment': _downPayment ?? 0,
+        'num_installments': _numInstallments,
+        'first_due_date': due0,
+        if (_installmentPeriod == 'monthly') 'period': 'monthly',
+        if (_installmentPeriod == 'days') 'period_days': _installmentPeriodDays ?? 30,
+        if (_interestRate != null && _installmentRows.isEmpty) 'interest_rate': _interestRate,
+        'method': 'flat',
+      };
+      // اگر برنامه دستی تعریف شده، اضافه کن
+      if (_installmentRows.isNotEmpty) {
+        final rows = <Map<String, dynamic>>[];
+        double interestTotal = 0;
+        for (var i = 0; i < _installmentRows.length; i++) {
+          final r = _installmentRows[i];
+          final dueDate = (r['due_date'] as DateTime? ?? _firstInstallmentDueDate ?? _invoiceDate ?? DateTime.now())
+              .toIso8601String()
+              .split('T')
+              .first;
+          final principal = (r['principal'] as num?)?.toDouble() ?? 0.0;
+          final interest = (r['interest'] as num?)?.toDouble() ?? 0.0;
+          final total = (r['total'] as num?)?.toDouble() ?? (principal + interest);
+          interestTotal += interest;
+          rows.add({
+            'seq': (r['seq'] as int?) ?? (i + 1),
+            'due_date': dueDate,
+            'principal': principal,
+            'interest': interest,
+            'total': total,
+          });
+        }
+        plan['schedule'] = rows;
+        plan['interest_total'] = interestTotal;
+      }
+      extraInfo['installment_plan'] = plan;
     }
     
     // ساخت payload
@@ -999,11 +1572,30 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              // ویجت انفجار فرمول (فقط برای فاکتور تولید)
+              if (_selectedInvoiceType == InvoiceType.production) ...[
+                BomExplosionWidget(
+                  businessId: widget.businessId,
+                  onExploded: (newItems) {
+                    setState(() {
+                      // افزودن ردیف‌های جدید به لیست موجود
+                      _lineItems = [..._lineItems, ...newItems];
+                      // محاسبه مجدد جمع‌ها
+                      _sumSubtotal = _lineItems.fold<num>(0, (acc, e) => acc + e.subtotal);
+                      _sumDiscount = _lineItems.fold<num>(0, (acc, e) => acc + e.discountAmount);
+                      _sumTax = _lineItems.fold<num>(0, (acc, e) => acc + e.taxAmount);
+                      _sumTotal = _lineItems.fold<num>(0, (acc, e) => acc + e.total);
+                    });
+                  },
+                ),
+                const SizedBox(height: 16),
+              ],
               InvoiceLineItemsTable(
                 businessId: widget.businessId,
                 selectedCurrencyId: _selectedCurrencyId,
                 invoiceType: (_selectedInvoiceType?.value ?? 'sales'),
                 postInventory: _postInventory,
+                initialRows: _lineItems,
                 onChanged: (rows) {
                   setState(() {
                     _lineItems = rows;
@@ -1084,6 +1676,54 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
               ),
               const SizedBox(height: 24),
 
+              // فروش اقساطی
+              if (isSalesOrReturn) ...[
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        SwitchListTile(
+                          title: Text(AppLocalizations.of(context).installmentsTitle),
+                          subtitle: Text(AppLocalizations.of(context).installmentsSubtitle),
+                          value: _useInstallments,
+                          onChanged: (value) {
+                            setState(() {
+                              _useInstallments = value;
+                              _firstInstallmentDueDate ??= _invoiceDate ?? DateTime.now();
+                              // همگام‌سازی TabController با تعداد تب‌ها پس از تغییر وضعیت اقساط
+                              final newTabCount = _getTabCountForType(_selectedInvoiceType);
+                              if (newTabCount != _tabController.length) {
+                                _tabController.dispose();
+                                _tabController = TabController(length: newTabCount, vsync: this);
+                                _attachTabListener();
+                              }
+                              if (value == true) {
+                                // در صورت فعال‌سازی فروش اقساطی، پلن‌ها را تازه‌سازی کن
+                                _loadInstallmentPlans();
+                                // انتقال خودکار به تب اقساط (در صورت وجود)
+                                if (_selectedInvoiceType == InvoiceType.sales || _selectedInvoiceType == InvoiceType.salesReturn) {
+                                  try {
+                                    // تب اقساط همیشه قبل از تب تنظیمات قرار می‌گیرد
+                                    final installmentsTabIndex = _tabController.length - 2;
+                                    if (installmentsTabIndex >= 0 && installmentsTabIndex < _tabController.length) {
+                                      _tabController.index = installmentsTabIndex;
+                                    }
+                                  } catch (_) {}
+                                }
+                              }
+                            });
+                          },
+                        ),
+                        // سایر تنظیمات اقساط به تب «اقساط» منتقل شد
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+              ],
+
               // تنظیمات انبار
               Card(
                 child: Padding(
@@ -1101,6 +1741,15 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                           });
                         },
                       ),
+                      const Divider(),
+                      // نادیده گرفتن اعتبار مشتری (فقط برای فاکتور فروش)
+                      if (_selectedInvoiceType == InvoiceType.sales)
+                        SwitchListTile(
+                          title: const Text('نادیده گرفتن اعتبار مشتری'),
+                          subtitle: const Text('در صورت فعال بودن، محدودیت اعتبار برای این فاکتور اعمال نمی‌شود'),
+                          value: _ignoreCreditCheck,
+                          onChanged: (value) => setState(() => _ignoreCreditCheck = value),
+                        ),
                     ],
                   ),
                 ),

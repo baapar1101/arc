@@ -4,6 +4,7 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 
 import '../../models/person_model.dart';
 import '../../services/person_service.dart';
+import '../../services/credit_api_service.dart';
 import '../../utils/number_normalizer.dart';
 
 class PersonFormDialog extends StatefulWidget {
@@ -72,6 +73,10 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
   // Bank accounts
   List<PersonBankAccount> _bankAccounts = [];
 
+  // Credit override UI state
+  final _creditLimitController = TextEditingController();
+  String _creditCheckMode = 'inherit'; // inherit | enabled | disabled
+
   @override
   void initState() {
     super.initState();
@@ -130,6 +135,24 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
       _commissionExcludeAdditionsDeductions = person.commissionExcludeAdditionsDeductions;
       _commissionPostInInvoiceDocument = person.commissionPostInInvoiceDocument;
     }
+    // Load person credit override if editing
+    if (widget.person?.id != null) {
+      Future.microtask(() async {
+        try {
+          final data = await CreditApiService.getPersonCredit(widget.businessId, widget.person!.id!);
+          final cl = data['credit_limit'];
+          final cce = data['credit_check_enabled'];
+          setState(() {
+            _creditLimitController.text = cl == null ? '' : (cl as num).toString();
+            if (cce == null) {
+              _creditCheckMode = 'inherit';
+            } else {
+              _creditCheckMode = (cce == true) ? 'enabled' : 'disabled';
+            }
+          });
+        } catch (_) {}
+      });
+    }
   }
 
   @override
@@ -158,6 +181,7 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
     _commissionSalesReturnPercentController.dispose();
     _commissionSalesAmountController.dispose();
     _commissionSalesReturnAmountController.dispose();
+    _creditLimitController.dispose();
     super.dispose();
   }
 
@@ -222,10 +246,23 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
               : null,
         );
 
-        await _personService.createPerson(
+        final created = await _personService.createPerson(
           businessId: widget.businessId,
           personData: personData,
         );
+        // Update credit override if any
+        final double? creditLimit = _creditLimitController.text.trim().isEmpty ? null : double.tryParse(_creditLimitController.text.trim());
+        bool? creditCheckEnabled;
+        if (_creditCheckMode == 'inherit') {
+          creditCheckEnabled = null;
+        } else if (_creditCheckMode == 'enabled') {
+          creditCheckEnabled = true;
+        } else {
+          creditCheckEnabled = false;
+        }
+        if (creditLimit != null || creditCheckEnabled != null) {
+          await CreditApiService.updatePersonCredit(widget.businessId, created.id!, creditLimit: creditLimit, creditCheckEnabled: creditCheckEnabled);
+        }
       } else {
         // Update existing person
         final personData = PersonUpdateRequest(
@@ -276,10 +313,23 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
               : null,
         );
 
-        await _personService.updatePerson(
+        final updated = await _personService.updatePerson(
           personId: widget.person!.id!,
           personData: personData,
         );
+        // Update credit override if any
+        final double? creditLimit = _creditLimitController.text.trim().isEmpty ? null : double.tryParse(_creditLimitController.text.trim());
+        bool? creditCheckEnabled;
+        if (_creditCheckMode == 'inherit') {
+          creditCheckEnabled = null;
+        } else if (_creditCheckMode == 'enabled') {
+          creditCheckEnabled = true;
+        } else {
+          creditCheckEnabled = false;
+        }
+        if (creditLimit != null || creditCheckEnabled != null) {
+          await CreditApiService.updatePersonCredit(widget.businessId, updated.id!, creditLimit: creditLimit, creditCheckEnabled: creditCheckEnabled);
+        }
       }
 
       if (mounted) {
@@ -381,6 +431,7 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
                     Tab(text: t.personEconomicInfo),
                     Tab(text: t.personContactInfo),
                     Tab(text: t.personBankInfo),
+                    Tab(text: t.creditTabTitle),
                   ];
                   final views = <Widget>[
                     SingleChildScrollView(
@@ -405,6 +456,12 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
                       child: Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                         child: _buildBankAccountsSection(t),
+                      ),
+                    ),
+                    SingleChildScrollView(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                        child: _buildCreditOverrideSection(),
                       ),
                     ),
                   ];
@@ -599,6 +656,41 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
           value: _commissionPostInInvoiceDocument,
           onChanged: (v) { setState(() { _commissionPostInInvoiceDocument = v; }); },
         ),
+      ],
+    );
+  }
+
+  Widget _buildCreditOverrideSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(AppLocalizations.of(context).creditPersonPolicyTitle, style: const TextStyle(fontWeight: FontWeight.bold)),
+        const SizedBox(height: 8),
+        DropdownButtonFormField<String>(
+          value: _creditCheckMode,
+          items: [
+            DropdownMenuItem(value: 'inherit', child: Text(AppLocalizations.of(context).creditCheckModeInherit)),
+            DropdownMenuItem(value: 'enabled', child: Text(AppLocalizations.of(context).creditCheckModeEnabled)),
+            DropdownMenuItem(value: 'disabled', child: Text(AppLocalizations.of(context).creditCheckModeDisabled)),
+          ],
+          onChanged: (v) => setState(() => _creditCheckMode = v ?? 'inherit'),
+          decoration: InputDecoration(labelText: AppLocalizations.of(context).creditCheckModeLabel),
+        ),
+        const SizedBox(height: 12),
+        TextFormField(
+          controller: _creditLimitController,
+          decoration: InputDecoration(
+            labelText: AppLocalizations.of(context).creditLimitLabel,
+            hintText: AppLocalizations.of(context).creditLimitHint,
+            border: const OutlineInputBorder(),
+          ),
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          inputFormatters: [
+            FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Text(AppLocalizations.of(context).creditTipText),
       ],
     );
   }

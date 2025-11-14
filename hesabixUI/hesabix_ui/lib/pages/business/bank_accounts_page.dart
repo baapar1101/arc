@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import '../../widgets/data_table/data_table_widget.dart';
@@ -107,11 +108,27 @@ class _BankAccountsPageState extends State<BankAccountsPage> {
           formatter: (account) => (account.code?.toString() ?? '-'),
           textAlign: TextAlign.center,
         ),
-        TextColumn(
+        CustomColumn(
           'name',
           t.title,
           width: ColumnWidth.large,
           formatter: (account) => account.name,
+          builder: (account, index) {
+            final accountName = account.name;
+            return InkWell(
+              onTap: () {
+                if (account.id != null) {
+                  context.go(
+                    '/business/${widget.businessId}/reports/kardex?bank_account_ids=${account.id}',
+                  );
+                }
+              },
+              child: Text(
+                accountName,
+                style: const TextStyle(decoration: TextDecoration.underline),
+              ),
+            );
+          },
         ),
         TextColumn(
           'branch',

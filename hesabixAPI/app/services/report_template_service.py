@@ -1,19 +1,27 @@
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Tuple
+import time
+import logging
 
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
 from jinja2.sandbox import SandboxedEnvironment
-from jinja2 import StrictUndefined, BaseLoader
+from jinja2 import StrictUndefined, BaseLoader, TemplateSyntaxError, UndefinedError
 
 from adapters.db.models.report_template import ReportTemplate
 from app.core.responses import ApiError
 from app.services.template_builder_compiler import compile_design_to_jinja_html
 
+logger = logging.getLogger(__name__)
+
 
 class ReportTemplateService:
 	"""سرویس مدیریت قالب‌های گزارش"""
+	
+	# سیستم کش برای قالب‌ها
+	_template_cache: Dict[int, Tuple[ReportTemplate, float]] = {}
+	CACHE_TTL = 300  # 5 دقیقه
 
 	@staticmethod
 	def list_templates(
@@ -47,8 +55,33 @@ class ReportTemplateService:
 			if business_id is not None:
 				q = q.filter(ReportTemplate.business_id == int(business_id))
 			return q.first()
-		except Exception:
+		except Exception as e:
+			logger.error(f"Error getting template {template_id}: {e}", exc_info=True)
 			return None
+	
+	@staticmethod
+	def get_template_cached(
+		db: Session, 
+		template_id: int, 
+		business_id: Optional[int] = None
+	) -> Optional[ReportTemplate]:
+		"""دریافت قالب با کش"""
+		cache_key = template_id
+		
+		if cache_key in ReportTemplateService._template_cache:
+			template, cached_time = ReportTemplateService._template_cache[cache_key]
+			if time.time() - cached_time < ReportTemplateService.CACHE_TTL:
+				return template
+		
+		template = ReportTemplateService.get_template(db, template_id, business_id)
+		if template:
+			ReportTemplateService._template_cache[cache_key] = (template, time.time())
+		return template
+	
+	@staticmethod
+	def invalidate_cache(template_id: int):
+		"""پاک کردن کش یک قالب"""
+		ReportTemplateService._template_cache.pop(template_id, None)
 
 	@staticmethod
 	def create_template(db: Session, data: Dict[str, Any], user_id: int) -> ReportTemplate:
@@ -98,6 +131,8 @@ class ReportTemplateService:
 			entity.version = int((entity.version or 1) + 1)
 		db.commit()
 		db.refresh(entity)
+		# پاک کردن کش
+		ReportTemplateService.invalidate_cache(template_id)
 		return entity
 
 	@staticmethod
@@ -107,6 +142,8 @@ class ReportTemplateService:
 			return
 		db.delete(entity)
 		db.commit()
+		# پاک کردن کش
+		ReportTemplateService.invalidate_cache(template_id)
 
 	@staticmethod
 	def publish_template(db: Session, template_id: int, business_id: int, is_published: bool = True) -> ReportTemplate:
@@ -232,6 +269,41 @@ class ReportTemplateService:
 			except Exception:
 				return str(v)
 		env.filters["date"] = _date
+		
+		# فیلتر اعداد فارسی
+		def _persian_number(v):
+			"""تبدیل اعداد انگلیسی به فارسی"""
+			persian_digits = '۰۱۲۳۴۵۶۷۸۹'
+			english_digits = '0123456789'
+			s = str(v)
+			for en, fa in zip(english_digits, persian_digits):
+				s = s.replace(en, fa)
+			return s
+		env.filters["persian"] = _persian_number
+		
+		# فیلتر فرمت شماره حساب
+		def _account_number(v, format_type="standard"):
+			"""فرمت شماره حساب: 1234-567-890"""
+			s = str(v).replace("-", "").replace(" ", "")
+			if format_type == "standard" and len(s) >= 9:
+				return f"{s[:4]}-{s[4:7]}-{s[7:]}"
+			return s
+		env.filters["account"] = _account_number
+		
+		# فیلتر خلاصه متن
+		def _truncate(v, length=50, suffix="..."):
+			"""کوتاه کردن متن"""
+			s = str(v)
+			if len(s) <= length:
+				return s
+			return s[:length] + suffix
+		env.filters["truncate"] = _truncate
+		
+		# فیلتر شرطی برای نمایش/مخفی کردن
+		def _show_if(condition, true_val, false_val=""):
+			"""نمایش شرطی"""
+			return true_val if condition else false_val
+		env.filters["show_if"] = _show_if
 
 		# تزریق assets به context برای دسترسی در قالب‌ها (مثلاً assets.images['logo'])
 		try:
@@ -242,8 +314,18 @@ class ReportTemplateService:
 				ctx = context
 		except Exception:
 			ctx = context
-		template_obj = env.from_string(template.content_html)
-		html = template_obj.render(**ctx)
+		try:
+			template_obj = env.from_string(template.content_html)
+			html = template_obj.render(**ctx)
+		except TemplateSyntaxError as e:
+			logger.error(f"Template syntax error in template {getattr(template, 'id', 'unknown')}: {e}", exc_info=True)
+			raise ApiError("TEMPLATE_SYNTAX_ERROR", f"خطای دستور در قالب: {e.message} (خط {e.lineno})", http_status=400)
+		except UndefinedError as e:
+			logger.warning(f"Undefined variable in template {getattr(template, 'id', 'unknown')}: {e}", exc_info=True)
+			raise ApiError("TEMPLATE_VARIABLE_ERROR", f"متغیر تعریف نشده در قالب: {e.message}", http_status=400)
+		except Exception as e:
+			logger.exception(f"Template rendering error for template {getattr(template, 'id', 'unknown')}: {e}")
+			raise ApiError("TEMPLATE_RENDER_ERROR", f"خطا در رندر قالب: {str(e)}", http_status=500)
 
 		# تنظیمات صفحه (@page) از روی ویژگی‌های قالب
 		try:
@@ -346,8 +428,30 @@ class ReportTemplateService:
 			return None
 		try:
 			return ReportTemplateService.render_with_template(template, context)
-		except Exception:
-			# خطای قالب نباید خروجی را کاملاً متوقف کند
+		except ApiError:
+			# خطاهای API را propagate کنیم
+			raise
+		except Exception as e:
+			# خطای قالب نباید خروجی را کاملاً متوقف کند، اما لاگ می‌کنیم
+			logger.warning(f"Template rendering failed for template {template.id if template else 'unknown'}: {e}", exc_info=True)
 			return None
+	
+	@staticmethod
+	def validate_template(content_html: str, context: Dict[str, Any] = None) -> List[str]:
+		"""اعتبارسنجی قالب و برگرداندن لیست خطاها"""
+		errors = []
+		try:
+			env = SandboxedEnvironment(loader=BaseLoader(), autoescape=True, undefined=StrictUndefined)
+			template_obj = env.from_string(content_html)
+			# تست رندر با context خالی یا نمونه
+			test_context = context or {}
+			template_obj.render(**test_context)
+		except TemplateSyntaxError as e:
+			errors.append(f"خطای دستور: {e.message} در خط {e.lineno}")
+		except UndefinedError as e:
+			errors.append(f"متغیر تعریف نشده: {e.message}")
+		except Exception as e:
+			errors.append(f"خطای رندر: {str(e)}")
+		return errors
 
 

@@ -598,6 +598,108 @@ def create_receipt_payment(
                 logger.info(f"خط کارمزد خدمات بانکی ایجاد شد: {commission_service_line}")
                 db.add(commission_service_line)
     
+    # --- فروش اقساطی: تخصیص به اقساط و شناسایی سود ---
+    try:
+        extra_info_all = data.get("extra_info") or {}
+        settlements = extra_info_all.get("settlements") or []
+        total_interest_to_recognize = Decimal(0)
+        updated_invoice_ids: List[int] = []
+        if is_receipt and isinstance(settlements, list) and settlements:
+            # برای هر فاکتور هدف، برنامه اقساط را به‌روز و سود دوره را شناسایی کن
+            for st in settlements:
+                try:
+                    invoice_id = int(st.get("invoice_id"))
+                except Exception:
+                    continue
+                invoice_doc = db.query(Document).filter(Document.id == invoice_id).first()
+                if not invoice_doc:
+                    continue
+                inv_extra = invoice_doc.extra_info or {}
+                plan = inv_extra.get("installment_plan")
+                schedule = (plan or {}).get("schedule")
+                if not (isinstance(plan, dict) and isinstance(schedule, list) and schedule):
+                    continue
+                # تجمیع تخصیص‌ها به ازای هر قسط (seq)
+                allocations = st.get("allocations") or []
+                seq_to_amount: Dict[int, Decimal] = {}
+                for al in allocations:
+                    try:
+                        seq = int(al.get("seq"))
+                        amt = Decimal(str(al.get("amount", 0) or 0))
+                        if seq > 0 and amt > 0:
+                            seq_to_amount[seq] = seq_to_amount.get(seq, Decimal(0)) + amt
+                    except Exception:
+                        continue
+                if not seq_to_amount:
+                    continue
+                # به‌روزرسانی schedule و محاسبه سود شناسایی‌شده جدید
+                interest_delta_for_invoice = Decimal(0)
+                new_schedule: List[Dict[str, Any]] = []
+                for item in schedule:
+                    seq = int(item.get("seq") or 0)
+                    paid_before = Decimal(str(item.get("paid_amount", 0) or 0))
+                    interest_part = Decimal(str(item.get("interest", 0) or 0))
+                    total_part = Decimal(str(item.get("total", 0) or 0))
+                    alloc_amt = seq_to_amount.get(seq, Decimal(0))
+                    paid_after = paid_before + alloc_amt
+                    # شناسایی سود: حداقلِ پرداخت تا سقف بهره‌ی همان قسط
+                    prev_interest_recognized = min(paid_before, interest_part)
+                    new_interest_recognized = min(paid_after, interest_part)
+                    delta = new_interest_recognized - prev_interest_recognized
+                    if delta > 0:
+                        interest_delta_for_invoice += delta
+                    # وضعیت قسط
+                    new_status = item.get("status") or "pending"
+                    try:
+                        if paid_after >= total_part and total_part > 0:
+                            new_status = "paid"
+                        elif paid_after > 0:
+                            new_status = "partial"
+                        else:
+                            new_status = "pending"
+                    except Exception:
+                        pass
+                    new_item = dict(item)
+                    new_item["paid_amount"] = float(paid_after)
+                    new_item["status"] = new_status
+                    new_schedule.append(new_item)
+                # بروزرسانی طرح در فاکتور
+                new_plan = dict(plan or {})
+                new_plan["schedule"] = new_schedule
+                inv_extra["installment_plan"] = new_plan
+                invoice_doc.extra_info = inv_extra
+                updated_invoice_ids.append(invoice_doc.id)
+                # تجمیع سود شناسایی‌شده برای ثبت در همین سند دریافت
+                total_interest_to_recognize += interest_delta_for_invoice
+            # اگر سودی برای شناسایی وجود دارد، ثبت انتقال از سود تحقق‌نیافته به سود فروش اقساطی
+            if total_interest_to_recognize > 0:
+                try:
+                    unearned = _get_fixed_account_by_code(db, "10405")
+                    earned = _get_fixed_account_by_code(db, "60205")
+                    db.add(DocumentLine(
+                        document_id=document.id,
+                        account_id=unearned.id,
+                        debit=total_interest_to_recognize,
+                        credit=Decimal(0),
+                        description="انتقال سود اقساط از سود تحقق‌نیافته",
+                        extra_info={"installment": True, "reclassification": True},
+                    ))
+                    db.add(DocumentLine(
+                        document_id=document.id,
+                        account_id=earned.id,
+                        debit=Decimal(0),
+                        credit=total_interest_to_recognize,
+                        description="شناسایی سود فروش اقساطی",
+                        extra_info={"installment": True, "reclassification": True},
+                    ))
+                except Exception:
+                    # در صورت عدم وجود حساب‌های ثابت، از شناسایی صرف‌نظر می‌شود
+                    pass
+    except Exception as _ex:
+        logger.exception("installment settlements processing failed: %s", _ex)
+        # از خطا عبور می‌کنیم تا سند دریافت ثبت شود
+        pass
+
     # ذخیره تغییرات
     logger.info(f"=== ذخیره تغییرات ===")
     db.commit()

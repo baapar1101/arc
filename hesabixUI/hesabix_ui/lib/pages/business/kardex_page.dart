@@ -234,9 +234,11 @@ class _KardexPageState extends State<KardexPage> {
         _presets = updated;
         _selectedPresetName = name;
       });
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('پریست ذخیره شد')));
+      final t = AppLocalizations.of(context);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.presetSaved)));
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطا در ذخیره پریست: $e')));
+      final t = AppLocalizations.of(context);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.presetSaveError('$e'))));
     }
   }
 
@@ -254,7 +256,8 @@ class _KardexPageState extends State<KardexPage> {
         }
       });
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطا در حذف پریست: $e')));
+      final t = AppLocalizations.of(context);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.presetDeleteError('$e'))));
     }
   }
 
@@ -304,7 +307,8 @@ class _KardexPageState extends State<KardexPage> {
 
       _updateRouteQuery();
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطا در اعمال پریست: $e')));
+      final t = AppLocalizations.of(context);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.presetApplyError('$e'))));
     }
   }
 
@@ -371,40 +375,40 @@ class _KardexPageState extends State<KardexPage> {
       businessId: widget.businessId,
       reportModuleKey: 'kardex',
       reportSubtype: 'list',
-      title: 'کاردکس اسناد',
+      title: t.kardexDocuments,
       showRowNumbers: true,
       columns: [
         DateColumn(
           'document_date',
-          'تاریخ سند',
+          t.documentDate,
           formatter: (item) => (item as Map<String, dynamic>)['document_date']?.toString(),
           filterType: ColumnFilterType.dateRange,
         ),
         TextColumn(
           'document_code',
-          'کد سند',
+          t.documentCode,
           formatter: (item) => (item as Map<String, dynamic>)['document_code']?.toString(),
         ),
         TextColumn(
           'document_type',
-          'نوع سند',
+          t.documentType,
           formatter: (item) => (item as Map<String, dynamic>)['document_type']?.toString(),
           filterType: ColumnFilterType.multiSelect,
-          filterOptions: const [
-            FilterOption(value: 'invoice_sales', label: 'فاکتور فروش'),
-            FilterOption(value: 'invoice_purchase', label: 'فاکتور خرید'),
-            FilterOption(value: 'invoice_sales_return', label: 'مرجوعی فروش'),
-            FilterOption(value: 'invoice_purchase_return', label: 'مرجوعی خرید'),
-            FilterOption(value: 'inventory_transfer', label: 'انتقال انبار'),
-            FilterOption(value: 'invoice_direct_consumption', label: 'مصرف مستقیم'),
-            FilterOption(value: 'invoice_waste', label: 'ضایعات'),
-            FilterOption(value: 'production', label: 'تولید'),
-            FilterOption(value: 'opening_balance', label: 'تراز افتتاحیه'),
+          filterOptions: [
+            FilterOption(value: 'invoice_sales', label: t.invoiceTypeSales),
+            FilterOption(value: 'invoice_purchase', label: t.invoiceTypePurchase),
+            FilterOption(value: 'invoice_sales_return', label: t.invoiceTypeSalesReturn),
+            FilterOption(value: 'invoice_purchase_return', label: t.invoiceTypePurchaseReturn),
+            FilterOption(value: 'inventory_transfer', label: t.warehouseTransfers),
+            FilterOption(value: 'invoice_direct_consumption', label: t.invoiceTypeDirectConsumption),
+            FilterOption(value: 'invoice_waste', label: t.invoiceTypeWaste),
+            FilterOption(value: 'production', label: t.invoiceTypeProduction),
+            FilterOption(value: 'opening_balance', label: t.openingBalance),
           ],
         ),
         TextColumn(
           'warehouse_name',
-          'انبار',
+          t.warehouse,
           formatter: (item) {
             final m = (item as Map<String, dynamic>);
             return (m['warehouse_name'] ?? m['warehouse_id'])?.toString();
@@ -412,38 +416,38 @@ class _KardexPageState extends State<KardexPage> {
         ),
         TextColumn(
           'movement',
-          'جهت حرکت',
+          t.movementDirection,
           formatter: (item) => (item as Map<String, dynamic>)['movement']?.toString(),
           filterType: ColumnFilterType.multiSelect,
-          filterOptions: const [
-            FilterOption(value: 'in', label: 'ورودی'),
-            FilterOption(value: 'out', label: 'خروجی'),
+          filterOptions: [
+            FilterOption(value: 'in', label: t.movementIn),
+            FilterOption(value: 'out', label: t.movementOut),
           ],
         ),
         TextColumn(
           'description',
-          'شرح',
+          t.description,
           formatter: (item) => (item as Map<String, dynamic>)['description']?.toString(),
         ),
         NumberColumn(
           'debit',
-          'بدهکار',
+          t.debit,
           formatter: (item) => ((item as Map<String, dynamic>)['debit'])?.toString(),
         ),
         NumberColumn(
           'credit',
-          'بستانکار',
+          t.credit,
           formatter: (item) => ((item as Map<String, dynamic>)['credit'])?.toString(),
         ),
         NumberColumn(
           'quantity',
-          'تعداد',
+          t.quantity,
           formatter: (item) => ((item as Map<String, dynamic>)['quantity'])?.toString(),
         ),
         // Custom colored running amount
         CustomColumn(
           'running_amount',
-          'مانده مبلغ',
+          t.runningAmount,
           builder: (item, _) {
             final m = (item as Map<String, dynamic>);
             final v = (m['running_amount']);
@@ -461,7 +465,7 @@ class _KardexPageState extends State<KardexPage> {
         ),
         CustomColumn(
           'running_quantity',
-          'مانده تعداد',
+          t.runningQuantity,
           builder: (item, _) {
             final m = (item as Map<String, dynamic>);
             final v = (m['running_quantity']);
@@ -480,11 +484,11 @@ class _KardexPageState extends State<KardexPage> {
         // Action column to open document details
         ActionColumn(
           'actions',
-          'عملیات',
+          t.actions,
           actions: [
             DataTableAction(
               icon: Icons.open_in_new,
-              label: 'مشاهده سند',
+              label: t.viewDocument,
               onTap: (item) {
                 final m = item as Map<String, dynamic>;
                 final docId = (m['document_id'] as num?)?.toInt();
@@ -521,12 +525,12 @@ class _KardexPageState extends State<KardexPage> {
         return null;
       },
       // Footer totals on current page
-      footerTotals: const {
-        'debit': 'جمع بدهکار',
-        'credit': 'جمع بستانکار',
-        'quantity': 'جمع تعداد',
-        'running_amount': 'مانده مبلغ',
-        'running_quantity': 'مانده تعداد',
+      footerTotals: {
+        'debit': t.totalsDebit,
+        'credit': t.totalsCredit,
+        'quantity': t.totalsQuantity,
+        'running_amount': t.totalsRunningAmount,
+        'running_quantity': t.totalsRunningQuantity,
       },
     );
   }
@@ -806,6 +810,14 @@ class _KardexPageState extends State<KardexPage> {
         runSpacing: 8,
         crossAxisAlignment: WrapCrossAlignment.center,
         children: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.filter_alt_outlined, size: 20),
+              const SizedBox(width: 6),
+              Text(t.filters, style: Theme.of(context).textTheme.titleSmall),
+            ],
+          ),
           // Add filter button
           ElevatedButton.icon(
             key: _addFilterBtnKey,
@@ -826,24 +838,24 @@ class _KardexPageState extends State<KardexPage> {
                 context: context,
                 position: position,
                 items: [
-                  PopupMenuItem(value: FilterType.person, child: Text('افزودن فیلتر: اشخاص')),
-                  PopupMenuItem(value: FilterType.product, child: Text('افزودن فیلتر: کالا/خدمت')),
-                  PopupMenuItem(value: FilterType.bank, child: Text('افزودن فیلتر: بانک')),
-                  PopupMenuItem(value: FilterType.cash, child: Text('افزودن فیلتر: صندوق')),
-                  PopupMenuItem(value: FilterType.petty, child: Text('افزودن فیلتر: تنخواه')),
-                  PopupMenuItem(value: FilterType.account, child: Text('افزودن فیلتر: حساب دفتری')),
-                  PopupMenuItem(value: FilterType.check, child: Text('افزودن فیلتر: چک')),
+                  PopupMenuItem(value: FilterType.person, child: Text(t.addFilterPersons)),
+                  PopupMenuItem(value: FilterType.product, child: Text(t.addFilterProduct)),
+                  PopupMenuItem(value: FilterType.bank, child: Text(t.addFilterBank)),
+                  PopupMenuItem(value: FilterType.cash, child: Text(t.addFilterCash)),
+                  PopupMenuItem(value: FilterType.petty, child: Text(t.addFilterPetty)),
+                  PopupMenuItem(value: FilterType.account, child: Text(t.addFilterAccount)),
+                  PopupMenuItem(value: FilterType.check, child: Text(t.addFilterCheck)),
                 ],
               );
               if (picked != null && mounted) setState(() => _activePicker = picked);
             },
             icon: const Icon(Icons.add),
-            label: const Text('افزودن فیلتر'),
+            label: Text(t.addFilter),
           ),
           TextButton.icon(
             onPressed: _clearAllFilters,
             icon: const Icon(Icons.refresh),
-            label: const Text('بازنشانی'),
+            label: Text(t.reset),
           ),
 
           // Presets controls
@@ -856,9 +868,9 @@ class _KardexPageState extends State<KardexPage> {
                     .map((name) => DropdownMenuItem<String>(value: name, child: Text(name)))
                     .toList(),
                 onChanged: (v) => setState(() => _selectedPresetName = v),
-                decoration: const InputDecoration(
-                  labelText: 'پریست‌ها',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: t.presetsTitle,
+                  border: const OutlineInputBorder(),
                   isDense: true,
                 ),
               ),
@@ -869,14 +881,14 @@ class _KardexPageState extends State<KardexPage> {
                   ? () => _applyPreset(_presets[_selectedPresetName] ?? const <String, dynamic>{})
                   : null,
               icon: const Icon(Icons.playlist_add_check),
-              label: const Text('اعمال پریست'),
+              label: Text(t.applyPreset),
             ),
           if (_presets.isNotEmpty)
             IconButton(
               onPressed: (_selectedPresetName != null)
                   ? () => _deletePreset(_selectedPresetName!)
                   : null,
-              tooltip: 'حذف پریست انتخاب‌شده',
+              tooltip: t.deleteSelectedPreset,
               icon: const Icon(Icons.delete_outline),
             ),
           TextButton.icon(
@@ -885,14 +897,14 @@ class _KardexPageState extends State<KardexPage> {
               final name = await showDialog<String>(
                 context: context,
                 builder: (ctx) => AlertDialog(
-                  title: const Text('ذخیره پریست'),
+                  title: Text(t.savePresetTitle),
                   content: TextField(
                     controller: controller,
-                    decoration: const InputDecoration(hintText: 'نام پریست را وارد کنید'),
+                    decoration: InputDecoration(hintText: t.presetNameHint),
                   ),
                   actions: [
-                    TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('انصراف')),
-                    ElevatedButton(onPressed: () => Navigator.pop(ctx, controller.text.trim()), child: const Text('ذخیره')),
+                    TextButton(onPressed: () => Navigator.pop(ctx), child: Text(t.cancel)),
+                    ElevatedButton(onPressed: () => Navigator.pop(ctx, controller.text.trim()), child: Text(t.save)),
                   ],
                 ),
               );
@@ -901,13 +913,13 @@ class _KardexPageState extends State<KardexPage> {
               }
             },
             icon: const Icon(Icons.save_alt),
-            label: const Text('ذخیره پریست'),
+            label: Text(t.savePreset),
           ),
 
           SizedBox(
             width: 200,
             child: DateInputField(
-              labelText: 'از تاریخ',
+              labelText: t.dateFrom,
               value: _fromDate,
               onChanged: (d) {
                 setState(() => _fromDate = d);
@@ -919,7 +931,7 @@ class _KardexPageState extends State<KardexPage> {
           SizedBox(
             width: 200,
             child: DateInputField(
-              labelText: 'تا تاریخ',
+              labelText: t.dateTo,
               value: _toDate,
               onChanged: (d) {
                 setState(() => _toDate = d);
@@ -932,9 +944,9 @@ class _KardexPageState extends State<KardexPage> {
             width: 220,
             child: DropdownButtonFormField<int>(
               value: _selectedFiscalYearId,
-              decoration: const InputDecoration(
-                labelText: 'سال مالی',
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                labelText: t.fiscalYear,
+                border: const OutlineInputBorder(),
                 isDense: true,
               ),
               items: _fiscalYears.map<DropdownMenuItem<int>>((fy) {
@@ -961,7 +973,7 @@ class _KardexPageState extends State<KardexPage> {
               children: [
                 // Persons
                 ..._selectedPersons.map((p) => InputChip(
-                      label: Text('شخص: ${p.displayName}'),
+                      label: Text('${t.accountTypePerson}: ${p.displayName}'),
                       onDeleted: () {
                         setState(() => _selectedPersons.removeWhere((it) => it.id == p.id));
                         _scheduleApply();
@@ -975,7 +987,7 @@ class _KardexPageState extends State<KardexPage> {
                   final name = (m['name'] ?? '').toString();
                   final label = code.isNotEmpty ? '$code - $name' : name;
                   return InputChip(
-                    label: Text('کالا: $label'),
+                    label: Text('${t.accountTypeProduct}: $label'),
                     onDeleted: () {
                       setState(() => _selectedProducts.removeWhere((x) => int.tryParse('${x['id']}') == id));
                       _scheduleApply();
@@ -985,7 +997,7 @@ class _KardexPageState extends State<KardexPage> {
                 }),
                 // Bank accounts
                 ..._selectedBankAccounts.map((b) => InputChip(
-                      label: Text('بانک: ${b.name}'),
+                      label: Text('${t.accountTypeBank}: ${b.name}'),
                       onDeleted: () {
                         setState(() => _selectedBankAccounts.removeWhere((x) => x.id == b.id));
                         _scheduleApply();
@@ -994,7 +1006,7 @@ class _KardexPageState extends State<KardexPage> {
                     )),
                 // Cash registers
                 ..._selectedCashRegisters.map((c) => InputChip(
-                      label: Text('صندوق: ${c.name}'),
+                      label: Text('${t.accountTypeCashRegister}: ${c.name}'),
                       onDeleted: () {
                         setState(() => _selectedCashRegisters.removeWhere((x) => x.id == c.id));
                         _scheduleApply();
@@ -1003,7 +1015,7 @@ class _KardexPageState extends State<KardexPage> {
                     )),
                 // Petty cash
                 ..._selectedPettyCash.map((p) => InputChip(
-                      label: Text('تنخواه: ${p.name}'),
+                      label: Text('${t.accountTypePettyCash}: ${p.name}'),
                       onDeleted: () {
                         setState(() => _selectedPettyCash.removeWhere((x) => x.id == p.id));
                         _scheduleApply();
@@ -1012,7 +1024,7 @@ class _KardexPageState extends State<KardexPage> {
                     )),
                 // Accounts
                 ..._selectedAccounts.map((a) => InputChip(
-                      label: Text('حساب: ${a.code} - ${a.name}'),
+                      label: Text('${t.ledgerAccount}: ${a.code} - ${a.name}'),
                       onDeleted: () {
                         setState(() => _selectedAccounts.removeWhere((x) => x.id == a.id));
                         _scheduleApply();
@@ -1021,7 +1033,7 @@ class _KardexPageState extends State<KardexPage> {
                     )),
                 // Checks
                 ..._selectedChecks.map((c) => InputChip(
-                      label: Text('چک: ${c.number.isNotEmpty ? c.number : 'چک #${c.id}'}'),
+                      label: Text('${t.accountTypeCheck}: ${c.number.isNotEmpty ? c.number : '#${c.id}'}'),
                       onDeleted: () {
                         setState(() => _selectedChecks.removeWhere((x) => x.id == c.id));
                         _scheduleApply();
@@ -1035,7 +1047,7 @@ class _KardexPageState extends State<KardexPage> {
                   final name = (w['name'] ?? '').toString();
                   final label = code.isNotEmpty ? '$code - $name' : name;
                   return InputChip(
-                    label: Text('انبار: $label'),
+                    label: Text('${t.warehouse}: $label'),
                     onDeleted: () {
                       setState(() => _selectedWarehouses.removeWhere((x) => int.tryParse('${x['id']}') == id));
                       _scheduleApply();
@@ -1059,7 +1071,7 @@ class _KardexPageState extends State<KardexPage> {
                         });
                         _scheduleApply();
                       },
-                      hintText: 'افزودن شخص',
+                      hintText: t.addPerson,
                     ),
                   ),
                 if (_activePicker == FilterType.product)
@@ -1097,7 +1109,7 @@ class _KardexPageState extends State<KardexPage> {
                         });
                         _scheduleApply();
                       },
-                      hintText: 'افزودن حساب بانکی',
+                      hintText: t.addBankAccount,
                     ),
                   ),
                 if (_activePicker == FilterType.cash)
@@ -1116,7 +1128,7 @@ class _KardexPageState extends State<KardexPage> {
                         });
                         _scheduleApply();
                       },
-                      hintText: 'افزودن صندوق',
+                      hintText: t.addCash,
                     ),
                   ),
                 if (_activePicker == FilterType.petty)
@@ -1135,7 +1147,7 @@ class _KardexPageState extends State<KardexPage> {
                         });
                         _scheduleApply();
                       },
-                      hintText: 'افزودن تنخواه',
+                      hintText: t.addPettyCash,
                     ),
                   ),
                 if (_activePicker == FilterType.account)
@@ -1154,7 +1166,7 @@ class _KardexPageState extends State<KardexPage> {
                         });
                         _scheduleApply();
                       },
-                      hintText: 'افزودن حساب',
+                      hintText: t.addAccount,
                     ),
                   ),
                 if (_activePicker == FilterType.check)
@@ -1184,10 +1196,10 @@ class _KardexPageState extends State<KardexPage> {
               setState(() => _matchMode = v ?? 'any');
               _scheduleApply();
             },
-            items: const [
-              DropdownMenuItem(value: 'any', child: Text('هرکدام')),
-              DropdownMenuItem(value: 'same_line', child: Text('هم‌زمان در یک خط')),
-              DropdownMenuItem(value: 'document_and', child: Text('هم‌زمان در یک سند')),
+            items: [
+              DropdownMenuItem(value: 'any', child: Text(t.matchModeAny)),
+              DropdownMenuItem(value: 'same_line', child: Text(t.matchModeSameLine)),
+              DropdownMenuItem(value: 'document_and', child: Text(t.matchModeDocumentAnd)),
             ],
           ),
           DropdownButton<String>(
@@ -1196,9 +1208,9 @@ class _KardexPageState extends State<KardexPage> {
               setState(() => _resultScope = v ?? 'lines_matching');
               _scheduleApply();
             },
-            items: const [
-              DropdownMenuItem(value: 'lines_matching', child: Text('فقط خطوط منطبق')),
-              DropdownMenuItem(value: 'lines_of_document', child: Text('کل خطوط سند')),
+            items: [
+              DropdownMenuItem(value: 'lines_matching', child: Text(t.resultScopeLinesMatching)),
+              DropdownMenuItem(value: 'lines_of_document', child: Text(t.resultScopeLinesOfDocument)),
             ],
           ),
           Row(
@@ -1209,7 +1221,7 @@ class _KardexPageState extends State<KardexPage> {
                 _scheduleApply();
               }),
               const SizedBox(width: 6),
-              const Text('مانده تجمعی'),
+              Text(t.includeRunningBalance),
             ],
           ),
           Row(
@@ -1217,7 +1229,7 @@ class _KardexPageState extends State<KardexPage> {
             children: [
               Switch(value: _manualApply, onChanged: (v) => setState(() => _manualApply = v)),
               const SizedBox(width: 6),
-              const Text('اعمال دستی'),
+              Text(t.applyManually),
             ],
           ),
           ElevatedButton.icon(
@@ -1226,7 +1238,7 @@ class _KardexPageState extends State<KardexPage> {
               _updateRouteQuery();
             },
             icon: const Icon(Icons.search),
-            label: const Text('اعمال فیلتر'),
+            label: Text(t.applyFilter),
           ),
         ],
       ),

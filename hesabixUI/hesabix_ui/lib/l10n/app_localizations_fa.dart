@@ -214,7 +214,7 @@ class AppLocalizationsFa extends AppLocalizations {
   String get ok => 'تایید';
 
   @override
-  String get cancel => 'لغو';
+  String get cancel => 'انصراف';
 
   @override
   String get columnSettings => 'تنظیمات ستون‌ها';
@@ -1380,7 +1380,7 @@ class AppLocalizationsFa extends AppLocalizations {
   String get receiptsAndPayments => 'دریافت و پرداخت';
 
   @override
-  String get productsAndServices => 'کالا و خدمات';
+  String get productsAndServices => 'کالا/خدمت';
 
   @override
   String get products => 'کالا‌ها و خدمات';
@@ -2428,7 +2428,7 @@ class AppLocalizationsFa extends AppLocalizations {
   String get inserted => 'ایجاد شده';
 
   @override
-  String get updated => 'به‌روزرسانی';
+  String get updated => 'به‌روزرسانی شد';
 
   @override
   String get skipped => 'رد شده';
@@ -2705,7 +2705,7 @@ class AppLocalizationsFa extends AppLocalizations {
   String get percentage => 'درصدی';
 
   @override
-  String get amount => 'مقداری';
+  String get amount => 'مبلغ';
 
   @override
   String get samplePercent => 'مثلاً 10٪';
@@ -2968,38 +2968,496 @@ class AppLocalizationsFa extends AppLocalizations {
   String get templateCustom => 'قالب سفارشی';
 
   @override
-  String get paymentGateways => 'درگاه‌های پرداخت';
+  String get invoicesListManage => 'مدیریت لیست فاکتورها';
 
   @override
-  String get addPaymentGateway => 'ایجاد درگاه پرداخت';
+  String get all => 'همه';
 
   @override
-  String get editPaymentGateway => 'ویرایش درگاه پرداخت';
+  String get invoiceTypeSales => 'فروش';
 
   @override
-  String get provider => 'ارائه‌دهنده';
+  String get invoiceTypePurchase => 'خرید';
 
   @override
-  String get displayName => 'نام نمایشی';
+  String get invoiceTypeSalesReturn => 'برگشت از فروش';
 
   @override
-  String get useSuggestedCallback => 'استفاده از کال‌بک پیشنهادی';
+  String get invoiceTypePurchaseReturn => 'برگشت از خرید';
 
   @override
-  String get successRedirectOptional => 'success_redirect (اختیاری)';
+  String get invoiceTypeProduction => 'تولید';
 
   @override
-  String get failureRedirectOptional => 'failure_redirect (اختیاری)';
+  String get invoiceTypeDirectConsumption => 'مصرف مستقیم';
+
+  @override
+  String get invoiceTypeWaste => 'ضایعات';
+
+  @override
+  String get documentDate => 'تاریخ سند';
+
+  @override
+  String get totalAmount => 'مبلغ کل';
+
+  @override
+  String get unknown => 'نامشخص';
+
+  @override
+  String get noInvoicesFound => 'هیچ فاکتوری یافت نشد';
+
+  @override
+  String get loadingInvoices => 'در حال بارگذاری فاکتورها...';
+
+  @override
+  String get errorLoadingInvoices => 'خطا در بارگذاری فاکتورها';
+
+  @override
+  String get proforma => 'پیش‌فاکتور';
+
+  @override
+  String get finalized => 'قطعی';
+
+  @override
+  String get clearDateFilter => 'پاک کردن فیلتر تاریخ';
+
+  @override
+  String get deleteConfirmTitle => 'تأیید حذف';
+
+  @override
+  String deleteInvoiceConfirm(String code) {
+    return 'آیا از حذف فاکتور $code اطمینان دارید؟ این عملیات غیرقابل بازگشت است.';
+  }
+
+  @override
+  String deletedInvoiceSuccess(String code) {
+    return 'فاکتور $code با موفقیت حذف شد';
+  }
+
+  @override
+  String get deleteInvoiceError => 'خطا در حذف فاکتور';
+
+  @override
+  String deleteInvoiceErrorWithMessage(String error) {
+    return 'خطا در حذف فاکتور: $error';
+  }
+
+  @override
+  String get saveInvoice => 'ذخیره فاکتور';
+
+  @override
+  String get invoiceInfoTab => 'اطلاعات فاکتور';
+
+  @override
+  String get productsServicesTab => 'کالاها و خدمات';
+
+  @override
+  String get transactionsTab => 'تراکنش‌ها';
+
+  @override
+  String get settingsTab => 'تنظیمات';
+
+  @override
+  String get invoiceCreatedSuccess => 'فاکتور با موفقیت ثبت شد';
+
+  @override
+  String saveInvoiceErrorWithMessage(String error) {
+    return 'خطا در ذخیره فاکتور: $error';
+  }
+
+  @override
+  String get noRowsAdded => 'ردیفی افزوده نشده است';
+
+  @override
+  String get quantityUnit => 'تعداد/واحد';
+
+  @override
+  String get unitPrice => 'قیمت واحد';
+
+  @override
+  String get installmentsTitle => 'فروش اقساطی';
+
+  @override
+  String get installmentsSubtitle =>
+      'در صورت فعال‌سازی، طرح اقساط همراه فاکتور ذخیره می‌شود';
+
+  @override
+  String get installmentsCount => 'تعداد اقساط';
+
+  @override
+  String get downPayment => 'پیش‌پرداخت';
+
+  @override
+  String get interestRatePercent => 'درصد سود کل دوره (%)';
+
+  @override
+  String get installmentsPeriod => 'دوره اقساط';
+
+  @override
+  String get installmentsMonthly => 'ماهانه (30 روزه)';
+
+  @override
+  String get installmentsDaysBased => 'بر اساس روز';
+
+  @override
+  String get installmentDaysLength => 'طول هر قسط (روز)';
+
+  @override
+  String get firstInstallmentDueDate => 'تاریخ اولین سررسید';
+
+  @override
+  String get invalidInstallmentsCount => 'تعداد اقساط معتبر نیست';
+
+  @override
+  String get unitPricePickHint => 'قیمت واحد (انتخاب از لیست یا ورود دستی)';
+
+  @override
+  String get lineTotalAmount => 'مبلغ کل این ردیف';
+
+  @override
+  String get lineDescription => 'شرح ردیف';
+
+  @override
+  String get descriptionOptional => 'شرح (اختیاری)';
+
+  @override
+  String get discountTypeAndValue => 'تخفیف (نوع و مقدار)';
+
+  @override
+  String get taxPercentAndAmount => 'مالیات (درصد و مبلغ)';
+
+  @override
+  String get selectUnitTitle => 'انتخاب واحد';
+
+  @override
+  String get mainUnitLabel => 'واحد اصلی';
+
+  @override
+  String get secondaryUnitLabel => 'واحد فرعی';
+
+  @override
+  String get noUnitsDefined => 'واحدی برای این محصول تعریف نشده است';
+
+  @override
+  String get discountType => 'نوع تخفیف';
+
+  @override
+  String get percent => 'درصد';
+
+  @override
+  String get pricePickFromList => 'انتخاب از لیست قیمت';
+
+  @override
+  String get noPricesFound => 'قیمتی برای نمایش یافت نشد';
+
+  @override
+  String get baseEstimatedPrice => 'قیمت پایه تخمینی';
+
+  @override
+  String get priceListLabel => 'لیست قیمت';
+
+  @override
+  String get kardexDocuments => 'کاردکس اسناد';
+
+  @override
+  String get documentCode => 'کد سند';
+
+  @override
+  String get documentType => 'نوع سند';
+
+  @override
+  String get movementDirection => 'جهت حرکت';
+
+  @override
+  String get movementIn => 'ورودی';
+
+  @override
+  String get movementOut => 'خروجی';
+
+  @override
+  String get debit => 'بدهکار';
+
+  @override
+  String get credit => 'بستانکار';
+
+  @override
+  String get quantity => 'تعداد';
+
+  @override
+  String get runningAmount => 'مانده مبلغ';
+
+  @override
+  String get runningQuantity => 'مانده تعداد';
+
+  @override
+  String get viewDocument => 'مشاهده سند';
+
+  @override
+  String get totalsDebit => 'جمع بدهکار';
+
+  @override
+  String get totalsCredit => 'جمع بستانکار';
+
+  @override
+  String get totalsQuantity => 'جمع تعداد';
+
+  @override
+  String get totalsRunningAmount => 'مانده مبلغ';
+
+  @override
+  String get totalsRunningQuantity => 'مانده تعداد';
+
+  @override
+  String get addFilter => 'افزودن فیلتر';
+
+  @override
+  String get presetsTitle => 'پریست‌ها';
+
+  @override
+  String get applyPreset => 'اعمال پریست';
+
+  @override
+  String get deleteSelectedPreset => 'حذف پریست انتخاب‌شده';
+
+  @override
+  String get savePreset => 'ذخیره پریست';
+
+  @override
+  String get savePresetTitle => 'ذخیره پریست';
+
+  @override
+  String get presetNameHint => 'نام پریست را وارد کنید';
+
+  @override
+  String get presetSaved => 'پریست ذخیره شد';
+
+  @override
+  String presetSaveError(String error) {
+    return 'خطا در ذخیره پریست: $error';
+  }
+
+  @override
+  String presetDeleteError(String error) {
+    return 'خطا در حذف پریست: $error';
+  }
+
+  @override
+  String presetApplyError(String error) {
+    return 'خطا در اعمال پریست: $error';
+  }
+
+  @override
+  String get fiscalYear => 'سال مالی';
+
+  @override
+  String get addFilterPersons => 'افزودن فیلتر: اشخاص';
+
+  @override
+  String get addFilterProduct => 'افزودن فیلتر: کالا/خدمت';
+
+  @override
+  String get addFilterBank => 'افزودن فیلتر: بانک';
+
+  @override
+  String get addFilterCash => 'افزودن فیلتر: صندوق';
+
+  @override
+  String get addFilterPetty => 'افزودن فیلتر: تنخواه';
+
+  @override
+  String get addFilterAccount => 'افزودن فیلتر: حساب دفتری';
+
+  @override
+  String get addFilterCheck => 'افزودن فیلتر: چک';
+
+  @override
+  String get matchModeAny => 'هرکدام';
+
+  @override
+  String get matchModeSameLine => 'هم‌زمان در یک خط';
+
+  @override
+  String get matchModeDocumentAnd => 'هم‌زمان در یک سند';
+
+  @override
+  String get resultScopeLinesMatching => 'فقط خطوط منطبق';
+
+  @override
+  String get resultScopeLinesOfDocument => 'کل خطوط سند';
+
+  @override
+  String get includeRunningBalance => 'مانده تجمعی';
+
+  @override
+  String get applyManually => 'اعمال دستی';
+
+  @override
+  String get ledgerAccount => 'حساب';
+
+  @override
+  String get reportsGeneralSection => 'گزارشات عمومی';
+
+  @override
+  String get reportsPeopleSection => 'گزارشات اشخاص';
+
+  @override
+  String get reportsProductsSection => 'گزارشات کالا و خدمات';
+
+  @override
+  String get reportsBankingSection => 'گزارشات بانک و صندوق';
+
+  @override
+  String get reportsSalesSection => 'گزارشات فروش';
+
+  @override
+  String get reportsPurchasesSection => 'گزارشات خرید';
+
+  @override
+  String get reportsProductionSection => 'گزارشات تولید';
+
+  @override
+  String get reportsBasicAccountingSection => 'حسابداری پایه';
+
+  @override
+  String get reportsProfitLossSection => 'سود و زیان';
+
+  @override
+  String get reportsKardexSubtitle =>
+      'نمایش ریز تراکنش‌ها بر اساس شخص/کالا/بانک/حساب/چک با فیلتر تاریخ';
+
+  @override
+  String get reportsDebtorsTitle => 'لیست بدهکاران';
+
+  @override
+  String get reportsDebtorsSubtitle => 'نمایش اشخاص با مانده بدهکار';
+
+  @override
+  String get reportsCreditorsTitle => 'لیست بستانکاران';
+
+  @override
+  String get reportsCreditorsSubtitle => 'نمایش اشخاص با مانده بستانکار';
+
+  @override
+  String get reportsPeopleTransactionsTitle => 'گزارش تراکنش‌های اشخاص';
+
+  @override
+  String get reportsPeopleTransactionsSubtitle =>
+      'ریز دریافت‌ها و پرداخت‌ها به تفکیک شخص';
+
+  @override
+  String get reportsItemMovementsTitle => 'گردش کالا';
+
+  @override
+  String get reportsItemMovementsSubtitle =>
+      'ورود، خروج و مانده کالا به تفکیک بازه';
+
+  @override
+  String get reportsInventoryKardexTitle => 'کارتکس انبار';
+
+  @override
+  String get reportsInventoryKardexSubtitle =>
+      'ریز گردش هر کالا (FIFO/LIFO/میانگین)';
+
+  @override
+  String get reportsSalesByProductTitle => 'فروش به تفکیک کالا';
+
+  @override
+  String get reportsSalesByProductSubtitle =>
+      'عملکرد فروش هر کالا در بازه زمانی';
+
+  @override
+  String get reportsBankAccountsTurnoverTitle => 'گردش حساب‌های بانکی';
+
+  @override
+  String get reportsBankAccountsTurnoverSubtitle =>
+      'برداشت و واریز به تفکیک حساب';
+
+  @override
+  String get reportsCashPettyTurnoverTitle => 'گردش صندوق و تنخواه';
+
+  @override
+  String get reportsCashPettyTurnoverSubtitle => 'ریز ورود و خروج وجه نقد';
+
+  @override
+  String get reportsChecksTitle => 'چک‌ها';
+
+  @override
+  String get reportsChecksSubtitle => 'دریافتی، پرداختی، سررسیدها و وضعیت‌ها';
+
+  @override
+  String get reportsDailySalesTitle => 'فروش روزانه';
+
+  @override
+  String get reportsDailySalesSubtitle => 'عملکرد فروش روزانه و روندها';
+
+  @override
+  String get reportsMonthlySalesTitle => 'فروش ماهانه';
+
+  @override
+  String get reportsMonthlySalesSubtitle => 'مقایسه ماهانه و رشد فروش';
+
+  @override
+  String get reportsTopCustomersTitle => 'مشتریان برتر';
+
+  @override
+  String get reportsTopCustomersSubtitle => 'رتبه‌بندی بر اساس مبلغ یا تعداد';
+
+  @override
+  String get reportsDailyPurchasesTitle => 'خرید روزانه';
+
+  @override
+  String get reportsDailyPurchasesSubtitle => 'عملکرد خرید روزانه و روندها';
+
+  @override
+  String get reportsTopSuppliersTitle => 'تامین‌کنندگان برتر';
+
+  @override
+  String get reportsTopSuppliersSubtitle =>
+      'رتبه‌بندی تامین‌کنندگان بر اساس خرید';
+
+  @override
+  String get reportsMaterialsConsumptionTitle => 'گزارش مصرف مواد';
+
+  @override
+  String get reportsMaterialsConsumptionSubtitle =>
+      'مصرف مواد اولیه به ازای محصول';
+
+  @override
+  String get reportsProductionTitle => 'گزارش تولیدات';
+
+  @override
+  String get reportsProductionSubtitle => 'میزان تولید و ضایعات';
+
+  @override
+  String get reportsTrialBalanceTitle => 'تراز آزمایشی';
+
+  @override
+  String get reportsTrialBalanceSubtitle => 'تراز دو/چهار/شش/هشت ستونی';
+
+  @override
+  String get reportsGeneralLedgerTitle => 'دفتر کل';
+
+  @override
+  String get reportsGeneralLedgerSubtitle => 'گردش حساب‌ها در بازه زمانی';
+
+  @override
+  String get reportsPnlPeriodTitle => 'گزارش سود و زیان دوره';
+
+  @override
+  String get reportsPnlPeriodSubtitle => 'درآمدها، هزینه‌ها و سود/زیان خالص';
+
+  @override
+  String get reportsPnlCumulativeTitle => 'سود و زیان تجمیعی';
+
+  @override
+  String get reportsPnlCumulativeSubtitle => 'مقایسه دوره‌ای و تجمیعی';
+
+  @override
+  String get reportsComingSoonMessage =>
+      'این گزارش به‌زودی در دسترس خواهد بود.';
 
   @override
   String get operationSuccessful => 'عملیات با موفقیت انجام شد';
-
-  @override
-  String get callbackNote =>
-      'نکته: پارامتر tx_id به‌صورت خودکار به callback اضافه می‌شود. پس از بازگشت، در صورت تنظیم success/failure redirect، کاربر به آدرس‌های مربوطه هدایت می‌شود.';
-
-  @override
-  String get create => 'ایجاد';
 
   @override
   String get notificationsSettingsTitle => 'تنظیمات اعلان و نوتیفیکیشن';
@@ -3170,4 +3628,440 @@ class AppLocalizationsFa extends AppLocalizations {
   @override
   String get notificationsAdvancedSaveError =>
       'ذخیرهٔ تنظیمات پیشرفتهٔ اعلان انجام نشد.';
+
+  @override
+  String get templateBuilderNew => 'سازنده بصری (جدید)';
+
+  @override
+  String get templateBuilderEdit => 'سازنده بصری (ویرایش)';
+
+  @override
+  String get undo => 'بازگشت';
+
+  @override
+  String get redo => 'بازگشت مجدد';
+
+  @override
+  String get header => 'هدر';
+
+  @override
+  String get body => 'بدنه';
+
+  @override
+  String get footer => 'فوتر';
+
+  @override
+  String get globalCssOptional => 'CSS کلی (اختیاری)';
+
+  @override
+  String get previewPdf => 'پیش‌نمایش PDF';
+
+  @override
+  String get previewHtmlOutput => 'پیش‌نمایش HTML (خروجی رندر)';
+
+  @override
+  String get empty => '(خالی)';
+
+  @override
+  String get createTemplateBuilder => 'ایجاد قالب (Builder)';
+
+  @override
+  String get saveChanges => 'ذخیره تغییرات';
+
+  @override
+  String createdWithId(int id) {
+    return 'ایجاد شد (ID: $id)';
+  }
+
+  @override
+  String previewError(String error) {
+    return 'خطا در پیش‌نمایش: $error';
+  }
+
+  @override
+  String createError(String error) {
+    return 'خطا در ایجاد: $error';
+  }
+
+  @override
+  String templateCreatedWithId(int id) {
+    return 'قالب ایجاد شد (ID: $id)';
+  }
+
+  @override
+  String get addText => 'افزودن متن';
+
+  @override
+  String get divider => 'جداکننده';
+
+  @override
+  String get spacer => 'فاصله';
+
+  @override
+  String get addImage => 'افزودن تصویر';
+
+  @override
+  String get addQr => 'افزودن QR';
+
+  @override
+  String get partyInfo => 'اطلاعات طرفین';
+
+  @override
+  String get addTotals => 'افزودن جمع‌ها';
+
+  @override
+  String get stampSignature => 'مهر/امضا';
+
+  @override
+  String get watermark => 'واترمارک';
+
+  @override
+  String get addTable => 'افزودن جدول';
+
+  @override
+  String get textWithVariable => 'متن (variable)';
+
+  @override
+  String get alignment => 'تراز';
+
+  @override
+  String get left => 'چپ';
+
+  @override
+  String get center => 'وسط';
+
+  @override
+  String get right => 'راست';
+
+  @override
+  String get showIfCondition => 'نمایش در صورت (شرط)';
+
+  @override
+  String blockType(String type) {
+    return 'بلوک $type';
+  }
+
+  @override
+  String get pageSize => 'سایز صفحه';
+
+  @override
+  String get orientation => 'جهت';
+
+  @override
+  String get portrait => 'عمودی';
+
+  @override
+  String get landscape => 'افقی';
+
+  @override
+  String get marginTop => 'حاشیه بالا (mm)';
+
+  @override
+  String get marginRight => 'راست (mm)';
+
+  @override
+  String get marginBottom => 'پایین (mm)';
+
+  @override
+  String get marginLeft => 'چپ (mm)';
+
+  @override
+  String get create => 'ایجاد';
+
+  @override
+  String get walletBusinessTitle => 'کیف‌پول کسب‌وکار';
+
+  @override
+  String get walletAvailableBalance => 'مانده قابل برداشت';
+
+  @override
+  String get walletPendingBalance => 'مانده در انتظار تایید';
+
+  @override
+  String get walletRequestPayout => 'درخواست تسویه';
+
+  @override
+  String get walletTopUp => 'افزایش اعتبار';
+
+  @override
+  String get walletLast30Days => 'گزارش ۳۰ روز اخیر';
+
+  @override
+  String get walletGrossIn => 'ورودی ناخالص';
+
+  @override
+  String get walletFeesIn => 'کارمزد ورودی';
+
+  @override
+  String get walletNetIn => 'ورودی خالص';
+
+  @override
+  String get walletGrossOut => 'خروجی ناخالص';
+
+  @override
+  String get walletFeesOut => 'کارمزد خروجی';
+
+  @override
+  String get walletNetOut => 'خروجی خالص';
+
+  @override
+  String get walletRecentTransactions => 'تراکنش‌های اخیر';
+
+  @override
+  String get walletTransactions => 'تراکنش‌ها';
+
+  @override
+  String get moneyAmount => 'مبلغ';
+
+  @override
+  String get feeAmount => 'کارمزد';
+
+  @override
+  String get document => 'سند';
+
+  @override
+  String get walletTypeTopUp => 'افزایش اعتبار';
+
+  @override
+  String get walletTypeCustomerPayment => 'پرداخت مشتری';
+
+  @override
+  String get walletTypePayoutRequest => 'درخواست تسویه';
+
+  @override
+  String get walletTypePayoutSettlement => 'تسویه';
+
+  @override
+  String get walletTypeRefund => 'استرداد';
+
+  @override
+  String get walletTypeFee => 'کارمزد';
+
+  @override
+  String get statusApproved => 'تایید شده';
+
+  @override
+  String get statusProcessing => 'در حال پردازش';
+
+  @override
+  String get statusSucceeded => 'موفق';
+
+  @override
+  String get statusFailed => 'ناموفق';
+
+  @override
+  String get statusCanceled => 'لغو شده';
+
+  @override
+  String get walletPayoutRequestTitle => 'درخواست تسویه';
+
+  @override
+  String get walletSelectBankAccountHint => 'انتخاب حساب بانکی';
+
+  @override
+  String get walletPaymentGateway => 'درگاه پرداخت';
+
+  @override
+  String get walletPayoutRequested => 'درخواست تسویه ثبت شد';
+
+  @override
+  String get walletTopUpTitle => 'افزایش اعتبار';
+
+  @override
+  String get walletTopUpInitializing =>
+      'در حال ثبت درخواست و آماده‌سازی درگاه...';
+
+  @override
+  String get walletRedirectingToGateway => 'در حال انتقال به درگاه پرداخت...';
+
+  @override
+  String get walletTopUpNoPaymentLink =>
+      'درخواست افزایش اعتبار ثبت شد، اما لینک پرداخت دریافت نشد. لطفاً بعداً دوباره تلاش کنید یا تنظیمات درگاه را بررسی کنید.';
+
+  @override
+  String get walletGatewayInitFailed =>
+      'خطا در اتصال به درگاه. لطفاً تنظیمات درگاه را بررسی کنید یا بعداً تلاش کنید.';
+
+  @override
+  String get walletInvalidGatewayConfig =>
+      'پیکربندی درگاه ناقص است. لطفاً مرچنت آی‌دی و آدرس بازگشت را بررسی کنید.';
+
+  @override
+  String get walletGatewayDisabled => 'این درگاه غیرفعال است.';
+
+  @override
+  String get walletGatewayNotFound => 'درگاه پرداخت یافت نشد.';
+
+  @override
+  String get walletGatewayServerError =>
+      'خطای سرور هنگام اتصال به درگاه. لطفاً بعداً تلاش کنید.';
+
+  @override
+  String get walletOpenGatewayDialogTitle => 'انتقال به درگاه پرداخت';
+
+  @override
+  String get walletOpenGatewayDialogInstructions =>
+      'برای ادامه پرداخت، لینک زیر را باز کنید:';
+
+  @override
+  String get walletPaymentResultTitle => 'نتیجه پرداخت کیف‌پول';
+
+  @override
+  String get walletPaymentSuccess => 'پرداخت با موفقیت انجام شد';
+
+  @override
+  String get walletPaymentFailed => 'پرداخت ناموفق بود';
+
+  @override
+  String get transactionId => 'شماره تراکنش';
+
+  @override
+  String get paymentReference => 'مرجع پرداخت';
+
+  @override
+  String get walletStatusCheckErrorPrefix => 'خطا در استعلام وضعیت:';
+
+  @override
+  String get walletBackToWallet => 'بازگشت به کیف‌پول';
+
+  @override
+  String get walletSettingsTitle => 'تنظیمات کیف‌پول';
+
+  @override
+  String get walletBaseCurrency => 'ارز پایه کیف‌پول';
+
+  @override
+  String get walletCurrencyRequired => 'انتخاب ارز الزامی است';
+
+  @override
+  String get saved => 'ذخیره شد';
+
+  @override
+  String get savedSuccessfully => 'با موفقیت ذخیره شد';
+
+  @override
+  String get currencyToman => 'تومان';
+
+  @override
+  String get creditSettingsTitle => 'اعتبار کاربران';
+
+  @override
+  String get creditEnableTitle => 'فعال‌سازی اعتبار';
+
+  @override
+  String get creditEnableSubtitle => 'بررسی سقف اعتبار مشتریان در فروش';
+
+  @override
+  String get creditDefaultLimit => 'سقف اعتبار پیش‌فرض';
+
+  @override
+  String get creditGraceDays => 'مهلت تسویه (روز)';
+
+  @override
+  String get creditLateFeeRatePercent => 'جریمه دیرکرد (%)';
+
+  @override
+  String get creditAutoBlockAfterDays => 'مسدودسازی خودکار پس از (روز)';
+
+  @override
+  String get creditStrategy => 'استراتژی';
+
+  @override
+  String get creditStrategySingleDefault => 'سقف پیش‌فرض یکنواخت';
+
+  @override
+  String get creditStrategyByGroup => 'بر اساس گروه/نقش';
+
+  @override
+  String get creditStrategyPerUser => 'سقف اختصاصی برای هر کاربر';
+
+  @override
+  String get installmentPlansTitle => 'پلن‌های فروش اقساطی';
+
+  @override
+  String get newInstallmentPlan => 'پلن جدید';
+
+  @override
+  String get editPlan => 'ویرایش';
+
+  @override
+  String get deletePlan => 'حذف';
+
+  @override
+  String deletePlanConfirm(String name) {
+    return 'پلن «$name» حذف شود؟';
+  }
+
+  @override
+  String get installmentPlanCreateTitle => 'پلن اقساط جدید';
+
+  @override
+  String get installmentPlanEditTitle => 'ویرایش پلن اقساط';
+
+  @override
+  String get planName => 'نام پلن';
+
+  @override
+  String get planMethod => 'روش محاسبه';
+
+  @override
+  String get planMethodFlat => 'ساده (Flat)';
+
+  @override
+  String get planMethodAmortized => 'آمورتیزاسیون';
+
+  @override
+  String get planNumInstallments => 'تعداد اقساط';
+
+  @override
+  String get planPeriodDays => 'فاصله اقساط (روز)';
+
+  @override
+  String get planDownPaymentPercent => 'پیش‌پرداخت (%)';
+
+  @override
+  String get planInterestRate => 'نرخ سود کل (%)';
+
+  @override
+  String get planLateFeeRate => 'جریمه دیرکرد (%)';
+
+  @override
+  String get planIssueFee => 'کارمزد صدور (تومان)';
+
+  @override
+  String get planIsActive => 'فعال';
+
+  @override
+  String get creditTabTitle => 'اعتبار';
+
+  @override
+  String get creditPersonPolicyTitle => 'سیاست اعتبار شخص';
+
+  @override
+  String get creditCheckModeLabel => 'حالت بررسی اعتبار';
+
+  @override
+  String get creditCheckModeInherit => 'ارث‌بری از تنظیمات کسب‌وکار';
+
+  @override
+  String get creditCheckModeEnabled => 'بررسی اعتبار فعال';
+
+  @override
+  String get creditCheckModeDisabled => 'بررسی اعتبار غیرفعال';
+
+  @override
+  String get creditLimitLabel => 'سقف اعتبار اختصاصی (تومان)';
+
+  @override
+  String get creditLimitHint => 'خالی: استفاده از سقف پیش‌فرض کسب‌وکار';
+
+  @override
+  String get creditTipText =>
+      'با خالی گذاشتن سقف اعتبار یا انتخاب حالت ارث‌بری، تنظیمات پیش‌فرض کسب‌وکار اعمال می‌شود.';
+
+  @override
+  String get selectInstallmentPlan => 'انتخاب پلن اقساط';
+
+  @override
+  String get applyPlan => 'اعمال پلن';
 }

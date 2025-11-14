@@ -44,8 +44,11 @@ class ExpenseIncomeService {
         switch (line.transactionType) {
           case TransactionType.bank:
             if (line.bankAccountId != null) {
+              // برای سازگاری با بک‌اند create و update هر دو کلید ارسال شود
               data['bank_account_id'] = line.bankAccountId;
               data['bank_account_name'] = line.bankAccountName;
+              data['bank_id'] = line.bankAccountId; // سازگاری با create
+              data['bank_name'] = line.bankAccountName;
             }
             break;
           case TransactionType.cashRegister:

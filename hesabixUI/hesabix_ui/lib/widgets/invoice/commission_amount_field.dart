@@ -31,7 +31,7 @@ class _CommissionAmountFieldState extends State<CommissionAmountField> {
   void initState() {
     super.initState();
     _controller = TextEditingController(
-      text: widget.initialValue?.toString() ?? '',
+      text: widget.initialValue != null ? formatNumberForInput(widget.initialValue) : '',
     );
   }
 
@@ -51,7 +51,7 @@ class _CommissionAmountFieldState extends State<CommissionAmountField> {
       return;
     }
 
-    final doubleValue = double.tryParse(value);
+    final doubleValue = parseFormattedDouble(value);
     if (doubleValue == null) {
       setState(() {
         _errorText = 'لطفا مبلغ معتبر وارد کنید';
@@ -78,8 +78,7 @@ class _CommissionAmountFieldState extends State<CommissionAmountField> {
       keyboardType: const TextInputType.numberWithOptions(decimal: true),
       inputFormatters: [
         const EnglishDigitsFormatter(),
-        FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
-        ThousandsSeparatorInputFormatter(),
+        const ThousandsSeparatorInputFormatter(allowDecimal: true),
       ],
       decoration: InputDecoration(
         labelText: widget.label,
@@ -105,46 +104,5 @@ class _CommissionAmountFieldState extends State<CommissionAmountField> {
         return _errorText;
       },
     );
-  }
-}
-
-class ThousandsSeparatorInputFormatter extends TextInputFormatter {
-  @override
-  TextEditingValue formatEditUpdate(
-    TextEditingValue oldValue,
-    TextEditingValue newValue,
-  ) {
-    if (newValue.text.isEmpty) {
-      return newValue;
-    }
-
-    // Remove all non-digit characters except decimal point
-    String cleanText = newValue.text.replaceAll(RegExp(r'[^\d.]'), '');
-    
-    // Split by decimal point
-    List<String> parts = cleanText.split('.');
-    String integerPart = parts[0];
-    String decimalPart = parts.length > 1 ? '.${parts[1]}' : '';
-
-    // Add thousands separators to integer part
-    String formattedInteger = _addThousandsSeparator(integerPart);
-    
-    String formattedText = formattedInteger + decimalPart;
-
-    return TextEditingValue(
-      text: formattedText,
-      selection: TextSelection.collapsed(offset: formattedText.length),
-    );
-  }
-
-  String _addThousandsSeparator(String text) {
-    if (text.isEmpty) return text;
-    
-    String reversed = text.split('').reversed.join('');
-    String withCommas = reversed.replaceAllMapped(
-      RegExp(r'(\d{3})(?=\d)'),
-      (Match match) => '${match.group(1)},',
-    );
-    return withCommas.split('').reversed.join('');
   }
 }

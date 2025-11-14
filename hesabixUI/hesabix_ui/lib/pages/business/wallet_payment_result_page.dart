@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../core/auth_store.dart';
 import '../../services/wallet_service.dart';
 import '../../core/api_client.dart';
@@ -52,6 +53,7 @@ class _WalletPaymentResultPageState extends State<WalletPaymentResultPage> {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
     final qp = GoRouterState.of(context).uri.queryParameters;
     final status = (qp['status'] ?? '').toLowerCase();
     final txId = qp['tx_id'];
@@ -62,7 +64,7 @@ class _WalletPaymentResultPageState extends State<WalletPaymentResultPage> {
     final color = isSuccess ? Colors.green : Colors.red;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('نتیجه پرداخت کیف‌پول')),
+      appBar: AppBar(title: Text(t.walletPaymentResultTitle)),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -73,18 +75,18 @@ class _WalletPaymentResultPageState extends State<WalletPaymentResultPage> {
                 Icon(icon, color: color, size: 32),
                 const SizedBox(width: 12),
                 Text(
-                  isSuccess ? 'پرداخت با موفقیت انجام شد' : 'پرداخت ناموفق بود',
+                  isSuccess ? t.walletPaymentSuccess : t.walletPaymentFailed,
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(color: color),
                 ),
               ],
             ),
             const SizedBox(height: 12),
-            if (txId != null) Text('شماره تراکنش: $txId'),
-            if (ref != null && ref.isNotEmpty) Text('مرجع پرداخت: $ref'),
+            if (txId != null) Text('${t.transactionId}: $txId'),
+            if (ref != null && ref.isNotEmpty) Text('${t.paymentReference}: $ref'),
             const SizedBox(height: 12),
             if (_loading) const LinearProgressIndicator(),
-            if (_error != null) Text('خطا در استعلام وضعیت: $_error', style: const TextStyle(color: Colors.red)),
-            if (_tx != null) Text('وضعیت ثبت‌شده: ${_tx!['status']} - مبلغ: ${_tx!['amount']}'),
+            if (_error != null) Text('${t.walletStatusCheckErrorPrefix} $_error', style: const TextStyle(color: Colors.red)),
+            if (_tx != null) Text('${t.status}: ${_tx!['status']} - ${t.moneyAmount}: ${_tx!['amount']}'),
             const Spacer(),
             FilledButton.icon(
               onPressed: () {
@@ -96,7 +98,7 @@ class _WalletPaymentResultPageState extends State<WalletPaymentResultPage> {
                 }
               },
               icon: const Icon(Icons.account_balance_wallet),
-              label: const Text('بازگشت به کیف‌پول'),
+              label: Text(t.walletBackToWallet),
             ),
           ],
         ),

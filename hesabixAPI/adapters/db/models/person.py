@@ -49,6 +49,10 @@ class Person(Base):
     commission_exclude_additions_deductions: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="0", comment="عدم محاسبه اضافات و کسورات فاکتور در پورسانت")
     commission_post_in_invoice_document: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="0", comment="ثبت پورسانت در سند حسابداری فاکتور")
     
+    # اعتبار
+    credit_limit: Mapped[float | None] = mapped_column(Numeric(14, 2), nullable=True, comment="سقف اعتبار شخص")
+    credit_check_enabled: Mapped[bool | None] = mapped_column(Boolean, nullable=True, comment="فعال بودن بررسی اعتبار برای شخص (خالی: تبعیت از تنظیمات کسب‌وکار)")
+    
     # اطلاعات اقتصادی
     national_id: Mapped[str | None] = mapped_column(String(20), nullable=True, index=True, comment="شناسه ملی")
     registration_number: Mapped[str | None] = mapped_column(String(50), nullable=True, comment="شماره ثبت")
