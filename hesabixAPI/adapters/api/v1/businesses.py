@@ -1,7 +1,11 @@
 # Removed __future__ annotations to fix OpenAPI schema generation
 
-from fastapi import APIRouter, Depends, Request, Query, HTTPException
+from typing import Dict, Any
+
+from fastapi import APIRouter, Depends, Request, Query, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
+from uuid import UUID
+import io
 
 from adapters.db.session import get_db
 from adapters.api.v1.schemas import (
@@ -12,9 +16,19 @@ from app.core.responses import success_response, format_datetime_fields
 from app.core.auth_dependency import get_current_user, AuthContext
 from app.core.permissions import require_business_management
 from app.services.business_service import (
-    create_business, get_business_by_id, get_businesses_by_owner, get_user_businesses,
-    update_business, delete_business, get_business_summary
+    create_business,
+    get_business_by_id,
+    get_businesses_by_owner,
+    get_user_businesses,
+    update_business,
+    delete_business,
+    get_business_summary,
+    get_business_print_settings,
+    update_business_print_settings,
 )
+from app.services.file_storage_service import FileStorageService
+from adapters.db.models.business import Business
+from starlette.responses import StreamingResponse
 
 
 router = APIRouter(prefix="/businesses", tags=["businesses"])
@@ -311,6 +325,143 @@ def delete_business_info(
     return success_response({"ok": True}, request, "کسب و کار با موفقیت حذف شد")
 
 
+@router.post(
+    "/{business_id}/logo",
+    summary="آپلود لوگوی کسب‌وکار",
+    description="آپلود تصویر لوگوی کسب‌وکار و ذخیره شناسه فایل روی رکورد Business.",
+    response_model=SuccessResponse,
+)
+@require_business_management()
+async def upload_business_logo(
+    request: Request,
+    business_id: int,
+    file: UploadFile = File(...),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    # اطمینان از مالکیت کسب‌وکار
+    business = db.query(Business).filter(Business.id == business_id).first()
+    if not business or business.owner_id != ctx.get_user_id():
+        raise HTTPException(status_code=404, detail="کسب و کار یافت نشد")
+
+    storage = FileStorageService(db)
+    saved = await storage.upload_file(
+        file=file,
+        user_id=ctx.get_user_id(),
+        module_context="business_logo",
+        context_id=None,
+        developer_data={"business_id": business_id, "type": "logo"},
+        is_temporary=False,
+        expires_in_days=3650,
+    )
+
+    business.logo_file_id = saved.get("file_id")
+    db.commit()
+
+    return success_response(
+        {
+            "logo_file_id": business.logo_file_id,
+            "file": saved,
+        },
+        request,
+        "لوگوی کسب‌وکار با موفقیت ذخیره شد",
+    )
+
+
+@router.get(
+    "/{business_id}/logo",
+    summary="دریافت لوگوی کسب‌وکار",
+    description="بازگرداندن تصویر لوگوی کسب‌وکار به‌صورت فایل برای نمایش در UI یا فاکتور.",
+)
+async def get_business_logo(
+    request: Request,
+    business_id: int,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    business = db.query(Business).filter(Business.id == business_id).first()
+    if not business or business.owner_id != ctx.get_user_id() or not getattr(business, "logo_file_id", None):
+        raise HTTPException(status_code=404, detail="لوگوی کسب و کار تنظیم نشده است")
+
+    storage = FileStorageService(db)
+    file_data = await storage.download_file(UUID(str(business.logo_file_id)))
+
+    filename = file_data.get("filename") or "logo"
+    return StreamingResponse(
+        io.BytesIO(file_data["content"]),
+        media_type=file_data.get("mime_type") or "image/png",
+        headers={"Content-Disposition": f'inline; filename="{filename}"'},
+    )
+
+
+@router.post(
+    "/{business_id}/stamp",
+    summary="آپلود مهر/امضای کسب‌وکار",
+    description="آپلود تصویر مهر یا امضای رسمی کسب‌وکار و ذخیره شناسه فایل روی رکورد Business.",
+    response_model=SuccessResponse,
+)
+@require_business_management()
+async def upload_business_stamp(
+    request: Request,
+    business_id: int,
+    file: UploadFile = File(...),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    business = db.query(Business).filter(Business.id == business_id).first()
+    if not business or business.owner_id != ctx.get_user_id():
+        raise HTTPException(status_code=404, detail="کسب و کار یافت نشد")
+
+    storage = FileStorageService(db)
+    saved = await storage.upload_file(
+        file=file,
+        user_id=ctx.get_user_id(),
+        module_context="business_stamp",
+        context_id=None,
+        developer_data={"business_id": business_id, "type": "stamp"},
+        is_temporary=False,
+        expires_in_days=3650,
+    )
+
+    business.stamp_file_id = saved.get("file_id")
+    db.commit()
+
+    return success_response(
+        {
+            "stamp_file_id": business.stamp_file_id,
+            "file": saved,
+        },
+        request,
+        "مهر/امضای کسب‌وکار با موفقیت ذخیره شد",
+    )
+
+
+@router.get(
+    "/{business_id}/stamp",
+    summary="دریافت مهر/امضای کسب‌وکار",
+    description="بازگرداندن تصویر مهر یا امضای کسب‌وکار به‌صورت فایل برای نمایش در UI یا فاکتور.",
+)
+async def get_business_stamp(
+    request: Request,
+    business_id: int,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    business = db.query(Business).filter(Business.id == business_id).first()
+    if not business or business.owner_id != ctx.get_user_id() or not getattr(business, "stamp_file_id", None):
+        raise HTTPException(status_code=404, detail="مهر/امضای کسب و کار تنظیم نشده است")
+
+    storage = FileStorageService(db)
+    file_data = await storage.download_file(UUID(str(business.stamp_file_id)))
+
+    filename = file_data.get("filename") or "stamp"
+    return StreamingResponse(
+        io.BytesIO(file_data["content"]),
+        media_type=file_data.get("mime_type") or "image/png",
+        headers={"Content-Disposition": f'inline; filename="{filename}"'},
+    )
+
+
 @router.post("/stats", 
     summary="آمار کسب و کارها", 
     description="دریافت آمار کلی کسب و کارهای کاربر",
@@ -353,3 +504,49 @@ def get_business_stats(
     owner_id = ctx.get_user_id()
     stats = get_business_summary(db, owner_id)
     return success_response(stats, request)
+
+
+@router.get(
+    "/{business_id}/print-settings",
+    summary="تنظیمات چاپ فاکتورهای کسب‌وکار",
+    description="دریافت تنظیمات چاپ فاکتور (لوگو، مهر، پرداخت‌ها، اقساط و متن انتهایی) به‌صورت پیش‌فرض و به تفکیک نوع فاکتور.",
+    response_model=SuccessResponse,
+)
+def get_business_print_settings_endpoint(
+    request: Request,
+    business_id: int,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    """دریافت تنظیمات چاپ فاکتورهای یک کسب‌وکار."""
+    owner_id = ctx.get_user_id()
+    business = get_business_by_id(db, business_id, owner_id)
+    if not business:
+        raise HTTPException(status_code=404, detail="کسب و کار یافت نشد")
+
+    data = get_business_print_settings(db, business_id)
+    return success_response(data, request)
+
+
+@router.put(
+    "/{business_id}/print-settings",
+    summary="ویرایش تنظیمات چاپ فاکتورهای کسب‌وکار",
+    description="ذخیره تنظیمات چاپ فاکتور (لوگو، مهر، پرداخت‌ها، اقساط و متن انتهایی) به‌صورت پیش‌فرض و به تفکیک نوع فاکتور.",
+    response_model=SuccessResponse,
+)
+@require_business_management()
+def update_business_print_settings_endpoint(
+    request: Request,
+    business_id: int,
+    payload: Dict[str, Any],
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    """ویرایش تنظیمات چاپ فاکتورهای یک کسب‌وکار."""
+    owner_id = ctx.get_user_id()
+    business = get_business_by_id(db, business_id, owner_id)
+    if not business:
+        raise HTTPException(status_code=404, detail="کسب و کار یافت نشد")
+
+    updated = update_business_print_settings(db, business_id, payload or {})
+    return success_response(updated, request, "تنظیمات چاپ با موفقیت ذخیره شد")

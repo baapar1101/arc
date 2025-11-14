@@ -333,6 +333,7 @@ class _ProfileShellState extends State<ProfileShell> {
       _Dest(t.businesses, Icons.business, Icons.business, '/user/profile/businesses'),
       _Dest(t.support, Icons.support_agent, Icons.support_agent, '/user/profile/support'),
       _Dest(t.marketing, Icons.campaign, Icons.campaign, '/user/profile/marketing'),
+      _Dest('امضا و تصویر کاربر', Icons.border_color, Icons.border_color, '/user/profile/signature'),
       _Dest(t.changePassword, Icons.password, Icons.password, '/user/profile/change-password'),
     ];
 

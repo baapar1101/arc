@@ -12,6 +12,8 @@ class InvoiceListItem {
   final String? createdByName;
   final bool isProforma;
   final String? description;
+  final String? taxStatus;
+  final bool isInstallmentSale;
 
   const InvoiceListItem({
     required this.id,
@@ -25,6 +27,8 @@ class InvoiceListItem {
     this.createdByName,
     required this.isProforma,
     this.description,
+    this.taxStatus,
+    required this.isInstallmentSale,
   });
 
   factory InvoiceListItem.fromJson(Map<String, dynamic> json) {
@@ -53,6 +57,8 @@ class InvoiceListItem {
       createdByName: json['created_by_name']?.toString(),
       isProforma: json['is_proforma'] == true,
       description: json['description']?.toString(),
+      taxStatus: json['tax_status']?.toString(),
+      isInstallmentSale: json['is_installment_sale'] == true,
     );
   }
 }

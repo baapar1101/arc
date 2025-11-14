@@ -205,6 +205,15 @@ def create_receipt_payment(
     
     is_receipt = (document_type == DOCUMENT_TYPE_RECEIPT)
     logger.info(f"آیا دریافت است: {is_receipt}")
+
+    # امکان override نوع حساب طرف‌شخص (دریافتنی/پرداختنی) برای سناریوهایی مثل برگشت فاکتور
+    extra_info_all = data.get("extra_info") or {}
+    person_is_receivable_override = extra_info_all.get("person_is_receivable")
+    if isinstance(person_is_receivable_override, bool):
+        is_person_receivable = person_is_receivable_override
+    else:
+        # پیش‌فرض: دریافت → دریافتنی، پرداخت → پرداختنی
+        is_person_receivable = is_receipt
     
     # اعتبارسنجی تاریخ
     document_date = _parse_iso_date(data.get("document_date", datetime.now()))
@@ -309,14 +318,14 @@ def create_receipt_payment(
         logger.info(f"توضیحات: {description}")
         
         # دریافت حساب شخص عمومی
-        # در دریافت: حساب دریافتنی (receivable) - کد 10401
-        # در پرداخت: حساب پرداختنی (payable) - کد 20201
-        logger.info(f"دریافت حساب شخص برای person_id={person_id}, is_receivable={is_receipt}")
+        # در حالت عادی: دریافت → حساب دریافتنی (10401)، پرداخت → حساب پرداختنی (20201)
+        # در صورت وجود person_is_receivable در extra_info، از همان تبعیت می‌کند
+        logger.info(f"دریافت حساب شخص برای person_id={person_id}, is_receivable={is_person_receivable}")
         person_account = _get_person_account(
             db,
             business_id,
             int(person_id),
-            is_receivable=is_receipt
+            is_receivable=is_person_receivable,
         )
         logger.info(f"حساب شخص پیدا شد: id={person_account.id}, code={person_account.code}, name={person_account.name}")
         
@@ -986,6 +995,14 @@ def update_receipt_payment(
     # تعیین نوع دریافت/پرداخت برای محاسبات بدهکار/بستانکار
     is_receipt = (document.document_type == DOCUMENT_TYPE_RECEIPT)
 
+    # امکان override نوع حساب طرف‌شخص (دریافتنی/پرداختنی) از extra_info در ویرایش
+    extra_info_all = data.get("extra_info") or document.extra_info or {}
+    person_is_receivable_override = extra_info_all.get("person_is_receivable")
+    if isinstance(person_is_receivable_override, bool):
+        is_person_receivable = person_is_receivable_override
+    else:
+        is_person_receivable = is_receipt
+
     # حذف خطوط فعلی و ایجاد مجدد
     db.query(DocumentLine).filter(DocumentLine.document_id == document.id).delete(synchronize_session=False)
 
@@ -998,7 +1015,7 @@ def update_receipt_payment(
         if amount <= 0:
             continue
         description = (person_line.get("description") or "").strip() or None
-        person_account = _get_person_account(db, document.business_id, int(person_id), is_receivable=is_receipt)
+        person_account = _get_person_account(db, document.business_id, int(person_id), is_receivable=is_person_receivable)
         debit_amount = amount if not is_receipt else Decimal(0)
         credit_amount = amount if is_receipt else Decimal(0)
         line = DocumentLine(

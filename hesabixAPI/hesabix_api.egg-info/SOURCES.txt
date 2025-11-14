@@ -86,6 +86,7 @@ adapters/db/models/api_key.py
 adapters/db/models/bank_account.py
 adapters/db/models/business.py
 adapters/db/models/business_permission.py
+adapters/db/models/business_print_settings.py
 adapters/db/models/captcha.py
 adapters/db/models/cash_register.py
 adapters/db/models/category.py
@@ -289,13 +290,16 @@ migrations/versions/20251110_100001_add_notification_templates_and_settings.py
 migrations/versions/20251110_101500_add_marketplace_tables.py
 migrations/versions/20251112_170001_add_credit_fields.py
 migrations/versions/20251112_200001_add_credit_settings_and_installment_templates.py
+migrations/versions/20251114_000010_add_business_print_settings.py
 migrations/versions/4b2ea782bcb3_merge_heads.py
 migrations/versions/5553f8745c6e_add_support_tables.py
+migrations/versions/755d6bd2d6d7_add_business_logo_stamp_columns.py
 migrations/versions/7891282548e9_merge_tax_types_and_unit_fields_heads.py
 migrations/versions/7ecb63029764_merge_heads.py
 migrations/versions/9a06b0cb880a_add_description_to_documents.py
 migrations/versions/9f9786ae7191_create_tax_units_table.py
 migrations/versions/a1443c153b47_merge_heads.py
+migrations/versions/a3a3a1b6669f_merge_heads_and_add_user_signature.py
 migrations/versions/ac9e4b3dcffc_add_fiscal_year_to_documents.py
 migrations/versions/b2b68cf299a3_convert_unit_fields_to_string.py
 migrations/versions/c302bc2f2cb8_remove_person_type_column.py

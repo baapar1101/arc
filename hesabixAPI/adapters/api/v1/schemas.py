@@ -90,6 +90,7 @@ class UserResponse(BaseModel):
 	app_permissions: Optional[dict] = Field(default=None, description="مجوزهای اپلیکیشن")
 	created_at: str = Field(..., description="تاریخ ایجاد")
 	updated_at: str = Field(..., description="تاریخ آخرین بروزرسانی")
+	signature_file_id: Optional[str] = Field(default=None, description="شناسه فایل امضای کاربر (در صورت تنظیم)")
 
 
 class CaptchaResponse(BaseModel):
@@ -220,6 +221,8 @@ class BusinessResponse(BaseModel):
 	province: Optional[str] = Field(default=None, description="استان")
 	city: Optional[str] = Field(default=None, description="شهر")
 	postal_code: Optional[str] = Field(default=None, description="کد پستی")
+	logo_file_id: Optional[str] = Field(default=None, description="شناسه فایل لوگوی کسب‌وکار (در صورت تنظیم)")
+	stamp_file_id: Optional[str] = Field(default=None, description="شناسه فایل مهر/امضای کسب‌وکار (در صورت تنظیم)")
 	# تنظیمات اعتبار مشتریان
 	default_credit_limit: Optional[float] = Field(default=None, description="سقف اعتبار پیشفرض اشخاص")
 	check_credit_enabled_by_default: bool = Field(default=False, description="بررسی اعتبار مشتریان به صورت پیشفرض")

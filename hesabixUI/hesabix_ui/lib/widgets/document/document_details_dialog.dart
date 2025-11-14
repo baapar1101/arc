@@ -7,6 +7,7 @@ import 'package:hesabix_ui/utils/number_formatters.dart' show formatWithThousand
 import 'package:hesabix_ui/services/warehouse_service.dart';
 import 'dart:html' as html;
 import 'package:hesabix_ui/l10n/app_localizations.dart';
+import 'package:hesabix_ui/services/report_template_service.dart';
 
 /// دیالوگ نمایش جزئیات کامل سند حسابداری
 class DocumentDetailsDialog extends StatefulWidget {
@@ -31,6 +32,10 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> {
   bool _isGeneratingPdf = false;
   final _warehouseService = WarehouseService();
   List<dynamic> _relatedWhDocs = const [];
+  final ReportTemplateService _templateService = ReportTemplateService(ApiClient());
+  List<Map<String, dynamic>> _invoiceTemplates = const [];
+  bool _loadingInvoiceTemplates = false;
+  int? _selectedInvoiceTemplateId;
 
   @override
   void initState() {
@@ -53,7 +58,11 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> {
         // سایر اسناد: endpoint عمومی با قالب documents/detail
         path = '/documents/${doc.id}/pdf';
       }
-      final bytes = await api.downloadPdf(path);
+      final query = <String, dynamic>{};
+      if (doc.documentType.startsWith('invoice') && _selectedInvoiceTemplateId != null) {
+        query['template_id'] = _selectedInvoiceTemplateId;
+      }
+      final bytes = await api.downloadPdf(path, query: query.isNotEmpty ? query : null);
       await _savePdfFile(bytes, doc.code);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -100,6 +109,14 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> {
           _isLoading = false;
         });
       }
+      // اگر سند از نوع فاکتور باشد، قالب‌های چاپ فاکتور را بارگذاری کن
+      try {
+        if (doc.documentType.startsWith('invoice')) {
+          await _loadInvoiceTemplates(doc.businessId);
+        }
+      } catch (_) {
+        // خطای بارگذاری قالب‌ها نباید نمایش سند را متوقف کند
+      }
       // load related warehouse docs
       try {
         final data = await _warehouseService.search(
@@ -121,6 +138,35 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> {
         setState(() {
           _errorMessage = e.toString();
           _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _loadInvoiceTemplates(int businessId) async {
+    setState(() {
+      _loadingInvoiceTemplates = true;
+    });
+    try {
+      final items = await _templateService.listTemplates(
+        businessId: businessId,
+        moduleKey: 'invoices',
+        subtype: 'detail',
+        status: 'published',
+      );
+      if (!mounted) return;
+      setState(() {
+        _invoiceTemplates = items;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _invoiceTemplates = const [];
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _loadingInvoiceTemplates = false;
         });
       }
     }
@@ -574,6 +620,47 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> {
             label: Text(_isGeneratingPdf ? AppLocalizations.of(context).generating : AppLocalizations.of(context).printPdf),
           ),
           const SizedBox(width: 12),
+          if (_document != null &&
+              _document!.documentType.startsWith('invoice') &&
+              !_loadingInvoiceTemplates &&
+              _invoiceTemplates.isNotEmpty) ...[
+            DropdownButton<int?>(
+              value: _selectedInvoiceTemplateId,
+              hint: Text(AppLocalizations.of(context).printTemplatePublished),
+              items: [
+                DropdownMenuItem<int?>(
+                  value: null,
+                  child: Text(AppLocalizations.of(context).noCustomTemplate),
+                ),
+                ..._invoiceTemplates.map((tpl) {
+                  final id = (tpl['id'] as num).toInt();
+                  final name = (tpl['name'] ?? 'Template').toString();
+                  final isDefault = tpl['is_default'] == true;
+                  return DropdownMenuItem<int?>(
+                    value: id,
+                    child: Row(
+                      children: [
+                        if (isDefault) const Icon(Icons.star, size: 16),
+                        if (isDefault) const SizedBox(width: 4),
+                        Flexible(
+                          child: Text(
+                            name,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+              ],
+              onChanged: (value) {
+                setState(() {
+                  _selectedInvoiceTemplateId = value;
+                });
+              },
+            ),
+            const SizedBox(width: 12),
+          ],
           // دکمه بستن
           ElevatedButton(
             onPressed: () => Navigator.pop(context),

@@ -9,6 +9,7 @@ from adapters.db.repositories.fiscal_year_repo import FiscalYearRepository
 from adapters.db.models.currency import Currency, BusinessCurrency
 from adapters.db.repositories.business_permission_repo import BusinessPermissionRepository
 from adapters.db.models.business import Business, BusinessType, BusinessField
+from adapters.db.models.business_print_settings import BusinessPrintSettings
 from adapters.api.v1.schemas import (
     BusinessCreateRequest, BusinessUpdateRequest, BusinessResponse,
     BusinessListResponse, BusinessSummaryResponse, PaginationInfo
@@ -314,6 +315,174 @@ def get_business_summary(db: Session, owner_id: int) -> Dict[str, Any]:
     }
 
 
+def get_business_print_settings(db: Session, business_id: int) -> Dict[str, Any]:
+    """
+    دریافت تنظیمات چاپ فاکتورهای یک کسب‌وکار.
+
+    - رکوردی با document_type = 'all' به عنوان تنظیمات عمومی (پیش‌فرض) استفاده می‌شود.
+    - در صورت وجود رکورد برای نوع سند خاص، همان برای آن نوع استفاده می‌شود.
+    - اگر هیچ رکوردی وجود نداشته باشد، مقادیر پیش‌فرض (همه روشن، بدون متن پاورقی) برگردانده می‌شود.
+    """
+    rows = (
+        db.query(BusinessPrintSettings)
+        .filter(BusinessPrintSettings.business_id == business_id)
+        .all()
+    )
+
+    def _row_to_dict(row: BusinessPrintSettings) -> Dict[str, Any]:
+        return {
+            "document_type": row.document_type,
+            "show_logo": bool(getattr(row, "show_logo", True)),
+            "show_stamp": bool(getattr(row, "show_stamp", True)),
+            "show_payments": bool(getattr(row, "show_payments", True)),
+            "show_installment_plan": bool(getattr(row, "show_installment_plan", True)),
+            "footer_note": getattr(row, "footer_note", None),
+        }
+
+    default_settings: Dict[str, Any] = {
+        "document_type": "all",
+        "show_logo": True,
+        "show_stamp": True,
+        "show_payments": True,
+        "show_installment_plan": True,
+        "footer_note": None,
+    }
+    per_type: Dict[str, Any] = {}
+
+    for row in rows:
+        data = _row_to_dict(row)
+        if row.document_type == "all":
+            default_settings = data
+        else:
+            per_type[row.document_type] = data
+
+    return {
+        "default": default_settings,
+        "per_type": per_type,
+    }
+
+
+def update_business_print_settings(
+    db: Session,
+    business_id: int,
+    settings_payload: Dict[str, Any],
+) -> Dict[str, Any]:
+    """
+    به‌روزرسانی تنظیمات چاپ فاکتورهای یک کسب‌وکار.
+
+    ورودی انتظار دارد ساختاری شبیه:
+    {
+      "default": { ... },
+      "per_type": {
+        "invoice_sales": { ... },
+        "invoice_purchase": { ... },
+        ...
+      }
+    }
+    """
+    default_data = (settings_payload or {}).get("default") or {}
+    per_type_data: Dict[str, Any] = (settings_payload or {}).get("per_type") or {}
+
+    # کمک‌کننده برای گرفتن مقدار بولین با پیش‌فرض
+    def _get_bool(d: Dict[str, Any], key: str, default: bool) -> bool:
+        val = d.get(key)
+        if isinstance(val, bool):
+            return val
+        if isinstance(val, (int, float)):
+            return bool(val)
+        if isinstance(val, str):
+            s = val.strip().lower()
+            if s in {"true", "1", "yes", "on"}:
+                return True
+            if s in {"false", "0", "no", "off"}:
+                return False
+        return default
+
+    # ابتدا رکورد تنظیمات عمومی (all) را به‌روزرسانی یا ایجاد می‌کنیم
+    default_row = (
+        db.query(BusinessPrintSettings)
+        .filter(
+            BusinessPrintSettings.business_id == business_id,
+            BusinessPrintSettings.document_type == "all",
+        )
+        .first()
+    )
+    if default_data:
+        if not default_row:
+            default_row = BusinessPrintSettings(
+                business_id=business_id,
+                document_type="all",
+            )
+            db.add(default_row)
+        default_row.show_logo = _get_bool(default_data, "show_logo", True)
+        default_row.show_stamp = _get_bool(default_data, "show_stamp", True)
+        default_row.show_payments = _get_bool(default_data, "show_payments", True)
+        default_row.show_installment_plan = _get_bool(
+            default_data,
+            "show_installment_plan",
+            True,
+        )
+        default_row.footer_note = (
+            (default_data.get("footer_note") or None)
+            if isinstance(default_data.get("footer_note"), str)
+            else default_data.get("footer_note")
+        )
+
+    # سپس تنظیمات اختصاصی هر نوع سند را به‌روزرسانی / ایجاد می‌کنیم
+    # document_type فقط برای انواعی نگهداری می‌شود که در per_type ارسال شده‌اند.
+    existing_rows = (
+        db.query(BusinessPrintSettings)
+        .filter(
+            BusinessPrintSettings.business_id == business_id,
+            BusinessPrintSettings.document_type != "all",
+        )
+        .all()
+    )
+    existing_map: Dict[str, BusinessPrintSettings] = {
+        r.document_type: r for r in existing_rows
+    }
+
+    # انواعی که باید نگه داشته شوند
+    keep_types = set()
+
+    for doc_type, cfg in per_type_data.items():
+        if not isinstance(cfg, dict):
+            continue
+        doc_type_str = str(doc_type).strip()
+        if not doc_type_str:
+            continue
+        keep_types.add(doc_type_str)
+        row = existing_map.get(doc_type_str)
+        if not row:
+            row = BusinessPrintSettings(
+                business_id=business_id,
+                document_type=doc_type_str,
+            )
+            db.add(row)
+        row.show_logo = _get_bool(cfg, "show_logo", True)
+        row.show_stamp = _get_bool(cfg, "show_stamp", True)
+        row.show_payments = _get_bool(cfg, "show_payments", True)
+        row.show_installment_plan = _get_bool(
+            cfg,
+            "show_installment_plan",
+            True,
+        )
+        row.footer_note = (
+            (cfg.get("footer_note") or None)
+            if isinstance(cfg.get("footer_note"), str)
+            else cfg.get("footer_note")
+        )
+
+    # سایر رکوردهای موجود که دیگر در per_type نیستند حذف می‌شوند
+    for doc_type, row in existing_map.items():
+        if doc_type not in keep_types:
+            db.delete(row)
+
+    db.commit()
+
+    return get_business_print_settings(db, business_id)
+
+
 def _business_to_dict(business: Business) -> Dict[str, Any]:
     """تبدیل مدل کسب و کار به dictionary"""
     data = {
@@ -332,6 +501,10 @@ def _business_to_dict(business: Business) -> Dict[str, Any]:
         "province": business.province,
         "city": business.city,
         "postal_code": business.postal_code,
+        # فایل‌های گرافیکی مرتبط با کسب‌وکار
+        "logo_file_id": getattr(business, "logo_file_id", None),
+        "stamp_file_id": getattr(business, "stamp_file_id", None),
+        # تنظیمات اعتبار
         "default_credit_limit": float(business.default_credit_limit) if getattr(business, "default_credit_limit", None) is not None else None,
         "check_credit_enabled_by_default": bool(getattr(business, "check_credit_enabled_by_default", False)),
         "created_at": business.created_at,  # datetime object بماند

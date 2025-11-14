@@ -11,6 +11,7 @@ import 'pages/profile/profile_shell.dart';
 import 'pages/profile/profile_dashboard_page.dart';
 import 'pages/profile/new_business_page.dart';
 import 'pages/profile/businesses_page.dart';
+import 'pages/profile/user_signature_page.dart';
 import 'pages/profile/support_page.dart';
 import 'pages/profile/change_password_page.dart';
 import 'pages/profile/marketing_page.dart';
@@ -33,6 +34,7 @@ import 'pages/business/wallet_payment_result_page.dart';
 import 'pages/admin/wallet_settings_page.dart';
 import 'pages/admin/payment_gateways_page.dart';
 import 'pages/business/invoices_list_page.dart';
+import 'pages/business/tax_workspace_page.dart';
 import 'pages/business/new_invoice_page.dart';
 import 'pages/business/edit_invoice_page.dart';
 import 'pages/business/settings_page.dart';
@@ -58,6 +60,7 @@ import 'pages/business/warehouses_page.dart';
 import 'pages/business/inventory_transfers_page.dart';
 import 'pages/business/installments_report_page.dart';
 import 'pages/business/credit_settings_page.dart';
+import 'pages/business/print_settings_page.dart';
 import 'pages/business/installment_plans_page.dart';
 import 'pages/error_404_page.dart';
 import 'core/locale_controller.dart';
@@ -434,6 +437,11 @@ class _MyAppState extends State<MyApp> {
               builder: (context, state) => MarketingPage(calendarController: _calendarController!),
             ),
             GoRoute(
+              path: '/user/profile/signature',
+              name: 'profile_signature',
+              builder: (context, state) => const UserSignaturePage(),
+            ),
+            GoRoute(
               path: '/user/profile/change-password',
               name: 'profile_change_password',
               builder: (context, state) => const ChangePasswordPage(),
@@ -748,6 +756,21 @@ class _MyAppState extends State<MyApp> {
               },
             ),
             GoRoute(
+              path: '/business/:business_id/tax-workspace',
+              name: 'business_tax_workspace',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return NoTransitionPage(
+                  child: TaxWorkspacePage(
+                    businessId: businessId,
+                    calendarController: _calendarController!,
+                    authStore: _authStore!,
+                    apiClient: ApiClient(),
+                  ),
+                );
+              },
+            ),
+            GoRoute(
               path: '/business/:business_id/invoice/new',
               name: 'business_new_invoice',
               pageBuilder: (context, state) {
@@ -900,6 +923,21 @@ class _MyAppState extends State<MyApp> {
                 }
                 return NoTransitionPage(
                   child: CreditSettingsPage(businessId: businessId),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/settings/print',
+              name: 'business_settings_print',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                if (!_authStore!.hasBusinessPermission('settings', 'join')) {
+                  return NoTransitionPage(
+                    child: PermissionGuard.buildAccessDeniedPage(),
+                  );
+                }
+                return NoTransitionPage(
+                  child: BusinessPrintSettingsPage(businessId: businessId),
                 );
               },
             ),

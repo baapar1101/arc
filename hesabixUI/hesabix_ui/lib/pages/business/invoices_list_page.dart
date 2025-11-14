@@ -42,15 +42,20 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
   bool? _isProforma; // null=همه، true=پیشفاکتور، false=قطعی
 
   void _refreshData() {
-    final state = _tableKey.currentState;
-    if (state != null) {
-      try {
-        // ignore: avoid_dynamic_calls
-        (state as dynamic).refresh();
-        return;
-      } catch (_) {}
-    }
-    if (mounted) setState(() {});
+    // استفاده از addPostFrameCallback تا بعد از rebuild اجرا شود
+    // این باعث می‌شود که widget.config با مقادیر جدید فیلترها rebuild شده باشد
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final state = _tableKey.currentState;
+      if (state != null) {
+        try {
+          // ignore: avoid_dynamic_calls
+          (state as dynamic).refresh();
+          return;
+        } catch (_) {}
+      }
+      if (mounted) setState(() {});
+    });
   }
 
   @override
@@ -240,6 +245,18 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
                 onTap: (item) => _onDelete(item as InvoiceListItem),
                 isDestructive: true,
               ),
+            if (widget.authStore.canWriteSection('invoices'))
+              DataTableAction(
+                icon: Icons.drive_folder_upload,
+                label: t.taxAddToWorkspaceSingle,
+                onTap: (item) => _onAddToTaxWorkspace(item as InvoiceListItem),
+              ),
+            if (widget.authStore.canWriteSection('invoices'))
+              DataTableAction(
+                icon: Icons.folder_off,
+                label: t.taxRemoveFromWorkspaceSingle,
+                onTap: (item) => _onRemoveFromTaxWorkspace(item as InvoiceListItem),
+              ),
           ],
         ),
         // کد سند
@@ -261,12 +278,58 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
           formatter: (item) => item.totalAmount != null ? formatWithThousands(item.totalAmount!) : '-',
           suffix: ' ریال',
         ),
+        // اقساطی؟
+        CustomColumn(
+          'is_installment_sale',
+          t.installmentColumn,
+          width: ColumnWidth.small,
+          sortable: false,
+          searchable: false,
+          builder: (dynamic item, int index) {
+            final invoice = item as InvoiceListItem;
+            if (!invoice.isInstallmentSale) {
+              return const SizedBox.shrink();
+            }
+            return const Icon(Icons.check_circle, color: Colors.green, size: 18);
+          },
+          tooltip: t.installmentsTitle,
+        ),
         // ارز
         TextColumn('currency_code', t.currency, formatter: (item) => item.currencyCode ?? t.unknown, width: ColumnWidth.small),
         // ایجادکننده
         TextColumn('created_by_name', t.createdBy, formatter: (item) => item.createdByName ?? t.unknown, width: ColumnWidth.medium),
         // وضعیت
-        TextColumn('is_proforma', t.status, formatter: (item) => item.isProforma ? t.proforma : t.finalized, width: ColumnWidth.small),
+        TextColumn(
+          'is_proforma',
+          t.status,
+          formatter: (item) => item.isProforma ? t.proforma : t.finalized,
+          width: ColumnWidth.small,
+        ),
+        // وضعیت کارپوشه مودیان
+        TextColumn(
+          'tax_status',
+          t.taxStatus,
+          formatter: (item) {
+            final status = item.taxStatus ?? 'not_in_workspace';
+            switch (status) {
+              case 'in_workspace':
+                return t.taxInWorkspace;
+              case 'not_in_workspace':
+                return t.taxNotInWorkspace;
+              case 'pending':
+                return t.taxStatusPending;
+              case 'sent':
+                return t.taxStatusSent;
+              case 'finalized':
+                return t.taxStatusFinalized;
+              case 'failed':
+                return t.taxStatusFailed;
+              default:
+                return t.taxStatusNotSent;
+            }
+          },
+          width: ColumnWidth.medium,
+        ),
       ],
       searchFields: const ['code', 'description'],
       filterFields: const ['document_type'],
@@ -400,6 +463,156 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(t.deleteInvoiceErrorWithMessage(e.toString())),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _onAddToTaxWorkspace(InvoiceListItem item) async {
+    final t = AppLocalizations.of(context);
+
+    // فقط برای فاکتورهای فروش و برگشت از فروش و غیر پیش‌نویس
+    final isSalesOrReturn = item.documentType == 'invoice_sales' || item.documentType == 'invoice_sales_return';
+    if (!isSalesOrReturn || item.isProforma) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(t.taxAddToWorkspaceNotAllowed),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(t.taxAddToWorkspaceDialogTitle),
+        content: Text(t.taxAddToWorkspaceDialogMessage(item.code)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(t.cancel),
+          ),
+          FilledButton.icon(
+            onPressed: () => Navigator.pop(context, true),
+            icon: const Icon(Icons.drive_folder_upload),
+            label: Text(t.confirm),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    final navigator = Navigator.of(context, rootNavigator: true);
+    showDialog<void>(
+      context: context,
+      useRootNavigator: true,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      final success = await _invoiceService.addToTaxWorkspace(
+        businessId: widget.businessId,
+        invoiceId: item.id,
+      );
+
+      if (navigator.canPop()) {
+        navigator.pop();
+      }
+
+      if (!mounted) return;
+
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(t.taxAddToWorkspaceSuccess(item.code)),
+            backgroundColor: Colors.green,
+          ),
+        );
+        _refreshData();
+      } else {
+        throw Exception(t.taxAddToWorkspaceError);
+      }
+    } catch (e) {
+      if (navigator.canPop()) {
+        navigator.pop();
+      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(t.taxAddToWorkspaceErrorWithMessage(e.toString())),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _onRemoveFromTaxWorkspace(InvoiceListItem item) async {
+    final t = AppLocalizations.of(context);
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(t.taxRemoveFromWorkspaceDialogTitle),
+        content: Text(t.taxRemoveFromWorkspaceDialogMessage(item.code)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(t.cancel),
+          ),
+          FilledButton.icon(
+            onPressed: () => Navigator.pop(context, true),
+            icon: const Icon(Icons.folder_off),
+            label: Text(t.confirm),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    final navigator = Navigator.of(context, rootNavigator: true);
+    showDialog<void>(
+      context: context,
+      useRootNavigator: true,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      final success = await _invoiceService.removeFromTaxWorkspace(
+        businessId: widget.businessId,
+        invoiceId: item.id,
+      );
+
+      if (navigator.canPop()) {
+        navigator.pop();
+      }
+
+      if (!mounted) return;
+
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(t.taxRemoveFromWorkspaceSuccess),
+            backgroundColor: Colors.green,
+          ),
+        );
+        _refreshData();
+      } else {
+        throw Exception(t.taxRemoveFromWorkspaceError);
+      }
+    } catch (e) {
+      if (navigator.canPop()) {
+        navigator.pop();
+      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(t.taxRemoveFromWorkspaceErrorWithMessage(e.toString())),
           backgroundColor: Colors.red,
         ),
       );

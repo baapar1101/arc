@@ -4089,4 +4089,178 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get applyPlan => 'Apply plan';
+
+  @override
+  String get taxWorkspaceMenu => 'Tax workspace';
+
+  @override
+  String get taxWorkspaceTitle => 'Tax workspace';
+
+  @override
+  String get taxWorkspaceSubtitle =>
+      'Review invoices before sending them to the tax system.';
+
+  @override
+  String get taxAddToWorkspaceSingle => 'Add to tax workspace';
+
+  @override
+  String get taxRemoveFromWorkspaceSingle => 'Remove from tax workspace';
+
+  @override
+  String get taxStatus => 'Tax status';
+
+  @override
+  String get taxInWorkspace => 'In tax workspace';
+
+  @override
+  String get taxNotInWorkspace => 'Not in tax workspace';
+
+  @override
+  String get taxStatusPending => 'Pending';
+
+  @override
+  String get taxStatusSent => 'Sent';
+
+  @override
+  String get taxStatusFinalized => 'Finalized';
+
+  @override
+  String get taxStatusFailed => 'Failed';
+
+  @override
+  String get installmentColumn => 'Installment';
+
+  @override
+  String get taxStatusNotSent => 'Not sent';
+
+  @override
+  String get taxAddToWorkspaceNotAllowed =>
+      'This invoice cannot be added to the tax workspace.';
+
+  @override
+  String get taxAddToWorkspaceDialogTitle => 'Add to tax workspace';
+
+  @override
+  String taxAddToWorkspaceDialogMessage(String code) {
+    return 'Add invoice $code to tax workspace?';
+  }
+
+  @override
+  String taxAddToWorkspaceSuccess(String code) {
+    return 'Invoice $code added to tax workspace.';
+  }
+
+  @override
+  String get taxAddToWorkspaceError => 'Failed to add to tax workspace.';
+
+  @override
+  String taxAddToWorkspaceErrorWithMessage(String error) {
+    return 'Failed to add to tax workspace: $error';
+  }
+
+  @override
+  String get taxRemoveFromWorkspaceDialogTitle => 'Remove from tax workspace';
+
+  @override
+  String taxRemoveFromWorkspaceDialogMessage(String code) {
+    return 'Remove invoice $code from tax workspace?';
+  }
+
+  @override
+  String get taxRemoveFromWorkspaceSuccess =>
+      'Invoice removed from tax workspace.';
+
+  @override
+  String get taxRemoveFromWorkspaceError =>
+      'Failed to remove from tax workspace.';
+
+  @override
+  String taxRemoveFromWorkspaceErrorWithMessage(String error) {
+    return 'Failed to remove from tax workspace: $error';
+  }
+
+  @override
+  String get taxWorkspaceEmpty => 'No invoices in tax workspace.';
+
+  @override
+  String get taxWorkspaceLoading => 'Loading tax workspace...';
+
+  @override
+  String get taxWorkspaceError => 'Error loading tax workspace.';
+
+  @override
+  String get taxSendSingle => 'Send to tax system';
+
+  @override
+  String get taxTrackingCode => 'Tracking code';
+
+  @override
+  String get taxLastSendAt => 'Last sent at';
+
+  @override
+  String get taxSendSingleDialogTitle => 'Send to tax system';
+
+  @override
+  String taxSendSingleDialogMessage(String code) {
+    return 'Send invoice $code to tax system?';
+  }
+
+  @override
+  String get taxSendSuccess => 'Sent to tax system.';
+
+  @override
+  String taxSendErrorWithMessage(String error) {
+    return 'Failed to send to tax system: $error';
+  }
+
+  @override
+  String get taxSendSelectedTooltip => 'Send selected invoices to tax system';
+
+  @override
+  String taxSendSelectedButton(int count) {
+    return 'Send selected ($count)';
+  }
+
+  @override
+  String get taxRemoveSelectedTooltip =>
+      'Remove selected invoices from tax workspace';
+
+  @override
+  String taxRemoveSelectedButton(int count) {
+    return 'Remove selected ($count)';
+  }
+
+  @override
+  String get taxSendSelectedDialogTitle => 'Send selected to tax system';
+
+  @override
+  String taxSendSelectedDialogMessage(int count) {
+    return 'Send $count selected invoices to tax system?';
+  }
+
+  @override
+  String get taxSendSelectedSuccess => 'Selected invoices sent to tax system.';
+
+  @override
+  String taxSendSelectedErrorWithMessage(String error) {
+    return 'Failed to send selected invoices: $error';
+  }
+
+  @override
+  String get taxRemoveSelectedDialogTitle =>
+      'Remove selected from tax workspace';
+
+  @override
+  String taxRemoveSelectedDialogMessage(int count) {
+    return 'Remove $count selected invoices from tax workspace?';
+  }
+
+  @override
+  String get taxRemoveSelectedSuccess =>
+      'Selected invoices removed from tax workspace.';
+
+  @override
+  String taxRemoveSelectedErrorWithMessage(String error) {
+    return 'Failed to remove selected invoices: $error';
+  }
 }

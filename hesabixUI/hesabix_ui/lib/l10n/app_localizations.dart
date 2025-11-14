@@ -7951,6 +7951,288 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Apply plan'**
   String get applyPlan;
+
+  /// No description provided for @taxWorkspaceMenu.
+  ///
+  /// In en, this message translates to:
+  /// **'Tax workspace'**
+  String get taxWorkspaceMenu;
+
+  /// No description provided for @taxWorkspaceTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Tax workspace'**
+  String get taxWorkspaceTitle;
+
+  /// No description provided for @taxWorkspaceSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Review invoices before sending them to the tax system.'**
+  String get taxWorkspaceSubtitle;
+
+  /// No description provided for @taxAddToWorkspaceSingle.
+  ///
+  /// In en, this message translates to:
+  /// **'Add to tax workspace'**
+  String get taxAddToWorkspaceSingle;
+
+  /// No description provided for @taxRemoveFromWorkspaceSingle.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove from tax workspace'**
+  String get taxRemoveFromWorkspaceSingle;
+
+  /// No description provided for @taxStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Tax status'**
+  String get taxStatus;
+
+  /// No description provided for @taxInWorkspace.
+  ///
+  /// In en, this message translates to:
+  /// **'In tax workspace'**
+  String get taxInWorkspace;
+
+  /// No description provided for @taxNotInWorkspace.
+  ///
+  /// In en, this message translates to:
+  /// **'Not in tax workspace'**
+  String get taxNotInWorkspace;
+
+  /// No description provided for @taxStatusPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending'**
+  String get taxStatusPending;
+
+  /// No description provided for @taxStatusSent.
+  ///
+  /// In en, this message translates to:
+  /// **'Sent'**
+  String get taxStatusSent;
+
+  /// No description provided for @taxStatusFinalized.
+  ///
+  /// In en, this message translates to:
+  /// **'Finalized'**
+  String get taxStatusFinalized;
+
+  /// No description provided for @taxStatusFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed'**
+  String get taxStatusFailed;
+
+  /// No description provided for @installmentColumn.
+  ///
+  /// In en, this message translates to:
+  /// **'Installment'**
+  String get installmentColumn;
+
+  /// No description provided for @taxStatusNotSent.
+  ///
+  /// In en, this message translates to:
+  /// **'Not sent'**
+  String get taxStatusNotSent;
+
+  /// No description provided for @taxAddToWorkspaceNotAllowed.
+  ///
+  /// In en, this message translates to:
+  /// **'This invoice cannot be added to the tax workspace.'**
+  String get taxAddToWorkspaceNotAllowed;
+
+  /// No description provided for @taxAddToWorkspaceDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Add to tax workspace'**
+  String get taxAddToWorkspaceDialogTitle;
+
+  /// No description provided for @taxAddToWorkspaceDialogMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Add invoice {code} to tax workspace?'**
+  String taxAddToWorkspaceDialogMessage(String code);
+
+  /// No description provided for @taxAddToWorkspaceSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Invoice {code} added to tax workspace.'**
+  String taxAddToWorkspaceSuccess(String code);
+
+  /// No description provided for @taxAddToWorkspaceError.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to add to tax workspace.'**
+  String get taxAddToWorkspaceError;
+
+  /// No description provided for @taxAddToWorkspaceErrorWithMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to add to tax workspace: {error}'**
+  String taxAddToWorkspaceErrorWithMessage(String error);
+
+  /// No description provided for @taxRemoveFromWorkspaceDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove from tax workspace'**
+  String get taxRemoveFromWorkspaceDialogTitle;
+
+  /// No description provided for @taxRemoveFromWorkspaceDialogMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove invoice {code} from tax workspace?'**
+  String taxRemoveFromWorkspaceDialogMessage(String code);
+
+  /// No description provided for @taxRemoveFromWorkspaceSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Invoice removed from tax workspace.'**
+  String get taxRemoveFromWorkspaceSuccess;
+
+  /// No description provided for @taxRemoveFromWorkspaceError.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to remove from tax workspace.'**
+  String get taxRemoveFromWorkspaceError;
+
+  /// No description provided for @taxRemoveFromWorkspaceErrorWithMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to remove from tax workspace: {error}'**
+  String taxRemoveFromWorkspaceErrorWithMessage(String error);
+
+  /// No description provided for @taxWorkspaceEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No invoices in tax workspace.'**
+  String get taxWorkspaceEmpty;
+
+  /// No description provided for @taxWorkspaceLoading.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading tax workspace...'**
+  String get taxWorkspaceLoading;
+
+  /// No description provided for @taxWorkspaceError.
+  ///
+  /// In en, this message translates to:
+  /// **'Error loading tax workspace.'**
+  String get taxWorkspaceError;
+
+  /// No description provided for @taxSendSingle.
+  ///
+  /// In en, this message translates to:
+  /// **'Send to tax system'**
+  String get taxSendSingle;
+
+  /// No description provided for @taxTrackingCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Tracking code'**
+  String get taxTrackingCode;
+
+  /// No description provided for @taxLastSendAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Last sent at'**
+  String get taxLastSendAt;
+
+  /// No description provided for @taxSendSingleDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Send to tax system'**
+  String get taxSendSingleDialogTitle;
+
+  /// No description provided for @taxSendSingleDialogMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Send invoice {code} to tax system?'**
+  String taxSendSingleDialogMessage(String code);
+
+  /// No description provided for @taxSendSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Sent to tax system.'**
+  String get taxSendSuccess;
+
+  /// No description provided for @taxSendErrorWithMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to send to tax system: {error}'**
+  String taxSendErrorWithMessage(String error);
+
+  /// No description provided for @taxSendSelectedTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Send selected invoices to tax system'**
+  String get taxSendSelectedTooltip;
+
+  /// No description provided for @taxSendSelectedButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Send selected ({count})'**
+  String taxSendSelectedButton(int count);
+
+  /// No description provided for @taxRemoveSelectedTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove selected invoices from tax workspace'**
+  String get taxRemoveSelectedTooltip;
+
+  /// No description provided for @taxRemoveSelectedButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove selected ({count})'**
+  String taxRemoveSelectedButton(int count);
+
+  /// No description provided for @taxSendSelectedDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Send selected to tax system'**
+  String get taxSendSelectedDialogTitle;
+
+  /// No description provided for @taxSendSelectedDialogMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Send {count} selected invoices to tax system?'**
+  String taxSendSelectedDialogMessage(int count);
+
+  /// No description provided for @taxSendSelectedSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Selected invoices sent to tax system.'**
+  String get taxSendSelectedSuccess;
+
+  /// No description provided for @taxSendSelectedErrorWithMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to send selected invoices: {error}'**
+  String taxSendSelectedErrorWithMessage(String error);
+
+  /// No description provided for @taxRemoveSelectedDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove selected from tax workspace'**
+  String get taxRemoveSelectedDialogTitle;
+
+  /// No description provided for @taxRemoveSelectedDialogMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove {count} selected invoices from tax workspace?'**
+  String taxRemoveSelectedDialogMessage(int count);
+
+  /// No description provided for @taxRemoveSelectedSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Selected invoices removed from tax workspace.'**
+  String get taxRemoveSelectedSuccess;
+
+  /// No description provided for @taxRemoveSelectedErrorWithMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to remove selected invoices: {error}'**
+  String taxRemoveSelectedErrorWithMessage(String error);
 }
 
 class _AppLocalizationsDelegate

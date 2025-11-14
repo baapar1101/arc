@@ -1503,8 +1503,7 @@
   "walletSettingsTitle": "Wallet settings",
   "walletBaseCurrency": "Wallet base currency",
   "walletCurrencyRequired": "Currency selection is required",
-  "saved": "Saved"
-  ,
+  "saved": "Saved",
   "savedSuccessfully": "Saved successfully",
   "currencyToman": "Toman",
   "creditSettingsTitle": "Customer credit",
@@ -1547,6 +1546,154 @@
   "creditLimitHint": "Leave empty to use business default",
   "creditTipText": "Leaving empty or choosing inherit uses the business default credit settings.",
   "selectInstallmentPlan": "Select installment plan",
-  "applyPlan": "Apply plan"
+  "applyPlan": "Apply plan",
+
+  "taxWorkspaceMenu": "Tax workspace",
+  "taxWorkspaceTitle": "Tax workspace",
+  "taxWorkspaceSubtitle": "Review invoices before sending them to the tax system.",
+
+  "taxAddToWorkspaceSingle": "Add to tax workspace",
+  "taxRemoveFromWorkspaceSingle": "Remove from tax workspace",
+
+  "taxStatus": "Tax status",
+  "taxInWorkspace": "In tax workspace",
+  "taxNotInWorkspace": "Not in tax workspace",
+  "taxStatusPending": "Pending",
+  "taxStatusSent": "Sent",
+  "taxStatusFinalized": "Finalized",
+  "taxStatusFailed": "Failed",
+  "installmentColumn": "Installment",
+  "taxStatusNotSent": "Not sent",
+
+  "taxAddToWorkspaceNotAllowed": "This invoice cannot be added to the tax workspace.",
+  "taxAddToWorkspaceDialogTitle": "Add to tax workspace",
+  "taxAddToWorkspaceDialogMessage": "Add invoice {code} to tax workspace?",
+  "@taxAddToWorkspaceDialogMessage": {
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
+  "taxAddToWorkspaceSuccess": "Invoice {code} added to tax workspace.",
+  "@taxAddToWorkspaceSuccess": {
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
+  "taxAddToWorkspaceError": "Failed to add to tax workspace.",
+  "taxAddToWorkspaceErrorWithMessage": "Failed to add to tax workspace: {error}",
+  "@taxAddToWorkspaceErrorWithMessage": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+
+  "taxRemoveFromWorkspaceDialogTitle": "Remove from tax workspace",
+  "taxRemoveFromWorkspaceDialogMessage": "Remove invoice {code} from tax workspace?",
+  "@taxRemoveFromWorkspaceDialogMessage": {
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
+  "taxRemoveFromWorkspaceSuccess": "Invoice removed from tax workspace.",
+  "taxRemoveFromWorkspaceError": "Failed to remove from tax workspace.",
+  "taxRemoveFromWorkspaceErrorWithMessage": "Failed to remove from tax workspace: {error}",
+  "@taxRemoveFromWorkspaceErrorWithMessage": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+
+  "taxWorkspaceEmpty": "No invoices in tax workspace.",
+  "taxWorkspaceLoading": "Loading tax workspace...",
+  "taxWorkspaceError": "Error loading tax workspace.",
+
+  "taxSendSingle": "Send to tax system",
+  "taxTrackingCode": "Tracking code",
+  "taxLastSendAt": "Last sent at",
+  "taxSendSingleDialogTitle": "Send to tax system",
+  "taxSendSingleDialogMessage": "Send invoice {code} to tax system?",
+  "@taxSendSingleDialogMessage": {
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
+  "taxSendSuccess": "Sent to tax system.",
+  "taxSendErrorWithMessage": "Failed to send to tax system: {error}",
+  "@taxSendErrorWithMessage": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+
+  "taxSendSelectedTooltip": "Send selected invoices to tax system",
+  "taxSendSelectedButton": "Send selected ({count})",
+  "@taxSendSelectedButton": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "taxRemoveSelectedTooltip": "Remove selected invoices from tax workspace",
+  "taxRemoveSelectedButton": "Remove selected ({count})",
+  "@taxRemoveSelectedButton": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+
+  "taxSendSelectedDialogTitle": "Send selected to tax system",
+  "taxSendSelectedDialogMessage": "Send {count} selected invoices to tax system?",
+  "@taxSendSelectedDialogMessage": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "taxSendSelectedSuccess": "Selected invoices sent to tax system.",
+  "taxSendSelectedErrorWithMessage": "Failed to send selected invoices: {error}",
+  "@taxSendSelectedErrorWithMessage": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+
+  "taxRemoveSelectedDialogTitle": "Remove selected from tax workspace",
+  "taxRemoveSelectedDialogMessage": "Remove {count} selected invoices from tax workspace?",
+  "@taxRemoveSelectedDialogMessage": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "taxRemoveSelectedSuccess": "Selected invoices removed from tax workspace.",
+  "taxRemoveSelectedErrorWithMessage": "Failed to remove selected invoices: {error}",
+  "@taxRemoveSelectedErrorWithMessage": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  }
 }
 

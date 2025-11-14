@@ -1544,8 +1544,7 @@
   "walletSettingsTitle": "تنظیمات کیف‌پول",
   "walletBaseCurrency": "ارز پایه کیف‌پول",
   "walletCurrencyRequired": "انتخاب ارز الزامی است",
-  "saved": "ذخیره شد"
-  ,
+  "saved": "ذخیره شد",
   "savedSuccessfully": "با موفقیت ذخیره شد",
   "currencyToman": "تومان",
   "creditSettingsTitle": "اعتبار کاربران",
@@ -1588,6 +1587,154 @@
   "creditLimitHint": "خالی: استفاده از سقف پیش‌فرض کسب‌وکار",
   "creditTipText": "با خالی گذاشتن سقف اعتبار یا انتخاب حالت ارث‌بری، تنظیمات پیش‌فرض کسب‌وکار اعمال می‌شود.",
   "selectInstallmentPlan": "انتخاب پلن اقساط",
-  "applyPlan": "اعمال پلن"
+  "applyPlan": "اعمال پلن",
+
+  "taxWorkspaceMenu": "کارپوشه مالیاتی",
+  "taxWorkspaceTitle": "کارپوشه مودیان",
+  "taxWorkspaceSubtitle": "فاکتورها را قبل از ارسال به سامانه مودیان بررسی و مدیریت کنید.",
+
+  "taxAddToWorkspaceSingle": "افزودن به کارپوشه مالیاتی",
+  "taxRemoveFromWorkspaceSingle": "حذف از کارپوشه مالیاتی",
+
+  "taxStatus": "وضعیت مالیاتی",
+  "taxInWorkspace": "در کارپوشه مالیاتی",
+  "taxNotInWorkspace": "خارج از کارپوشه مالیاتی",
+  "taxStatusPending": "در انتظار ارسال",
+  "taxStatusSent": "ارسال شده",
+  "taxStatusFinalized": "نهایی شده",
+  "taxStatusFailed": "ارسال ناموفق",
+  "installmentColumn": "اقساطی",
+  "taxStatusNotSent": "ارسال نشده",
+
+  "taxAddToWorkspaceNotAllowed": "این فاکتور قابل افزودن به کارپوشه مالیاتی نیست.",
+  "taxAddToWorkspaceDialogTitle": "افزودن به کارپوشه مالیاتی",
+  "taxAddToWorkspaceDialogMessage": "فاکتور {code} به کارپوشه مالیاتی اضافه شود؟",
+  "@taxAddToWorkspaceDialogMessage": {
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
+  "taxAddToWorkspaceSuccess": "فاکتور {code} به کارپوشه مالیاتی اضافه شد.",
+  "@taxAddToWorkspaceSuccess": {
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
+  "taxAddToWorkspaceError": "خطا در افزودن به کارپوشه مالیاتی.",
+  "taxAddToWorkspaceErrorWithMessage": "خطا در افزودن به کارپوشه مالیاتی: {error}",
+  "@taxAddToWorkspaceErrorWithMessage": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+
+  "taxRemoveFromWorkspaceDialogTitle": "حذف از کارپوشه مالیاتی",
+  "taxRemoveFromWorkspaceDialogMessage": "فاکتور {code} از کارپوشه مالیاتی حذف شود؟",
+  "@taxRemoveFromWorkspaceDialogMessage": {
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
+  "taxRemoveFromWorkspaceSuccess": "فاکتور از کارپوشه مالیاتی حذف شد.",
+  "taxRemoveFromWorkspaceError": "خطا در حذف از کارپوشه مالیاتی.",
+  "taxRemoveFromWorkspaceErrorWithMessage": "خطا در حذف از کارپوشه مالیاتی: {error}",
+  "@taxRemoveFromWorkspaceErrorWithMessage": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+
+  "taxWorkspaceEmpty": "هیچ فاکتوری در کارپوشه مالیاتی نیست.",
+  "taxWorkspaceLoading": "در حال بارگذاری کارپوشه مالیاتی...",
+  "taxWorkspaceError": "خطا در بارگذاری کارپوشه مالیاتی.",
+
+  "taxSendSingle": "ارسال به سامانه مودیان",
+  "taxTrackingCode": "کد رهگیری",
+  "taxLastSendAt": "زمان آخرین ارسال",
+  "taxSendSingleDialogTitle": "ارسال به سامانه مودیان",
+  "taxSendSingleDialogMessage": "فاکتور {code} به سامانه مودیان ارسال شود؟",
+  "@taxSendSingleDialogMessage": {
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
+  "taxSendSuccess": "ارسال به سامانه مودیان انجام شد.",
+  "taxSendErrorWithMessage": "خطا در ارسال به سامانه مودیان: {error}",
+  "@taxSendErrorWithMessage": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+
+  "taxSendSelectedTooltip": "ارسال فاکتورهای انتخاب‌شده به سامانه مودیان",
+  "taxSendSelectedButton": "ارسال انتخاب‌شده‌ها ({count})",
+  "@taxSendSelectedButton": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "taxRemoveSelectedTooltip": "حذف فاکتورهای انتخاب‌شده از کارپوشه مالیاتی",
+  "taxRemoveSelectedButton": "حذف انتخاب‌شده‌ها ({count})",
+  "@taxRemoveSelectedButton": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+
+  "taxSendSelectedDialogTitle": "ارسال انتخاب‌شده‌ها به سامانه مودیان",
+  "taxSendSelectedDialogMessage": "{count} فاکتور انتخاب‌شده به سامانه مودیان ارسال شود؟",
+  "@taxSendSelectedDialogMessage": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "taxSendSelectedSuccess": "فاکتورهای انتخاب‌شده به سامانه مودیان ارسال شدند.",
+  "taxSendSelectedErrorWithMessage": "خطا در ارسال فاکتورهای انتخاب‌شده: {error}",
+  "@taxSendSelectedErrorWithMessage": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+
+  "taxRemoveSelectedDialogTitle": "حذف انتخاب‌شده‌ها از کارپوشه",
+  "taxRemoveSelectedDialogMessage": "{count} فاکتور انتخاب‌شده از کارپوشه مالیاتی حذف شوند؟",
+  "@taxRemoveSelectedDialogMessage": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "taxRemoveSelectedSuccess": "فاکتورهای انتخاب‌شده از کارپوشه مالیاتی حذف شدند.",
+  "taxRemoveSelectedErrorWithMessage": "خطا در حذف فاکتورهای انتخاب‌شده: {error}",
+  "@taxRemoveSelectedErrorWithMessage": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  }
 }
 

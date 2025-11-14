@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import '../../widgets/data_table/data_table_widget.dart';
@@ -105,11 +106,27 @@ class _CashRegistersPageState extends State<CashRegistersPage> {
 					formatter: (row) => (row.code?.toString() ?? '-'),
 					textAlign: TextAlign.center,
 				),
-				TextColumn(
+				CustomColumn(
 					'name',
 					t.title,
 					width: ColumnWidth.large,
 					formatter: (row) => row.name,
+					builder: (row, index) {
+						final registerName = row.name;
+						return InkWell(
+							onTap: () {
+								if (row.id != null) {
+									context.go(
+										'/business/${widget.businessId}/reports/kardex?cash_register_ids=${row.id}',
+									);
+								}
+							},
+							child: Text(
+								registerName,
+								style: const TextStyle(decoration: TextDecoration.underline),
+							),
+						);
+					},
 				),
 				TextColumn(
 					'currency_id',

@@ -106,6 +106,7 @@ class UserRepository(BaseRepository[User]):
 			"app_permissions": user.app_permissions,
 			"created_at": user.created_at,
 			"updated_at": user.updated_at,
+			"signature_file_id": getattr(user, "signature_file_id", None),
 		}
 
 

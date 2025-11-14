@@ -92,6 +92,30 @@ class InvoiceService {
     }
   }
 
+  /// افزودن یک فاکتور به کارپوشه مودیان
+  Future<bool> addToTaxWorkspace({
+    required int businessId,
+    required int invoiceId,
+  }) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/invoices/business/$businessId/$invoiceId/tax-workspace/add',
+      data: const <String, dynamic>{},
+    );
+    return res.data?['success'] == true;
+  }
+
+  /// حذف یک فاکتور از کارپوشه مودیان
+  Future<bool> removeFromTaxWorkspace({
+    required int businessId,
+    required int invoiceId,
+  }) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/invoices/business/$businessId/$invoiceId/tax-workspace/remove',
+      data: const <String, dynamic>{},
+    );
+    return res.data?['success'] == true;
+  }
+
   Future<Map<String, dynamic>> searchInstallments({
     required int businessId,
     Map<String, dynamic>? query,

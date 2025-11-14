@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:math' as math;
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../core/auth_store.dart';
 import '../../core/calendar_controller.dart';
@@ -62,6 +63,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
   Person? _selectedSupplier; // برای فاکتورهای خرید
   double? _customerBalance;
   String? _customerStatus;
+  Map<String, dynamic>? _customerCreditInfo; // credit_limit, effective_credit_limit, credit_check_enabled
   double? _commissionPercentage;
   double? _commissionAmount;
   CommissionType? _commissionType;
@@ -102,6 +104,61 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
   // پلن‌های اقساط
   List<InstallmentPlan> _installmentPlans = <InstallmentPlan>[];
   InstallmentPlan? _selectedInstallmentPlan;
+
+  // خلاصه محاسبات اقساط
+  double get _installmentsPrincipalTotal {
+    double sum = 0;
+    for (final r in _installmentRows) {
+      sum += (r['principal'] as num?)?.toDouble() ?? 0.0;
+    }
+    return sum;
+  }
+
+  double get _installmentsInterestTotal {
+    double sum = 0;
+    for (final r in _installmentRows) {
+      sum += (r['interest'] as num?)?.toDouble() ?? 0.0;
+    }
+    return sum;
+  }
+
+  double get _installmentsTotal {
+    double sum = 0;
+    for (final r in _installmentRows) {
+      sum += (r['total'] as num?)?.toDouble() ?? 0.0;
+    }
+    return sum;
+  }
+
+  bool get _isSalesOrReturn =>
+      _selectedInvoiceType == InvoiceType.sales || _selectedInvoiceType == InvoiceType.salesReturn;
+
+  bool get _isCreditLimitExceededApprox {
+    if (!_isSalesOrReturn) return false;
+    if (_customerCreditInfo == null || _customerBalance == null) return false;
+    final effectiveLimit = (_customerCreditInfo!['effective_credit_limit'] as num?)?.toDouble();
+    if (effectiveLimit == null) return false;
+    // بدهی فعلی (تراز منفی یعنی بدهکار)
+    double currentDebt = 0;
+    final bal = _customerBalance!;
+    if (bal < 0) {
+      currentDebt = -bal;
+    }
+    // مبلغ فاکتور (با مالیات)
+    final gross = _sumSubtotal.toDouble();
+    final discount = _sumDiscount.toDouble();
+    final tax = _sumTax.toDouble();
+    final totalWithTax = gross - discount + tax;
+    // پرداخت‌های برنامه‌ریزی‌شده
+    double plannedPaid = 0;
+    for (final p in _transactions) {
+      plannedPaid += (p.amount).toDouble();
+    }
+    double invoiceEffect = totalWithTax - plannedPaid;
+    if (invoiceEffect < 0) invoiceEffect = 0;
+    final newDebt = currentDebt + invoiceEffect;
+    return newDebt > effectiveLimit + 0.01;
+  }
 
   @override
   void initState() {
@@ -144,6 +201,18 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
     } catch (_) {}
   }
 
+  Future<void> _loadCustomerCreditIfNeeded() async {
+    if (_selectedCustomer == null) return;
+    try {
+      final data = await CreditApiService.getPersonCredit(widget.businessId, _selectedCustomer!.id);
+      setState(() {
+        _customerCreditInfo = data;
+      });
+    } catch (_) {
+      // در صورت خطا، فقط نادیده بگیر
+    }
+  }
+
   Widget _buildInstallmentsTab() {
     // ابزارها: تولید خودکار، افزودن/حذف ردیف
     void autoDistribute() {
@@ -151,34 +220,75 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
       if (n <= 0) return;
       final start = _firstInstallmentDueDate ?? _invoiceDate ?? DateTime.now();
       final periodDays = (_installmentPeriod == 'monthly') ? 30 : (_installmentPeriodDays ?? 30);
-      // محاسبه اصل با لحاظ پیش‌پرداخت، بدون اعشار
+      // محاسبه اصل با لحاظ پیش‌پرداخت
       final totalNet = _sumTotal.toDouble();
       final principalTarget = (totalNet - (_downPayment ?? 0)).clamp(0, double.infinity);
-      final principalTotal = principalTarget.round(); // کل اصل بدون اعشار
-      // توزیع یکنواخت اصل بدون اعشار
-      final basePrincipal = principalTotal ~/ n;
-      int remainderPrincipal = principalTotal - (basePrincipal * n);
-      // محاسبه سود کل و توزیع بدون اعشار
+      final principalTotal = principalTarget;
+
+      final method = _selectedInstallmentPlan?.method ?? 'flat';
       final rate = (_interestRate ?? 0.0);
-      final interestTotal = ((principalTotal * (rate / 100.0))).round();
-      final baseInterest = interestTotal ~/ n;
-      int remainderInterest = interestTotal - (baseInterest * n);
+
       final rows = <Map<String, dynamic>>[];
-      for (int i = 0; i < n; i++) {
-        final due = start.add(Duration(days: periodDays * i));
-        final principal = basePrincipal + (remainderPrincipal > 0 ? 1 : 0);
-        if (remainderPrincipal > 0) remainderPrincipal -= 1;
-        final interest = baseInterest + (remainderInterest > 0 ? 1 : 0);
-        if (remainderInterest > 0) remainderInterest -= 1;
-        rows.add({
-          'seq': i + 1,
-          'due_date': due,
-          'principal': principal.toDouble(),
-          'interest': interest.toDouble(),
-          'total': (principal + interest).toDouble(),
-        });
+
+      if (method == 'amortized' && rate > 0) {
+        // قسط ثابت بر اساس نرخ سود هر دوره (rate درصد به‌ازای هر قسط)
+        final i = rate / 100.0;
+        final nDouble = n.toDouble();
+        double installmentAmount;
+        if (i == 0) {
+          installmentAmount = principalTotal / nDouble;
+        } else {
+          final powFactor = math.pow(1 + i, nDouble) as double;
+          installmentAmount = principalTotal * i * powFactor / (powFactor - 1);
+        }
+        double remainingPrincipal = principalTotal.toDouble();
+        for (int k = 0; k < n; k++) {
+          final due = start.add(Duration(days: periodDays * k));
+          double interest = remainingPrincipal * i;
+          double principalPay = installmentAmount - interest;
+          if (k == n - 1) {
+            // آخرین قسط: تسویه باقیمانده برای جلوگیری از خطای اعشاری
+            principalPay = remainingPrincipal;
+            interest = installmentAmount - principalPay;
+          }
+          if (principalPay < 0) principalPay = 0;
+          remainingPrincipal -= principalPay;
+          // رند کردن به مبلغ بدون اعشار
+          final principalInt = principalPay.round();
+          final interestInt = interest.round();
+          rows.add({
+            'seq': k + 1,
+            'due_date': due,
+            'principal': principalInt.toDouble(),
+            'interest': interestInt.toDouble(),
+            'total': (principalInt + interestInt).toDouble(),
+          });
+        }
+        setState(() => _installmentRows = rows);
+      } else {
+        // روش ساده flat: تقسیم مساوی اصل و سود کل
+        final principalTotalRounded = principalTotal.round(); // کل اصل بدون اعشار
+        final basePrincipal = principalTotalRounded ~/ n;
+        int remainderPrincipal = principalTotalRounded - (basePrincipal * n);
+        final interestTotal = ((principalTotal * (rate / 100.0))).round();
+        final baseInterest = interestTotal ~/ n;
+        int remainderInterest = interestTotal - (baseInterest * n);
+        for (int i = 0; i < n; i++) {
+          final due = start.add(Duration(days: periodDays * i));
+          final principal = basePrincipal + (remainderPrincipal > 0 ? 1 : 0);
+          if (remainderPrincipal > 0) remainderPrincipal -= 1;
+          final interest = baseInterest + (remainderInterest > 0 ? 1 : 0);
+          if (remainderInterest > 0) remainderInterest -= 1;
+          rows.add({
+            'seq': i + 1,
+            'due_date': due,
+            'principal': principal.toDouble(),
+            'interest': interest.toDouble(),
+            'total': (principal + interest).toDouble(),
+          });
+        }
+        setState(() => _installmentRows = rows);
       }
-      setState(() => _installmentRows = rows);
     }
 
     return SingleChildScrollView(
@@ -368,7 +478,53 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                   children: [
                     const Icon(Icons.person),
                     const SizedBox(width: 8),
-                    Expanded(child: Text('مشتری: ${_selectedCustomer!.name}')),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('مشتری: ${_selectedCustomer!.name}'),
+                          if (_customerCreditInfo != null) ...[
+                            const SizedBox(height: 4),
+                            Builder(builder: (context) {
+                              final effectiveLimit = (_customerCreditInfo!['effective_credit_limit'] as num?)?.toDouble();
+                              final used = (_customerBalance ?? 0) < 0 ? -_customerBalance! : 0;
+                              final remaining = effectiveLimit != null ? (effectiveLimit - used) : null;
+                              final creditEnabled = _customerCreditInfo!['credit_check_enabled'];
+                              final enabledText = (creditEnabled == null)
+                                  ? 'پیروی از تنظیمات سیستم'
+                                  : (creditEnabled == true ? 'کنترل اعتبار فعال' : 'کنترل اعتبار غیرفعال');
+                              final limitExceeded = _isCreditLimitExceededApprox;
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  if (effectiveLimit != null)
+                                    Text('سقف اعتبار مؤثر: ${effectiveLimit.toStringAsFixed(0)}'),
+                                  if (remaining != null)
+                                    Text('اعتبار باقیمانده تقریبی: ${remaining.toStringAsFixed(0)}'),
+                                  Text(enabledText, style: Theme.of(context).textTheme.bodySmall),
+                                  if (limitExceeded && !_ignoreCreditCheck)
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 4),
+                                      child: Text(
+                                        'ثبت این فاکتور احتمالاً از سقف اعتبار عبور می‌کند و توسط سیستم رد می‌شود مگر این‌که گزینه نادیده گرفتن اعتبار را فعال کنید.',
+                                        style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.red),
+                                      ),
+                                    ),
+                                  if (limitExceeded && _ignoreCreditCheck)
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 4),
+                                      child: Text(
+                                        'هشدار: این فاکتور با وجود عبور از سقف اعتبار، به دلیل فعال بودن نادیده گرفتن اعتبار ثبت خواهد شد.',
+                                        style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.orange),
+                                      ),
+                                    ),
+                                ],
+                              );
+                            }),
+                          ],
+                        ],
+                      ),
+                    ),
                     if (_customerBalance != null) Text('تراز: ${_customerBalance!.toStringAsFixed(0)}'),
                     const SizedBox(width: 8),
                     if (_customerStatus != null) Chip(label: Text(_customerStatus!)),
@@ -554,14 +710,9 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                   // خلاصه اقساط
                   Builder(
                     builder: (context) {
-                      double sumPrincipal = 0;
-                      double sumInterest = 0;
-                      double sumTotal = 0;
-                      for (final r in _installmentRows) {
-                        sumPrincipal += (r['principal'] as num?)?.toDouble() ?? 0.0;
-                        sumInterest += (r['interest'] as num?)?.toDouble() ?? 0.0;
-                        sumTotal += (r['total'] as num?)?.toDouble() ?? 0.0;
-                      }
+                      final sumPrincipal = _installmentsPrincipalTotal;
+                      final sumInterest = _installmentsInterestTotal;
+                      final sumTotal = _installmentsTotal;
                       final targetPrincipal = (_sumTotal.toDouble() - (_downPayment ?? 0)).clamp(0, double.infinity);
                       final diff = sumPrincipal - targetPrincipal;
                       final diffColor = diff.abs() <= 1 ? Colors.green : Colors.orange;
@@ -814,8 +965,10 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                                 _selectedCustomer = customer;
                                 _customerBalance = null;
                                 _customerStatus = null;
+                                _customerCreditInfo = null;
                               });
                               _loadCustomerBalance();
+                              _loadCustomerCreditIfNeeded();
                             },
                             businessId: widget.businessId,
                             authStore: widget.authStore,

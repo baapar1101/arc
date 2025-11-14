@@ -45,6 +45,10 @@ class Business(Base):
     national_id: Mapped[str | None] = mapped_column(String(20), nullable=True, index=True)
     registration_number: Mapped[str | None] = mapped_column(String(50), nullable=True, index=True)
     economic_id: Mapped[str | None] = mapped_column(String(50), nullable=True, index=True)
+
+    # شناسه فایل‌های ذخیره‌سازی شده برای لوگو و مهر (ارجاع به جدول file_storage)
+    logo_file_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    stamp_file_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     
     # فیلدهای جغرافیایی
     country: Mapped[str | None] = mapped_column(String(100), nullable=True)

@@ -246,13 +246,44 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
       final String? myRef = user != null ? user['referral_code']?.toString() : null;
       unawaited(ReferralStore.saveUserReferralCode(myRef));
       
-      // ذخیره دسترسی‌های اپلیکیشن
+      // ذخیره دسترسی‌های اپلیکیشن و اطلاعات کاربر برای نمایش در منو
       final appPermissions = user?['app_permissions'] as Map<String, dynamic>?;
       final isSuperAdmin = appPermissions?['superadmin'] == true;
       final userId = user?['id'] as int?;
-      
+      String? userName;
+      String? userMobile;
+      if (user != null) {
+        final fullName = user['full_name']?.toString().trim();
+        final firstName = user['first_name']?.toString().trim();
+        final lastName = user['last_name']?.toString().trim();
+        if (fullName != null && fullName.isNotEmpty) {
+          userName = fullName;
+        } else {
+          final buffer = <String>[];
+          if (firstName != null && firstName.isNotEmpty) buffer.add(firstName);
+          if (lastName != null && lastName.isNotEmpty) buffer.add(lastName);
+          if (buffer.isNotEmpty) {
+            userName = buffer.join(' ');
+          } else {
+            final email = user['email']?.toString().trim();
+            if (email != null && email.isNotEmpty) {
+              userName = email;
+            }
+          }
+        }
+        final mobile = user['mobile']?.toString().trim();
+        if (mobile != null && mobile.isNotEmpty) {
+          userMobile = mobile;
+        }
+      }
       if (appPermissions != null) {
-        await widget.authStore.saveAppPermissions(appPermissions, isSuperAdmin, userId: userId);
+        await widget.authStore.saveAppPermissions(
+          appPermissions,
+          isSuperAdmin,
+          userId: userId,
+          userName: userName,
+          userMobile: userMobile,
+        );
       }
 
       if (!mounted) return;
@@ -348,13 +379,44 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
       final String? myRef = user != null ? user['referral_code'] as String? : null;
       unawaited(ReferralStore.saveUserReferralCode(myRef));
       
-      // ذخیره دسترسی‌های اپلیکیشن
+      // ذخیره دسترسی‌های اپلیکیشن و اطلاعات کاربر برای نمایش در منو
       final appPermissions = user?['app_permissions'] as Map<String, dynamic>?;
       final isSuperAdmin = appPermissions?['superadmin'] == true;
       final userId = user?['id'] as int?;
-      
+      String? userName;
+      String? userMobile;
+      if (user != null) {
+        final fullName = user['full_name']?.toString().trim();
+        final firstName = user['first_name']?.toString().trim();
+        final lastName = user['last_name']?.toString().trim();
+        if (fullName != null && fullName.isNotEmpty) {
+          userName = fullName;
+        } else {
+          final buffer = <String>[];
+          if (firstName != null && firstName.isNotEmpty) buffer.add(firstName);
+          if (lastName != null && lastName.isNotEmpty) buffer.add(lastName);
+          if (buffer.isNotEmpty) {
+            userName = buffer.join(' ');
+          } else {
+            final email = user['email']?.toString().trim();
+            if (email != null && email.isNotEmpty) {
+              userName = email;
+            }
+          }
+        }
+        final mobile = user['mobile']?.toString().trim();
+        if (mobile != null && mobile.isNotEmpty) {
+          userMobile = mobile;
+        }
+      }
       if (appPermissions != null) {
-        await widget.authStore.saveAppPermissions(appPermissions, isSuperAdmin, userId: userId);
+        await widget.authStore.saveAppPermissions(
+          appPermissions,
+          isSuperAdmin,
+          userId: userId,
+          userName: userName,
+          userMobile: userMobile,
+        );
       }
       _showSnack(t.registerSuccess);
       // پاکسازی کد معرف پس از ثبت‌نام موفق

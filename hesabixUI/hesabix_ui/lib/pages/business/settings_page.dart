@@ -82,7 +82,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   title: t.printDocuments,
                   subtitle: t.printDocumentsDescription,
                   icon: Icons.print,
-                  onTap: () => _showPrintDocumentsDialog(context),
+                  onTap: () => context.go('/business/${widget.businessId}/settings/print'),
                 ),
                 // Report Builder - Templates access
                 _buildSettingItem(
@@ -237,32 +237,6 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   // دیالوگ‌های تنظیمات
-  
-  void _showPrintDocumentsDialog(BuildContext context) {
-    final t = AppLocalizations.of(context);
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(t.printDocuments),
-        content: Text(t.printDocumentsDialogContent),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(t.close),
-          ),
-          FilledButton(
-            onPressed: () {
-              Navigator.pop(context);
-              // Navigate to business dashboard for now (until print documents page is created)
-              context.go('/business/${widget.businessId}/dashboard');
-            },
-            child: Text(t.configure),
-          ),
-        ],
-      ),
-    );
-  }
-
   // ignore: unused_element
   void _showDataBackupDialog(BuildContext context) {
     final t = AppLocalizations.of(context);

@@ -1,3 +1,5 @@
+import 'package:dio/dio.dart' as dio;
+
 import '../core/api_client.dart';
 import '../models/business_models.dart';
 
@@ -111,6 +113,78 @@ class BusinessApiService {
       return response.data['data'];
     } else {
       throw Exception(response.data['message'] ?? 'خطا در دریافت آمار کسب و کارها');
+    }
+  }
+
+  // آپلود لوگوی کسب‌وکار
+  static Future<Map<String, dynamic>> uploadLogo({
+    required int businessId,
+    required String filename,
+    required List<int> bytes,
+  }) async {
+    final formData = dio.FormData.fromMap({
+      'file': dio.MultipartFile.fromBytes(bytes, filename: filename),
+    });
+    final response = await _apiClient.post<Map<String, dynamic>>(
+      '$_basePath/$businessId/logo',
+      data: formData,
+      options: dio.Options(contentType: 'multipart/form-data'),
+    );
+    if (response.data != null && response.data!['success'] == true) {
+      return (response.data!['data'] as Map).cast<String, dynamic>();
+    } else {
+      throw Exception(response.data?['message'] ?? 'خطا در آپلود لوگو');
+    }
+  }
+
+  // آپلود مهر/امضای کسب‌وکار
+  static Future<Map<String, dynamic>> uploadStamp({
+    required int businessId,
+    required String filename,
+    required List<int> bytes,
+  }) async {
+    final formData = dio.FormData.fromMap({
+      'file': dio.MultipartFile.fromBytes(bytes, filename: filename),
+    });
+    final response = await _apiClient.post<Map<String, dynamic>>(
+      '$_basePath/$businessId/stamp',
+      data: formData,
+      options: dio.Options(contentType: 'multipart/form-data'),
+    );
+    if (response.data != null && response.data!['success'] == true) {
+      return (response.data!['data'] as Map).cast<String, dynamic>();
+    } else {
+      throw Exception(response.data?['message'] ?? 'خطا در آپلود مهر/امضا');
+    }
+  }
+
+  /// دریافت تنظیمات چاپ فاکتورهای کسب‌وکار (عمومی و به تفکیک نوع فاکتور)
+  static Future<Map<String, dynamic>> getPrintSettings(int businessId) async {
+    final response = await _apiClient.get<Map<String, dynamic>>(
+      '$_basePath/$businessId/print-settings',
+    );
+    final data = response.data;
+    if (data != null && data['success'] == true) {
+      return (data['data'] as Map).cast<String, dynamic>();
+    } else {
+      throw Exception(data?['message'] ?? 'خطا در دریافت تنظیمات چاپ');
+    }
+  }
+
+  /// به‌روزرسانی تنظیمات چاپ فاکتورهای کسب‌وکار
+  static Future<Map<String, dynamic>> updatePrintSettings(
+    int businessId,
+    Map<String, dynamic> payload,
+  ) async {
+    final response = await _apiClient.put<Map<String, dynamic>>(
+      '$_basePath/$businessId/print-settings',
+      data: payload,
+    );
+    final data = response.data;
+    if (data != null && data['success'] == true) {
+      return (data['data'] as Map).cast<String, dynamic>();
+    } else {
+      throw Exception(data?['message'] ?? 'خطا در ذخیره تنظیمات چاپ');
     }
   }
 }

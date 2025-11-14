@@ -28,6 +28,8 @@ class User(Base):
 	telegram_connected_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 	created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 	updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+	# شناسه فایل ذخیره‌سازی شده برای امضای کاربر (ارجاع به جدول file_storage)
+	signature_file_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
 	
 	# Support relationships
 	tickets = relationship("Ticket", foreign_keys="Ticket.user_id", back_populates="user")

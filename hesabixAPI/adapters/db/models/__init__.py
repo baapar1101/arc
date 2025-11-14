@@ -6,6 +6,7 @@ from .api_key import ApiKey  # noqa: F401
 from .captcha import Captcha  # noqa: F401
 from .password_reset import PasswordReset  # noqa: F401
 from .business import Business  # noqa: F401
+from .business_print_settings import BusinessPrintSettings  # noqa: F401
 from .business_permission import BusinessPermission  # noqa: F401
 from .person import Person, PersonBankAccount  # noqa: F401
 # Business user models removed - using business_permissions instead

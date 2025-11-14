@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'dart:typed_data';
+
+import 'package:dio/dio.dart' as dio;
+import 'package:file_picker/file_picker.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/models/business_models.dart';
@@ -40,6 +44,12 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
   // تنظیمات اعتبار
   bool _checkCreditEnabledByDefault = false;
   final _defaultCreditLimitController = TextEditingController();
+
+  // فایل‌های گرافیکی
+  Uint8List? _logoBytes;
+  Uint8List? _stampBytes;
+  bool _uploadingLogo = false;
+  bool _uploadingStamp = false;
 
   late final ApiClient _apiClient;
 
@@ -90,6 +100,9 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
       _businessField = _resolveBusinessField(resp.businessField);
       _checkCreditEnabledByDefault = resp.checkCreditEnabledByDefault;
       _defaultCreditLimitController.text = (resp.defaultCreditLimit ?? 0).toStringAsFixed(0);
+
+      // بارگذاری پیش‌نمایش لوگو و مهر در صورت وجود
+      await _loadBrandingImages(resp);
     } catch (e) {
       _error = e.toString();
     } finally {
@@ -199,6 +212,106 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
     }
   }
 
+  Future<void> _loadBrandingImages(BusinessResponse resp) async {
+    _logoBytes = null;
+    _stampBytes = null;
+    try {
+      if (resp.logoFileId != null && resp.logoFileId!.isNotEmpty) {
+        final res = await _apiClient.get<List<int>>(
+          '/api/v1/businesses/${widget.businessId}/logo',
+          options: dio.Options(responseType: dio.ResponseType.bytes),
+        );
+        final data = res.data;
+        if (data != null && data.isNotEmpty) {
+          _logoBytes = Uint8List.fromList(data);
+        }
+      }
+    } catch (_) {
+      _logoBytes = null;
+    }
+    try {
+      if (resp.stampFileId != null && resp.stampFileId!.isNotEmpty) {
+        final res = await _apiClient.get<List<int>>(
+          '/api/v1/businesses/${widget.businessId}/stamp',
+          options: dio.Options(responseType: dio.ResponseType.bytes),
+        );
+        final data = res.data;
+        if (data != null && data.isNotEmpty) {
+          _stampBytes = Uint8List.fromList(data);
+        }
+      }
+    } catch (_) {
+      _stampBytes = null;
+    }
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  Future<void> _pickAndUploadLogo() async {
+    if (_uploadingLogo) return;
+    setState(() {
+      _uploadingLogo = true;
+    });
+    try {
+      final res = await FilePicker.platform.pickFiles(type: FileType.image, withData: true);
+      final f = res?.files.isNotEmpty == true ? res!.files.first : null;
+      if (f == null || f.bytes == null) return;
+      final bytes = f.bytes!;
+      await BusinessApiService.uploadLogo(
+        businessId: widget.businessId,
+        filename: f.name,
+        bytes: bytes,
+      );
+      _logoBytes = Uint8List.fromList(bytes);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('لوگو با موفقیت ذخیره شد')));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطا در آپلود لوگو: $e')));
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _uploadingLogo = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _pickAndUploadStamp() async {
+    if (_uploadingStamp) return;
+    setState(() {
+      _uploadingStamp = true;
+    });
+    try {
+      final res = await FilePicker.platform.pickFiles(type: FileType.image, withData: true);
+      final f = res?.files.isNotEmpty == true ? res!.files.first : null;
+      if (f == null || f.bytes == null) return;
+      final bytes = f.bytes!;
+      await BusinessApiService.uploadStamp(
+        businessId: widget.businessId,
+        filename: f.name,
+        bytes: bytes,
+      );
+      _stampBytes = Uint8List.fromList(bytes);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('مهر/امضا با موفقیت ذخیره شد')));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطا در آپلود مهر/امضا: $e')));
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _uploadingStamp = false;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
@@ -280,6 +393,18 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
               _buildTextField(controller: _economicIdController, label: t.economicId),
 
               const SizedBox(height: 24),
+              _buildSectionTitle('لوگو و مهر کسب‌وکار', cs),
+              const SizedBox(height: 8),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: _buildLogoCard(cs)),
+                  const SizedBox(width: 12),
+                  Expanded(child: _buildStampCard(cs)),
+                ],
+              ),
+
+              const SizedBox(height: 24),
               _buildSectionTitle(t.businessGeographicInfo, cs),
               const SizedBox(height: 8),
               Row(
@@ -319,6 +444,116 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
 
   Widget _buildSectionTitle(String title, ColorScheme cs) {
     return Text(title, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: cs.onSurface));
+  }
+
+  Widget _buildLogoCard(ColorScheme cs) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.image_outlined, color: cs.primary),
+                const SizedBox(width: 8),
+                const Text('لوگو', style: TextStyle(fontWeight: FontWeight.w600)),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Container(
+              height: 120,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                border: Border.all(color: cs.outlineVariant),
+                borderRadius: BorderRadius.circular(8),
+                color: cs.surfaceVariant.withOpacity(0.2),
+              ),
+              alignment: Alignment.center,
+              child: _logoBytes != null
+                  ? Image.memory(
+                      _logoBytes!,
+                      fit: BoxFit.contain,
+                    )
+                  : Text(
+                      'لوگویی ثبت نشده است',
+                      style: TextStyle(color: cs.onSurfaceVariant),
+                    ),
+            ),
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: OutlinedButton.icon(
+                onPressed: _uploadingLogo ? null : _pickAndUploadLogo,
+                icon: _uploadingLogo
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.upload_file),
+                label: const Text('انتخاب و آپلود لوگو'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStampCard(ColorScheme cs) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.verified_outlined, color: cs.primary),
+                const SizedBox(width: 8),
+                const Text('مهر / امضای شرکت', style: TextStyle(fontWeight: FontWeight.w600)),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Container(
+              height: 120,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                border: Border.all(color: cs.outlineVariant),
+                borderRadius: BorderRadius.circular(8),
+                color: cs.surfaceVariant.withOpacity(0.2),
+              ),
+              alignment: Alignment.center,
+              child: _stampBytes != null
+                  ? Image.memory(
+                      _stampBytes!,
+                      fit: BoxFit.contain,
+                    )
+                  : Text(
+                      'مهر/امضایی ثبت نشده است',
+                      style: TextStyle(color: cs.onSurfaceVariant),
+                    ),
+            ),
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: OutlinedButton.icon(
+                onPressed: _uploadingStamp ? null : _pickAndUploadStamp,
+                icon: _uploadingStamp
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.upload_file),
+                label: const Text('انتخاب و آپلود مهر / امضا'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildTextField({

@@ -1,4 +1,4 @@
-from __future__ import annotations
+# Removed __future__ annotations to fix OpenAPI schema generation
 
 from typing import Any, Dict, Optional, Literal
 from fastapi import APIRouter, Depends, Request, Body, HTTPException

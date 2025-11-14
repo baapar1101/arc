@@ -26,6 +26,9 @@ class CombinedUserMenuButton extends StatelessWidget {
   void _showUserMenu(BuildContext context) {
     final t = AppLocalizations.of(context);
     final cs = Theme.of(context).colorScheme;
+    final userName = authStore.currentUserName;
+    final userMobile = authStore.currentUserMobile;
+    final maskedMobile = _maskMobile(userMobile);
 
     showDialog(
       context: context,
@@ -49,7 +52,7 @@ class CombinedUserMenuButton extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Header با آواتار و نام کاربر
+              // Header ساده با آواتار و نام کاربر
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
@@ -76,18 +79,11 @@ class CombinedUserMenuButton extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            t.profile,
+                            userName?.isNotEmpty == true ? userName! : t.profile,
                             style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.w600,
                               color: cs.onSurface,
-                            ),
-                          ),
-                          Text(
-                            'کاربر حسابیکس',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: cs.onSurfaceVariant,
                             ),
                           ),
                         ],
@@ -102,6 +98,28 @@ class CombinedUserMenuButton extends StatelessWidget {
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   children: [
+                    // نمایش شماره موبایل (فقط در صورت موجود بودن)
+                    if (maskedMobile != null && maskedMobile.isNotEmpty) ...[
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.phone_iphone,
+                            color: cs.onSurfaceVariant,
+                            size: 18,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            maskedMobile,
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: cs.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+
                     // آیتم حساب کاربری
                     Container(
                       width: double.infinity,
@@ -323,6 +341,20 @@ class CombinedUserMenuButton extends StatelessWidget {
         child,
       ],
     );
+  }
+
+  /// ماسک‌کردن شماره موبایل: نگه‌داشتن ۳ رقم اول و ۳ رقم آخر و ستاره‌کردن وسط
+  String? _maskMobile(String? mobile) {
+    if (mobile == null) return null;
+    final raw = mobile.replaceAll(RegExp(r'\\s+'), '');
+    if (raw.length <= 6) {
+      return raw;
+    }
+    final start = raw.substring(0, 3);
+    final end = raw.substring(raw.length - 3);
+    final maskedCount = raw.length - 6;
+    final stars = '*' * maskedCount;
+    return '$start$stars$end';
   }
 
   void _confirmLogout(BuildContext context) {

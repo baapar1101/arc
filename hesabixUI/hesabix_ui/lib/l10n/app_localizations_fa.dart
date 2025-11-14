@@ -4064,4 +4064,179 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get applyPlan => 'اعمال پلن';
+
+  @override
+  String get taxWorkspaceMenu => 'کارپوشه مالیاتی';
+
+  @override
+  String get taxWorkspaceTitle => 'کارپوشه مودیان';
+
+  @override
+  String get taxWorkspaceSubtitle =>
+      'فاکتورها را قبل از ارسال به سامانه مودیان بررسی و مدیریت کنید.';
+
+  @override
+  String get taxAddToWorkspaceSingle => 'افزودن به کارپوشه مالیاتی';
+
+  @override
+  String get taxRemoveFromWorkspaceSingle => 'حذف از کارپوشه مالیاتی';
+
+  @override
+  String get taxStatus => 'وضعیت مالیاتی';
+
+  @override
+  String get taxInWorkspace => 'در کارپوشه مالیاتی';
+
+  @override
+  String get taxNotInWorkspace => 'خارج از کارپوشه مالیاتی';
+
+  @override
+  String get taxStatusPending => 'در انتظار ارسال';
+
+  @override
+  String get taxStatusSent => 'ارسال شده';
+
+  @override
+  String get taxStatusFinalized => 'نهایی شده';
+
+  @override
+  String get taxStatusFailed => 'ارسال ناموفق';
+
+  @override
+  String get installmentColumn => 'اقساطی';
+
+  @override
+  String get taxStatusNotSent => 'ارسال نشده';
+
+  @override
+  String get taxAddToWorkspaceNotAllowed =>
+      'این فاکتور قابل افزودن به کارپوشه مالیاتی نیست.';
+
+  @override
+  String get taxAddToWorkspaceDialogTitle => 'افزودن به کارپوشه مالیاتی';
+
+  @override
+  String taxAddToWorkspaceDialogMessage(String code) {
+    return 'فاکتور $code به کارپوشه مالیاتی اضافه شود؟';
+  }
+
+  @override
+  String taxAddToWorkspaceSuccess(String code) {
+    return 'فاکتور $code به کارپوشه مالیاتی اضافه شد.';
+  }
+
+  @override
+  String get taxAddToWorkspaceError => 'خطا در افزودن به کارپوشه مالیاتی.';
+
+  @override
+  String taxAddToWorkspaceErrorWithMessage(String error) {
+    return 'خطا در افزودن به کارپوشه مالیاتی: $error';
+  }
+
+  @override
+  String get taxRemoveFromWorkspaceDialogTitle => 'حذف از کارپوشه مالیاتی';
+
+  @override
+  String taxRemoveFromWorkspaceDialogMessage(String code) {
+    return 'فاکتور $code از کارپوشه مالیاتی حذف شود؟';
+  }
+
+  @override
+  String get taxRemoveFromWorkspaceSuccess =>
+      'فاکتور از کارپوشه مالیاتی حذف شد.';
+
+  @override
+  String get taxRemoveFromWorkspaceError => 'خطا در حذف از کارپوشه مالیاتی.';
+
+  @override
+  String taxRemoveFromWorkspaceErrorWithMessage(String error) {
+    return 'خطا در حذف از کارپوشه مالیاتی: $error';
+  }
+
+  @override
+  String get taxWorkspaceEmpty => 'هیچ فاکتوری در کارپوشه مالیاتی نیست.';
+
+  @override
+  String get taxWorkspaceLoading => 'در حال بارگذاری کارپوشه مالیاتی...';
+
+  @override
+  String get taxWorkspaceError => 'خطا در بارگذاری کارپوشه مالیاتی.';
+
+  @override
+  String get taxSendSingle => 'ارسال به سامانه مودیان';
+
+  @override
+  String get taxTrackingCode => 'کد رهگیری';
+
+  @override
+  String get taxLastSendAt => 'زمان آخرین ارسال';
+
+  @override
+  String get taxSendSingleDialogTitle => 'ارسال به سامانه مودیان';
+
+  @override
+  String taxSendSingleDialogMessage(String code) {
+    return 'فاکتور $code به سامانه مودیان ارسال شود؟';
+  }
+
+  @override
+  String get taxSendSuccess => 'ارسال به سامانه مودیان انجام شد.';
+
+  @override
+  String taxSendErrorWithMessage(String error) {
+    return 'خطا در ارسال به سامانه مودیان: $error';
+  }
+
+  @override
+  String get taxSendSelectedTooltip =>
+      'ارسال فاکتورهای انتخاب‌شده به سامانه مودیان';
+
+  @override
+  String taxSendSelectedButton(int count) {
+    return 'ارسال انتخاب‌شده‌ها ($count)';
+  }
+
+  @override
+  String get taxRemoveSelectedTooltip =>
+      'حذف فاکتورهای انتخاب‌شده از کارپوشه مالیاتی';
+
+  @override
+  String taxRemoveSelectedButton(int count) {
+    return 'حذف انتخاب‌شده‌ها ($count)';
+  }
+
+  @override
+  String get taxSendSelectedDialogTitle =>
+      'ارسال انتخاب‌شده‌ها به سامانه مودیان';
+
+  @override
+  String taxSendSelectedDialogMessage(int count) {
+    return '$count فاکتور انتخاب‌شده به سامانه مودیان ارسال شود؟';
+  }
+
+  @override
+  String get taxSendSelectedSuccess =>
+      'فاکتورهای انتخاب‌شده به سامانه مودیان ارسال شدند.';
+
+  @override
+  String taxSendSelectedErrorWithMessage(String error) {
+    return 'خطا در ارسال فاکتورهای انتخاب‌شده: $error';
+  }
+
+  @override
+  String get taxRemoveSelectedDialogTitle => 'حذف انتخاب‌شده‌ها از کارپوشه';
+
+  @override
+  String taxRemoveSelectedDialogMessage(int count) {
+    return '$count فاکتور انتخاب‌شده از کارپوشه مالیاتی حذف شوند؟';
+  }
+
+  @override
+  String get taxRemoveSelectedSuccess =>
+      'فاکتورهای انتخاب‌شده از کارپوشه مالیاتی حذف شدند.';
+
+  @override
+  String taxRemoveSelectedErrorWithMessage(String error) {
+    return 'خطا در حذف فاکتورهای انتخاب‌شده: $error';
+  }
 }

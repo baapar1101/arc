@@ -557,7 +557,7 @@ class _BusinessShellState extends State<BusinessShell> {
         label: t.taxpayers,
         icon: Icons.account_balance,
         selectedIcon: Icons.account_balance,
-        path: '/business/${widget.businessId}/taxpayers',
+        path: '/business/${widget.businessId}/tax-workspace',
         type: _MenuItemType.simple,
         hasAddButton: false,
       ),

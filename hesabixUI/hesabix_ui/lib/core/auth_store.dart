@@ -12,6 +12,8 @@ class AuthStore with ChangeNotifier {
   static const _kAppPermissions = 'app_permissions';
   static const _kIsSuperAdmin = 'is_superadmin';
   static const _kLastUrl = 'last_url';
+  static const _kUserName = 'user_name';
+  static const _kUserMobile = 'user_mobile';
   static const _kCurrentBusiness = 'current_business';
   static const _kSelectedCurrencyCode = 'selected_currency_code';
   static const _kSelectedCurrencyId = 'selected_currency_id';
@@ -25,6 +27,8 @@ class AuthStore with ChangeNotifier {
   Map<String, dynamic>? _businessPermissions;
   String? _selectedCurrencyCode; // مثل USD/EUR/IRR
   int? _selectedCurrencyId; // شناسه ارز در دیتابیس
+  String? _currentUserName;
+  String? _currentUserMobile;
 
   String? get apiKey => _apiKey;
   String get deviceId => _deviceId ?? '';
@@ -32,6 +36,8 @@ class AuthStore with ChangeNotifier {
   bool get isSuperAdmin => _isSuperAdmin;
   int? _currentUserId;
   int? get currentUserId => _currentUserId;
+  String? get currentUserName => _currentUserName;
+  String? get currentUserMobile => _currentUserMobile;
   BusinessWithPermission? get currentBusiness => _currentBusiness;
   Map<String, dynamic>? get businessPermissions => _businessPermissions;
   String? get selectedCurrencyCode => _selectedCurrencyCode;
@@ -70,11 +76,10 @@ class AuthStore with ChangeNotifier {
     
     if (kIsWeb) {
       final permissionsJson = prefs.getString(_kAppPermissions);
-      
       if (permissionsJson != null) {
         try {
           _appPermissions = Map<String, dynamic>.from(
-            const JsonDecoder().convert(permissionsJson)
+            const JsonDecoder().convert(permissionsJson),
           );
         } catch (e) {
           _appPermissions = null;
@@ -83,22 +88,27 @@ class AuthStore with ChangeNotifier {
         _appPermissions = null;
       }
       _isSuperAdmin = prefs.getBool(_kIsSuperAdmin) ?? false;
+      _currentUserName = prefs.getString(_kUserName);
+      _currentUserMobile = prefs.getString(_kUserMobile);
     } else {
       try {
         final permissionsJson = await _secure.read(key: _kAppPermissions);
-        
         if (permissionsJson != null) {
           _appPermissions = Map<String, dynamic>.from(
-            const JsonDecoder().convert(permissionsJson)
+            const JsonDecoder().convert(permissionsJson),
           );
         } else {
           _appPermissions = null;
         }
         final superAdminStr = await _secure.read(key: _kIsSuperAdmin);
         _isSuperAdmin = superAdminStr == 'true';
+        _currentUserName = await _secure.read(key: _kUserName);
+        _currentUserMobile = await _secure.read(key: _kUserMobile);
       } catch (e) {
         _appPermissions = null;
         _isSuperAdmin = false;
+        _currentUserName = null;
+        _currentUserMobile = null;
       }
     }
   }
@@ -131,30 +141,68 @@ class AuthStore with ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> saveAppPermissions(Map<String, dynamic>? permissions, bool isSuperAdmin, {int? userId}) async {
+  Future<void> saveAppPermissions(
+    Map<String, dynamic>? permissions,
+    bool isSuperAdmin, {
+    int? userId,
+    String? userName,
+    String? userMobile,
+  }) async {
     final prefs = await SharedPreferences.getInstance();
     _appPermissions = permissions;
     _isSuperAdmin = isSuperAdmin;
     if (userId != null) {
       _currentUserId = userId;
     }
+    _currentUserName = userName;
+    _currentUserMobile = userMobile;
 
     if (permissions == null) {
       await _clearAppPermissions();
     } else {
       final permissionsJson = const JsonEncoder().convert(permissions);
-      
+
       if (kIsWeb) {
         await prefs.setString(_kAppPermissions, permissionsJson);
         await prefs.setBool(_kIsSuperAdmin, isSuperAdmin);
+        if (userName != null) {
+          await prefs.setString(_kUserName, userName);
+        } else {
+          await prefs.remove(_kUserName);
+        }
+        if (userMobile != null) {
+          await prefs.setString(_kUserMobile, userMobile);
+        } else {
+          await prefs.remove(_kUserMobile);
+        }
       } else {
         try {
           await _secure.write(key: _kAppPermissions, value: permissionsJson);
           await _secure.write(key: _kIsSuperAdmin, value: isSuperAdmin.toString());
+          if (userName != null) {
+            await _secure.write(key: _kUserName, value: userName);
+          } else {
+            await _secure.delete(key: _kUserName);
+          }
+          if (userMobile != null) {
+            await _secure.write(key: _kUserMobile, value: userMobile);
+          } else {
+            await _secure.delete(key: _kUserMobile);
+          }
         } catch (_) {
           // Fallback to SharedPreferences
           await prefs.setString(_kAppPermissions, permissionsJson);
           await prefs.setBool(_kIsSuperAdmin, isSuperAdmin);
+          if (userName != null) {
+            await prefs.setString(_kUserName, userName);
+          } else {
+            await prefs.remove(_kUserName);
+          }
+          if (userMobile != null) {
+            await prefs.setString(_kUserMobile, userMobile);
+          } else {
+            await prefs.remove(_kUserMobile);
+          }
         }
       }
     }
@@ -165,17 +213,25 @@ class AuthStore with ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     _appPermissions = null;
     _isSuperAdmin = false;
+    _currentUserName = null;
+    _currentUserMobile = null;
 
     if (kIsWeb) {
       await prefs.remove(_kAppPermissions);
       await prefs.remove(_kIsSuperAdmin);
+      await prefs.remove(_kUserName);
+      await prefs.remove(_kUserMobile);
     } else {
       try {
         await _secure.delete(key: _kAppPermissions);
         await _secure.delete(key: _kIsSuperAdmin);
+        await _secure.delete(key: _kUserName);
+        await _secure.delete(key: _kUserMobile);
       } catch (_) {}
       await prefs.remove(_kAppPermissions);
       await prefs.remove(_kIsSuperAdmin);
+      await prefs.remove(_kUserName);
+      await prefs.remove(_kUserMobile);
     }
   }
 
@@ -200,10 +256,35 @@ class AuthStore with ChangeNotifier {
           Map<String, dynamic>? appPermissions;
           bool isSuperAdmin = false;
           int? userId;
+          String? userName;
+          String? userMobile;
 
           if (user != null) {
             appPermissions = user['app_permissions'] as Map<String, dynamic>?;
             userId = user['id'] as int?;
+            // استخراج نام کاربر (اولویت با full_name، سپس first_name + last_name، سپس email)
+            final fullName = user['full_name']?.toString().trim();
+            final firstName = user['first_name']?.toString().trim();
+            final lastName = user['last_name']?.toString().trim();
+            if (fullName != null && fullName.isNotEmpty) {
+              userName = fullName;
+            } else {
+              final buffer = <String>[];
+              if (firstName != null && firstName.isNotEmpty) buffer.add(firstName);
+              if (lastName != null && lastName.isNotEmpty) buffer.add(lastName);
+              if (buffer.isNotEmpty) {
+                userName = buffer.join(' ');
+              } else {
+                final email = user['email']?.toString().trim();
+                if (email != null && email.isNotEmpty) {
+                  userName = email;
+                }
+              }
+            }
+            final mobile = user['mobile']?.toString().trim();
+            if (mobile != null && mobile.isNotEmpty) {
+              userMobile = mobile;
+            }
           }
           // fallback: اگر در permissions هم مقدار باشد از آن بخوان
           if (!isSuperAdmin && permsObj != null) {
@@ -217,7 +298,13 @@ class AuthStore with ChangeNotifier {
           }
 
           // ذخیره در استور و لوکال
-          await saveAppPermissions(appPermissions, isSuperAdmin, userId: userId);
+          await saveAppPermissions(
+            appPermissions,
+            isSuperAdmin,
+            userId: userId,
+            userName: userName,
+            userMobile: userMobile,
+          );
         }
       }
     } catch (e) {

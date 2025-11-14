@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Tuple
 from datetime import datetime, date, timedelta
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 import logging
 
 from sqlalchemy.orm import Session
@@ -22,6 +22,7 @@ from adapters.db.models.person import Person
 from adapters.db.models.product import Product
 from adapters.db.models.invoice_item_line import InvoiceItemLine
 from app.core.responses import ApiError
+from app.services.credit_service import get_business_credit_settings
 import jdatetime
 import io
 import csv
@@ -436,9 +437,13 @@ def _resolve_accounts_for_invoice(db: Session, data: Dict[str, Any]) -> Dict[str
         # درآمد و برگشت فروش مطابق چارت سید:
         "revenue": _get_fixed_account_by_code(db, code("revenue", "50001")),
         "sales_return": _get_fixed_account_by_code(db, code("sales_return", "50002")),
-        # موجودی و ساخته‌شده (در نبود حساب مجزا) هر دو 10102
+        # تخفیفات فروش و خرید (به‌صورت مجزا)
+        "sales_discount": _get_fixed_account_by_code(db, code("sales_discount", "50003")),
+        "purchase_discount": _get_fixed_account_by_code(db, code("purchase_discount", "40003")),
+        # موجودی، GRNI و ساخته‌شده (در نبود حساب مجزا)
         "inventory": _get_fixed_account_by_code(db, code("inventory", "10102")),
         "inventory_finished": _get_fixed_account_by_code(db, code("inventory_finished", "10102")),
+        "grni": _get_fixed_account_by_code(db, code("grni", "30101")),
         # بهای تمام شده و VAT ها مطابق سید
         "cogs": _get_fixed_account_by_code(db, code("cogs", "40001")),
         "vat_out": _get_fixed_account_by_code(db, code("vat_out", "20101")),
@@ -615,6 +620,15 @@ def _compute_installment_plan(
                     "paid_amount": float(Decimal(str(it.get("paid_amount", 0) or 0))),
                 })
             down_payment = Decimal(str(plan_input.get("down_payment", 0) or 0))
+            # ولیدیشن پایه: جمع اصل اقساط + پیش‌پرداخت با مبلغ فاکتور (با مالیات) هم‌خوان باشد
+            tolerance = Decimal("1")
+            target = (total_with_tax - down_payment).max(Decimal(0))
+            if (principal_total - target).copy_abs() > tolerance:
+                raise ApiError(
+                    "INVALID_INSTALLMENT_PLAN",
+                    f"installment principal total ({float(principal_total)}) does not match invoice amount ({float(target)})",
+                    http_status=422,
+                )
             plan_dict: Dict[str, Any] = {
                 "method": plan_input.get("method") or "flat",
                 "down_payment": float(down_payment),
@@ -753,84 +767,115 @@ def create_invoice(
     movement_hint, _ = _movement_from_type(invoice_type)
 
     # --- اعتبارسنجی اعتبار مشتری (قبل از ایجاد سند) ---
-    try:
-        is_proforma_req = bool(data.get("is_proforma", False))
-        # فقط برای فروش (افزایش دریافتنی) و غیر پروفرما
-        if not is_proforma_req and invoice_type == INVOICE_SALES and person_id:
-            # تنظیمات شخص و کسب‌وکار
-            from adapters.db.models.person import Person as _PersonModel
-            from adapters.db.models.business import Business as _BusinessModel
-            person_obj = db.query(_PersonModel).filter(_PersonModel.id == int(person_id)).first()
-            business_obj = db.query(_BusinessModel).filter(_BusinessModel.id == int(business_id)).first()
-            # تعیین محدودیت و فعال بودن بررسی
-            check_enabled = None
-            credit_limit_val = None
-            if person_obj:
-                check_enabled = getattr(person_obj, "credit_check_enabled", None)
-                credit_limit_val = getattr(person_obj, "credit_limit", None)
-            if (check_enabled is None) and business_obj:
-                check_enabled = bool(getattr(business_obj, "check_credit_enabled_by_default", False))
-            if (credit_limit_val is None) and business_obj:
-                credit_limit_val = getattr(business_obj, "default_credit_limit", None)
-            # اگر بررسی غیرفعال است یا سقف تعریف نشده، رد شو
-            if check_enabled and (credit_limit_val is not None):
-                # محاسبه بدهی فعلی
-                from app.services.person_service import calculate_person_balance
-                bal, _status = calculate_person_balance(db, int(person_id), fiscal_year_id=fiscal_year.id if fiscal_year else None)
-                # اگر balance منفی باشد یعنی بدهکار
-                current_debt = Decimal(str(0))
-                try:
-                    if bal is not None:
-                        bdec = Decimal(str(bal))
-                        current_debt = (-bdec) if bdec < 0 else Decimal(0)
-                except Exception:
-                    current_debt = Decimal(0)
-                # مبلغ کل فاکتور (با مالیات) که AR را افزایش می‌دهد
-                net_wo_tax = Decimal(str(totals.get("gross", 0))) - Decimal(str(totals.get("discount", 0)))
-                tax_amt = Decimal(str(totals.get("tax", 0)))
-                total_with_tax = net_wo_tax + tax_amt
-                # پرداخت‌های همزمان ارسالی با فاکتور
+    is_proforma_req = bool(data.get("is_proforma", False))
+    # فقط برای فروش (افزایش دریافتنی) و غیر پروفرما
+    if not is_proforma_req and invoice_type == INVOICE_SALES and person_id:
+        # تنظیمات شخص و کسب‌وکار
+        from adapters.db.models.person import Person as _PersonModel
+        from adapters.db.models.business import Business as _BusinessModel
+        person_obj = db.query(_PersonModel).filter(_PersonModel.id == int(person_id)).first()
+        business_obj = db.query(_BusinessModel).filter(_BusinessModel.id == int(business_id)).first()
+        # تعیین محدودیت و فعال بودن بررسی
+        check_enabled = None
+        credit_limit_val = None
+        if person_obj:
+            check_enabled = getattr(person_obj, "credit_check_enabled", None)
+            credit_limit_val = getattr(person_obj, "credit_limit", None)
+        if (check_enabled is None) and business_obj:
+            check_enabled = bool(getattr(business_obj, "check_credit_enabled_by_default", False))
+        if (credit_limit_val is None) and business_obj:
+            credit_limit_val = getattr(business_obj, "default_credit_limit", None)
+        # اگر بررسی غیرفعال است یا سقف تعریف نشده، رد شو
+        if check_enabled and (credit_limit_val is not None):
+            # محاسبه بدهی فعلی
+            from app.services.person_service import calculate_person_balance
+            bal, _status = calculate_person_balance(db, int(person_id), fiscal_year_id=fiscal_year.id if fiscal_year else None)
+            # اگر balance منفی باشد یعنی بدهکار
+            current_debt = Decimal(str(0))
+            try:
+                if bal is not None:
+                    bdec = Decimal(str(bal))
+                    current_debt = (-bdec) if bdec < 0 else Decimal(0)
+            except Exception:
+                current_debt = Decimal(0)
+            # مبلغ کل فاکتور (با مالیات) که AR را افزایش می‌دهد
+            net_wo_tax = Decimal(str(totals.get("gross", 0))) - Decimal(str(totals.get("discount", 0)))
+            tax_amt = Decimal(str(totals.get("tax", 0)))
+            total_with_tax = net_wo_tax + tax_amt
+            # پرداخت‌های همزمان ارسالی با فاکتور
+            planned_paid = Decimal(0)
+            try:
+                for p in (data.get("payments") or []):
+                    amt = Decimal(str(p.get("amount", 0) or 0))
+                    if amt > 0:
+                        planned_paid += amt
+            except Exception:
                 planned_paid = Decimal(0)
-                try:
-                    for p in (data.get("payments") or []):
-                        amt = Decimal(str(p.get("amount", 0) or 0))
-                        if amt > 0:
-                            planned_paid += amt
-                except Exception:
-                    planned_paid = Decimal(0)
-                invoice_effect = total_with_tax - planned_paid
-                if invoice_effect < 0:
-                    invoice_effect = Decimal(0)
-                new_debt = current_debt + invoice_effect
-                limit_dec = Decimal(str(credit_limit_val))
-                if new_debt > limit_dec:
-                    ignore_flag = bool((data.get("extra_info") or {}).get("ignore_credit_check", False))
+            invoice_effect = total_with_tax - planned_paid
+            if invoice_effect < 0:
+                invoice_effect = Decimal(0)
+            new_debt = current_debt + invoice_effect
+            limit_dec = Decimal(str(credit_limit_val))
+            ignore_flag = bool((data.get("extra_info") or {}).get("ignore_credit_check", False))
+            # --- کنترل سقف اعتبار ---
+            if new_debt > limit_dec:
+                if not ignore_flag:
+                    # توقف با خطا
+                    raise ApiError(
+                        "CREDIT_LIMIT_EXCEEDED",
+                        f"اعتبار مشتری کافی نیست. مانده فعلی: {float(current_debt):.2f}، اثر فاکتور: {float(invoice_effect):.2f}، سقف: {float(limit_dec):.2f}",
+                        http_status=400
+                    )
+                else:
+                    # اجازه ادامه؛ هشدار را در extra_info ذخیره خواهیم کرد (پس از ساخت سند)
+                    header_extra = dict(header_extra or {})
+                    warns = list((header_extra.get("warnings") or []))
+                    warns.append({
+                        "code": "CREDIT_LIMIT_EXCEEDED",
+                        "message": "اعتبار مشتری از سقف عبور کرده است اما نادیده گرفته شد",
+                        "current_debt": float(current_debt),
+                        "invoice_effect": float(invoice_effect),
+                        "new_debt": float(new_debt),
+                        "limit": float(limit_dec),
+                    })
+                    header_extra["warnings"] = warns
+                    data["extra_info"] = header_extra
+
+            # --- کنترل بلاک خودکار بر اساس اقساط معوق ---
+            auto_block_days = None
+            credit_cfg = get_business_credit_settings(db, business_id)
+            auto_block_days_raw = credit_cfg.get("auto_block_after_days")
+            if auto_block_days_raw is not None:
+                auto_block_days = int(auto_block_days_raw)
+            if auto_block_days and auto_block_days > 0:
+                inst_data = search_installments(
+                    db=db,
+                    business_id=business_id,
+                    query={"person_id": int(person_id), "status": "overdue"},
+                )
+                max_overdue = 0
+                for it in inst_data.get("items", []):
+                    od = int(it.get("overdue_days") or 0)
+                    if od > max_overdue:
+                        max_overdue = od
+                if max_overdue > auto_block_days:
                     if not ignore_flag:
-                        # توقف با خطا
                         raise ApiError(
-                            "CREDIT_LIMIT_EXCEEDED",
-                            f"اعتبار مشتری کافی نیست. مانده فعلی: {float(current_debt):.2f}، اثر فاکتور: {float(invoice_effect):.2f}، سقف: {float(limit_dec):.2f}",
-                            http_status=400
+                            "CREDIT_AUTO_BLOCKED",
+                            f"به دلیل اقساط معوق بیش از {auto_block_days} روز، ثبت فاکتور جدید مجاز نیست.",
+                            http_status=400,
                         )
                     else:
-                        # اجازه ادامه؛ هشدار را در extra_info ذخیره خواهیم کرد (پس از ساخت سند)
                         header_extra = dict(header_extra or {})
                         warns = list((header_extra.get("warnings") or []))
                         warns.append({
-                            "code": "CREDIT_LIMIT_EXCEEDED",
-                            "message": "اعتبار مشتری از سقف عبور کرده است اما نادیده گرفته شد",
-                            "current_debt": float(current_debt),
-                            "invoice_effect": float(invoice_effect),
-                            "new_debt": float(new_debt),
-                            "limit": float(limit_dec),
+                            "code": "CREDIT_AUTO_BLOCKED_OVERRIDDEN",
+                            "message": "به دلیل اقساط معوق، حساب به صورت خودکار باید مسدود می‌شد اما نادیده گرفته شد",
+                            "auto_block_after_days": auto_block_days,
+                            "max_overdue_days": max_overdue,
                         })
                         header_extra["warnings"] = warns
                         data["extra_info"] = header_extra
-    except ApiError:
-        raise
-    except Exception:
-        # در صورت خطای غیرمنتظره، اعتبارسنجی را مسدود نکن
-        logger.exception("credit check failed silently")
 
     # Resolve inventory tracking per product and annotate lines
     all_product_ids = [int(ln.get("product_id")) for ln in lines_input if ln.get("product_id")]
@@ -906,7 +951,9 @@ def create_invoice(
     if not document.is_proforma:
         accounts = _resolve_accounts_for_invoice(db, data)
 
-        net = Decimal(str(totals["gross"])) - Decimal(str(totals["discount"]))
+        gross = Decimal(str(totals["gross"]))
+        discount = Decimal(str(totals["discount"]))
+        net = gross - discount
         tax = Decimal(str(totals["tax"]))
         total_with_tax = net + tax
 
@@ -925,13 +972,24 @@ def create_invoice(
                     description=data.get("description"),
                     extra_info={"side": "person", "person_id": person_id},
                 ))
-            db.add(DocumentLine(
-                document_id=document.id,
-                account_id=accounts["revenue"].id,
-                debit=Decimal(0),
-                credit=net,
-                description="درآمد فروش",
-            ))
+            # فروش قبل از تخفیف
+            if gross > 0:
+                db.add(DocumentLine(
+                    document_id=document.id,
+                    account_id=accounts["revenue"].id,
+                    debit=Decimal(0),
+                    credit=gross,
+                    description="فروش کالا (قبل از تخفیف)",
+                ))
+            # تخفیفات فروش به‌صورت مستقل
+            if discount > 0:
+                db.add(DocumentLine(
+                    document_id=document.id,
+                    account_id=accounts["sales_discount"].id,
+                    debit=discount,
+                    credit=Decimal(0),
+                    description="تخفیفات فروش",
+                ))
             if tax > 0:
                 db.add(DocumentLine(
                     document_id=document.id,
@@ -943,31 +1001,33 @@ def create_invoice(
             # COGS/Inventory در پست حواله ثبت خواهد شد
             # --- فروش اقساطی (ثبت سود تحقق‌نیافته و افزایش AR) ---
             plan_dict, total_interest = _compute_installment_plan(total_with_tax, header_extra, document_date)
-            if plan_dict and total_interest > 0:
-                # افزایش بدهکار دریافتنی به میزان سود کل اقساط
-                if person_id:
-                    db.add(DocumentLine(
-                        document_id=document.id,
-                        account_id=accounts["person"].id,
-                        person_id=person_id,
-                        debit=total_interest,
-                        credit=Decimal(0),
-                        description="سود کل اقساط افزوده به دریافتنی",
-                        extra_info={"installment": True, "side": "person", "person_id": person_id},
-                    ))
-                # بستانکار سود تحقق‌نیافته
-                db.add(DocumentLine(
-                    document_id=document.id,
-                    account_id=accounts["unearned_installment_profit"].id,
-                    debit=Decimal(0),
-                    credit=total_interest,
-                    description="سود تحقق‌نیافته فروش اقساطی",
-                    extra_info={"installment": True},
-                ))
-                # ذخیره طرح در extra_info سند
+            if plan_dict:
+                # در همه حالات طرح روی سند ذخیره می‌شود
                 extra = document.extra_info or {}
                 extra["installment_plan"] = plan_dict
                 document.extra_info = extra
+                # اگر سود اقساط مثبت باشد، ثبت‌های حسابداری سود اعمال می‌شود
+                if total_interest > 0:
+                    # افزایش بدهکار دریافتنی به میزان سود کل اقساط
+                    if person_id:
+                        db.add(DocumentLine(
+                            document_id=document.id,
+                            account_id=accounts["person"].id,
+                            person_id=person_id,
+                            debit=total_interest,
+                            credit=Decimal(0),
+                            description="سود کل اقساط افزوده به دریافتنی",
+                            extra_info={"installment": True, "side": "person", "person_id": person_id},
+                        ))
+                    # بستانکار سود تحقق‌نیافته
+                    db.add(DocumentLine(
+                        document_id=document.id,
+                        account_id=accounts["unearned_installment_profit"].id,
+                        debit=Decimal(0),
+                        credit=total_interest,
+                        description="سود تحقق‌نیافته فروش اقساطی",
+                        extra_info={"installment": True},
+                    ))
 
 
         # Sales Return
@@ -982,17 +1042,29 @@ def create_invoice(
                     description=data.get("description"),
                     extra_info={"side": "person", "person_id": person_id},
                 ))
-            db.add(DocumentLine(
-                document_id=document.id,
-                account_id=accounts["sales_return"].id,
-                debit=net,
-                credit=Decimal(0),
-                description="برگشت از فروش",
-            ))
-            if tax > 0:
+            # برگشت از فروش قبل از تخفیف
+            if gross > 0:
                 db.add(DocumentLine(
                     document_id=document.id,
-                    account_id=accounts["vat_in"].id,
+                    account_id=accounts["sales_return"].id,
+                    debit=gross,
+                    credit=Decimal(0),
+                    description="برگشت از فروش (قبل از تخفیف)",
+                ))
+            # برگشت تخفیفات فروش
+            if discount > 0:
+                db.add(DocumentLine(
+                    document_id=document.id,
+                    account_id=accounts["sales_discount"].id,
+                    debit=Decimal(0),
+                    credit=discount,
+                    description="برگشت تخفیفات فروش",
+                ))
+            if tax > 0:
+                # تعدیل VAT خروجی فاکتور فروش
+                db.add(DocumentLine(
+                    document_id=document.id,
+                    account_id=accounts["vat_out"].id,
                     debit=tax,
                     credit=Decimal(0),
                     description="تعدیل VAT برگشت از فروش",
@@ -1001,13 +1073,25 @@ def create_invoice(
 
         # Purchase
         elif invoice_type == INVOICE_PURCHASE:
-            db.add(DocumentLine(
-                document_id=document.id,
-                account_id=accounts["inventory"].id,
-                debit=net,
-                credit=Decimal(0),
-                description="ورود به موجودی بابت خرید",
-            ))
+            # ثبت GRNI بابت خرید به مبلغ ناخالص (قبل از تخفیف)
+            if gross > 0:
+                db.add(DocumentLine(
+                    document_id=document.id,
+                    account_id=accounts["grni"].id,
+                    debit=gross,
+                    credit=Decimal(0),
+                    description="ثبت GRNI خرید (مبلغ ناخالص)",
+                ))
+            # تخفیفات خرید به صورت جداگانه
+            if discount > 0:
+                db.add(DocumentLine(
+                    document_id=document.id,
+                    account_id=accounts["purchase_discount"].id,
+                    debit=Decimal(0),
+                    credit=discount,
+                    description="تخفیفات خرید",
+                ))
+            # VAT ورودی
             if tax > 0:
                 db.add(DocumentLine(
                     document_id=document.id,
@@ -1016,6 +1100,7 @@ def create_invoice(
                     credit=Decimal(0),
                     description="مالیات بر ارزش افزوده ورودی",
                 ))
+            # طرف‌شخص (حساب‌های پرداختنی) به مبلغ خالص با مالیات
             if person_id:
                 db.add(DocumentLine(
                     document_id=document.id,
@@ -1029,13 +1114,25 @@ def create_invoice(
 
         # Purchase Return
         elif invoice_type == INVOICE_PURCHASE_RETURN:
-            db.add(DocumentLine(
-                document_id=document.id,
-                account_id=accounts["inventory"].id,
-                debit=Decimal(0),
-                credit=net,
-                description="خروج از موجودی بابت برگشت خرید",
-            ))
+            # ثبت برگشت GRNI به مبلغ ناخالص (قبل از تخفیف)
+            if gross > 0:
+                db.add(DocumentLine(
+                    document_id=document.id,
+                    account_id=accounts["grni"].id,
+                    debit=Decimal(0),
+                    credit=gross,
+                    description="برگشت GRNI بابت برگشت خرید (مبلغ ناخالص)",
+                ))
+            # برگشت تخفیفات خرید
+            if discount > 0:
+                db.add(DocumentLine(
+                    document_id=document.id,
+                    account_id=accounts["purchase_discount"].id,
+                    debit=discount,
+                    credit=Decimal(0),
+                    description="برگشت تخفیفات خرید",
+                ))
+            # تعدیل VAT ورودی
             if tax > 0:
                 db.add(DocumentLine(
                     document_id=document.id,
@@ -1044,6 +1141,7 @@ def create_invoice(
                     credit=tax,
                     description="تعدیل VAT ورودی برگشت خرید",
                 ))
+            # طرف‌شخص (کاهش بدهی)
             if person_id:
                 db.add(DocumentLine(
                     document_id=document.id,
@@ -1055,82 +1153,10 @@ def create_invoice(
                     extra_info={"side": "person", "person_id": person_id},
                 ))
 
-        # Direct consumption
-        elif invoice_type == INVOICE_DIRECT_CONSUMPTION:
-            cogs_lines = [l for l in lines_input if ((l.get("extra_info") or {}).get("movement") or movement_hint) == "out"]
-            cogs_total = _extract_cogs_total(cogs_lines if cogs_lines else lines_input)
-            if cogs_total > 0:
-                db.add(DocumentLine(
-                    document_id=document.id,
-                    account_id=accounts["direct_consumption"].id,
-                    debit=cogs_total,
-                    credit=Decimal(0),
-                    description="مصرف مستقیم",
-                ))
-                db.add(DocumentLine(
-                    document_id=document.id,
-                    account_id=accounts["inventory"].id,
-                    debit=Decimal(0),
-                    credit=cogs_total,
-                    description="خروج از موجودی بابت مصرف",
-                ))
-
-        # Waste
-        elif invoice_type == INVOICE_WASTE:
-            cogs_lines = [l for l in lines_input if ((l.get("extra_info") or {}).get("movement") or movement_hint) == "out"]
-            cogs_total = _extract_cogs_total(cogs_lines if cogs_lines else lines_input)
-            if cogs_total > 0:
-                db.add(DocumentLine(
-                    document_id=document.id,
-                    account_id=accounts["waste_expense"].id,
-                    debit=cogs_total,
-                    credit=Decimal(0),
-                    description="ضایعات",
-                ))
-                db.add(DocumentLine(
-                    document_id=document.id,
-                    account_id=accounts["inventory"].id,
-                    debit=Decimal(0),
-                    credit=cogs_total,
-                    description="خروج از موجودی بابت ضایعات",
-                ))
-
-        # Production (WIP)
-        elif invoice_type == INVOICE_PRODUCTION:
-            # materials (out) → Debit WIP, Credit Inventory
-            materials_cost = _extract_cogs_total([l for l in lines_input if (l.get("extra_info") or {}).get("movement") == "out"])
-            if materials_cost > 0:
-                db.add(DocumentLine(
-                    document_id=document.id,
-                    account_id=accounts["wip"].id,
-                    debit=materials_cost,
-                    credit=Decimal(0),
-                    description="انتقال مواد به کاردرجریان",
-                ))
-                db.add(DocumentLine(
-                    document_id=document.id,
-                    account_id=accounts["inventory"].id,
-                    debit=Decimal(0),
-                    credit=materials_cost,
-                    description="خروج مواد اولیه",
-                ))
-            # finished goods (in) → Debit Finished Inventory, Credit WIP
-            finished_cost = _extract_cogs_total([l for l in lines_input if (l.get("extra_info") or {}).get("movement") == "in"])
-            if finished_cost > 0:
-                db.add(DocumentLine(
-                    document_id=document.id,
-                    account_id=accounts["inventory_finished"].id,
-                    debit=finished_cost,
-                    credit=Decimal(0),
-                    description="ورود کالای ساخته‌شده",
-                ))
-                db.add(DocumentLine(
-                    document_id=document.id,
-                    account_id=accounts["wip"].id,
-                    debit=Decimal(0),
-                    credit=finished_cost,
-                    description="انتقال از کاردرجریان",
-                ))
+        # Direct consumption / Waste / Production
+        elif invoice_type in (INVOICE_DIRECT_CONSUMPTION, INVOICE_WASTE, INVOICE_PRODUCTION):
+            # برای این انواع، ثبت‌های موجودی و بهای تمام‌شده فقط در پست حواله انبار انجام می‌شود
+            pass
 
         # --- پورسانت فروشنده/بازاریاب (تکمیلی پس از ثبت خطوط انواع فاکتور) ---
         if invoice_type in (INVOICE_SALES, INVOICE_SALES_RETURN):
@@ -1248,6 +1274,10 @@ def create_invoice(
 
                 if total_amount > 0 and account_lines:
                     is_receipt = invoice_type in {INVOICE_SALES, INVOICE_PURCHASE_RETURN}
+                    # نوع حساب طرف‌شخص برای سند دریافت/پرداخت متناسب با نوع فاکتور:
+                    # فروش و برگشت از فروش → دریافتنی‌ها (10401)
+                    # خرید و برگشت از خرید → پرداختنی‌ها (20201)
+                    person_is_receivable = invoice_type in {INVOICE_SALES, INVOICE_SALES_RETURN}
                     rp_data = {
                         "document_type": "receipt" if is_receipt else "payment",
                         "document_date": document.document_date.isoformat(),
@@ -1259,7 +1289,12 @@ def create_invoice(
                             "description": f"طرف حساب فاکتور {document.code}",
                         }],
                         "account_lines": account_lines,
-                        "extra_info": {"source": "invoice", "invoice_id": document.id},
+                        "extra_info": {
+                            "source": "invoice",
+                            "invoice_id": document.id,
+                            # هدایت نوع حساب طرف‌شخص در سند دریافت/پرداخت
+                            "person_is_receivable": person_is_receivable,
+                        },
                     }
                     rp_doc = create_receipt_payment(db=db, business_id=business_id, user_id=user_id, data=rp_data)
                     if isinstance(rp_doc, dict) and rp_doc.get("id"):
@@ -1414,7 +1449,9 @@ def update_invoice(
         totals = (header_extra.get("totals") or {})
         if not totals:
             totals = _extract_totals_from_lines(lines_input)
-        net = Decimal(str(totals.get("gross", 0))) - Decimal(str(totals.get("discount", 0)))
+        gross = Decimal(str(totals.get("gross", 0)))
+        discount = Decimal(str(totals.get("discount", 0)))
+        net = gross - discount
         tax = Decimal(str(totals.get("tax", 0)))
         total_with_tax = net + tax
         person_id = _person_id_from_header({"extra_info": header_extra})
@@ -1422,56 +1459,170 @@ def update_invoice(
 
         if inv_type == INVOICE_SALES:
             if person_id:
-                db.add(DocumentLine(document_id=document.id, account_id=accounts["person"].id, person_id=person_id, debit=total_with_tax, credit=Decimal(0), description=document.description))
-            db.add(DocumentLine(document_id=document.id, account_id=accounts["revenue"].id, debit=Decimal(0), credit=net, description="درآمد فروش"))
+                db.add(DocumentLine(
+                    document_id=document.id,
+                    account_id=accounts["person"].id,
+                    person_id=person_id,
+                    debit=total_with_tax,
+                    credit=Decimal(0),
+                    description=document.description,
+                ))
+            # فروش قبل از تخفیف
+            if gross > 0:
+                db.add(DocumentLine(
+                    document_id=document.id,
+                    account_id=accounts["revenue"].id,
+                    debit=Decimal(0),
+                    credit=gross,
+                    description="فروش کالا (قبل از تخفیف)",
+                ))
+            # تخفیفات فروش
+            if discount > 0:
+                db.add(DocumentLine(
+                    document_id=document.id,
+                    account_id=accounts["sales_discount"].id,
+                    debit=discount,
+                    credit=Decimal(0),
+                    description="تخفیفات فروش",
+                ))
             if tax > 0:
                 db.add(DocumentLine(document_id=document.id, account_id=accounts["vat_out"].id, debit=Decimal(0), credit=tax, description="مالیات خروجی"))
             # COGS/Inventory by warehouse posting
             # فروش اقساطی (ثبت سود تحقق‌نیافته و افزایش AR)
             plan_dict, total_interest = _compute_installment_plan(total_with_tax, header_extra, document.document_date)
-            if plan_dict and total_interest > 0:
-                if person_id:
-                    db.add(DocumentLine(
-                        document_id=document.id,
-                        account_id=accounts["person"].id,
-                        person_id=person_id,
-                        debit=total_interest,
-                        credit=Decimal(0),
-                        description="سود کل اقساط افزوده به دریافتنی",
-                        extra_info={"installment": True, "side": "person", "person_id": person_id},
-                    ))
-                db.add(DocumentLine(
-                    document_id=document.id,
-                    account_id=accounts["unearned_installment_profit"].id,
-                    debit=Decimal(0),
-                    credit=total_interest,
-                    description="سود تحقق‌نیافته فروش اقساطی",
-                    extra_info={"installment": True},
-                ))
+            if plan_dict:
                 # merge extra_info to include plan (preserve links)
                 ex_old = document.extra_info or {}
                 ex_new = dict(ex_old)
                 ex_new["installment_plan"] = plan_dict
                 document.extra_info = ex_new
+                if total_interest > 0:
+                    if person_id:
+                        db.add(DocumentLine(
+                            document_id=document.id,
+                            account_id=accounts["person"].id,
+                            person_id=person_id,
+                            debit=total_interest,
+                            credit=Decimal(0),
+                            description="سود کل اقساط افزوده به دریافتنی",
+                            extra_info={"installment": True, "side": "person", "person_id": person_id},
+                        ))
+                    db.add(DocumentLine(
+                        document_id=document.id,
+                        account_id=accounts["unearned_installment_profit"].id,
+                        debit=Decimal(0),
+                        credit=total_interest,
+                        description="سود تحقق‌نیافته فروش اقساطی",
+                        extra_info={"installment": True},
+                    ))
         elif inv_type == INVOICE_SALES_RETURN:
             if person_id:
-                db.add(DocumentLine(document_id=document.id, account_id=accounts["person"].id, person_id=person_id, debit=Decimal(0), credit=total_with_tax, description=document.description))
-            db.add(DocumentLine(document_id=document.id, account_id=accounts["sales_return"].id, debit=net, credit=Decimal(0), description="برگشت از فروش"))
+                db.add(DocumentLine(
+                    document_id=document.id,
+                    account_id=accounts["person"].id,
+                    person_id=person_id,
+                    debit=Decimal(0),
+                    credit=total_with_tax,
+                    description=document.description,
+                ))
+            # برگشت از فروش قبل از تخفیف
+            if gross > 0:
+                db.add(DocumentLine(
+                    document_id=document.id,
+                    account_id=accounts["sales_return"].id,
+                    debit=gross,
+                    credit=Decimal(0),
+                    description="برگشت از فروش (قبل از تخفیف)",
+                ))
+            # برگشت تخفیفات فروش
+            if discount > 0:
+                db.add(DocumentLine(
+                    document_id=document.id,
+                    account_id=accounts["sales_discount"].id,
+                    debit=Decimal(0),
+                    credit=discount,
+                    description="برگشت تخفیفات فروش",
+                ))
             if tax > 0:
-                db.add(DocumentLine(document_id=document.id, account_id=accounts["vat_in"].id, debit=tax, credit=Decimal(0), description="تعدیل VAT"))
+                # تعدیل VAT خروجی فاکتور فروش
+                db.add(DocumentLine(document_id=document.id, account_id=accounts["vat_out"].id, debit=tax, credit=Decimal(0), description="تعدیل VAT برگشت از فروش"))
             # Inventory/COGS handled in warehouse posting
         elif inv_type == INVOICE_PURCHASE:
-            # Inventory via warehouse posting; invoice handles VAT/AP only (or GRNI if فعال)
+            # ثبت GRNI به مبلغ ناخالص
+            if gross > 0:
+                db.add(DocumentLine(
+                    document_id=document.id,
+                    account_id=accounts["grni"].id,
+                    debit=gross,
+                    credit=Decimal(0),
+                    description="ثبت GRNI خرید (مبلغ ناخالص)",
+                ))
+            # تخفیفات خرید
+            if discount > 0:
+                db.add(DocumentLine(
+                    document_id=document.id,
+                    account_id=accounts["purchase_discount"].id,
+                    debit=Decimal(0),
+                    credit=discount,
+                    description="تخفیفات خرید",
+                ))
+            # VAT ورودی
             if tax > 0:
-                db.add(DocumentLine(document_id=document.id, account_id=accounts["vat_in"].id, debit=tax, credit=Decimal(0), description="مالیات ورودی"))
+                db.add(DocumentLine(
+                    document_id=document.id,
+                    account_id=accounts["vat_in"].id,
+                    debit=tax,
+                    credit=Decimal(0),
+                    description="مالیات ورودی",
+                ))
+            # طرف‌شخص
             if person_id:
-                db.add(DocumentLine(document_id=document.id, account_id=accounts["person"].id, person_id=person_id, debit=Decimal(0), credit=total_with_tax, description=document.description))
+                db.add(DocumentLine(
+                    document_id=document.id,
+                    account_id=accounts["person"].id,
+                    person_id=person_id,
+                    debit=Decimal(0),
+                    credit=total_with_tax,
+                    description=document.description,
+                ))
         elif inv_type == INVOICE_PURCHASE_RETURN:
-            # Inventory via warehouse posting
+            # برگشت GRNI به مبلغ ناخالص
+            if gross > 0:
+                db.add(DocumentLine(
+                    document_id=document.id,
+                    account_id=accounts["grni"].id,
+                    debit=Decimal(0),
+                    credit=gross,
+                    description="برگشت GRNI بابت برگشت خرید (مبلغ ناخالص)",
+                ))
+            # برگشت تخفیفات خرید
+            if discount > 0:
+                db.add(DocumentLine(
+                    document_id=document.id,
+                    account_id=accounts["purchase_discount"].id,
+                    debit=discount,
+                    credit=Decimal(0),
+                    description="برگشت تخفیفات خرید",
+                ))
+            # تعدیل VAT ورودی
             if tax > 0:
-                db.add(DocumentLine(document_id=document.id, account_id=accounts["vat_in"].id, debit=Decimal(0), credit=tax, description="تعدیل VAT ورودی"))
+                db.add(DocumentLine(
+                    document_id=document.id,
+                    account_id=accounts["vat_in"].id,
+                    debit=Decimal(0),
+                    credit=tax,
+                    description="تعدیل VAT ورودی",
+                ))
+            # طرف‌شخص (کاهش بدهی)
             if person_id:
-                db.add(DocumentLine(document_id=document.id, account_id=accounts["person"].id, person_id=person_id, debit=total_with_tax, credit=Decimal(0), description=document.description))
+                db.add(DocumentLine(
+                    document_id=document.id,
+                    account_id=accounts["person"].id,
+                    person_id=person_id,
+                    debit=total_with_tax,
+                    credit=Decimal(0),
+                    description=document.description,
+                ))
         elif inv_type == INVOICE_DIRECT_CONSUMPTION:
             # Expense/Inventory in warehouse posting
             pass
@@ -1820,6 +1971,23 @@ def search_installments(
     due_from_dt = _parse_date(due_from)
     due_to_dt = _parse_date(due_to)
 
+    # تنظیمات اعتبار برای محاسبه جریمه دیرکرد
+    late_fee_rate_dec: Decimal | None = None
+    grace_days_val: int | None = None
+    try:
+        credit_cfg = get_business_credit_settings(db, business_id)
+        if credit_cfg.get("late_fee_rate") is not None:
+            late_fee_rate_dec = Decimal(str(credit_cfg.get("late_fee_rate")))
+        gd = credit_cfg.get("grace_days")
+        if gd is not None:
+            try:
+                grace_days_val = int(gd)
+            except Exception:
+                grace_days_val = None
+    except Exception:
+        late_fee_rate_dec = None
+        grace_days_val = None
+
     # اسناد فروش دارای طرح اقساط
     docs_q = db.query(Document).filter(
         and_(
@@ -1848,6 +2016,18 @@ def search_installments(
                     continue
             except Exception:
                 continue
+        # تلاش برای استخراج نام شخص برای نمایش در گزارش
+        person_name = None
+        try:
+            if extra.get("person_id") is not None:
+                pid = int(extra.get("person_id"))
+                person = db.query(Person).filter(
+                    and_(Person.id == pid, Person.business_id == int(business_id))
+                ).first()
+                if person is not None:
+                    person_name = getattr(person, "name", None)
+        except Exception:
+            person_name = None
         schedule = plan.get("schedule") or []
         for it in schedule:
             # استخراج تاریخ سررسید
@@ -1883,10 +2063,36 @@ def search_installments(
             # فیلتر وضعیت
             if status_filter and st != status_filter:
                 continue
+            overdue_days = 0
+            if st == "overdue":
+                try:
+                    overdue_days = max((today - due).days, 0)
+                except Exception:
+                    overdue_days = 0
+            # جریمه دیرکرد ساده بر اساس تنظیمات کسب‌وکار (بدون اعشار)
+            late_fee_amount = Decimal(0)
+            if (
+                st == "overdue"
+                and late_fee_rate_dec is not None
+                and late_fee_rate_dec > Decimal(0)
+                and remaining > Decimal(0)
+            ):
+                apply_fee = True
+                if grace_days_val is not None and grace_days_val > 0:
+                    if overdue_days <= grace_days_val:
+                        apply_fee = False
+                if apply_fee:
+                    try:
+                        late_fee_amount = (remaining * late_fee_rate_dec / Decimal("100")).quantize(
+                            Decimal("1"), rounding=ROUND_HALF_UP
+                        )
+                    except Exception:
+                        late_fee_amount = Decimal(0)
             items.append({
                 "invoice_id": int(doc.id),
                 "invoice_code": doc.code,
                 "person_id": extra.get("person_id"),
+                "person_name": person_name,
                 "document_date": doc.document_date.isoformat(),
                 "seq": int(it.get("seq") or 0),
                 "due_date": due.isoformat(),
@@ -1896,6 +2102,8 @@ def search_installments(
                 "paid_amount": float(paid),
                 "remaining": float(remaining),
                 "status": st,
+                "overdue_days": overdue_days,
+                "late_fee_amount": float(late_fee_amount),
             })
 
     total_count = len(items)
@@ -1938,6 +2146,7 @@ def export_installments_csv(
         "invoice_id",
         "invoice_code",
         "person_id",
+        "person_name",
         "document_date",
         "seq",
         "due_date",
@@ -1947,12 +2156,15 @@ def export_installments_csv(
         "total",
         "paid_amount",
         "remaining",
+        "overdue_days",
+        "late_fee_amount",
     ])
     for it in items:
         writer.writerow([
             it.get("invoice_id"),
             it.get("invoice_code"),
             it.get("person_id"),
+            it.get("person_name"),
             it.get("document_date"),
             it.get("seq"),
             it.get("due_date"),
@@ -1962,6 +2174,8 @@ def export_installments_csv(
             it.get("total"),
             it.get("paid_amount"),
             it.get("remaining"),
+            it.get("overdue_days"),
+            it.get("late_fee_amount"),
         ])
     return output.getvalue().encode("utf-8-sig")
 
@@ -1984,6 +2198,7 @@ def export_installments_xlsx(
             "invoice_id",
             "invoice_code",
             "person_id",
+            "person_name",
             "document_date",
             "seq",
             "due_date",
@@ -1993,6 +2208,8 @@ def export_installments_xlsx(
             "total",
             "paid_amount",
             "remaining",
+            "overdue_days",
+            "late_fee_amount",
         ]
         ws.append(headers)
         data = search_installments(db, business_id, query)
@@ -2001,6 +2218,7 @@ def export_installments_xlsx(
                 it.get("invoice_id"),
                 it.get("invoice_code"),
                 it.get("person_id"),
+                it.get("person_name"),
                 it.get("document_date"),
                 it.get("seq"),
                 it.get("due_date"),
@@ -2010,6 +2228,8 @@ def export_installments_xlsx(
                 it.get("total"),
                 it.get("paid_amount"),
                 it.get("remaining"),
+                it.get("overdue_days"),
+                it.get("late_fee_amount"),
             ])
         bio = io.BytesIO()
         wb.save(bio)

@@ -1,7 +1,8 @@
 # Removed __future__ annotations to fix OpenAPI schema generation
 
-from fastapi import APIRouter, Depends, Request, Query
+from fastapi import APIRouter, Depends, Request, Query, UploadFile, File
 from sqlalchemy.orm import Session
+import io
 
 from adapters.db.session import get_db
 from adapters.db.repositories.user_repo import UserRepository
@@ -9,6 +10,9 @@ from adapters.api.v1.schemas import QueryInfo, SuccessResponse, UsersListRespons
 from app.core.responses import success_response, format_datetime_fields
 from app.core.auth_dependency import get_current_user, AuthContext
 from app.core.permissions import require_user_management
+from app.services.file_storage_service import FileStorageService
+from uuid import UUID
+from starlette.responses import StreamingResponse
 
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -213,6 +217,75 @@ def list_users_simple(
 	formatted_users = [format_datetime_fields(user_dict, None) for user_dict in user_dicts]
 	
 	return success_response(formatted_users, None)
+
+
+@router.post(
+	"/me/signature",
+	summary="آپلود امضای کاربر جاری",
+	description="آپلود تصویر امضای کاربر و ذخیره آن در سیستم فایل.",
+	response_model=SuccessResponse,
+)
+async def upload_my_signature(
+	request: Request,
+	file: UploadFile = File(...),
+	ctx: AuthContext = Depends(get_current_user),
+	db: Session = Depends(get_db),
+):
+	"""آپلود امضای کاربر کنونی و ذخیره file_id در User.signature_file_id"""
+	repo = UserRepository(db)
+	user = repo.get_by_id(ctx.get_user_id())
+	if not user:
+		from app.core.responses import ApiError
+		raise ApiError("USER_NOT_FOUND", "کاربر یافت نشد", http_status=404)
+
+	storage = FileStorageService(db)
+	saved = await storage.upload_file(
+		file=file,
+		user_id=ctx.get_user_id(),
+		module_context="user_signature",
+		context_id=None,
+		developer_data={"user_id": ctx.get_user_id()},
+		is_temporary=False,
+		expires_in_days=3650,
+	)
+
+	# به‌روز کردن شناسه امضا روی کاربر
+	user.signature_file_id = saved.get("file_id")
+	db.commit()
+
+	return success_response(
+		{
+			"signature_file_id": user.signature_file_id,
+			"file": saved,
+		},
+		request,
+	)
+
+
+@router.get(
+	"/me/signature",
+	summary="دریافت فایل امضای کاربر جاری",
+	description="بازگرداندن تصویر امضای کاربر کنونی به‌صورت فایل (برای نمایش در پروفایل یا فاکتور).",
+)
+async def get_my_signature(
+	request: Request,
+	ctx: AuthContext = Depends(get_current_user),
+	db: Session = Depends(get_db),
+):
+	repo = UserRepository(db)
+	user = repo.get_by_id(ctx.get_user_id())
+	if not user or not getattr(user, "signature_file_id", None):
+		from app.core.responses import ApiError
+		raise ApiError("SIGNATURE_NOT_SET", "امضایی برای این کاربر ثبت نشده است", http_status=404)
+
+	storage = FileStorageService(db)
+	file_data = await storage.download_file(UUID(str(user.signature_file_id)))
+
+	return StreamingResponse(
+		content=io.BytesIO(file_data["content"]),
+		media_type=file_data["mime_type"] or "image/png",
+		headers={"Content-Disposition": f'inline; filename="{file_data["filename"]}"'},
+	)
 
 
 @router.get("/{user_id}", 

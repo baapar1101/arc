@@ -725,7 +725,8 @@ class _KardexPageState extends State<KardexPage> {
   }
   void _parseInitialQueryParams() {
     try {
-      final uri = Uri.base;
+      final routeState = GoRouterState.of(context);
+      final uri = routeState.uri;
       _log('Parsing query params: ' + uri.toString());
       List<int> _parseIds(String singularKey, String pluralKey) {
         final out = <int>{};

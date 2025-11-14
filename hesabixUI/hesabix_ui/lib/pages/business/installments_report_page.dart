@@ -224,13 +224,24 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
                           return ListTile(
                             dense: true,
                             title: Text('${it['invoice_code'] ?? '-'}  |  قسط ${it['seq'] ?? '-'}'),
-                            subtitle: Text('سررسید: ${it['due_date'] ?? '-'}   |   وضعیت: ${it['status'] ?? '-'}'),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('سررسید: ${it['due_date'] ?? '-'}   |   وضعیت: ${it['status'] ?? '-'}'),
+                                if (it['person_name'] != null && (it['person_name'] as String).isNotEmpty)
+                                  Text('شخص: ${it['person_name']}'),
+                                if ((it['overdue_days'] ?? 0) is num && (it['overdue_days'] as num) > 0)
+                                  Text('روزهای تاخیر: ${(it['overdue_days'] as num).toInt()}'),
+                              ],
+                            ),
                             trailing: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               crossAxisAlignment: CrossAxisAlignment.end,
                               children: [
                                 Text('مانده: ${(it['remaining'] ?? 0).toString()}'),
                                 Text('پرداخت: ${(it['paid_amount'] ?? 0).toString()}'),
+                                if ((it['late_fee_amount'] ?? 0) is num && (it['late_fee_amount'] as num) > 0)
+                                  Text('جریمه دیرکرد: ${(it['late_fee_amount'] as num).toInt()}'),
                               ],
                             ),
                           );
