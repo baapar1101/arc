@@ -142,6 +142,36 @@ class InvoiceService {
     throw Exception('Invalid CSV response');
   }
 
+  /// چاپ چند فاکتور به صورت یک PDF واحد
+  Future<List<int>> printMultipleInvoices({
+    required int businessId,
+    required List<int> invoiceIds,
+  }) async {
+    if (invoiceIds.isEmpty) {
+      throw Exception('هیچ فاکتوری انتخاب نشده است');
+    }
+
+    final res = await _api.post<dynamic>(
+      '/api/v1/invoices/business/$businessId/print-multiple',
+      data: {'invoice_ids': invoiceIds},
+      options: Options(
+        responseType: ResponseType.bytes,
+        headers: {
+          'Accept': 'application/pdf',
+        },
+      ),
+    );
+
+    final data = res.data;
+    if (data is Uint8List) {
+      return data.toList();
+    } else if (data is List<int>) {
+      return data;
+    } else {
+      throw Exception('Invalid PDF response');
+    }
+  }
+
 }
 
 

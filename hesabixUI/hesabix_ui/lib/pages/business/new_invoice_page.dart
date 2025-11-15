@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'dart:math' as math;
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../core/auth_store.dart';
@@ -780,6 +781,8 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
 
   // بررسی اینکه آیا تب تراکنش‌ها باید نمایش داده شود
   bool get _shouldShowTransactionsTab {
+    // اگر پیش‌فاکتور است، تب تراکنش‌ها نمایش داده نمی‌شود
+    if (_isDraft) return false;
     return _selectedInvoiceType != InvoiceType.waste && 
            _selectedInvoiceType != InvoiceType.directConsumption && 
            _selectedInvoiceType != InvoiceType.production;
@@ -904,6 +907,22 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                           onDraftChanged: (isDraft) {
                             setState(() {
                               _isDraft = isDraft;
+                              // اگر پیش‌فاکتور فعال شد، اقساط را غیرفعال کن
+                              if (isDraft && _useInstallments) {
+                                _useInstallments = false;
+                                _numInstallments = null;
+                                _downPayment = null;
+                                _interestRate = null;
+                                _firstInstallmentDueDate = null;
+                                _installmentRows = [];
+                                // همگام‌سازی TabController
+                                final newTabCount = _getTabCountForType(_selectedInvoiceType);
+                                if (newTabCount != _tabController.length) {
+                                  _tabController.dispose();
+                                  _tabController = TabController(length: newTabCount, vsync: this);
+                                  _attachTabListener();
+                                }
+                              }
                             });
                           },
                           isRequired: true,
@@ -1181,6 +1200,22 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                                 onDraftChanged: (isDraft) {
                                   setState(() {
                                     _isDraft = isDraft;
+                                    // اگر پیش‌فاکتور فعال شد، اقساط را غیرفعال کن
+                                    if (isDraft && _useInstallments) {
+                                      _useInstallments = false;
+                                      _numInstallments = null;
+                                      _downPayment = null;
+                                      _interestRate = null;
+                                      _firstInstallmentDueDate = null;
+                                      _installmentRows = [];
+                                      // همگام‌سازی TabController
+                                      final newTabCount = _getTabCountForType(_selectedInvoiceType);
+                                      if (newTabCount != _tabController.length) {
+                                        _tabController.dispose();
+                                        _tabController = TabController(length: newTabCount, vsync: this);
+                                        _attachTabListener();
+                                      }
+                                    }
                                   });
                                 },
                                 isRequired: true,
@@ -1476,6 +1511,10 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
           duration: const Duration(seconds: 2),
         ),
       );
+      // بازگشت به لیست فاکتورها بعد از ثبت موفق
+      if (mounted) {
+        context.pop(true); // true به معنای موفقیت‌آمیز بودن ثبت
+      }
     } catch (e) {
       _showError(t.saveInvoiceErrorWithMessage(e.toString()));
     }
@@ -1841,7 +1880,8 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                           title: Text(AppLocalizations.of(context).installmentsTitle),
                           subtitle: Text(AppLocalizations.of(context).installmentsSubtitle),
                           value: _useInstallments,
-                          onChanged: (value) {
+                          // غیرفعال در حالت پیش‌فاکتور (onChanged: null باعث غیرفعال شدن می‌شود)
+                          onChanged: _isDraft ? null : (value) {
                             setState(() {
                               _useInstallments = value;
                               _firstInstallmentDueDate ??= _invoiceDate ?? DateTime.now();

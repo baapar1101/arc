@@ -1,3 +1,4 @@
+import 'dart:html' as html;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
@@ -40,6 +41,7 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
   DateTime? _fromDate;
   DateTime? _toDate;
   bool? _isProforma; // null=همه، true=پیشفاکتور، false=قطعی
+  Set<int> _selectedRowIndices = <int>{};
 
   void _refreshData() {
     // استفاده از addPostFrameCallback تا بعد از rebuild اجرا شود
@@ -102,6 +104,16 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
               ],
             ),
           ),
+          // دکمه چاپ فاکتورهای انتخاب شده
+          if (_selectedRowIndices.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: FilledButton.icon(
+                onPressed: _onPrintSelected,
+                icon: const Icon(Icons.print),
+                label: Text('${t.print} (${_selectedRowIndices.length})'),
+              ),
+            ),
           // دکمه افزودن فاکتور (در آینده به فرم ایجاد وصل میشود)
           FilledButton.icon(
             onPressed: _onAddNew,
@@ -217,7 +229,6 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
       endpoint: '/invoices/business/${widget.businessId}/search',
       title: t.invoices,
       excelEndpoint: '/invoices/business/${widget.businessId}/export/excel',
-      pdfEndpoint: '/invoices/business/${widget.businessId}/export/pdf',
       businessId: widget.businessId,
       reportModuleKey: 'invoices',
       reportSubtype: 'list',
@@ -231,6 +242,11 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
               icon: Icons.visibility,
               label: t.view,
               onTap: (item) => _onView(item as InvoiceListItem),
+            ),
+            DataTableAction(
+              icon: Icons.print,
+              label: t.print,
+              onTap: (item) => _onPrintSingle(item as InvoiceListItem),
             ),
             if (widget.authStore.canWriteSection('invoices'))
               DataTableAction(
@@ -340,8 +356,13 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
       showColumnSearch: true,
       showRefreshButton: true,
       showClearFiltersButton: true,
-      enableRowSelection: false,
-      enableMultiRowSelection: false,
+      enableRowSelection: true,
+      enableMultiRowSelection: true,
+      onRowSelectionChanged: (Set<int> selectedRows) {
+        setState(() {
+          _selectedRowIndices = selectedRows;
+        });
+      },
       defaultPageSize: 20,
       pageSizeOptions: const [10, 20, 50, 100],
       additionalParams: {
@@ -616,6 +637,163 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
           backgroundColor: Colors.red,
         ),
       );
+    }
+  }
+
+  Future<void> _onPrintSingle(InvoiceListItem item) async {
+    // نمایش لودینگ
+    final navigator = Navigator.of(context, rootNavigator: true);
+    showDialog<void>(
+      context: context,
+      useRootNavigator: true,
+      barrierDismissible: false,
+      builder: (_) => Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const CircularProgressIndicator(),
+            const SizedBox(height: 16),
+            Text('در حال تولید PDF...'),
+          ],
+        ),
+      ),
+    );
+
+    try {
+      // دانلود PDF تک فاکتور
+      final api = ApiClient();
+      final pdfBytes = await api.downloadPdf(
+        '/api/v1/invoices/business/${widget.businessId}/${item.id}/pdf',
+      );
+
+      // ذخیره فایل PDF
+      await _savePdfFile(pdfBytes, item.code);
+
+      if (navigator.canPop()) {
+        navigator.pop();
+      }
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('PDF با موفقیت تولید شد'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      if (navigator.canPop()) {
+        navigator.pop();
+      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('خطا در تولید PDF: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _onPrintSelected() async {
+    if (_selectedRowIndices.isEmpty) return;
+    
+    // دریافت items از state جدول
+    final state = _tableKey.currentState;
+    if (state == null) return;
+    
+    List<InvoiceListItem> selectedInvoices = [];
+    try {
+      // ignore: avoid_dynamic_calls
+      final selectedItems = (state as dynamic).getSelectedItems() as List<InvoiceListItem>;
+      selectedInvoices = selectedItems;
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('خطا در دریافت فاکتورهای انتخاب شده: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    if (selectedInvoices.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('هیچ فاکتوری انتخاب نشده است'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    // نمایش لودینگ
+    final navigator = Navigator.of(context, rootNavigator: true);
+    showDialog<void>(
+      context: context,
+      useRootNavigator: true,
+      barrierDismissible: false,
+      builder: (_) => Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const CircularProgressIndicator(),
+            const SizedBox(height: 16),
+            Text('در حال تولید PDF...'),
+          ],
+        ),
+      ),
+    );
+
+    try {
+      final invoiceIds = selectedInvoices.map((inv) => inv.id).toList();
+      final pdfBytes = await _invoiceService.printMultipleInvoices(
+        businessId: widget.businessId,
+        invoiceIds: invoiceIds,
+      );
+
+      // ذخیره فایل PDF
+      await _savePdfFile(pdfBytes, 'invoices_${DateTime.now().millisecondsSinceEpoch}');
+
+      if (navigator.canPop()) {
+        navigator.pop();
+      }
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('PDF با موفقیت تولید شد'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      if (navigator.canPop()) {
+        navigator.pop();
+      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('خطا در تولید PDF: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _savePdfFile(List<int> bytes, String filename) async {
+    try {
+      // استفاده از dart:html برای دانلود فایل در وب
+      final blob = html.Blob([bytes], 'application/pdf');
+      final url = html.Url.createObjectUrlFromBlob(blob);
+      html.AnchorElement(href: url)
+        ..setAttribute('download', filename.endsWith('.pdf') ? filename : '$filename.pdf')
+        ..click();
+      html.Url.revokeObjectUrl(url);
+    } catch (e) {
+      throw Exception('خطا در ذخیره فایل PDF: $e');
     }
   }
 }

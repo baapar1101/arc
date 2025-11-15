@@ -40,6 +40,11 @@ from app.core.calendar import CalendarConverter
 from adapters.db.models.person import Person
 from app.services.receipt_payment_service import get_receipt_payment
 from app.services.file_storage_service import FileStorageService
+from app.services.person_service import calculate_person_balance
+from adapters.db.models.bank_account import BankAccount
+from adapters.db.models.cash_register import CashRegister
+from adapters.db.models.petty_cash import PettyCash
+from sqlalchemy import func
 
 
 logger = logging.getLogger(__name__)
@@ -591,6 +596,86 @@ async def export_single_invoice_pdf(
         except Exception:
             amount_without_tax = None
 
+    # محاسبه وضعیت حساب مشتری (فقط برای فاکتورهای دارای person_id و با همان ارز فاکتور)
+    customer_balance_info: Dict[str, Any] = {}
+    try:
+        if person_id is not None:
+            # محاسبه تراز فعلی مشتری (فقط اسناد قطعی و با همان ارز فاکتور)
+            invoice_currency_id = item.get("currency_id")
+            if invoice_currency_id:
+                # محاسبه تراز با فیلتر ارز
+                query = db.query(
+                    func.coalesce(func.sum(DocumentLine.credit), 0).label('total_credit'),
+                    func.coalesce(func.sum(DocumentLine.debit), 0).label('total_debit')
+                ).join(
+                    Document, DocumentLine.document_id == Document.id
+                ).filter(
+                    DocumentLine.person_id == int(person_id),
+                    Document.is_proforma == False,  # فقط اسناد قطعی
+                    Document.currency_id == int(invoice_currency_id)  # فقط همان ارز فاکتور
+                )
+                result = query.first()
+                if result is not None:
+                    total_credit = float(result.total_credit or 0)
+                    total_debit = float(result.total_debit or 0)
+                    current_balance = total_credit - total_debit
+                    if total_credit == 0 and total_debit == 0:
+                        current_status = "بدون تراکنش"
+                    elif current_balance > 0:
+                        current_status = "بستانکار"
+                    elif current_balance < 0:
+                        current_status = "بدهکار"
+                    else:
+                        current_status = "بالانس"
+                else:
+                    current_balance = 0.0
+                    current_status = "بدون تراکنش"
+            else:
+                # اگر ارز فاکتور مشخص نبود، از تابع قبلی استفاده می‌کنیم
+                current_balance, current_status = calculate_person_balance(db, int(person_id))
+            
+            # اگر فاکتور پیش‌فاکتور است، تراز احتمالی بعد از قطعی شدن را محاسبه می‌کنیم
+            if is_proforma:
+                # محاسبه تاثیر این فاکتور بر تراز
+                # برای فاکتور فروش: بدهکار می‌شود (debit)
+                # برای فاکتور برگشت از فروش: بستانکار می‌شود (credit)
+                # برای فاکتور خرید: بستانکار می‌شود (credit)
+                # برای فاکتور برگشت از خرید: بدهکار می‌شود (debit)
+                invoice_impact = 0.0
+                if inv_type in ("invoice_sales", "invoice_purchase_return"):
+                    # بدهکار می‌شود
+                    invoice_impact = -float(payable_total or 0)
+                elif inv_type in ("invoice_sales_return", "invoice_purchase"):
+                    # بستانکار می‌شود
+                    invoice_impact = float(payable_total or 0)
+                
+                potential_balance = current_balance + invoice_impact
+                
+                # تعیین وضعیت احتمالی
+                if potential_balance > 0:
+                    potential_status = "بستانکار" if is_fa else "Creditor"
+                elif potential_balance < 0:
+                    potential_status = "بدهکار" if is_fa else "Debtor"
+                else:
+                    potential_status = "بالانس" if is_fa else "Balanced"
+                
+                customer_balance_info = {
+                    "current_balance": current_balance,
+                    "current_status": current_status,
+                    "potential_balance": potential_balance,
+                    "potential_status": potential_status,
+                    "invoice_impact": invoice_impact,
+                }
+            else:
+                # فاکتور قطعی است، تراز فعلی شامل این فاکتور است
+                customer_balance_info = {
+                    "current_balance": current_balance,
+                    "current_status": current_status,
+                }
+    except Exception:
+        logger.exception("Error calculating customer balance for invoice_id=%s", invoice_id)
+        customer_balance_info = {}
+
     # تراکنش‌های پرداخت مرتبط با فاکتور (رسید/پرداخت‌ها)
     payments: list[dict[str, Any]] = []
     try:
@@ -627,28 +712,61 @@ async def export_single_invoice_pdf(
                             pay_date_display = fd.get("date_only") or fd.get("formatted", "")
                 except Exception:
                     pay_date_display = str(pay_date_raw) if pay_date_raw is not None else None
-                # روش پرداخت (ترکیب نوع تراکنش‌ها)
+                # استخراج اطلاعات کامل از account_lines (نوع پرداخت، نام حساب، توضیحات)
+                account_details: list[dict[str, Any]] = []
                 methods: list[str] = []
+                
                 for ln in (rp.get("account_lines") or []):
                     ttype = (ln.get("transaction_type") or "").strip().lower()
                     if not ttype:
                         continue
+                    
+                    # نام نوع پرداخت
                     if ttype == "bank":
-                        label = "بانک" if is_fa else "Bank"
+                        method_label = "بانک" if is_fa else "Bank"
                     elif ttype == "cash_register":
-                        label = "صندوق" if is_fa else "Cash"
+                        method_label = "صندوق" if is_fa else "Cash"
                     elif ttype == "petty_cash":
-                        label = "تنخواه" if is_fa else "Petty cash"
+                        method_label = "تنخواه" if is_fa else "Petty cash"
                     elif ttype == "check":
-                        label = "چک" if is_fa else "Check"
+                        method_label = "چک" if is_fa else "Check"
                     elif ttype == "wallet":
-                        label = "کیف‌پول" if is_fa else "Wallet"
+                        method_label = "کیف‌پول" if is_fa else "Wallet"
                     elif ttype == "person":
-                        label = "شخص" if is_fa else "Person"
+                        method_label = "شخص" if is_fa else "Person"
                     else:
-                        label = ttype
-                    if label not in methods:
-                        methods.append(label)
+                        method_label = ttype
+                    
+                    if method_label not in methods:
+                        methods.append(method_label)
+                    
+                    # استخراج نام حساب (بانک/صندوق/تنخواه)
+                    account_name = ln.get("account_name") or ""
+                    bank_name = ln.get("bank_name") or ""
+                    cash_register_name = ln.get("cash_register_name") or ""
+                    petty_cash_name = ln.get("petty_cash_name") or ""
+                    check_number = ln.get("check_number") or ""
+                    description = ln.get("description") or ""
+                    
+                    # تعیین نام نمایشی
+                    display_name = account_name
+                    if ttype == "bank" and bank_name:
+                        display_name = bank_name
+                    elif ttype == "cash_register" and cash_register_name:
+                        display_name = cash_register_name
+                    elif ttype == "petty_cash" and petty_cash_name:
+                        display_name = petty_cash_name
+                    elif ttype == "check" and check_number:
+                        display_name = f"چک {check_number}" if is_fa else f"Check {check_number}"
+                    
+                    account_details.append({
+                        "transaction_type": ttype,
+                        "method_label": method_label,
+                        "display_name": display_name,
+                        "amount": ln.get("amount", 0),
+                        "description": description,
+                    })
+                
                 payments.append(
                     {
                         "id": rp.get("id"),
@@ -658,6 +776,8 @@ async def export_single_invoice_pdf(
                         "date": pay_date_display,
                         "total_amount": rp.get("total_amount"),
                         "methods": ", ".join(methods),
+                        "account_details": account_details,
+                        "description": rp.get("description") or "",
                     }
                 )
         logger.info(
@@ -802,6 +922,7 @@ async def export_single_invoice_pdf(
         "fa_font_url_regular": fa_font_url_regular,
         "fa_font_url_bold": fa_font_url_bold,
         "invoice_footer_note": invoice_footer_note,
+        "customer_balance_info": customer_balance_info,
     }
 
     # تلاش برای رندر با قالب سفارشی
@@ -887,6 +1008,128 @@ async def export_single_invoice_pdf(
         headers={
             "Content-Disposition": f"{disposition}; filename={filename}",
             "Content-Length": str(len(pdf_bytes)),
+            "Access-Control-Expose-Headers": "Content-Disposition",
+        },
+    )
+
+@router.post(
+    "/business/{business_id}/print-multiple",
+    summary="چاپ چند فاکتور به صورت یک PDF واحد",
+    description="دریافت فایل PDF ترکیبی از چند فاکتور انتخاب شده",
+)
+@require_business_access("business_id")
+async def print_multiple_invoices_pdf(
+    business_id: int,
+    request: Request,
+    body: Dict[str, Any] = Body(...),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    template_id: int | None = None,
+):
+    """
+    خروجی PDF ترکیبی از چند فاکتور:
+    - لیست invoice_id ها را از body دریافت می‌کند
+    - برای هر فاکتور، PDF جداگانه تولید می‌کند
+    - همه PDF ها را در یک PDF واحد ترکیب می‌کند
+    """
+    from weasyprint import HTML
+    from weasyprint.text.fonts import FontConfiguration
+    import io
+
+    invoice_ids = body.get("invoice_ids", [])
+    if not isinstance(invoice_ids, list) or len(invoice_ids) == 0:
+        from app.core.responses import ApiError
+        raise ApiError("INVALID_REQUEST", "invoice_ids must be a non-empty list", http_status=400)
+
+    # اعتبارسنجی و دریافت فاکتورها
+    invoices = []
+    for invoice_id in invoice_ids:
+        try:
+            invoice_id_int = int(invoice_id)
+        except (ValueError, TypeError):
+            continue
+        
+        doc = db.query(Document).filter(
+            Document.id == invoice_id_int,
+            Document.business_id == business_id,
+            Document.document_type.in_(list(SUPPORTED_INVOICE_TYPES)),
+        ).first()
+        
+        if doc:
+            invoices.append(doc)
+    
+    if not invoices:
+        from app.core.responses import ApiError
+        raise ApiError("NO_INVOICES_FOUND", "No valid invoices found", http_status=404)
+
+    # تولید PDF برای هر فاکتور و ترکیب آنها
+    try:
+        from pypdf import PdfWriter, PdfReader
+    except ImportError:
+        try:
+            from PyPDF2 import PdfWriter, PdfReader
+        except ImportError:
+            from app.core.responses import ApiError
+            raise ApiError("DEPENDENCY_ERROR", "PyPDF2 or pypdf library is required", http_status=500)
+    
+    pdf_writer = PdfWriter()
+    
+    for doc in invoices:
+        try:
+            # استفاده از endpoint موجود برای تولید PDF هر فاکتور
+            # ایجاد یک request موقت برای فراخوانی export_single_invoice_pdf
+            from starlette.datastructures import Headers
+            
+            # ساخت request موقت با همان headers
+            temp_headers = Headers(request.headers)
+            temp_request = Request(
+                scope={
+                    "type": "http",
+                    "method": "GET",
+                    "path": f"/invoices/business/{business_id}/{doc.id}/pdf",
+                    "headers": temp_headers.raw,
+                }
+            )
+            
+            # فراخوانی تابع export_single_invoice_pdf
+            pdf_response = await export_single_invoice_pdf(
+                business_id=business_id,
+                invoice_id=doc.id,
+                request=temp_request,
+                ctx=ctx,
+                db=db,
+                template_id=template_id,
+            )
+            
+            # خواندن PDF از response
+            pdf_bytes = pdf_response.body
+            pdf_reader = PdfReader(io.BytesIO(pdf_bytes))
+            
+            # اضافه کردن صفحات به PDF ترکیبی
+            for page in pdf_reader.pages:
+                pdf_writer.add_page(page)
+                
+        except Exception as e:
+            logger.exception(f"Error processing invoice {doc.id}: {e}")
+            continue
+
+    # تولید PDF نهایی
+    output_buffer = io.BytesIO()
+    pdf_writer.write(output_buffer)
+    combined_pdf_bytes = output_buffer.getvalue()
+
+    # نام فایل
+    def _slugify(text: str) -> str:
+        return re.sub(r"[^A-Za-z0-9_-]+", "_", (text or "")).strip("_") or "invoices"
+    
+    filename = f"invoices_combined_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+
+    return Response(
+        content=combined_pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f"attachment; filename={filename}",
+            "Content-Length": str(len(combined_pdf_bytes)),
             "Access-Control-Expose-Headers": "Content-Disposition",
         },
     )

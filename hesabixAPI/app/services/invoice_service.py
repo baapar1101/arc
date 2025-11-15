@@ -1412,6 +1412,9 @@ def update_invoice(
 
     document.document_date = document_date
     document.currency_id = int(currency_id)
+    # به‌روزرسانی وضعیت پیش‌فاکتور
+    if "is_proforma" in data:
+        document.is_proforma = bool(data.get("is_proforma", False))
     if isinstance(data.get("extra_info"), dict) or data.get("extra_info") is None:
         # preserve links if present
         new_extra = data.get("extra_info") or {}
@@ -1703,6 +1706,128 @@ def update_invoice(
                         credit=commission_amount,
                         description="تعدیل هزینه پورسانت",
                     ))
+
+    # پردازش تراکنش‌های پرداخت (مشابه create_invoice)
+    payment_docs: List[int] = []
+    payments = data.get("payments")
+    if payments and isinstance(payments, list) and not document.is_proforma:
+        try:
+            # دریافت person_id از extra_info
+            header_extra = data.get("extra_info") or document.extra_info or {}
+            person_id = _person_id_from_header({"extra_info": header_extra})
+            
+            # Only when person is present
+            if person_id:
+                from app.services.receipt_payment_service import create_receipt_payment, delete_receipt_payment
+                
+                # حذف سندهای دریافت/پرداخت قدیمی مرتبط با این فاکتور
+                old_links = (document.extra_info or {}).get("links", {})
+                old_receipt_payment_ids = old_links.get("receipt_payment_document_ids") or []
+                for old_rp_id in old_receipt_payment_ids:
+                    try:
+                        delete_receipt_payment(db, old_rp_id)
+                        logger.info(f"Deleted old receipt/payment document {old_rp_id} for invoice {document.id}")
+                    except Exception as ex:
+                        logger.warning(f"Could not delete old receipt/payment document {old_rp_id}: {ex}")
+                
+                # ایجاد سندهای جدید (مشابه create_invoice)
+                account_lines: List[Dict[str, Any]] = []
+                total_amount = Decimal(0)
+                invoice_currency_id = int(document.currency_id)
+                
+                for p in payments:
+                    amount = Decimal(str(p.get("amount", 0) or 0))
+                    if amount <= 0:
+                        continue
+                    total_amount += amount
+                    ttype = (p.get("transaction_type") or p.get("type") or "").strip().lower()
+                    
+                    # Currency match checks
+                    if ttype in ("bank", "cash_register", "petty_cash", "check"):
+                        if ttype == "bank":
+                            ref_id = p.get("bank_id")
+                            if ref_id:
+                                acct = db.query(BankAccount).filter(BankAccount.id == int(ref_id)).first()
+                                if not acct:
+                                    raise ApiError("PAYMENT_ACCOUNT_NOT_FOUND", "Bank account not found", http_status=404)
+                                if int(acct.currency_id) != invoice_currency_id:
+                                    raise ApiError("PAYMENT_CURRENCY_MISMATCH", "Currency of bank account does not match invoice currency", http_status=400)
+                        elif ttype == "cash_register":
+                            ref_id = p.get("cash_register_id")
+                            if ref_id:
+                                acct = db.query(CashRegister).filter(CashRegister.id == int(ref_id)).first()
+                                if not acct:
+                                    raise ApiError("PAYMENT_ACCOUNT_NOT_FOUND", "Cash register not found", http_status=404)
+                                if int(acct.currency_id) != invoice_currency_id:
+                                    raise ApiError("PAYMENT_CURRENCY_MISMATCH", "Currency of cash register does not match invoice currency", http_status=400)
+                        elif ttype == "petty_cash":
+                            ref_id = p.get("petty_cash_id")
+                            if ref_id:
+                                acct = db.query(PettyCash).filter(PettyCash.id == int(ref_id)).first()
+                                if not acct:
+                                    raise ApiError("PAYMENT_ACCOUNT_NOT_FOUND", "Petty cash not found", http_status=404)
+                                if int(acct.currency_id) != invoice_currency_id:
+                                    raise ApiError("PAYMENT_CURRENCY_MISMATCH", "Currency of petty cash does not match invoice currency", http_status=400)
+                        elif ttype == "check":
+                            ref_id = p.get("check_id")
+                            if ref_id:
+                                chk = db.query(Check).filter(Check.id == int(ref_id)).first()
+                                if not chk:
+                                    raise ApiError("PAYMENT_ACCOUNT_NOT_FOUND", "Check not found", http_status=404)
+                                if int(chk.currency_id) != invoice_currency_id:
+                                    raise ApiError("PAYMENT_CURRENCY_MISMATCH", "Currency of check does not match invoice currency", http_status=400)
+                    
+                    transaction_type_value = p.get("transaction_type") or p.get("type")
+                    account_line: Dict[str, Any] = {
+                        "transaction_type": transaction_type_value,
+                        "amount": float(amount),
+                        "description": p.get("description"),
+                        "transaction_date": p.get("transaction_date"),
+                        "commission": p.get("commission"),
+                    }
+                    for key in ("bank_id", "bank_name", "cash_register_id", "cash_register_name", "petty_cash_id", "petty_cash_name", "check_id", "check_number", "person_id", "account_id"):
+                        if p.get(key) is not None:
+                            account_line[key] = p.get(key)
+                    account_lines.append(account_line)
+                
+                if total_amount > 0 and account_lines:
+                    is_receipt = inv_type in {INVOICE_SALES, INVOICE_PURCHASE_RETURN}
+                    person_is_receivable = inv_type in {INVOICE_SALES, INVOICE_SALES_RETURN}
+                    rp_data = {
+                        "document_type": "receipt" if is_receipt else "payment",
+                        "document_date": document.document_date.isoformat(),
+                        "currency_id": document.currency_id,
+                        "description": f"تسویه مرتبط با فاکتور {document.code}",
+                        "person_lines": [{
+                            "person_id": person_id,
+                            "amount": float(total_amount),
+                            "description": f"طرف حساب فاکتور {document.code}",
+                        }],
+                        "account_lines": account_lines,
+                        "extra_info": {
+                            "source": "invoice",
+                            "invoice_id": document.id,
+                            "person_is_receivable": person_is_receivable,
+                        },
+                    }
+                    rp_doc = create_receipt_payment(db=db, business_id=document.business_id, user_id=user_id, data=rp_data)
+                    if isinstance(rp_doc, dict) and rp_doc.get("id"):
+                        rp_id = int(rp_doc["id"])
+                        payment_docs.append(rp_id)
+                        logger.info(f"Created receipt/payment document {rp_id} for invoice {document.id}")
+                
+                # به‌روزرسانی لینک‌ها در extra_info
+                if payment_docs:
+                    extra = dict(document.extra_info) if document.extra_info else {}
+                    links = dict(extra.get("links", {}))
+                    links["receipt_payment_document_ids"] = payment_docs
+                    extra["links"] = links
+                    document.extra_info = extra
+                    from sqlalchemy.orm.attributes import flag_modified
+                    flag_modified(document, "extra_info")
+        except Exception as ex:
+            logger.exception("could not update receipt/payment for invoice: %s", ex)
+            # حتی در صورت خطا، ادامه بده
 
     db.commit()
     db.refresh(document)

@@ -1,20 +1,26 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:uuid/uuid.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../core/auth_store.dart';
 import '../../core/calendar_controller.dart';
 import '../../widgets/permission/access_denied_page.dart';
+import '../../widgets/invoice/invoice_type_combobox.dart';
 import '../../widgets/invoice/code_field_widget.dart';
 import '../../widgets/invoice/customer_combobox_widget.dart';
 import '../../widgets/invoice/person_combobox_widget.dart';
 import '../../widgets/date_input_field.dart';
 import '../../widgets/banking/currency_picker_widget.dart';
 import '../../widgets/invoice/line_items_table.dart';
+import '../../widgets/invoice/invoice_transactions_widget.dart';
 import '../../utils/number_formatters.dart';
 import '../../models/invoice_type_model.dart';
 import '../../models/customer_model.dart';
 import '../../models/person_model.dart';
 import '../../models/invoice_line_item.dart';
+import '../../models/invoice_transaction.dart';
 import '../../services/invoice_service.dart';
+import '../../services/receipt_payment_service.dart';
 import '../../core/api_client.dart';
 import '../../services/person_service.dart';
 
@@ -48,7 +54,7 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
   DateTime? _invoiceDate;
   int? _selectedCurrencyId;
   String? _invoiceTitle;
-  bool _isProforma = false; // فقط نمایشی در ویرایش
+  bool _isProforma = false; // وضعیت پیش‌فاکتور (قابل تغییر)
   bool _postInventory = true;
 
   // Party selections (اختیاری برای نمایش؛ هنگام ذخیره از extra_info اصلی نگهداری می‌شود)
@@ -62,14 +68,38 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
   num _sumTax = 0;
   num _sumTotal = 0;
 
+  // تراکنش‌های پرداخت
+  List<InvoiceTransaction> _transactions = [];
+
   // For preserving and merging extra_info
   Map<String, dynamic> _originalExtraInfo = <String, dynamic>{};
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    // تعداد تب‌ها: اطلاعات، کالاها، تراکنش‌ها (اگر پیش‌فاکتور نباشد)، تنظیمات
+    final tabCount = _isProforma ? 3 : 4;
+    _tabController = TabController(length: tabCount, vsync: this);
     _loadInvoice();
+  }
+
+  // محاسبه تعداد تب‌ها بر اساس نوع فاکتور
+  int _getTabCount() {
+    if (_isProforma) return 3; // اطلاعات، کالاها، تنظیمات
+    if (_selectedInvoiceType == InvoiceType.waste || 
+        _selectedInvoiceType == InvoiceType.directConsumption || 
+        _selectedInvoiceType == InvoiceType.production) {
+      return 3; // اطلاعات، کالاها، تنظیمات (بدون تراکنش)
+    }
+    return 4; // اطلاعات، کالاها، تراکنش‌ها، تنظیمات
+  }
+
+  // بررسی اینکه آیا تب تراکنش‌ها باید نمایش داده شود
+  bool get _shouldShowTransactionsTab {
+    if (_isProforma) return false;
+    return _selectedInvoiceType != InvoiceType.waste && 
+           _selectedInvoiceType != InvoiceType.directConsumption && 
+           _selectedInvoiceType != InvoiceType.production;
   }
 
   @override
@@ -101,6 +131,9 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
       // extra_info
       _originalExtraInfo = Map<String, dynamic>.from(item['extra_info'] ?? const {});
       _postInventory = (_originalExtraInfo['post_inventory'] is bool) ? _originalExtraInfo['post_inventory'] as bool : true;
+      
+      // بارگذاری تراکنش‌های پرداخت موجود
+      await _loadPaymentTransactions();
 
       // lines
       final List<dynamic> lines = List<dynamic>.from(item['product_lines'] ?? const []);
@@ -177,6 +210,13 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
         }
       } catch (_) {}
 
+      // به‌روزرسانی TabController بر اساس تعداد تب‌ها
+      final newTabCount = _getTabCount();
+      if (newTabCount != _tabController.length) {
+        _tabController.dispose();
+        _tabController = TabController(length: newTabCount, vsync: this);
+      }
+
       if (mounted) {
         setState(() {
           _loading = false;
@@ -189,6 +229,71 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
           _loading = false;
         });
       }
+    }
+  }
+
+  /// بارگذاری تراکنش‌های پرداخت موجود از اسناد دریافت/پرداخت مرتبط
+  Future<void> _loadPaymentTransactions() async {
+    if (_isProforma) return; // پیش‌فاکتورها تراکنش ندارند
+    
+    try {
+      final links = _originalExtraInfo['links'] as Map<String, dynamic>?;
+      if (links == null) return;
+      
+      final receiptPaymentIds = links['receipt_payment_document_ids'] as List<dynamic>?;
+      if (receiptPaymentIds == null || receiptPaymentIds.isEmpty) return;
+      
+      final receiptPaymentService = ReceiptPaymentService(ApiClient());
+      final List<InvoiceTransaction> transactions = [];
+      
+      for (final id in receiptPaymentIds) {
+        try {
+          final doc = await receiptPaymentService.getById(id as int);
+          if (doc == null) continue;
+          
+          // تبدیل سند دریافت/پرداخت به InvoiceTransaction
+          for (final accountLine in doc.accountLines) {
+            if (accountLine.transactionType == null) continue;
+            
+            final transactionType = TransactionType.fromValue(accountLine.transactionType ?? '');
+            if (transactionType == null) continue;
+            
+            final transaction = InvoiceTransaction(
+              id: const Uuid().v4(), // ID موقت برای ویرایش
+              type: transactionType,
+              amount: accountLine.amount,
+              transactionDate: accountLine.transactionDate ?? doc.documentDate,
+              description: accountLine.description,
+              commission: accountLine.commission,
+              // استخراج اطلاعات اضافی (تبدیل int به String)
+              bankId: accountLine.extraInfo?['bank_id']?.toString(),
+              bankName: accountLine.extraInfo?['bank_name'] as String?,
+              cashRegisterId: accountLine.extraInfo?['cash_register_id']?.toString(),
+              cashRegisterName: accountLine.extraInfo?['cash_register_name'] as String?,
+              pettyCashId: accountLine.extraInfo?['petty_cash_id']?.toString(),
+              pettyCashName: accountLine.extraInfo?['petty_cash_name'] as String?,
+              checkId: accountLine.extraInfo?['check_id']?.toString(),
+              checkNumber: accountLine.extraInfo?['check_number'] as String?,
+              personId: accountLine.extraInfo?['person_id']?.toString(),
+              personName: accountLine.extraInfo?['person_name'] as String?,
+              accountId: accountLine.accountId.toString(),
+              accountName: accountLine.accountName,
+            );
+            transactions.add(transaction);
+          }
+        } catch (e) {
+          // اگر خطا رخ داد، ادامه بده
+          print('Error loading payment transaction from document $id: $e');
+        }
+      }
+      
+      if (mounted) {
+        setState(() {
+          _transactions = transactions;
+        });
+      }
+    } catch (e) {
+      print('Error loading payment transactions: $e');
     }
   }
 
@@ -219,10 +324,12 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
         ],
         bottom: TabBar(
           controller: _tabController,
-          tabs: const [
-            Tab(icon: Icon(Icons.info_outline), text: 'اطلاعات فاکتور'),
-            Tab(icon: Icon(Icons.inventory_2_outlined), text: 'کالاها و خدمات'),
-            Tab(icon: Icon(Icons.settings_outlined), text: 'تنظیمات'),
+          tabs: [
+            const Tab(icon: Icon(Icons.info_outline), text: 'اطلاعات فاکتور'),
+            const Tab(icon: Icon(Icons.inventory_2_outlined), text: 'کالاها و خدمات'),
+            if (_shouldShowTransactionsTab)
+              const Tab(icon: Icon(Icons.receipt_long_outlined), text: 'تراکنش‌ها'),
+            const Tab(icon: Icon(Icons.settings_outlined), text: 'تنظیمات'),
           ],
         ),
       ),
@@ -235,6 +342,7 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
                   children: [
                     _buildInvoiceInfoTab(),
                     _buildProductsTab(),
+                    if (_shouldShowTransactionsTab) _buildTransactionsTab(),
                     _buildSettingsTab(),
                   ],
                 ),
@@ -259,7 +367,33 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Expanded(
-                            child: _buildReadOnlyField(label: 'نوع فاکتور', value: _selectedInvoiceType?.label ?? '-'),
+                            child: InvoiceTypeCombobox(
+                              selectedType: _selectedInvoiceType,
+                              onTypeChanged: (type) {
+                                setState(() {
+                                  _selectedInvoiceType = type;
+                                });
+                              },
+                              isDraft: _isProforma,
+                              onDraftChanged: (isDraft) {
+                                setState(() {
+                                  _isProforma = isDraft;
+                                  // اگر پیش‌فاکتور فعال شد، تراکنش‌های پرداخت را پاک کن
+                                  if (isDraft && _transactions.isNotEmpty) {
+                                    _transactions = [];
+                                  }
+                                  // به‌روزرسانی TabController
+                                  final newTabCount = _getTabCount();
+                                  if (newTabCount != _tabController.length) {
+                                    _tabController.dispose();
+                                    _tabController = TabController(length: newTabCount, vsync: this);
+                                  }
+                                });
+                              },
+                              isRequired: true,
+                              label: 'نوع فاکتور',
+                              hintText: 'انتخاب نوع فاکتور',
+                            ),
                           ),
                           const SizedBox(width: 12),
                           Expanded(
@@ -332,14 +466,13 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
                         initialValue: _invoiceTitle,
                         onChanged: (v) => setState(() => _invoiceTitle = v.trim().isEmpty ? null : v.trim()),
                         decoration: const InputDecoration(
-                          labelText: 'عنوان فاکتور',
+                          labelText: 'توضیحات فاکتور',
                           hintText: 'مثال: فروش محصولات',
                           border: OutlineInputBorder(),
                         ),
                         textInputAction: TextInputAction.next,
+                        maxLines: 3,
                       ),
-                      const SizedBox(height: 12),
-                      _buildReadOnlyField(label: 'وضعیت', value: _isProforma ? 'پیش‌فاکتور' : 'قطعی'),
                     ],
                   );
                 },
@@ -352,16 +485,6 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
     );
   }
 
-  Widget _buildReadOnlyField({required String label, required String value}) {
-    return TextFormField(
-      initialValue: value,
-      readOnly: true,
-      decoration: InputDecoration(
-        labelText: label,
-        border: const OutlineInputBorder(),
-      ),
-    );
-  }
 
   Widget _buildProductsTab() {
     return Padding(
@@ -400,6 +523,33 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
                 ),
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTransactionsTab() {
+    if (!_shouldShowTransactionsTab) {
+      return const Center(child: Text('تراکنش‌ها برای این نوع فاکتور در دسترس نیست'));
+    }
+    
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1600),
+          child: InvoiceTransactionsWidget(
+            transactions: _transactions,
+            onChanged: (transactions) {
+              setState(() {
+                _transactions = transactions;
+              });
+            },
+            businessId: widget.businessId,
+            calendarController: widget.calendarController,
+            invoiceType: _selectedInvoiceType ?? InvoiceType.sales,
+            selectedCurrencyId: _selectedCurrencyId,
           ),
         ),
       ),
@@ -462,6 +612,10 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('تغییرات فاکتور با موفقیت ذخیره شد')),
       );
+      // بازگشت به لیست فاکتورها بعد از ذخیره موفق
+      if (mounted) {
+        context.pop(true); // true به معنای موفقیت‌آمیز بودن ویرایش
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -500,10 +654,16 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
       'invoice_type': _convertInvoiceTypeToApi(_selectedInvoiceType!), // جهت سازگاری حساب‌ها
       'document_date': _invoiceDate!.toIso8601String().split('T')[0],
       'currency_id': _selectedCurrencyId,
+      'is_proforma': _isProforma, // ارسال وضعیت پیش‌فاکتور
       'extra_info': mergedExtra,
       if ((_invoiceTitle ?? '').isNotEmpty) 'description': _invoiceTitle,
       'lines': _lineItems.map((e) => _serializeLineItem(e)).toList(),
     };
+    
+    // افزودن تراکنش‌های پرداخت (فقط برای فاکتورهای قطعی)
+    if (!_isProforma && _transactions.isNotEmpty) {
+      payload['payments'] = _transactions.map((t) => t.toJson()).toList();
+    }
 
     return payload;
   }

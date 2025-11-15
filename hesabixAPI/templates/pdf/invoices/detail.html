@@ -340,15 +340,86 @@
 
     {# یادداشت و خلاصه مالی در یک سطر کنار هم #}
     <div style="display: flex; gap: 24px; align-items: flex-start; flex-wrap: wrap;">
-      {# متن ثابت انتهای فاکتور (پاورقی قابل تنظیم از تنظیمات چاپ) #}
-      {% if invoice_footer_note %}
+      {# متن ثابت انتهای فاکتور (پاورقی قابل تنظیم از تنظیمات چاپ) + اسناد پرداختی + وضعیت حساب مشتری #}
+      {% if invoice_footer_note or (payments and payments|length > 0) or customer_balance_info %}
         <div class="section-card" style="flex: 1; min-width: 200px;">
-          <div class="meta" style="margin-bottom: 4px; font-weight: bold;">
-            {{ 'توضیحات' if is_fa else 'Notes' }}:
-          </div>
-          <div class="meta">
-            {{ invoice_footer_note }}
-          </div>
+          {% if invoice_footer_note %}
+            <div class="meta" style="margin-bottom: 4px; font-weight: bold;">
+              {{ 'توضیحات' if is_fa else 'Notes' }}:
+            </div>
+            <div class="meta" style="{% if payments and payments|length > 0 or customer_balance_info %}margin-bottom: 12px;{% endif %}">
+              {{ invoice_footer_note }}
+            </div>
+          {% endif %}
+          {% if payments and payments|length > 0 %}
+            <div style="{% if invoice_footer_note %}margin-top: 12px; padding-top: 12px; border-top: 1px dashed #ccc;{% endif %}">
+              <div class="meta" style="margin-bottom: 4px; font-weight: bold;">
+                {{ 'اسناد پرداختی مرتبط' if is_fa else 'Related payment documents' }}:
+              </div>
+              <div class="meta" style="line-height: 1.4; font-size: 10px;">
+                {% for p in payments %}
+                  <div style="margin-bottom: 3px;">
+                    <strong>{{ p.date or '-' }}</strong>
+                    <span style="margin-inline-start: 3px;">-</span>
+                    <span style="margin-inline-start: 3px;">{{ p.document_type_name or '-' }}</span>
+                    <span style="margin-inline-start: 3px;">-</span>
+                    <span style="margin-inline-start: 3px;">{{ p.code or '-' }}</span>
+                    <span style="margin-inline-start: 3px;">-</span>
+                    <span class="amount" style="margin-inline-start: 3px;">{{ (p.total_amount or 0) | format_amount(0) | ltr | safe }}</span>
+                    {% if p.account_details and p.account_details|length > 0 %}
+                      <span style="margin-inline-start: 4px;">(</span>
+                      {% for acc in p.account_details %}
+                        <span>{{ acc.method_label or '-' }}</span>
+                        {% if acc.display_name %}
+                          <span style="margin-inline-start: 2px;">{{ acc.display_name }}</span>
+                        {% endif %}
+                        <span class="amount" style="margin-inline-start: 2px;">{{ (acc.amount or 0) | format_amount(0) | ltr | safe }}</span>
+                        {% if acc.description %}
+                          <span style="margin-inline-start: 2px;">{{ acc.description }}</span>
+                        {% endif %}
+                        {% if not loop.last %}
+                          <span style="margin-inline-start: 2px;">،</span>
+                        {% endif %}
+                      {% endfor %}
+                      <span>)</span>
+                    {% endif %}
+                    {% if p.description %}
+                      <span style="margin-inline-start: 4px; color: #555; font-style: italic;">- {{ p.description }}</span>
+                    {% endif %}
+                  </div>
+                {% endfor %}
+              </div>
+            </div>
+          {% endif %}
+          {% if customer_balance_info %}
+            <div style="{% if invoice_footer_note or (payments and payments|length > 0) %}margin-top: 12px; padding-top: 12px; border-top: 1px dashed #ccc;{% endif %}">
+              <div class="meta" style="margin-bottom: 6px; font-weight: bold;">
+                {{ 'وضعیت حساب مشتری' if is_fa else 'Customer account status' }}:
+              </div>
+              <div class="meta" style="line-height: 1.6;">
+                {% if invoice.is_proforma %}
+                  {# پیش‌فاکتور: نمایش تراز فعلی و تراز احتمالی #}
+                  <div style="margin-bottom: 6px;">
+                    <strong>{{ 'تراز فعلی' if is_fa else 'Current balance' }}:</strong>
+                    <span class="amount" style="margin-inline-start: 4px;">{{ customer_balance_info.current_balance | format_amount(0) | ltr | safe }}</span>
+                    <span style="margin-inline-start: 6px; color: #555;">({{ customer_balance_info.current_status }})</span>
+                  </div>
+                  <div>
+                    <strong>{{ 'تراز احتمالی پس از قطعی شدن' if is_fa else 'Potential balance after finalization' }}:</strong>
+                    <span class="amount" style="margin-inline-start: 4px;">{{ customer_balance_info.potential_balance | format_amount(0) | ltr | safe }}</span>
+                    <span style="margin-inline-start: 6px; color: #555;">({{ customer_balance_info.potential_status }})</span>
+                  </div>
+                {% else %}
+                  {# فاکتور قطعی: نمایش تراز فعلی #}
+                  <div>
+                    <strong>{{ 'تراز حساب' if is_fa else 'Account balance' }}:</strong>
+                    <span class="amount" style="margin-inline-start: 4px;">{{ customer_balance_info.current_balance | format_amount(0) | ltr | safe }}</span>
+                    <span style="margin-inline-start: 6px; color: #555;">({{ customer_balance_info.current_status }})</span>
+                  </div>
+                {% endif %}
+              </div>
+            </div>
+          {% endif %}
         </div>
       {% endif %}
 
