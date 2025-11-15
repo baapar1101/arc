@@ -360,8 +360,6 @@ def create_receipt_payment(
         logger.info(f"پردازش خط حساب {i+1}: {account_line}")
         account_id = account_line.get("account_id")
         logger.info(f"account_id: {account_id}")
-        if not account_id:
-            logger.info(f"خط حساب {i+1}: account_id موجود نیست، ادامه می‌دهد")
         
         amount = Decimal(str(account_line.get("amount", 0)))
         logger.info(f"مبلغ: {amount}")
@@ -369,7 +367,15 @@ def create_receipt_payment(
             logger.warning(f"خط حساب {i+1}: مبلغ صفر یا منفی، رد می‌شود")
             continue
         
-        description = account_line.get("description", "").strip() or None
+        # مدیریت description که ممکن است None باشد
+        description_raw = account_line.get("description")
+        description = None
+        if description_raw:
+            if isinstance(description_raw, str):
+                description = description_raw.strip() or None
+            else:
+                description = str(description_raw).strip() or None
+        
         transaction_type = account_line.get("transaction_type")
         transaction_date = account_line.get("transaction_date")
         commission = account_line.get("commission")
@@ -434,12 +440,27 @@ def create_receipt_payment(
             ).first()
         
         if not account:
-            logger.error(f"خط حساب {i+1}: حساب پیدا نشد برای transaction_type: {transaction_type}")
-            raise ApiError(
-                "ACCOUNT_NOT_FOUND",
-                f"Account not found for transaction_type: {transaction_type}",
-                http_status=404
-            )
+            # اگر transaction_type موجود نباشد، از account_id استفاده کن
+            if not transaction_type and account_id:
+                logger.warning(f"خط حساب {i+1}: transaction_type موجود نیست اما account_id موجود است: {account_id}")
+                # تلاش مجدد برای پیدا کردن حساب با account_id
+                account = db.query(Account).filter(
+                    and_(
+                        Account.id == int(account_id),
+                        or_(
+                            Account.business_id == business_id,
+                            Account.business_id == None  # حساب‌های عمومی
+                        )
+                    )
+                ).first()
+            
+            if not account:
+                logger.error(f"خط حساب {i+1}: حساب پیدا نشد برای transaction_type: {transaction_type}, account_id: {account_id}")
+                raise ApiError(
+                    "ACCOUNT_NOT_FOUND",
+                    f"Account not found for transaction_type: {transaction_type}, account_id: {account_id}",
+                    http_status=404
+                )
         
         logger.info(f"حساب پیدا شد: id={account.id}, code={account.code}, name={account.name}")
         

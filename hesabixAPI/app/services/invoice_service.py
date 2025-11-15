@@ -6,6 +6,7 @@ from decimal import Decimal, ROUND_HALF_UP
 import logging
 
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.attributes import flag_modified
 from sqlalchemy import and_, or_
 
 from adapters.db.models.document import Document
@@ -1222,7 +1223,8 @@ def create_invoice(
                     if amount <= 0:
                         continue
                     total_amount += amount
-                    ttype = str(p.get("transaction_type") or "").strip().lower()
+                    # پشتیبانی از هر دو فیلد 'type' و 'transaction_type'
+                    ttype = (p.get("transaction_type") or p.get("type") or "").strip().lower()
                     # Currency match checks for money accounts
                     if ttype in ("bank", "cash_register", "petty_cash", "check"):
                         if ttype == "bank":
@@ -1259,13 +1261,17 @@ def create_invoice(
                                     raise ApiError("PAYMENT_CURRENCY_MISMATCH", "Currency of check does not match invoice currency", http_status=400)
 
                     # Build account line entry including ids/names for linking
+                    # استفاده از 'type' یا 'transaction_type' (فرانت‌اند 'type' می‌فرستد)
+                    transaction_type_value = p.get("transaction_type") or p.get("type")
+                    logger.info(f"Payment item: type={p.get('type')}, transaction_type={p.get('transaction_type')}, resolved={transaction_type_value}")
                     account_line: Dict[str, Any] = {
-                        "transaction_type": p.get("transaction_type"),
+                        "transaction_type": transaction_type_value,
                         "amount": float(amount),
                         "description": p.get("description"),
                         "transaction_date": p.get("transaction_date"),
                         "commission": p.get("commission"),
                     }
+                    logger.info(f"Created account_line: {account_line}")
                     # pass through reference ids/names if provided
                     for key in ("bank_id", "bank_name", "cash_register_id", "cash_register_name", "petty_cash_id", "petty_cash_name", "check_id", "check_number", "person_id", "account_id"):
                         if p.get(key) is not None:
@@ -1297,20 +1303,44 @@ def create_invoice(
                         },
                     }
                     rp_doc = create_receipt_payment(db=db, business_id=business_id, user_id=user_id, data=rp_data)
+                    logger.info(f"create_receipt_payment returned: type={type(rp_doc)}, value={rp_doc}")
                     if isinstance(rp_doc, dict) and rp_doc.get("id"):
-                        payment_docs.append(int(rp_doc["id"]))
+                        rp_id = int(rp_doc["id"])
+                        payment_docs.append(rp_id)
+                        logger.info(f"Added receipt/payment document ID {rp_id} to payment_docs. Current list: {payment_docs}")
+                    else:
+                        logger.warning(f"create_receipt_payment did not return valid document with id. Returned: {rp_doc}")
         except Exception as ex:
             logger.exception("could not create receipt/payment for invoice: %s", ex)
+            # حتی در صورت خطا، اگر payment_docs پر شده باشد، لینک را ذخیره کن
+            if payment_docs:
+                logger.info(f"Exception occurred but payment_docs has {len(payment_docs)} items. Will still save links.")
 
     # Save links back to invoice
     if payment_docs:
-        extra = document.extra_info or {}
-        links = dict((extra.get("links") or {}))
+        logger.info(f"Saving links to invoice {document.id}. payment_docs: {payment_docs}")
+        # اطمینان از اینکه document در session است
+        db.add(document)
+        # دریافت extra_info فعلی (ممکن است dict یا None باشد)
+        extra = dict(document.extra_info) if document.extra_info else {}
+        # ایجاد یا به‌روزرسانی links
+        links = dict(extra.get("links", {}))
         links["receipt_payment_document_ids"] = payment_docs
         extra["links"] = links
+        # به‌روزرسانی extra_info
         document.extra_info = extra
-        db.commit()
-        db.refresh(document)
+        # علامت‌گذاری برای به‌روزرسانی (برای JSON fields در SQLAlchemy)
+        flag_modified(document, "extra_info")
+        try:
+            db.commit()
+            db.refresh(document)
+            logger.info(f"Successfully saved links to invoice {document.id}. Updated extra_info: {document.extra_info}")
+        except Exception as ex:
+            logger.exception(f"Failed to save links to invoice {document.id}: {ex}")
+            db.rollback()
+            raise
+    else:
+        logger.warning(f"No payment_docs to save for invoice {document.id}. payments data: {payments}")
 
     # ایجاد حواله انبار draft در صورت نیاز و جدا از فاکتور
     try:

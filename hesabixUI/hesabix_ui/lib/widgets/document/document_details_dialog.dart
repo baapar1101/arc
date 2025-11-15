@@ -8,6 +8,9 @@ import 'package:hesabix_ui/services/warehouse_service.dart';
 import 'dart:html' as html;
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/services/report_template_service.dart';
+import 'package:hesabix_ui/services/receipt_payment_service.dart';
+import 'package:hesabix_ui/models/receipt_payment_document.dart';
+import 'package:hesabix_ui/core/date_utils.dart' show HesabixDateUtils;
 
 /// دیالوگ نمایش جزئیات کامل سند حسابداری
 class DocumentDetailsDialog extends StatefulWidget {
@@ -36,6 +39,11 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> {
   List<Map<String, dynamic>> _invoiceTemplates = const [];
   bool _loadingInvoiceTemplates = false;
   int? _selectedInvoiceTemplateId;
+  
+  // تراکنش‌های پرداخت
+  final _receiptPaymentService = ReceiptPaymentService(ApiClient());
+  List<ReceiptPaymentDocument> _paymentDocuments = [];
+  bool _loadingPayments = false;
 
   @override
   void initState() {
@@ -133,6 +141,11 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> {
           });
         }
       } catch (_) {}
+      
+      // بارگذاری تراکنش‌های پرداخت برای فاکتورها
+      if (doc.documentType.startsWith('invoice')) {
+        await _loadPaymentDocuments(doc);
+      }
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -167,6 +180,48 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> {
       if (mounted) {
         setState(() {
           _loadingInvoiceTemplates = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _loadPaymentDocuments(DocumentModel doc) async {
+    if (doc.extraInfo == null) return;
+    
+    final links = doc.extraInfo!['links'] as Map<String, dynamic>?;
+    if (links == null) return;
+    
+    final receiptPaymentIds = links['receipt_payment_document_ids'] as List<dynamic>?;
+    if (receiptPaymentIds == null || receiptPaymentIds.isEmpty) return;
+    
+    setState(() {
+      _loadingPayments = true;
+    });
+    
+    try {
+      final List<ReceiptPaymentDocument> documents = [];
+      for (final id in receiptPaymentIds) {
+        try {
+          final doc = await _receiptPaymentService.getById(id as int);
+          if (doc != null) {
+            documents.add(doc);
+          }
+        } catch (e) {
+          // اگر خطا رخ داد، ادامه بده
+          print('Error loading payment document $id: $e');
+        }
+      }
+      
+      if (mounted) {
+        setState(() {
+          _paymentDocuments = documents;
+          _loadingPayments = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _loadingPayments = false;
         });
       }
     }
@@ -351,6 +406,12 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> {
 
           // جمع کل
           _buildTotals(theme),
+
+          // تراکنش‌های پرداخت (فقط برای فاکتورها)
+          if (_document != null && _document!.documentType.startsWith('invoice')) ...[
+            const SizedBox(height: 24),
+            _buildPaymentTransactions(theme),
+          ],
         ],
       ),
     );
@@ -590,6 +651,245 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> {
             fontFamily: 'monospace',
           ),
           textDirection: TextDirection.ltr,
+        ),
+      ],
+    );
+  }
+
+  /// ساخت بخش تراکنش‌های پرداخت
+  Widget _buildPaymentTransactions(ThemeData theme) {
+    if (_loadingPayments) {
+      return Card(
+        elevation: 2,
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const CircularProgressIndicator(),
+                const SizedBox(height: 16),
+                Text(
+                  'در حال بارگذاری تراکنش‌های پرداخت...',
+                  style: theme.textTheme.bodyMedium,
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (_paymentDocuments.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Card(
+      elevation: 2,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.payment,
+                  color: theme.colorScheme.primary,
+                  size: 24,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'تراکنش‌های پرداخت',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(16),
+            itemCount: _paymentDocuments.length,
+            separatorBuilder: (context, index) => const SizedBox(height: 12),
+            itemBuilder: (context, index) {
+              final paymentDoc = _paymentDocuments[index];
+              return _buildPaymentCard(theme, paymentDoc);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// ساخت کارت یک تراکنش پرداخت
+  Widget _buildPaymentCard(ThemeData theme, ReceiptPaymentDocument doc) {
+    final isReceipt = doc.documentType == 'receipt';
+    final totalAmount = doc.totalAmount;
+    
+    // جمع‌آوری اطلاعات تراکنش‌ها از account_lines
+    final transactionMethods = <String>[];
+    for (final line in doc.accountLines) {
+      if (line.transactionType != null) {
+        String methodName;
+        switch (line.transactionType) {
+          case 'bank':
+            methodName = 'بانک';
+            if (line.extraInfo?['bank_name'] != null) {
+              methodName += ' (${line.extraInfo!['bank_name']})';
+            }
+            break;
+          case 'cash_register':
+            methodName = 'صندوق';
+            if (line.extraInfo?['cash_register_name'] != null) {
+              methodName += ' (${line.extraInfo!['cash_register_name']})';
+            }
+            break;
+          case 'petty_cash':
+            methodName = 'تنخواهگردان';
+            if (line.extraInfo?['petty_cash_name'] != null) {
+              methodName += ' (${line.extraInfo!['petty_cash_name']})';
+            }
+            break;
+          case 'check':
+            methodName = 'چک';
+            if (line.extraInfo?['check_number'] != null) {
+              methodName += ' (${line.extraInfo!['check_number']})';
+            }
+            break;
+          case 'person':
+            methodName = 'شخص';
+            break;
+          case 'account':
+            methodName = line.accountName;
+            break;
+          default:
+            methodName = line.transactionType ?? 'نامشخص';
+        }
+        if (!transactionMethods.contains(methodName)) {
+          transactionMethods.add(methodName);
+        }
+      }
+    }
+
+    return Card(
+      elevation: 1,
+      color: theme.colorScheme.surfaceContainerHighest,
+      child: InkWell(
+        onTap: () {
+          // می‌توانید دیالوگ مشاهده جزئیات سند دریافت/پرداخت را باز کنید
+        },
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    isReceipt ? Icons.arrow_downward : Icons.arrow_upward,
+                    color: isReceipt ? Colors.green : Colors.red,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      doc.code,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: isReceipt 
+                          ? Colors.green.withOpacity(0.1)
+                          : Colors.red.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      isReceipt ? 'دریافت' : 'پرداخت',
+                      style: TextStyle(
+                        color: isReceipt ? Colors.green : Colors.red,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildPaymentInfoRow(
+                      'تاریخ:',
+                      HesabixDateUtils.formatForDisplay(
+                        doc.documentDate,
+                        widget.calendarController.isJalali == true,
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: _buildPaymentInfoRow(
+                      'مبلغ:',
+                      formatWithThousands(totalAmount.toInt()),
+                      isAmount: true,
+                    ),
+                  ),
+                ],
+              ),
+              if (transactionMethods.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                _buildPaymentInfoRow(
+                  'روش پرداخت:',
+                  transactionMethods.join('، '),
+                ),
+              ],
+              if (doc.description != null && doc.description!.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                _buildPaymentInfoRow(
+                  'توضیحات:',
+                  doc.description!,
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// ساخت یک ردیف اطلاعات در کارت پرداخت
+  Widget _buildPaymentInfoRow(String label, String value, {bool isAmount = false}) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 80,
+          child: Text(
+            label,
+            style: const TextStyle(
+              fontWeight: FontWeight.w600,
+              color: Colors.grey,
+              fontSize: 12,
+            ),
+          ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: TextStyle(
+              fontWeight: isAmount ? FontWeight.bold : FontWeight.normal,
+              fontSize: 12,
+              fontFamily: isAmount ? 'monospace' : null,
+            ),
+            textDirection: isAmount ? TextDirection.ltr : null,
+          ),
         ),
       ],
     );
