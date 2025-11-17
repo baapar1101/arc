@@ -27,13 +27,15 @@ class FileStorageService:
     async def upload_file(
         self,
         file: UploadFile,
-        user_id: UUID,
+        user_id: int | UUID,
         module_context: str,
-        context_id: Optional[UUID] = None,
+        context_id: Optional[UUID | str] = None,
         developer_data: Optional[Dict] = None,
         is_temporary: bool = False,
         expires_in_days: int = 30,
-        storage_config_id: Optional[UUID] = None
+        storage_config_id: Optional[UUID] = None,
+        business_id: Optional[int] = None,
+        check_storage_limit: bool = True,
     ) -> Dict[str, Any]:
         try:
             # دریافت تنظیمات ذخیره‌سازی
@@ -63,12 +65,50 @@ class FileStorageService:
             file_content = await file.read()
             file_size = len(file_content)
             
+            # بررسی محدودیت ذخیره‌سازی (اگر business_id ارائه شده باشد)
+            subscription_id = None
+            if business_id and check_storage_limit:
+                from app.services.storage_subscription_service import check_storage_limit, get_active_subscriptions
+                limit_info = check_storage_limit(self.db, business_id, file_size)
+                
+                if limit_info["over_limit"]:
+                    # اگر از محدودیت تجاوز کرد، خطا برمی‌گردانیم
+                    # Frontend باید از کاربر بپرسد آیا می‌خواهد صورتحساب برای حجم اضافی ایجاد شود
+                    raise HTTPException(
+                        status_code=400,
+                        detail={
+                            "error": "STORAGE_LIMIT_EXCEEDED",
+                            "message": "حجم فایل از محدودیت ذخیره‌سازی تجاوز می‌کند",
+                            "total_limit_gb": limit_info["total_limit_gb"],
+                            "current_usage_gb": limit_info["current_usage_gb"],
+                            "available_gb": limit_info["available_gb"],
+                            "required_gb": limit_info["additional_gb"],
+                            "over_usage_gb": limit_info["over_usage_gb"],
+                        }
+                    )
+                
+                # دریافت اولین اشتراک فعال برای ثبت
+                active_subs = get_active_subscriptions(self.db, business_id)
+                if active_subs:
+                    subscription_id = active_subs[0]["id"]
+            
             # محاسبه checksum
             checksum = hashlib.sha256(file_content).hexdigest()
 
             # ذخیره فایل
             await self._save_file_to_storage(file_content, file_path, storage_config)
 
+            # تبدیل user_id به int (چون uploaded_by در مدل Integer است)
+            if isinstance(user_id, int):
+                user_id_int = user_id
+            elif isinstance(user_id, UUID):
+                # اگر UUID است، نمی‌توانیم مستقیماً به int تبدیل کنیم
+                # باید از user_id اصلی استفاده کنیم
+                # این حالت نباید اتفاق بیفتد چون ما int می‌فرستیم
+                raise ValueError(f"user_id باید int باشد، نه UUID: {user_id}")
+            else:
+                user_id_int = int(user_id)
+            
             # ذخیره اطلاعات در دیتابیس
             file_storage = await self.file_repo.create_file(
                 original_name=file.filename or "unknown",
@@ -77,15 +117,31 @@ class FileStorageService:
                 file_size=file_size,
                 mime_type=file.content_type or "application/octet-stream",
                 storage_type=(storage_config.storage_type or "local").lower(),
-                uploaded_by=user_id,
+                uploaded_by=user_id_int,
                 module_context=module_context,
                 context_id=context_id,
                 developer_data=developer_data,
                 checksum=checksum,
                 is_temporary=is_temporary,
                 expires_in_days=expires_in_days,
-                storage_config_id=storage_config.id
+                storage_config_id=storage_config.id,
+                business_id=business_id,
+                subscription_id=subscription_id,
             )
+
+            # ثبت تراکنش استفاده
+            if business_id:
+                from adapters.db.models.storage_plan import StorageUsageTransaction
+                usage_gb = file_size / (1024 * 1024 * 1024)
+                usage_tx = StorageUsageTransaction(
+                    business_id=business_id,
+                    file_storage_id=file_storage.id,
+                    usage_gb=usage_gb,
+                    transaction_type="upload",
+                    subscription_id=subscription_id,
+                )
+                self.db.add(usage_tx)
+                self.db.flush()
 
             # تولید توکن تایید برای فایل‌های موقت
             verification_token = None
@@ -108,6 +164,8 @@ class FileStorageService:
                 "expires_at": file_storage.expires_at.isoformat() if file_storage.expires_at else None
             }
 
+        except HTTPException:
+            raise
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"File upload failed: {str(e)}")
 
@@ -145,6 +203,20 @@ class FileStorageService:
         file_storage = await self.file_repo.get_file_by_id(file_id)
         if not file_storage:
             return False
+
+        # ثبت تراکنش استفاده (حذف)
+        if file_storage.business_id:
+            from adapters.db.models.storage_plan import StorageUsageTransaction
+            usage_gb = file_storage.file_size / (1024 * 1024 * 1024)
+            usage_tx = StorageUsageTransaction(
+                business_id=file_storage.business_id,
+                file_storage_id=file_storage.id,
+                usage_gb=-usage_gb,  # منفی برای حذف
+                transaction_type="delete",
+                subscription_id=file_storage.subscription_id,
+            )
+            self.db.add(usage_tx)
+            self.db.flush()
 
         # حذف فایل از storage
         try:

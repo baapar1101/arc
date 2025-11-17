@@ -11,6 +11,11 @@ import 'package:hesabix_ui/services/report_template_service.dart';
 import 'package:hesabix_ui/services/receipt_payment_service.dart';
 import 'package:hesabix_ui/models/receipt_payment_document.dart';
 import 'package:hesabix_ui/core/date_utils.dart' show HesabixDateUtils;
+import 'package:hesabix_ui/services/business_storage_service.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:dio/dio.dart';
+import 'package:go_router/go_router.dart';
+import 'package:hesabix_ui/widgets/attached_files/attached_files_widget.dart';
 
 /// دیالوگ نمایش جزئیات کامل سند حسابداری
 class DocumentDetailsDialog extends StatefulWidget {
@@ -44,12 +49,227 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> {
   final _receiptPaymentService = ReceiptPaymentService(ApiClient());
   List<ReceiptPaymentDocument> _paymentDocuments = [];
   bool _loadingPayments = false;
+  
+  // سرویس ذخیره‌سازی
+  late final BusinessStorageService _storageService;
+  bool _uploadingFile = false;
+  final AttachedFilesWidgetKey _attachedFilesKey = AttachedFilesWidgetKey();
 
   @override
   void initState() {
     super.initState();
     _service = DocumentService(ApiClient());
+    _storageService = BusinessStorageService(ApiClient());
     _loadDocument();
+  }
+  
+  Future<void> _attachFile() async {
+    if (_document == null) return;
+    
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.any,
+        withData: true,
+      );
+      
+      if (result == null || result.files.isEmpty) return;
+      
+      final file = result.files.first;
+      if (file.bytes == null) return;
+      
+      setState(() => _uploadingFile = true);
+      
+      try {
+        await _storageService.uploadFile(
+          businessId: _document!.businessId,
+          fileBytes: file.bytes!,
+          filename: file.name,
+          moduleContext: 'accounting',
+          contextId: _document!.id.toString(),
+        );
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('فایل با موفقیت الصاق شد'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          // رفرش لیست فایل‌ها
+          _attachedFilesKey.refresh();
+        }
+      } on DioException catch (e) {
+        if (mounted) {
+          await _handleUploadError(e);
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('خطا در آپلود فایل: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      } finally {
+        if (mounted) {
+          setState(() => _uploadingFile = false);
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('خطا: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        setState(() => _uploadingFile = false);
+      }
+    }
+  }
+  
+  Future<void> _handleUploadError(DioException e) async {
+    final response = e.response;
+    if (response != null && response.data is Map) {
+      final data = response.data as Map<String, dynamic>;
+      final error = data['error'];
+      
+      if (error is Map && error['code'] == 'STORAGE_LIMIT_EXCEEDED') {
+        // نمایش دیالوگ با جزئیات خطا
+        await _showStorageLimitDialog(Map<String, dynamic>.from(error));
+        return;
+      }
+    }
+    
+    // خطای عمومی
+    String errorMessage = 'خطا در آپلود فایل';
+    if (response?.data is Map) {
+      final data = response!.data as Map<String, dynamic>;
+      if (data.containsKey('message')) {
+        errorMessage = data['message'] as String;
+      } else if (data.containsKey('error') && data['error'] is Map) {
+        final errorMap = data['error'] as Map;
+        if (errorMap.containsKey('message')) {
+          errorMessage = errorMap['message'] as String;
+        }
+      }
+    }
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(errorMessage),
+        backgroundColor: Colors.red,
+      ),
+    );
+  }
+  
+  Future<void> _showStorageLimitDialog(Map<String, dynamic> error) async {
+    final totalLimit = (error['total_limit_gb'] as num?)?.toDouble() ?? 0.0;
+    final currentUsage = (error['current_usage_gb'] as num?)?.toDouble() ?? 0.0;
+    final available = (error['available_gb'] as num?)?.toDouble() ?? 0.0;
+    final overUsage = (error['over_usage_gb'] as num?)?.toDouble() ?? 0.0;
+    final required = (error['required_gb'] as num?)?.toDouble() ?? 0.0;
+    
+    final theme = Theme.of(context);
+    
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 28),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                'محدودیت ذخیره‌سازی',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                error['message'] as String? ?? 'حجم فایل از محدودیت ذخیره‌سازی تجاوز می‌کند',
+                style: theme.textTheme.bodyLarge,
+              ),
+              const SizedBox(height: 20),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildStorageInfoRow('محدودیت کل:', '${totalLimit.toStringAsFixed(3)} GB', theme),
+                    _buildStorageInfoRow('استفاده شده:', '${currentUsage.toStringAsFixed(3)} GB', theme),
+                    _buildStorageInfoRow('موجود:', '${available.toStringAsFixed(3)} GB', theme),
+                    const Divider(height: 24),
+                    _buildStorageInfoRow('حجم مورد نیاز:', '${required.toStringAsFixed(3)} GB', theme, isHighlight: true),
+                    _buildStorageInfoRow('حجم اضافی:', '${overUsage.toStringAsFixed(3)} GB', theme, isHighlight: true, isError: true),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'برای آپلود این فایل، لطفاً پلن ذخیره‌سازی خود را ارتقا دهید یا فایل کوچکتری انتخاب کنید.',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('متوجه شدم'),
+          ),
+          FilledButton.icon(
+            onPressed: () {
+              Navigator.pop(context);
+              context.go('/business/${_document!.businessId}/storage-files');
+            },
+            icon: const Icon(Icons.storage_outlined),
+            label: const Text('مدیریت ذخیره‌سازی'),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  Widget _buildStorageInfoRow(String label, String value, ThemeData theme, {bool isHighlight = false, bool isError = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+            ),
+          ),
+          Text(
+            value,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              fontWeight: isHighlight ? FontWeight.bold : FontWeight.normal,
+              color: isError 
+                  ? Colors.red 
+                  : isHighlight 
+                      ? theme.colorScheme.primary 
+                      : theme.colorScheme.onSurface,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _generatePdf() async {
@@ -412,8 +632,30 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> {
             const SizedBox(height: 24),
             _buildPaymentTransactions(theme),
           ],
+          
+          // فایل‌های الصاق شده
+          const SizedBox(height: 24),
+          _buildAttachedFiles(theme),
         ],
       ),
+    );
+  }
+  
+  /// ساخت بخش فایل‌های الصاق شده
+  Widget _buildAttachedFiles(ThemeData theme) {
+    if (_document == null) return const SizedBox.shrink();
+    
+    return AttachedFilesWidget(
+      refreshKey: _attachedFilesKey,
+      businessId: _document!.businessId,
+      moduleContext: 'accounting',
+      contextId: _document!.id.toString(),
+      title: 'فایل‌های الصاق شده',
+      autoLoad: true,
+      allowDelete: false, // در دیالوگ مشاهده، حذف مجاز نیست
+      onFilesLoaded: (files) {
+        // می‌توانید عملیات اضافی انجام دهید
+      },
     );
   }
 
@@ -910,6 +1152,16 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
+          // دکمه الصاق فایل
+          OutlinedButton.icon(
+            onPressed: _uploadingFile ? null : _attachFile,
+            icon: _uploadingFile
+                ? const SizedBox(
+                    width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                : const Icon(Icons.attach_file),
+            label: Text(_uploadingFile ? 'در حال آپلود...' : 'الصاق فایل'),
+          ),
+          const SizedBox(width: 12),
           // دکمه چاپ PDF
           OutlinedButton.icon(
             onPressed: _isGeneratingPdf ? null : _generatePdf,

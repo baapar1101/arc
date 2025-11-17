@@ -34,6 +34,10 @@ class ProductFormData {
   
   // Attributes
   Set<int> selectedAttributeIds;
+  
+  // Image
+  String? imageFileId;
+  String? imageUrl;
 
   ProductFormData({
     this.itemType = 'کالا',
@@ -60,6 +64,8 @@ class ProductFormData {
     this.taxCode,
     this.taxUnitId,
     Set<int>? selectedAttributeIds,
+    this.imageFileId,
+    this.imageUrl,
   }) : selectedAttributeIds = selectedAttributeIds ?? <int>{};
 
   ProductFormData copyWith({
@@ -87,6 +93,8 @@ class ProductFormData {
     String? taxCode,
     int? taxUnitId,
     Set<int>? selectedAttributeIds,
+    String? imageFileId,
+    String? imageUrl,
   }) {
     return ProductFormData(
       itemType: itemType ?? this.itemType,
@@ -113,6 +121,8 @@ class ProductFormData {
       taxCode: taxCode ?? this.taxCode,
       taxUnitId: taxUnitId ?? this.taxUnitId,
       selectedAttributeIds: selectedAttributeIds ?? this.selectedAttributeIds,
+      imageFileId: imageFileId ?? this.imageFileId,
+      imageUrl: imageUrl ?? this.imageUrl,
     );
   }
 
@@ -144,6 +154,7 @@ class ProductFormData {
       'tax_code': taxCode,
       'tax_unit_id': taxUnitId,
       'attribute_ids': selectedAttributeIds.isEmpty ? null : selectedAttributeIds.toList(),
+      'image_file_id': imageFileId,
     };
     // Remove only nulls we intentionally kept nullable
     payload.removeWhere((k, v) => v == null);
@@ -176,6 +187,8 @@ class ProductFormData {
       taxCode: product['tax_code']?.toString(),
       taxUnitId: product['tax_unit_id'] as int?,
       selectedAttributeIds: _parseAttributeIds(product['attribute_ids']),
+      imageFileId: product['image_file_id']?.toString(),
+      imageUrl: product['image_url']?.toString(),
     );
   }
 

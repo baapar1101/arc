@@ -32,6 +32,7 @@ from adapters.api.v1.admin.file_storage import router as admin_file_storage_rout
 from adapters.api.v1.admin.email_config import router as admin_email_config_router
 from adapters.api.v1.admin.system_settings import router as admin_system_settings_router
 from adapters.api.v1.admin.wallet_admin import router as admin_wallet_router
+from adapters.api.v1.admin.storage_plans import router as admin_storage_plans_router
 from adapters.api.v1.announcements import router as announcements_router
 from adapters.api.v1.admin.announcements import router as admin_announcements_router
 from adapters.api.v1.receipts_payments import router as receipts_payments_router
@@ -55,6 +56,7 @@ from adapters.api.v1.notifications_ws import router as notifications_ws_router
 from adapters.api.v1.business_backups import router as business_backups_router
 from adapters.api.v1.jobs import router as jobs_router
 from app.services.notification_processor import background_loop as notifications_background_loop
+from app.services.storage_background_jobs import storage_cleanup_loop, storage_subscription_check_loop
 from app.core.i18n import negotiate_locale, Translator
 from app.core.error_handlers import register_error_handlers
 from app.core.smart_normalizer import smart_normalize_json, SmartNormalizerConfig
@@ -358,6 +360,9 @@ def create_app() -> FastAPI:
     application.include_router(notifications_ws_router)
     # Business backups
     application.include_router(business_backups_router, prefix=settings.api_v1_prefix)
+    # Business storage
+    from adapters.api.v1.business.storage import router as business_storage_router
+    application.include_router(business_storage_router, prefix=settings.api_v1_prefix)
     # Jobs
     application.include_router(jobs_router, prefix=settings.api_v1_prefix)
     from adapters.api.v1.payment_gateways import router as payment_gateways_router
@@ -379,6 +384,7 @@ def create_app() -> FastAPI:
     application.include_router(admin_email_config_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_system_settings_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_wallet_router, prefix=settings.api_v1_prefix)
+    application.include_router(admin_storage_plans_router, prefix=settings.api_v1_prefix)
     from adapters.api.v1.admin.payment_gateways import router as admin_payment_gateways_router
     application.include_router(admin_payment_gateways_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_announcements_router, prefix=settings.api_v1_prefix)
@@ -389,8 +395,12 @@ def create_app() -> FastAPI:
     # Start background notification outbox processor
     import asyncio
     @application.on_event("startup")
-    async def _start_notification_processor():
+    async def _start_background_jobs():
         asyncio.create_task(notifications_background_loop(30))
+        # Storage cleanup: هر 24 ساعت یکبار
+        asyncio.create_task(storage_cleanup_loop(24))
+        # Subscription check: هر 6 ساعت یکبار
+        asyncio.create_task(storage_subscription_check_loop(6))
 
     @application.middleware("http")
     async def log_slow_requests(request: Request, call_next):

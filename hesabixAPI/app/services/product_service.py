@@ -113,6 +113,7 @@ def create_product(db: Session, business_id: int, payload: ProductCreateRequest)
         tax_type_id=payload.tax_type_id,
         tax_code=payload.tax_code,
         tax_unit_id=payload.tax_unit_id,
+        image_file_id=payload.image_file_id,
     )
 
     _upsert_attributes(db, obj.id, business_id, payload.attribute_ids)
@@ -198,6 +199,7 @@ def update_product(db: Session, product_id: int, business_id: int, payload: Prod
         tax_type_id=payload.tax_type_id,
         tax_code=payload.tax_code,
         tax_unit_id=payload.tax_unit_id,
+        image_file_id=payload.image_file_id if 'image_file_id' in fields_set else None,
     )
     if not updated:
         return None
@@ -213,6 +215,14 @@ def delete_product(db: Session, product_id: int, business_id: int) -> bool:
     if not obj or obj.business_id != business_id:
         return False
     return repo.delete(product_id)
+
+
+def _get_image_url(obj: Product) -> str | None:
+    """تولید URL برای نمایش عکس محصول"""
+    if not obj.image_file_id:
+        return None
+    # URL برای دانلود عکس از طریق storage endpoint
+    return f"/api/v1/business/{obj.business_id}/storage/files/{obj.image_file_id}/download"
 
 
 def _to_dict(obj: Product) -> Dict[str, Any]:
@@ -242,6 +252,8 @@ def _to_dict(obj: Product) -> Dict[str, Any]:
         "tax_type_id": obj.tax_type_id,
         "tax_code": obj.tax_code,
         "tax_unit_id": obj.tax_unit_id,
+        "image_file_id": obj.image_file_id,
+        "image_url": _get_image_url(obj) if obj.image_file_id else None,
         "created_at": obj.created_at,
         "updated_at": obj.updated_at,
     }

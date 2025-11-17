@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart' as dio;
 import '../core/api_client.dart';
 
 class ProductService {
@@ -8,12 +9,34 @@ class ProductService {
   Future<Map<String, dynamic>> createProduct({
     required int businessId,
     required Map<String, dynamic> payload,
+    List<int>? imageBytes,
+    String? imageFilename,
   }) async {
-    final res = await _api.post<Map<String, dynamic>>(
-      '/api/v1/products/business/$businessId',
-      data: payload,
-    );
-    return Map<String, dynamic>.from(res.data?['data'] ?? const {});
+    if (imageBytes != null && imageFilename != null) {
+      // استفاده از multipart/form-data برای آپلود فایل
+      final formData = dio.FormData.fromMap({
+        ...payload.map((key, value) => MapEntry(key, value?.toString() ?? '')),
+        if (imageBytes.isNotEmpty && imageFilename.isNotEmpty)
+          'file': dio.MultipartFile.fromBytes(
+            imageBytes,
+            filename: imageFilename,
+          ),
+      });
+      
+      final res = await _api.post<Map<String, dynamic>>(
+        '/api/v1/products/business/$businessId',
+        data: formData,
+        options: dio.Options(contentType: 'multipart/form-data'),
+      );
+      return Map<String, dynamic>.from(res.data?['data'] ?? const {});
+    } else {
+      // استفاده از JSON معمولی
+      final res = await _api.post<Map<String, dynamic>>(
+        '/api/v1/products/business/$businessId',
+        data: payload,
+      );
+      return Map<String, dynamic>.from(res.data?['data'] ?? const {});
+    }
   }
 
   Future<Map<String, dynamic>> getProduct({
@@ -30,12 +53,34 @@ class ProductService {
     required int businessId,
     required int productId,
     required Map<String, dynamic> payload,
+    List<int>? imageBytes,
+    String? imageFilename,
   }) async {
-    final res = await _api.put<Map<String, dynamic>>(
-      '/api/v1/products/business/$businessId/$productId',
-      data: payload,
-    );
-    return Map<String, dynamic>.from(res.data?['data'] ?? const {});
+    if (imageBytes != null && imageFilename != null) {
+      // استفاده از multipart/form-data برای آپلود فایل
+      final formData = dio.FormData.fromMap({
+        ...payload.map((key, value) => MapEntry(key, value?.toString() ?? '')),
+        if (imageBytes.isNotEmpty && imageFilename.isNotEmpty)
+          'file': dio.MultipartFile.fromBytes(
+            imageBytes,
+            filename: imageFilename,
+          ),
+      });
+      
+      final res = await _api.put<Map<String, dynamic>>(
+        '/api/v1/products/business/$businessId/$productId',
+        data: formData,
+        options: dio.Options(contentType: 'multipart/form-data'),
+      );
+      return Map<String, dynamic>.from(res.data?['data'] ?? const {});
+    } else {
+      // استفاده از JSON معمولی
+      final res = await _api.put<Map<String, dynamic>>(
+        '/api/v1/products/business/$businessId/$productId',
+        data: payload,
+      );
+      return Map<String, dynamic>.from(res.data?['data'] ?? const {});
+    }
   }
 
   Future<bool> deleteProduct({required int businessId, required int productId}) async {

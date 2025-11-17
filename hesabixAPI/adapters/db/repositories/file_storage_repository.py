@@ -20,18 +20,28 @@ class FileStorageRepository(BaseRepository[FileStorage]):
         file_size: int,
         mime_type: str,
         storage_type: str,
-        uploaded_by: UUID,
+        uploaded_by: int,
         module_context: str,
-        context_id: Optional[UUID] = None,
+        context_id: Optional[UUID | str] = None,
         developer_data: Optional[Dict] = None,
         checksum: Optional[str] = None,
         is_temporary: bool = False,
         expires_in_days: int = 30,
-        storage_config_id: Optional[UUID] = None
+        storage_config_id: Optional[UUID] = None,
+        business_id: Optional[int] = None,
+        subscription_id: Optional[int] = None,
     ) -> FileStorage:
         expires_at = None
         if is_temporary:
             expires_at = datetime.utcnow() + timedelta(days=expires_in_days)
+
+        # تبدیل context_id به string اگر UUID است
+        context_id_str = None
+        if context_id:
+            if isinstance(context_id, UUID):
+                context_id_str = str(context_id)
+            else:
+                context_id_str = str(context_id)
 
         file_storage = FileStorage(
             original_name=original_name,
@@ -42,8 +52,10 @@ class FileStorageRepository(BaseRepository[FileStorage]):
             storage_type=storage_type,
             storage_config_id=storage_config_id,
             uploaded_by=uploaded_by,
+            business_id=business_id,
+            subscription_id=subscription_id,
             module_context=module_context,
-            context_id=context_id,
+            context_id=context_id_str,
             developer_data=developer_data,
             checksum=checksum,
             is_temporary=is_temporary,

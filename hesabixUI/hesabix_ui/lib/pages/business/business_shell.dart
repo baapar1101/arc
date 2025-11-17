@@ -487,14 +487,6 @@ class _BusinessShellState extends State<BusinessShell> {
             type: _MenuItemType.simple,
             hasAddButton: false,
           ),
-          _MenuItem(
-            label: t.accountingSettings,
-            icon: Icons.settings,
-            selectedIcon: Icons.settings,
-            path: '/business/${widget.businessId}/accounting-settings',
-            type: _MenuItemType.simple,
-            hasAddButton: false,
-          ),
         ],
       ),
       _MenuItem(
@@ -549,7 +541,7 @@ class _BusinessShellState extends State<BusinessShell> {
         label: t.storageSpace,
         icon: Icons.storage,
         selectedIcon: Icons.storage,
-        path: '/business/${widget.businessId}/storage-space',
+        path: '/business/${widget.businessId}/storage-files',
         type: _MenuItemType.simple,
         hasAddButton: false,
       ),

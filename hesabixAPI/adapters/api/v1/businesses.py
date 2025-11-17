@@ -345,15 +345,44 @@ async def upload_business_logo(
         raise HTTPException(status_code=404, detail="کسب و کار یافت نشد")
 
     storage = FileStorageService(db)
-    saved = await storage.upload_file(
-        file=file,
-        user_id=ctx.get_user_id(),
-        module_context="business_logo",
-        context_id=None,
-        developer_data={"business_id": business_id, "type": "logo"},
-        is_temporary=False,
-        expires_in_days=3650,
-    )
+    
+    # حذف فایل قدیمی لوگو اگر وجود داشته باشد
+    if business.logo_file_id:
+        try:
+            old_file_id = UUID(str(business.logo_file_id))
+            await storage.delete_file(old_file_id)
+        except Exception:
+            pass  # اگر فایل قدیمی وجود نداشت یا خطا رخ داد، ادامه می‌دهیم
+    
+    try:
+        saved = await storage.upload_file(
+            file=file,
+            user_id=ctx.get_user_id(),
+            module_context="business_logo",
+            context_id=None,
+            developer_data={"business_id": business_id, "type": "logo"},
+            is_temporary=False,
+            expires_in_days=3650,
+            business_id=business_id,
+            check_storage_limit=True,
+        )
+    except HTTPException as e:
+        # اگر خطای محدودیت ذخیره‌سازی باشد، جزئیات را برمی‌گردانیم
+        if e.status_code == 400 and isinstance(e.detail, dict) and e.detail.get("error") == "STORAGE_LIMIT_EXCEEDED":
+            error_detail = {
+                "success": False,
+                "error": {
+                    "code": "STORAGE_LIMIT_EXCEEDED",
+                    "message": e.detail.get("message", "حجم فایل از محدودیت ذخیره‌سازی تجاوز می‌کند"),
+                    "total_limit_gb": e.detail.get("total_limit_gb"),
+                    "current_usage_gb": e.detail.get("current_usage_gb"),
+                    "available_gb": e.detail.get("available_gb"),
+                    "required_gb": e.detail.get("required_gb"),
+                    "over_usage_gb": e.detail.get("over_usage_gb"),
+                }
+            }
+            raise HTTPException(status_code=400, detail=error_detail)
+        raise
 
     business.logo_file_id = saved.get("file_id")
     db.commit()
@@ -413,15 +442,44 @@ async def upload_business_stamp(
         raise HTTPException(status_code=404, detail="کسب و کار یافت نشد")
 
     storage = FileStorageService(db)
-    saved = await storage.upload_file(
-        file=file,
-        user_id=ctx.get_user_id(),
-        module_context="business_stamp",
-        context_id=None,
-        developer_data={"business_id": business_id, "type": "stamp"},
-        is_temporary=False,
-        expires_in_days=3650,
-    )
+    
+    # حذف فایل قدیمی مهر اگر وجود داشته باشد
+    if business.stamp_file_id:
+        try:
+            old_file_id = UUID(str(business.stamp_file_id))
+            await storage.delete_file(old_file_id)
+        except Exception:
+            pass  # اگر فایل قدیمی وجود نداشت یا خطا رخ داد، ادامه می‌دهیم
+    
+    try:
+        saved = await storage.upload_file(
+            file=file,
+            user_id=ctx.get_user_id(),
+            module_context="business_stamp",
+            context_id=None,
+            developer_data={"business_id": business_id, "type": "stamp"},
+            is_temporary=False,
+            expires_in_days=3650,
+            business_id=business_id,
+            check_storage_limit=True,
+        )
+    except HTTPException as e:
+        # اگر خطای محدودیت ذخیره‌سازی باشد، جزئیات را برمی‌گردانیم
+        if e.status_code == 400 and isinstance(e.detail, dict) and e.detail.get("error") == "STORAGE_LIMIT_EXCEEDED":
+            error_detail = {
+                "success": False,
+                "error": {
+                    "code": "STORAGE_LIMIT_EXCEEDED",
+                    "message": e.detail.get("message", "حجم فایل از محدودیت ذخیره‌سازی تجاوز می‌کند"),
+                    "total_limit_gb": e.detail.get("total_limit_gb"),
+                    "current_usage_gb": e.detail.get("current_usage_gb"),
+                    "available_gb": e.detail.get("available_gb"),
+                    "required_gb": e.detail.get("required_gb"),
+                    "over_usage_gb": e.detail.get("over_usage_gb"),
+                }
+            }
+            raise HTTPException(status_code=400, detail=error_detail)
+        raise
 
     business.stamp_file_id = saved.get("file_id")
     db.commit()

@@ -24,6 +24,13 @@ class _SystemSettingsPageState extends State<SystemSettingsPage> {
         route: '/user/profile/system-settings/storage',
       ),
       SettingsItem(
+        title: 'پلن‌های ذخیره‌سازی',
+        description: 'مدیریت پلن‌های ذخیره‌سازی و تعیین قیمت‌ها',
+        icon: Icons.storage_outlined,
+        color: const Color(0xFF00BCD4),
+        route: '/user/profile/system-settings/storage-plans',
+      ),
+      SettingsItem(
         title: 'systemConfiguration',
         description: 'systemConfigurationDescription',
         icon: Icons.settings_outlined,

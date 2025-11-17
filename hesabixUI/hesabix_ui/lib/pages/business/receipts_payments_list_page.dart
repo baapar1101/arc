@@ -62,6 +62,8 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
 
   /// تازه‌سازی داده‌های جدول
   void _refreshData() {
+    if (!mounted) return;
+    
     final state = _tableKey.currentState;
     if (state != null) {
       try {
@@ -70,9 +72,16 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
         // ignore: avoid_dynamic_calls
         (state as dynamic).refresh();
         return;
-      } catch (_) {}
+      } catch (e) {
+        // در صورت خطا، با setState تلاش می‌کنیم
+        debugPrint('خطا در refresh جدول: $e');
+      }
     }
-    if (mounted) setState(() {});
+    
+    // Fallback: استفاده از setState برای به‌روزرسانی
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   @override
@@ -511,85 +520,106 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
 
   /// انجام عملیات حذف
   Future<void> _performDelete(ReceiptPaymentDocument document) async {
-    try {
-      // نمایش لودینگ هنگام حذف
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (_) => const Center(child: CircularProgressIndicator()),
-      );
+    if (!mounted) return;
+    
+    // نمایش لودینگ هنگام حذف
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
 
+    try {
       final success = await _service.delete(document.id);
+      if (!mounted) return;
+      
+      // بستن لودینگ
+      Navigator.pop(context);
+      
       if (success) {
-        if (mounted) {
-          Navigator.pop(context); // بستن لودینگ
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('سند ${document.code} با موفقیت حذف شد'),
-              backgroundColor: Colors.green,
-            ),
-          );
-          setState(() {
-            _selectedCount = 0; // پاک‌سازی شمارنده انتخاب پس از حذف
-          });
-          _refreshData();
-        }
+        // پاک‌سازی شمارنده انتخاب
+        setState(() {
+          _selectedCount = 0;
+        });
+        
+        // تازه‌سازی داده‌ها بعد از بستن دیالوگ
+        Future.microtask(() {
+          if (mounted) {
+            _refreshData();
+          }
+        });
+        
+        // نمایش پیام موفقیت
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('سند ${document.code} با موفقیت حذف شد'),
+            backgroundColor: Colors.green,
+          ),
+        );
       } else {
-        if (mounted) Navigator.pop(context);
         throw Exception('خطا در حذف سند');
       }
     } catch (e) {
-      if (mounted) {
-        // بستن لودینگ در صورت بروز خطا
+      if (!mounted) return;
+      
+      // بستن لودینگ در صورت بروز خطا
+      if (Navigator.canPop(context)) {
         Navigator.pop(context);
+      }
 
-        String message = 'خطا در حذف سند';
-        int? statusCode;
-        if (e is DioException) {
-          statusCode = e.response?.statusCode;
-          final data = e.response?.data;
-          try {
-            final detail = (data is Map<String, dynamic>) ? data['detail'] : null;
-            if (detail is Map<String, dynamic>) {
-              final err = detail['error'];
-              if (err is Map<String, dynamic>) {
-                final m = err['message'];
-                if (m is String && m.trim().isNotEmpty) {
-                  message = m;
-                }
+      String message = 'خطا در حذف سند';
+      int? statusCode;
+      if (e is DioException) {
+        statusCode = e.response?.statusCode;
+        final data = e.response?.data;
+        try {
+          final detail = (data is Map<String, dynamic>) ? data['detail'] : null;
+          if (detail is Map<String, dynamic>) {
+            final err = detail['error'];
+            if (err is Map<String, dynamic>) {
+              final m = err['message'];
+              if (m is String && m.trim().isNotEmpty) {
+                message = m;
               }
             }
-          } catch (_) {
-            // ignore parse errors
           }
-
-          if (statusCode == 404) {
-            message = 'سند یافت نشد یا قبلاً حذف شده است';
-            _refreshData();
-          } else if (statusCode == 403) {
-            message = 'دسترسی لازم برای حذف این سند را ندارید';
-          } else if (statusCode == 409) {
-            // پیام از سرور استخراج شده است (مثلاً سند قفل/دارای وابستگی)
-            if (message == 'خطا در حذف سند') {
-              message = 'حذف این سند امکان‌پذیر نیست';
-            }
-          }
-        } else {
-          message = e.toString();
+        } catch (_) {
+          // ignore parse errors
         }
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(message),
-            backgroundColor: Colors.red,
-          ),
-        );
+        if (statusCode == 404) {
+          message = 'سند یافت نشد یا قبلاً حذف شده است';
+          // تازه‌سازی داده‌ها در صورت 404
+          Future.microtask(() {
+            if (mounted) {
+              _refreshData();
+            }
+          });
+        } else if (statusCode == 403) {
+          message = 'دسترسی لازم برای حذف این سند را ندارید';
+        } else if (statusCode == 409) {
+          // پیام از سرور استخراج شده است (مثلاً سند قفل/دارای وابستگی)
+          if (message == 'خطا در حذف سند') {
+            message = 'حذف این سند امکان‌پذیر نیست';
+          }
+        }
+      } else {
+        message = e.toString();
       }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
   /// حذف گروهی اسناد انتخاب‌شده
   Future<void> _onBulkDelete() async {
+    if (!mounted) return;
+    
     // استخراج آیتم‌های انتخاب‌شده از جدول
     final state = _tableKey.currentState;
     if (state == null) return;
@@ -635,6 +665,7 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
     );
 
     if (confirmed != true) return;
+    if (!mounted) return;
 
     // نمایش لودینگ
     showDialog(
@@ -646,20 +677,39 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
     try {
       await _service.deleteMultiple(ids);
       if (!mounted) return;
-      Navigator.pop(context); // بستن لودینگ
+      
+      // بستن لودینگ
+      if (Navigator.canPop(context)) {
+        Navigator.pop(context);
+      }
+      
+      // پاک‌سازی شمارنده انتخاب
+      setState(() {
+        _selectedCount = 0;
+      });
+      
+      // تازه‌سازی داده‌ها بعد از بستن دیالوگ
+      Future.microtask(() {
+        if (mounted) {
+          _refreshData();
+        }
+      });
+      
+      // نمایش پیام موفقیت
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('${ids.length} سند با موفقیت حذف شد'),
           backgroundColor: Colors.green,
         ),
       );
-      setState(() {
-        _selectedCount = 0; // پاک‌سازی شمارنده انتخاب پس از حذف گروهی
-      });
-      _refreshData();
     } catch (e) {
       if (!mounted) return;
-      Navigator.pop(context); // بستن لودینگ
+      
+      // بستن لودینگ در صورت بروز خطا
+      if (Navigator.canPop(context)) {
+        Navigator.pop(context);
+      }
+      
       String message = 'خطا در حذف اسناد';
       if (e is DioException) {
         message = e.message ?? message;

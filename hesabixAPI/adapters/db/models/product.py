@@ -15,7 +15,7 @@ from sqlalchemy import (
     Numeric,
     Enum as SQLEnum,
 )
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from adapters.db.session import Base
 
@@ -81,7 +81,13 @@ class Product(Base):
     tax_code: Mapped[str | None] = mapped_column(String(100), nullable=True)
     tax_unit_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
 
+    # عکس کالا
+    image_file_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("file_storage.id", ondelete="SET NULL"), nullable=True, index=True)
+
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    # Relationships
+    image_file = relationship("FileStorage", foreign_keys=[image_file_id], lazy="select")
 
 

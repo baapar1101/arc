@@ -96,6 +96,8 @@ class ProductRepository(BaseRepository[Product]):
                 "tax_type_id": p.tax_type_id,
                 "tax_code": p.tax_code,
                 "tax_unit_id": p.tax_unit_id,
+                "image_file_id": p.image_file_id,
+                "image_url": f"/api/v1/business/{p.business_id}/storage/files/{p.image_file_id}/download" if p.image_file_id else None,
                 "created_at": p.created_at,
                 "updated_at": p.updated_at,
             }

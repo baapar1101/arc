@@ -134,6 +134,7 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
         onChanged: _controller.updateFormData,
         categories: _controller.categories,
         attributes: _controller.attributes,
+        controller: _controller,
       ),
     );
   }

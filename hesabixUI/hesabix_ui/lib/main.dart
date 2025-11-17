@@ -33,6 +33,7 @@ import 'pages/business/wallet_page.dart';
 import 'pages/business/wallet_payment_result_page.dart';
 import 'pages/admin/wallet_settings_page.dart';
 import 'pages/admin/payment_gateways_page.dart';
+import 'pages/admin/storage_plans_admin_page.dart';
 import 'pages/business/invoices_list_page.dart';
 import 'pages/business/tax_workspace_page.dart';
 import 'pages/business/new_invoice_page.dart';
@@ -75,6 +76,7 @@ import 'widgets/simple_splash_screen.dart';
 import 'widgets/url_tracker.dart';
 import 'pages/business/opening_balance_page.dart';
 import 'pages/business/report_templates_page.dart';
+import 'pages/business/storage_files_page.dart';
 import 'pages/business/backup/backup_page.dart';
 import 'pages/business/backup/restore_page.dart';
 
@@ -621,6 +623,20 @@ class _MyAppState extends State<MyApp> {
                     return const NotificationTemplatesAdminPage();
                   },
                 ),
+                GoRoute(
+                  path: 'storage-plans',
+                  name: 'system_settings_storage_plans',
+                  builder: (context, state) {
+                    if (_authStore == null) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    final allowed = _authStore!.isSuperAdmin || _authStore!.hasAppPermission('system_settings');
+                    if (!allowed) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    return const StoragePlansAdminPage();
+                  },
+                ),
               ],
             ),
           ],
@@ -1125,6 +1141,18 @@ class _MyAppState extends State<MyApp> {
                     calendarController: _calendarController!,
                     authStore: _authStore!,
                     apiClient: ApiClient(),
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/storage-files',
+              name: 'business_storage_files',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return NoTransitionPage(
+                  child: StorageFilesPage(
+                    businessId: businessId,
                   ),
                 );
               },

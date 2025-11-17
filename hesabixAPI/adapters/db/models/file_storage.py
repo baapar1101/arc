@@ -18,6 +18,8 @@ class FileStorage(Base):
     storage_type = Column(String(20), nullable=False)  # local, ftp
     storage_config_id = Column(String(36), ForeignKey("storage_configs.id"), nullable=True)
     uploaded_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+    business_id = Column(Integer, ForeignKey("businesses.id", ondelete="CASCADE"), nullable=True, index=True)  # کسب‌وکار مالک فایل
+    subscription_id = Column(Integer, ForeignKey("business_storage_subscriptions.id", ondelete="SET NULL"), nullable=True, index=True)  # پلن فعال در زمان آپلود
     module_context = Column(String(50), nullable=False)  # tickets, accounting, business_logo, etc.
     context_id = Column(String(36), nullable=True)  # ticket_id, document_id, etc.
     developer_data = Column(JSON, nullable=True)
@@ -28,6 +30,8 @@ class FileStorage(Base):
     verification_token = Column(String(100), nullable=True)
     last_verified_at = Column(DateTime(timezone=True), nullable=True)
     expires_at = Column(DateTime(timezone=True), nullable=True)
+    is_marked_for_deletion = Column(Boolean, default=False, nullable=False)  # برای حذف خودکار
+    marked_for_deletion_at = Column(DateTime(timezone=True), nullable=True)  # زمان علامت‌گذاری برای حذف
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
     deleted_at = Column(DateTime(timezone=True), nullable=True)
@@ -35,6 +39,8 @@ class FileStorage(Base):
     # Relationships
     uploader = relationship("User", foreign_keys=[uploaded_by])
     storage_config = relationship("StorageConfig", foreign_keys=[storage_config_id])
+    business = relationship("Business", foreign_keys=[business_id])
+    subscription = relationship("BusinessStorageSubscription", foreign_keys=[subscription_id])
 
 
 class StorageConfig(Base):

@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../widgets/data_table/data_table_widget.dart';
@@ -6,8 +8,9 @@ import '../../widgets/product/product_form_dialog.dart';
 import '../../widgets/product/bulk_price_update_dialog.dart';
 import '../../widgets/product/product_import_dialog.dart';
 import '../../core/api_client.dart';
-import 'price_lists_page.dart';
+import '../../config/app_config.dart';
 import '../../core/auth_store.dart';
+import 'price_lists_page.dart';
 import '../../utils/number_formatters.dart';
 
 class ProductsPage extends StatefulWidget {
@@ -22,6 +25,150 @@ class ProductsPage extends StatefulWidget {
 
 class _ProductsPageState extends State<ProductsPage> {
   final GlobalKey _tableKey = GlobalKey();
+  
+  /// نمایش دیالوگ تصویر
+  void _showImageDialog(BuildContext context, String imageUrl) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(20),
+        child: Stack(
+          children: [
+            Center(
+              child: FutureBuilder<List<int>>(
+                future: _loadImageWithAuth(imageUrl),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return Container(
+                      padding: const EdgeInsets.all(40),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).scaffoldBackgroundColor,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const CircularProgressIndicator(),
+                    );
+                  }
+                  if (snapshot.hasError || !snapshot.hasData) {
+                    return Container(
+                      padding: const EdgeInsets.all(40),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).scaffoldBackgroundColor,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.broken_image, size: 48, color: Colors.grey),
+                          const SizedBox(height: 16),
+                          Text(
+                            'خطا در بارگذاری تصویر',
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+                  return Container(
+                    constraints: BoxConstraints(
+                      maxWidth: MediaQuery.of(context).size.width * 0.9,
+                      maxHeight: MediaQuery.of(context).size.height * 0.9,
+                    ),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.3),
+                          blurRadius: 20,
+                          spreadRadius: 5,
+                        ),
+                      ],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.memory(
+                        Uint8List.fromList(snapshot.data!),
+                        fit: BoxFit.contain,
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            Positioned(
+              top: 10,
+              right: 10,
+              child: IconButton(
+                icon: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.5),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.close, color: Colors.white, size: 24),
+                ),
+                onPressed: () => Navigator.of(dialogContext).pop(),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// دانلود تصویر با استفاده از Dio (با headerهای authentication)
+  Future<List<int>> _loadImageWithAuth(String url) async {
+    try {
+      // تشخیص اینکه آیا URL کامل است یا نسبی
+      final isFullUrl = url.startsWith('http://') || url.startsWith('https://');
+      
+      // ساخت Dio instance
+      final dio = Dio(BaseOptions(
+        baseUrl: isFullUrl ? '' : AppConfig.apiBaseUrl.replaceAll(RegExp(r'/+$'), ''),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      ));
+      
+      // اضافه کردن interceptor برای headerهای authentication
+      dio.interceptors.add(InterceptorsWrapper(
+        onRequest: (options, handler) {
+          // اضافه کردن headerهای authentication از AuthStore
+          final apiKey = widget.authStore.apiKey;
+          if (apiKey != null && apiKey.isNotEmpty) {
+            options.headers['Authorization'] = 'ApiKey $apiKey';
+          }
+          final deviceId = widget.authStore.deviceId;
+          if (deviceId.isNotEmpty) {
+            options.headers['X-Device-Id'] = deviceId;
+          }
+          final currentBusiness = widget.authStore.currentBusiness;
+          if (currentBusiness != null) {
+            options.headers['X-Business-ID'] = currentBusiness.id.toString();
+          }
+          // اضافه کردن business_id از URL اگر موجود باشد
+          final urlToCheck = isFullUrl ? url : (options.baseUrl + url);
+          if (urlToCheck.contains('/business/')) {
+            final match = RegExp(r'/business/(\d+)').firstMatch(urlToCheck);
+            if (match != null) {
+              options.headers['X-Business-ID'] = match.group(1);
+            }
+          }
+          handler.next(options);
+        },
+      ));
+      
+      final response = await dio.get<List<int>>(
+        url,
+        options: Options(
+          responseType: ResponseType.bytes,
+        ),
+      );
+      return response.data ?? [];
+    } catch (e) {
+      return [];
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -48,6 +195,70 @@ class _ProductsPageState extends State<ProductsPage> {
           enableRowSelection: true,
           enableMultiRowSelection: true,
           columns: [
+            CustomColumn(
+              'image',
+              'عکس',
+              width: ColumnWidth.small,
+              sortable: false,
+              searchable: false,
+              builder: (item, index) {
+                final imageUrl = item['image_url'] as String?;
+                if (imageUrl == null || imageUrl.isEmpty) {
+                  return const Center(child: SizedBox.shrink());
+                }
+                // ساخت URL کامل
+                String fullUrl = imageUrl;
+                if (!imageUrl.startsWith('http://') && !imageUrl.startsWith('https://')) {
+                  // اگر URL نسبی است، base URL را اضافه می‌کنیم
+                  final baseUrl = AppConfig.apiBaseUrl.replaceAll(RegExp(r'/+$'), '');
+                  fullUrl = '$baseUrl${imageUrl.startsWith('/') ? imageUrl : '/$imageUrl'}';
+                }
+                // استفاده از Builder برای دسترسی به context
+                return Builder(
+                  builder: (builderContext) {
+                    // استفاده از FutureBuilder برای دانلود تصویر با Dio (با headerهای authentication)
+                    return Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(4.0),
+                        child: GestureDetector(
+                          onTap: () => _showImageDialog(builderContext, fullUrl),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(4),
+                            child: FutureBuilder<List<int>>(
+                              future: _loadImageWithAuth(fullUrl),
+                              builder: (context, snapshot) {
+                                if (snapshot.connectionState == ConnectionState.waiting) {
+                                  return SizedBox(
+                                    width: 40,
+                                    height: 40,
+                                    child: Center(
+                                      child: SizedBox(
+                                        width: 20,
+                                        height: 20,
+                                        child: CircularProgressIndicator(strokeWidth: 2),
+                                      ),
+                                    ),
+                                  );
+                                }
+                                if (snapshot.hasError || !snapshot.hasData) {
+                                  return const SizedBox.shrink();
+                                }
+                                return Image.memory(
+                                  Uint8List.fromList(snapshot.data!),
+                                  width: 40,
+                                  height: 40,
+                                  fit: BoxFit.cover,
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
             TextColumn('code', t.code, width: ColumnWidth.small),
             TextColumn('name', t.title, width: ColumnWidth.large),
             TextColumn('item_type', t.service, width: ColumnWidth.small),

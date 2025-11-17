@@ -41,6 +41,8 @@ class ProductCreateRequest(BaseModel):
     tax_unit_id: Optional[int] = None
 
     attribute_ids: Optional[List[int]] = Field(default=None, description="ویژگی‌های انتخابی برای لینک شدن")
+    
+    image_file_id: Optional[str] = Field(default=None, description="شناسه فایل عکس کالا")
 
 
 class ProductUpdateRequest(BaseModel):
@@ -73,6 +75,8 @@ class ProductUpdateRequest(BaseModel):
     tax_unit_id: Optional[int] = None
 
     attribute_ids: Optional[List[int]] = None
+    
+    image_file_id: Optional[str] = Field(default=None, description="شناسه فایل عکس کالا")
 
 
 class ProductResponse(BaseModel):
@@ -101,6 +105,8 @@ class ProductResponse(BaseModel):
     tax_type_id: Optional[int] = None
     tax_code: Optional[str] = None
     tax_unit_id: Optional[int] = None
+    image_file_id: Optional[str] = None
+    image_url: Optional[str] = Field(default=None, description="URL برای نمایش عکس")
     created_at: str
     updated_at: str
 

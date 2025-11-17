@@ -29,6 +29,7 @@ from app.services.bulk_price_update_service import (
 from adapters.db.models.business import Business
 from app.core.i18n import negotiate_locale
 from fastapi import UploadFile, File, Form
+import os
 
 
 router = APIRouter(prefix="/products", tags=["products"])
@@ -36,16 +37,121 @@ router = APIRouter(prefix="/products", tags=["products"])
 
 @router.post("/business/{business_id}")
 @require_business_access("business_id")
-def create_product_endpoint(
+async def create_product_endpoint(
     request: Request,
     business_id: int,
-    payload: ProductCreateRequest,
+    payload: ProductCreateRequest = None,
+    file: UploadFile = File(None),
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     if not ctx.has_business_permission("inventory", "write"):
         raise ApiError("FORBIDDEN", "Missing business permission: inventory.write", http_status=403)
+    
+    # بررسی اینکه آیا multipart/form-data است یا JSON
+    content_type = request.headers.get("content-type", "")
+    is_multipart = "multipart/form-data" in content_type
+    
+    image_file_id = None
+    
+    # اگر multipart/form-data است، فایل و داده‌ها را از form می‌خوانیم
+    if is_multipart:
+        form_data = await request.form()
+        
+        # آپلود فایل اگر وجود دارد
+        if "file" in form_data:
+            file = form_data["file"]
+            if hasattr(file, 'filename') and file.filename:
+                # بررسی فرمت فایل
+                allowed_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'}
+                file_ext = os.path.splitext(file.filename)[1].lower()
+                if file_ext not in allowed_extensions:
+                    raise ApiError("INVALID_FILE_FORMAT", "فرمت فایل معتبر نیست. فقط فرمت‌های JPG, PNG, GIF, WebP و BMP پشتیبانی می‌شوند", http_status=400)
+                
+                # آپلود فایل
+                from app.services.file_storage_service import FileStorageService
+                storage_service = FileStorageService(db)
+                try:
+                    upload_result = await storage_service.upload_file(
+                        file=file,
+                        user_id=ctx.get_user_id(),  # user_id به صورت int ارسال می‌شود
+                        module_context="products",
+                        context_id=None,
+                        developer_data={"business_id": business_id},
+                        is_temporary=False,
+                        expires_in_days=3650,
+                        business_id=business_id,
+                        check_storage_limit=True,
+                    )
+                    image_file_id = upload_result.get("file_id")
+                except Exception as e:
+                    raise ApiError("FILE_UPLOAD_ERROR", f"خطا در آپلود فایل: {str(e)}", http_status=400)
+        
+        # ساخت payload از form data
+        import json
+        product_data = {}
+        for key, value in form_data.items():
+            if key != "file":
+                # تبدیل مقادیر به نوع مناسب
+                if isinstance(value, str):
+                    # سعی می‌کنیم به عنوان JSON parse کنیم
+                    try:
+                        product_data[key] = json.loads(value)
+                    except:
+                        # اگر JSON نیست، به عنوان string نگه می‌داریم
+                        product_data[key] = value
+                else:
+                    product_data[key] = value
+        
+        try:
+            payload = ProductCreateRequest(**product_data)
+        except Exception as e:
+            raise ApiError("INVALID_PAYLOAD", f"خطا در پردازش داده‌ها: {str(e)}", http_status=400)
+    else:
+        # اگر JSON است، فایل را از پارامتر file می‌خوانیم
+        if file and file.filename:
+            # بررسی فرمت فایل
+            allowed_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'}
+            file_ext = os.path.splitext(file.filename)[1].lower()
+            if file_ext not in allowed_extensions:
+                raise ApiError("INVALID_FILE_FORMAT", "فرمت فایل معتبر نیست. فقط فرمت‌های JPG, PNG, GIF, WebP و BMP پشتیبانی می‌شوند", http_status=400)
+            
+            # آپلود فایل
+            from app.services.file_storage_service import FileStorageService
+            storage_service = FileStorageService(db)
+            try:
+                upload_result = await storage_service.upload_file(
+                    file=file,
+                    user_id=ctx.get_user_id(),  # user_id به صورت int ارسال می‌شود
+                    module_context="products",
+                    context_id=None,
+                    developer_data={"business_id": business_id},
+                    is_temporary=False,
+                    expires_in_days=3650,
+                    business_id=business_id,
+                    check_storage_limit=True,
+                )
+                image_file_id = upload_result.get("file_id")
+            except Exception as e:
+                raise ApiError("FILE_UPLOAD_ERROR", f"خطا در آپلود فایل: {str(e)}", http_status=400)
+    
+    # تنظیم image_file_id در payload
+    if image_file_id and payload:
+        payload.image_file_id = image_file_id
+    
+    if not payload:
+        raise ApiError("INVALID_PAYLOAD", "داده‌های محصول ارسال نشده است", http_status=400)
+    
     result = create_product(db, business_id, payload)
+    
+    # به‌روزرسانی context_id فایل با product_id
+    if image_file_id and result.get("data", {}).get("id"):
+        from adapters.db.models.file_storage import FileStorage
+        file_storage = db.query(FileStorage).filter(FileStorage.id == image_file_id).first()
+        if file_storage:
+            file_storage.context_id = str(result["data"]["id"])
+            db.commit()
+    
     return success_response(data=format_datetime_fields(result["data"], request), request=request, message=result.get("message"))
 
 
@@ -90,19 +196,130 @@ def get_product_endpoint(
 
 @router.put("/business/{business_id}/{product_id}")
 @require_business_access("business_id")
-def update_product_endpoint(
+async def update_product_endpoint(
     request: Request,
     business_id: int,
     product_id: int,
-    payload: ProductUpdateRequest,
+    payload: ProductUpdateRequest = None,
+    file: UploadFile = File(None),
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     if not ctx.has_business_permission("inventory", "write"):
         raise ApiError("FORBIDDEN", "Missing business permission: inventory.write", http_status=403)
+    
+    # بررسی وجود محصول
+    from adapters.db.models.product import Product
+    product = db.get(Product, product_id)
+    if not product or product.business_id != business_id:
+        raise ApiError("NOT_FOUND", "Product not found", http_status=404)
+    
+    # بررسی اینکه آیا multipart/form-data است یا JSON
+    content_type = request.headers.get("content-type", "")
+    is_multipart = "multipart/form-data" in content_type
+    
+    image_file_id = None
+    old_image_file_id = product.image_file_id
+    
+    # اگر multipart/form-data است، فایل و داده‌ها را از form می‌خوانیم
+    if is_multipart:
+        form_data = await request.form()
+        
+        # آپلود فایل اگر وجود دارد
+        if "file" in form_data:
+            file = form_data["file"]
+            if hasattr(file, 'filename') and file.filename:
+                # بررسی فرمت فایل
+                allowed_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'}
+                file_ext = os.path.splitext(file.filename)[1].lower()
+                if file_ext not in allowed_extensions:
+                    raise ApiError("INVALID_FILE_FORMAT", "فرمت فایل معتبر نیست. فقط فرمت‌های JPG, PNG, GIF, WebP و BMP پشتیبانی می‌شوند", http_status=400)
+                
+                # آپلود فایل جدید
+                from app.services.file_storage_service import FileStorageService
+                storage_service = FileStorageService(db)
+                try:
+                    upload_result = await storage_service.upload_file(
+                        file=file,
+                        user_id=ctx.get_user_id(),  # user_id به صورت int ارسال می‌شود
+                        module_context="products",
+                        context_id=str(product_id),
+                        developer_data={"business_id": business_id, "product_id": product_id},
+                        is_temporary=False,
+                        expires_in_days=3650,
+                        business_id=business_id,
+                        check_storage_limit=True,
+                    )
+                    image_file_id = upload_result.get("file_id")
+                except Exception as e:
+                    raise ApiError("FILE_UPLOAD_ERROR", f"خطا در آپلود فایل: {str(e)}", http_status=400)
+        
+        # ساخت payload از form data
+        import json
+        product_data = {}
+        for key, value in form_data.items():
+            if key != "file":
+                if isinstance(value, str):
+                    try:
+                        product_data[key] = json.loads(value)
+                    except:
+                        product_data[key] = value
+                else:
+                    product_data[key] = value
+        
+        try:
+            payload = ProductUpdateRequest(**product_data)
+        except Exception as e:
+            raise ApiError("INVALID_PAYLOAD", f"خطا در پردازش داده‌ها: {str(e)}", http_status=400)
+    else:
+        # اگر JSON است، فایل را از پارامتر file می‌خوانیم
+        if file and file.filename:
+            # بررسی فرمت فایل
+            allowed_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'}
+            file_ext = os.path.splitext(file.filename)[1].lower()
+            if file_ext not in allowed_extensions:
+                raise ApiError("INVALID_FILE_FORMAT", "فرمت فایل معتبر نیست. فقط فرمت‌های JPG, PNG, GIF, WebP و BMP پشتیبانی می‌شوند", http_status=400)
+            
+            # آپلود فایل جدید
+            from app.services.file_storage_service import FileStorageService
+            storage_service = FileStorageService(db)
+            try:
+                upload_result = await storage_service.upload_file(
+                    file=file,
+                    user_id=ctx.get_user_id(),  # user_id به صورت int ارسال می‌شود
+                    module_context="products",
+                    context_id=str(product_id),
+                    developer_data={"business_id": business_id, "product_id": product_id},
+                    is_temporary=False,
+                    expires_in_days=3650,
+                    business_id=business_id,
+                    check_storage_limit=True,
+                )
+                image_file_id = upload_result.get("file_id")
+            except Exception as e:
+                raise ApiError("FILE_UPLOAD_ERROR", f"خطا در آپلود فایل: {str(e)}", http_status=400)
+    
+    # تنظیم image_file_id در payload
+    if image_file_id and payload:
+        payload.image_file_id = image_file_id
+    
+    if not payload:
+        raise ApiError("INVALID_PAYLOAD", "داده‌های محصول ارسال نشده است", http_status=400)
+    
     result = update_product(db, product_id, business_id, payload)
     if not result:
         raise ApiError("NOT_FOUND", "Product not found", http_status=404)
+    
+    # حذف عکس قبلی اگر عکس جدید آپلود شده
+    if image_file_id and old_image_file_id and old_image_file_id != image_file_id:
+        from app.services.file_storage_service import FileStorageService
+        from uuid import UUID
+        storage_service = FileStorageService(db)
+        try:
+            await storage_service.delete_file(UUID(old_image_file_id))
+        except Exception:
+            pass  # اگر حذف فایل با خطا مواجه شد، ادامه می‌دهیم
+    
     return success_response(data=format_datetime_fields(result["data"], request), request=request, message=result.get("message"))
 
 

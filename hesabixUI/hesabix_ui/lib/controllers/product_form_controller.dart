@@ -34,6 +34,10 @@ class ProductFormController extends ChangeNotifier {
 
   // Draft price items per price list (for multi-currency)
   final List<Map<String, dynamic>> _draftPriceItems = [];
+  
+  // Image management
+  List<int>? _selectedImageBytes;
+  String? _selectedImageFilename;
 
   ProductFormController({
     required this.businessId,
@@ -248,11 +252,20 @@ class ProductFormController extends ChangeNotifier {
       }
       
       // Always create in submitForm; editing handled by updateProduct
-      final created = await _productService.createProduct(businessId: businessId, payload: payload);
+      final created = await _productService.createProduct(
+        businessId: businessId,
+        payload: payload,
+        imageBytes: _selectedImageBytes,
+        imageFilename: _selectedImageFilename,
+      );
       final newId = (created['id'] as num?)?.toInt();
       if (newId != null) {
         await _saveDraftPriceItems(productId: newId);
       }
+      
+      // پاک کردن عکس انتخابی بعد از آپلود موفق
+      _selectedImageBytes = null;
+      _selectedImageFilename = null;
       
       _clearError();
       return true;
@@ -291,8 +304,14 @@ class ProductFormController extends ChangeNotifier {
         businessId: businessId,
         productId: productId,
         payload: payload,
+        imageBytes: _selectedImageBytes,
+        imageFilename: _selectedImageFilename,
       );
       await _saveDraftPriceItems(productId: productId);
+      
+      // پاک کردن عکس انتخابی بعد از آپلود موفق
+      _selectedImageBytes = null;
+      _selectedImageFilename = null;
       
       _clearError();
       return true;
@@ -303,6 +322,24 @@ class ProductFormController extends ChangeNotifier {
       _setLoading(false);
     }
   }
+  
+  // مدیریت عکس
+  void setProductImage(List<int> imageBytes, String filename) {
+    _selectedImageBytes = imageBytes;
+    _selectedImageFilename = filename;
+    notifyListeners();
+  }
+  
+  void clearProductImage() {
+    _selectedImageBytes = null;
+    _selectedImageFilename = null;
+    _formData = _formData.copyWith(imageFileId: null, imageUrl: null);
+    notifyListeners();
+  }
+  
+  bool get hasSelectedImage => _selectedImageBytes != null && _selectedImageBytes!.isNotEmpty;
+  List<int>? get selectedImageBytes => _selectedImageBytes;
+  String? get selectedImageFilename => _selectedImageFilename;
 
   Future<void> _saveDraftPriceItems({required int productId}) async {
     // Group by price_list_id and call upsert for each draft row
