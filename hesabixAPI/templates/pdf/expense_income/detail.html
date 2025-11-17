@@ -1,0 +1,187 @@
+{% extends "pdf/base.html" %}
+{% block content %}
+  <style>
+    .ei-layout { font-size: 11px; }
+    .ei-layout .section-card {
+      border: 1px solid #000;
+      border-radius: 8px;
+      padding: 10px 12px;
+      margin-bottom: 10px;
+      background: #ffffff;
+      page-break-inside: avoid;
+    }
+    .ei-layout .title { font-size: 18px; margin-bottom: 4px; }
+    .ei-layout .meta { color: #000; margin: 2px 0; }
+    .ei-layout .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .ei-layout .table-card { padding: 0; border: none; background: transparent; }
+    .ei-layout .table-wrapper {
+      border: 1px solid #000; border-radius: 8px; overflow: hidden; background: #fff;
+    }
+    .ei-layout table { width: 100%; border-collapse: collapse; }
+    .ei-layout thead { background: #f0f0f0; color: #000; }
+    .ei-layout th, .ei-layout td { border: 1px solid #000; text-align: center; padding: 6px; }
+    .ei-layout tbody tr:nth-child(even) { background: #fafafa; }
+    .ei-layout .footer-note { margin-top: 8px; font-size: 10px; color: #666; }
+  </style>
+
+  {# قالب عدد: حذف .0 انتهایی و نمایش تمیز #}
+  {% macro fmtamt(val, currency_symbol=None) -%}
+    {%- set v = (val if val is not none else 0) -%}
+    {%- if v is number -%}
+      {{ '{:,.0f}'.format(v) }}{%- if currency_symbol -%} {{ currency_symbol }}{%- endif -%}
+    {%- elif v -%}
+      {{ v }}{%- if currency_symbol -%} {{ currency_symbol }}{%- endif -%}
+    {%- else -%}
+      0{%- if currency_symbol -%} {{ currency_symbol }}{%- endif -%}
+    {%- endif -%}
+  {%- endmacro %}
+
+  <div class="ei-layout">
+    <div class="section-card">
+      <div class="title">{{ title_text or ('سند هزینه/درآمد' if is_fa else 'Expense/Income') }}</div>
+      <div class="grid-2">
+        <div>
+          <div class="meta">{{ 'کسب‌وکار' if is_fa else 'Business' }}: {{ business_name or '-' }}</div>
+          <div class="meta">{{ 'کد سند' if is_fa else 'Code' }}: {{ document.code or '-' }}</div>
+          <div class="meta">
+            {{ 'نوع' if is_fa else 'Type' }}:
+            {{ document.document_type_name or ('درآمد' if document.document_type == 'income' else 'هزینه') }}
+          </div>
+        </div>
+        <div>
+          <div class="meta">
+            {{ 'تاریخ سند' if is_fa else 'Date' }}:
+            {% if is_jalali %}
+              {{ document_date_jalali or document.document_date }}
+            {% else %}
+              {{ document_date_gregorian or document.document_date }}
+            {% endif %}
+          </div>
+          <div class="meta">
+            {{ 'مبلغ کل' if is_fa else 'Total' }}:
+            {{ fmtamt(document.total_amount, document.currency_symbol) }}
+          </div>
+          {% if document.currency_symbol %}
+          <div class="meta">{{ 'واحد پول' if is_fa else 'Currency' }}: {{ document.currency_symbol }}</div>
+          {% endif %}
+        </div>
+      </div>
+      {% if document.description %}
+      <div class="meta">{{ 'توضیحات' if is_fa else 'Description' }}: {{ document.description }}</div>
+      {% endif %}
+    </div>
+
+    <div class="section-card table-card">
+      <div class="meta" style="font-weight:bold; margin-bottom:6px;">
+        {{ 'حساب‌های هزینه/درآمد' if is_fa else 'Expense/Income Accounts' }}
+      </div>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>{{ 'کد حساب' if is_fa else 'Account Code' }}</th>
+              <th>{{ 'نام حساب' if is_fa else 'Account Name' }}</th>
+              <th>{{ 'مبلغ بدهکار' if is_fa else 'Debit' }}</th>
+              <th>{{ 'مبلغ بستانکار' if is_fa else 'Credit' }}</th>
+              <th>{{ 'توضیح' if is_fa else 'Note' }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for it in item_lines %}
+              {# مقداردهی بدهکار/بستانکار با درنظرگرفتن هر دو ساختار amount یا debit/credit #}
+              {% set debit_val = it.debit if it.debit is not none else (
+                   (it.amount if document.document_type == 'expense' else 0) if it.amount is not none else 0
+              ) %}
+              {% set credit_val = it.credit if it.credit is not none else (
+                   (it.amount if document.document_type == 'income' else 0) if it.amount is not none else 0
+              ) %}
+              <tr>
+                <td>{{ it.account_code or it.account_id or '' }}</td>
+                <td>{{ it.account_name or '' }}</td>
+                <td>{{ fmtamt(debit_val, document.currency_symbol) }}</td>
+                <td>{{ fmtamt(credit_val, document.currency_symbol) }}</td>
+                <td>{{ it.description or '' }}</td>
+              </tr>
+            {% endfor %}
+            {% if not item_lines or item_lines|length == 0 %}
+              <tr><td colspan="5">{{ 'بدون حساب' if is_fa else 'No accounts' }}</td></tr>
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="section-card table-card">
+      <div class="meta" style="font-weight:bold; margin-bottom:6px;">{{ 'طرف‌حساب‌ها' if is_fa else 'Counterparties' }}</div>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>{{ 'نوع تراکنش' if is_fa else 'Type' }}</th>
+              <th>{{ 'جزئیات' if is_fa else 'Details' }}</th>
+              <th>{{ 'تاریخ تراکنش' if is_fa else 'Txn Date' }}</th>
+              <th>{{ 'مبلغ بدهکار' if is_fa else 'Debit' }}</th>
+              <th>{{ 'مبلغ بستانکار' if is_fa else 'Credit' }}</th>
+              <th>{{ 'کمیسیون' if is_fa else 'Commission' }}</th>
+              <th>{{ 'توضیح' if is_fa else 'Note' }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% set cps = counterparty_lines_fmt if counterparty_lines_fmt is defined else counterparty_lines %}
+            {% for cp in cps %}
+              {% set extra = cp.extra_info or {} %}
+              {# نگاشت نام نوع تراکنش به فارسی در صورت نبود transaction_type_name #}
+              {% set tx = cp.transaction_type or extra.transaction_type %}
+              {% set tx_name = cp.transaction_type_name or extra.transaction_type_name or
+                   ('بانک' if tx == 'bank' else
+                    'صندوق' if tx == 'cash_register' else
+                    'تنخواهگردان' if tx == 'petty_cash' else
+                    'چک' if tx == 'check' else
+                    'خرج چک' if tx == 'check_expense' else
+                    'شخص' if tx == 'person' else
+                    'حساب' if tx == 'account' else (tx or '')) %}
+              {# جزئیات نمایشی بر اساس نوع #}
+              {% set details =
+                   (extra.bank_account_name or '') if tx == 'bank' else
+                   (extra.cash_register_name or '') if tx == 'cash_register' else
+                   (extra.petty_cash_name or '') if tx == 'petty_cash' else
+                   (('چک ' ~ (extra.check_number or '')) if tx == 'check' else
+                   (('خرج چک ' ~ (extra.check_number or '')) if tx == 'check_expense' else
+                   (extra.person_name or '') if tx == 'person' else
+                   (cp.account_name or ''))) %}
+              {# تاریخ تراکنش قالب‌بندی‌شده (jalali/gregorian) #}
+              {% set txn_j = cp.txn_date_j %}
+              {% set txn_g = cp.txn_date_g %}
+              {# محاسبه بدهکار/بستانکار #}
+              {% set debit_val = cp.debit if cp.debit is not none else (
+                   (cp.amount if document.document_type == 'income' else 0) if cp.amount is not none else 0
+              ) %}
+              {% set credit_val = cp.credit if cp.credit is not none else (
+                   (cp.amount if document.document_type == 'expense' else 0) if cp.amount is not none else 0
+              ) %}
+              {# کمیسیون درصورت وجود #}
+              {% set commission_val = cp.commission if cp.commission is not none else extra.commission %}
+              <tr>
+                <td>{{ tx_name }}</td>
+                <td>{{ details }}</td>
+                <td>
+                  {% if is_jalali %}{{ txn_j or '' }}{% else %}{{ txn_g or '' }}{% endif %}
+                </td>
+                <td>{{ fmtamt(debit_val, document.currency_symbol) }}</td>
+                <td>{{ fmtamt(credit_val, document.currency_symbol) }}</td>
+                <td>{{ commission_val is not none and fmtamt(commission_val, document.currency_symbol) or '' }}</td>
+                <td>{{ cp.description or '' }}</td>
+              </tr>
+            {% endfor %}
+            {% if not counterparty_lines or counterparty_lines|length == 0 %}
+              <tr><td colspan="7">{{ 'بدون طرف‌حساب' if is_fa else 'No counterparties' }}</td></tr>
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    
+  </div>
+{% endblock %}
+

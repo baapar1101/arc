@@ -34,6 +34,7 @@ adapters/api/v1/payment_callbacks.py
 adapters/api/v1/payment_gateways.py
 adapters/api/v1/persons.py
 adapters/api/v1/petty_cash.py
+adapters/api/v1/ping_pong.py
 adapters/api/v1/price_lists.py
 adapters/api/v1/product_attributes.py
 adapters/api/v1/products.py
@@ -106,6 +107,7 @@ adapters/db/models/password_reset.py
 adapters/db/models/payment_gateway.py
 adapters/db/models/person.py
 adapters/db/models/petty_cash.py
+adapters/db/models/ping_pong_score.py
 adapters/db/models/price_list.py
 adapters/db/models/product.py
 adapters/db/models/product_attribute.py
@@ -140,6 +142,7 @@ adapters/db/repositories/fiscal_year_repo.py
 adapters/db/repositories/notification_repo.py
 adapters/db/repositories/password_reset_repo.py
 adapters/db/repositories/petty_cash_repository.py
+adapters/db/repositories/ping_pong_repository.py
 adapters/db/repositories/price_list_repository.py
 adapters/db/repositories/product_attribute_repository.py
 adapters/db/repositories/product_bom_repository.py
@@ -231,6 +234,7 @@ migrations/versions/20250106_000001_fix_tax_types_structure.py
 migrations/versions/20250106_000002_remove_tax_fields.py
 migrations/versions/20250106_000003_cleanup_tax_units_table.py
 migrations/versions/20250106_000004_seed_tax_units_list.py
+migrations/versions/20250115_000001_add_ping_pong_scores_table.py
 migrations/versions/20250117_000003_add_business_table.py
 migrations/versions/20250117_000004_add_business_contact_fields.py
 migrations/versions/20250117_000005_add_business_geographic_fields.py

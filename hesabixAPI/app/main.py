@@ -47,6 +47,7 @@ from adapters.api.v1.wallet import router as wallet_router
 from adapters.api.v1.wallet_webhook import router as wallet_webhook_router
 from adapters.api.v1.credit import router as credit_router
 from adapters.api.v1.marketplace import router as marketplace_router
+from adapters.api.v1.ping_pong import router as ping_pong_router
 from adapters.api.v1.integrations.telegram import router as telegram_integration_router
 from adapters.api.v1.notifications import router as notifications_router
 from adapters.api.v1.admin.notification_templates import router as admin_notification_templates_router
@@ -348,6 +349,8 @@ def create_app() -> FastAPI:
     application.include_router(wallet_webhook_router, prefix=settings.api_v1_prefix)
     application.include_router(credit_router, prefix=settings.api_v1_prefix)
     application.include_router(marketplace_router, prefix=settings.api_v1_prefix)
+    # Ping Pong Game
+    application.include_router(ping_pong_router, prefix=settings.api_v1_prefix)
     # Integrations
     application.include_router(telegram_integration_router, prefix=settings.api_v1_prefix)
     # Notifications

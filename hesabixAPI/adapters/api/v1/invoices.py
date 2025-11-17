@@ -1012,128 +1012,6 @@ async def export_single_invoice_pdf(
         },
     )
 
-@router.post(
-    "/business/{business_id}/print-multiple",
-    summary="چاپ چند فاکتور به صورت یک PDF واحد",
-    description="دریافت فایل PDF ترکیبی از چند فاکتور انتخاب شده",
-)
-@require_business_access("business_id")
-async def print_multiple_invoices_pdf(
-    business_id: int,
-    request: Request,
-    body: Dict[str, Any] = Body(...),
-    ctx: AuthContext = Depends(get_current_user),
-    db: Session = Depends(get_db),
-    template_id: int | None = None,
-):
-    """
-    خروجی PDF ترکیبی از چند فاکتور:
-    - لیست invoice_id ها را از body دریافت می‌کند
-    - برای هر فاکتور، PDF جداگانه تولید می‌کند
-    - همه PDF ها را در یک PDF واحد ترکیب می‌کند
-    """
-    from weasyprint import HTML
-    from weasyprint.text.fonts import FontConfiguration
-    import io
-
-    invoice_ids = body.get("invoice_ids", [])
-    if not isinstance(invoice_ids, list) or len(invoice_ids) == 0:
-        from app.core.responses import ApiError
-        raise ApiError("INVALID_REQUEST", "invoice_ids must be a non-empty list", http_status=400)
-
-    # اعتبارسنجی و دریافت فاکتورها
-    invoices = []
-    for invoice_id in invoice_ids:
-        try:
-            invoice_id_int = int(invoice_id)
-        except (ValueError, TypeError):
-            continue
-        
-        doc = db.query(Document).filter(
-            Document.id == invoice_id_int,
-            Document.business_id == business_id,
-            Document.document_type.in_(list(SUPPORTED_INVOICE_TYPES)),
-        ).first()
-        
-        if doc:
-            invoices.append(doc)
-    
-    if not invoices:
-        from app.core.responses import ApiError
-        raise ApiError("NO_INVOICES_FOUND", "No valid invoices found", http_status=404)
-
-    # تولید PDF برای هر فاکتور و ترکیب آنها
-    try:
-        from pypdf import PdfWriter, PdfReader
-    except ImportError:
-        try:
-            from PyPDF2 import PdfWriter, PdfReader
-        except ImportError:
-            from app.core.responses import ApiError
-            raise ApiError("DEPENDENCY_ERROR", "PyPDF2 or pypdf library is required", http_status=500)
-    
-    pdf_writer = PdfWriter()
-    
-    for doc in invoices:
-        try:
-            # استفاده از endpoint موجود برای تولید PDF هر فاکتور
-            # ایجاد یک request موقت برای فراخوانی export_single_invoice_pdf
-            from starlette.datastructures import Headers
-            
-            # ساخت request موقت با همان headers
-            temp_headers = Headers(request.headers)
-            temp_request = Request(
-                scope={
-                    "type": "http",
-                    "method": "GET",
-                    "path": f"/invoices/business/{business_id}/{doc.id}/pdf",
-                    "headers": temp_headers.raw,
-                }
-            )
-            
-            # فراخوانی تابع export_single_invoice_pdf
-            pdf_response = await export_single_invoice_pdf(
-                business_id=business_id,
-                invoice_id=doc.id,
-                request=temp_request,
-                ctx=ctx,
-                db=db,
-                template_id=template_id,
-            )
-            
-            # خواندن PDF از response
-            pdf_bytes = pdf_response.body
-            pdf_reader = PdfReader(io.BytesIO(pdf_bytes))
-            
-            # اضافه کردن صفحات به PDF ترکیبی
-            for page in pdf_reader.pages:
-                pdf_writer.add_page(page)
-                
-        except Exception as e:
-            logger.exception(f"Error processing invoice {doc.id}: {e}")
-            continue
-
-    # تولید PDF نهایی
-    output_buffer = io.BytesIO()
-    pdf_writer.write(output_buffer)
-    combined_pdf_bytes = output_buffer.getvalue()
-
-    # نام فایل
-    def _slugify(text: str) -> str:
-        return re.sub(r"[^A-Za-z0-9_-]+", "_", (text or "")).strip("_") or "invoices"
-    
-    filename = f"invoices_combined_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
-
-    return Response(
-        content=combined_pdf_bytes,
-        media_type="application/pdf",
-        headers={
-            "Content-Disposition": f"attachment; filename={filename}",
-            "Content-Length": str(len(combined_pdf_bytes)),
-            "Access-Control-Expose-Headers": "Content-Disposition",
-        },
-    )
-
 @router.post("/business/{business_id}/search")
 @require_business_access("business_id")
 async def search_invoices_endpoint(
@@ -2220,7 +2098,7 @@ async def export_invoices_excel(
             ('total_amount', 'مبلغ کل' if is_fa else 'Total amount'),
             ('currency_code', 'ارز' if is_fa else 'Currency'),
             ('created_by_name', 'ایجادکننده' if is_fa else 'Created by'),
-            ('is_proforma', 'وضعیت' if is_fa else 'Status'),
+            ('is_proforma', 'پیش‌فاکتور' if is_fa else 'Proforma'),
             ('registered_at', 'تاریخ ثبت' if is_fa else 'Registered at'),
         ]
         for key, label in default_columns:
@@ -2403,6 +2281,17 @@ async def export_invoices_pdf(
         return mapping.get(str(tp), str(tp))
 
     items: List[Dict[str, Any]] = []
+    # Helper to resolve person display name
+    def _get_person_display_name(person_id: int | None) -> str | None:
+        if person_id is None:
+            return None
+        try:
+            p = db.query(Person).filter(Person.id == int(person_id)).first()
+            if p is None:
+                return None
+            return getattr(p, "display_name", None) or getattr(p, "name", None)
+        except Exception:
+            return None
     for d in docs:
         item = invoice_document_to_dict(db, d)
         total_amount = None
@@ -2431,6 +2320,22 @@ async def export_invoices_pdf(
         item['document_type_name'] = _type_name(item.get('document_type'))
         if total_amount is not None:
             item['total_amount'] = total_amount
+        # Counterparty based on type: sales -> buyer (person), purchase -> seller (person)
+        try:
+            inv_type = str(item.get("document_type") or "")
+            extra = item.get("extra_info") or {}
+            person_id = extra.get("person_id")
+            person_name = _get_person_display_name(person_id)
+            counterparty = ""
+            if inv_type in ("invoice_sales", "invoice_sales_return"):
+                counterparty = person_name or ""
+            elif inv_type in ("invoice_purchase", "invoice_purchase_return"):
+                counterparty = person_name or ""
+            else:
+                counterparty = person_name or ""
+            item["counterparty"] = counterparty
+        except Exception:
+            item["counterparty"] = ""
         items.append(format_datetime_fields(item, request))
 
     # Handle selected rows
@@ -2463,11 +2368,12 @@ async def export_invoices_pdf(
         default_columns = [
             ('code', 'کد سند' if is_fa else 'Code'),
             ('document_type_name', 'نوع فاکتور' if is_fa else 'Invoice type'),
+            ('counterparty', 'طرف حساب' if is_fa else 'Counterparty'),
             ('document_date', 'تاریخ سند' if is_fa else 'Document date'),
             ('total_amount', 'مبلغ کل' if is_fa else 'Total amount'),
             ('currency_code', 'ارز' if is_fa else 'Currency'),
             ('created_by_name', 'ایجادکننده' if is_fa else 'Created by'),
-            ('is_proforma', 'وضعیت' if is_fa else 'Status'),
+            ('is_proforma', 'پیش‌فاکتور' if is_fa else 'Proforma'),
             ('registered_at', 'تاریخ ثبت' if is_fa else 'Registered at'),
         ]
         for key, label in default_columns:
@@ -2486,7 +2392,18 @@ async def export_invoices_pdf(
 
     locale = negotiate_locale(request.headers.get("Accept-Language"))
     is_fa = locale == 'fa'
-    now = datetime.datetime.now().strftime('%Y/%m/%d %H:%M')
+    # respect user's calendar for generated_at
+    try:
+        cal_header = (request.headers.get("X-Calendar-Type") or "").strip().lower()
+        cal_type = cal_header or ("jalali" if is_fa else "gregorian")
+    except Exception:
+        cal_type = "jalali" if is_fa else "gregorian"
+    try:
+        _now = datetime.datetime.now()
+        _fd = CalendarConverter.format_datetime(_now, cal_type)
+        now = _fd.get("formatted") or _fd.get("date_only") or _now.strftime('%Y/%m/%d %H:%M')
+    except Exception:
+        now = datetime.datetime.now().strftime('%Y/%m/%d %H:%M')
     title_text = "لیست فاکتورها" if is_fa else "Invoices List"
     label_biz = "کسب و کار" if is_fa else "Business"
     label_date = "تاریخ تولید" if is_fa else "Generated Date"
@@ -2494,17 +2411,94 @@ async def export_invoices_pdf(
 
     headers_html = ''.join(f'<th>{escape(header)}</th>' for header in headers)
 
+    # Determine calendar type for date formatting in table rows
+    try:
+        cal_header = (request.headers.get("X-Calendar-Type") or "").strip().lower()
+        cal_type_for_rows = cal_header or ("jalali" if is_fa else "gregorian")
+    except Exception:
+        cal_type_for_rows = "jalali" if is_fa else "gregorian"
+
+    # Helper to format date string using CalendarConverter
+    def _format_date_for_calendar(value: str) -> str:
+        try:
+            dt = datetime.datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+            fd = CalendarConverter.format_datetime(dt, cal_type_for_rows)
+            return fd.get("date_only") or fd.get("formatted") or str(value)
+        except Exception:
+            return str(value)
+
+    # Helpers for numeric formatting with thousands separator and trimming .00
+    def _format_number_for_display(value: object) -> str:
+        try:
+            if value is None:
+                return ""
+            v = float(value)
+            s = f"{v:,.2f}"
+            # Trim trailing .00 or trailing zeros
+            if "." in s:
+                s = s.rstrip("0").rstrip(".")
+            return s
+        except Exception:
+            return str(value)
+
+    # Build rows with numeric alignment and calendar-aware dates
+    amount_keys = {"total_amount", "subtotal", "discount_total", "tax_total", "payable_total"}
+    date_keys = {"document_date", "registered_at", "created_at"}
     rows_html = []
+    total_sum = 0.0
+    discount_sum = 0.0
+    tax_sum = 0.0
     for item in items:
         row_cells = []
         for key in keys:
             value = item.get(key, "")
+            # Normalize list/dict to string
             if isinstance(value, list):
                 value = ", ".join(str(v) for v in value)
             elif isinstance(value, dict):
                 value = str(value)
-            row_cells.append(f'<td>{escape(str(value))}</td>')
+            # Calendar-aware date formatting
+            if key in date_keys and value:
+                value = _format_date_for_calendar(value)
+            # Amount cells: format and accumulate totals
+            if key in amount_keys:
+                try:
+                    vnum = float(item.get(key)) if item.get(key) is not None else None
+                    if key == "total_amount" and vnum is not None:
+                        total_sum += vnum
+                    if key == "discount_total" and vnum is not None:
+                        discount_sum += vnum
+                    if key == "tax_total" and vnum is not None:
+                        tax_sum += vnum
+                except Exception:
+                    pass
+                disp = _format_number_for_display(value)
+                row_cells.append(f'<td class="amount">{escape(disp)}</td>')
+            # Proforma: show checkmark for true, empty otherwise
+            elif key == "is_proforma":
+                checked = (str(value).lower() in ("true", "1"))
+                cell = "✓" if checked else ""
+                row_cells.append(f'<td style="text-align:center">{cell}</td>')
+            else:
+                row_cells.append(f'<td>{escape(str(value))}</td>')
         rows_html.append(f'<tr>{"".join(row_cells)}</tr>')
+
+    # Summary block (only total amount and count for list)
+    total_count = len(items)
+    label_rows = 'تعداد ردیف' if is_fa else 'Rows'
+    label_total = 'جمع مبلغ کل' if is_fa else 'Total of amounts'
+    label_discount = 'جمع تخفیف' if is_fa else 'Total discount'
+    label_tax = 'جمع مالیات' if is_fa else 'Total tax'
+    summary_parts = [
+        f'<div><strong>{label_rows}:</strong> {total_count}</div>',
+        f'<div><strong>{label_total}:</strong> <span class="amount">{total_sum:.2f}</span></div>',
+    ]
+    # Only render discount/tax if present in any row (non-zero)
+    if discount_sum != 0.0:
+        summary_parts.append(f'<div><strong>{label_discount}:</strong> <span class="amount">{discount_sum:.2f}</span></div>')
+    if tax_sum != 0.0:
+        summary_parts.append(f'<div><strong>{label_tax}:</strong> <span class="amount">{tax_sum:.2f}</span></div>')
+    summary_html = f'<div class="summary">{"".join(summary_parts)}</div>'
 
     # کانتکست مشترک برای قالب‌های سفارشی
     template_context: Dict[str, Any] = {
@@ -2512,13 +2506,36 @@ async def export_invoices_pdf(
         "business_name": business_name,
         "generated_at": now,
         "is_fa": is_fa,
+        "fa_font_url_regular": None,
+        "fa_font_url_bold": None,
         "headers": headers,
         "keys": keys,
         "items": items,
         # خروجی‌های HTML آماده برای استفاده سریع در قالب
         "table_headers_html": headers_html,
         "table_rows_html": "".join(rows_html),
+        "table_summary_html": summary_html,
     }
+
+    # Embed Farsi fonts like single-invoice PDF (if available)
+    try:
+        if is_fa:
+            project_root = Path(__file__).resolve().parents[4]
+            fonts_dir = project_root / "hesabixUI" / "hesabix_ui" / "assets" / "fonts"
+            regular_path = fonts_dir / "YekanBakhFaNum-Regular.ttf"
+            bold_path = fonts_dir / "YekanBakhFaNum-Bold.ttf"
+            if regular_path.is_file():
+                import base64 as _b64
+                _data = regular_path.read_bytes()
+                _b64_data = _b64.b64encode(_data).decode("ascii")
+                template_context["fa_font_url_regular"] = f"data:font/ttf;base64,{_b64_data}"
+            if bold_path.is_file():
+                import base64 as _b64b
+                _data_b = bold_path.read_bytes()
+                _b64_data_b = _b64b.b64encode(_data_b).decode("ascii")
+                template_context["fa_font_url_bold"] = f"data:font/ttf;base64,{_b64_data_b}"
+    except Exception:
+        pass
 
     # تلاش برای رندر با قالب سفارشی (explicit یا پیش‌فرض)
     try:
@@ -2575,6 +2592,22 @@ async def export_invoices_pdf(
         base += f"_{slugify(business_name)}"
     if selected_only:
         base += "_selected"
+    # Add filters to filename when available
+    try:
+        doc_type = body.get("document_type")
+        if isinstance(doc_type, str) and doc_type:
+            base += f"_{slugify(doc_type)}"
+    except Exception:
+        pass
+    try:
+        fd = body.get("from_date")
+        td = body.get("to_date")
+        if isinstance(fd, str) and fd:
+            base += f"_from_{slugify(fd[:10])}"
+        if isinstance(td, str) and td:
+            base += f"_to_{slugify(td[:10])}"
+    except Exception:
+        pass
     filename = f"{base}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
 
     return Response(

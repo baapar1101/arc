@@ -55,27 +55,117 @@ class ExpenseIncomeDocument {
   }
 
   factory ExpenseIncomeDocument.fromJson(Map<String, dynamic> json) {
+    // نوع سند
+    final String docType = (json['document_type'] as String?) ?? 'expense';
+    // تاریخ سند
+    final DateTime docDate = _safeParseDate(json['document_date']) ?? DateTime.now();
+    // registered_at ممکن است در پاسخ لیست نباشد؛ در این صورت از document_date استفاده می‌کنیم
+    final DateTime regAt = _safeParseDate(json['registered_at']) ?? docDate;
+
+    // خطوط آیتم: پشتیبانی از دو شکل different: item_lines (جدید) یا items (قدیمی/دیگر لیست‌ها)
+    final List<ItemLine> parsedItemLines = (() {
+      final dynamic il = json['item_lines'];
+      if (il is List) {
+        return il
+            .whereType<Map<String, dynamic>>()
+            .map((m) => ItemLine.fromJson(m))
+            .toList();
+      }
+      final dynamic legacyItems = json['items'];
+      if (legacyItems is List) {
+        return legacyItems.whereType<Map<String, dynamic>>().map((m) {
+          // بعضی پاسخ‌ها debit/credit دارند؛ amount را بیشینه این دو می‌گیریم
+          final num debit = (m['debit'] as num?) ?? 0;
+          final num credit = (m['credit'] as num?) ?? 0;
+          final double amount = (debit.abs() > credit.abs() ? debit : credit).toDouble();
+          return ItemLine(
+            id: (m['id'] as int?) ?? 0,
+            accountId: (m['account_id'] as int?) ?? 0,
+            accountCode: (m['account_code'] as String?) ?? '',
+            accountName: (m['account_name'] as String?) ?? 'حساب',
+            amount: amount,
+            description: m['description'] as String?,
+          );
+        }).toList();
+      }
+      return <ItemLine>[];
+    })();
+
+    // خطوط طرف‌حساب: پشتیبانی از counterparty_lines یا counterparties + extra_info
+    final List<CounterpartyLine> parsedCounterpartyLines = (() {
+      final dynamic cl = json['counterparty_lines'];
+      if (cl is List) {
+        return cl
+            .whereType<Map<String, dynamic>>()
+            .map((m) => CounterpartyLine.fromJson(m))
+            .toList();
+      }
+      final dynamic legacy = json['counterparties'];
+      if (legacy is List) {
+        return legacy.whereType<Map<String, dynamic>>().map((m) {
+          final num debit = (m['debit'] as num?) ?? 0;
+          final num credit = (m['credit'] as num?) ?? 0;
+          final double amount = (debit.abs() > credit.abs() ? debit : credit).toDouble();
+          final Map<String, dynamic> extra = (m['extra_info'] as Map<String, dynamic>?) ?? const {};
+          final String txType = (extra['transaction_type'] as String?) ?? 'account';
+          final DateTime txDate = _safeParseDate(extra['transaction_date']) ?? docDate;
+          return CounterpartyLine(
+            id: (m['id'] as int?) ?? 0,
+            transactionType: txType,
+            transactionTypeName: CounterpartyLine._getTransactionTypeName(txType),
+            amount: amount,
+            transactionDate: txDate,
+            description: m['description'] as String?,
+            commission: null,
+            bankAccountId: m['bank_account_id'] as int? ?? extra['bank_account_id'] as int?,
+            bankAccountName: extra['bank_account_name'] as String?,
+            cashRegisterId: m['cash_register_id'] as int? ?? extra['cash_register_id'] as int?,
+            cashRegisterName: extra['cash_register_name'] as String?,
+            pettyCashId: m['petty_cash_id'] as int? ?? extra['petty_cash_id'] as int?,
+            pettyCashName: extra['petty_cash_name'] as String?,
+            checkId: m['check_id'] as int?,
+            checkNumber: extra['check_number'] as String?,
+            personId: m['person_id'] as int? ?? extra['person_id'] as int?,
+            personName: extra['person_name'] as String?,
+            accountId: m['account_id'] as int?,
+            accountName: m['account_name'] as String?,
+          );
+        }).toList();
+      }
+      return <CounterpartyLine>[];
+    })();
+
+    // مبلغ کل: اگر total_amount نبود، از جمع مبالغ خطوط می‌سازیم
+    final double totalAmount = (() {
+      final num? ta = json['total_amount'] as num?;
+      if (ta != null) return ta.toDouble();
+      if (parsedItemLines.isNotEmpty) {
+        return parsedItemLines.fold<double>(0, (sum, l) => sum + l.amount);
+      }
+      if (parsedCounterpartyLines.isNotEmpty) {
+        return parsedCounterpartyLines.fold<double>(0, (sum, l) => sum + l.amount);
+      }
+      return 0.0;
+    })();
+
     return ExpenseIncomeDocument(
       id: json['id'] as int,
-      code: json['code'] as String,
-      documentType: json['document_type'] as String,
-      documentTypeName: json['document_type_name'] as String? ?? 
-          (json['document_type'] == 'income' ? 'درآمد' : 'هزینه'),
-      documentDate: DateTime.parse(json['document_date'] as String),
-      currencyId: json['currency_id'] as int,
+      code: (json['code'] as String?) ?? '',
+      documentType: docType,
+      documentTypeName: (json['document_type_name'] as String?) ??
+          (docType == 'income' ? 'درآمد' : 'هزینه'),
+      documentDate: docDate,
+      currencyId: (json['currency_id'] as int?) ?? 0,
       currencyCode: json['currency_code'] as String?,
-      totalAmount: (json['total_amount'] as num).toDouble(),
+      totalAmount: totalAmount,
       description: json['description'] as String?,
-      itemLines: (json['item_lines'] as List<dynamic>?)
-          ?.map((line) => ItemLine.fromJson(line as Map<String, dynamic>))
-          .toList() ?? [],
-      counterpartyLines: (json['counterparty_lines'] as List<dynamic>?)
-          ?.map((line) => CounterpartyLine.fromJson(line as Map<String, dynamic>))
-          .toList() ?? [],
-      itemLinesCount: json['item_lines_count'] as int? ?? 0,
-      counterpartyLinesCount: json['counterparty_lines_count'] as int? ?? 0,
+      itemLines: parsedItemLines,
+      counterpartyLines: parsedCounterpartyLines,
+      itemLinesCount: (json['item_lines_count'] as int?) ?? parsedItemLines.length,
+      counterpartyLinesCount:
+          (json['counterparty_lines_count'] as int?) ?? parsedCounterpartyLines.length,
       createdByName: json['created_by_name'] as String?,
-      registeredAt: DateTime.parse(json['registered_at'] as String),
+      registeredAt: regAt,
       extraInfo: json['extra_info'] as Map<String, dynamic>?,
     );
   }
@@ -100,6 +190,19 @@ class ExpenseIncomeDocument {
       'extra_info': extraInfo,
     };
   }
+}
+
+DateTime? _safeParseDate(dynamic value) {
+  if (value == null) return null;
+  if (value is DateTime) return value;
+  if (value is String && value.isNotEmpty) {
+    try {
+      return DateTime.parse(value);
+    } catch (_) {
+      return null;
+    }
+  }
+  return null;
 }
 
 /// خط آیتم (حساب هزینه/درآمد)

@@ -44,3 +44,4 @@ from .petty_cash import PettyCash  # noqa: F401
 from .check import Check  # noqa: F401
 from .warehouse import Warehouse  # noqa: F401
 from .product_bom import ProductBOM, ProductBOMItem, ProductBOMOutput, ProductBOMOperation  # noqa: F401
+from .ping_pong_score import PingPongScore  # noqa: F401

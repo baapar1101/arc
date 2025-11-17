@@ -1,0 +1,22 @@
+{% extends "pdf/base.html" %}
+{% block content %}
+  <div class="header">
+    <div>
+      <div class="title">{{ title_text }}</div>
+      <div class="meta">{{ 'کسب و کار' if is_fa else 'Business' }}: {{ business_name }}</div>
+    </div>
+    <div class="meta">{{ 'تاریخ تولید' if is_fa else 'Generated' }}: {{ generated_at }}</div>
+  </div>
+
+  <div class="table-wrapper">
+    <table>
+      <thead>
+        <tr>{{ table_headers_html | safe }}</tr>
+      </thead>
+      <tbody>
+        {{ table_rows_html | safe }}
+      </tbody>
+    </table>
+  </div>
+{% endblock %}
+

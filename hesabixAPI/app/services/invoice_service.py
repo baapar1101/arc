@@ -2050,6 +2050,14 @@ def get_invoice_installment_plan(
         sum_remaining += remaining
         new_item = dict(item)
         new_item["remaining"] = float(remaining)
+        # اطمینان از وجود status - اگر موجود نباشد، محاسبه کن
+        if "status" not in new_item or not new_item.get("status"):
+            if total > 0 and paid >= total:
+                new_item["status"] = "paid"
+            elif paid > 0:
+                new_item["status"] = "partial"
+            else:
+                new_item["status"] = "pending"
         enriched_schedule.append(new_item)
     return {
         "invoice_id": int(document.id),

@@ -434,27 +434,205 @@ async def get_expense_income_pdf_endpoint(
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
 ):
-    """PDF یک سند"""
-    from app.services.expense_income_service import generate_expense_income_pdf
+    """PDF یک سند (سبک فاکتور: قالب سفارشی یا پیش‌فرض Jinja + WeasyPrint)"""
     from fastapi.responses import Response
-    
-    # بررسی دسترسی
-    doc = get_expense_income(db, document_id)
-    if not doc:
+    from weasyprint import HTML
+    from weasyprint.text.fonts import FontConfiguration
+    from app.core.i18n import negotiate_locale
+    from html import escape
+    import datetime, re
+
+    # دریافت سند و بررسی دسترسی
+    item = get_expense_income(db, document_id)
+    if not item:
         from app.core.responses import ApiError
         raise ApiError("DOCUMENT_NOT_FOUND", "Document not found", http_status=404)
-    
-    business_id = doc.get("business_id")
+    business_id = item.get("business_id")
     if business_id and not ctx.can_access_business(business_id):
         from app.core.responses import ApiError
         raise ApiError("FORBIDDEN", "Access denied", http_status=403)
-    
-    pdf_data = generate_expense_income_pdf(db, document_id)
-    
+
+    # اطلاعات کسب‌وکار
+    business_name = ""
+    business_info: Dict[str, Any] = {}
+    try:
+        from adapters.db.models.business import Business
+        b = db.query(Business).filter(Business.id == business_id).first()
+        if b is not None:
+            business_name = b.name or ""
+            business_info = {
+                "name": b.name,
+                "economic_code": getattr(b, "economic_code", None),
+                "registration_number": getattr(b, "registration_number", None),
+                "phone": getattr(b, "phone", None),
+                "address": getattr(b, "address", None),
+            }
+    except Exception:
+        business_name = business_name or ""
+
+    # فونت فارسی (YekanBakhFaNum) مشابه فاکتورها
+    fa_font_url_regular = None
+    fa_font_url_bold = None
+    try:
+        from pathlib import Path
+        project_root = Path(__file__).resolve().parents[4]
+        fonts_dir = project_root / "hesabixUI" / "hesabix_ui" / "assets" / "fonts"
+        # Preferred: YekanBakhFaNum
+        regular_path = fonts_dir / "YekanBakhFaNum-Regular.ttf"
+        bold_path = fonts_dir / "YekanBakhFaNum-Bold.ttf"
+        # Fallbacks: Vazirmatn
+        regular_fallback = fonts_dir / "Vazirmatn-Regular.ttf"
+        bold_fallback = fonts_dir / "Vazirmatn-Bold.ttf"
+        import base64 as _b64
+        if regular_path.is_file():
+            _data = regular_path.read_bytes()
+            fa_font_url_regular = f"data:font/ttf;base64,{_b64.b64encode(_data).decode('ascii')}"
+        elif regular_fallback.is_file():
+            _data = regular_fallback.read_bytes()
+            fa_font_url_regular = f"data:font/ttf;base64,{_b64.b64encode(_data).decode('ascii')}"
+        if bold_path.is_file():
+            _data_b = bold_path.read_bytes()
+            fa_font_url_bold = f"data:font/ttf;base64,{_b64.b64encode(_data_b).decode('ascii')}"
+        elif bold_fallback.is_file():
+            _data_b = bold_fallback.read_bytes()
+            fa_font_url_bold = f"data:font/ttf;base64,{_b64.b64encode(_data_b).decode('ascii')}"
+    except Exception:
+        fa_font_url_regular = None
+        fa_font_url_bold = None
+
+    # Locale و Calendar
+    locale = negotiate_locale(request.headers.get("Accept-Language"))
+    is_fa = locale == "fa"
+    from app.core.calendar import CalendarConverter, get_calendar_type_from_header
+    from datetime import datetime as _dt
+    def _parse_dt(val: str | None) -> _dt | None:
+        if not val:
+            return None
+        try:
+            # handle possible timezone 'Z'
+            v = str(val).replace("Z", "+00:00")
+            return _dt.fromisoformat(v)
+        except Exception:
+            return None
+    calendar_type = get_calendar_type_from_header(request.headers.get("X-Calendar-Type"))
+    # تاریخ‌های هدر
+    doc_dt = _parse_dt(item.get("document_date"))
+    doc_date_g = CalendarConverter.to_gregorian(doc_dt)["date_only"] if doc_dt else ""
+    doc_date_j = CalendarConverter.to_jalali(doc_dt)["date_only"] if doc_dt else ""
+
+    # محاسبه مبلغ کل درصورت نبود
+    def _as_num(x):
+        try:
+            return float(x)
+        except Exception:
+            return 0.0
+    total_amount = item.get("total_amount")
+    if total_amount is None:
+        il = item.get("item_lines") or item.get("items") or []
+        if il:
+            # اگر amount بود جمع می‌زنیم؛ در غیر اینصورت از debit/credit با توجه به نوع سند
+            if any("amount" in r for r in il):
+                total_amount = sum(_as_num(r.get("amount")) for r in il)
+            else:
+                if str(item.get("document_type")) == "income":
+                    total_amount = sum(_as_num(r.get("credit")) for r in il)
+                else:
+                    total_amount = sum(_as_num(r.get("debit")) for r in il)
+        else:
+            cps = item.get("counterparty_lines") or item.get("counterparties") or []
+            if cps:
+                if any("amount" in r for r in cps):
+                    total_amount = sum(_as_num(r.get("amount")) for r in cps)
+                else:
+                    if str(item.get("document_type")) == "income":
+                        total_amount = sum(_as_num(r.get("debit")) for r in cps)
+                    else:
+                        total_amount = sum(_as_num(r.get("credit")) for r in cps)
+    item["total_amount"] = total_amount
+
+    # قالب‌بندی تاریخ تراکنش‌های طرف‌حساب
+    raw_cps = item.get("counterparty_lines") or item.get("counterparties") or []
+    counterparty_lines_fmt = []
+    for cp in raw_cps:
+        tx_raw = (cp.get("transaction_date") or (cp.get("extra_info") or {}).get("transaction_date"))
+        tx_dt = _parse_dt(tx_raw)
+        cp_copy = dict(cp)
+        cp_copy["txn_date_g"] = CalendarConverter.to_gregorian(tx_dt)["date_only"] if tx_dt else ""
+        cp_copy["txn_date_j"] = CalendarConverter.to_jalali(tx_dt)["date_only"] if tx_dt else ""
+        counterparty_lines_fmt.append(cp_copy)
+
+    # زمینه قالب
+    template_context = {
+        "business_id": business_id,
+        "business_name": business_name,
+        "business": business_info,
+        "document": item,
+        "item_lines": item.get("item_lines") or item.get("items") or [],
+        "counterparty_lines": raw_cps,
+        "counterparty_lines_fmt": counterparty_lines_fmt,
+        "is_fa": is_fa,
+        "is_jalali": (calendar_type == "jalali"),
+        "fa_font_url_regular": fa_font_url_regular,
+        "fa_font_url_bold": fa_font_url_bold,
+        "generated_at": datetime.datetime.now(),
+        "document_date_jalali": doc_date_j,
+        "document_date_gregorian": doc_date_g,
+    }
+
+    # تلاش برای استفاده از قالب سفارشی
+    resolved_html = None
+    try:
+        from app.services.report_template_service import ReportTemplateService
+        explicit_template_id = None
+        try:
+            # پشتیبانی از ?template_id=...
+            if request.query_params.get("template_id") is not None:
+                explicit_template_id = int(request.query_params.get("template_id"))
+        except Exception:
+            explicit_template_id = None
+        resolved_html = ReportTemplateService.try_render_resolved(
+            db=db,
+            business_id=business_id,
+            module_key="expense_income",
+            subtype="detail",
+            context=template_context,
+            explicit_template_id=explicit_template_id,
+        )
+    except Exception:
+        resolved_html = None
+
+    # پارامترهای نمایشی
+    disposition = request.query_params.get("disposition") or "attachment"
+    paper_size = request.query_params.get("paper_size")
+    orientation = request.query_params.get("orientation")
+
+    # HTML پیش‌فرض
+    html_content = resolved_html or render_template(
+        "pdf/expense_income/detail.html",
+        {
+            **template_context,
+            "title_text": ("سند هزینه/درآمد" if is_fa else "Expense/Income"),
+            "paper_size": paper_size,
+            "orientation": orientation,
+        },
+    )
+
+    font_config = FontConfiguration()
+    pdf_bytes = HTML(string=html_content).write_pdf(font_config=font_config)
+
+    # نام فایل
+    def _slugify(text: str) -> str:
+        return re.sub(r"[^A-Za-z0-9_-]+", "_", (text or "")).strip("_") or "expense_income"
+    filename = f"expense_income_{_slugify(str(item.get('code') or document_id))}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+
     return Response(
-        content=pdf_data,
+        content=pdf_bytes,
         media_type="application/pdf",
-        headers={"Content-Disposition": f"attachment; filename=expense_income_{document_id}.pdf"}
+        headers={
+            "Content-Disposition": f"{disposition}; filename={filename}",
+            "Content-Length": str(len(pdf_bytes)),
+            "Access-Control-Expose-Headers": "Content-Disposition",
+        },
     )
 
 

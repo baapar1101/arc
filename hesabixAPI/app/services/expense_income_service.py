@@ -51,9 +51,17 @@ def _get_fixed_account_by_code(db: Session, account_code: str) -> Account:
 
 
 def _get_business_fiscal_year(db: Session, business_id: int) -> FiscalYear:
-    fy = db.query(FiscalYear).filter(
-        and_(FiscalYear.business_id == business_id, FiscalYear.is_closed == False)  # noqa: E712
-    ).order_by(FiscalYear.start_date.desc()).first()
+    fy = (
+        db.query(FiscalYear)
+        .filter(
+            and_(
+                FiscalYear.business_id == business_id,
+                FiscalYear.is_last == True,  # noqa: E712
+            )
+        )
+        .order_by(FiscalYear.start_date.desc())
+        .first()
+    )
     if not fy:
         raise ApiError("FISCAL_YEAR_NOT_FOUND", "Active fiscal year not found", http_status=404)
     return fy
@@ -344,6 +352,7 @@ def document_to_dict(db: Session, document: Document) -> Dict[str, Any]:
         row = {
             "id": ln.id,
             "account_id": ln.account_id,
+            "account_code": getattr(account, "code", None),
             "account_name": account.name if account else None,
             "debit": float(ln.debit or 0),
             "credit": float(ln.credit or 0),
@@ -361,14 +370,28 @@ def document_to_dict(db: Session, document: Document) -> Dict[str, Any]:
         else:
             items.append(row)
 
+    # ساخته‌های نمایشی: نام ایجادکننده و کد ارز
+    from adapters.db.models.user import User
+    from adapters.db.models.currency import Currency
+    created_by = db.query(User).filter(User.id == document.created_by_user_id).first()
+    created_by_name = f"{getattr(created_by, 'first_name', '')} {getattr(created_by, 'last_name', '')}".strip() if created_by else None
+    currency = db.query(Currency).filter(Currency.id == document.currency_id).first()
+    currency_code = getattr(currency, "code", None)
+    currency_symbol = getattr(currency, "symbol", None)
+
     return {
         "id": document.id,
         "code": document.code,
         "business_id": document.business_id,
         "fiscal_year_id": document.fiscal_year_id,
         "currency_id": document.currency_id,
+        "currency_code": currency_code,
+        "currency_symbol": currency_symbol,
         "document_type": document.document_type,
         "document_date": document.document_date.isoformat(),
+        "registered_at": (document.registered_at.isoformat() if getattr(document, "registered_at", None) else document.document_date.isoformat()),
+        "created_by_user_id": document.created_by_user_id,
+        "created_by_name": created_by_name,
         "description": document.description,
         "items": items,
         "counterparties": counterparties,
@@ -567,65 +590,125 @@ def update_expense_income(
         # تعیین نوع تراکنش و حساب مربوطه
         transaction_type = line.get("transaction_type", "bank")
         account = None
+        # شناسه‌های موجود برای نگاشت به فیلدهای خط سند
+        resolved_bank_account_id = None
+        cash_register_id_val = line.get("cash_register_id")
+        petty_cash_id_val = line.get("petty_cash_id")
+        check_id_val = line.get("check_id")
+        person_id_val = line.get("person_id")
         
         if transaction_type == "bank":
-            bank_account_id = line.get("bank_account_id")
+            # سازگاری: bank_account_id یا bank_id
+            bank_account_id = line.get("bank_account_id") or line.get("bank_id")
             if bank_account_id:
-                from adapters.db.models.bank_account import BankAccount
-                bank_account = db.query(BankAccount).filter(BankAccount.id == int(bank_account_id)).first()
-                if bank_account:
-                    account = bank_account.account
+                try:
+                    from adapters.db.models.bank_account import BankAccount
+                    bank_account = db.query(BankAccount).filter(BankAccount.id == int(bank_account_id)).first()
+                    if bank_account and bank_account.account:
+                        account = bank_account.account
+                        resolved_bank_account_id = int(bank_account_id)
+                except Exception:
+                    resolved_bank_account_id = None
+            if account is None:
+                # fallback به حساب ثابت بانک
+                account = _get_fixed_account_by_code(db, "10203")
         elif transaction_type == "cash_register":
-            cash_register_id = line.get("cash_register_id")
-            if cash_register_id:
-                from adapters.db.models.cash_register import CashRegister
-                cash_register = db.query(CashRegister).filter(CashRegister.id == int(cash_register_id)).first()
-                if cash_register:
-                    account = cash_register.account
+            if cash_register_id_val:
+                try:
+                    from adapters.db.models.cash_register import CashRegister
+                    cash_register = db.query(CashRegister).filter(CashRegister.id == int(cash_register_id_val)).first()
+                    if cash_register and cash_register.account:
+                        account = cash_register.account
+                except Exception:
+                    pass
+            if account is None:
+                account = _get_fixed_account_by_code(db, "10202")
         elif transaction_type == "petty_cash":
-            petty_cash_id = line.get("petty_cash_id")
-            if petty_cash_id:
-                from adapters.db.models.petty_cash import PettyCash
-                petty_cash = db.query(PettyCash).filter(PettyCash.id == int(petty_cash_id)).first()
-                if petty_cash:
-                    account = petty_cash.account
+            if petty_cash_id_val:
+                try:
+                    from adapters.db.models.petty_cash import PettyCash
+                    petty_cash = db.query(PettyCash).filter(PettyCash.id == int(petty_cash_id_val)).first()
+                    if petty_cash and petty_cash.account:
+                        account = petty_cash.account
+                except Exception:
+                    pass
+            if account is None:
+                account = _get_fixed_account_by_code(db, "10201")
         elif transaction_type == "check":
-            check_id = line.get("check_id")
-            if check_id:
-                from adapters.db.models.check import Check
-                check = db.query(Check).filter(Check.id == int(check_id)).first()
-                if check:
-                    account = check.account
+            # برای چک‌ها از کدهای اسناد دریافتنی/پرداختنی استفاده شود
+            account = _get_fixed_account_by_code(db, "10403" if is_income else "20202")
         elif transaction_type == "person":
-            person_id = line.get("person_id")
-            if person_id:
-                from adapters.db.models.person import Person
-                person = db.query(Person).filter(Person.id == int(person_id)).first()
-                if person:
-                    # حساب شخص بر اساس نوع (دریافتنی/پرداختنی)
-                    account = _get_person_account(db, document.business_id, int(person_id), is_income)
-        
+            # حساب شخص بر اساس نوع (دریافتنی در درآمد / پرداختنی در هزینه)
+            if person_id_val:
+                try:
+                    account = _get_person_account(db, document.business_id, int(person_id_val), is_income)
+                except Exception:
+                    account = _get_fixed_account_by_code(db, "20201" if not is_income else "1211")
+            else:
+                account = _get_fixed_account_by_code(db, "20201" if not is_income else "1211")
+        elif line.get("account_id"):
+            account = db.query(Account).filter(
+                and_(
+                    Account.id == int(line.get("account_id")),
+                    or_(Account.business_id == document.business_id, Account.business_id == None),  # noqa: E711
+                )
+            ).first()
         if not account:
-            # اگر حساب مشخص نشده، از حساب پیش‌فرض استفاده کن
-            account_code = "1111" if is_income else "2111"  # نقد یا بانک
-            account = _get_fixed_account_by_code(db, account_code)
+            raise ApiError("ACCOUNT_NOT_FOUND", "Account not found for counterparty line", http_status=404)
         
-        # مبلغ اصلی
+        extra_info: Dict[str, Any] = {}
+        if transaction_type:
+            extra_info["transaction_type"] = transaction_type
+        if line.get("transaction_date"):
+            extra_info["transaction_date"] = line.get("transaction_date")
+        if commission and commission > 0:
+            extra_info["commission"] = float(commission)
+        if transaction_type == "bank":
+            # همواره هر دو کلید را برای سازگاری نگه داریم
+            if line.get("bank_id"):
+                extra_info["bank_id"] = line.get("bank_id")
+            if line.get("bank_account_id"):
+                extra_info["bank_account_id"] = line.get("bank_account_id")
+            if line.get("bank_name"):
+                extra_info["bank_name"] = line.get("bank_name")
+            if line.get("bank_account_name"):
+                extra_info["bank_account_name"] = line.get("bank_account_name")
+        elif transaction_type == "cash_register":
+            if line.get("cash_register_id"):
+                extra_info["cash_register_id"] = line.get("cash_register_id")
+            if line.get("cash_register_name"):
+                extra_info["cash_register_name"] = line.get("cash_register_name")
+        elif transaction_type == "petty_cash":
+            if line.get("petty_cash_id"):
+                extra_info["petty_cash_id"] = line.get("petty_cash_id")
+            if line.get("petty_cash_name"):
+                extra_info["petty_cash_name"] = line.get("petty_cash_name")
+        elif transaction_type == "check":
+            if line.get("check_id"):
+                extra_info["check_id"] = line.get("check_id")
+            if line.get("check_number"):
+                extra_info["check_number"] = line.get("check_number")
+        elif transaction_type == "person":
+            if line.get("person_id"):
+                extra_info["person_id"] = line.get("person_id")
+            if line.get("person_name"):
+                extra_info["person_name"] = line.get("person_name")
+
         debit_amount = amount if is_income else Decimal(0)
         credit_amount = amount if not is_income else Decimal(0)
-        
+
         db.add(DocumentLine(
             document_id=document.id,
             account_id=account.id,
+            person_id=(int(person_id_val) if transaction_type == "person" and person_id_val else None),
+            bank_account_id=(int(resolved_bank_account_id) if transaction_type == "bank" and resolved_bank_account_id else None),
+            cash_register_id=cash_register_id_val,
+            petty_cash_id=petty_cash_id_val,
+            check_id=check_id_val,
             debit=debit_amount,
             credit=credit_amount,
             description=description,
-            extra_info={
-                "transaction_type": transaction_type,
-                "transaction_date": line.get("transaction_date"),
-                "commission": float(commission),
-                **{k: v for k, v in line.items() if k not in ["amount", "description", "commission", "transaction_type", "transaction_date"]}
-            }
+            extra_info=extra_info or None,
         ))
         
         # اگر کارمزد وجود دارد، خط کارمزد اضافه کن
@@ -736,62 +819,174 @@ def export_expense_income_excel(db: Session, business_id: int, query: Dict[str, 
 
 
 def export_expense_income_pdf(db: Session, business_id: int, query: Dict[str, Any]) -> bytes:
-    """خروجی PDF اسناد هزینه/درآمد"""
-    # این تابع باید پیاده‌سازی شود
-    # فعلاً یک فایل PDF خالی برمی‌گرداند
-    from reportlab.pdfgen import canvas
-    from reportlab.lib.pagesizes import letter
-    import io
-    
-    output = io.BytesIO()
-    c = canvas.Canvas(output, pagesize=letter)
-    
-    # عنوان
-    c.setFont("Helvetica-Bold", 16)
-    c.drawString(100, 750, "گزارش هزینه و درآمد")
-    
+    """خروجی PDF اسناد هزینه/درآمد با WeasyPrint (بدون وابستگی به reportlab)."""
+    from weasyprint import HTML
+    from weasyprint.text.fonts import FontConfiguration
+    from html import escape
+    import datetime
     # دریافت داده‌ها
     result = list_expense_income(db, business_id, query)
     items = result.get("items", [])
-    
-    # اضافه کردن داده‌ها
-    y = 700
-    c.setFont("Helvetica", 12)
-    for item in items[:20]:  # حداکثر 20 آیتم
-        c.drawString(100, y, f"{item.get('code', '')} - {item.get('document_type_name', '')} - {item.get('total_amount', 0)}")
-        y -= 20
-        if y < 100:
-            c.showPage()
-            y = 750
-    
-    c.save()
-    return output.getvalue()
+    # ساخت جدول ساده HTML
+    headers = ["کد", "نوع", "تاریخ", "مبلغ کل"]
+    def _get(item, key, default=""):
+        return escape(str(item.get(key, default)))
+    rows_html = []
+    for item in items:
+        total_amount = _get(item, 'total_amount', 0)
+        currency_symbol = item.get('currency_symbol') or ''
+        amount_display = f"{total_amount} {currency_symbol}".strip() if currency_symbol else total_amount
+        rows_html.append(
+            "<tr>"
+            f"<td>{_get(item, 'code')}</td>"
+            f"<td>{_get(item, 'document_type_name')}</td>"
+            f"<td>{_get(item, 'document_date')}</td>"
+            f"<td>{amount_display}</td>"
+            "</tr>"
+        )
+    now_str = datetime.datetime.now().strftime('%Y/%m/%d %H:%M')
+    html = f"""
+<!doctype html>
+<html lang="fa">
+  <head>
+    <meta charset="utf-8">
+    <style>
+      body {{ font-family: DejaVu Sans, sans-serif; font-size: 12px; }}
+      h1 {{ font-size: 16px; margin-bottom: 8px; }}
+      table {{ width: 100%; border-collapse: collapse; }}
+      th, td {{ border: 1px solid #999; padding: 6px; text-align: right; }}
+      th {{ background: #f2f2f2; }}
+      .footer {{ margin-top: 12px; font-size: 11px; color: #666; }}
+    </style>
+  </head>
+  <body dir="rtl">
+    <h1>گزارش هزینه و درآمد</h1>
+    <table>
+      <thead>
+        <tr>{"".join(f"<th>{escape(h)}</th>" for h in headers)}</tr>
+      </thead>
+      <tbody>
+        {"".join(rows_html)}
+      </tbody>
+    </table>
+    <div class="footer">تولید شده در {escape(now_str)}</div>
+  </body>
+</html>
+"""
+    return HTML(string=html).write_pdf(font_config=FontConfiguration())
 
 
 def generate_expense_income_pdf(db: Session, document_id: int) -> bytes:
-    """تولید PDF یک سند هزینه/درآمد"""
-    # این تابع باید پیاده‌سازی شود
-    # فعلاً یک فایل PDF خالی برمی‌گرداند
-    from reportlab.pdfgen import canvas
-    from reportlab.lib.pagesizes import letter
-    import io
-    
-    output = io.BytesIO()
-    c = canvas.Canvas(output, pagesize=letter)
-    
-    # دریافت سند
-    document = db.query(Document).filter(Document.id == document_id).first()
-    if not document:
+    """تولید PDF یک سند هزینه/درآمد با WeasyPrint (بدون reportlab)."""
+    from weasyprint import HTML
+    from weasyprint.text.fonts import FontConfiguration
+    from html import escape
+    # دریافت داکیومنت به‌صورت دیکشنری قابل استفاده
+    doc = get_expense_income(db, document_id)
+    if not doc:
         raise ApiError("DOCUMENT_NOT_FOUND", "Document not found", http_status=404)
-    
-    # عنوان
-    c.setFont("Helvetica-Bold", 16)
-    c.drawString(100, 750, f"سند {document.document_type_name}")
-    c.drawString(100, 730, f"کد: {document.code}")
-    c.drawString(100, 710, f"تاریخ: {document.document_date}")
-    
-    c.save()
-    return output.getvalue()
+    code = escape(str(doc.get("code") or ""))
+    dtype = escape(str(doc.get("document_type_name") or doc.get("document_type") or ""))
+    date = escape(str(doc.get("document_date") or ""))
+    total = escape(str(doc.get("total_amount") or ""))
+    description = escape(str(doc.get("description") or ""))
+    currency_symbol = doc.get("currency_symbol") or ""
+    # خطوط
+    item_lines = doc.get("item_lines") or doc.get("items") or []
+    counterparty_lines = doc.get("counterparty_lines") or doc.get("counterparties") or []
+    def _esc(x): return escape(str(x)) if x is not None else ""
+    def _fmt_amount(amt): 
+        amt_str = _esc(amt)
+        return f"{amt_str} {currency_symbol}".strip() if currency_symbol else amt_str
+    item_rows = []
+    for it in item_lines:
+        # پشتیبانی از دو شکل: amount یا debit/credit
+        amount = it.get("amount")
+        if amount is None:
+            debit = it.get("debit") or 0
+            credit = it.get("credit") or 0
+            amount = debit if abs(debit) >= abs(credit) else credit
+        item_rows.append(
+            "<tr>"
+            f"<td>{_esc(it.get('account_code',''))}</td>"
+            f"<td>{_esc(it.get('account_name',''))}</td>"
+            f"<td>{_fmt_amount(amount)}</td>"
+            f"<td>{_esc(it.get('description',''))}</td>"
+            "</tr>"
+        )
+    cp_rows = []
+    for cp in counterparty_lines:
+        extra = cp.get("extra_info") or {}
+        tx_type = extra.get("transaction_type") or cp.get("transaction_type") or ""
+        tx_name = extra.get("transaction_type_name") or cp.get("transaction_type_name") or tx_type
+        amount = cp.get("amount")
+        if amount is None:
+            debit = cp.get("debit") or 0
+            credit = cp.get("credit") or 0
+            amount = debit if abs(debit) >= abs(credit) else credit
+        cp_rows.append(
+            "<tr>"
+            f"<td>{_esc(tx_name)}</td>"
+            f"<td>{_esc(cp.get('account_name') or extra.get('person_name') or extra.get('bank_account_name') or '')}</td>"
+            f"<td>{_fmt_amount(amount)}</td>"
+            f"<td>{_esc(cp.get('description',''))}</td>"
+            "</tr>"
+        )
+    html = f"""
+<!doctype html>
+<html lang="fa">
+  <head>
+    <meta charset="utf-8">
+    <style>
+      body {{ font-family: DejaVu Sans, sans-serif; font-size: 12px; }}
+      h1 {{ font-size: 16px; margin-bottom: 8px; }}
+      .section-title {{ margin-top: 14px; margin-bottom: 6px; font-weight: bold; }}
+      table {{ width: 100%; border-collapse: collapse; }}
+      th, td {{ border: 1px solid #999; padding: 6px; text-align: right; }}
+      th {{ background: #f2f2f2; }}
+    </style>
+  </head>
+  <body dir="rtl">
+    <h1>سند هزینه/درآمد</h1>
+    <div>کد سند: {code}</div>
+    <div>نوع سند: {dtype}</div>
+    <div>تاریخ سند: {date}</div>
+    <div>مبلغ کل: {total} {currency_symbol}</div>
+    <div>توضیحات: {description}</div>
+
+    <div class="section-title">اقلام</div>
+    <table>
+      <thead>
+        <tr>
+          <th>کد حساب</th>
+          <th>نام حساب</th>
+          <th>مبلغ</th>
+          <th>توضیح</th>
+        </tr>
+      </thead>
+      <tbody>
+        {"".join(item_rows)}
+      </tbody>
+    </table>
+
+    <div class="section-title">طرف‌حساب‌ها</div>
+    <table>
+      <thead>
+        <tr>
+          <th>نوع تراکنش</th>
+          <th>شرح</th>
+          <th>مبلغ</th>
+          <th>توضیح</th>
+        </tr>
+      </thead>
+      <tbody>
+        {"".join(cp_rows)}
+      </tbody>
+    </table>
+  </body>
+</html>
+"""
+    return HTML(string=html).write_pdf(font_config=FontConfiguration())
 
 
 def _get_person_account(
@@ -810,7 +1005,7 @@ def _get_person_account(
     if is_receivable:
         account_code = "1211"  # دریافتنی‌ها
     else:
-        account_code = "2211"  # پرداختنی‌ها
+        account_code = "20201"  # پرداختنی‌ها
     
     return _get_fixed_account_by_code(db, account_code)
 

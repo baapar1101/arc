@@ -45,9 +45,17 @@ def _get_fixed_account_by_code(db: Session, account_code: str) -> Account:
 
 def _get_business_fiscal_year(db: Session, business_id: int) -> FiscalYear:
     from sqlalchemy import and_  # local import to avoid unused import if not used elsewhere
-    fy = db.query(FiscalYear).filter(
-        and_(FiscalYear.business_id == business_id, FiscalYear.is_closed == False)  # noqa: E712
-    ).order_by(FiscalYear.start_date.desc()).first()
+    fy = (
+        db.query(FiscalYear)
+        .filter(
+            and_(
+                FiscalYear.business_id == business_id,
+                FiscalYear.is_last == True,  # noqa: E712
+            )
+        )
+        .order_by(FiscalYear.start_date.desc())
+        .first()
+    )
     if not fy:
         from app.core.responses import ApiError
         raise ApiError("FISCAL_YEAR_NOT_FOUND", "Active fiscal year not found", http_status=404)

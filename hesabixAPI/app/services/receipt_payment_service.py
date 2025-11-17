@@ -14,6 +14,7 @@ from decimal import Decimal
 import logging
 
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.attributes import flag_modified
 from sqlalchemy import and_, or_, func
 
 from adapters.db.models.document import Document
@@ -297,6 +298,108 @@ def create_receipt_payment(
     )
     db.add(document)
     db.flush()  # برای دریافت document.id
+    
+    # --- اعتبارسنجی اقساط قبل از اعمال (سختگیرانه) ---
+    extra_info_all = data.get("extra_info") or {}
+    settlements_input = extra_info_all.get("settlements") or []
+    if settlements_input:
+        # فقط روی دریافت مجاز است
+        if not is_receipt:
+            raise ApiError(
+                "INSTALLMENT_NOT_ALLOWED_FOR_PAYMENT",
+                "تخصیص اقساط فقط در اسناد دریافت مجاز است",
+                http_status=400,
+            )
+        # نقشه مبلغ خطوط هر شخص
+        person_amount_by_id: Dict[int, Decimal] = {}
+        for pl in person_lines:
+            try:
+                pid = int(pl.get("person_id"))
+                amt = Decimal(str(pl.get("amount", 0) or 0))
+                if pid and amt > 0:
+                    person_amount_by_id[pid] = person_amount_by_id.get(pid, Decimal(0)) + amt
+            except Exception:
+                continue
+        # مجموع تخصیص اقساط به ازای هر شخص
+        allocated_by_person: Dict[int, Decimal] = {}
+        for st in settlements_input:
+            # الزام person_id در هر settlement برای تطبیق با خطوط شخص
+            try:
+                st_person_id = int(st.get("person_id"))
+            except Exception:
+                raise ApiError(
+                    "INSTALLMENT_PERSON_REQUIRED",
+                    "برای هر تخصیص قسط، person_id الزامی است",
+                    http_status=400,
+                )
+            if st_person_id not in person_amount_by_id:
+                raise ApiError(
+                    "INSTALLMENT_PERSON_MISMATCH",
+                    "شخص تخصیص قسط باید در خطوط اشخاص سند وجود داشته باشد",
+                    http_status=400,
+                )
+            # اعتبارسنجی فاکتور و ارز
+            try:
+                invoice_id = int(st.get("invoice_id"))
+            except Exception:
+                raise ApiError("INSTALLMENT_INVOICE_INVALID", "شناسه فاکتور اقساط نامعتبر است", http_status=400)
+            invoice_doc = db.query(Document).filter(Document.id == invoice_id).first()
+            if not invoice_doc:
+                raise ApiError("INSTALLMENT_INVOICE_NOT_FOUND", "فاکتور اقساط پیدا نشد", http_status=404)
+            if int(invoice_doc.currency_id) != int(currency_id):
+                raise ApiError(
+                    "INSTALLMENT_CURRENCY_MISMATCH",
+                    "ارز فاکتور اقساط با ارز سند دریافت یکسان نیست",
+                    http_status=400,
+                )
+            inv_extra = invoice_doc.extra_info or {}
+            plan = inv_extra.get("installment_plan")
+            schedule = (plan or {}).get("schedule")
+            if not (isinstance(plan, dict) and isinstance(schedule, list) and schedule):
+                raise ApiError(
+                    "INSTALLMENT_PLAN_NOT_FOUND",
+                    "برای فاکتور انتخاب‌شده، طرح اقساط ثبت نشده است",
+                    http_status=404,
+                )
+            # بررسی عدم بیش‌پرداخت در هر قسط
+            remaining_by_seq: Dict[int, Decimal] = {}
+            for item in schedule:
+                try:
+                    seq_i = int(item.get("seq") or 0)
+                    total_i = Decimal(str(item.get("total", 0) or 0))
+                    paid_i = Decimal(str(item.get("paid_amount", 0) or 0))
+                    remaining_by_seq[seq_i] = max(total_i - paid_i, Decimal(0))
+                except Exception:
+                    continue
+            allocations = st.get("allocations") or []
+            if not isinstance(allocations, list) or not allocations:
+                raise ApiError("INSTALLMENT_ALLOCATIONS_REQUIRED", "لیست تخصیص اقساط خالی است", http_status=400)
+            for al in allocations:
+                try:
+                    seq = int(al.get("seq"))
+                    amt = Decimal(str(al.get("amount", 0) or 0))
+                except Exception:
+                    raise ApiError("INSTALLMENT_ALLOCATION_INVALID", "تخصیص قسط نامعتبر است", http_status=400)
+                if seq <= 0 or amt <= 0:
+                    raise ApiError("INSTALLMENT_ALLOCATION_INVALID", "تخصیص قسط نامعتبر است", http_status=400)
+                remain = remaining_by_seq.get(seq, None)
+                if remain is None:
+                    raise ApiError("INSTALLMENT_SEQ_NOT_FOUND", "شماره قسط در طرح اقساط یافت نشد", http_status=404)
+                if amt > remain:
+                    raise ApiError(
+                        "INSTALLMENT_OVERPAY_PER_SEQ",
+                        "مبلغ تخصیص از مانده همان قسط بیشتر است",
+                        http_status=400,
+                    )
+                allocated_by_person[st_person_id] = allocated_by_person.get(st_person_id, Decimal(0)) + amt
+        # کنترل سقف مجموع تخصیص هر شخص نسبت به مبلغ خطوط همان شخص
+        for pid, alloc_sum in allocated_by_person.items():
+            if alloc_sum > person_amount_by_id.get(pid, Decimal(0)):
+                raise ApiError(
+                    "INSTALLMENT_OVER_PERSON_LINES",
+                    "جمع تخصیص اقساط یک شخص از مجموع مبلغ خطوط همان شخص بیشتر است",
+                    http_status=400,
+                )
     
     # ایجاد خطوط سند برای اشخاص
     logger.info(f"=== شروع ایجاد خطوط اشخاص ===")
@@ -628,112 +731,126 @@ def create_receipt_payment(
                 logger.info(f"خط کارمزد خدمات بانکی ایجاد شد: {commission_service_line}")
                 db.add(commission_service_line)
     
-    # --- فروش اقساطی: تخصیص به اقساط و شناسایی سود ---
-    try:
-        extra_info_all = data.get("extra_info") or {}
-        settlements = extra_info_all.get("settlements") or []
-        total_interest_to_recognize = Decimal(0)
-        updated_invoice_ids: List[int] = []
-        if is_receipt and isinstance(settlements, list) and settlements:
-            # برای هر فاکتور هدف، برنامه اقساط را به‌روز و سود دوره را شناسایی کن
-            for st in settlements:
-                try:
-                    invoice_id = int(st.get("invoice_id"))
-                except Exception:
-                    continue
-                invoice_doc = db.query(Document).filter(Document.id == invoice_id).first()
-                if not invoice_doc:
-                    continue
-                inv_extra = invoice_doc.extra_info or {}
-                plan = inv_extra.get("installment_plan")
-                schedule = (plan or {}).get("schedule")
-                if not (isinstance(plan, dict) and isinstance(schedule, list) and schedule):
-                    continue
-                # تجمیع تخصیص‌ها به ازای هر قسط (seq)
-                allocations = st.get("allocations") or []
-                seq_to_amount: Dict[int, Decimal] = {}
-                for al in allocations:
-                    try:
-                        seq = int(al.get("seq"))
-                        amt = Decimal(str(al.get("amount", 0) or 0))
-                        if seq > 0 and amt > 0:
-                            seq_to_amount[seq] = seq_to_amount.get(seq, Decimal(0)) + amt
-                    except Exception:
-                        continue
-                if not seq_to_amount:
-                    continue
-                # به‌روزرسانی schedule و محاسبه سود شناسایی‌شده جدید
-                interest_delta_for_invoice = Decimal(0)
-                new_schedule: List[Dict[str, Any]] = []
-                for item in schedule:
-                    seq = int(item.get("seq") or 0)
-                    paid_before = Decimal(str(item.get("paid_amount", 0) or 0))
-                    interest_part = Decimal(str(item.get("interest", 0) or 0))
-                    total_part = Decimal(str(item.get("total", 0) or 0))
-                    alloc_amt = seq_to_amount.get(seq, Decimal(0))
-                    paid_after = paid_before + alloc_amt
-                    # شناسایی سود: حداقلِ پرداخت تا سقف بهره‌ی همان قسط
-                    prev_interest_recognized = min(paid_before, interest_part)
-                    new_interest_recognized = min(paid_after, interest_part)
-                    delta = new_interest_recognized - prev_interest_recognized
-                    if delta > 0:
-                        interest_delta_for_invoice += delta
-                    # وضعیت قسط
-                    new_status = item.get("status") or "pending"
-                    try:
-                        if paid_after >= total_part and total_part > 0:
-                            new_status = "paid"
-                        elif paid_after > 0:
-                            new_status = "partial"
-                        else:
-                            new_status = "pending"
-                    except Exception:
-                        pass
-                    new_item = dict(item)
-                    new_item["paid_amount"] = float(paid_after)
-                    new_item["status"] = new_status
-                    new_schedule.append(new_item)
-                # بروزرسانی طرح در فاکتور
-                new_plan = dict(plan or {})
-                new_plan["schedule"] = new_schedule
-                inv_extra["installment_plan"] = new_plan
-                invoice_doc.extra_info = inv_extra
-                updated_invoice_ids.append(invoice_doc.id)
-                # تجمیع سود شناسایی‌شده برای ثبت در همین سند دریافت
-                total_interest_to_recognize += interest_delta_for_invoice
-            # اگر سودی برای شناسایی وجود دارد، ثبت انتقال از سود تحقق‌نیافته به سود فروش اقساطی
-            if total_interest_to_recognize > 0:
-                try:
-                    unearned = _get_fixed_account_by_code(db, "10405")
-                    earned = _get_fixed_account_by_code(db, "60205")
-                    db.add(DocumentLine(
-                        document_id=document.id,
-                        account_id=unearned.id,
-                        debit=total_interest_to_recognize,
-                        credit=Decimal(0),
-                        description="انتقال سود اقساط از سود تحقق‌نیافته",
-                        extra_info={"installment": True, "reclassification": True},
-                    ))
-                    db.add(DocumentLine(
-                        document_id=document.id,
-                        account_id=earned.id,
-                        debit=Decimal(0),
-                        credit=total_interest_to_recognize,
-                        description="شناسایی سود فروش اقساطی",
-                        extra_info={"installment": True, "reclassification": True},
-                    ))
-                except Exception:
-                    # در صورت عدم وجود حساب‌های ثابت، از شناسایی صرف‌نظر می‌شود
-                    pass
-    except Exception as _ex:
-        logger.exception("installment settlements processing failed: %s", _ex)
-        # از خطا عبور می‌کنیم تا سند دریافت ثبت شود
-        pass
+    # --- فروش اقساطی: تخصیص به اقساط و شناسایی سود (بدون try/except ساکت) ---
+    extra_info_all = data.get("extra_info") or {}
+    settlements = extra_info_all.get("settlements") or []
+    total_interest_to_recognize = Decimal(0)
+    updated_invoice_ids: List[int] = []
+    if is_receipt and isinstance(settlements, list) and settlements:
+        for st in settlements:
+            invoice_id = int(st.get("invoice_id"))
+            invoice_doc = db.query(Document).filter(Document.id == invoice_id).first()
+            if not invoice_doc:
+                raise ApiError("INSTALLMENT_INVOICE_NOT_FOUND", "فاکتور اقساط پیدا نشد", http_status=404)
+            inv_extra = invoice_doc.extra_info or {}
+            plan = inv_extra.get("installment_plan")
+            schedule = (plan or {}).get("schedule")
+            if not (isinstance(plan, dict) and isinstance(schedule, list) and schedule):
+                raise ApiError("INSTALLMENT_PLAN_NOT_FOUND", "طرح اقساط برای فاکتور یافت نشد", http_status=404)
+            allocations = st.get("allocations") or []
+            if not isinstance(allocations, list) or not allocations:
+                raise ApiError("INSTALLMENT_ALLOCATIONS_REQUIRED", "لیست تخصیص اقساط خالی است", http_status=400)
+            seq_to_amount: Dict[int, Decimal] = {}
+            for al in allocations:
+                seq = int(al.get("seq"))
+                amt = Decimal(str(al.get("amount", 0) or 0))
+                if seq <= 0 or amt <= 0:
+                    raise ApiError("INSTALLMENT_ALLOCATION_INVALID", "تخصیص قسط نامعتبر است", http_status=400)
+                seq_to_amount[seq] = seq_to_amount.get(seq, Decimal(0)) + amt
+            # کنترل مانده هر قسط (با اتکا به اعتبارسنجی بالادستی remaining)
+            remaining_by_seq: Dict[int, Decimal] = {}
+            for item in schedule:
+                seq_i = int(item.get("seq") or 0)
+                total_i = Decimal(str(item.get("total", 0) or 0))
+                paid_i = Decimal(str(item.get("paid_amount", 0) or 0))
+                remaining_by_seq[seq_i] = max(total_i - paid_i, Decimal(0))
+            for seq, alloc in seq_to_amount.items():
+                remain = remaining_by_seq.get(seq)
+                if remain is None:
+                    raise ApiError("INSTALLMENT_SEQ_NOT_FOUND", "شماره قسط یافت نشد", http_status=404)
+                if alloc > remain:
+                    raise ApiError("INSTALLMENT_OVERPAY_PER_SEQ", "مبلغ تخصیص از مانده قسط بیشتر است", http_status=400)
+            # اعمال و محاسبه سود
+            interest_delta_for_invoice = Decimal(0)
+            new_schedule: List[Dict[str, Any]] = []
+            for item in schedule:
+                seq = int(item.get("seq") or 0)
+                paid_before = Decimal(str(item.get("paid_amount", 0) or 0))
+                interest_part = Decimal(str(item.get("interest", 0) or 0))
+                total_part = Decimal(str(item.get("total", 0) or 0))
+                alloc_amt = seq_to_amount.get(seq, Decimal(0))
+                paid_after = paid_before + alloc_amt
+                prev_interest_recognized = min(paid_before, interest_part)
+                new_interest_recognized = min(paid_after, interest_part)
+                delta = new_interest_recognized - prev_interest_recognized
+                if delta > 0:
+                    interest_delta_for_invoice += delta
+                # محاسبه status با tolerance برای خطای ممیز شناور
+                tolerance = Decimal("0.01")
+                if total_part > 0 and (paid_after >= total_part or (total_part - paid_after) <= tolerance):
+                    new_status = "paid"
+                elif paid_after > tolerance:
+                    new_status = "partial"
+                else:
+                    new_status = "pending"
+                logger.info(f"قسط #{seq}: total={total_part}, paid_before={paid_before}, alloc={alloc_amt}, paid_after={paid_after}, status={new_status}")
+                new_item = dict(item)
+                new_item["paid_amount"] = float(paid_after)
+                new_item["status"] = new_status
+                new_schedule.append(new_item)
+            new_plan = dict(plan or {})
+            new_plan["schedule"] = new_schedule
+            inv_extra["installment_plan"] = new_plan
+            invoice_doc.extra_info = inv_extra
+            # flag کردن تغییرات در JSON field برای SQLAlchemy
+            flag_modified(invoice_doc, "extra_info")
+            updated_invoice_ids.append(invoice_doc.id)
+            total_interest_to_recognize += interest_delta_for_invoice
+        if total_interest_to_recognize > 0:
+            # عدم ساکت کردن خطا؛ اگر حساب ثابت نبود، خطا می‌دهیم تا وضعیت شفاف باشد
+            unearned = _get_fixed_account_by_code(db, "10405")
+            earned = _get_fixed_account_by_code(db, "60205")
+            db.add(DocumentLine(
+                document_id=document.id,
+                account_id=unearned.id,
+                debit=total_interest_to_recognize,
+                credit=Decimal(0),
+                description="انتقال سود اقساط از سود تحقق‌نیافته",
+                extra_info={"installment": True, "reclassification": True},
+            ))
+            db.add(DocumentLine(
+                document_id=document.id,
+                account_id=earned.id,
+                debit=Decimal(0),
+                credit=total_interest_to_recognize,
+                description="شناسایی سود فروش اقساطی",
+                extra_info={"installment": True, "reclassification": True},
+            ))
 
     # ذخیره تغییرات
     logger.info(f"=== ذخیره تغییرات ===")
+    # flush کردن تغییرات قبل از commit برای اطمینان از ذخیره شدن
+    db.flush()
     db.commit()
     db.refresh(document)
+    # refresh کردن فاکتورهای اقساطی که به‌روزرسانی شدند
+    for invoice_id in updated_invoice_ids:
+        invoice_doc = db.query(Document).filter(Document.id == invoice_id).first()
+        if invoice_doc:
+            db.refresh(invoice_doc)
+            logger.info(f"فاکتور اقساطی refresh شد: id={invoice_id}")
+            # بررسی محتوای extra_info بعد از refresh
+            if invoice_doc.extra_info:
+                plan = invoice_doc.extra_info.get("installment_plan")
+                if plan:
+                    schedule = plan.get("schedule", [])
+                    logger.info(f"   تعداد اقساط در فاکتور: {len(schedule)}")
+                    for item in schedule:
+                        seq = item.get("seq")
+                        status = item.get("status")
+                        paid = item.get("paid_amount", 0)
+                        total = item.get("total", 0)
+                        logger.info(f"   قسط #{seq}: status={status}, paid={paid}, total={total}")
     logger.info(f"سند با موفقیت ایجاد شد: id={document.id}, code={document.code}")
     
     return document_to_dict(db, document)
@@ -926,9 +1043,12 @@ def update_receipt_payment(
     data: Dict[str, Any]
 ) -> Dict[str, Any]:
     """به‌روزرسانی سند دریافت/پرداخت - استراتژی Full-Replace خطوط"""
+    logger.info(f"[UPDATE_RECEIPT_PAYMENT] شروع ویرایش سند {document_id}")
+    logger.info(f"[UPDATE_RECEIPT_PAYMENT] data دریافتی: {data}")
     document = db.query(Document).filter(Document.id == document_id).first()
     if document is None:
         raise ApiError("DOCUMENT_NOT_FOUND", "Document not found", http_status=404)
+    logger.info(f"[UPDATE_RECEIPT_PAYMENT] document.extra_info قبل از تغییر: {document.extra_info}")
 
     if document.document_type not in (DOCUMENT_TYPE_RECEIPT, DOCUMENT_TYPE_PAYMENT):
         raise ApiError("INVALID_DOCUMENT_TYPE", "Invalid document type", http_status=400)
@@ -1015,9 +1135,11 @@ def update_receipt_payment(
 
     # تعیین نوع دریافت/پرداخت برای محاسبات بدهکار/بستانکار
     is_receipt = (document.document_type == DOCUMENT_TYPE_RECEIPT)
+    logger.info(f"[UPDATE_RECEIPT_PAYMENT] document.document_type={document.document_type}, is_receipt={is_receipt}")
 
     # امکان override نوع حساب طرف‌شخص (دریافتنی/پرداختنی) از extra_info در ویرایش
     extra_info_all = data.get("extra_info") or document.extra_info or {}
+    logger.info(f"[UPDATE_RECEIPT_PAYMENT] extra_info_all: {extra_info_all}")
     person_is_receivable_override = extra_info_all.get("person_is_receivable")
     if isinstance(person_is_receivable_override, bool):
         is_person_receivable = person_is_receivable_override
@@ -1053,6 +1175,105 @@ def update_receipt_payment(
             },
         )
         db.add(line)
+
+    # --- اعتبارسنجی اقساط در ویرایش (هم‌راستا با ایجاد) ---
+    extra_info_all = data.get("extra_info") or {}
+    settlements_input = extra_info_all.get("settlements") or []
+    logger.info(f"[UPDATE_RECEIPT_PAYMENT] settlements_input برای validation: {settlements_input}")
+    if settlements_input:
+        # فقط روی دریافت مجاز است
+        if not is_receipt:
+            logger.error(f"[UPDATE_RECEIPT_PAYMENT] خطا: settlements برای payment مجاز نیست")
+            raise ApiError(
+                "INSTALLMENT_NOT_ALLOWED_FOR_PAYMENT",
+                "تخصیص اقساط فقط در اسناد دریافت مجاز است",
+                http_status=400,
+            )
+        person_amount_by_id: Dict[int, Decimal] = {}
+        for pl in person_lines:
+            try:
+                pid = int(pl.get("person_id"))
+                amt = Decimal(str(pl.get("amount", 0) or 0))
+                if pid and amt > 0:
+                    person_amount_by_id[pid] = person_amount_by_id.get(pid, Decimal(0)) + amt
+            except Exception:
+                continue
+        logger.info(f"[UPDATE_RECEIPT_PAYMENT] person_amount_by_id: {person_amount_by_id}")
+        
+        # یافتن allocations قبلی این سند برای کم کردن از paid_amount در validation
+        old_settlements = (document.extra_info or {}).get("settlements") or []
+        logger.info(f"[UPDATE_RECEIPT_PAYMENT] old_settlements برای validation: {old_settlements}")
+        
+        allocated_by_person: Dict[int, Decimal] = {}
+        for st in settlements_input:
+            try:
+                st_person_id = int(st.get("person_id"))
+            except Exception:
+                raise ApiError("INSTALLMENT_PERSON_REQUIRED", "برای هر تخصیص قسط، person_id الزامی است", http_status=400)
+            if st_person_id not in person_amount_by_id:
+                raise ApiError("INSTALLMENT_PERSON_MISMATCH", "شخص تخصیص قسط باید در خطوط اشخاص سند وجود داشته باشد", http_status=400)
+            try:
+                invoice_id = int(st.get("invoice_id"))
+            except Exception:
+                raise ApiError("INSTALLMENT_INVOICE_INVALID", "شناسه فاکتور اقساط نامعتبر است", http_status=400)
+            invoice_doc = db.query(Document).filter(Document.id == invoice_id).first()
+            if not invoice_doc:
+                raise ApiError("INSTALLMENT_INVOICE_NOT_FOUND", "فاکتور اقساط پیدا نشد", http_status=404)
+            if int(invoice_doc.currency_id) != int(currency_id):
+                raise ApiError("INSTALLMENT_CURRENCY_MISMATCH", "ارز فاکتور اقساط با ارز سند دریافت یکسان نیست", http_status=400)
+            inv_extra = invoice_doc.extra_info or {}
+            plan = inv_extra.get("installment_plan")
+            schedule = (plan or {}).get("schedule")
+            if not (isinstance(plan, dict) and isinstance(schedule, list) and schedule):
+                raise ApiError("INSTALLMENT_PLAN_NOT_FOUND", "برای فاکتور انتخاب‌شده، طرح اقساط ثبت نشده است", http_status=404)
+            
+            # یافتن allocations قبلی این سند برای این فاکتور
+            old_allocations_by_seq_for_validation: Dict[int, Decimal] = {}
+            for old_st in old_settlements:
+                if int(old_st.get("invoice_id", 0)) == invoice_id:
+                    old_allocs = old_st.get("allocations") or []
+                    for old_al in old_allocs:
+                        old_seq = int(old_al.get("seq", 0))
+                        old_amt = Decimal(str(old_al.get("amount", 0) or 0))
+                        if old_seq > 0 and old_amt > 0:
+                            old_allocations_by_seq_for_validation[old_seq] = old_allocations_by_seq_for_validation.get(old_seq, Decimal(0)) + old_amt
+            logger.info(f"[UPDATE_RECEIPT_PAYMENT] old_allocations_by_seq_for_validation برای فاکتور {invoice_id}: {old_allocations_by_seq_for_validation}")
+            
+            remaining_by_seq: Dict[int, Decimal] = {}
+            for item in schedule:
+                try:
+                    seq_i = int(item.get("seq") or 0)
+                    total_i = Decimal(str(item.get("total", 0) or 0))
+                    paid_i = Decimal(str(item.get("paid_amount", 0) or 0))
+                    # کم کردن allocations قبلی این سند از paid_amount
+                    old_alloc_for_seq = old_allocations_by_seq_for_validation.get(seq_i, Decimal(0))
+                    paid_i_adjusted = max(paid_i - old_alloc_for_seq, Decimal(0))
+                    remaining_by_seq[seq_i] = max(total_i - paid_i_adjusted, Decimal(0))
+                    logger.info(f"[UPDATE_RECEIPT_PAYMENT] validation قسط {seq_i}: total={total_i}, paid_i={paid_i}, old_alloc={old_alloc_for_seq}, paid_i_adjusted={paid_i_adjusted}, remaining={remaining_by_seq[seq_i]}")
+                except Exception:
+                    continue
+            allocations = st.get("allocations") or []
+            if not isinstance(allocations, list) or not allocations:
+                raise ApiError("INSTALLMENT_ALLOCATIONS_REQUIRED", "لیست تخصیص اقساط خالی است", http_status=400)
+            for al in allocations:
+                try:
+                    seq = int(al.get("seq"))
+                    amt = Decimal(str(al.get("amount", 0) or 0))
+                except Exception:
+                    raise ApiError("INSTALLMENT_ALLOCATION_INVALID", "تخصیص قسط نامعتبر است", http_status=400)
+                if seq <= 0 or amt <= 0:
+                    raise ApiError("INSTALLMENT_ALLOCATION_INVALID", "تخصیص قسط نامعتبر است", http_status=400)
+                remain = remaining_by_seq.get(seq, None)
+                if remain is None:
+                    raise ApiError("INSTALLMENT_SEQ_NOT_FOUND", "شماره قسط در طرح اقساط یافت نشد", http_status=404)
+                logger.info(f"[UPDATE_RECEIPT_PAYMENT] validation قسط {seq}: alloc={amt}, remain={remain}")
+                if amt > remain:
+                    logger.error(f"[UPDATE_RECEIPT_PAYMENT] خطا در validation قسط {seq}: alloc={amt} > remain={remain}")
+                    raise ApiError("INSTALLMENT_OVERPAY_PER_SEQ", "مبلغ تخصیص از مانده همان قسط بیشتر است", http_status=400)
+                allocated_by_person[st_person_id] = allocated_by_person.get(st_person_id, Decimal(0)) + amt
+        for pid, alloc_sum in allocated_by_person.items():
+            if alloc_sum > person_amount_by_id.get(pid, Decimal(0)):
+                raise ApiError("INSTALLMENT_OVER_PERSON_LINES", "جمع تخصیص اقساط یک شخص از مجموع مبلغ خطوط همان شخص بیشتر است", http_status=400)
 
     # خطوط حساب‌ها + کارمزدها
     total_commission = Decimal(0)
@@ -1207,8 +1428,205 @@ def update_receipt_payment(
                     },
                 ))
 
+    # --- اعمال اقساط در ویرایش، مشابه ایجاد ---
+    settlements = (data.get("extra_info") or {}).get("settlements") or []
+    logger.info(f"[UPDATE_RECEIPT_PAYMENT] settlements جدید از data: {settlements}")
+    total_interest_to_recognize = Decimal(0)
+    updated_invoice_ids: List[int] = []
+    if is_receipt and isinstance(settlements, list) and settlements:
+        logger.info(f"[UPDATE_RECEIPT_PAYMENT] تعداد settlements: {len(settlements)}")
+        for st in settlements:
+            invoice_id = int(st.get("invoice_id"))
+            invoice_doc = db.query(Document).filter(Document.id == invoice_id).first()
+            if not invoice_doc:
+                raise ApiError("INSTALLMENT_INVOICE_NOT_FOUND", "فاکتور اقساط پیدا نشد", http_status=404)
+            inv_extra = invoice_doc.extra_info or {}
+            plan = inv_extra.get("installment_plan")
+            schedule = (plan or {}).get("schedule")
+            logger.info(f"[INSTALLMENT] فاکتور {invoice_id}: plan={plan}")
+            logger.info(f"[INSTALLMENT] فاکتور {invoice_id}: schedule={schedule}")
+            if not (isinstance(plan, dict) and isinstance(schedule, list) and schedule):
+                raise ApiError("INSTALLMENT_PLAN_NOT_FOUND", "طرح اقساط برای فاکتور یافت نشد", http_status=404)
+            allocations = st.get("allocations") or []
+            logger.info(f"[INSTALLMENT] شروع پردازش allocations برای فاکتور {invoice_id} (سند {document.id})")
+            
+            # یافتن allocations قبلی این سند برای کم کردن از paid_amount
+            old_settlements = (document.extra_info or {}).get("settlements") or []
+            old_allocations_by_seq: Dict[int, Decimal] = {}
+            logger.info(f"[INSTALLMENT] old_settlements برای فاکتور {invoice_id}: {old_settlements}")
+            for old_st in old_settlements:
+                if int(old_st.get("invoice_id", 0)) == invoice_id:
+                    old_allocs = old_st.get("allocations") or []
+                    logger.info(f"[INSTALLMENT] old_allocs برای فاکتور {invoice_id}: {old_allocs}")
+                    for old_al in old_allocs:
+                        old_seq = int(old_al.get("seq", 0))
+                        old_amt = Decimal(str(old_al.get("amount", 0) or 0))
+                        if old_seq > 0 and old_amt > 0:
+                            old_allocations_by_seq[old_seq] = old_allocations_by_seq.get(old_seq, Decimal(0)) + old_amt
+            logger.info(f"[INSTALLMENT] old_allocations_by_seq برای فاکتور {invoice_id}: {old_allocations_by_seq}")
+            
+            seq_to_amount: Dict[int, Decimal] = {}
+            logger.info(f"[INSTALLMENT] allocations جدید برای فاکتور {invoice_id}: {allocations}")
+            for al in allocations:
+                seq = int(al.get("seq"))
+                amt = Decimal(str(al.get("amount", 0) or 0))
+                if seq <= 0 or amt <= 0:
+                    raise ApiError("INSTALLMENT_ALLOCATION_INVALID", "تخصیص قسط نامعتبر است", http_status=400)
+                seq_to_amount[seq] = seq_to_amount.get(seq, Decimal(0)) + amt
+            logger.info(f"[INSTALLMENT] seq_to_amount برای فاکتور {invoice_id}: {seq_to_amount}")
+            
+            # بررسی اینکه آیا allocations جدید با allocations قبلی یکسان هستند
+            # باید هم seq ها و هم amount ها را بررسی کنیم
+            allocations_changed = False
+            old_seqs = set(old_allocations_by_seq.keys())
+            new_seqs = set(seq_to_amount.keys())
+            
+            # بررسی تغییرات در seq ها
+            if old_seqs != new_seqs:
+                allocations_changed = True
+                logger.info(f"[INSTALLMENT] seq های allocations تغییر کرده: old_seqs={old_seqs}, new_seqs={new_seqs}")
+            else:
+                # اگر seq ها یکسان باشند، amount ها را بررسی می‌کنیم
+                for seq in new_seqs:
+                    old_amt = old_allocations_by_seq.get(seq, Decimal(0))
+                    new_amt = seq_to_amount.get(seq, Decimal(0))
+                    diff = abs(new_amt - old_amt)
+                    logger.info(f"[INSTALLMENT] مقایسه قسط {seq}: old={old_amt}, new={new_amt}, diff={diff}")
+                    if diff > Decimal("0.01"):  # tolerance برای خطای ممیز شناور
+                        allocations_changed = True
+                        logger.info(f"[INSTALLMENT] قسط {seq} تغییر کرده: diff={diff} > 0.01")
+                        break
+            logger.info(f"[INSTALLMENT] allocations_changed برای فاکتور {invoice_id}: {allocations_changed}")
+            
+            remaining_by_seq: Dict[int, Decimal] = {}
+            logger.info(f"[INSTALLMENT] محاسبه remaining_by_seq برای فاکتور {invoice_id}")
+            for item in schedule:
+                seq_i = int(item.get("seq") or 0)
+                total_i = Decimal(str(item.get("total", 0) or 0))
+                paid_i = Decimal(str(item.get("paid_amount", 0) or 0))
+                # کم کردن allocations قبلی این سند از paid_amount
+                old_alloc_for_seq = old_allocations_by_seq.get(seq_i, Decimal(0))
+                paid_i_adjusted = max(paid_i - old_alloc_for_seq, Decimal(0))
+                remaining = max(total_i - paid_i_adjusted, Decimal(0))
+                remaining_by_seq[seq_i] = remaining
+                logger.info(f"[INSTALLMENT] قسط {seq_i}: total={total_i}, paid_i={paid_i}, old_alloc={old_alloc_for_seq}, paid_i_adjusted={paid_i_adjusted}, remaining={remaining}")
+            
+            # اعتبارسنجی فقط اگر allocations تغییر کرده باشند
+            if allocations_changed:
+                logger.info(f"[INSTALLMENT] اعتبارسنجی allocations برای فاکتور {invoice_id}")
+                for seq, alloc in seq_to_amount.items():
+                    remain = remaining_by_seq.get(seq)
+                    if remain is None:
+                        logger.error(f"[INSTALLMENT] قسط {seq} در schedule یافت نشد")
+                        raise ApiError("INSTALLMENT_SEQ_NOT_FOUND", "شماره قسط یافت نشد", http_status=404)
+                    logger.info(f"[INSTALLMENT] اعتبارسنجی قسط {seq}: alloc={alloc}, remain={remain}")
+                    if alloc > remain:
+                        logger.error(f"[INSTALLMENT] خطا در قسط {seq}: alloc={alloc} > remain={remain}")
+                        logger.error(f"[INSTALLMENT] جزئیات قسط {seq}: total={schedule[seq-1].get('total') if seq <= len(schedule) else 'N/A'}, paid_i={schedule[seq-1].get('paid_amount') if seq <= len(schedule) else 'N/A'}, old_alloc={old_allocations_by_seq.get(seq, 0)}")
+                        raise ApiError("INSTALLMENT_OVERPAY_PER_SEQ", "مبلغ تخصیص از مانده قسط بیشتر است", http_status=400)
+                logger.info(f"[INSTALLMENT] اعتبارسنجی موفق برای فاکتور {invoice_id}")
+            else:
+                # اگر allocations تغییر نکرده باشند، از اعمال مجدد صرف نظر می‌کنیم
+                logger.info(f"[INSTALLMENT] allocations برای فاکتور {invoice_id} تغییر نکرده است، از اعمال مجدد صرف نظر می‌کنیم")
+                continue
+            interest_delta_for_invoice = Decimal(0)
+            new_schedule: List[Dict[str, Any]] = []
+            logger.info(f"[INSTALLMENT] شروع اعمال allocations برای فاکتور {invoice_id}")
+            for item in schedule:
+                seq = int(item.get("seq") or 0)
+                paid_before_raw = Decimal(str(item.get("paid_amount", 0) or 0))
+                # کم کردن allocations قبلی این سند از paid_before (فقط در حالت ویرایش)
+                old_alloc_for_seq = old_allocations_by_seq.get(seq, Decimal(0))
+                paid_before = max(paid_before_raw - old_alloc_for_seq, Decimal(0))
+                interest_part = Decimal(str(item.get("interest", 0) or 0))
+                total_part = Decimal(str(item.get("total", 0) or 0))
+                alloc_amt = seq_to_amount.get(seq, Decimal(0))
+                paid_after = paid_before + alloc_amt
+                logger.info(f"[INSTALLMENT] قسط {seq}: paid_before_raw={paid_before_raw}, old_alloc={old_alloc_for_seq}, paid_before={paid_before}, alloc_amt={alloc_amt}, paid_after={paid_after}")
+                
+                # محاسبه interest_delta: فقط برای allocations جدید (نه allocations قبلی)
+                # اگر allocations قبلی وجود داشته باشد، interest_delta قبلی را rollback می‌کنیم
+                # interest_delta قبلی = interest_delta که با allocations قبلی ایجاد شده بود
+                # interest_delta جدید = interest_delta که با allocations جدید ایجاد می‌شود
+                # interest_delta کل = interest_delta جدید - interest_delta قبلی
+                prev_interest_recognized_with_old = min(paid_before_raw, interest_part)
+                prev_interest_recognized_without_old = min(paid_before, interest_part)
+                new_interest_recognized = min(paid_after, interest_part)
+                # interest_delta قبلی (که باید rollback شود)
+                old_interest_delta = prev_interest_recognized_with_old - prev_interest_recognized_without_old
+                # interest_delta جدید (با allocations جدید)
+                new_interest_delta = new_interest_recognized - prev_interest_recognized_without_old
+                # interest_delta کل = جدید - قبلی
+                delta = new_interest_delta - old_interest_delta
+                logger.info(f"[INSTALLMENT] قسط {seq} interest_delta: interest_part={interest_part}, prev_with_old={prev_interest_recognized_with_old}, prev_without_old={prev_interest_recognized_without_old}, new={new_interest_recognized}, old_delta={old_interest_delta}, new_delta={new_interest_delta}, delta={delta}")
+                if delta > 0:
+                    interest_delta_for_invoice += delta
+                elif delta < 0:
+                    # اگر allocations جدید کمتر از allocations قبلی باشد، interest_delta منفی می‌شود
+                    interest_delta_for_invoice += delta
+                # محاسبه status با tolerance برای خطای ممیز شناور
+                tolerance = Decimal("0.01")
+                if total_part > 0 and (paid_after >= total_part or (total_part - paid_after) <= tolerance):
+                    new_status = "paid"
+                elif paid_after > tolerance:
+                    new_status = "partial"
+                else:
+                    new_status = "pending"
+                logger.info(f"[INSTALLMENT] قسط {seq}: total={total_part}, status={new_status}")
+                new_item = dict(item)
+                new_item["paid_amount"] = float(paid_after)
+                new_item["status"] = new_status
+                new_schedule.append(new_item)
+            new_plan = dict(plan or {})
+            new_plan["schedule"] = new_schedule
+            inv_extra["installment_plan"] = new_plan
+            invoice_doc.extra_info = inv_extra
+            # flag کردن تغییرات در JSON field برای SQLAlchemy
+            flag_modified(invoice_doc, "extra_info")
+            updated_invoice_ids.append(invoice_doc.id)
+            total_interest_to_recognize += interest_delta_for_invoice
+        if total_interest_to_recognize > 0:
+            unearned = _get_fixed_account_by_code(db, "10405")
+            earned = _get_fixed_account_by_code(db, "60205")
+            db.add(DocumentLine(
+                document_id=document.id,
+                account_id=unearned.id,
+                debit=total_interest_to_recognize,
+                credit=Decimal(0),
+                description="انتقال سود اقساط از سود تحقق‌نیافته",
+                extra_info={"installment": True, "reclassification": True},
+            ))
+            db.add(DocumentLine(
+                document_id=document.id,
+                account_id=earned.id,
+                debit=Decimal(0),
+                credit=total_interest_to_recognize,
+                description="شناسایی سود فروش اقساطی",
+                extra_info={"installment": True, "reclassification": True},
+            ))
+
+    # flush کردن تغییرات قبل از commit برای اطمینان از ذخیره شدن
+    db.flush()
     db.commit()
     db.refresh(document)
+    # refresh کردن فاکتورهای اقساطی که به‌روزرسانی شدند
+    for invoice_id in updated_invoice_ids:
+        invoice_doc = db.query(Document).filter(Document.id == invoice_id).first()
+        if invoice_doc:
+            db.refresh(invoice_doc)
+            logger.info(f"فاکتور اقساطی refresh شد: id={invoice_id}")
+            # بررسی محتوای extra_info بعد از refresh
+            if invoice_doc.extra_info:
+                plan = invoice_doc.extra_info.get("installment_plan")
+                if plan:
+                    schedule = plan.get("schedule", [])
+                    logger.info(f"   تعداد اقساط در فاکتور: {len(schedule)}")
+                    for item in schedule:
+                        seq = item.get("seq")
+                        status = item.get("status")
+                        paid = item.get("paid_amount", 0)
+                        total = item.get("total", 0)
+                        logger.info(f"   قسط #{seq}: status={status}, paid={paid}, total={total}")
     return document_to_dict(db, document)
 def document_to_dict(db: Session, document: Document) -> Dict[str, Any]:
     """تبدیل سند به دیکشنری"""
@@ -1281,12 +1699,19 @@ def document_to_dict(db: Session, document: Document) -> Dict[str, Any]:
         
         # تشخیص اینکه آیا این خط مربوط به شخص است یا حساب
         # خطوط کارمزد را جداگانه تشخیص می‌دهیم
+        # خطوط اقساط (سود تحقق‌نیافته و سود فروش اقساطی) را از نمایش حذف می‌کنیم
         is_commission_line = line.extra_info and line.extra_info.get("is_commission_line", False)
+        is_installment_line = line.extra_info and (line.extra_info.get("installment", False) or line.extra_info.get("reclassification", False))
+        
+        # خطوط اقساط را از نمایش حذف می‌کنیم (فقط در پشت صحنه ثبت می‌شوند)
+        if is_installment_line:
+            continue  # این خط را نادیده بگیر و به لیست اضافه نکن
         
         if is_commission_line:
-            # خط کارمزد - همیشه در account_lines قرار می‌گیرد
+            # خط کارمزد - در account_lines قرار می‌گیرد
             account_lines.append(line_dict)
         elif line.extra_info and line.extra_info.get("person_id"):
+            # خط شخص
             person_lines.append(line_dict)
         else:
             account_lines.append(line_dict)

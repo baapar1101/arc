@@ -14,6 +14,7 @@ class InvoiceListItem {
   final String? description;
   final String? taxStatus;
   final bool isInstallmentSale;
+  final String? counterparty;
 
   const InvoiceListItem({
     required this.id,
@@ -29,6 +30,7 @@ class InvoiceListItem {
     this.description,
     this.taxStatus,
     required this.isInstallmentSale,
+    this.counterparty,
   });
 
   factory InvoiceListItem.fromJson(Map<String, dynamic> json) {
@@ -59,6 +61,7 @@ class InvoiceListItem {
       description: json['description']?.toString(),
       taxStatus: json['tax_status']?.toString(),
       isInstallmentSale: json['is_installment_sale'] == true,
+      counterparty: json['counterparty']?.toString(),
     );
   }
 }

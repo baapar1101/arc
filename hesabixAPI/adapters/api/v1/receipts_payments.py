@@ -24,6 +24,11 @@ from app.services.receipt_payment_service import (
     update_receipt_payment,
 )
 from adapters.db.models.business import Business
+from adapters.db.models.user import User
+from adapters.db.models.business_print_settings import BusinessPrintSettings
+from app.services.file_storage_service import FileStorageService
+from typing import Optional
+import base64
 from app.services.pdf.template_renderer import render_template
 
 
@@ -470,14 +475,80 @@ async def export_single_receipt_payment_pdf(
     if business_id and not auth_context.can_access_business(business_id):
         raise ApiError("FORBIDDEN", "Access denied", http_status=403)
     
-    # دریافت اطلاعات کسب‌وکار
+    # دریافت اطلاعات کسب‌وکار + فایل‌های گرافیکی (لوگو/مهر/امضا)
     business_name = ""
+    business_logo_data_uri: Optional[str] = None
+    business_stamp_data_uri: Optional[str] = None
+    owner_signature_data_uri: Optional[str] = None
+    storage = FileStorageService(db)
+
+    async def _load_image_data_uri(file_id_str: Optional[str]) -> Optional[str]:
+        if not file_id_str:
+            return None
+        try:
+            from uuid import UUID
+            try:
+                file_data = await storage.download_file(UUID(str(file_id_str)))
+            except Exception:
+                return None
+            content: bytes = file_data.get("content") or b""
+            if not content:
+                return None
+            mime = file_data.get("mime_type") or "image/png"
+            b64 = base64.b64encode(content).decode("ascii")
+            return f"data:{mime};base64,{b64}"
+        except Exception:
+            return None
+
     try:
         b = db.query(Business).filter(Business.id == business_id).first()
         if b is not None:
             business_name = b.name or ""
+            # تنظیمات چاپ (all یا بر اساس نوع سند receipt/payment)
+            try:
+                rows = (
+                    db.query(BusinessPrintSettings)
+                    .filter(BusinessPrintSettings.business_id == business_id)
+                    .all()
+                )
+            except Exception:
+                rows = []
+
+            def _pick_cfg() -> dict:
+                cfg = {"show_logo": True, "show_stamp": True, "footer_note": None}
+                per_type = None
+                for r in rows:
+                    if r.document_type == "all":
+                        cfg = {
+                            "show_logo": bool(getattr(r, "show_logo", True)),
+                            "show_stamp": bool(getattr(r, "show_stamp", True)),
+                            "footer_note": getattr(r, "footer_note", None),
+                        }
+                    elif r.document_type in ("receipt", "payment"):
+                        per_type = {
+                            "show_logo": bool(getattr(r, "show_logo", True)),
+                            "show_stamp": bool(getattr(r, "show_stamp", True)),
+                            "footer_note": getattr(r, "footer_note", None),
+                        }
+                if per_type:
+                    merged = dict(cfg)
+                    merged.update({k: v for k, v in per_type.items() if v is not None})
+                    return merged
+                return cfg
+
+            cfg = _pick_cfg()
+            if cfg.get("show_logo", True):
+                business_logo_data_uri = await _load_image_data_uri(getattr(b, "logo_file_id", None))
+            if cfg.get("show_stamp", True):
+                business_stamp_data_uri = await _load_image_data_uri(getattr(b, "stamp_file_id", None))
+                try:
+                    owner_user = db.query(User).filter(User.id == b.owner_id).first()
+                except Exception:
+                    owner_user = None
+                if owner_user is not None:
+                    owner_signature_data_uri = await _load_image_data_uri(getattr(owner_user, "signature_file_id", None))
     except Exception:
-        business_name = ""
+        business_name = business_name or ""
 
     # Locale handling
     locale = negotiate_locale(request.headers.get("Accept-Language"))
@@ -522,6 +593,9 @@ async def export_single_receipt_payment_pdf(
             "title_text": title_text,
             "generated_at": now,
             "is_fa": is_fa,
+            "business_logo_data_uri": business_logo_data_uri,
+            "business_stamp_data_uri": business_stamp_data_uri,
+            "owner_signature_data_uri": owner_signature_data_uri,
         }
         resolved_html = ReportTemplateService.try_render_resolved(
             db=db,
@@ -562,6 +636,9 @@ async def export_single_receipt_payment_pdf(
             "paper_size": paper_size,
             "orientation": orientation,
             "footer_text": footer_text,
+            "business_logo_data_uri": business_logo_data_uri,
+            "business_stamp_data_uri": business_stamp_data_uri,
+            "owner_signature_data_uri": owner_signature_data_uri,
         },
     )
 

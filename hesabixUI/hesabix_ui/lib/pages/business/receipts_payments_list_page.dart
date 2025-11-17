@@ -706,15 +706,20 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog> {
   final TextEditingController _descriptionController = TextEditingController();
   final List<_PersonLine> _personLines = <_PersonLine>[];
   final List<InvoiceTransaction> _centerTransactions = <InvoiceTransaction>[];
-  // اقساط
-  int? _installmentInvoiceId;
-  List<Map<String, dynamic>> _installmentSchedule = <Map<String, dynamic>>[];
-  final Map<int, double> _allocationsBySeq = <int, double>{};
-  Person? _installmentPerson;
+  // استراتژی پیش‌فرض انتخاب قسط جاری برای این کسب‌وکار
+  late String _defaultInstallmentSelectionStrategy; // 'first_remaining' | 'nearest_due' | 'prefer_partial'
 
   @override
   void initState() {
     super.initState();
+    // بارگذاری استراتژی پیش‌فرض از localStorage
+    try {
+      final key = 'installment_strategy_${widget.businessId}';
+      final v = html.window.localStorage[key];
+      _defaultInstallmentSelectionStrategy = (v == 'nearest_due' || v == 'prefer_partial') ? (v!) : 'first_remaining';
+    } catch (_) {
+      _defaultInstallmentSelectionStrategy = 'first_remaining';
+    }
     final initial = widget.initialDocument;
     if (initial != null) {
       // حالت ویرایش: پرکردن اولیه از سند
@@ -733,6 +738,54 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog> {
             description: pl.description,
           ),
         );
+      }
+      // لود کردن اطلاعات اقساط از extra_info.settlements
+      if (initial.extraInfo != null && initial.extraInfo!['settlements'] != null) {
+        final settlements = initial.extraInfo!['settlements'] as List<dynamic>?;
+        if (settlements != null && settlements.isNotEmpty) {
+          for (final st in settlements) {
+            final personId = st['person_id'] as int?;
+            final invoiceId = st['invoice_id'] as int?;
+            final allocations = st['allocations'] as List<dynamic>?;
+            if (personId != null && invoiceId != null && allocations != null && allocations.isNotEmpty) {
+              // پیدا کردن personLine مربوطه
+              final personLineIndex = _personLines.indexWhere((pl) => pl.personId == personId.toString());
+              if (personLineIndex >= 0) {
+                // تبدیل allocations به Map<int, double>
+                final allocMap = <int, double>{};
+                for (final al in allocations) {
+                  final seq = (al['seq'] as num?)?.toInt();
+                  final amount = (al['amount'] as num?)?.toDouble();
+                  if (seq != null && amount != null && amount > 0) {
+                    allocMap[seq] = amount;
+                  }
+                }
+                if (allocMap.isNotEmpty) {
+                  // پیدا کردن قسط جاری (اولین قسط با تخصیص)
+                  int? currentSeq;
+                  if (allocMap.isNotEmpty) {
+                    currentSeq = allocMap.keys.first;
+                  }
+                  // فعال کردن اقساط و تنظیم اطلاعات
+                  _personLines[personLineIndex] = _personLines[personLineIndex].copyWith(
+                    installmentsEnabled: true,
+                    installmentInvoiceId: invoiceId,
+                    installmentAllocations: allocMap,
+                    installmentCurrentSeq: currentSeq,
+                    installmentSelectionStrategy: _defaultInstallmentSelectionStrategy,
+                  );
+                  // لود کردن برنامه اقساط برای نمایش (بعد از initState)
+                  final lineToLoad = _personLines[personLineIndex];
+                  Future.microtask(() async {
+                    if (mounted) {
+                      await _loadInstallmentPlanForLine(lineToLoad);
+                    }
+                  });
+                }
+              }
+            }
+          }
+        }
       }
       // تبدیل خطوط حساب‌ها (حذف خطوط کارمزد)
       _centerTransactions.clear();
@@ -861,6 +914,10 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog> {
                           _personLines.clear();
                           _personLines.addAll(ls);
                         }),
+                        calendarController: widget.calendarController,
+                        apiClient: widget.apiClient,
+                        selectedCurrencyId: _selectedCurrencyId,
+                        isReceipt: _isReceipt,
                       ),
                     ),
                     const VerticalDivider(width: 1),
@@ -882,102 +939,7 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog> {
                   ],
                 ),
               ),
-              const Divider(height: 1),
-              // تخصیص به اقساط (اختیاری)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Row(
-                          children: [
-                            const Text('تخصیص به اقساط (اختیاری)'),
-                            const Spacer(),
-                            SizedBox(
-                              width: 260,
-                              child: PersonComboboxWidget(
-                                businessId: widget.businessId,
-                                selectedPerson: _installmentPerson,
-                                label: 'مشتری',
-                                hintText: 'انتخاب مشتری',
-                                onChanged: (p) => setState(() {
-                                  _installmentPerson = p;
-                                  // پاک‌سازی انتخاب فاکتور
-                                  _installmentInvoiceId = null;
-                                  _installmentSchedule = [];
-                                  _allocationsBySeq.clear();
-                                }),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            FilledButton(
-                              onPressed: _pickInvoiceForInstallments,
-                              child: Text(_installmentInvoiceId == null ? 'انتخاب فاکتور' : 'تغییر فاکتور'),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        if (_installmentSchedule.isNotEmpty)
-                          Column(
-                            children: [
-                              Row(
-                                children: const [
-                                  Expanded(child: Text('قسط')),
-                                  Expanded(child: Text('سررسید')),
-                                  Expanded(child: Text('باقیمانده')),
-                                  SizedBox(width: 120, child: Text('مبلغ تخصیص', textAlign: TextAlign.end)),
-                                ],
-                              ),
-                              const Divider(),
-                              ..._installmentSchedule.map((it) {
-                                final seq = (it['seq'] as num?)?.toInt() ?? 0;
-                                final due = (it['due_date'] as String?) ?? '-';
-                                final remaining = (it['remaining'] as num?)?.toDouble() ??
-                                    (((it['total'] as num?)?.toDouble() ?? 0) - ((it['paid_amount'] as num?)?.toDouble() ?? 0));
-                                final current = _allocationsBySeq[seq] ?? 0.0;
-                                return Padding(
-                                  padding: const EdgeInsets.symmetric(vertical: 6),
-                                  child: Row(
-                                    children: [
-                                      Expanded(child: Text('#$seq')),
-                                      Expanded(child: Text(due)),
-                                      Expanded(child: Text(remaining.toStringAsFixed(0))),
-                                      SizedBox(
-                                        width: 120,
-                                        child: TextFormField(
-                                          textAlign: TextAlign.end,
-                                          initialValue: current > 0 ? current.toStringAsFixed(0) : '',
-                                          decoration: const InputDecoration(
-                                            isDense: true,
-                                            border: OutlineInputBorder(),
-                                          ),
-                                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                          onChanged: (v) {
-                                            final val = double.tryParse(v.replaceAll(',', '')) ?? 0;
-                                            setState(() {
-                                              if (val <= 0) {
-                                                _allocationsBySeq.remove(seq);
-                                              } else {
-                                                _allocationsBySeq[seq] = val;
-                                              }
-                                            });
-                                          },
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              }).toList(),
-                            ],
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
+              // سکشن اقساط حذف شد؛ اقساط در هر ردیف شخص مدیریت می‌شود
               const Divider(height: 1),
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
@@ -1019,6 +981,20 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog> {
 
   Future<void> _onSave() async {
     if (!mounted) return;
+    
+    // بررسی اعتبارسنجی: اگر سویچ اقساط روشن است، باید فاکتور انتخاب شده باشد
+    for (final line in _personLines) {
+      if (line.installmentsEnabled == true && line.installmentInvoiceId == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('برای ${line.personName ?? 'شخص انتخاب شده'} سویچ اقساط روشن است اما فاکتوری انتخاب نشده است. لطفاً فاکتور را انتخاب کنید یا سویچ اقساط را خاموش کنید.'),
+            backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+        return;
+      }
+    }
     
     // نمایش loading
     showDialog(
@@ -1072,23 +1048,39 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog> {
         },
       }).toList();
       
-      // ساخت extra_info (تخصیص اقساط در صورت وجود)
+      // ساخت extra_info (تخصیص اقساط بر اساس ردیف‌های شخص)
       Map<String, dynamic>? extraInfo;
-      if (_installmentInvoiceId != null && _allocationsBySeq.isNotEmpty) {
-        final allocations = _allocationsBySeq.entries
+      final settlementsPayload = <Map<String, dynamic>>[];
+      for (final line in _personLines) {
+        if (!(line.installmentsEnabled == true)) continue;
+        if (line.installmentInvoiceId == null || (line.installmentAllocations?.isEmpty ?? true)) continue;
+        final pidStr = line.personId;
+        if (pidStr == null) continue;
+        // سقف جمع: مجموع تخصیص‌های همین ردیف ≤ مبلغ ردیف
+        final allocSum = line.installmentAllocations!.values.fold<double>(0, (p, e) => p + (e > 0 ? e : 0));
+        if (allocSum > (line.amount + 0.0001)) {
+          Navigator.pop(context);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('جمع تخصیص اقساط برای ${line.personName ?? ''} از مبلغ خط همان شخص بیشتر است'),
+              backgroundColor: Colors.red,
+            ),
+          );
+          return;
+        }
+        final allocations = line.installmentAllocations!.entries
             .where((e) => (e.value) > 0)
             .map((e) => {'seq': e.key, 'amount': e.value})
             .toList();
-        if (allocations.isNotEmpty) {
-          extraInfo = {
-            'settlements': [
-              {
-                'invoice_id': _installmentInvoiceId,
+        if (allocations.isEmpty) continue;
+        settlementsPayload.add({
+          'invoice_id': line.installmentInvoiceId,
+          'person_id': int.tryParse(pidStr),
                 'allocations': allocations,
+        });
               }
-            ],
-          };
-        }
+      if (settlementsPayload.isNotEmpty) {
+        extraInfo = {'settlements': settlementsPayload};
       }
       // اگر initialDocument وجود دارد، حالت ویرایش
       if (widget.initialDocument != null) {
@@ -1150,13 +1142,13 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog> {
     }
   }
 
-  Future<void> _loadInstallmentPlan() async {
-    if (_installmentInvoiceId == null) return;
+  Future<void> _loadInstallmentPlanForLine(_PersonLine line) async {
+    if (line.installmentInvoiceId == null) return;
     try {
       final svc = InvoiceService(apiClient: widget.apiClient);
       final data = await svc.getInstallmentPlan(
         businessId: widget.businessId,
-        invoiceId: _installmentInvoiceId!,
+        invoiceId: line.installmentInvoiceId!,
       );
       // بررسی هم‌ارزی ارز سند دریافت با ارز فاکتور اقساطی
       final planCurrencyId = (data['currency_id'] as num?)?.toInt();
@@ -1168,30 +1160,136 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog> {
             backgroundColor: Colors.orange,
           ),
         );
+        final idx = _personLines.indexOf(line);
+        if (idx >= 0) {
+          final updated = _personLines[idx].copyWith(
+            installmentSchedule: const <Map<String, dynamic>>[],
+            installmentAllocations: <int, double>{},
+            installmentCurrentSeq: null,
+        );
         setState(() {
-          _installmentSchedule = const <Map<String, dynamic>>[];
-          _allocationsBySeq.clear();
+            _personLines[idx] = updated;
         });
+        }
         return;
       }
       final plan = (data['plan'] as Map<String, dynamic>?) ?? const <String, dynamic>{};
       final schedule = (plan['schedule'] as List?)?.cast<Map<String, dynamic>>() ?? const <Map<String, dynamic>>[];
+      final invoiceCode = (data['invoice_code'] as String?) ?? '';
+      // اگر allocations موجود است (حالت ویرایش)، از آن استفاده کن، در غیر این صورت قسط جاری را انتخاب کن
+      final existingAllocations = line.installmentAllocations;
+      final strategy = line.installmentSelectionStrategy ?? 'first_remaining';
+      int? currentSeq;
+      double currentRemaining = 0;
+      if (strategy == 'nearest_due') {
+        DateTime? bestDue;
+        for (final it in schedule) {
+          final seq = (it['seq'] as num?)?.toInt() ?? 0;
+          final total = (it['total'] as num?)?.toDouble() ?? 0;
+          final paid = (it['paid_amount'] as num?)?.toDouble() ?? 0;
+          final remaining = (it['remaining'] as num?)?.toDouble() ?? (total - paid);
+          if (remaining <= 0) continue;
+          final dueStr = (it['due_date'] as String?) ?? '';
+          DateTime? due;
+          try { if (dueStr.isNotEmpty) due = DateTime.parse(dueStr); } catch (_) {}
+          if (due != null && (bestDue == null || due.isBefore(bestDue))) {
+            bestDue = due;
+            currentSeq = seq;
+            currentRemaining = remaining;
+          }
+        }
+      } else if (strategy == 'prefer_partial') {
+        for (final it in schedule) {
+          final seq = (it['seq'] as num?)?.toInt() ?? 0;
+          final total = (it['total'] as num?)?.toDouble() ?? 0;
+          final paid = (it['paid_amount'] as num?)?.toDouble() ?? 0;
+          final remaining = (it['remaining'] as num?)?.toDouble() ?? (total - paid);
+          if (paid > 0 && remaining > 0) { currentSeq = seq; currentRemaining = remaining; break; }
+        }
+        if (currentSeq == null) {
+          for (final it in schedule) {
+            final seq = (it['seq'] as num?)?.toInt() ?? 0;
+            final total = (it['total'] as num?)?.toDouble() ?? 0;
+            final paid = (it['paid_amount'] as num?)?.toDouble() ?? 0;
+            final remaining = (it['remaining'] as num?)?.toDouble() ?? (total - paid);
+            if (remaining > 0) { currentSeq = seq; currentRemaining = remaining; break; }
+          }
+        }
+      } else {
+        for (final it in schedule) {
+          final seq = (it['seq'] as num?)?.toInt() ?? 0;
+          final total = (it['total'] as num?)?.toDouble() ?? 0;
+          final paid = (it['paid_amount'] as num?)?.toDouble() ?? 0;
+          final remaining = (it['remaining'] as num?)?.toDouble() ?? (total - paid);
+          if (seq > 0 && remaining > 0) { currentSeq = seq; currentRemaining = remaining; break; }
+        }
+      }
+      final idx = _personLines.indexOf(line);
+      if (idx >= 0) {
+        // اگر allocations موجود است (حالت ویرایش)، از آن استفاده کن
+        final finalAllocs = existingAllocations?.isNotEmpty == true 
+            ? existingAllocations! 
+            : (currentSeq != null ? <int, double>{currentSeq: currentRemaining} : <int, double>{});
+        // اگر allocations موجود است، currentSeq را از آن بگیر
+        final finalCurrentSeq = existingAllocations?.isNotEmpty == true 
+            ? existingAllocations!.keys.first 
+            : currentSeq;
+        var newDesc = _personLines[idx].description;
+        if (finalCurrentSeq != null && invoiceCode.isNotEmpty) {
+          // توضیح خودکار: قسط N فاکتور CODE
+          newDesc = 'قسط ${finalCurrentSeq} فاکتور ${invoiceCode}'.trim();
+        }
+        final updated = _personLines[idx].copyWith(
+          installmentSchedule: schedule,
+          installmentAllocations: finalAllocs,
+          installmentCurrentSeq: finalCurrentSeq,
+          installmentInvoiceCode: invoiceCode.isNotEmpty ? invoiceCode : _personLines[idx].installmentInvoiceCode,
+          amount: existingAllocations?.isNotEmpty == true 
+              ? _personLines[idx].amount  // در حالت ویرایش، مبلغ را تغییر نده
+              : (currentSeq != null ? currentRemaining : _personLines[idx].amount),
+          description: newDesc,
+        );
       setState(() {
-        _installmentSchedule = schedule;
-        _allocationsBySeq.clear();
+          _personLines[idx] = updated;
       });
+      }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('خطا در دریافت اقساط: ${e.toString()}'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      String message = 'خطا در دریافت اقساط';
+      if (e is DioException) {
+        final status = e.response?.statusCode;
+        if (status == 404) {
+          message = 'برای این فاکتور طرح اقساط ثبت نشده است';
+          // پاک‌سازی انتخاب اقساط تا UI در حالت ناسازگار نماند
+          final idx = _personLines.indexOf(line);
+          if (idx >= 0) {
+            final updated = _personLines[idx].copyWith(
+              installmentSchedule: const <Map<String, dynamic>>[],
+              installmentAllocations: <int, double>{},
+              installmentCurrentSeq: null,
+            );
+          setState(() {
+              _personLines[idx] = updated;
+          });
+          }
+        } else {
+          // تلاش برای استخراج پیام سرور
+          final data = e.response?.data;
+          final serverMsg = (data is Map && data['error'] is Map && (data['error']['message'] is String))
+              ? (data['error']['message'] as String)
+              : null;
+          if (serverMsg != null && serverMsg.trim().isNotEmpty) {
+            message = serverMsg;
+          }
+        }
+      } else {
+        message = e.toString();
+      }
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
     }
   }
 
-  Future<void> _pickInvoiceForInstallments() async {
+  Future<void> _pickInvoiceForLine(_PersonLine line) async {
     final svc = InvoiceService(apiClient: widget.apiClient);
     final TextEditingController searchCtrl = TextEditingController();
     List<Map<String, dynamic>> results = <Map<String, dynamic>>[];
@@ -1204,9 +1302,8 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog> {
           (ctx as Element).markNeedsBuild();
           try {
             final bodyFilters = <String, dynamic>{};
-            if (_installmentPerson != null) {
-              bodyFilters['person_id'] = _installmentPerson!.id;
-            }
+            final pid = int.tryParse(line.personId ?? '');
+            if (pid != null) bodyFilters['person_id'] = pid;
             if (_selectedCurrencyId != null) {
               bodyFilters['currency_id'] = _selectedCurrencyId;
             }
@@ -1218,7 +1315,11 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog> {
               filters: bodyFilters.isEmpty ? null : bodyFilters,
             );
             final items = (data['items'] as List?)?.cast<Map<String, dynamic>>() ?? const <Map<String, dynamic>>[];
-            results = items;
+            // فقط فاکتورهای اقساطی را نمایش بده
+            results = items.where((it) {
+              final isInstallment = it['is_installment_sale'] == true;
+              return isInstallment;
+            }).toList();
           } catch (e) {
             results = <Map<String, dynamic>>[];
           } finally {
@@ -1251,8 +1352,8 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog> {
                       label: const Text('جستجو'),
                     ),
                     const SizedBox(width: 8),
-                    if (_installmentPerson != null)
-                      Chip(label: Text('مشتری: ${_installmentPerson!.displayName}')),
+                    if (line.personName != null)
+                      Chip(label: Text('مشتری: ${line.personName!}')),
                   ],
                 ),
                 const SizedBox(height: 12),
@@ -1264,13 +1365,48 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog> {
                     itemCount: results.length,
                     itemBuilder: (c, i) {
                       final it = results[i];
-                      return ListTile(
+                      final code = (it['code']?.toString() ?? '-');
+                      final desc = (it['description']?.toString() ?? '').trim();
+                      final person = (it['counterparty']?.toString() ?? '').trim();
+                      final docDate = (it['document_date']?.toString() ?? '').split('T').first;
+                      final total = (it['total_amount'] is num) ? (it['total_amount'] as num).toDouble() : null;
+                      final currency = (it['currency_code']?.toString() ?? '').trim();
+                      return Card(
+                        margin: const EdgeInsets.symmetric(vertical: 4),
+                        child: ListTile(
                         leading: const Icon(Icons.receipt_long),
-                        title: Text(it['code']?.toString() ?? '-'),
-                        subtitle: Text(it['description']?.toString() ?? ''),
+                          title: Row(
+                            children: [
+                              Text(code, style: const TextStyle(fontWeight: FontWeight.w600)),
+                              if (currency.isNotEmpty) ...[
+                                const SizedBox(width: 8),
+                                Chip(label: Text(currency), visualDensity: VisualDensity.compact),
+                              ],
+                            ],
+                          ),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                              const SizedBox(height: 4),
+                              Wrap(
+                                spacing: 12,
+                                runSpacing: 4,
+                              children: [
+                                  if (person.isNotEmpty) Text('طرف حساب: $person'),
+                                if (docDate.isNotEmpty) Text('تاریخ: $docDate'),
+                                  if (total != null) Text('مبلغ کل: ${formatWithThousands(total)}'),
+                              ],
+                            ),
+                              if (desc.isNotEmpty) ...[
+                                const SizedBox(height: 4),
+                                Text(desc, maxLines: 2, overflow: TextOverflow.ellipsis),
+                              ],
+                          ],
+                        ),
                         onTap: () {
                           Navigator.pop(ctx, it);
                         },
+                        ),
                       );
                     },
                   ),
@@ -1289,11 +1425,19 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog> {
     ).then((picked) async {
       if (picked is Map<String, dynamic>) {
         final id = picked['id'] as int?;
+        final code = (picked['code']?.toString() ?? '').trim();
         if (id != null) {
+          final idx = _personLines.indexOf(line);
+          if (idx >= 0) {
           setState(() {
-            _installmentInvoiceId = id;
+              _personLines[idx] = _personLines[idx].copyWith(
+                installmentInvoiceId: id,
+                installmentInvoiceCode: code.isNotEmpty ? code : _personLines[idx].installmentInvoiceCode,
+              );
           });
-          await _loadInstallmentPlan();
+            // استفاده از line به‌روز شده
+            await _loadInstallmentPlanForLine(_personLines[idx]);
+          }
         }
       }
     });
@@ -1304,10 +1448,18 @@ class _PersonsPanel extends StatefulWidget {
   final int businessId;
   final List<_PersonLine> lines;
   final ValueChanged<List<_PersonLine>> onChanged;
+  final CalendarController calendarController;
+  final ApiClient apiClient;
+  final int? selectedCurrencyId;
+  final bool isReceipt;
   const _PersonsPanel({
     required this.businessId,
     required this.lines,
     required this.onChanged,
+    required this.calendarController,
+    required this.apiClient,
+    required this.selectedCurrencyId,
+    required this.isReceipt,
   });
 
   @override
@@ -1359,6 +1511,10 @@ class _PersonsPanelState extends State<_PersonsPanel> {
                           newLines.removeAt(i);
                           widget.onChanged(newLines);
                         },
+                        apiClient: (context.findAncestorStateOfType<_BulkSettlementDialogState>())!.widget.apiClient,
+                        calendarController: (context.findAncestorStateOfType<_BulkSettlementDialogState>())!.widget.calendarController,
+                        selectedCurrencyId: (context.findAncestorStateOfType<_BulkSettlementDialogState>())!._selectedCurrencyId,
+                        isReceipt: widget.isReceipt,
                       );
                     },
                   ),
@@ -1374,11 +1530,19 @@ class _PersonLineTile extends StatefulWidget {
   final _PersonLine line;
   final ValueChanged<_PersonLine> onChanged;
   final VoidCallback onDelete;
+  final ApiClient apiClient;
+  final CalendarController calendarController;
+  final int? selectedCurrencyId;
+  final bool isReceipt;
   const _PersonLineTile({
     required this.businessId,
     required this.line,
     required this.onChanged,
     required this.onDelete,
+    required this.apiClient,
+    required this.calendarController,
+    required this.selectedCurrencyId,
+    required this.isReceipt,
   });
 
   @override
@@ -1388,12 +1552,30 @@ class _PersonLineTile extends StatefulWidget {
 class _PersonLineTileState extends State<_PersonLineTile> {
   final _amountController = TextEditingController();
   final _descController = TextEditingController();
+  bool _showInstallmentSchedule = false; // برای نمایش/مخفی کردن لیست اقساط
 
   @override
   void initState() {
     super.initState();
-    _amountController.text = widget.line.amount == 0 ? '' : widget.line.amount.toStringAsFixed(0);
+    _amountController.text = widget.line.amount == 0 ? '' : formatWithThousands(widget.line.amount);
     _descController.text = widget.line.description ?? '';
+    // اگر قسط جاری انتخاب شده باشد، لیست را مخفی کن
+    _showInstallmentSchedule = widget.line.installmentCurrentSeq == null;
+  }
+
+  @override
+  void didUpdateWidget(covariant _PersonLineTile oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.line.amount != widget.line.amount) {
+      _amountController.text = widget.line.amount == 0 ? '' : formatWithThousands(widget.line.amount);
+    }
+    if (oldWidget.line.description != widget.line.description) {
+      _descController.text = widget.line.description ?? '';
+    }
+    // اگر قسط جاری انتخاب شده باشد، لیست را مخفی کن
+    if (widget.line.installmentCurrentSeq != null && oldWidget.line.installmentCurrentSeq == null) {
+      _showInstallmentSchedule = false;
+    }
   }
 
   @override
@@ -1474,6 +1656,324 @@ class _PersonLineTileState extends State<_PersonLineTile> {
               ),
               onChanged: (v) => widget.onChanged(widget.line.copyWith(description: v.trim().isEmpty ? null : v.trim())),
             ),
+            // بخش اقساط فقط برای اسناد دریافت نمایش داده می‌شود
+            if (widget.isReceipt) ...[
+              const SizedBox(height: 8),
+              // سطر اول: سویچ اقساط و انتخاب فاکتور
+              Row(
+                children: [
+                  Switch(
+                    value: widget.line.installmentsEnabled,
+                    onChanged: (enabled) {
+                      final ancestor = context.findAncestorStateOfType<_BulkSettlementDialogState>();
+                      final defaultStrategy = ancestor?._defaultInstallmentSelectionStrategy ?? 'first_remaining';
+                      var updated = widget.line.copyWith(
+                        installmentsEnabled: enabled,
+                        installmentSelectionStrategy: enabled
+                            ? (widget.line.installmentSelectionStrategy ?? defaultStrategy)
+                            : widget.line.installmentSelectionStrategy,
+                      );
+                      if (!enabled) {
+                        updated = updated.copyWith(
+                          installmentInvoiceId: null,
+                          installmentSchedule: const <Map<String, dynamic>>[],
+                          installmentAllocations: <int, double>{},
+                          installmentCurrentSeq: null,
+                          installmentSelectionStrategy: null,
+                        );
+                      }
+                      widget.onChanged(updated);
+                    },
+                  ),
+                  const SizedBox(width: 8),
+                  const Text('اقساط'),
+                  const Spacer(),
+                if (widget.line.installmentsEnabled) ...[
+                  FilledButton(
+                    onPressed: (widget.line.personId == null)
+                        ? null
+                        : () async {
+                            await (context.findAncestorStateOfType<_BulkSettlementDialogState>())!
+                                ._pickInvoiceForLine(widget.line);
+                            setState(() {});
+                          },
+                    child: Text(widget.line.installmentInvoiceId == null ? 'انتخاب فاکتور' : 'تغییر فاکتور'),
+                  ),
+                  if (widget.line.installmentInvoiceCode != null && widget.line.installmentInvoiceCode!.isNotEmpty) ...[
+                    const SizedBox(width: 8),
+                    Chip(
+                      label: Text('فاکتور: ${widget.line.installmentInvoiceCode}'),
+                      avatar: const Icon(Icons.receipt_long, size: 18),
+                    ),
+                  ],
+                ],
+              ],
+            ),
+            // سطر دوم: استراتژی و دکمه اعمال
+            if (widget.line.installmentsEnabled) ...[
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  // استراتژی انتخاب قسط جاری
+                  Expanded(
+                    child: DropdownButtonFormField<String>(
+                      value: widget.line.installmentSelectionStrategy
+                          ?? (context.findAncestorStateOfType<_BulkSettlementDialogState>()?._defaultInstallmentSelectionStrategy ?? 'first_remaining'),
+                      decoration: const InputDecoration(
+                        isDense: true,
+                        labelText: 'روش انتخاب قسط جاری',
+                        border: OutlineInputBorder(),
+                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      ),
+                      isExpanded: true,
+                      items: const [
+                        DropdownMenuItem(value: 'first_remaining', child: Text('اولین قسط با مانده')),
+                        DropdownMenuItem(value: 'nearest_due', child: Text('نزدیک‌ترین سررسید با مانده')),
+                        DropdownMenuItem(value: 'prefer_partial', child: Text('اول قسط‌های نیمه‌پرداخت')),
+                      ],
+                      onChanged: (v) {
+                        widget.onChanged(widget.line.copyWith(installmentSelectionStrategy: v));
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Tooltip(
+                    message: 'تنظیم استراتژی پیش‌فرض اقساط برای این کسب‌وکار',
+                    child: IconButton(
+                      onPressed: () async {
+                        final ancestor = context.findAncestorStateOfType<_BulkSettlementDialogState>();
+                        if (ancestor == null) return;
+                        final current = ancestor._defaultInstallmentSelectionStrategy;
+                        String temp = current;
+                        await showDialog(
+                          context: context,
+                          builder: (ctx) {
+                            return AlertDialog(
+                              title: const Text('تنظیم استراتژی پیش‌فرض اقساط'),
+                              content: StatefulBuilder(
+                                builder: (ctx, setSt) {
+                                  return SizedBox(
+                                    width: 360,
+                                    child: DropdownButtonFormField<String>(
+                                      value: temp,
+                                      decoration: const InputDecoration(
+                                        isDense: true,
+                                        labelText: 'استراتژی پیش‌فرض',
+                                        border: OutlineInputBorder(),
+                                      ),
+                                      items: const [
+                                        DropdownMenuItem(value: 'first_remaining', child: Text('اولین قسط با مانده')),
+                                        DropdownMenuItem(value: 'nearest_due', child: Text('نزدیک‌ترین سررسید با مانده')),
+                                        DropdownMenuItem(value: 'prefer_partial', child: Text('اول قسط‌های نیمه‌پرداخت')),
+                                      ],
+                                      onChanged: (v) => setSt(() => temp = v ?? 'first_remaining'),
+                                    ),
+                                  );
+                                },
+                              ),
+                              actions: [
+                                TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('انصراف')),
+                                FilledButton(
+                                  onPressed: () {
+                                    try {
+                                      final key = 'installment_strategy_${ancestor.widget.businessId}';
+                                      html.window.localStorage[key] = temp;
+                                      ancestor.setState(() {
+                                        ancestor._defaultInstallmentSelectionStrategy = temp;
+                                      });
+                                    } catch (_) {}
+                                    Navigator.pop(ctx);
+                                  },
+                                  child: const Text('ذخیره'),
+                                ),
+                              ],
+                            );
+                          },
+                        );
+                      },
+                      icon: const Icon(Icons.settings_suggest_outlined),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  OutlinedButton(
+                    onPressed: (widget.line.installmentInvoiceId == null) ? null : () async {
+                      // اعمال مجدد استراتژی روی برنامه موجود
+                      final schedule = widget.line.installmentSchedule ?? const <Map<String, dynamic>>[];
+                      if (schedule.isEmpty) return;
+                      final strategy = widget.line.installmentSelectionStrategy ?? 'first_remaining';
+                      int? selSeq;
+                      double selRemain = 0;
+                      if (strategy == 'nearest_due') {
+                        DateTime? bestDue;
+                        for (final it in schedule) {
+                          final total = (it['total'] as num?)?.toDouble() ?? 0;
+                          final paid = (it['paid_amount'] as num?)?.toDouble() ?? 0;
+                          final remain = (it['remaining'] as num?)?.toDouble() ?? (total - paid);
+                          if (remain <= 0) continue;
+                          final dueStr = (it['due_date'] as String?) ?? '';
+                          DateTime? due;
+                          try { if (dueStr.isNotEmpty) due = DateTime.parse(dueStr); } catch (_) {}
+                          final seq = (it['seq'] as num?)?.toInt() ?? 0;
+                          if (due != null && (bestDue == null || due.isBefore(bestDue))) {
+                            bestDue = due;
+                            selSeq = seq;
+                            selRemain = remain;
+                          }
+                        }
+                      } else if (strategy == 'prefer_partial') {
+                        // ابتدا partial: paid>0 && remaining>0
+                        for (final it in schedule) {
+                          final total = (it['total'] as num?)?.toDouble() ?? 0;
+                          final paid = (it['paid_amount'] as num?)?.toDouble() ?? 0;
+                          final remain = (it['remaining'] as num?)?.toDouble() ?? (total - paid);
+                          final seq = (it['seq'] as num?)?.toInt() ?? 0;
+                          if (paid > 0 && remain > 0) {
+                            selSeq = seq; selRemain = remain; break;
+                          }
+                        }
+                        // اگر نبود، اولین با مانده
+                        if (selSeq == null) {
+                          for (final it in schedule) {
+                            final total = (it['total'] as num?)?.toDouble() ?? 0;
+                            final paid = (it['paid_amount'] as num?)?.toDouble() ?? 0;
+                            final remain = (it['remaining'] as num?)?.toDouble() ?? (total - paid);
+                            final seq = (it['seq'] as num?)?.toInt() ?? 0;
+                            if (remain > 0) { selSeq = seq; selRemain = remain; break; }
+                          }
+                        }
+                      } else {
+                        // first_remaining
+                        for (final it in schedule) {
+                          final total = (it['total'] as num?)?.toDouble() ?? 0;
+                          final paid = (it['paid_amount'] as num?)?.toDouble() ?? 0;
+                          final remain = (it['remaining'] as num?)?.toDouble() ?? (total - paid);
+                          final seq = (it['seq'] as num?)?.toInt() ?? 0;
+                          if (remain > 0) { selSeq = seq; selRemain = remain; break; }
+                        }
+                      }
+                      if (selSeq != null && selRemain > 0) {
+                        final newAllocs = <int, double>{selSeq: selRemain};
+                        final newDesc = 'قسط $selSeq فاکتور ${widget.line.installmentInvoiceCode ?? ''}'.trim();
+                        widget.onChanged(widget.line.copyWith(
+                          installmentAllocations: newAllocs,
+                          installmentCurrentSeq: selSeq,
+                          amount: selRemain,
+                          description: newDesc,
+                        ));
+                        setState(() {});
+                      }
+                    },
+                    child: const Text('اعمال استراتژی'),
+                  ),
+                ],
+              ),
+            ],
+            if (widget.line.installmentsEnabled && (widget.line.installmentSchedule?.isNotEmpty ?? false)) ...[
+              const SizedBox(height: 8),
+              // دکمه نمایش/مخفی کردن لیست اقساط
+              Row(
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: () {
+                      setState(() {
+                        _showInstallmentSchedule = !_showInstallmentSchedule;
+                      });
+                    },
+                    icon: Icon(_showInstallmentSchedule ? Icons.expand_less : Icons.expand_more),
+                    label: Text(_showInstallmentSchedule ? 'مخفی کردن لیست اقساط' : 'نمایش لیست اقساط'),
+                  ),
+                  if (widget.line.installmentCurrentSeq != null) ...[
+                    const SizedBox(width: 8),
+                    Chip(
+                      label: Text('قسط جاری: ${widget.line.installmentCurrentSeq}'),
+                      avatar: const Icon(Icons.check_circle, size: 18),
+                    ),
+                  ],
+                ],
+              ),
+              if (_showInstallmentSchedule) ...[
+                const SizedBox(height: 8),
+                Row(
+                  children: const [
+                    Expanded(child: Text('قسط')),
+                    Expanded(child: Text('سررسید')),
+                    Expanded(child: Text('باقیمانده')),
+                    SizedBox(width: 120, child: Text('مبلغ تخصیص', textAlign: TextAlign.end)),
+                  ],
+                ),
+                const Divider(),
+                ...(widget.line.installmentSchedule ?? const <Map<String, dynamic>>[]).map((it) {
+                  final seq = (it['seq'] as num?)?.toInt() ?? 0;
+                  final dueStr = (it['due_date'] as String?);
+                  DateTime? dueDate;
+                  String dueDisplay = '-';
+                  if (dueStr != null && dueStr.isNotEmpty && dueStr != '-') {
+                    try {
+                      dueDate = DateTime.parse(dueStr);
+                      dueDisplay = HesabixDateUtils.formatForDisplay(dueDate, widget.calendarController.isJalali);
+                    } catch (_) {
+                      dueDisplay = dueStr;
+                    }
+                  }
+                  final remaining = (it['remaining'] as num?)?.toDouble() ??
+                      (((it['total'] as num?)?.toDouble() ?? 0) - ((it['paid_amount'] as num?)?.toDouble() ?? 0));
+                  final current = widget.line.installmentAllocations?[seq] ?? 0.0;
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    child: Row(
+                      children: [
+                        Expanded(child: Text('#$seq')),
+                        Expanded(child: Text(dueDisplay)),
+                        Expanded(child: Text(formatWithThousands(remaining))),
+                        SizedBox(
+                          width: 120,
+                          child: TextFormField(
+                            textAlign: TextAlign.end,
+                            initialValue: current > 0 ? formatWithThousands(current) : '',
+                            decoration: const InputDecoration(
+                              isDense: true,
+                              border: OutlineInputBorder(),
+                            ),
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            onChanged: (v) {
+                              final val = double.tryParse(v.replaceAll(',', '')) ?? 0;
+                              final newMap = Map<int, double>.from(widget.line.installmentAllocations ?? <int, double>{});
+                              if (val <= 0) {
+                                newMap.remove(seq);
+                              } else {
+                                newMap[seq] = val;
+                              }
+                              widget.onChanged(widget.line.copyWith(installmentAllocations: newMap));
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        // دکمه انتخاب به عنوان قسط جاری: مبلغ و توضیح ردیف را خودکار تنظیم می‌کند
+                        FilledButton.tonal(
+                          onPressed: remaining <= 0
+                              ? null
+                              : () {
+                                  final newAllocs = <int, double>{seq: remaining};
+                                  final newDesc = 'قسط $seq فاکتور ${widget.line.installmentInvoiceCode ?? ''}'.trim();
+                                  widget.onChanged(widget.line.copyWith(
+                                    installmentAllocations: newAllocs,
+                                    installmentCurrentSeq: seq,
+                                    amount: remaining,
+                                    description: newDesc,
+                                  ));
+                                  setState(() {
+                                    _showInstallmentSchedule = false; // مخفی کردن لیست بعد از انتخاب
+                                  });
+                                },
+                          child: const Text('انتخاب به عنوان جاری'),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+              ],
+            ],
+            ],
           ],
         ),
       ),
@@ -1503,17 +2003,58 @@ class _PersonLine {
   final String? personName;
   final double amount;
   final String? description;
+  final bool installmentsEnabled;
+  final int? installmentInvoiceId;
+  final List<Map<String, dynamic>>? installmentSchedule;
+  final Map<int, double>? installmentAllocations;
+  final String? installmentInvoiceCode;
+  final int? installmentCurrentSeq;
+  final String? installmentSelectionStrategy; // 'first_remaining' | 'nearest_due' | 'prefer_partial'
 
-  const _PersonLine({this.personId, this.personName, required this.amount, this.description});
+  const _PersonLine({
+    this.personId,
+    this.personName,
+    required this.amount,
+    this.description,
+    this.installmentsEnabled = false,
+    this.installmentInvoiceId,
+    this.installmentSchedule,
+    this.installmentAllocations,
+    this.installmentInvoiceCode,
+    this.installmentCurrentSeq,
+    this.installmentSelectionStrategy,
+  });
 
-  factory _PersonLine.empty() => const _PersonLine(amount: 0);
+  factory _PersonLine.empty() => const _PersonLine(
+        amount: 0,
+        installmentsEnabled: false,
+      );
 
-  _PersonLine copyWith({String? personId, String? personName, double? amount, String? description}) {
+  _PersonLine copyWith({
+    String? personId,
+    String? personName,
+    double? amount,
+    String? description,
+    bool? installmentsEnabled,
+    int? installmentInvoiceId,
+    List<Map<String, dynamic>>? installmentSchedule,
+    Map<int, double>? installmentAllocations,
+    String? installmentInvoiceCode,
+    int? installmentCurrentSeq,
+    String? installmentSelectionStrategy,
+  }) {
     return _PersonLine(
       personId: personId ?? this.personId,
       personName: personName ?? this.personName,
       amount: amount ?? this.amount,
       description: description ?? this.description,
+      installmentsEnabled: installmentsEnabled ?? this.installmentsEnabled,
+      installmentInvoiceId: installmentInvoiceId ?? this.installmentInvoiceId,
+      installmentSchedule: installmentSchedule ?? this.installmentSchedule,
+      installmentAllocations: installmentAllocations ?? this.installmentAllocations,
+      installmentInvoiceCode: installmentInvoiceCode ?? this.installmentInvoiceCode,
+      installmentCurrentSeq: installmentCurrentSeq ?? this.installmentCurrentSeq,
+      installmentSelectionStrategy: installmentSelectionStrategy ?? this.installmentSelectionStrategy,
     );
   }
 }

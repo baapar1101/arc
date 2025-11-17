@@ -81,47 +81,46 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
         ),
         const SizedBox(height: 16),
         
-        // لیست تراکنش‌ها
-        if (widget.transactions.isEmpty)
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(32),
-              child: Column(
-                children: [
-                  Icon(
-                    Icons.receipt_long_outlined,
-                    size: 48,
-                    color: theme.colorScheme.outline,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'هیچ تراکنشی اضافه نشده است',
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      color: theme.colorScheme.outline,
+        // لیست تراکنش‌ها با اسکرول عمودی
+        Expanded(
+          child: widget.transactions.isEmpty
+              ? Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(32),
+                    child: Column(
+                      children: [
+                        Icon(
+                          Icons.receipt_long_outlined,
+                          size: 48,
+                          color: theme.colorScheme.outline,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'هیچ تراکنشی اضافه نشده است',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            color: theme.colorScheme.outline,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'برای افزودن تراکنش روی دکمه "افزودن تراکنش" کلیک کنید',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: theme.colorScheme.outline,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'برای افزودن تراکنش روی دکمه "افزودن تراکنش" کلیک کنید',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.outline,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          )
-        else
-          ListView.separated(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: widget.transactions.length,
-            separatorBuilder: (context, index) => const SizedBox(height: 12),
-            itemBuilder: (context, index) {
-              final transaction = widget.transactions[index];
-              return _buildTransactionCard(transaction, index);
-            },
-          ),
+                )
+              : ListView.separated(
+                  itemCount: widget.transactions.length,
+                  separatorBuilder: (context, index) => const SizedBox(height: 12),
+                  itemBuilder: (context, index) {
+                    final transaction = widget.transactions[index];
+                    return _buildTransactionCard(transaction, index);
+                  },
+                ),
+        ),
       ],
     );
   }
@@ -412,8 +411,12 @@ class _TransactionDialogState extends State<TransactionDialog> {
     super.initState();
     _selectedType = widget.transaction?.type ?? TransactionType.person;
     _transactionDate = widget.transaction?.transactionDate ?? DateTime.now();
-    _amountController.text = widget.transaction?.amount.toString() ?? '';
-    _commissionController.text = widget.transaction?.commission?.toString() ?? '';
+    _amountController.text = widget.transaction?.amount != null 
+        ? formatWithThousands(widget.transaction!.amount, decimalPlaces: 0)
+        : '';
+    _commissionController.text = widget.transaction?.commission != null
+        ? formatWithThousands(widget.transaction!.commission!, decimalPlaces: 0)
+        : '';
     _descriptionController.text = widget.transaction?.description ?? '';
     
     // تنظیم فیلدهای خاص
@@ -636,12 +639,14 @@ class _TransactionDialogState extends State<TransactionDialog> {
                               inputFormatters: [
                                 EnglishDigitsFormatter(),
                                 FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+                                ThousandsSeparatorInputFormatter(allowDecimal: false),
                               ],
                               validator: (value) {
                                 if (value == null || value.isEmpty) {
                                   return 'مبلغ الزامی است';
                                 }
-                                if (double.tryParse(value) == null) {
+                                final cleanValue = value.replaceAll(',', '');
+                                if (double.tryParse(cleanValue) == null) {
                                   return 'مبلغ باید عدد باشد';
                                 }
                                 return null;
@@ -661,6 +666,7 @@ class _TransactionDialogState extends State<TransactionDialog> {
                               inputFormatters: [
                                 EnglishDigitsFormatter(),
                                 FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+                                ThousandsSeparatorInputFormatter(allowDecimal: false),
                               ],
                             ),
                           ),
@@ -897,9 +903,9 @@ class _TransactionDialogState extends State<TransactionDialog> {
   void _saveTransaction() {
     if (!_formKey.currentState!.validate()) return;
     
-    final amount = double.parse(_amountController.text);
+    final amount = double.parse(_amountController.text.replaceAll(',', ''));
     final commission = _commissionController.text.isNotEmpty 
-        ? double.parse(_commissionController.text) 
+        ? double.parse(_commissionController.text.replaceAll(',', '')) 
         : null;
     // اعتبارسنجی هم‌خوانی ارز با ارز فاکتور برای انواع دارای ارز
     final invoiceCurrencyId = widget.selectedCurrencyId;

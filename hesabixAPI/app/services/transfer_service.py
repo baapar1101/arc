@@ -670,21 +670,41 @@ def transfer_document_to_dict(db: Session, document: Document) -> Dict[str, Any]
 
     # Compute total as sum of debits of non-commission lines (destination line amount)
     total_amount = sum(l.get("debit", 0) for l in account_lines if not l.get("is_commission_line"))
+    
+    # Compute commission from commission expense lines
+    commission = sum(l.get("debit", 0) for l in account_lines if l.get("is_commission_line") and l.get("side") == "commission")
 
     created_by = db.query(User).filter(User.id == document.created_by_user_id).first()
     created_by_name = f"{created_by.first_name} {created_by.last_name}".strip() if created_by else None
 
     currency = db.query(Currency).filter(Currency.id == document.currency_id).first()
     currency_code = currency.code if currency else None
+    
+    # Helper function to get type name in Persian
+    def _get_type_name(tp: str) -> str:
+        if tp == "bank":
+            return "حساب بانکی"
+        elif tp == "cash_register":
+            return "صندوق"
+        elif tp == "petty_cash":
+            return "تنخواه"
+        return tp or ""
+    
+    source_type_name = _get_type_name(source_type) if source_type else ""
+    destination_type_name = _get_type_name(destination_type) if destination_type else ""
 
+    # Convert dates to datetime for proper formatting
+    document_date_dt = datetime.combine(document.document_date, datetime.min.time()) if document.document_date else None
+    registered_at_dt = document.registered_at if document.registered_at else None
+    
     return {
         "id": document.id,
         "code": document.code,
         "business_id": document.business_id,
         "document_type": document.document_type,
         "document_type_name": "انتقال",
-        "document_date": document.document_date.isoformat(),
-        "registered_at": document.registered_at.isoformat(),
+        "document_date": document_date_dt,  # Keep as datetime for format_datetime_fields
+        "registered_at": registered_at_dt,  # Keep as datetime for format_datetime_fields
         "currency_id": document.currency_id,
         "currency_code": currency_code,
         "created_by_user_id": document.created_by_user_id,
@@ -692,17 +712,20 @@ def transfer_document_to_dict(db: Session, document: Document) -> Dict[str, Any]
         "is_proforma": document.is_proforma,
         "description": document.description,
         "source_type": source_type,
+        "source_type_name": source_type_name,
         "source_name": source_name,
         "destination_type": destination_type,
+        "destination_type_name": destination_type_name,
         "destination_name": destination_name,
+        "commission": float(commission),
         "extra_info": document.extra_info,
         "person_lines": [],
         "account_lines": account_lines,
         "total_amount": float(total_amount),
         "person_lines_count": 0,
         "account_lines_count": len(account_lines),
-        "created_at": document.created_at.isoformat(),
-        "updated_at": document.updated_at.isoformat(),
+        "created_at": document.created_at if hasattr(document, 'created_at') and document.created_at else None,
+        "updated_at": document.updated_at if hasattr(document, 'updated_at') and document.updated_at else None,
     }
 
 

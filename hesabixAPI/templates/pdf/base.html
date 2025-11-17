@@ -22,11 +22,17 @@
         @bottom-left {
           color: #666;
           font-size: 10px;
+          {% if is_fa %}font-family: 'YekanBakhFaNum', Vazirmatn, Tahoma, Arial, sans-serif;{% endif %}
+          {% if is_fa %}
+          content: "صفحه " counter(page) " از " counter(pages);
+          {% else %}
           content: "Page " counter(page) " / " counter(pages);
+          {% endif %}
         }
         @bottom-right {
           color: #666;
           font-size: 10px;
+          {% if is_fa %}font-family: 'YekanBakhFaNum', Vazirmatn, Tahoma, Arial, sans-serif;{% endif %}
           content: string(doc_footer);
         }
       }

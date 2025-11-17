@@ -56,11 +56,23 @@ class InvoiceService {
     String? search,
     Map<String, dynamic>? filters,
   }) async {
+    // Normalize filters: backend expects a list of {property, operator, value}
+    List<Map<String, dynamic>>? normalizedFilters;
+    if (filters != null && filters.isNotEmpty) {
+      normalizedFilters = filters.entries
+          .map((e) => <String, dynamic>{
+                'property': e.key,
+                'operator': '=',
+                'value': e.value,
+              })
+          .toList();
+    }
+
     final body = {
       'take': limit,
       'skip': (page - 1) * limit,
       if (search != null && search.isNotEmpty) 'search': search,
-      if (filters != null) 'filters': filters,
+      if (normalizedFilters != null) 'filters': normalizedFilters,
     };
     final res = await _api.post<Map<String, dynamic>>(
       '/api/v1/invoices/business/$businessId/search',
@@ -140,36 +152,6 @@ class InvoiceService {
     if (data is Uint8List) return data;
     if (data is List<int>) return Uint8List.fromList(data);
     throw Exception('Invalid CSV response');
-  }
-
-  /// چاپ چند فاکتور به صورت یک PDF واحد
-  Future<List<int>> printMultipleInvoices({
-    required int businessId,
-    required List<int> invoiceIds,
-  }) async {
-    if (invoiceIds.isEmpty) {
-      throw Exception('هیچ فاکتوری انتخاب نشده است');
-    }
-
-    final res = await _api.post<dynamic>(
-      '/api/v1/invoices/business/$businessId/print-multiple',
-      data: {'invoice_ids': invoiceIds},
-      options: Options(
-        responseType: ResponseType.bytes,
-        headers: {
-          'Accept': 'application/pdf',
-        },
-      ),
-    );
-
-    final data = res.data;
-    if (data is Uint8List) {
-      return data.toList();
-    } else if (data is List<int>) {
-      return data;
-    } else {
-      throw Exception('Invalid PDF response');
-    }
   }
 
 }

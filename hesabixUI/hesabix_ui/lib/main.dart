@@ -70,6 +70,7 @@ import 'theme/theme_controller.dart';
 import 'theme/app_theme.dart';
 import 'core/auth_store.dart';
 import 'core/permission_guard.dart';
+import 'core/keyboard_shortcut_listener.dart';
 import 'widgets/simple_splash_screen.dart';
 import 'widgets/url_tracker.dart';
 import 'pages/business/opening_balance_page.dart';
@@ -89,6 +90,9 @@ class MyApp extends StatefulWidget {
   @override
   State<MyApp> createState() => _MyAppState();
 }
+
+// Global navigator key for accessing Navigator from anywhere
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 class _MyAppState extends State<MyApp> {
   LocaleController? _controller;
@@ -305,6 +309,7 @@ class _MyAppState extends State<MyApp> {
     }();
 
     final router = GoRouter(
+      navigatorKey: navigatorKey,
       initialLocation: currentInitialLocation,
       redirect: (context, state) async {
         final currentPath = state.uri.path;
@@ -1259,6 +1264,12 @@ class _MyAppState extends State<MyApp> {
               GlobalCupertinoLocalizations.delegate,
               GlobalWidgetsLocalizations.delegate,
             ],
+            builder: (context, child) {
+              // KeyboardShortcutListener باید داخل MaterialApp باشد تا context معتبر داشته باشد
+              return KeyboardShortcutListener(
+                child: child ?? const SizedBox(),
+              );
+            },
           ),
         );
       },
