@@ -65,11 +65,11 @@ def subscribe_to_plan(
 			ends_at = starts_at + timedelta(days=plan.period_months * 30)
 			grace_period_ends_at = ends_at + timedelta(days=plan.grace_period_days)
 	
-	# ایجاد اشتراک
+	# ایجاد اشتراک (در وضعیت در انتظار پرداخت تا تسویه کامل شود)
 	subscription = BusinessStorageSubscription(
 		business_id=business_id,
 		plan_id=plan_id,
-		status="active",
+		status="pending",
 		starts_at=starts_at,
 		ends_at=ends_at,
 		auto_renew=auto_renew,

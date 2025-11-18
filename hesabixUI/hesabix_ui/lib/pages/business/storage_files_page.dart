@@ -123,21 +123,27 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
   
   Future<void> _subscribeToPlan(int planId) async {
     try {
-      await _storageService.subscribeToPlan(
+      final result = await _storageService.subscribeToPlan(
         businessId: widget.businessId,
         planId: planId,
       );
+      final invoice = (result['invoice'] as Map?)?.cast<String, dynamic>();
+      final payment = (result['payment'] as Map?)?.cast<String, dynamic>();
+      final invoiceStatus = invoice?['status']?.toString().toLowerCase();
+      final bool isPaid = invoiceStatus == 'paid';
       
       if (mounted) {
+        final message = isPaid
+            ? 'پلن با موفقیت خریداری و پرداخت شد.'
+            : 'اشتراک با موفقیت ایجاد شد. لطفاً صورتحساب را پرداخت کنید.';
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('اشتراک با موفقیت ایجاد شد. لطفاً صورتحساب را پرداخت کنید.'),
-            backgroundColor: Colors.green,
-          ),
+          SnackBar(content: Text(message), backgroundColor: Colors.green),
         );
         _load();
         _loadInvoices();
-        _tabController.animateTo(2); // رفتن به تب صورتحساب‌ها
+        if (!isPaid) {
+          _tabController.animateTo(2); // رفتن به تب صورتحساب‌ها برای مشاهده پرداخت دستی
+        }
       }
     } on DioException catch (e) {
       if (mounted) {
@@ -148,6 +154,8 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
             final error = data['error'] as Map;
             if (error['code'] == 'FREE_PLAN_ALREADY_ACTIVE') {
               errorMessage = error['message'] as String? ?? 'این پلن رایگان قبلاً فعال شده است';
+            } else if (error['code'] == 'INSUFFICIENT_WALLET_FUNDS') {
+              errorMessage = error['message'] as String? ?? 'موجودی کیف پول کافی نیست';
             } else if (error.containsKey('message')) {
               errorMessage = error['message'] as String;
             }

@@ -19,6 +19,7 @@ import 'package:hesabix_ui/widgets/data_table/data_table_widget.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
 import '../../core/calendar_controller.dart';
 import 'package:hesabix_ui/utils/number_normalizer.dart';
+import '../../core/date_utils.dart' show HesabixDateUtils;
 
 class WalletPage extends StatefulWidget {
   final int businessId;
@@ -59,6 +60,16 @@ class _WalletPageState extends State<WalletPage> {
         return l.walletTypeRefund;
       case 'fee':
         return l.walletTypeFee;
+      case 'storage_subscription':
+        return 'خرید اشتراک ذخیره‌سازی';
+      case 'storage_over_usage':
+        return 'پرداخت استفاده بیش از حد ذخیره‌سازی';
+      case 'storage_renewal':
+        return 'تمدید اشتراک ذخیره‌سازی';
+      case 'storage_payment':
+        return 'پرداخت ذخیره‌سازی';
+      case 'gift_credit':
+        return 'اعتبار هدیه';
       default:
         return l.unknown;
     }
@@ -556,8 +567,41 @@ class _WalletPageState extends State<WalletPage> {
                                 enableColumnSettings: true,
                                 columns: [
                               DateColumn('created_at', t.createdAt, filterType: ColumnFilterType.dateRange, formatter: (it) {
-                                    final v = (it['created_at'] ?? '').toString();
-                                    return v.split('T').first;
+                                    final v = it['created_at'];
+                                    if (v == null) return '';
+                                    
+                                    DateTime? date;
+                                    if (v is DateTime) {
+                                      date = v;
+                                    } else if (v is String) {
+                                      try {
+                                        // حذف T و بخش زمان اگر وجود دارد
+                                        final cleanDate = v.split('T').first;
+                                        date = DateTime.parse(cleanDate);
+                                      } catch (e) {
+                                        return v.toString();
+                                      }
+                                    } else if (v is Map<String, dynamic>) {
+                                      // اگر تاریخ فرمت‌شده از سرور آمد
+                                      if (v.containsKey('formatted')) {
+                                        // اگر تاریخ از قبل فرمت شده است، مستقیم بازگردان
+                                        return v['formatted'].toString();
+                                      } else if (v.containsKey('date_only')) {
+                                        try {
+                                          date = DateTime.parse(v['date_only'].toString());
+                                        } catch (e) {
+                                          return v['date_only'].toString();
+                                        }
+                                      } else {
+                                        return v.toString();
+                                      }
+                                    } else {
+                                      return v.toString();
+                                    }
+                                    
+                                    // استفاده از تقویم کاربر برای فرمت کردن
+                                    final isJalali = _calendarCtrl?.isJalali ?? false;
+                                    return HesabixDateUtils.formatForDisplay(date, isJalali);
                                   }),
                                   TextColumn('type', t.type, formatter: (it) => _typeLabel((it['type'] ?? '').toString())),
                                   TextColumn('status', t.status, formatter: (it) => _statusLabel((it['status'] ?? '').toString())),

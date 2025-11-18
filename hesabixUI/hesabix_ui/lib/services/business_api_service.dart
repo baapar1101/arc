@@ -187,4 +187,101 @@ class BusinessApiService {
       throw Exception(data?['message'] ?? 'خطا در ذخیره تنظیمات چاپ');
     }
   }
+
+  /// دریافت لیست تمام کسب و کارها (برای سوپر ادمین)
+  static Future<Map<String, dynamic>> getAllBusinessesAdmin({
+    int take = 10,
+    int skip = 0,
+    String? sortBy,
+    bool sortDesc = true,
+    String? search,
+    String? businessType,
+    String? businessField,
+    String? province,
+    String? city,
+  }) async {
+    final queryParams = <String, dynamic>{
+      'take': take,
+      'skip': skip,
+      'sort_desc': sortDesc,
+    };
+
+    if (sortBy != null && sortBy.isNotEmpty) {
+      queryParams['sort_by'] = sortBy;
+    }
+
+    if (search != null && search.isNotEmpty) {
+      queryParams['search'] = search;
+    }
+
+    if (businessType != null && businessType.isNotEmpty) {
+      queryParams['business_type'] = businessType;
+    }
+
+    if (businessField != null && businessField.isNotEmpty) {
+      queryParams['business_field'] = businessField;
+    }
+
+    if (province != null && province.isNotEmpty) {
+      queryParams['province'] = province;
+    }
+
+    if (city != null && city.isNotEmpty) {
+      queryParams['city'] = city;
+    }
+
+    final response = await _apiClient.post<Map<String, dynamic>>(
+      '/api/v1/admin/businesses/list',
+      data: queryParams,
+    );
+
+    final data = response.data;
+    if (data != null && data['success'] == true) {
+      return (data['data'] as Map).cast<String, dynamic>();
+    } else {
+      throw Exception(data?['message'] ?? 'خطا در دریافت لیست کسب و کارها');
+    }
+  }
+
+  // دریافت اطلاعات کیف‌پول کسب‌وکار (برای ادمین)
+  static Future<Map<String, dynamic>> getBusinessWalletAdmin(int businessId) async {
+    final response = await _apiClient.get(
+      '/api/v1/admin/businesses/$businessId/wallet',
+    );
+
+    if (response.data['success'] == true) {
+      return response.data['data'];
+    } else {
+      throw Exception(response.data['message'] ?? 'خطا در دریافت اطلاعات کیف‌پول');
+    }
+  }
+
+  // افزودن موجودی هدیه به کیف‌پول کسب‌وکار (برای ادمین)
+  static Future<Map<String, dynamic>> addGiftBalanceAdmin({
+    required int businessId,
+    required double amount,
+    String? description,
+    String? reason,
+  }) async {
+    final payload = <String, dynamic>{
+      'amount': amount,
+    };
+    if (description != null && description.isNotEmpty) {
+      payload['description'] = description;
+    }
+    if (reason != null && reason.isNotEmpty) {
+      payload['reason'] = reason;
+    }
+
+    final response = await _apiClient.post(
+      '/api/v1/admin/businesses/$businessId/wallet/add-gift',
+      data: payload,
+    );
+
+    if (response.data['success'] == true) {
+      return response.data['data'];
+    } else {
+      throw Exception(response.data['message'] ?? 'خطا در افزودن موجودی هدیه');
+    }
+  }
 }

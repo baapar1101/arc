@@ -6,10 +6,12 @@ from __future__ import annotations
 
 from typing import Dict, Any, Optional
 from datetime import datetime
+from decimal import Decimal
 
 from fastapi import APIRouter, Depends, Body, Query, Request, Response, UploadFile, File, Form, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
+from sqlalchemy import and_
 from uuid import UUID
 
 from adapters.db.session import get_db
@@ -33,6 +35,8 @@ from app.services.storage_invoice_service import (
 	list_storage_invoices,
 )
 from app.services.storage_export_service import export_business_files_as_zip, get_export_info
+from adapters.db.models.wallet import WalletAccount
+from adapters.db.models.storage_plan import StoragePlan
 import io
 
 
@@ -79,17 +83,69 @@ def subscribe_endpoint(
 		raise ApiError("VALIDATION_ERROR", "plan_id الزامی است", http_status=422)
 	
 	auto_renew = bool(payload.get("auto_renew", False))
+	user_id = ctx.get_user_id()
+
+	# بررسی پلن برای دریافت قیمت و وضعیت
+	plan = db.query(StoragePlan).filter(
+		and_(StoragePlan.id == plan_id, StoragePlan.is_active == True)
+	).first()
+	if not plan:
+		raise ApiError("PLAN_NOT_FOUND", "پلن یافت نشد یا غیرفعال است", http_status=404)
+
+	plan_price = Decimal(str(plan.price or 0))
+	if plan_price < 0:
+		plan_price = Decimal("0")
+
+	# بررسی موجودی کیف پول قبل از ایجاد اشتراک (برای پلن‌های پولی)
+	if plan_price > 0 and not plan.is_free:
+		account = (
+			db.query(WalletAccount)
+			.filter(WalletAccount.business_id == business_id)
+			.with_for_update()
+			.first()
+		)
+		available_balance = Decimal(str(account.available_balance or 0)) if account else Decimal("0")
+		if available_balance < plan_price:
+			raise ApiError(
+				"INSUFFICIENT_WALLET_FUNDS",
+				"موجودی کیف پول کافی نیست. لطفاً ابتدا کیف پول را شارژ کنید.",
+				http_status=400,
+			)
 	
 	# ایجاد اشتراک
 	subscription = subscribe_to_plan(db, business_id, plan_id, auto_renew)
 	
 	# ایجاد صورتحساب
-	invoice = create_subscription_invoice(db, business_id, subscription["id"], ctx.get_user_id())
+	invoice = create_subscription_invoice(db, business_id, subscription["id"], user_id)
+
+	payment_result: Optional[Dict[str, Any]] = None
+
+	# برای پلن‌های پولی، بلافاصله پرداخت را انجام می‌دهیم
+	if plan_price > 0 and not plan.is_free:
+		payment_result = pay_storage_invoice_from_wallet(db, business_id, invoice["id"], user_id)
+		if payment_result.get("status") == "insufficient_funds":
+			raise ApiError(
+				"INSUFFICIENT_WALLET_FUNDS",
+				"موجودی کیف پول کافی نیست. لطفاً ابتدا کیف پول را شارژ کنید.",
+				http_status=400,
+			)
 	
-	return success_response({
+	# تازه‌سازی داده‌های اشتراک و صورتحساب (وضعیت باید پس از پرداخت active/paid باشد)
+	subscription = get_subscription(db, business_id, subscription["id"])
+	invoice = get_storage_invoice(db, business_id, invoice["id"])
+
+	response_data: Dict[str, Any] = {
 		"subscription": subscription,
 		"invoice": invoice,
-	}, request, "اشتراک با موفقیت ایجاد شد. لطفاً صورتحساب را پرداخت کنید.")
+	}
+	if payment_result:
+		response_data["payment"] = payment_result
+	
+	return success_response(
+		response_data,
+		request,
+		"پلن با موفقیت خریداری و پرداخت شد." if plan_price > 0 and not plan.is_free else "اشتراک با موفقیت ایجاد شد.",
+	)
 
 
 @router.put(

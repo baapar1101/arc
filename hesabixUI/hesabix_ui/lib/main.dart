@@ -24,6 +24,7 @@ import 'pages/admin/user_management_page.dart';
 import 'pages/admin/system_logs_page.dart';
 import 'pages/admin/email_settings_page.dart';
 import 'pages/admin/announcements_admin_page.dart';
+import 'pages/admin/businesses_list_page.dart';
 import 'pages/business/business_shell.dart';
 import 'pages/business/dashboard/business_dashboard_page.dart';
 import 'pages/business/users_permissions_page.dart';
@@ -635,6 +636,20 @@ class _MyAppState extends State<MyApp> {
                       return PermissionGuard.buildAccessDeniedPage();
                     }
                     return const StoragePlansAdminPage();
+                  },
+                ),
+                GoRoute(
+                  path: 'businesses',
+                  name: 'system_settings_businesses',
+                  builder: (context, state) {
+                    if (_authStore == null) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    final allowed = _authStore!.isSuperAdmin;
+                    if (!allowed) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    return const BusinessesListPage();
                   },
                 ),
               ],

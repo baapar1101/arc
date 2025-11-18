@@ -483,6 +483,121 @@ def update_business_print_settings(
     return get_business_print_settings(db, business_id)
 
 
+def get_all_businesses_admin(db: Session, query_info: Dict[str, Any]) -> Dict[str, Any]:
+    """دریافت لیست همه کسب و کارها برای ادمین (فقط سوپر ادمین)"""
+    from adapters.db.models.user import User
+    from sqlalchemy import or_, func
+    
+    business_repo = BusinessRepository(db)
+    
+    # ساخت کوئری پایه
+    query = db.query(Business)
+    
+    # اعمال فیلتر جستجو
+    if query_info.get('search'):
+        search_term = query_info['search'].lower()
+        search_conditions = [
+            func.lower(Business.name).contains(search_term)
+        ]
+        
+        # اضافه کردن شرایط جستجو برای فیلدهای اختیاری (که ممکن است null باشند)
+        search_conditions.append(func.lower(Business.phone).contains(search_term))
+        search_conditions.append(func.lower(Business.mobile).contains(search_term))
+        search_conditions.append(func.lower(Business.national_id).contains(search_term))
+        search_conditions.append(func.lower(Business.economic_id).contains(search_term))
+        
+        query = query.filter(or_(*search_conditions))
+    
+    # فیلتر بر اساس نوع کسب و کار
+    if query_info.get('business_type'):
+        from adapters.db.models.business import BusinessType
+        try:
+            business_type = BusinessType(query_info['business_type'])
+            query = query.filter(Business.business_type == business_type)
+        except (ValueError, KeyError):
+            pass
+    
+    # فیلتر بر اساس زمینه فعالیت
+    if query_info.get('business_field'):
+        from adapters.db.models.business import BusinessField
+        try:
+            business_field = BusinessField(query_info['business_field'])
+            query = query.filter(Business.business_field == business_field)
+        except (ValueError, KeyError):
+            pass
+    
+    # فیلتر بر اساس استان
+    if query_info.get('province'):
+        query = query.filter(Business.province == query_info['province'])
+    
+    # فیلتر بر اساس شهر
+    if query_info.get('city'):
+        query = query.filter(Business.city == query_info['city'])
+    
+    # شمارش کل
+    total = query.count()
+    
+    # اعمال مرتب‌سازی
+    sort_by = query_info.get('sort_by', 'created_at')
+    sort_desc = query_info.get('sort_desc', True)
+    
+    if sort_by == 'name':
+        order_by = Business.name.desc() if sort_desc else Business.name.asc()
+    elif sort_by == 'business_type':
+        order_by = Business.business_type.desc() if sort_desc else Business.business_type.asc()
+    elif sort_by == 'owner_id':
+        order_by = Business.owner_id.desc() if sort_desc else Business.owner_id.asc()
+    else:  # created_at (پیش‌فرض)
+        order_by = Business.created_at.desc() if sort_desc else Business.created_at.asc()
+    
+    query = query.order_by(order_by)
+    
+    # اعمال صفحه‌بندی
+    skip = query_info.get('skip', 0)
+    take = query_info.get('take', 10)
+    businesses = query.offset(skip).limit(take).all()
+    
+    # محاسبه اطلاعات صفحه‌بندی
+    total_pages = (total + take - 1) // take if take > 0 else 1
+    current_page = (skip // take) + 1 if take > 0 else 1
+    
+    pagination = PaginationInfo(
+        total=total,
+        page=current_page,
+        per_page=take,
+        total_pages=total_pages,
+        has_next=current_page < total_pages,
+        has_prev=current_page > 1
+    )
+    
+    # تبدیل کسب و کارها به dictionary و افزودن اطلاعات مالک
+    items = []
+    for business in businesses:
+        business_dict = _business_to_dict(business)
+        
+        # افزودن اطلاعات مالک
+        owner = db.get(User, business.owner_id)
+        if owner:
+            business_dict['owner'] = {
+                'id': owner.id,
+                'email': owner.email,
+                'mobile': owner.mobile,
+                'first_name': owner.first_name,
+                'last_name': owner.last_name,
+                'full_name': f"{owner.first_name or ''} {owner.last_name or ''}".strip() or owner.email or owner.mobile
+            }
+        else:
+            business_dict['owner'] = None
+        
+        items.append(business_dict)
+    
+    return {
+        "items": items,
+        "pagination": pagination.dict(),
+        "query_info": query_info
+    }
+
+
 def _business_to_dict(business: Business) -> Dict[str, Any]:
     """تبدیل مدل کسب و کار به dictionary"""
     data = {

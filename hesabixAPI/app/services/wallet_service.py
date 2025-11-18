@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Optional, Dict, Any, List
 from decimal import Decimal
+import json
+import structlog
 
 from sqlalchemy.orm import Session
 from sqlalchemy import select, and_
@@ -16,6 +18,8 @@ from adapters.db.models.fiscal_year import FiscalYear
 from app.core.responses import ApiError
 from app.services.system_settings_service import get_wallet_settings
 from datetime import datetime, date
+
+logger = structlog.get_logger()
 
 
 def _ensure_wallet_account(db: Session, business_id: int) -> WalletAccount:
@@ -672,3 +676,204 @@ def _post_payout_document(db: Session, business_id: int, user_id: int, net_amoun
 		accounting_lines=lines,
 	)
 	return int(document.id)
+
+
+def _post_gift_credit_document(db: Session, business_id: int, user_id: int, amount: Decimal, description: str | None = None, doc_date: date | None = None) -> int:
+	"""
+	ایجاد سند حسابداری برای اعتبارات هدیه
+	Dr 10204 (wallet) = amount
+	Cr 60205 (gift credit income) = amount
+	"""
+	currency_id = _resolve_wallet_currency_id(db)
+	wallet_acc = _get_fixed_account_by_code(db, "10204")
+	gift_income_acc = _get_fixed_account_by_code(db, "60205")
+	
+	lines = [
+		{"account_id": wallet_acc.id, "debit": amount, "credit": 0, "description": "افزایش اعتبار هدیه"},
+		{"account_id": gift_income_acc.id, "debit": 0, "credit": amount, "description": description or "اعتبارات هدیه از مدیر سیستم"},
+	]
+	
+	document = _create_simple_document(
+		db=db,
+		business_id=business_id,
+		user_id=user_id,
+		document_type="receipt",
+		currency_id=currency_id,
+		document_date=doc_date or datetime.utcnow().date(),
+		description=description or "افزایش اعتبار هدیه توسط مدیر سیستم",
+		accounting_lines=lines,
+	)
+	return int(document.id)
+
+
+def add_gift_balance_admin(
+	db: Session,
+	business_id: int,
+	user_id: int,
+	amount: Decimal,
+	description: str | None = None,
+	reason: str | None = None,
+) -> Dict[str, Any]:
+	"""
+	افزودن موجودی هدیه به کیف‌پول کسب‌وکار توسط مدیر سیستم
+	
+	Args:
+		db: Database session
+		business_id: شناسه کسب‌وکار
+		user_id: شناسه کاربر مدیر سیستم
+		amount: مبلغ هدیه
+		description: توضیحات (اختیاری)
+		reason: دلیل (اختیاری)
+	
+	Returns:
+		اطلاعات کیف‌پول و تراکنش ایجاد شده
+	"""
+	logger.info(
+		"add_gift_balance_admin_start",
+		business_id=business_id,
+		user_id=user_id,
+		amount=float(amount),
+		description=description,
+		reason=reason
+	)
+	
+	# بررسی کسب‌وکار
+	business = db.query(Business).filter(Business.id == int(business_id)).first()
+	if not business:
+		logger.error("add_gift_balance_admin_business_not_found", business_id=business_id)
+		raise ApiError("BUSINESS_NOT_FOUND", "کسب‌وکار یافت نشد", http_status=404)
+	
+	logger.debug("add_gift_balance_admin_business_found", business_id=business_id, business_name=business.name)
+	
+	# اعتبارسنجی مبلغ
+	amount = Decimal(str(amount))
+	if amount <= 0:
+		logger.error("add_gift_balance_admin_invalid_amount", amount=float(amount))
+		raise ApiError("INVALID_AMOUNT", "مبلغ باید بزرگتر از صفر باشد", http_status=400)
+	
+	logger.debug("add_gift_balance_admin_amount_validated", amount=float(amount))
+	
+	# دریافت یا ایجاد حساب کیف‌پول
+	logger.debug("add_gift_balance_admin_getting_wallet_account", business_id=business_id)
+	account = _get_wallet_account_for_update(db, business_id)
+	old_balance = float(account.available_balance or 0)
+	logger.debug(
+		"add_gift_balance_admin_wallet_account_found",
+		account_id=account.id,
+		old_balance=old_balance,
+		old_pending=float(account.pending_balance or 0)
+	)
+	
+	# افزایش موجودی قابل استفاده
+	account.available_balance = Decimal(str(account.available_balance or 0)) + amount
+	new_balance = float(account.available_balance)
+	logger.debug(
+		"add_gift_balance_admin_balance_updated",
+		old_balance=old_balance,
+		new_balance=new_balance,
+		delta=float(amount)
+	)
+	
+	try:
+		db.flush()
+		logger.debug("add_gift_balance_admin_wallet_balance_flushed")
+	except Exception as e:
+		logger.error("add_gift_balance_admin_flush_error", error=str(e), error_type=type(e).__name__, exc_info=True)
+		raise
+	
+	# ثبت تراکنش
+	desc_text = description or "افزایش اعتبار هدیه توسط مدیر سیستم"
+	if reason:
+		desc_text = f"{desc_text} (دلیل: {reason})"
+	
+	# تبدیل extra_info به JSON string
+	extra_info_dict = {"added_by": user_id}
+	if reason:
+		extra_info_dict["reason"] = reason
+	extra_info_json = json.dumps(extra_info_dict) if extra_info_dict else None
+	
+	logger.debug(
+		"add_gift_balance_admin_creating_transaction",
+		description=desc_text,
+		extra_info=extra_info_json
+	)
+	
+	tx = WalletTransaction(
+		business_id=int(business_id),
+		type="gift_credit",
+		status="succeeded",
+		amount=amount,
+		fee_amount=Decimal("0"),
+		description=desc_text,
+		external_ref=None,
+		document_id=None,
+		extra_info=extra_info_json,
+	)
+	db.add(tx)
+	
+	try:
+		db.flush()
+		logger.info(
+			"add_gift_balance_admin_transaction_created",
+			transaction_id=tx.id,
+			business_id=business_id,
+			amount=float(amount)
+		)
+	except Exception as e:
+		logger.error("add_gift_balance_admin_transaction_flush_error", error=str(e), error_type=type(e).__name__, exc_info=True)
+		raise
+	
+	# ایجاد سند حسابداری
+	logger.debug("add_gift_balance_admin_creating_document", business_id=business_id)
+	try:
+		doc_id = _post_gift_credit_document(db, business_id, user_id, amount, desc_text)
+		tx.document_id = int(doc_id)
+		db.flush()
+		logger.info(
+			"add_gift_balance_admin_document_created",
+			document_id=doc_id,
+			transaction_id=tx.id
+		)
+	except Exception as e:
+		# اگر سند ایجاد نشد، تراکنش مالی معتبر است اما سند ندارد
+		logger.warning(
+			"add_gift_balance_admin_document_creation_failed",
+			error=str(e),
+			error_type=type(e).__name__,
+			business_id=business_id,
+			amount=float(amount),
+			transaction_id=tx.id,
+			exc_info=True
+		)
+	
+	# Commit تغییرات (اگر session خودمان commit می‌کند)
+	try:
+		# بررسی اینکه آیا session در حالت autocommit است
+		if db.is_active:
+			logger.debug("add_gift_balance_admin_session_is_active", in_transaction=db.in_transaction())
+		else:
+			logger.warning("add_gift_balance_admin_session_not_active")
+	except Exception:
+		pass
+	
+	# بازگشت اطلاعات
+	result = {
+		"transaction_id": tx.id,
+		"business_id": business_id,
+		"amount": float(amount),
+		"available_balance": float(account.available_balance),
+		"pending_balance": float(account.pending_balance or 0),
+		"status": account.status,
+		"document_id": tx.document_id,
+	}
+	
+	logger.info(
+		"add_gift_balance_admin_completed",
+		transaction_id=tx.id,
+		business_id=business_id,
+		amount=float(amount),
+		final_balance=result["available_balance"],
+		document_id=tx.document_id
+	)
+	
+	return result

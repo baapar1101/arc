@@ -64,11 +64,24 @@ def require_superadmin():
     """Decorator برای بررسی superadmin بودن"""
     def decorator(func: Callable) -> Callable:
         @wraps(func)
-        def wrapper(*args, **kwargs) -> Any:
-            ctx = get_current_user()
+        async def wrapper(*args, **kwargs) -> Any:
+            # پیدا کردن AuthContext در kwargs (از Depends(get_current_user))
+            ctx = None
+            for key, value in kwargs.items():
+                if isinstance(value, AuthContext):
+                    ctx = value
+                    break
+            
+            if not ctx:
+                raise ApiError("UNAUTHORIZED", "Authentication required", http_status=401)
+            
             if not ctx.is_superadmin():
                 raise ApiError("FORBIDDEN", "Superadmin access required", http_status=403)
-            return func(*args, **kwargs)
+            
+            result = func(*args, **kwargs)
+            if inspect.isawaitable(result):
+                result = await result
+            return result
         return wrapper
     return decorator
 

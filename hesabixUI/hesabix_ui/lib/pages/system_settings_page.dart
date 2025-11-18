@@ -93,6 +93,13 @@ class _SystemSettingsPageState extends State<SystemSettingsPage> {
         color: const Color(0xFF455A64),
         route: '/user/profile/system-settings/notification-templates',
       ),
+      SettingsItem(
+        title: 'مدیریت کسب و کارها',
+        description: 'مشاهده و مدیریت لیست همه کسب و کارهای سیستم',
+        icon: Icons.business_outlined,
+        color: const Color(0xFF1976D2),
+        route: '/user/profile/system-settings/businesses',
+      ),
     ];
   }
 
