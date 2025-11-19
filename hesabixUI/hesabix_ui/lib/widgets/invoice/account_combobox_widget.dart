@@ -59,7 +59,6 @@ class _AccountComboboxWidgetState extends State<AccountComboboxWidget> {
         _accounts = items;
       });
     } catch (e) {
-      print('خطا در لود کردن حساب‌ها: $e');
       setState(() {
         _accounts = [];
       });

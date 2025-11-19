@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'ping_pong_game.dart';
 import '../../services/ping_pong_service.dart';
 import '../../models/ping_pong_score_model.dart';
@@ -15,8 +14,8 @@ class PingPongDialog extends StatefulWidget {
 class _PingPongDialogState extends State<PingPongDialog> {
   int _currentScore = 0;
   int _survivalTime = 0;
-  int _heroModeUsesRemaining = 3;
-  bool _heroModeActive = false;
+  final int _heroModeUsesRemaining = 3;
+  final bool _heroModeActive = false;
   PingPongScore? _bestScore;
   List<LeaderboardEntry>? _leaderboard;
   bool _isLoading = true;
@@ -232,7 +231,7 @@ class _PingPongDialogState extends State<PingPongDialog> {
                             Container(
                               padding: const EdgeInsets.all(6),
                               decoration: BoxDecoration(
-                                color: theme.colorScheme.secondaryContainer.withOpacity(0.35),
+                                color: theme.colorScheme.secondaryContainer.withValues(alpha: 0.35),
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               child: Column(

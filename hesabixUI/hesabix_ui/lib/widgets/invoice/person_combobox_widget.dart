@@ -87,11 +87,6 @@ class _PersonComboboxWidgetState extends State<PersonComboboxWidget> {
 
     try {
       // Debug: نمایش پارامترهای جست‌وجو
-      print('PersonComboboxWidget - _performSearch:');
-      print('seq: $seq');
-      print('query: $query');
-      print('businessId: ${widget.businessId}');
-      print('personTypes: ${widget.personTypes}');
 
       final response = await _personService.getPersons(
         businessId: widget.businessId,
@@ -108,7 +103,6 @@ class _PersonComboboxWidgetState extends State<PersonComboboxWidget> {
       }
 
       final persons = _personService.parsePersonsList(response);
-      print('Search returned ${persons.length} persons');
 
       if (mounted) {
         setState(() {
@@ -127,7 +121,6 @@ class _PersonComboboxWidgetState extends State<PersonComboboxWidget> {
       if (seq != _searchSeq || query != _latestQuery) {
         return;
       }
-      print('Error in _performSearch: $e');
       if (mounted) {
         setState(() {
           _persons = [];

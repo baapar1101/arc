@@ -18,6 +18,7 @@ from adapters.db.models.bank_account import BankAccount
 from adapters.db.models.cash_register import CashRegister
 from adapters.db.models.petty_cash import PettyCash
 from app.core.responses import ApiError
+from app.services.document_monetization_service import ensure_document_policy_allows_creation
 import jdatetime
 
 
@@ -197,6 +198,14 @@ def create_transfer(
         def _type_name(tp: str) -> str:
             return "حساب بانکی" if tp == "bank" else ("صندوق" if tp == "cash_register" else "تنخواه")
         auto_description = f"انتقال از {_type_name(src_type)} {src_name} به {_type_name(dst_type)} {dst_name}"
+
+    ensure_document_policy_allows_creation(
+        db,
+        business_id,
+        document_type=DOCUMENT_TYPE_TRANSFER,
+        document_date=document_date,
+        amount=amount,
+    )
 
     document = Document(
         business_id=business_id,

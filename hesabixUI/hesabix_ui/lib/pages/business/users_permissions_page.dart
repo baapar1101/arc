@@ -87,6 +87,8 @@ class _UsersPermissionsPageState extends State<UsersPermissionsPage> {
       return;
     }
 
+    if (!context.mounted) return;
+    final ctx = context;
     try {
       final request = AddUserRequest(
         businessId: int.parse(widget.businessId),
@@ -103,7 +105,8 @@ class _UsersPermissionsPageState extends State<UsersPermissionsPage> {
         _showErrorSnackBar(response.message);
       }
     } catch (e) {
-      _showErrorSnackBar('${AppLocalizations.of(context).userAddFailed}: $e');
+      if (!ctx.mounted) return;
+      _showErrorSnackBar('${AppLocalizations.of(ctx).userAddFailed}: $e');
     }
   }
 

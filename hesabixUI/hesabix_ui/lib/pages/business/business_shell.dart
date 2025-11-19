@@ -26,6 +26,7 @@ import '../../services/announcements_service.dart';
 import '../../services/notifications_ws_client.dart';
 import '../../widgets/transfer/transfer_form_dialog.dart';
 import '../../widgets/expense_income/expense_income_form_dialog.dart';
+import 'check_form_page.dart';
 
 class BusinessShell extends StatefulWidget {
   final int businessId;
@@ -89,9 +90,12 @@ class _BusinessShellState extends State<BusinessShell> {
   }
 
     Future<void> showAddReceiptPaymentDialog() async {
+      if (!context.mounted) return;
+      final ctx = context;
       final calendarController = widget.calendarController ?? await CalendarController.load();
+      if (!ctx.mounted) return;
       final result = await showDialog<bool>(
-        context: context,
+        context: ctx,
         builder: (context) => BulkSettlementDialog(
           businessId: widget.businessId,
           calendarController: calendarController,
@@ -107,9 +111,12 @@ class _BusinessShellState extends State<BusinessShell> {
     }
 
     Future<void> showAddTransferDialog() async {
+      if (!context.mounted) return;
+      final ctx = context;
       final calendarController = widget.calendarController ?? await CalendarController.load();
+      if (!ctx.mounted) return;
       final result = await showDialog<bool>(
-        context: context,
+        context: ctx,
         builder: (context) => TransferFormDialog(
           businessId: widget.businessId,
           calendarController: calendarController,
@@ -123,15 +130,39 @@ class _BusinessShellState extends State<BusinessShell> {
     }
 
     Future<void> showAddExpenseIncomeDialog() async {
+      if (!context.mounted) return;
+      final ctx = context;
       final calendarController = widget.calendarController ?? await CalendarController.load();
+      if (!ctx.mounted) return;
       final result = await showDialog<bool>(
-        context: context,
+        context: ctx,
         builder: (context) => ExpenseIncomeFormDialog(
           businessId: widget.businessId,
           calendarController: calendarController,
           isIncome: false, // پیش‌فرض هزینه؛ قابل تغییر داخل دیالوگ
           businessInfo: widget.authStore.currentBusiness,
           apiClient: ApiClient(),
+        ),
+      );
+      if (result == true) {
+        _refreshCurrentPage();
+      }
+    }
+
+    Future<void> showAddCheckDialog() async {
+      if (!context.mounted) return;
+      final ctx = context;
+      final calendarController = widget.calendarController ?? await CalendarController.load();
+      if (!ctx.mounted) return;
+      final result = await showDialog<bool>(
+        context: ctx,
+        builder: (context) => CheckFormDialog(
+          businessId: widget.businessId,
+          authStore: widget.authStore,
+          calendarController: calendarController,
+          onSuccess: () {
+            _refreshCurrentPage();
+          },
         ),
       );
       if (result == true) {
@@ -161,8 +192,10 @@ class _BusinessShellState extends State<BusinessShell> {
           gatewayId = int.tryParse('${gateways.first['id']}');
         }
       } catch (_) {}
+      if (!context.mounted) return;
+      final ctx = context;
       final confirmed = await showDialog<bool>(
-        context: context,
+        context: ctx,
         builder: (ctx) => AlertDialog(
           title: const Text('افزایش اعتبار'),
           content: Form(
@@ -188,7 +221,7 @@ class _BusinessShellState extends State<BusinessShell> {
                 const SizedBox(height: 8),
                 if (gateways.isNotEmpty)
                   DropdownButtonFormField<int>(
-                    value: gatewayId,
+                    initialValue: gatewayId,
                     decoration: const InputDecoration(labelText: 'درگاه پرداخت'),
                     items: gateways
                         .map((g) => DropdownMenuItem<int>(
@@ -248,30 +281,16 @@ class _BusinessShellState extends State<BusinessShell> {
     }
 
   Future<void> _loadBusinessInfo() async {
-    print('=== _loadBusinessInfo START ===');
-    print('Current business ID: ${widget.businessId}');
-    print('AuthStore current business ID: ${widget.authStore.currentBusiness?.id}');
     
     if (widget.authStore.currentBusiness?.id == widget.businessId) {
-      print('Business info already loaded, skipping...');
       return; // اطلاعات قبلاً بارگذاری شده
     }
 
     try {
-      print('Loading business info for business ID: ${widget.businessId}');
       final businessData = await _businessService.getBusinessWithPermissions(widget.businessId);
-      print('Business data loaded successfully:');
-      print('  - Name: ${businessData.name}');
-      print('  - ID: ${businessData.id}');
-      print('  - Is Owner: ${businessData.isOwner}');
-      print('  - Role: ${businessData.role}');
-      print('  - Permissions: ${businessData.permissions}');
       
       await widget.authStore.setCurrentBusiness(businessData);
-      print('Business info set in authStore');
-      print('AuthStore business permissions: ${widget.authStore.businessPermissions}');
     } catch (e) {
-      print('Error loading business info: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -281,7 +300,6 @@ class _BusinessShellState extends State<BusinessShell> {
         );
       }
     }
-    print('=== _loadBusinessInfo END ===');
   }
 
   @override
@@ -617,36 +635,42 @@ class _BusinessShellState extends State<BusinessShell> {
       
           if (item.type == _MenuItemType.simple && item.path != null) {
         try {
-          if (GoRouterState.of(context).uri.toString() != item.path!) {
+          if (!context.mounted) return;
+          final ctx = context;
+          if (GoRouterState.of(ctx).uri.toString() != item.path!) {
             if (item.label == t.categories) {
               // باز کردن دیالوگ دسته‌بندی‌ها به جای ناوبری
               if (widget.authStore.canReadSection('categories')) {
+                if (!ctx.mounted) return;
                 await showDialog<bool>(
-                  context: context,
-                  builder: (ctx) => CategoryTreeDialog(
+                  context: ctx,
+                  builder: (dialogCtx) => CategoryTreeDialog(
                     businessId: widget.businessId,
                     authStore: widget.authStore,
                   ),
                 );
               }
             } else {
-              context.go(item.path!);
+              ctx.go(item.path!);
             }
           }
         } catch (e) {
           // اگر GoRouterState در دسترس نیست، مستقیماً به مسیر برود
+          if (!context.mounted) return;
+          final ctx = context;
             if (item.label == t.categories) {
               if (widget.authStore.canReadSection('categories')) {
+                if (!ctx.mounted) return;
                 await showDialog<bool>(
-                  context: context,
-                  builder: (ctx) => CategoryTreeDialog(
+                  context: ctx,
+                  builder: (dialogCtx) => CategoryTreeDialog(
                     businessId: widget.businessId,
                     authStore: widget.authStore,
                   ),
                 );
               }
             } else {
-              context.go(item.path!);
+              ctx.go(item.path!);
             }
         }
       } else if (item.type == _MenuItemType.expandable) {
@@ -781,9 +805,12 @@ class _BusinessShellState extends State<BusinessShell> {
     }
 
     Future<void> showAddDocumentDialog() async {
+      if (!context.mounted) return;
+      final ctx = context;
       final calendarController = widget.calendarController ?? await CalendarController.load();
+      if (!ctx.mounted) return;
       final result = await showDialog<bool>(
-        context: context,
+        context: ctx,
         barrierDismissible: false,
         builder: (context) => DocumentFormDialog(
           businessId: widget.businessId,
@@ -1189,8 +1216,8 @@ class _BusinessShellState extends State<BusinessShell> {
                                         // Show add transfer dialog
                                         showAddTransferDialog();
                                           } else if (item.label == t.checks) {
-                                            // Navigate to add check
-                                            context.go('/business/${widget.businessId}/checks/new');
+                                            // Show add check dialog
+                                            showAddCheckDialog();
                                           } else if (item.label == t.documents) {
                                             // Show add document dialog
                                             showAddDocumentDialog();
@@ -1300,8 +1327,8 @@ class _BusinessShellState extends State<BusinessShell> {
                                   // Show add transfer dialog
                                   showAddTransferDialog();
                                 } else if (item.label == t.checks) {
-                                  // Navigate to add check
-                                  context.go('/business/${widget.businessId}/checks/new');
+                                  // Show add check dialog
+                                  showAddCheckDialog();
                                 } else if (item.label == t.documents) {
                                   // Show add document dialog
                                   showAddDocumentDialog();
@@ -1426,63 +1453,44 @@ class _BusinessShellState extends State<BusinessShell> {
 
   // فیلتر کردن منو بر اساس دسترسی‌ها
   List<_MenuItem> _getFilteredMenuItems(List<_MenuItem> allItems) {
-    print('=== _getFilteredMenuItems START ===');
-    print('Total menu items: ${allItems.length}');
-    print('Current business: ${widget.authStore.currentBusiness?.name} (ID: ${widget.authStore.currentBusiness?.id})');
-    print('Is owner: ${widget.authStore.currentBusiness?.isOwner}');
-    print('Business permissions: ${widget.authStore.businessPermissions}');
     
     final filteredItems = allItems.where((item) {
       if (item.type == _MenuItemType.separator) {
-        print('Separator item: ${item.label} - KEEPING');
         return true;
       }
       
       if (item.type == _MenuItemType.simple) {
         final hasAccess = _hasAccessToMenuItem(item);
-        print('Simple item: ${item.label} - ${hasAccess ? 'KEEPING' : 'REMOVING'}');
         return hasAccess;
       }
       
       if (item.type == _MenuItemType.expandable) {
         final hasAccess = _hasAccessToExpandableMenuItem(item);
-        print('Expandable item: ${item.label} - ${hasAccess ? 'KEEPING' : 'REMOVING'}');
         return hasAccess;
       }
       
-      print('Unknown item type: ${item.label} - REMOVING');
       return false;
     }).toList();
-    
-    print('Filtered menu items: ${filteredItems.length}');
-    for (final item in filteredItems) {
-      print('  - ${item.label} (${item.type})');
-    }
-    print('=== _getFilteredMenuItems END ===');
     
     return filteredItems;
   }
 
   bool _hasAccessToMenuItem(_MenuItem item) {
     final section = _sectionForLabel(item.label, AppLocalizations.of(context));
-    print('  Checking access for: ${item.label} -> section: $section');
     
     // داشبورد همیشه قابل مشاهده است
     if (item.path != null && item.path!.endsWith('/dashboard')) {
-      print('    Dashboard item - ALWAYS ACCESSIBLE');
       return true;
     }
     
     // اگر سکشن تعریف نشده، نمایش داده نشود
     if (section == null) {
-      print('    No section mapping found - DENIED');
       return false;
     }
     
     // بررسی دسترسی‌های مختلف برای نمایش منو
     // اگر کاربر مالک است، همه منوها قابل مشاهده هستند
     if (widget.authStore.currentBusiness?.isOwner == true) {
-      print('    User is owner - GRANTED');
       return true;
     }
     
@@ -1490,38 +1498,26 @@ class _BusinessShellState extends State<BusinessShell> {
     // تنظیمات: نیازمند دسترسی join
     if (section == 'settings' && item.label == AppLocalizations.of(context).settings) {
       final hasJoin = widget.authStore.hasBusinessPermission('settings', 'join');
-      print('    Settings item requires join permission: $hasJoin');
       return hasJoin;
     }
 
     // سایر سکشن‌ها: بررسی دسترسی view
     final hasAccess = widget.authStore.canReadSection(section);
-    print('    Checking view permission for section "$section": $hasAccess');
     
     // Debug: بررسی دقیق‌تر دسترسی‌ها
-    if (widget.authStore.businessPermissions != null) {
-      final sectionPerms = widget.authStore.businessPermissions![section];
-      print('    Section permissions for "$section": $sectionPerms');
-      if (sectionPerms != null) {
-        final viewPerm = sectionPerms['view'];
-        print('    View permission: $viewPerm');
-      }
-    }
+    // viewPerm is checked implicitly through hasAccess
     
     return hasAccess;
   }
 
   bool _hasAccessToExpandableMenuItem(_MenuItem item) {
     if (item.children == null) {
-      print('  Expandable item "${item.label}" has no children - DENIED');
       return false;
     }
     
-    print('  Checking expandable item: ${item.label} with ${item.children!.length} children');
     
     // اگر حداقل یکی از زیرآیتم‌ها قابل دسترسی باشد، منو نمایش داده شود
     final hasAccess = item.children!.any((child) => _hasAccessToMenuItem(child));
-    print('  Expandable item "${item.label}" access: $hasAccess');
     
     return hasAccess;
   }
@@ -1609,157 +1605,149 @@ class _BusinessShellState extends State<BusinessShell> {
     setState(() {
       _unreadCount = 0;
     });
-    final items = _notifications.take(10).toList();
-    final cs = Theme.of(context).colorScheme;
     showDialog<void>(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        titlePadding: EdgeInsets.zero,
-        title: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(colors: [cs.primary, cs.primary.withValues(alpha: 0.8)]),
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-          ),
-          child: Row(
-            children: const [
-              Icon(Icons.notifications_active, color: Colors.white),
-              SizedBox(width: 8),
-              Text('مرکز اعلان‌ها', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-            ],
-          ),
-        ),
-        content: LayoutBuilder(
-          builder: (ctx, _) {
-            final double dialogWidth = math.min(MediaQuery.of(ctx).size.width - 96, 720);
-            return ConstrainedBox(
-              constraints: BoxConstraints(minWidth: dialogWidth, maxWidth: dialogWidth, maxHeight: 420),
-              child: items.isEmpty
-                  ? const SizedBox(height: 140, child: Center(child: Text('اعلانی وجود ندارد')))
-                  : ListView.separated(
-                      padding: EdgeInsets.zero,
-                      shrinkWrap: true,
-                      itemBuilder: (_, i) {
-                    final it = items[i];
-                    final level = '${it['level'] ?? 'info'}';
-                    IconData icon;
-                    Color levelColor;
-                    switch (level) {
-                      case 'warning':
-                        icon = Icons.warning_amber_rounded;
-                        levelColor = Colors.orange;
-                        break;
-                      case 'critical':
-                        icon = Icons.error_outline;
-                        levelColor = Colors.red;
-                        break;
-                      default:
-                        icon = Icons.notifications_none;
-                        levelColor = cs.primary;
-                    }
-                    final int? annId = it['id'] is int ? it['id'] as int : int.tryParse('${it['id']}');
-                    final bool busy = annId != null && _busyAnnIds.contains(annId);
-                    return Container(
-                      decoration: BoxDecoration(
-                        color: cs.surface,
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: [BoxShadow(color: cs.shadow.withValues(alpha: 0.05), blurRadius: 6, offset: const Offset(0, 2))],
-                        border: Border(left: BorderSide(color: levelColor, width: 3)),
-                      ),
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Container(
-                            width: 36,
-                            height: 36,
-                            decoration: BoxDecoration(color: levelColor.withOpacity(0.12), shape: BoxShape.circle),
-                            child: Icon(icon, color: levelColor),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text('${it['title'] ?? 'اعلان'}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600)),
-                                const SizedBox(height: 4),
-                                Text('${it['body'] ?? ''}', maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: cs.onSurfaceVariant)),
-                              ],
-                            ),
-                          ),
-                          if (annId != null)
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                IconButton(
-                                  tooltip: 'خوانده شد',
-                                  icon: busy
-                                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                                      : const Icon(Icons.done_all, size: 20),
-                                  onPressed: busy
-                                      ? null
-                                      : () async {
-                                          setState(() => _busyAnnIds.add(annId));
-                                          try {
-                                            await AnnouncementsService(ApiClient()).markRead(annId);
-                                            setState(() {
-                                              _notifications.removeWhere((e) => (e['id'] is int ? e['id'] == annId : int.tryParse('${e['id']}') == annId));
-                                            });
-                                          } catch (_) {} finally {
-                                            if (mounted) setState(() => _busyAnnIds.remove(annId));
-                                          }
-                                        },
-                                ),
-                                IconButton(
-                                  tooltip: 'پنهان کردن',
-                                  icon: busy
-                                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                                      : const Icon(Icons.close, size: 20),
-                                  onPressed: busy
-                                      ? null
-                                      : () async {
-                                          setState(() => _busyAnnIds.add(annId));
-                                          try {
-                                            await AnnouncementsService(ApiClient()).dismiss(annId);
-                                            setState(() {
-                                              _notifications.removeWhere((e) => (e['id'] is int ? e['id'] == annId : int.tryParse('${e['id']}') == annId));
-                                            });
-                                          } catch (_) {} finally {
-                                            if (mounted) setState(() => _busyAnnIds.remove(annId));
-                                          }
-                                        },
-                                ),
-                              ],
-                            ),
-                        ],
-                      ),
-                    );
-                  },
-                  separatorBuilder: (_, __) => const SizedBox(height: 8),
-                  itemCount: items.length,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, dialogSetState) {
+            final items = _notifications.take(10).toList();
+            final cs = Theme.of(context).colorScheme;
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              titlePadding: EdgeInsets.zero,
+              title: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(colors: [cs.primary, cs.primary.withValues(alpha: 0.8)]),
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
                 ),
+                child: Row(
+                  children: const [
+                    Icon(Icons.notifications_active, color: Colors.white),
+                    SizedBox(width: 8),
+                    Text('مرکز اعلان‌ها', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+              ),
+              content: LayoutBuilder(
+                builder: (ctx, _) {
+                  final double dialogWidth = math.min(MediaQuery.of(ctx).size.width - 96, 900);
+                  return ConstrainedBox(
+                    constraints: BoxConstraints(minWidth: dialogWidth, maxWidth: dialogWidth, maxHeight: 420),
+                    child: items.isEmpty
+                        ? const SizedBox(height: 140, child: Center(child: Text('اعلانی وجود ندارد')))
+                        : ListView.separated(
+                            padding: EdgeInsets.zero,
+                            shrinkWrap: true,
+                            itemBuilder: (_, i) {
+                              final it = items[i];
+                              final level = '${it['level'] ?? 'info'}';
+                              IconData icon;
+                              Color levelColor;
+                              switch (level) {
+                                case 'warning':
+                                  icon = Icons.warning_amber_rounded;
+                                  levelColor = Colors.orange;
+                                  break;
+                                case 'critical':
+                                  icon = Icons.error_outline;
+                                  levelColor = Colors.red;
+                                  break;
+                                default:
+                                  icon = Icons.notifications_none;
+                                  levelColor = cs.primary;
+                              }
+                              final int? annId = it['id'] is int ? it['id'] as int : int.tryParse('${it['id']}');
+                              final bool busy = annId != null && _busyAnnIds.contains(annId);
+                              return Container(
+                                decoration: BoxDecoration(
+                                  color: cs.surface,
+                                  borderRadius: BorderRadius.circular(12),
+                                  boxShadow: [BoxShadow(color: cs.shadow.withValues(alpha: 0.05), blurRadius: 6, offset: const Offset(0, 2))],
+                                  border: Border(left: BorderSide(color: levelColor, width: 3)),
+                                ),
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Container(
+                                      width: 36,
+                                      height: 36,
+                                      decoration: BoxDecoration(color: levelColor.withValues(alpha: 0.12), shape: BoxShape.circle),
+                                      child: Icon(icon, color: levelColor),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text('${it['title'] ?? 'اعلان'}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600)),
+                                          const SizedBox(height: 4),
+                                          Text('${it['body'] ?? ''}', maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: cs.onSurfaceVariant)),
+                                        ],
+                                      ),
+                                    ),
+                                    if (annId != null)
+                                      IconButton(
+                                        tooltip: 'خوانده شد',
+                                        icon: busy
+                                            ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                                            : const Icon(Icons.done_all, size: 20),
+                                        onPressed: busy ? null : () async => _markNotificationRead(annId, dialogSetState: dialogSetState),
+                                      ),
+                                  ],
+                                ),
+                              );
+                            },
+                            separatorBuilder: (_, __) => const SizedBox(height: 8),
+                            itemCount: items.length,
+                          ),
+                  );
+                },
+              ),
+              actionsPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('بستن'),
+                ),
+                FilledButton.icon(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    context.go('/user/profile/announcements');
+                  },
+                  icon: const Icon(Icons.notifications, size: 18),
+                  label: const Text('مشاهده همه اعلان‌ها'),
+                ),
+              ],
             );
           },
-        ),
-        actionsPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('بستن'),
-          ),
-          FilledButton.icon(
-            onPressed: () {
-              Navigator.of(context).pop();
-              context.go('/user/profile/announcements');
-            },
-            icon: const Icon(Icons.notifications, size: 18),
-            label: const Text('مشاهده همه اعلان‌ها'),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
+
+  Future<void> _markNotificationRead(int id, {StateSetter? dialogSetState}) async {
+    void refreshDialog() => dialogSetState?.call(() {});
+    setState(() => _busyAnnIds.add(id));
+    refreshDialog();
+    try {
+      await AnnouncementsService(ApiClient()).markRead(id);
+      setState(() {
+        _notifications.removeWhere((e) => (e['id'] is int ? e['id'] == id : int.tryParse('${e['id']}') == id));
+      });
+      refreshDialog();
+    } catch (_) {
+    } finally {
+      if (mounted) {
+        setState(() => _busyAnnIds.remove(id));
+      } else {
+        _busyAnnIds.remove(id);
+      }
+      refreshDialog();
+    }
+  }
+
 }
 
 enum _MenuItemType { simple, expandable, separator }

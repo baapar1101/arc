@@ -76,7 +76,9 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
         _error = null;
       });
       final defs = await _definitionsOrLoad();
-      final bp = _currentBreakpoint(MediaQuery.of(context).size.width);
+      if (!context.mounted) return;
+      final ctx = context;
+      final bp = _currentBreakpoint(MediaQuery.of(ctx).size.width);
       var layout = await _service.getLayoutProfile(businessId: widget.businessId, breakpoint: bp);
       // اطمینان از حضور ویجت‌های جدید پیش‌فرض (مثل نمودار فروش) در چیدمان
       final existingKeys = layout.items.map((e) => e.key).toSet();
@@ -265,11 +267,9 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
                   const double minTileUnit = 180; // حداقل عرض یک ستون برای جلوگیری از صفر/منفی
                   if (unit <= 0) {
                     // ignore: avoid_print
-                    print('[DASH][WARN] unit<=0 totalWidth=$totalWidth columns=$crossAxisCount spacing=$_gridSpacingPx');
                     unit = minTileUnit;
                   } else if (unit < minTileUnit) {
                     // ignore: avoid_print
-                    print('[DASH][INFO] unit too small -> clamped to $minTileUnit (was $unit)');
                     unit = minTileUnit;
                   }
                   if (unit > 0 && _columnUnitPx != unit) {
@@ -280,7 +280,6 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
                     final w = (unit * it.colSpan) + _gridSpacingPx * (it.colSpan - 1);
                     final cw = w > totalWidth ? totalWidth : (w < unit ? unit : w);
                     // ignore: avoid_print
-                    print('[DASH] view child key=${it.key} colSpan=${it.colSpan} -> width=$w clamped=$cw unit=$unit totalWidth=$totalWidth');
                     children.add(AnimatedContainer(
                       duration: const Duration(milliseconds: 180),
                       curve: Curves.easeInOut,
@@ -308,11 +307,9 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
                   const double minTileUnit = 180;
                   if (unit <= 0) {
                     // ignore: avoid_print
-                    print('[DASH][WARN] unit<=0 totalWidth=$totalWidth columns=$crossAxisCount spacing=$_gridSpacingPx');
                     unit = minTileUnit;
                   } else if (unit < minTileUnit) {
                     // ignore: avoid_print
-                    print('[DASH][INFO] unit too small -> clamped to $minTileUnit (was $unit)');
                     unit = minTileUnit;
                   }
                   // ذخیره آخرین اندازه واحد ستون برای رزایز اسنپی
@@ -325,7 +322,6 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
                     final w = (unit * it.colSpan) + _gridSpacingPx * (it.colSpan - 1);
                     final cw = w > totalWidth ? totalWidth : (w < unit ? unit : w);
                     // ignore: avoid_print
-                    print('[DASH] edit child key=${it.key} colSpan=${it.colSpan} -> width=$w clamped=$cw unit=$unit totalWidth=$totalWidth');
                     children.add(AnimatedContainer(
                       duration: const Duration(milliseconds: 180),
                       curve: Curves.easeInOut,
@@ -552,7 +548,140 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
   Map<String, DashboardWidgetBuilder> get _widgetFactory => <String, DashboardWidgetBuilder>{
         'latest_sales_invoices': _latestSalesInvoicesWidget,
         'sales_bar_chart': _salesBarChartWidget,
+        'checks_today': _checksTodayWidget,
+        'checks_tomorrow': _checksTomorrowWidget,
+        'checks_this_month': _checksThisMonthWidget,
       };
+
+  Widget _buildChecksWidget(BuildContext context, dynamic data, String title, VoidCallback? onRefresh) {
+    final theme = Theme.of(context);
+    final Map<String, dynamic> payload = (data is Map<String, dynamic>) ? data : const <String, dynamic>{};
+    final List<Map<String, dynamic>> checks = (payload['items'] is List) 
+        ? List<Map<String, dynamic>>.from(payload['items'] as List) 
+        : const <Map<String, dynamic>>[];
+    final Map<String, dynamic> totalsByCurrency = Map<String, dynamic>.from(payload['totals_by_currency'] ?? {});
+    final int count = (payload['count'] as int?) ?? checks.length;
+
+    if (checks.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Center(
+          child: Text(
+            'چک‌ای یافت نشد',
+            style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+          ),
+        ),
+      );
+    }
+
+    // Build summary header with totals
+    Widget? summaryWidget;
+    if (totalsByCurrency.isNotEmpty) {
+      final summaryText = StringBuffer();
+      totalsByCurrency.forEach((currencyCode, amount) {
+        if (summaryText.isNotEmpty) summaryText.write(' + ');
+        summaryText.write('${formatWithThousands(amount as num)} $currencyCode');
+      });
+      summaryWidget = Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: Row(
+          children: [
+            Icon(Icons.info_outline, size: 16, color: theme.colorScheme.primary),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'مجموع: $summaryText ($count چک)',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.primary,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (summaryWidget != null) summaryWidget,
+        Expanded(
+          child: ListView.separated(
+            physics: const NeverScrollableScrollPhysics(),
+            shrinkWrap: true,
+            itemCount: checks.length,
+            separatorBuilder: (_, __) => const Divider(height: 1),
+            itemBuilder: (context, index) {
+              final check = checks[index];
+              final checkNumber = '${check['check_number'] ?? '-'}';
+              final personName = check['person_name'] as String?;
+              final amount = (check['amount'] as num?) ?? 0;
+              final currencyCode = (check['currency_code'] ?? '').toString();
+              final type = (check['type'] ?? '').toString();
+              final status = (check['status'] ?? '').toString();
+              final dueDate = check['due_date'] as String?;
+              
+              final typeText = type == 'received' ? 'دریافتی' : type == 'transferred' ? 'پرداختنی' : type;
+              final statusText = _getCheckStatusText(status);
+              
+              final subtitle = StringBuffer();
+              if (personName != null && personName.isNotEmpty) {
+                subtitle.write(personName);
+                subtitle.write(' • ');
+              }
+              subtitle.write(typeText);
+              if (statusText.isNotEmpty) {
+                subtitle.write(' • ');
+                subtitle.write(statusText);
+              }
+              if (dueDate != null) {
+                final formattedDate = DateFormatters.formatServerDateOnly(dueDate);
+                subtitle.write(' • ');
+                subtitle.write(formattedDate);
+              }
+
+              return ListTile(
+                dense: true,
+                leading: Icon(
+                  type == 'received' ? Icons.account_balance_wallet : Icons.account_balance,
+                  color: type == 'received' 
+                      ? theme.colorScheme.primary 
+                      : theme.colorScheme.error,
+                ),
+                title: Text(checkNumber),
+                subtitle: Text(subtitle.toString()),
+                trailing: Text(
+                  currencyCode.isNotEmpty ? '${formatWithThousands(amount)} $currencyCode' : formatWithThousands(amount),
+                  style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
+                ),
+                onTap: () {
+                  // Navigate to checks page with filter or check detail
+                  final checkId = check['id'] as int?;
+                  if (checkId != null) {
+                    // TODO: Navigate to check detail or checks page with filter
+                    // Navigator.of(context).pushNamed('/business/${widget.businessId}/checks', arguments: {'check_id': checkId});
+                  }
+                },
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _checksTodayWidget(BuildContext context, dynamic data, DashboardLayoutItem item, {VoidCallback? onRefresh}) {
+    return _buildChecksWidget(context, data, 'چک‌های امروز', onRefresh);
+  }
+
+  Widget _checksTomorrowWidget(BuildContext context, dynamic data, DashboardLayoutItem item, {VoidCallback? onRefresh}) {
+    return _buildChecksWidget(context, data, 'چک‌های فردا', onRefresh);
+  }
+
+  Widget _checksThisMonthWidget(BuildContext context, dynamic data, DashboardLayoutItem item, {VoidCallback? onRefresh}) {
+    return _buildChecksWidget(context, data, 'چک‌های این ماه', onRefresh);
+  }
 
   Widget _latestSalesInvoicesWidget(BuildContext context, dynamic data, DashboardLayoutItem item, {VoidCallback? onRefresh}) {
     final theme = Theme.of(context);
@@ -842,22 +971,48 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
     );
   }
 
+  String _getCheckStatusText(String status) {
+    switch (status) {
+      case 'RECEIVED_ON_HAND':
+        return 'در دست';
+      case 'DEPOSITED':
+        return 'سپرده';
+      case 'ENDORSED':
+        return 'واگذار شده';
+      case 'RETURNED':
+        return 'عودت';
+      case 'BOUNCED':
+        return 'برگشت';
+      case 'TRANSFERRED_ISSUED':
+        return 'صادر شده';
+      case 'CLEARED':
+        return 'پاس شده';
+      case 'CANCELLED':
+        return 'ابطال';
+      default:
+        return '';
+    }
+  }
+
   // Pick custom date range; returns iso from/to
   Future<(String, String)?> _pickCustomRange(BuildContext context) async {
+    if (!context.mounted) return null;
+    final ctx = context;
     final isJalali = widget.calendarController?.isJalali == true;
     if (isJalali) {
       try {
         final now = DateTime.now();
         final from = await showJalaliDatePicker(
-          context: context,
+          context: ctx,
           initialDate: now,
           firstDate: DateTime(now.year - 10, 1, 1),
           lastDate: DateTime(now.year + 10, 12, 31),
           helpText: 'انتخاب تاریخ شروع',
         );
         if (from == null) return null;
+        if (!ctx.mounted) return null;
         final to = await showJalaliDatePicker(
-          context: context,
+          context: ctx,
           initialDate: from,
           firstDate: from,
           lastDate: DateTime(now.year + 10, 12, 31),
@@ -870,15 +1025,17 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
       } catch (_) {/* fallback below */}
     }
     // Gregorian fallback
+    if (!ctx.mounted) return null;
     DateTime? from = await showDatePicker(
-      context: context,
+      context: ctx,
       initialDate: DateTime.now(),
       firstDate: DateTime(2000),
       lastDate: DateTime(2100),
     );
     if (from == null) return null;
+    if (!ctx.mounted) return null;
     DateTime? to = await showDatePicker(
-      context: context,
+      context: ctx,
       initialDate: from,
       firstDate: from,
       lastDate: DateTime(2100),
@@ -900,7 +1057,7 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
             decoration: BoxDecoration(
               color: Theme.of(context).colorScheme.surfaceContainerHighest,
               border: Border(
-                bottom: BorderSide(color: Theme.of(context).dividerColor.withOpacity(0.08)),
+                bottom: BorderSide(color: Theme.of(context).dividerColor.withValues(alpha: 0.08)),
               ),
             ),
             child: Row(
@@ -1123,6 +1280,12 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
         return 'آخرین فاکتورهای فروش';
       case 'sales_bar_chart':
         return 'نمودار فروش';
+      case 'checks_today':
+        return 'چک‌های امروز';
+      case 'checks_tomorrow':
+        return 'چک‌های فردا';
+      case 'checks_this_month':
+        return 'چک‌های این ماه';
       default:
         return key;
     }

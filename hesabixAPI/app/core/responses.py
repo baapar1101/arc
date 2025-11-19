@@ -38,25 +38,44 @@ def format_datetime_fields(data: Any, request: Request) -> Any:
 	
 	calendar_type = request.state.calendar_type
 	
+	# Fields that should show only date (no time)
+	DATE_ONLY_FIELDS = {'issue_date', 'due_date'}
+	
 	if isinstance(data, dict):
 		formatted_data = {}
 		for key, value in data.items():
 			if value is None:
 				formatted_data[key] = None
 			elif isinstance(value, datetime):
-				# Format the main date field based on calendar type
-				if calendar_type == "jalali":
-					formatted_data[key] = CalendarConverter.to_jalali(value)["formatted"]
+				# For date-only fields (like issue_date, due_date), use date_only format
+				is_date_only = key in DATE_ONLY_FIELDS
+				if is_date_only:
+					# Format the main date field as date only (no time)
+					if calendar_type == "jalali":
+						formatted_data[key] = CalendarConverter.to_jalali(value)["date_only"]
+					else:
+						# Extract date part only (YYYY-MM-DD)
+						formatted_data[key] = value.date().isoformat()
 				else:
-					formatted_data[key] = value.isoformat()
+					# Format the main date field based on calendar type (with time)
+					if calendar_type == "jalali":
+						formatted_data[key] = CalendarConverter.to_jalali(value)["formatted"]
+					else:
+						formatted_data[key] = value.isoformat()
 				
 				# Add formatted date as additional field
 				formatted_data[f"{key}_formatted"] = CalendarConverter.format_datetime(value, calendar_type)
 				# Convert raw date to the same calendar type as the formatted date
 				if calendar_type == "jalali":
-					formatted_data[f"{key}_raw"] = CalendarConverter.to_jalali(value)["formatted"]
+					if is_date_only:
+						formatted_data[f"{key}_raw"] = CalendarConverter.to_jalali(value)["date_only"]
+					else:
+						formatted_data[f"{key}_raw"] = CalendarConverter.to_jalali(value)["formatted"]
 				else:
-					formatted_data[f"{key}_raw"] = value.isoformat()
+					if is_date_only:
+						formatted_data[f"{key}_raw"] = value.date().isoformat()
+					else:
+						formatted_data[f"{key}_raw"] = value.isoformat()
 			elif isinstance(value, date):
 				# Convert date to datetime for processing
 				dt_value = datetime.combine(value, datetime.min.time())

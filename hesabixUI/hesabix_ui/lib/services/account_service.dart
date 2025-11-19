@@ -15,7 +15,7 @@ class AccountService {
       final responseData = res.data?['data'] as Map<String, dynamic>?;
       return responseData ?? <String, dynamic>{'items': <dynamic>[]};
     } catch (e) {
-      print('خطا در دریافت درخت حساب‌ها: $e');
+      // Error handled silently, returning empty result
       return <String, dynamic>{'items': <dynamic>[]};
     }
   }
@@ -30,7 +30,7 @@ class AccountService {
       final responseData = res.data?['data'] as Map<String, dynamic>?;
       return responseData ?? <String, dynamic>{'items': <dynamic>[]};
     } catch (e) {
-      print('خطا در دریافت حساب‌ها: $e');
+      // Error handled silently, returning empty result
       return <String, dynamic>{'items': <dynamic>[]};
     }
   }
@@ -51,7 +51,6 @@ class AccountService {
       }
       return responseData;
     } catch (e) {
-      print('خطا در دریافت حساب $accountId: $e');
       rethrow;
     }
   }
@@ -82,7 +81,7 @@ class AccountService {
       final responseData = res.data?['data'] as Map<String, dynamic>?;
       return responseData ?? <String, dynamic>{'items': <dynamic>[]};
     } catch (e) {
-      print('خطا در جستجوی حساب‌ها: $e');
+      // Error handled silently, returning empty result
       return <String, dynamic>{'items': <dynamic>[]};
     }
   }

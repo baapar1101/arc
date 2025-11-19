@@ -728,7 +728,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                             Chip(label: Text('جمع اقساط: ${formatWithThousands(sumTotal, decimalPlaces: 0)}')),
                             Chip(
                               label: Text('اختلاف اصل: ${formatWithThousands(diff, decimalPlaces: 0)}'),
-                              backgroundColor: diffColor.withOpacity(0.12),
+                              backgroundColor: diffColor.withValues(alpha: 0.12),
                               labelStyle: TextStyle(color: diffColor),
                             ),
                           ],

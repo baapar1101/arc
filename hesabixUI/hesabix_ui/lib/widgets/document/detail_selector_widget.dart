@@ -128,7 +128,6 @@ class _DetailSelectorWidgetState extends State<DetailSelectorWidget> {
           _controller.text = 'ID: ${widget.selectedDetailId}';
       }
     } catch (e) {
-      print('خطا در بارگذاری تفضیل: $e');
       _controller.text = '';
     } finally {
       if (mounted) {

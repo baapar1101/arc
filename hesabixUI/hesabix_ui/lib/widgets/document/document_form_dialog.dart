@@ -119,7 +119,6 @@ class _DocumentFormDialogState extends State<DocumentFormDialog> {
               account = Account.fromJson(accountData);
             }
           } catch (e) {
-            print('خطا در بارگذاری حساب ${line.accountId}: $e');
             // در صورت خطا، یک حساب خالی با ID می‌سازیم
             account = Account(
               id: line.accountId,
@@ -156,7 +155,6 @@ class _DocumentFormDialogState extends State<DocumentFormDialog> {
           });
         }
       } catch (e) {
-        print('خطا در بارگذاری سطرهای سند: $e');
         if (mounted) {
           setState(() {
             _lines = [
@@ -509,17 +507,22 @@ class _DocumentFormDialogState extends State<DocumentFormDialog> {
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
           // دکمه انصراف
-          OutlinedButton(
+          SizedBox(
+            height: 48,
+            child: OutlinedButton(
             onPressed: _isSaving ? null : () => Navigator.of(context).pop(),
-            child: const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              child: Text('انصراف'),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              ),
+              child: const Text('انصراف'),
             ),
           ),
           const SizedBox(width: 12),
 
           // دکمه ذخیره
-          ElevatedButton.icon(
+          SizedBox(
+            height: 48,
+            child: ElevatedButton.icon(
             onPressed: _isSaving ? null : _saveDocument,
             icon: _isSaving
                 ? const SizedBox(
@@ -531,13 +534,12 @@ class _DocumentFormDialogState extends State<DocumentFormDialog> {
                     ),
                   )
                 : const Icon(Icons.save),
-            label: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              child: Text(_isSaving ? 'در حال ذخیره...' : 'ذخیره سند'),
-            ),
+              label: Text(_isSaving ? 'در حال ذخیره...' : 'ذخیره سند'),
             style: ElevatedButton.styleFrom(
               backgroundColor: theme.colorScheme.primary,
               foregroundColor: theme.colorScheme.onPrimary,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              ),
             ),
           ),
         ],

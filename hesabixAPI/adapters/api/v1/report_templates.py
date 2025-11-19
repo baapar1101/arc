@@ -302,6 +302,54 @@ async def report_template_schema(
 			{"name": "invoice", "desc": "شیء فاکتور"},
 			{"name": "items", "desc": "آیتم‌های فاکتور"},
 		]
+	elif module_key == "transfers" and (subtype or "") == "detail":
+		data["keys"] += [
+			{"name": "document", "desc": "شیء کامل سند انتقال"},
+			{"name": "code", "desc": "کد سند"},
+			{"name": "document_date", "desc": "تاریخ سند (فرمت شده)"},
+			{"name": "total_amount", "desc": "مبلغ کل انتقال"},
+			{"name": "commission", "desc": "کارمزد (در صورت وجود)"},
+			{"name": "description", "desc": "توضیحات سند"},
+			{"name": "source_type", "desc": "نوع مبدأ (bank/cash_register/petty_cash)"},
+			{"name": "source_type_name", "desc": "نام فارسی نوع مبدأ"},
+			{"name": "source_name", "desc": "نام مبدأ"},
+			{"name": "destination_type", "desc": "نوع مقصد (bank/cash_register/petty_cash)"},
+			{"name": "destination_type_name", "desc": "نام فارسی نوع مقصد"},
+			{"name": "destination_name", "desc": "نام مقصد"},
+			{"name": "account_lines", "desc": "لیست خطوط حساب‌ها (شامل مبدأ، مقصد و کارمزد)"},
+			{"name": "business_name", "desc": "نام کسب‌وکار"},
+			{"name": "business_logo_data_uri", "desc": "لوگوی کسب‌وکار (data URI)"},
+			{"name": "business_stamp_data_uri", "desc": "مهر کسب‌وکار (data URI)"},
+			{"name": "owner_signature_data_uri", "desc": "امضای مالک (data URI)"},
+			{"name": "generated_at", "desc": "تاریخ/زمان تولید PDF"},
+			{"name": "is_fa", "desc": "آیا زبان فارسی است (boolean)"},
+		]
+		data["sample_context"]["document"] = {
+			"id": 1,
+			"code": "TR-20240101-0001",
+			"total_amount": 1000000,
+			"commission": 5000,
+			"source_type": "bank",
+			"source_type_name": "حساب بانکی",
+			"source_name": "بانک ملی",
+			"destination_type": "cash_register",
+			"destination_type_name": "صندوق",
+			"destination_name": "صندوق اصلی",
+		}
+		data["sample_context"]["account_lines"] = [
+			{
+				"account_name": "صندوق",
+				"account_code": "10202",
+				"side": "destination",
+				"amount": 1000000,
+			},
+			{
+				"account_name": "حساب بانکی",
+				"account_code": "10203",
+				"side": "source",
+				"amount": 1000000,
+			},
+		]
 	elif module_key in ("documents", "receipts_payments", "expense_income"):
 		data["keys"] += [
 			{"name": "items", "desc": "لیست رکوردها"},

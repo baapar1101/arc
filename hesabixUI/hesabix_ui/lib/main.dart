@@ -35,6 +35,7 @@ import 'pages/business/wallet_payment_result_page.dart';
 import 'pages/admin/wallet_settings_page.dart';
 import 'pages/admin/payment_gateways_page.dart';
 import 'pages/admin/storage_plans_admin_page.dart';
+import 'pages/admin/document_monetization_page.dart';
 import 'pages/business/invoices_list_page.dart';
 import 'pages/business/tax_workspace_page.dart';
 import 'pages/business/new_invoice_page.dart';
@@ -54,6 +55,7 @@ import 'pages/business/checks_page.dart';
 import 'pages/business/plugin_marketplace_page.dart';
 import 'pages/business/marketplace_invoices_page.dart';
 import 'pages/business/check_form_page.dart';
+import 'pages/business/check_reconciliation_page.dart';
 import 'pages/business/receipts_payments_list_page.dart';
 import 'pages/business/expense_income_list_page.dart';
 import 'pages/business/transfers_page.dart';
@@ -78,6 +80,7 @@ import 'widgets/url_tracker.dart';
 import 'pages/business/opening_balance_page.dart';
 import 'pages/business/report_templates_page.dart';
 import 'pages/business/storage_files_page.dart';
+import 'pages/business/document_monetization_page.dart';
 import 'pages/business/backup/backup_page.dart';
 import 'pages/business/backup/restore_page.dart';
 
@@ -165,23 +168,19 @@ class _MyAppState extends State<MyApp> {
     if (_authStore != null) {
       try {
         final currentUrl = Uri.base.path;
-        print('🔍 LOADING DEBUG: Current URL before finishing loading: $currentUrl');
         
         if (currentUrl.isNotEmpty && 
             currentUrl != '/' && 
             currentUrl != '/login' &&
             (currentUrl.startsWith('/user/profile/') || currentUrl.startsWith('/business/'))) {
-          print('🔍 LOADING DEBUG: Saving current URL: $currentUrl');
           await _authStore!.saveLastUrl(currentUrl);
         }
       } catch (e) {
-        print('🔍 LOADING DEBUG: Error saving current URL: $e');
       }
     }
     
     // اتمام loading
     if (mounted) {
-      print('🔍 LOADING DEBUG: Finishing loading, setting _isLoading to false');
       setState(() {
         _isLoading = false;
       });
@@ -191,8 +190,6 @@ class _MyAppState extends State<MyApp> {
   // Root of application with GoRouter
   @override
   Widget build(BuildContext context) {
-    print('🔍 BUILD DEBUG: Building app, _isLoading: $_isLoading');
-    print('🔍 BUILD DEBUG: Controllers - locale: ${_controller != null}, calendar: ${_calendarController != null}, theme: ${_themeController != null}, auth: ${_authStore != null}');
     
     // اگر هنوز loading است، splash screen نمایش بده
     if (_isLoading || 
@@ -200,7 +197,6 @@ class _MyAppState extends State<MyApp> {
         _calendarController == null || 
         _themeController == null || 
         _authStore == null) {
-      print('🔍 BUILD DEBUG: Still loading, showing splash screen');
       final loadingRouter = GoRouter(
         redirect: (context, state) {
           // در حین loading، هیچ redirect نکن - URL را حفظ کن
@@ -274,7 +270,6 @@ class _MyAppState extends State<MyApp> {
                     onComplete: () {
                       // این callback زمانی فراخوانی می‌شود که splash screen تمام شود
                       // اما ما از splash controller استفاده می‌کنیم
-                      print('🔍 SPLASH DEBUG: Splash screen completed');
                     },
                   );
                 },
@@ -301,7 +296,6 @@ class _MyAppState extends State<MyApp> {
     final controller = _controller!;
     final themeController = _themeController!;
 
-    print('🔍 BUILD DEBUG: All controllers loaded, creating main router');
     // حفظ URL فعلی مرورگر هنگام سوئیچ از لودینگ به روتر اصلی
     final currentInitialLocation = () {
       final base = Uri.base;
@@ -316,64 +310,49 @@ class _MyAppState extends State<MyApp> {
       initialLocation: currentInitialLocation,
       redirect: (context, state) async {
         final currentPath = state.uri.path;
-        final fullUri = state.uri.toString();
-        print('🔍 REDIRECT DEBUG: Current path: $currentPath');
-        print('🔍 REDIRECT DEBUG: Full URI: $fullUri');
         
         // اگر authStore هنوز load نشده، منتظر بمان
         if (_authStore == null) {
-          print('🔍 REDIRECT DEBUG: AuthStore is null, staying on current path');
           return null;
         }
         
         final hasKey = _authStore!.apiKey != null && _authStore!.apiKey!.isNotEmpty;
-        print('🔍 REDIRECT DEBUG: Has API key: $hasKey');
         
         // اگر API key ندارد
         if (!hasKey) {
-          print('🔍 REDIRECT DEBUG: No API key');
           // اگر در login نیست، به login برود
           if (currentPath != '/login') {
-            print('🔍 REDIRECT DEBUG: Redirecting to login from $currentPath');
             return '/login';
           }
           // اگر در login است، بماند
-          print('🔍 REDIRECT DEBUG: Already on login, staying');
           return null;
         }
         
         // اگر API key دارد
-        print('🔍 REDIRECT DEBUG: Has API key, checking current path');
         
         // اگر در login است، به dashboard برود
         if (currentPath == '/login') {
-          print('🔍 REDIRECT DEBUG: On login page, redirecting to dashboard');
           return '/user/profile/dashboard';
         }
         
         // اگر در root است، آخرین URL را بررسی کن
         if (currentPath == '/') {
-          print('🔍 REDIRECT DEBUG: On root path, checking last URL');
           // اگر آخرین URL موجود است و معتبر است، به آن برود
           final lastUrl = await _authStore!.getLastUrl();
-          print('🔍 REDIRECT DEBUG: Last URL: $lastUrl');
           
           if (lastUrl != null && 
               lastUrl.isNotEmpty && 
               lastUrl != '/' && 
               lastUrl != '/login' &&
               (lastUrl.startsWith('/user/profile/') || lastUrl.startsWith('/business/'))) {
-            print('🔍 REDIRECT DEBUG: Redirecting to last URL: $lastUrl');
             return lastUrl;
           }
           // وگرنه به dashboard برود (فقط اگر در root باشیم)
-          print('🔍 REDIRECT DEBUG: No valid last URL, redirecting to dashboard');
           return '/user/profile/dashboard';
         }
         
         // برای سایر صفحات (شامل صفحات profile و business)، redirect نکن (بماند)
         // این مهم است: اگر کاربر در صفحات profile یا business است، بماند
-        print('🔍 REDIRECT DEBUG: On other page ($currentPath), staying on current path');
         // ذخیره مسیر فعلی به عنوان آخرین URL معتبر
         if (currentPath.isNotEmpty &&
             currentPath != '/' &&
@@ -381,10 +360,8 @@ class _MyAppState extends State<MyApp> {
             (currentPath.startsWith('/user/profile/') || currentPath.startsWith('/business/'))) {
           try {
             await _authStore!.saveLastUrl(currentPath);
-            print('🔍 REDIRECT DEBUG: Saved last URL: $currentPath');
           } catch (e) {
             // صرفاً لاگ برای خطای غیر بحرانی ذخیره آدرس
-            print('🔍 REDIRECT DEBUG: Error saving last URL: $e');
           }
         }
         return null;
@@ -636,6 +613,20 @@ class _MyAppState extends State<MyApp> {
                       return PermissionGuard.buildAccessDeniedPage();
                     }
                     return const StoragePlansAdminPage();
+                  },
+                ),
+                GoRoute(
+                  path: 'document-monetization',
+                  name: 'system_settings_document_monetization',
+                  builder: (context, state) {
+                    if (_authStore == null) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    final allowed = _authStore!.isSuperAdmin || _authStore!.hasAppPermission('system_settings');
+                    if (!allowed) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    return const DocumentMonetizationAdminPage();
                   },
                 ),
                 GoRoute(
@@ -993,6 +984,21 @@ class _MyAppState extends State<MyApp> {
               },
             ),
             GoRoute(
+              path: '/business/:business_id/document-monetization',
+              name: 'business_document_monetization',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                if (!_authStore!.hasBusinessPermission('settings', 'join')) {
+                  return NoTransitionPage(
+                    child: PermissionGuard.buildAccessDeniedPage(),
+                  );
+                }
+                return NoTransitionPage(
+                  child: DocumentMonetizationBusinessPage(businessId: businessId),
+                );
+              },
+            ),
+            GoRoute(
               path: '/business/:business_id/product-attributes',
               name: 'business_product_attributes',
               pageBuilder: (context, state) {
@@ -1233,6 +1239,7 @@ class _MyAppState extends State<MyApp> {
                   child: ChecksPage(
                     businessId: businessId,
                     authStore: _authStore!,
+                    calendarController: _calendarController!,
                   ),
                 );
               },
@@ -1262,6 +1269,20 @@ class _MyAppState extends State<MyApp> {
                     businessId: businessId,
                     authStore: _authStore!,
                     checkId: checkId,
+                    calendarController: _calendarController!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/checks/reconciliation',
+              name: 'business_checks_reconciliation',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return NoTransitionPage(
+                  child: CheckReconciliationPage(
+                    businessId: businessId,
+                    authStore: _authStore!,
                     calendarController: _calendarController!,
                   ),
                 );

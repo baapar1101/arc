@@ -290,7 +290,7 @@ class _InstallmentPlansPageState extends State<InstallmentPlansPage> {
                                               Chip(
                                                 label: Text(AppLocalizations.of(context).inactive),
                                                 visualDensity: VisualDensity.compact,
-                                                backgroundColor: cs.surfaceVariant,
+                                                backgroundColor: cs.surfaceContainerHighest,
                                               ),
                                           ],
                                         ),
@@ -437,7 +437,7 @@ class _InstallmentPlanDialogState extends State<InstallmentPlanDialog> {
                 const SizedBox(height: 12),
                 // روش محاسبه
                 DropdownButtonFormField<String>(
-                  value: _method,
+                  initialValue: _method,
                   items: [
                     DropdownMenuItem(value: 'flat', child: Text(AppLocalizations.of(context).planMethodFlat)),
                     DropdownMenuItem(value: 'amortized', child: Text(AppLocalizations.of(context).planMethodAmortized)),

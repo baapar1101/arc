@@ -175,7 +175,7 @@ class _DocumentLinesEditorState extends State<DocumentLinesEditor> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.primaryContainer.withOpacity(0.3),
+                  color: theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
                   borderRadius: const BorderRadius.vertical(
                     top: Radius.circular(7),
                   ),
@@ -209,6 +209,17 @@ class _DocumentLinesEditorState extends State<DocumentLinesEditor> {
                         style: theme.textTheme.labelLarge?.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    SizedBox(
+                      width: 100,
+                      child: Text(
+                        'تعداد',
+                        style: theme.textTheme.labelLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -299,7 +310,7 @@ class _DocumentLinesEditorState extends State<DocumentLinesEditor> {
             child: Center(
               child: CircleAvatar(
                 radius: 14,
-                backgroundColor: theme.colorScheme.primary.withOpacity(0.2),
+                backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.2),
                 child: Text(
                   '${index + 1}',
                   style: TextStyle(
@@ -321,8 +332,9 @@ class _DocumentLinesEditorState extends State<DocumentLinesEditor> {
               onChanged: (account) {
                 setState(() {
                   line.account = account;
-                  // ریست کردن تفضیل وقتی حساب عوض می‌شود
+                  // ریست کردن تفضیل و تعداد وقتی حساب عوض می‌شود
                   line.detail = null;
+                  line.quantity = null;
                 });
                 _notifyChanged();
               },
@@ -345,12 +357,47 @@ class _DocumentLinesEditorState extends State<DocumentLinesEditor> {
                   line.detail?['bank_account_id'],
               onChanged: (detail) {
                 setState(() {
+                  // اگر تفضیل حذف شد یا نوع حساب دیگر کالا نیست، تعداد را ریست کن
+                  if (detail == null || _getAccountDetailType(line.account) != 'product') {
+                    line.quantity = null;
+                  }
                   line.detail = detail;
                 });
                 _notifyChanged();
               },
               label: '',
             ),
+          ),
+          const SizedBox(width: 8),
+
+          // تعداد کالا (فقط برای حساب‌های کالا که تفضیل انتخاب شده)
+          SizedBox(
+            width: 100,
+            child: _shouldShowQuantityField(line)
+                ? TextFormField(
+                    key: ValueKey('quantity_${index}_${line.detail?['product_id']}'),
+                    initialValue: line.quantity != null && line.quantity! > 0
+                        ? line.quantity.toString()
+                        : '',
+                    decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
+                      labelText: 'تعداد',
+                      hintText: '0',
+                    ),
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    textAlign: TextAlign.left,
+                    inputFormatters: [
+                      const EnglishDigitsFormatter(),
+                      FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,6}')),
+                    ],
+                    onChanged: (value) {
+                      final parsedValue = double.tryParse(value);
+                      line.quantity = parsedValue != null && parsedValue > 0 ? parsedValue : null;
+                      setState(() {});
+                      _notifyChanged();
+                    },
+                  )
+                : const SizedBox.shrink(),
           ),
           const SizedBox(width: 8),
 
@@ -361,8 +408,6 @@ class _DocumentLinesEditorState extends State<DocumentLinesEditor> {
               initialValue: line.debit > 0 ? line.debit.toString() : '',
               decoration: const InputDecoration(
                 border: OutlineInputBorder(),
-                contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                isDense: true,
               ),
               keyboardType: TextInputType.number,
               textAlign: TextAlign.left,
@@ -390,8 +435,6 @@ class _DocumentLinesEditorState extends State<DocumentLinesEditor> {
               initialValue: line.credit > 0 ? line.credit.toString() : '',
               decoration: const InputDecoration(
                 border: OutlineInputBorder(),
-                contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                isDense: true,
               ),
               keyboardType: TextInputType.number,
               textAlign: TextAlign.left,
@@ -420,8 +463,6 @@ class _DocumentLinesEditorState extends State<DocumentLinesEditor> {
               decoration: const InputDecoration(
                 border: OutlineInputBorder(),
                 hintText: 'توضیحات',
-                contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                isDense: true,
               ),
               maxLines: 1,
               onChanged: (value) {
@@ -451,7 +492,7 @@ class _DocumentLinesEditorState extends State<DocumentLinesEditor> {
     return Card(
       elevation: 2,
       color: _isBalanced
-          ? theme.colorScheme.primaryContainer.withOpacity(0.3)
+          ? theme.colorScheme.primaryContainer.withValues(alpha: 0.3)
           : Colors.orange.shade50,
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -590,12 +631,15 @@ class _DocumentLinesEditorState extends State<DocumentLinesEditor> {
   }
 
   /// تشخیص نوع تفضیل بر اساس حساب
-  /// TODO: باید از API یا از metadata حساب بیاید
   String? _getAccountDetailType(Account? account) {
     if (account == null) return null;
 
-    // این یک پیاده‌سازی ساده است
-    // در واقع باید از account.detailType یا API استفاده شود
+    // اول چک کردن accountType که دقیق‌تر است
+    if (account.accountType == 'product') {
+      return 'product';
+    }
+
+    // سپس چک کردن نام حساب به عنوان fallback
     final accountName = account.name.toLowerCase();
 
     if (accountName.contains('دریافتنی') ||
@@ -611,23 +655,35 @@ class _DocumentLinesEditorState extends State<DocumentLinesEditor> {
       return 'product';
     }
 
-    if (accountName.contains('بانک')) {
+    if (account.accountType == 'bank' || accountName.contains('بانک')) {
       return 'bank_account';
     }
 
-    if (accountName.contains('صندوق')) {
+    if (account.accountType == 'cash_register' || accountName.contains('صندوق')) {
       return 'cash_register';
     }
 
-    if (accountName.contains('تنخواه')) {
+    if (account.accountType == 'petty_cash' || accountName.contains('تنخواه')) {
       return 'petty_cash';
     }
 
-    if (accountName.contains('چک')) {
+    if (account.accountType == 'check' || accountName.contains('چک')) {
       return 'check';
     }
 
+    if (account.accountType == 'person') {
+      return 'person';
+    }
+
     return null; // حساب نیاز به تفضیل ندارد
+  }
+
+  /// آیا حساب انتخاب شده از نوع کالا است و تفضیل کالا انتخاب شده؟
+  bool _shouldShowQuantityField(DocumentLineEdit line) {
+    final detailType = _getAccountDetailType(line.account);
+    return detailType == 'product' &&
+        line.detail != null &&
+        line.detail!['product_id'] != null;
   }
 }
 

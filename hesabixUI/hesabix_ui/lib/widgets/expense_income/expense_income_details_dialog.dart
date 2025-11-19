@@ -6,6 +6,7 @@ import 'package:hesabix_ui/models/expense_income_document.dart';
 import 'package:hesabix_ui/services/expense_income_service.dart';
 import 'package:hesabix_ui/utils/number_formatters.dart' show formatWithThousands;
 import 'package:hesabix_ui/core/date_utils.dart' show HesabixDateUtils;
+// ignore: avoid_web_libraries_in_flutter
 import 'dart:html' as html;
 
 /// دیالوگ مشاهده جزئیات سند هزینه/درآمد
@@ -407,9 +408,7 @@ class _ExpenseIncomeDetailsDialogState extends State<ExpenseIncomeDetailsDialog>
         ..click();
       html.Url.revokeObjectUrl(url);
       
-      print('✅ PDF downloaded successfully: $filename');
     } catch (e) {
-      print('❌ Error downloading PDF: $e');
       rethrow;
     }
   }

@@ -19,7 +19,7 @@ class _AnnouncementsAdminPageState extends State<AnnouncementsAdminPage> {
   String? _error;
   List<Map<String, dynamic>> _items = const <Map<String, dynamic>>[];
   int _page = 1;
-  int _limit = 20;
+  final int _limit = 20;
   int _totalPages = 1;
 
   @override
@@ -116,7 +116,7 @@ class _AnnouncementsAdminPageState extends State<AnnouncementsAdminPage> {
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
-                      value: level,
+                      initialValue: level,
                       decoration: const InputDecoration(labelText: 'سطح'),
                       items: const [
                         DropdownMenuItem(value: 'info', child: Text('اطلاع‌رسانی')),
@@ -207,6 +207,7 @@ class _AnnouncementsAdminPageState extends State<AnnouncementsAdminPage> {
   }
 
   Future<DateTime?> _pickDate(BuildContext ctx, DateTime initial) async {
+    if (!ctx.mounted) return null;
     final isJalali = _calendarController?.isJalali == true;
     if (isJalali) {
       try {
@@ -223,6 +224,7 @@ class _AnnouncementsAdminPageState extends State<AnnouncementsAdminPage> {
         // fallback to Gregorian
       }
     }
+    if (!ctx.mounted) return null;
     return await showDatePicker(
       context: ctx,
       initialDate: initial,

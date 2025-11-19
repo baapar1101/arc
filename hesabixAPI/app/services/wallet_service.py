@@ -66,6 +66,55 @@ def _get_wallet_account_for_update(db: Session, business_id: int) -> WalletAccou
 	return acc
 
 
+def charge_wallet_for_service(
+	db: Session,
+	business_id: int,
+	amount: Decimal,
+	*,
+	description: str,
+	tx_type: str = "internal_service_charge",
+	document_id: int | None = None,
+	extra_info: Dict[str, Any] | None = None,
+	allow_negative_balance: bool = False,
+) -> Dict[str, Any]:
+	"""
+	کسر مبلغ از کیف‌پول برای سرویس‌های داخلی (مثل سناریو درآمدزایی اسناد)
+	"""
+	amount = Decimal(str(amount or 0))
+	if amount <= 0:
+		raise ApiError("INVALID_AMOUNT", "مبلغ باید بزرگتر از صفر باشد", http_status=400)
+
+	account = _get_wallet_account_for_update(db, business_id)
+	available = Decimal(str(account.available_balance or 0))
+
+	if not allow_negative_balance and available < amount:
+		raise ApiError("INSUFFICIENT_FUNDS", "موجودی کیف پول کافی نیست", http_status=400)
+
+	account.available_balance = available - amount
+	db.flush()
+
+	extra_info_json = json.dumps(extra_info) if extra_info else None
+
+	tx = WalletTransaction(
+		business_id=int(business_id),
+		type=tx_type,
+		status="succeeded",
+		amount=amount,
+		fee_amount=Decimal("0"),
+		description=description,
+		document_id=document_id,
+		extra_info=extra_info_json,
+	)
+	db.add(tx)
+	db.flush()
+
+	return {
+		"transaction_id": tx.id,
+		"status": tx.status,
+		"available_balance": float(account.available_balance or 0),
+	}
+
+
 def get_wallet_overview(db: Session, business_id: int) -> Dict[str, Any]:
 	_ = db.query(Business).filter(Business.id == int(business_id)).first() or None
 	if _ is None:

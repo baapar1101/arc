@@ -93,7 +93,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
                 ? () => _handleBulkAction(_BulkUserAction.activate)
                 : null,
             icon: const Icon(Icons.verified_user_outlined),
-            label: Text('فعال‌سازی (${_selectedCount})'),
+            label: Text('فعال‌سازی ($_selectedCount)'),
           ),
         ),
         const SizedBox(width: 8),
@@ -108,7 +108,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
               foregroundColor: theme.colorScheme.onErrorContainer,
             ),
             icon: const Icon(Icons.pause_circle_outline),
-            label: Text('تعلیق (${_selectedCount})'),
+            label: Text('تعلیق ($_selectedCount)'),
           ),
         ),
         const SizedBox(width: 8),
@@ -852,7 +852,7 @@ class _EmptyInlineState extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceVariant.withValues(alpha: 0.4),
+        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(

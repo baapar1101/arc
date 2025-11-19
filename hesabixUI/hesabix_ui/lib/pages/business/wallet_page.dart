@@ -10,7 +10,6 @@ import 'package:go_router/go_router.dart';
 import '../../core/api_client.dart';
 import '../../services/payment_gateway_service.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:url_launcher/url_launcher_string.dart';
 import 'package:url_launcher/link.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -211,7 +210,9 @@ class _WalletPageState extends State<WalletPage> {
   }
 
   Future<void> _openTopUpDialog() async {
-    final t = AppLocalizations.of(context);
+    if (!context.mounted) return;
+    final ctx = context;
+    final t = AppLocalizations.of(ctx);
     final formKey = GlobalKey<FormState>();
     final amountCtrl = TextEditingController();
     final descCtrl = TextEditingController();
@@ -224,8 +225,9 @@ class _WalletPageState extends State<WalletPage> {
         gatewayId = int.tryParse('${gateways.first['id']}');
       }
     } catch (_) {}
+    if (!ctx.mounted) return;
     final result = await showDialog<bool>(
-      context: context,
+      context: ctx,
       builder: (ctx) {
         return AlertDialog(
           title: Text(t.walletTopUpTitle),
@@ -419,7 +421,7 @@ class _WalletPageState extends State<WalletPage> {
                 try {
                   await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
                 } finally {
-                  if (mounted) Navigator.of(ctx).pop();
+                  if (ctx.mounted) Navigator.of(ctx).pop();
                 }
               },
               child: Text(AppLocalizations.of(context).open),

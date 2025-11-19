@@ -170,7 +170,7 @@ class _AccountsPageState extends State<AccountsPage> {
 									),
 									const SizedBox(height: 10),
 									DropdownButtonFormField<String>(
-										value: selectedType,
+										initialValue: selectedType,
 										items: const [
 											DropdownMenuItem(value: 'bank', child: Text('بانک')),
 											DropdownMenuItem(value: 'cash_register', child: Text('صندوق')),
@@ -186,7 +186,7 @@ class _AccountsPageState extends State<AccountsPage> {
 									),
 									const SizedBox(height: 10),
 									DropdownButtonFormField<String>(
-										value: selectedParentId,
+										initialValue: selectedParentId,
 										items: [
 											...(() {
 												List<Map<String, String>> src = parents;
@@ -240,16 +240,16 @@ class _AccountsPageState extends State<AccountsPage> {
 										'/api/v1/accounts/business/${widget.businessId}/create',
 										data: payload,
 									);
-									if (context.mounted) Navigator.of(ctx).pop(true);
+									if (!ctx.mounted) return;
+									Navigator.of(ctx).pop(true);
 								} catch (e) {
-									if (context.mounted) {
-										ScaffoldMessenger.of(context).showSnackBar(
-											SnackBar(content: Text('خطا در ایجاد حساب: $e')),
-										);
-										}
+									if (!ctx.mounted) return;
+									ScaffoldMessenger.of(ctx).showSnackBar(
+										SnackBar(content: Text('خطا در ایجاد حساب: $e')),
+									);
 								}
-								},
-								child: Text(t.add),
+							},
+							child: Text(t.add),
 						),
 				],
 				);
@@ -307,7 +307,7 @@ class _AccountsPageState extends State<AccountsPage> {
 								TextField(controller: codeCtrl, decoration: InputDecoration(labelText: t.code)),
 								TextField(controller: nameCtrl, decoration: InputDecoration(labelText: t.title)),
 								DropdownButtonFormField<String>(
-									value: selectedType,
+									initialValue: selectedType,
 									items: const [
 										DropdownMenuItem(value: 'bank', child: Text('بانک')),
 										DropdownMenuItem(value: 'cash_register', child: Text('صندوق')),
@@ -322,7 +322,7 @@ class _AccountsPageState extends State<AccountsPage> {
 									decoration: InputDecoration(labelText: t.type),
 								),
 								DropdownButtonFormField<String>(
-									value: selectedParentId,
+									initialValue: selectedParentId,
 									items: [
 										DropdownMenuItem<String>(value: null, child: Text('بدون والد')),
 										...parents.where((p) {
@@ -349,19 +349,19 @@ class _AccountsPageState extends State<AccountsPage> {
 									final pid = int.tryParse(selectedParentId!);
 									if (pid != null) payload["parent_id"] = pid;
 								}
-									try {
+								try {
 									final id = int.tryParse(node.id);
 									if (id == null) return;
 									final api = ApiClient();
 									await api.put('/api/v1/accounts/account/$id', data: payload);
-									if (context.mounted) Navigator.of(ctx).pop(true);
-									} catch (e) {
-										if (context.mounted) {
-											ScaffoldMessenger.of(context).showSnackBar(
-												SnackBar(content: Text('خطا در ویرایش حساب: $e')),
-											);
-										}
-									}
+									if (!ctx.mounted) return;
+									Navigator.of(ctx).pop(true);
+								} catch (e) {
+									if (!ctx.mounted) return;
+									ScaffoldMessenger.of(ctx).showSnackBar(
+										SnackBar(content: Text('خطا در ویرایش حساب: $e')),
+									);
+								}
 							},
 							child: Text(t.save),
 						),
@@ -390,16 +390,17 @@ class _AccountsPageState extends State<AccountsPage> {
 			),
 		);
 		if (ok == true) {
+			if (!context.mounted) return;
+			final ctx = context;
 			try {
 				final api = ApiClient();
 				await api.delete('/api/v1/accounts/account/$id');
 				await _fetch();
 			} catch (e) {
-				if (context.mounted) {
-					ScaffoldMessenger.of(context).showSnackBar(
-						SnackBar(content: Text('خطا در حذف حساب: $e')),
-					);
-				}
+				if (!ctx.mounted) return;
+				ScaffoldMessenger.of(ctx).showSnackBar(
+					SnackBar(content: Text('خطا در حذف حساب: $e')),
+				);
 			}
 		}
 	}

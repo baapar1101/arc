@@ -25,6 +25,7 @@ from adapters.db.models.currency import Currency
 from adapters.db.models.user import User
 from adapters.db.models.fiscal_year import FiscalYear
 from app.core.responses import ApiError
+from app.services.document_monetization_service import ensure_document_policy_allows_creation
 import jdatetime
 
 # تنظیم لاگر
@@ -282,6 +283,16 @@ def create_receipt_payment(
     
     doc_code = f"{prefix}-{next_num:04d}"
     
+    amount_decimal = Decimal(str(person_total))
+
+    ensure_document_policy_allows_creation(
+        db,
+        business_id,
+        document_type=document_type,
+        document_date=document_date,
+        amount=amount_decimal,
+    )
+
     # ایجاد سند
     document = Document(
         business_id=business_id,
@@ -439,6 +450,22 @@ def create_receipt_payment(
         credit_amount = amount if is_receipt else Decimal(0)
         logger.info(f"مقادیر بدهکار/بستانکار: debit={debit_amount}, credit={credit_amount}")
         
+        # ساخت extra_info برای خط شخص
+        line_extra_info = {
+            "person_id": int(person_id),
+            "person_name": person_line.get("person_name"),
+        }
+        
+        # اضافه کردن اطلاعات فاکتور از extra_info شخص
+        person_line_extra = person_line.get("extra_info")
+        if isinstance(person_line_extra, dict):
+            if person_line_extra.get("invoice_id"):
+                line_extra_info["invoice_id"] = person_line_extra["invoice_id"]
+            if person_line_extra.get("invoice_code"):
+                line_extra_info["invoice_code"] = person_line_extra["invoice_code"]
+            if person_line_extra.get("link_to_invoice"):
+                line_extra_info["link_to_invoice"] = person_line_extra["link_to_invoice"]
+        
         line = DocumentLine(
             document_id=document.id,
             account_id=person_account.id,
@@ -447,10 +474,7 @@ def create_receipt_payment(
             debit=debit_amount,
             credit=credit_amount,
             description=description,
-            extra_info={
-                "person_id": int(person_id),
-                "person_name": person_line.get("person_name"),
-            }
+            extra_info=line_extra_info
         )
         logger.info(f"خط سند شخص ایجاد شد: {line}")
         db.add(line)
@@ -1161,6 +1185,23 @@ def update_receipt_payment(
         person_account = _get_person_account(db, document.business_id, int(person_id), is_receivable=is_person_receivable)
         debit_amount = amount if not is_receipt else Decimal(0)
         credit_amount = amount if is_receipt else Decimal(0)
+        
+        # ساخت extra_info برای خط شخص
+        line_extra_info = {
+            "person_id": int(person_id),
+            "person_name": person_line.get("person_name"),
+        }
+        
+        # اضافه کردن اطلاعات فاکتور از extra_info شخص
+        person_line_extra = person_line.get("extra_info")
+        if isinstance(person_line_extra, dict):
+            if person_line_extra.get("invoice_id"):
+                line_extra_info["invoice_id"] = person_line_extra["invoice_id"]
+            if person_line_extra.get("invoice_code"):
+                line_extra_info["invoice_code"] = person_line_extra["invoice_code"]
+            if person_line_extra.get("link_to_invoice"):
+                line_extra_info["link_to_invoice"] = person_line_extra["link_to_invoice"]
+        
         line = DocumentLine(
             document_id=document.id,
             account_id=person_account.id,
@@ -1169,10 +1210,7 @@ def update_receipt_payment(
             debit=debit_amount,
             credit=credit_amount,
             description=description,
-            extra_info={
-                "person_id": int(person_id),
-                "person_name": person_line.get("person_name"),
-            },
+            extra_info=line_extra_info,
         )
         db.add(line)
 
@@ -1688,6 +1726,13 @@ def document_to_dict(db: Session, document: Document) -> Dict[str, Any]:
                 line_dict["check_number"] = line.extra_info["check_number"]
             if "person_name" in line.extra_info:
                 line_dict["person_name"] = line.extra_info["person_name"]
+            # اضافه کردن اطلاعات فاکتور از extra_info
+            if "invoice_id" in line.extra_info:
+                line_dict["invoice_id"] = line.extra_info["invoice_id"]
+            if "invoice_code" in line.extra_info:
+                line_dict["invoice_code"] = line.extra_info["invoice_code"]
+            if "link_to_invoice" in line.extra_info:
+                line_dict["link_to_invoice"] = line.extra_info["link_to_invoice"]
         
         # اگر person_id موجود است، نام شخص را از دیتابیس دریافت کن
         if line.person_id and "person_name" not in line_dict:

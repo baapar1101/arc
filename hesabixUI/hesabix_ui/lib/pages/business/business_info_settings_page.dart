@@ -467,7 +467,7 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
               decoration: BoxDecoration(
                 border: Border.all(color: cs.outlineVariant),
                 borderRadius: BorderRadius.circular(8),
-                color: cs.surfaceVariant.withOpacity(0.2),
+                color: cs.surfaceContainerHighest.withValues(alpha: 0.2),
               ),
               alignment: Alignment.center,
               child: _logoBytes != null
@@ -522,7 +522,7 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
               decoration: BoxDecoration(
                 border: Border.all(color: cs.outlineVariant),
                 borderRadius: BorderRadius.circular(8),
-                color: cs.surfaceVariant.withOpacity(0.2),
+                color: cs.surfaceContainerHighest.withValues(alpha: 0.2),
               ),
               alignment: Alignment.center,
               child: _stampBytes != null
@@ -577,7 +577,7 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
 
   Widget _buildBusinessTypeDropdown(AppLocalizations t) {
     return DropdownButtonFormField<BusinessType>(
-      value: _businessType,
+      initialValue: _businessType,
       decoration: InputDecoration(labelText: t.businessType),
       items: BusinessType.values
           .map((e) => DropdownMenuItem(value: e, child: Text(e.displayName)))
@@ -589,7 +589,7 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
 
   Widget _buildBusinessFieldDropdown(AppLocalizations t) {
     return DropdownButtonFormField<BusinessField>(
-      value: _businessField,
+      initialValue: _businessField,
       decoration: InputDecoration(labelText: t.businessField),
       items: BusinessField.values
           .map((e) => DropdownMenuItem(value: e, child: Text(e.displayName)))

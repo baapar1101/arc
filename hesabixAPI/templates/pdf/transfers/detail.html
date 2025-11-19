@@ -1,0 +1,230 @@
+{% extends "pdf/base.html" %}
+{% block content %}
+  <style>
+    .transfer-layout {
+      font-size: 11px;
+    }
+    .transfer-layout .section-card {
+      border: 1px solid #000;
+      border-radius: 8px;
+      padding: 10px 12px;
+      margin-bottom: 10px;
+      background: #ffffff;
+      page-break-inside: avoid;
+    }
+    .transfer-layout .header {
+      margin-bottom: 0;
+      padding: 0;
+      background: none;
+      box-shadow: none;
+      border-bottom: none;
+      display: block;
+    }
+    .transfer-layout .header-bottom {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .transfer-layout .header-main { flex: 1; }
+    .transfer-layout .header-meta-right { flex: 0 0 auto; font-size: 11px; }
+    .transfer-layout .title { font-size: 18px; color: #000; margin-bottom: 4px; }
+    .transfer-layout .meta { color: #000; }
+    .transfer-layout .table-card { padding: 0; overflow: visible; border: none; border-radius: 0; background: transparent; }
+    .transfer-layout .table-card .table-inner { padding: 8px 8px 4px 8px; }
+    .transfer-layout .table-wrapper {
+      margin: 0;
+      border-radius: 8px;
+      border: 1px solid #000;
+      overflow: hidden;
+      background: #ffffff;
+    }
+    .transfer-layout table { box-shadow: none; border-radius: 0; width: 100%; border-collapse: collapse; }
+    .transfer-layout thead { background: #f0f0f0; color: #000; }
+    .transfer-layout th, .transfer-layout td { border: 1px solid #000; text-align: center; padding: 6px 4px; }
+    .transfer-layout tbody tr:nth-child(even) { background: #fafafa; }
+    .transfer-layout .amount { text-align: center; }
+    .transfer-layout .source-destination {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+    .transfer-layout .source-destination-card {
+      flex: 1;
+      border: 1px solid #000;
+      border-radius: 8px;
+      padding: 10px;
+      background: #f9f9f9;
+    }
+    .transfer-layout .source-destination-card .label {
+      font-weight: bold;
+      margin-bottom: 4px;
+      font-size: 12px;
+    }
+    .transfer-layout .signatures { display: flex; gap: 12px; justify-content: space-between; align-items: flex-end; }
+    .transfer-layout .signatures-card { border: none; background: transparent; box-shadow: none; }
+    .transfer-layout .signature-box { flex: 1; text-align: center; }
+    .transfer-layout .signature-frame {
+      height: 70px; margin: 0 16px 4px 16px; border: 1px solid #000; border-radius: 8px;
+      display: flex; align-items: center; justify-content: center; flex-direction: column; overflow: hidden; text-align: center;
+    }
+  </style>
+
+  <div class="transfer-layout">
+    <div class="section-card">
+      <div class="header">
+        <div class="header-bottom">
+          {% if business_logo_data_uri %}
+            <div class="header-logo" style="flex:0 0 auto; margin-inline-start: 16px;">
+              <img src="{{ business_logo_data_uri }}" alt="Logo" style="max-height: 60px; max-width: 120px; object-fit: contain;">
+            </div>
+          {% endif %}
+          <div class="header-main">
+            <div class="title">{{ title_text }}</div>
+            <div class="meta">
+              {{ 'کسب‌وکار' if is_fa else 'Business' }}: {{ business_name or '-' }}
+            </div>
+          </div>
+          <div class="header-meta-right">
+            <div>{{ 'کد سند' if is_fa else 'Code' }}: {{ code or '-' }}</div>
+            <div>{{ 'تاریخ سند' if is_fa else 'Date' }}: {{ document_date or '-' }}</div>
+            <div>{{ 'تاریخ تولید' if is_fa else 'Generated' }}: {{ generated_at }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {% if source_type_name or source_name or destination_type_name or destination_name %}
+      <div class="section-card">
+        <div class="source-destination">
+          <div class="source-destination-card">
+            <div class="label">{{ 'مبدأ' if is_fa else 'Source' }}</div>
+            <div class="meta">
+              {% if source_type_name %}{{ source_type_name }}{% endif %}
+              {% if source_name %} {{ source_name }}{% endif %}
+              {% if not source_type_name and not source_name %}-{% endif %}
+            </div>
+          </div>
+          <div style="display: flex; align-items: center; padding: 0 8px;">
+            <span style="font-size: 20px;">→</span>
+          </div>
+          <div class="source-destination-card">
+            <div class="label">{{ 'مقصد' if is_fa else 'Destination' }}</div>
+            <div class="meta">
+              {% if destination_type_name %}{{ destination_type_name }}{% endif %}
+              {% if destination_name %} {{ destination_name }}{% endif %}
+              {% if not destination_type_name and not destination_name %}-{% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+    {% endif %}
+
+    {% if description %}
+      <div class="section-card">
+        <div class="meta" style="margin-bottom: 2px; font-weight: bold;">
+          {{ 'توضیحات' if is_fa else 'Description' }}:
+        </div>
+        <div class="meta">
+          {{ description }}
+        </div>
+      </div>
+    {% endif %}
+
+    <div class="section-card table-card">
+      <div class="table-inner">
+        <div class="meta" style="font-weight:bold; margin-bottom:6px; font-size: 12px;">
+          {{ 'خطوط حساب‌ها' if is_fa else 'Account lines' }}
+        </div>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>{{ 'ردیف' if is_fa else 'No.' }}</th>
+                <th>{{ 'نام حساب' if is_fa else 'Account' }}</th>
+                <th>{{ 'کد حساب' if is_fa else 'Code' }}</th>
+                <th>{{ 'نوع تراکنش' if is_fa else 'Transaction Type' }}</th>
+                <th>{{ 'مبلغ' if is_fa else 'Amount' }}</th>
+                <th>{{ 'توضیحات' if is_fa else 'Description' }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for line in account_lines or [] %}
+                <tr class="{{ 'commission-row' if (line.extra_info or {}).get('is_commission_line') else '' }}">
+                  <td>{{ loop.index }}</td>
+                  <td>{{ line.account_name or '' }}</td>
+                  <td>{{ line.account_code or '' }}</td>
+                  <td>
+                    {% if (line.extra_info or {}).get('is_commission_line') %}
+                      {{ 'کارمزد' if is_fa else 'Commission' }}
+                    {% elif line.side == 'source' %}
+                      {{ 'مبدأ' if is_fa else 'Source' }}
+                    {% elif line.side == 'destination' %}
+                      {{ 'مقصد' if is_fa else 'Destination' }}
+                    {% else %}
+                      {{ line.side or '' }}
+                    {% endif %}
+                  </td>
+                  <td class="amount">{{ line.amount | default(0) | format_amount(0) | ltr | safe }}</td>
+                  <td>{{ line.description or '' }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex; gap: 24px; align-items:flex-start; flex-wrap: wrap;">
+      <div class="section-card" style="flex: 1; min-width: 220px;">
+        <div class="meta" style="margin-bottom: 6px; font-size: 12px; font-weight: bold;">
+          {{ 'خلاصه مالی سند' if is_fa else 'Document summary' }}
+        </div>
+        <div>
+          <div style="display:flex; justify-content: space-between;">
+            <span class="meta">{{ 'مبلغ کل' if is_fa else 'Total amount' }}:</span>
+            <span class="amount">{{ (total_amount or 0) | format_amount(0) | ltr | safe }}</span>
+          </div>
+          {% if commission and commission > 0 %}
+            <div style="display:flex; justify-content: space-between;">
+              <span class="meta">{{ 'کارمزد' if is_fa else 'Commission' }}:</span>
+              <span class="amount">{{ (commission or 0) | format_amount(0) | ltr | safe }}</span>
+            </div>
+          {% endif %}
+          <div style="display:flex; justify-content: space-between;">
+            <span class="meta">{{ 'جمع خطوط حساب‌ها' if is_fa else 'Sum of account lines' }}:</span>
+            <span class="amount">
+              {{ ( (account_lines | sum(attribute='amount')) or 0 ) | format_amount(0) | ltr | safe }}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-card signatures-card" style="flex: 1; min-width: 220px;">
+        <div class="signatures">
+          <div class="signature-box">
+            <div class="signature-frame">
+              {% if business_stamp_data_uri %}
+                <img src="{{ business_stamp_data_uri }}" alt="Stamp" style="max-height: 60px; max-width: 140px; object-fit: contain; opacity: 0.95;">
+              {% endif %}
+              {% if owner_signature_data_uri %}
+                <img src="{{ owner_signature_data_uri }}" alt="Owner signature" style="max-height: 40px; max-width: 140px; object-fit: contain; margin-top: 4px;">
+              {% endif %}
+            </div>
+            <div class="meta" style="margin-top: 4px; font-size: 11px;">
+              {{ 'امضای مسئول / مهر شرکت' if is_fa else 'Signature / Company stamp' }}
+            </div>
+          </div>
+          <div class="signature-box">
+            <div class="signature-frame"></div>
+            <div class="meta" style="margin-top: 4px; font-size: 11px;">
+              {{ 'امضای طرف مقابل' if is_fa else 'Counterparty signature' }}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+

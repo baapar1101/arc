@@ -237,54 +237,137 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
     if (_isProforma) return; // پیش‌فاکتورها تراکنش ندارند
     
     try {
-      final links = _originalExtraInfo['links'] as Map<String, dynamic>?;
-      if (links == null) return;
-      
-      final receiptPaymentIds = links['receipt_payment_document_ids'] as List<dynamic>?;
-      if (receiptPaymentIds == null || receiptPaymentIds.isEmpty) return;
-      
       final receiptPaymentService = ReceiptPaymentService(ApiClient());
       final List<InvoiceTransaction> transactions = [];
+      final Set<int> processedDocIds = {}; // برای جلوگیری از تکرار
       
-      for (final id in receiptPaymentIds) {
-        try {
-          final doc = await receiptPaymentService.getById(id as int);
-          if (doc == null) continue;
-          
-          // تبدیل سند دریافت/پرداخت به InvoiceTransaction
-          for (final accountLine in doc.accountLines) {
-            if (accountLine.transactionType == null) continue;
-            
-            final transactionType = TransactionType.fromValue(accountLine.transactionType ?? '');
-            if (transactionType == null) continue;
-            
-            final transaction = InvoiceTransaction(
-              id: const Uuid().v4(), // ID موقت برای ویرایش
-              type: transactionType,
-              amount: accountLine.amount,
-              transactionDate: accountLine.transactionDate ?? doc.documentDate,
-              description: accountLine.description,
-              commission: accountLine.commission,
-              // استخراج اطلاعات اضافی (تبدیل int به String)
-              bankId: accountLine.extraInfo?['bank_id']?.toString(),
-              bankName: accountLine.extraInfo?['bank_name'] as String?,
-              cashRegisterId: accountLine.extraInfo?['cash_register_id']?.toString(),
-              cashRegisterName: accountLine.extraInfo?['cash_register_name'] as String?,
-              pettyCashId: accountLine.extraInfo?['petty_cash_id']?.toString(),
-              pettyCashName: accountLine.extraInfo?['petty_cash_name'] as String?,
-              checkId: accountLine.extraInfo?['check_id']?.toString(),
-              checkNumber: accountLine.extraInfo?['check_number'] as String?,
-              personId: accountLine.extraInfo?['person_id']?.toString(),
-              personName: accountLine.extraInfo?['person_name'] as String?,
-              accountId: accountLine.accountId.toString(),
-              accountName: accountLine.accountName,
-            );
-            transactions.add(transaction);
+      // 1. بارگذاری از لینک‌های مستقیم (receipt_payment_document_ids)
+      final links = _originalExtraInfo['links'] as Map<String, dynamic>?;
+      if (links != null) {
+        final receiptPaymentIds = links['receipt_payment_document_ids'] as List<dynamic>?;
+        if (receiptPaymentIds != null && receiptPaymentIds.isNotEmpty) {
+          for (final id in receiptPaymentIds) {
+            try {
+              final docId = id is int ? id : int.tryParse(id.toString());
+              if (docId == null || processedDocIds.contains(docId)) continue;
+              
+              final doc = await receiptPaymentService.getById(docId);
+              if (doc == null) continue;
+              
+              processedDocIds.add(docId);
+              
+              // تبدیل سند دریافت/پرداخت به InvoiceTransaction
+              for (final accountLine in doc.accountLines) {
+                if (accountLine.transactionType == null) continue;
+                
+                final transactionType = TransactionType.fromValue(accountLine.transactionType ?? '');
+                if (transactionType == null) continue;
+                
+                final transaction = InvoiceTransaction(
+                  id: const Uuid().v4(), // ID موقت برای ویرایش
+                  type: transactionType,
+                  amount: accountLine.amount,
+                  transactionDate: accountLine.transactionDate ?? doc.documentDate,
+                  description: accountLine.description,
+                  commission: accountLine.commission,
+                  // استخراج اطلاعات اضافی (تبدیل int به String)
+                  bankId: accountLine.extraInfo?['bank_id']?.toString(),
+                  bankName: accountLine.extraInfo?['bank_name'] as String?,
+                  cashRegisterId: accountLine.extraInfo?['cash_register_id']?.toString(),
+                  cashRegisterName: accountLine.extraInfo?['cash_register_name'] as String?,
+                  pettyCashId: accountLine.extraInfo?['petty_cash_id']?.toString(),
+                  pettyCashName: accountLine.extraInfo?['petty_cash_name'] as String?,
+                  checkId: accountLine.extraInfo?['check_id']?.toString(),
+                  checkNumber: accountLine.extraInfo?['check_number'] as String?,
+                  personId: accountLine.extraInfo?['person_id']?.toString(),
+                  personName: accountLine.extraInfo?['person_name'] as String?,
+                  accountId: accountLine.accountId.toString(),
+                  accountName: accountLine.accountName,
+                );
+                transactions.add(transaction);
+              }
+            } catch (e) {
+              // اگر خطا رخ داد، ادامه بده
+            }
           }
-        } catch (e) {
-          // اگر خطا رخ داد، ادامه بده
-          print('Error loading payment transaction from document $id: $e');
         }
+      }
+      
+      // 2. جستجوی اسناد دریافت/پرداخت که به این فاکتور لینک شده‌اند
+      // (از طریق extra_info.invoice_id در person_lines)
+      try {
+        final receiptPaymentList = await receiptPaymentService.listReceiptsPayments(
+          businessId: widget.businessId,
+          skip: 0,
+          take: 1000, // محدود کردن به 1000 رکورد
+        );
+        
+        final items = (receiptPaymentList['items'] as List<dynamic>?) ?? [];
+        for (final item in items) {
+          try {
+            final docId = (item['id'] as num?)?.toInt();
+            if (docId == null || processedDocIds.contains(docId)) continue;
+            
+            // بررسی person_lines برای invoice_id
+            final personLines = item['person_lines'] as List<dynamic>?;
+            if (personLines == null) continue;
+            
+            bool hasInvoiceLink = false;
+            for (final pl in personLines) {
+              final extraInfo = pl['extra_info'] as Map<String, dynamic>?;
+              if (extraInfo != null) {
+                final invoiceId = extraInfo['invoice_id'];
+                if (invoiceId is int && invoiceId == widget.invoiceId) {
+                  hasInvoiceLink = true;
+                  break;
+                } else if (invoiceId is num && invoiceId.toInt() == widget.invoiceId) {
+                  hasInvoiceLink = true;
+                  break;
+                }
+              }
+            }
+            
+            if (!hasInvoiceLink) continue;
+            
+            // دریافت جزئیات کامل سند
+            final doc = await receiptPaymentService.getById(docId);
+            if (doc == null) continue;
+            
+            processedDocIds.add(docId);
+            
+            // تبدیل سند دریافت/پرداخت به InvoiceTransaction
+            for (final accountLine in doc.accountLines) {
+              if (accountLine.transactionType == null) continue;
+              
+              final transactionType = TransactionType.fromValue(accountLine.transactionType ?? '');
+              if (transactionType == null) continue;
+              
+              final transaction = InvoiceTransaction(
+                id: const Uuid().v4(), // ID موقت برای ویرایش
+                type: transactionType,
+                amount: accountLine.amount,
+                transactionDate: accountLine.transactionDate ?? doc.documentDate,
+                description: accountLine.description,
+                commission: accountLine.commission,
+                bankId: accountLine.extraInfo?['bank_id']?.toString(),
+                bankName: accountLine.extraInfo?['bank_name'] as String?,
+                cashRegisterId: accountLine.extraInfo?['cash_register_id']?.toString(),
+                cashRegisterName: accountLine.extraInfo?['cash_register_name'] as String?,
+                pettyCashId: accountLine.extraInfo?['petty_cash_id']?.toString(),
+                pettyCashName: accountLine.extraInfo?['petty_cash_name'] as String?,
+                checkId: accountLine.extraInfo?['check_id']?.toString(),
+                checkNumber: accountLine.extraInfo?['check_number'] as String?,
+                personId: accountLine.extraInfo?['person_id']?.toString(),
+                personName: accountLine.extraInfo?['person_name'] as String?,
+                accountId: accountLine.accountId.toString(),
+                accountName: accountLine.accountName,
+              );
+              transactions.add(transaction);
+            }
+          } catch (e) {
+          }
+        }
+      } catch (e) {
       }
       
       if (mounted) {
@@ -293,7 +376,6 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
         });
       }
     } catch (e) {
-      print('Error loading payment transactions: $e');
     }
   }
 

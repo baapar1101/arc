@@ -1,9 +1,11 @@
 import '../core/api_client.dart';
 import '../models/receipt_payment_document.dart';
+import 'document_policy_guard.dart';
 
 /// سرویس دریافت و پرداخت
 class ReceiptPaymentService {
   final ApiClient _apiClient;
+  late final DocumentPolicyGuard _policyGuard = DocumentPolicyGuard(_apiClient);
 
   ReceiptPaymentService(this._apiClient);
 
@@ -27,6 +29,15 @@ class ReceiptPaymentService {
     String? description,
     Map<String, dynamic>? extraInfo,
   }) async {
+    final amount = _sumLineAmounts(personLines);
+
+    await _policyGuard.ensureAllowed(
+      businessId: businessId,
+      documentType: documentType,
+      documentDate: documentDate,
+      amount: amount,
+    );
+
     final response = await _apiClient.post(
       '/businesses/$businessId/receipts-payments/create',
       data: {
@@ -226,5 +237,18 @@ class ReceiptPaymentService {
       search: search,
     );
   }
+}
+
+num _sumLineAmounts(List<Map<String, dynamic>> lines) {
+  num sum = 0;
+  for (final line in lines) {
+    final value = line['amount'];
+    if (value is num) {
+      sum += value.abs();
+    } else if (value is String) {
+      sum += num.tryParse(value) ?? 0;
+    }
+  }
+  return sum.abs();
 }
 

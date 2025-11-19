@@ -78,7 +78,7 @@ class _ProductsPageState extends State<ProductsPage> {
                       borderRadius: BorderRadius.circular(12),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.3),
+                          color: Colors.black.withValues(alpha: 0.3),
                           blurRadius: 20,
                           spreadRadius: 5,
                         ),
@@ -102,7 +102,7 @@ class _ProductsPageState extends State<ProductsPage> {
                 icon: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.5),
+                    color: Colors.black.withValues(alpha: 0.5),
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(Icons.close, color: Colors.white, size: 24),
@@ -367,14 +367,12 @@ class _ProductsPageState extends State<ProductsPage> {
                     await api.delete<Map<String, dynamic>>(
                       '/products/business/${widget.businessId}/${row['id']}',
                     );
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.productDeletedSuccessfully)));
-                      try { ( _tableKey.currentState as dynamic)?.refresh(); } catch (_) {}
-                    }
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.productDeletedSuccessfully)));
+                    try { ( _tableKey.currentState as dynamic)?.refresh(); } catch (_) {}
                   } catch (e) {
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${t.error}: $e')));
-                    }
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${t.error}: $e')));
                   }
                 },
               ),
@@ -428,14 +426,12 @@ class _ProductsPageState extends State<ProductsPage> {
                         data: { 'ids': ids },
                       );
                       try { ( _tableKey.currentState as dynamic)?.refresh(); } catch (_) {}
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.productsDeletedSuccessfully)));
-                      }
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.productsDeletedSuccessfully)));
                     } catch (e) {
-                      if (mounted) {
-                        final t = AppLocalizations.of(context);
-                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${t.error}: $e')));
-                      }
+                      if (!context.mounted) return;
+                      final t = AppLocalizations.of(context);
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${t.error}: $e')));
                     }
                   },
                   icon: const Icon(Icons.delete_sweep_outlined),

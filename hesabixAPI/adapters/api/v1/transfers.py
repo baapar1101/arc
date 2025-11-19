@@ -2,11 +2,11 @@
 API endpoints برای انتقال وجه (Transfers)
 """
 
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 from fastapi import APIRouter, Depends, Request, Body
 from sqlalchemy.orm import Session
 from fastapi.responses import Response
-import io, datetime, re
+import io, datetime, re, base64
 
 from adapters.db.session import get_db
 from app.core.auth_dependency import get_current_user, AuthContext
@@ -21,6 +21,9 @@ from app.services.transfer_service import (
     update_transfer,
 )
 from adapters.db.models.business import Business
+from adapters.db.models.user import User
+from adapters.db.models.business_print_settings import BusinessPrintSettings
+from app.services.file_storage_service import FileStorageService
 
 
 router = APIRouter(tags=["transfers"])
@@ -107,6 +110,265 @@ async def get_transfer_endpoint(
     if business_id and not ctx.can_access_business(business_id):
         raise ApiError("FORBIDDEN", "Access denied", http_status=403)
     return success_response(data=format_datetime_fields(result, request), request=request, message="TRANSFER_DETAILS")
+
+
+@router.get(
+    "/transfers/{document_id}/pdf",
+    summary="خروجی PDF تک سند انتقال",
+    description="خروجی PDF یک سند انتقال",
+)
+async def export_single_transfer_pdf(
+    document_id: int,
+    request: Request,
+    auth_context: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    template_id: int | None = None,
+):
+    """خروجی PDF تک سند انتقال"""
+    from weasyprint import HTML
+    from weasyprint.text.fonts import FontConfiguration
+    from app.core.i18n import negotiate_locale
+    from app.core.calendar import CalendarConverter, get_calendar_type_from_header
+    from html import escape
+    from app.services.pdf.template_renderer import render_template
+    
+    # دریافت سند
+    result = get_transfer(db, document_id)
+    if not result:
+        raise ApiError(
+            "DOCUMENT_NOT_FOUND",
+            "Transfer document not found",
+            http_status=404
+        )
+    
+    # بررسی دسترسی
+    business_id = result.get("business_id")
+    if business_id and not auth_context.can_access_business(business_id):
+        raise ApiError("FORBIDDEN", "Access denied", http_status=403)
+    
+    # دریافت اطلاعات کسب‌وکار + فایل‌های گرافیکی (لوگو/مهر/امضا)
+    business_name = ""
+    business_logo_data_uri: Optional[str] = None
+    business_stamp_data_uri: Optional[str] = None
+    owner_signature_data_uri: Optional[str] = None
+    storage = FileStorageService(db)
+
+    async def _load_image_data_uri(file_id_str: Optional[str]) -> Optional[str]:
+        if not file_id_str:
+            return None
+        try:
+            from uuid import UUID
+            try:
+                file_data = await storage.download_file(UUID(str(file_id_str)))
+            except Exception:
+                return None
+            content: bytes = file_data.get("content") or b""
+            if not content:
+                return None
+            mime = file_data.get("mime_type") or "image/png"
+            b64 = base64.b64encode(content).decode("ascii")
+            return f"data:{mime};base64,{b64}"
+        except Exception:
+            return None
+
+    try:
+        b = db.query(Business).filter(Business.id == business_id).first()
+        if b is not None:
+            business_name = b.name or ""
+            # تنظیمات چاپ
+            try:
+                rows = (
+                    db.query(BusinessPrintSettings)
+                    .filter(BusinessPrintSettings.business_id == business_id)
+                    .all()
+                )
+            except Exception:
+                rows = []
+
+            def _pick_cfg() -> dict:
+                cfg = {"show_logo": True, "show_stamp": True, "footer_note": None}
+                per_type = None
+                for r in rows:
+                    if r.document_type == "all":
+                        cfg = {
+                            "show_logo": bool(getattr(r, "show_logo", True)),
+                            "show_stamp": bool(getattr(r, "show_stamp", True)),
+                            "footer_note": getattr(r, "footer_note", None),
+                        }
+                    elif r.document_type == "transfer":
+                        per_type = {
+                            "show_logo": bool(getattr(r, "show_logo", True)),
+                            "show_stamp": bool(getattr(r, "show_stamp", True)),
+                            "footer_note": getattr(r, "footer_note", None),
+                        }
+                if per_type:
+                    merged = dict(cfg)
+                    merged.update({k: v for k, v in per_type.items() if v is not None})
+                    return merged
+                return cfg
+
+            cfg = _pick_cfg()
+            if cfg.get("show_logo", True):
+                business_logo_data_uri = await _load_image_data_uri(getattr(b, "logo_file_id", None))
+            if cfg.get("show_stamp", True):
+                business_stamp_data_uri = await _load_image_data_uri(getattr(b, "stamp_file_id", None))
+                try:
+                    owner_user = db.query(User).filter(User.id == b.owner_id).first()
+                except Exception:
+                    owner_user = None
+                if owner_user is not None:
+                    owner_signature_data_uri = await _load_image_data_uri(getattr(owner_user, "signature_file_id", None))
+    except Exception:
+        business_name = business_name or ""
+
+    # Locale handling
+    locale = negotiate_locale(request.headers.get("Accept-Language"))
+    is_fa = locale == 'fa'
+    
+    # Get calendar type for date formatting
+    calendar_type = get_calendar_type_from_header(request.headers.get("X-Calendar-Type"))
+    if not calendar_type:
+        calendar_type = "jalali" if is_fa else "gregorian"
+    
+    # آماده‌سازی داده‌ها
+    doc_type_name = result.get("document_type_name", "انتقال")
+    doc_code = result.get("code", "")
+    doc_date_dt = result.get("document_date")
+    doc_date = ""
+    if doc_date_dt:
+        try:
+            if isinstance(doc_date_dt, datetime.datetime):
+                formatted = CalendarConverter.format_datetime(doc_date_dt, calendar_type)
+                doc_date = formatted.get("date_only", "") or formatted.get("formatted", "")
+            else:
+                doc_date = str(doc_date_dt)
+        except Exception:
+            doc_date = str(doc_date_dt) if doc_date_dt else ""
+    
+    total_amount = result.get("total_amount", 0)
+    commission = result.get("commission", 0)
+    description = result.get("description", "")
+    account_lines = result.get("account_lines", [])
+    source_type = result.get("source_type", "")
+    source_type_name = result.get("source_type_name", "")
+    source_name = result.get("source_name", "")
+    destination_type = result.get("destination_type", "")
+    destination_type_name = result.get("destination_type_name", "")
+    destination_name = result.get("destination_name", "")
+    
+    # تاریخ تولید
+    try:
+        _now = datetime.datetime.now()
+        _fd = CalendarConverter.format_datetime(_now, calendar_type)
+        generated_at = _fd.get("formatted") or _fd.get("date_only") or _now.strftime('%Y/%m/%d %H:%M')
+    except Exception:
+        generated_at = datetime.datetime.now().strftime('%Y/%m/%d %H:%M')
+    
+    title_text = f"سند {doc_type_name}" if is_fa else f"{doc_type_name} Document"
+    footer_text = f"تولید شده در {generated_at}" if is_fa else f"Generated at {generated_at}"
+
+    # تلاش برای رندر با قالب سفارشی (transfers/detail)
+    resolved_html = None
+    try:
+        from app.services.report_template_service import ReportTemplateService
+        explicit_template_id = None
+        try:
+            if template_id is not None:
+                explicit_template_id = int(template_id)
+        except Exception:
+            explicit_template_id = None
+        template_context = {
+            "business_id": business_id,
+            "business_name": business_name,
+            "document": result,
+            "account_lines": account_lines,
+            "code": doc_code,
+            "document_date": doc_date,
+            "total_amount": total_amount,
+            "commission": commission,
+            "description": description,
+            "source_type": source_type,
+            "source_type_name": source_type_name,
+            "source_name": source_name,
+            "destination_type": destination_type,
+            "destination_type_name": destination_type_name,
+            "destination_name": destination_name,
+            "title_text": title_text,
+            "generated_at": generated_at,
+            "is_fa": is_fa,
+            "business_logo_data_uri": business_logo_data_uri,
+            "business_stamp_data_uri": business_stamp_data_uri,
+            "owner_signature_data_uri": owner_signature_data_uri,
+        }
+        resolved_html = ReportTemplateService.try_render_resolved(
+            db=db,
+            business_id=business_id,
+            module_key="transfers",
+            subtype="detail",
+            context=template_context,
+            explicit_template_id=explicit_template_id,
+        )
+    except Exception:
+        resolved_html = None
+
+    # HTML پیش‌فرض در نبود قالب: فایل قالب + پارامترها
+    try:
+        qp = request.query_params
+        paper_size = qp.get("paper_size")
+        orientation = qp.get("orientation")
+        disposition = qp.get("disposition") or "attachment"
+    except Exception:
+        paper_size = None
+        orientation = None
+        disposition = "attachment"
+    html_content = resolved_html or render_template(
+        "pdf/transfers/detail.html",
+        {
+            "business_id": business_id,
+            "business_name": business_name,
+            "document": result,
+            "account_lines": account_lines,
+            "code": doc_code,
+            "document_date": doc_date,
+            "total_amount": total_amount,
+            "commission": commission,
+            "description": description,
+            "source_type": source_type,
+            "source_type_name": source_type_name,
+            "source_name": source_name,
+            "destination_type": destination_type,
+            "destination_type_name": destination_type_name,
+            "destination_name": destination_name,
+            "title_text": title_text,
+            "generated_at": generated_at,
+            "is_fa": is_fa,
+            "paper_size": paper_size,
+            "orientation": orientation,
+            "footer_text": footer_text,
+            "business_logo_data_uri": business_logo_data_uri,
+            "business_stamp_data_uri": business_stamp_data_uri,
+            "owner_signature_data_uri": owner_signature_data_uri,
+        },
+    )
+
+    font_config = FontConfiguration()
+    pdf_bytes = HTML(string=html_content).write_pdf(font_config=font_config)
+
+    # Build filename
+    def slugify(text: str) -> str:
+        return re.sub(r"[^A-Za-z0-9_-]+", "_", text).strip("_")
+    
+    filename = f"transfer_{slugify(doc_code)}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+    
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f"{disposition}; filename={filename}",
+            "Content-Length": str(len(pdf_bytes)),
+            "Access-Control-Expose-Headers": "Content-Disposition",
+        },
+    )
 
 
 @router.delete(

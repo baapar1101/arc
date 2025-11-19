@@ -31,6 +31,13 @@ class _SystemSettingsPageState extends State<SystemSettingsPage> {
         route: '/user/profile/system-settings/storage-plans',
       ),
       SettingsItem(
+        title: 'تنظیمات پکیج‌ها',
+        description: 'مدیریت سناریوی درآمدزایی اسناد و پکیج‌ها',
+        icon: Icons.layers_outlined,
+        color: const Color(0xFF26A69A),
+        route: '/user/profile/system-settings/document-monetization',
+      ),
+      SettingsItem(
         title: 'systemConfiguration',
         description: 'systemConfigurationDescription',
         icon: Icons.settings_outlined,

@@ -1,4 +1,3 @@
-import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -492,7 +491,7 @@ class _ProductBasicInfoSectionState extends State<ProductBasicInfoSection> {
                             onPressed: () => _pickImage(context),
                             tooltip: 'تغییر عکس',
                             style: IconButton.styleFrom(
-                              backgroundColor: Colors.white.withOpacity(0.8),
+                              backgroundColor: Colors.white.withValues(alpha: 0.8),
                               padding: const EdgeInsets.all(8),
                             ),
                           ),
@@ -504,7 +503,7 @@ class _ProductBasicInfoSectionState extends State<ProductBasicInfoSection> {
                             },
                             tooltip: 'حذف عکس',
                             style: IconButton.styleFrom(
-                              backgroundColor: Colors.white.withOpacity(0.8),
+                              backgroundColor: Colors.white.withValues(alpha: 0.8),
                               padding: const EdgeInsets.all(8),
                             ),
                           ),

@@ -226,18 +226,18 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                         paperSize: _paperSize,
                         orientation: _orientation,
                       );
-                      if (!mounted) return;
+                      if (!ctx.mounted) return;
                       Navigator.pop(ctx);
-                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.createdWithId(id))));
+                      ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(t.createdWithId(id))));
                     } else {
                       await _service.updateTemplate(
                         businessId: widget.businessId,
                         templateId: existingTemplateId,
                         changes: {'assets': {'builder_design': design, ...assets}, 'engine': 'builder'},
                       );
-                      if (!mounted) return;
+                      if (!ctx.mounted) return;
                       Navigator.pop(ctx);
-                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.updated)));
+                      ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(t.updated)));
                     }
                     await _fetch();
                   } catch (e) {
@@ -1292,15 +1292,13 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                     orientation: _orientation,
                     margins: margins,
                   );
-                  if (mounted) Navigator.pop(ctx);
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.templateCreatedWithId(id))));
-                  }
+                  if (!ctx.mounted) return;
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(t.templateCreatedWithId(id))));
                   await _fetch();
                 } catch (e) {
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.createError(e.toString()))));
-                  }
+                  if (!ctx.mounted) return;
+                  ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(t.createError(e.toString()))));
                 }
               },
               child: Text(t.create),
@@ -1369,8 +1367,10 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
       _marginLeftCtrl.text = (margins['left']?.toString() ?? _marginLeftCtrl.text);
     } catch (_) {}
 
+    if (!context.mounted) return;
+    final ctx = context;
     await showDialog(
-      context: context,
+      context: ctx,
       builder: (ctx) {
         return AlertDialog(
           title: const Text('ویرایش قالب'),
@@ -1619,12 +1619,12 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                     templateId: (item['id'] as num).toInt(),
                     changes: changes,
                   );
-                  if (mounted) Navigator.pop(ctx);
+                  if (!ctx.mounted) return;
+                  Navigator.pop(ctx);
                   await _fetch();
                 } catch (e) {
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطا در ویرایش: $e')));
-                  }
+                  if (!ctx.mounted) return;
+                  ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text('خطا در ویرایش: $e')));
                 }
               },
               child: const Text('ذخیره'),
@@ -1713,12 +1713,15 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
               try {
                 // فعلاً اولین مورد را به‌عنوان نمونه خروجی می‌گیریم؛ در آینده selection اضافه می‌شود
                 final item = _items.first;
+                if (!context.mounted) return;
+                final ctx = context;
                 final full = await _service.getTemplate(
                   businessId: widget.businessId,
                   templateId: (item['id'] as num).toInt(),
                 );
+                if (!ctx.mounted) return;
                 await showDialog(
-                  context: context,
+                  context: ctx,
                   builder: (ctx) {
                     return AlertDialog(
                       title: const Text('خروجی JSON قالب'),
@@ -1750,6 +1753,7 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                   },
                 );
               } catch (e) {
+                if (!context.mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطا در خروجی: $e')));
               }
             },
@@ -1783,6 +1787,8 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                 ),
               );
               if (ok == true) {
+                if (!context.mounted) return;
+                final ctx = context;
                 try {
                   final data = jsonDecode(ctrl.text) as Map<String, dynamic>;
                   _moduleCtrl.text = (data['module_key'] ?? _moduleCtrl.text).toString();
@@ -1800,9 +1806,11 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                   _marginRightCtrl.text = (margins['right']?.toString() ?? _marginRightCtrl.text);
                   _marginBottomCtrl.text = (margins['bottom']?.toString() ?? _marginBottomCtrl.text);
                   _marginLeftCtrl.text = (margins['left']?.toString() ?? _marginLeftCtrl.text);
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('وارد شد. می‌توانید ذخیره کنید.')));
+                  if (!ctx.mounted) return;
+                  ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('وارد شد. می‌توانید ذخیره کنید.')));
                 } catch (e) {
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('JSON نامعتبر: $e')));
+                  if (!ctx.mounted) return;
+                  ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text('JSON نامعتبر: $e')));
                 }
               }
             },
@@ -1837,16 +1845,18 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                 const SizedBox(width: 8),
                 OutlinedButton.icon(
                   onPressed: () async {
+                    if (!context.mounted) return;
+                    final ctx = context;
                     try {
                       final data = await _service.schema(
                         businessId: widget.businessId,
                         moduleKey: _moduleCtrl.text.trim().isEmpty ? 'invoices' : _moduleCtrl.text.trim(),
                         subtype: _subtypeCtrl.text.trim().isEmpty ? null : _subtypeCtrl.text.trim(),
                       );
-                      if (!mounted) return;
+                      if (!ctx.mounted) return;
                       final keys = (data['keys'] as List? ?? const []).cast<Map>();
                       await showDialog(
-                        context: context,
+                        context: ctx,
                         builder: (ctx) {
                           return AlertDialog(
                             title: const Text('متغیرهای قابل استفاده'),
@@ -1882,8 +1892,8 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                         },
                       );
                     } catch (e) {
-                      if (!mounted) return;
-                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطا در دریافت schema: $e')));
+                      if (!ctx.mounted) return;
+                      ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text('خطا در دریافت schema: $e')));
                     }
                   },
                   icon: const Icon(Icons.help_outline),

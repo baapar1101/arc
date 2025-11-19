@@ -147,7 +147,7 @@ class _CreditSettingsPageState extends State<CreditSettingsPage> {
                       ),
                       const SizedBox(height: 8),
                       DropdownButtonFormField<String>(
-                        value: _strategy,
+                        initialValue: _strategy,
                         items: const [
                           DropdownMenuItem(value: 'single-default', child: Text('سقف پیش‌فرض یکنواخت')),
                           DropdownMenuItem(value: 'by-group', child: Text('بر اساس گروه/نقش')),

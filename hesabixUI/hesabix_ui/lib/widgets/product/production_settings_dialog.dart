@@ -75,13 +75,15 @@ class _ProductionSettingsDialogState extends State<ProductionSettingsDialog> {
                     const SizedBox(width: 8),
                     FilledButton(
                       onPressed: () async {
+                        if (!context.mounted) return;
+                        final ctx = context;
                         await _service.saveDefaultAccounts(
                           businessId: widget.businessId,
                           inventoryCode: _invCtrl.text.trim(),
                           wipCode: _wipCtrl.text.trim(),
                         );
-                        if (!mounted) return;
-                        Navigator.pop(context, true);
+                        if (!ctx.mounted) return;
+                        Navigator.pop(ctx, true);
                       },
                       child: const Text('ذخیره'),
                     ),

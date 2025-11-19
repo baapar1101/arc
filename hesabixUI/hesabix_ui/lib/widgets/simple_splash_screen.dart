@@ -79,12 +79,10 @@ class _SimpleSplashScreenState extends State<SimpleSplashScreen>
   }
 
   void _checkAuthenticationAndComplete() {
-    print('🔍 SPLASH DEBUG: Checking authentication and completing splash screen');
     
     // اگر authStore موجود است، وضعیت احراز هویت را بررسی کن
     if (widget.authStore != null) {
       final hasApiKey = widget.authStore!.apiKey != null && widget.authStore!.apiKey!.isNotEmpty;
-      print('🔍 SPLASH DEBUG: AuthStore available, has API key: $hasApiKey');
       
       // اگر کاربر وارد شده، URL فعلی را ذخیره کن
       if (hasApiKey) {
@@ -92,17 +90,14 @@ class _SimpleSplashScreenState extends State<SimpleSplashScreen>
         try {
           // در web، URL فعلی را از window.location می‌گیریم
           final currentUrl = Uri.base.path;
-          print('🔍 SPLASH DEBUG: Current URL from Uri.base: $currentUrl');
           
           if (currentUrl.isNotEmpty && 
               currentUrl != '/' && 
               currentUrl != '/login' &&
               (currentUrl.startsWith('/user/profile/') || currentUrl.startsWith('/business/'))) {
-            print('🔍 SPLASH DEBUG: Saving current URL: $currentUrl');
             widget.authStore!.saveLastUrl(currentUrl);
           }
         } catch (e) {
-          print('🔍 SPLASH DEBUG: Error getting current URL: $e');
         }
       }
       
@@ -110,10 +105,8 @@ class _SimpleSplashScreenState extends State<SimpleSplashScreen>
       // اگر کاربر وارد شده، در صفحه کنونی می‌ماند
       // این منطق در main.dart در GoRouter redirect مدیریت می‌شود
     } else {
-      print('🔍 SPLASH DEBUG: AuthStore is null');
     }
     
-    print('🔍 SPLASH DEBUG: Calling onComplete callback');
     widget.onComplete?.call();
   }
 

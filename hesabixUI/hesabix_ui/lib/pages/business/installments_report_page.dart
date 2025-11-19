@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
+// ignore: avoid_web_libraries_in_flutter
 import 'dart:html' as html;
 import 'package:hesabix_ui/widgets/invoice/person_combobox_widget.dart';
 import 'package:hesabix_ui/models/person_model.dart';
@@ -118,7 +119,7 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
                 SizedBox(
                   width: 220,
                   child: DropdownButtonFormField<int>(
-                    value: _selectedFiscalYearId,
+                    initialValue: _selectedFiscalYearId,
                     items: _fiscalYears
                         .map((fy) => DropdownMenuItem<int>(
                               value: fy['id'] as int,
@@ -135,7 +136,7 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
                 SizedBox(
                   width: 180,
                   child: DropdownButtonFormField<String>(
-                    value: _status,
+                    initialValue: _status,
                     items: const [
                       DropdownMenuItem(value: null, child: Text('همه وضعیت‌ها')),
                       DropdownMenuItem(value: 'pending', child: Text('در انتظار')),

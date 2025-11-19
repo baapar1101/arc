@@ -1,8 +1,12 @@
 import '../core/api_client.dart';
 import 'package:dio/dio.dart';
 
+import 'document_policy_guard.dart';
+
 class TransferService {
   final ApiClient _apiClient;
+  late final DocumentPolicyGuard _policyGuard = DocumentPolicyGuard(_apiClient);
+
   TransferService(this._apiClient);
 
   Future<Map<String, dynamic>> create({
@@ -16,6 +20,13 @@ class TransferService {
     String? description,
     Map<String, dynamic>? extraInfo,
   }) async {
+    await _policyGuard.ensureAllowed(
+      businessId: businessId,
+      documentType: 'transfer',
+      documentDate: documentDate,
+      amount: amount.abs(),
+    );
+
     final body = <String, dynamic>{
       'document_date': documentDate.toIso8601String(),
       'currency_id': currencyId,

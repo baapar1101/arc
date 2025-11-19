@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -6,6 +8,8 @@ import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/utils/date_formatters.dart' as date_formatters;
 import 'package:hesabix_ui/services/business_api_service.dart';
 import 'package:hesabix_ui/utils/number_normalizer.dart';
+import '../../core/api_client.dart';
+import '../../services/document_monetization_service.dart';
 
 class BusinessesListPage extends StatefulWidget {
   const BusinessesListPage({super.key});
@@ -281,13 +285,14 @@ class _BusinessDetailsDialog extends StatelessWidget {
             // Tabs
             Expanded(
               child: DefaultTabController(
-                length: 2, // تعداد تب‌ها
+                length: 3,
                 child: Column(
                   children: [
-                    TabBar(
-                      tabs: const [
+                    const TabBar(
+                      tabs: [
                         Tab(text: 'اطلاعات کسب و کار'),
                         Tab(text: 'کیف پول'),
+                        Tab(text: 'سیاست‌ها و پکیج‌ها'),
                       ],
                     ),
                     Expanded(
@@ -295,6 +300,7 @@ class _BusinessDetailsDialog extends StatelessWidget {
                         children: [
                           _buildBusinessInfoTab(theme),
                           _WalletTab(businessId: business['id'] as int),
+                          _BusinessPoliciesTab(businessId: business['id'] as int),
                         ],
                       ),
                     ),
@@ -838,5 +844,342 @@ class _WalletTabState extends State<_WalletTab> {
         ),
       ),
     );
+  }
+}
+
+class _BusinessPoliciesTab extends StatefulWidget {
+  final int businessId;
+  const _BusinessPoliciesTab({required this.businessId});
+
+  @override
+  State<_BusinessPoliciesTab> createState() => _BusinessPoliciesTabState();
+}
+
+class _BusinessPoliciesTabState extends State<_BusinessPoliciesTab> {
+  final DocumentMonetizationService _service = DocumentMonetizationService(ApiClient());
+  bool _loading = true;
+  bool _assigningPlan = false;
+  bool _deleting = false;
+  String? _error;
+  int? _selectedPlanId;
+  List<Map<String, dynamic>> _policies = const <Map<String, dynamic>>[];
+  List<Map<String, dynamic>> _plans = const <Map<String, dynamic>>[];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final policies = await _service.listBusinessPoliciesAdmin(widget.businessId);
+      final plans = await _service.listSubscriptionPlans(onlyActive: true);
+      setState(() {
+        _policies = policies;
+        _plans = plans;
+        if (_selectedPlanId == null && plans.isNotEmpty) {
+          _selectedPlanId = plans.first['id'] as int?;
+        }
+        _loading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = '$e';
+        _loading = false;
+      });
+    }
+  }
+
+  Future<void> _assignPlan() async {
+    if (_selectedPlanId == null) {
+      _showSnack('پلن را انتخاب کنید');
+      return;
+    }
+    setState(() => _assigningPlan = true);
+    try {
+      await _service.assignSubscriptionToBusiness(
+        widget.businessId,
+        {'plan_id': _selectedPlanId, 'auto_renew': false},
+      );
+      _showSnack('پلن با موفقیت اعمال شد');
+    } catch (e) {
+      _showSnack('خطا در اعمال پلن: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _assigningPlan = false);
+      }
+    }
+  }
+
+  Future<void> _deletePolicy(int policyId) async {
+    setState(() => _deleting = true);
+    try {
+      await _service.deleteBusinessPolicyAdmin(widget.businessId, policyId);
+      await _loadData();
+      _showSnack('سیاست حذف شد');
+    } catch (e) {
+      _showSnack('خطا در حذف سیاست: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _deleting = false);
+      }
+    }
+  }
+
+  Future<void> _openPolicyDialog({Map<String, dynamic>? initial}) async {
+    final formKey = GlobalKey<FormState>();
+    final titleCtrl = TextEditingController(text: initial?['title'] ?? '');
+    final priorityCtrl = TextEditingController(text: initial?['priority']?.toString() ?? '120');
+    final configCtrl = TextEditingController(
+      text: initial == null ? '{\n  "fee_amount": 0\n}' : const JsonEncoder.withIndent('  ').convert(initial['config'] ?? {}),
+    );
+    bool isActive = initial?['is_active'] ?? true;
+    String policyType = (initial?['policy_type'] ?? 'per_document') as String;
+
+    await showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setInnerState) => AlertDialog(
+            title: Text(initial == null ? 'سیاست جدید' : 'ویرایش سیاست'),
+            content: SizedBox(
+              width: 480,
+              child: Form(
+                key: formKey,
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      TextFormField(
+                        controller: titleCtrl,
+                        decoration: const InputDecoration(labelText: 'عنوان'),
+                        validator: (v) => v == null || v.isEmpty ? 'عنوان الزامی است' : null,
+                      ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                        initialValue: policyType,
+                        decoration: const InputDecoration(labelText: 'نوع سیاست'),
+                        items: const [
+                          DropdownMenuItem(value: 'free', child: Text('رایگان')),
+                          DropdownMenuItem(value: 'subscription', child: Text('اشتراک')),
+                          DropdownMenuItem(value: 'per_document', child: Text('به‌ازای هر سند')),
+                          DropdownMenuItem(value: 'volume', child: Text('حجمی/تناوبی')),
+                          DropdownMenuItem(value: 'hybrid', child: Text('ترکیبی')),
+                        ],
+                        onChanged: (v) => setInnerState(() => policyType = v ?? policyType),
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: priorityCtrl,
+                        decoration: const InputDecoration(labelText: 'اولویت'),
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                        validator: (v) => v == null || v.isEmpty ? 'اولویت الزامی است' : null,
+                      ),
+                      const SizedBox(height: 12),
+                      SwitchListTile(
+                        title: const Text('فعال'),
+                        value: isActive,
+                        onChanged: (v) => setInnerState(() => isActive = v),
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: configCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'پیکربندی (JSON)',
+                          alignLabelWithHint: true,
+                        ),
+                        maxLines: 8,
+                        validator: (v) {
+                          if (v == null || v.isEmpty) return 'پیکربندی الزامی است';
+                          try {
+                            jsonDecode(v);
+                            return null;
+                          } catch (_) {
+                            return 'فرمت JSON نامعتبر است';
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('انصراف'),
+              ),
+              FilledButton(
+                onPressed: () async {
+                  if (!formKey.currentState!.validate()) return;
+                  if (!context.mounted) return;
+                  final ctx = context;
+                  try {
+                    final config = jsonDecode(configCtrl.text) as Map<String, dynamic>;
+                    final payload = <String, dynamic>{
+                      'title': titleCtrl.text.trim(),
+                      'policy_type': policyType,
+                      'priority': int.parse(priorityCtrl.text.trim()),
+                      'is_active': isActive,
+                      'config': config,
+                    };
+                    if (initial != null) {
+                      payload['id'] = initial['id'];
+                    }
+                    await _service.saveBusinessPolicyAdmin(widget.businessId, payload);
+                    if (!ctx.mounted) return;
+                    Navigator.pop(ctx);
+                    _loadData();
+                  } catch (e) {
+                    _showSnack('خطا در ذخیره سیاست: $e');
+                  }
+                },
+                child: const Text('ذخیره'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_error != null) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline, color: Colors.red, size: 32),
+            const SizedBox(height: 8),
+            Text(_error!),
+            const SizedBox(height: 12),
+            ElevatedButton.icon(
+              onPressed: _loadData,
+              icon: const Icon(Icons.refresh),
+              label: const Text('تلاش مجدد'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: _loadData,
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('تعیین پکیج اشتراک برای کسب‌وکار', style: TextStyle(fontWeight: FontWeight.bold)),
+                      IconButton(
+                        icon: const Icon(Icons.refresh),
+                        tooltip: 'به‌روزرسانی پلن‌ها',
+                        onPressed: _loadData,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<int>(
+                    initialValue: _selectedPlanId,
+                    items: _plans
+                        .map(
+                          (plan) => DropdownMenuItem<int>(
+                            value: plan['id'] as int?,
+                            child: Text('${plan['name']} (${plan['period_months']} ماه)'),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (v) => setState(() => _selectedPlanId = v),
+                    decoration: const InputDecoration(
+                      labelText: 'انتخاب پکیج',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  FilledButton.icon(
+                    onPressed: _assigningPlan ? null : _assignPlan,
+                    icon: const Icon(Icons.check_circle_outline),
+                    label: Text(_assigningPlan ? 'در حال اعمال...' : 'اعمال پکیج'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('سیاست‌های فعال', style: TextStyle(fontWeight: FontWeight.bold)),
+                      FilledButton.icon(
+                        onPressed: () => _openPolicyDialog(),
+                        icon: const Icon(Icons.add),
+                        label: const Text('سیاست جدید'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  if (_policies.isEmpty)
+                    const Text('سیاستی ثبت نشده است', textAlign: TextAlign.center)
+                  else
+                    ..._policies.map((policy) {
+                      final status = policy['is_active'] == true ? 'فعال' : 'غیرفعال';
+                      return Card(
+                        margin: const EdgeInsets.symmetric(vertical: 6),
+                        child: ListTile(
+                          title: Text(policy['title'] as String? ?? '-'),
+                          subtitle: Text('نوع: ${policy['policy_type']} | اولویت: ${policy['priority']} | وضعیت: $status'),
+                          trailing: Wrap(
+                            spacing: 8,
+                            children: [
+                              IconButton(
+                                icon: const Icon(Icons.edit),
+                                tooltip: 'ویرایش',
+                                onPressed: () => _openPolicyDialog(initial: policy),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.delete_outline),
+                                tooltip: _deleting ? 'در حال حذف...' : 'حذف',
+                                onPressed: _deleting ? null : () => _deletePolicy(policy['id'] as int),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showSnack(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
 }

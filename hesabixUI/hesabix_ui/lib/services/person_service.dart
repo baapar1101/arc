@@ -76,11 +76,6 @@ class PersonService {
         queryParams['filters'] = filtersList;
       }
 
-      // Debug: نمایش پارامترهای ارسالی
-      print('PersonService API Call:');
-      print('URL: /api/v1/persons/businesses/$businessId/persons');
-      print('Data: $queryParams');
-      
       final response = await _apiClient.post(
         '/api/v1/persons/businesses/$businessId/persons',
         data: queryParams,
@@ -88,7 +83,6 @@ class PersonService {
 
       if (response.statusCode == 200) {
         final data = response.data['data'];
-        print('PersonService Response Data: $data');
         return data;
       } else {
         throw Exception('خطا در دریافت لیست اشخاص');

@@ -23,6 +23,7 @@ from adapters.db.models.person import Person
 from adapters.db.models.product import Product
 from adapters.db.models.invoice_item_line import InvoiceItemLine
 from app.core.responses import ApiError
+from app.services.document_monetization_service import ensure_document_policy_allows_creation
 from app.services.credit_service import get_business_credit_settings
 import jdatetime
 import io
@@ -904,6 +905,20 @@ def create_invoice(
     costing_method = _get_costing_method(data)
     # محاسبه COGS به پست حواله منتقل می‌شود
 
+    gross = Decimal(str(totals["gross"]))
+    discount = Decimal(str(totals["discount"]))
+    net = gross - discount
+    tax = Decimal(str(totals["tax"]))
+    total_with_tax = net + tax
+
+    ensure_document_policy_allows_creation(
+        db,
+        business_id,
+        document_type=invoice_type,
+        document_date=document_date,
+        amount=abs(total_with_tax),
+    )
+
     # Create document
     doc_code = _build_invoice_code(db, business_id, invoice_type)
 
@@ -951,12 +966,6 @@ def create_invoice(
     # Accounting lines for finalized invoices (بدون خطوط COGS/Inventory؛ به حواله موکول شد)
     if not document.is_proforma:
         accounts = _resolve_accounts_for_invoice(db, data)
-
-        gross = Decimal(str(totals["gross"]))
-        discount = Decimal(str(totals["discount"]))
-        net = gross - discount
-        tax = Decimal(str(totals["tax"]))
-        total_with_tax = net + tax
 
         # COGS به پست حواله منتقل شد
 

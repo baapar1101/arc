@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/auth_store.dart';
+import '../../core/calendar_controller.dart';
+import '../../core/date_utils.dart';
+import '../../utils/number_formatters.dart';
 import '../../widgets/data_table/data_table_widget.dart';
 import '../../widgets/data_table/data_table_config.dart';
 import '../../widgets/permission/permission_widgets.dart';
@@ -9,15 +12,19 @@ import '../../widgets/invoice/person_combobox_widget.dart';
 import '../../models/person_model.dart';
 import '../../services/check_service.dart';
 import '../../widgets/invoice/bank_account_combobox_widget.dart';
+import 'check_form_page.dart';
+import 'check_details_dialog.dart';
 
 class ChecksPage extends StatefulWidget {
   final int businessId;
   final AuthStore authStore;
+  final CalendarController calendarController;
 
   const ChecksPage({
     super.key,
     required this.businessId,
     required this.authStore,
+    required this.calendarController,
   });
 
   @override
@@ -46,6 +53,7 @@ class _ChecksPageState extends State<ChecksPage> {
         key: _tableKey,
         config: _buildConfig(t, context),
         fromJson: (json) => json,
+        calendarController: widget.calendarController,
       ),
     );
   }
@@ -87,14 +95,64 @@ class _ChecksPageState extends State<ChecksPage> {
           'تاریخ صدور',
           width: ColumnWidth.medium,
           filterType: ColumnFilterType.dateRange,
-          formatter: (row) => (row['issue_date'] ?? '-'),
+          formatter: (row) {
+            final value = row['issue_date'];
+            if (value == null) return '-';
+            
+            // If value is already formatted string from backend (date_only)
+            if (value is String) {
+              // Try to parse and format based on calendar type
+              try {
+                final date = DateTime.parse(value.split('T').first);
+                return HesabixDateUtils.formatForDisplay(date, widget.calendarController.isJalali);
+              } catch (e) {
+                // If it's already formatted (e.g., "1403/01/15"), return as is
+                return value;
+              }
+            } else if (value is Map<String, dynamic>) {
+              // Handle formatted date objects from backend
+              if (value.containsKey('date_only')) {
+                return value['date_only'].toString();
+              } else if (value.containsKey('formatted')) {
+                // Extract date part only (remove time)
+                final formatted = value['formatted'].toString();
+                return formatted.split(' ').first;
+              }
+            }
+            return '-';
+          },
         ),
         DateColumn(
           'due_date',
           'تاریخ سررسید',
           width: ColumnWidth.medium,
           filterType: ColumnFilterType.dateRange,
-          formatter: (row) => (row['due_date'] ?? '-'),
+          formatter: (row) {
+            final value = row['due_date'];
+            if (value == null) return '-';
+            
+            // If value is already formatted string from backend (date_only)
+            if (value is String) {
+              // Try to parse and format based on calendar type
+              try {
+                final date = DateTime.parse(value.split('T').first);
+                return HesabixDateUtils.formatForDisplay(date, widget.calendarController.isJalali);
+              } catch (e) {
+                // If it's already formatted (e.g., "1403/01/15"), return as is
+                return value;
+              }
+            } else if (value is Map<String, dynamic>) {
+              // Handle formatted date objects from backend
+              if (value.containsKey('date_only')) {
+                return value['date_only'].toString();
+              } else if (value.containsKey('formatted')) {
+                // Extract date part only (remove time)
+                final formatted = value['formatted'].toString();
+                return formatted.split(' ').first;
+              }
+            }
+            return '-';
+          },
         ),
         TextColumn('check_number', 'شماره چک', width: ColumnWidth.medium,
           formatter: (row) => (row['check_number'] ?? '-'),
@@ -109,7 +167,7 @@ class _ChecksPageState extends State<ChecksPage> {
           formatter: (row) => (row['branch_name'] ?? '-'),
         ),
         NumberColumn('amount', 'مبلغ', width: ColumnWidth.medium,
-          formatter: (row) => (row['amount']?.toString() ?? '-'),
+          formatter: (row) => formatWithThousands(row['amount']),
         ),
         TextColumn('currency', 'ارز', width: ColumnWidth.small,
           formatter: (row) => (row['currency'] ?? '-'),
@@ -148,7 +206,7 @@ class _ChecksPageState extends State<ChecksPage> {
             onTap: (row) {
               final id = row is Map<String, dynamic> ? row['id'] : null;
               if (id is int) {
-                context.go('/business/${widget.businessId}/checks/$id/edit');
+                _showCheckFormDialog(context, checkId: id);
               }
             },
           ),
@@ -229,6 +287,15 @@ class _ChecksPageState extends State<ChecksPage> {
               }
             },
           ),
+          if (widget.authStore.canWriteSection('checks'))
+            DataTableAction(
+              icon: Icons.delete,
+              label: t.delete,
+              onTap: (row) {
+                _confirmDelete(context, row as Map<String, dynamic>);
+              },
+              isDestructive: true,
+            ),
         ]),
       ],
       searchFields: ['check_number','sayad_code','bank_name','branch_name','person_name'],
@@ -251,6 +318,16 @@ class _ChecksPageState extends State<ChecksPage> {
           ),
         ),
         const SizedBox(width: 8),
+        Tooltip(
+          message: 'راس‌گیری چک‌ها',
+          child: IconButton(
+            onPressed: () {
+              context.go('/business/${widget.businessId}/checks/reconciliation');
+            },
+            icon: const Icon(Icons.calculate),
+          ),
+        ),
+        const SizedBox(width: 8),
         PermissionButton(
           section: 'checks',
           action: 'add',
@@ -258,58 +335,65 @@ class _ChecksPageState extends State<ChecksPage> {
           child: Tooltip(
             message: t.add,
             child: IconButton(
-              onPressed: () => context.go('/business/${widget.businessId}/checks/new'),
+              onPressed: () => _showCheckFormDialog(context),
               icon: const Icon(Icons.add),
             ),
           ),
         ),
       ],
       onRowTap: (row) {
-        final id = row is Map<String, dynamic> ? row['id'] : null;
-        if (id is int) {
-          context.go('/business/${widget.businessId}/checks/$id/edit');
-        }
+        _showCheckDetailsDialog(context, row as Map<String, dynamic>);
       },
     );
   }
 
   Future<void> _openEndorseDialog(BuildContext context, Map<String, dynamic> row) async {
-    Person? selected;
+    Person? selectedPerson;
     await showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('واگذاری چک به شخص'),
-        content: SizedBox(
-          width: 360,
-          child: PersonComboboxWidget(
-            businessId: widget.businessId,
-            selectedPerson: selected,
-            onChanged: (p) => selected = p,
-            isRequired: true,
-            label: 'شخص مقصد',
-            hintText: 'انتخاب شخص',
-          ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('انصراف')),
-          FilledButton(
-            onPressed: () async {
-              if (selected == null) return;
-              try {
-                await _checkService.endorse(checkId: row['id'] as int, body: {
-                  'target_person_id': (selected as dynamic).id,
-                  'auto_post': true,
-                });
-                if (mounted) Navigator.pop(ctx);
-                _refresh();
-              } catch (e) {
-                if (mounted) Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطا: $e')));
-              }
-            },
-            child: const Text('ثبت'),
-          ),
-        ],
+      builder: (ctx) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) {
+          return AlertDialog(
+            title: const Text('واگذاری چک به شخص'),
+            content: SizedBox(
+              width: 360,
+              child: PersonComboboxWidget(
+                businessId: widget.businessId,
+                selectedPerson: selectedPerson,
+                onChanged: (p) {
+                  setDialogState(() {
+                    selectedPerson = p;
+                  });
+                },
+                isRequired: true,
+                label: 'شخص مقصد',
+                hintText: 'انتخاب شخص',
+              ),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('انصراف')),
+              FilledButton(
+                onPressed: () async {
+                  if (selectedPerson == null) return;
+                  if (!context.mounted) return;
+                  try {
+                    await _checkService.endorse(checkId: row['id'] as int, body: {
+                      'target_person_id': selectedPerson!.id,
+                    });
+                    if (!context.mounted) return;
+                    Navigator.pop(ctx);
+                    _refresh();
+                  } catch (e) {
+                    if (!context.mounted) return;
+                    Navigator.pop(ctx);
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطا: $e')));
+                  }
+                },
+                child: const Text('ثبت'),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -338,15 +422,17 @@ class _ChecksPageState extends State<ChecksPage> {
           FilledButton(
             onPressed: () async {
               if (selected == null || (selected!.id).isEmpty) return;
+              if (!context.mounted) return;
               try {
                 await _checkService.clear(checkId: row['id'] as int, body: {
                   'bank_account_id': int.tryParse(selected!.id) ?? 0,
-                  'auto_post': true,
                 });
-                if (mounted) Navigator.pop(ctx);
+                if (!context.mounted) return;
+                Navigator.pop(ctx);
                 _refresh();
               } catch (e) {
-                if (mounted) Navigator.pop(ctx);
+                if (!context.mounted) return;
+                Navigator.pop(ctx);
                 ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطا: $e')));
               }
             },
@@ -358,8 +444,48 @@ class _ChecksPageState extends State<ChecksPage> {
   }
 
   Future<void> _openPayDialog(BuildContext context, Map<String, dynamic> row) async {
-    // پرداخت چک پرداختنی (pay)
-    await _openClearDialog(context, row);
+    BankAccountOption? selected;
+    final currencyId = row['currency_id'] as int?;
+    await showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('پرداخت چک پرداختنی'),
+        content: SizedBox(
+          width: 420,
+          child: BankAccountComboboxWidget(
+            businessId: widget.businessId,
+            selectedAccountId: null,
+            filterCurrencyId: currencyId,
+            onChanged: (opt) => selected = opt,
+            label: 'حساب بانکی',
+            hintText: 'انتخاب حساب بانکی',
+            isRequired: true,
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('انصراف')),
+          FilledButton(
+            onPressed: () async {
+              if (selected == null || (selected!.id).isEmpty) return;
+              if (!context.mounted) return;
+              try {
+                await _checkService.pay(checkId: row['id'] as int, body: {
+                  'bank_account_id': int.tryParse(selected!.id) ?? 0,
+                });
+                if (!context.mounted) return;
+                Navigator.pop(ctx);
+                _refresh();
+              } catch (e) {
+                if (!context.mounted) return;
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطا: $e')));
+              }
+            },
+            child: const Text('ثبت'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _confirmReturn(BuildContext context, Map<String, dynamic> row) async {
@@ -375,10 +501,12 @@ class _ChecksPageState extends State<ChecksPage> {
       ),
     );
     if (ok != true) return;
+    if (!context.mounted) return;
     try {
-      await _checkService.returnCheck(checkId: row['id'] as int, body: {'auto_post': true});
+      await _checkService.returnCheck(checkId: row['id'] as int, body: {});
       _refresh();
     } catch (e) {
+      if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطا: $e')));
     }
   }
@@ -396,10 +524,12 @@ class _ChecksPageState extends State<ChecksPage> {
       ),
     );
     if (ok != true) return;
+    if (!context.mounted) return;
     try {
-      await _checkService.bounce(checkId: row['id'] as int, body: {'auto_post': true});
+      await _checkService.bounce(checkId: row['id'] as int, body: {});
       _refresh();
     } catch (e) {
+      if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطا: $e')));
     }
   }
@@ -417,11 +547,108 @@ class _ChecksPageState extends State<ChecksPage> {
       ),
     );
     if (ok != true) return;
+    if (!context.mounted) return;
     try {
-      await _checkService.deposit(checkId: row['id'] as int, body: {'auto_post': true});
+      await _checkService.deposit(checkId: row['id'] as int, body: {});
       _refresh();
     } catch (e) {
+      if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطا: $e')));
+    }
+  }
+
+  Future<void> _confirmDelete(BuildContext context, Map<String, dynamic> row) async {
+    final checkNumber = row['check_number']?.toString() ?? 'نامشخص';
+    final status = (row['status'] ?? '').toString();
+    
+    // بررسی وضعیت چک
+    if (status == 'CLEARED') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('نمی‌توان چک پاس شده را حذف کرد')),
+      );
+      return;
+    }
+    
+    if (status == 'DEPOSITED') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('نمی‌توان چک سپرده شده را حذف کرد. لطفاً ابتدا چک را از سپرده خارج کنید')),
+      );
+      return;
+    }
+    
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('حذف چک'),
+        content: Text('آیا از حذف چک شماره $checkNumber مطمئن هستید؟\n\nتوجه: تمام اسناد حسابداری مرتبط با این چک نیز حذف خواهند شد.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('انصراف'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('حذف'),
+          ),
+        ],
+      ),
+    );
+    
+    if (ok != true) return;
+    if (!context.mounted) return;
+    
+    try {
+      await _checkService.delete(row['id'] as int);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('چک با موفقیت حذف شد')),
+      );
+      _refresh();
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('خطا در حذف چک: $e')),
+      );
+    }
+  }
+
+  void _showCheckDetailsDialog(BuildContext context, Map<String, dynamic> row) {
+    final checkId = row['id'] as int?;
+    if (checkId == null) return;
+    
+    showDialog(
+      context: context,
+      builder: (ctx) => CheckDetailsDialog(
+        checkId: checkId,
+        businessId: widget.businessId,
+        authStore: widget.authStore,
+        calendarController: widget.calendarController,
+        initialData: row,
+        onEdit: () {
+          Navigator.pop(ctx);
+          _showCheckFormDialog(context, checkId: checkId);
+        },
+      ),
+    );
+  }
+
+
+  Future<void> _showCheckFormDialog(BuildContext context, {int? checkId}) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => CheckFormDialog(
+        businessId: widget.businessId,
+        authStore: widget.authStore,
+        checkId: checkId,
+        calendarController: widget.calendarController,
+        onSuccess: () {
+          _refresh();
+        },
+      ),
+    );
+    if (result == true) {
+      _refresh();
     }
   }
 }

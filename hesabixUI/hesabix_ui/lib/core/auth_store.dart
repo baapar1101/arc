@@ -350,18 +350,10 @@ class AuthStore with ChangeNotifier {
 
   // مدیریت کسب و کار فعلی
   Future<void> setCurrentBusiness(BusinessWithPermission business) async {
-    print('=== setCurrentBusiness START ===');
-    print('Setting business: ${business.name} (ID: ${business.id})');
-    print('Is owner: ${business.isOwner}');
-    print('Role: ${business.role}');
-    print('Permissions: ${business.permissions}');
     
     _currentBusiness = business;
     _businessPermissions = business.permissions;
     
-    print('AuthStore updated:');
-    print('  - Current business: ${_currentBusiness?.name}');
-    print('  - Business permissions: $_businessPermissions');
     
     notifyListeners();
     
@@ -371,7 +363,6 @@ class AuthStore with ChangeNotifier {
     // اگر ارز انتخاب نشده یا ارز انتخابی با کسب‌وکار ناسازگار است، ارز پیشفرض کسب‌وکار را ست کن
     await _ensureCurrencyForBusiness();
     
-    print('=== setCurrentBusiness END ===');
   }
 
   Future<void> clearCurrentBusiness() async {
@@ -452,34 +443,23 @@ class AuthStore with ChangeNotifier {
 
   // بررسی دسترسی‌های کسب و کار
   bool hasBusinessPermission(String section, String action) {
-    print('=== hasBusinessPermission ===');
-    print('Section: $section, Action: $action');
-    print('Current business: ${_currentBusiness?.name} (ID: ${_currentBusiness?.id})');
-    print('Is owner: ${_currentBusiness?.isOwner}');
-    print('Business permissions: $_businessPermissions');
     
     if (_currentBusiness?.isOwner == true) {
-      print('User is owner - GRANTED');
       return true;
     }
     
     if (_businessPermissions == null) {
-      print('No business permissions - DENIED');
       return false;
     }
     
     final sectionPerms = _businessPermissions![section] as Map<String, dynamic>?;
-    print('Section permissions for "$section": $sectionPerms');
     
     // اگر سکشن در دسترسی‌ها موجود نیست، هیچ دسترسی‌ای وجود ندارد
     if (sectionPerms == null) {
-      print('Section not found in permissions - DENIED');
       return false;
     }
     
     final hasPermission = sectionPerms[action] == true;
-    print('Permission "$action" for section "$section": $hasPermission');
-    print('=== hasBusinessPermission END ===');
     
     return hasPermission;
   }

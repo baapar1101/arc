@@ -1,4 +1,5 @@
 import 'dart:convert';
+// ignore: avoid_web_libraries_in_flutter
 import 'dart:html' as html show WebSocket, MessageEvent;
 import '../config/app_config.dart';
 import 'notifications_ws_client_stub.dart';

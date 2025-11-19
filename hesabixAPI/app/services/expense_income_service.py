@@ -22,6 +22,7 @@ from adapters.db.models.currency import Currency
 from adapters.db.models.fiscal_year import FiscalYear
 from adapters.db.models.user import User
 from app.core.responses import ApiError
+from app.services.document_monetization_service import ensure_document_policy_allows_creation
 
 
 logger = logging.getLogger(__name__)
@@ -155,6 +156,14 @@ def create_expense_income(
 
     # کد سند ساده: EI-YYYYMMDD-<rand>
     code = f"EI-{document_date.strftime('%Y%m%d')}-{int(datetime.utcnow().timestamp())%100000}"
+
+    ensure_document_policy_allows_creation(
+        db,
+        business_id,
+        document_type=document_type,
+        document_date=document_date,
+        amount=sum_items,
+    )
 
     document = Document(
         code=code,

@@ -242,7 +242,7 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
               foregroundColor: Theme.of(context).colorScheme.onErrorContainer,
             ),
             icon: const Icon(Icons.delete_forever),
-            label: Text('حذف (${_selectedCount})'),
+            label: Text('حذف ($_selectedCount)'),
           ),
         ),
       ],
@@ -416,20 +416,23 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
 
   /// مشاهده جزئیات سند
   void _onView(ExpenseIncomeDocument document) async {
+    if (!context.mounted) return;
+    final ctx = context;
     try {
       // دریافت جزئیات کامل سند
       final fullDoc = await _service.getById(document.id);
       if (fullDoc == null) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
+        if (!ctx.mounted) return;
+        ScaffoldMessenger.of(ctx).showSnackBar(
           const SnackBar(content: Text('سند یافت نشد')),
         );
         return;
       }
 
       // نمایش دیالوگ مشاهده جزئیات
+      if (!ctx.mounted) return;
       await showDialog(
-        context: context,
+        context: ctx,
         builder: (_) => ExpenseIncomeDetailsDialog(
           document: fullDoc,
           calendarController: widget.calendarController,
@@ -438,8 +441,8 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
         ),
       );
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      if (!ctx.mounted) return;
+      ScaffoldMessenger.of(ctx).showSnackBar(
         SnackBar(content: Text('خطا در بارگذاری جزئیات: $e')),
       );
     }
@@ -447,19 +450,21 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
 
   /// ویرایش سند
   void _onEdit(ExpenseIncomeDocument document) async {
+    if (!context.mounted) return;
+    final ctx = context;
     try {
       // دریافت جزئیات کامل سند
       final fullDoc = await _service.getById(document.id);
       if (fullDoc == null) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
+        if (!ctx.mounted) return;
+        ScaffoldMessenger.of(ctx).showSnackBar(
           const SnackBar(content: Text('سند یافت نشد')),
         );
         return;
       }
-
+      if (!ctx.mounted) return;
       final result = await showDialog<bool>(
-        context: context,
+        context: ctx,
         builder: (_) => ExpenseIncomeFormDialog(
           businessId: widget.businessId,
           calendarController: widget.calendarController,
@@ -474,8 +479,8 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
         _refreshData();
       }
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      if (!ctx.mounted) return;
+      ScaffoldMessenger.of(ctx).showSnackBar(
         SnackBar(content: Text('خطا در آماده‌سازی ویرایش: $e')),
       );
     }
@@ -633,17 +638,19 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
     if (confirmed != true) return;
 
     // نمایش لودینگ
+    if (!context.mounted) return;
+    final ctx = context;
     showDialog(
-      context: context,
+      context: ctx,
       barrierDismissible: false,
       builder: (_) => const Center(child: CircularProgressIndicator()),
     );
 
     try {
       await _service.deleteMultiple(ids);
-      if (!mounted) return;
-      Navigator.pop(context); // بستن لودینگ
-      ScaffoldMessenger.of(context).showSnackBar(
+      if (!ctx.mounted) return;
+      Navigator.pop(ctx); // بستن لودینگ
+      ScaffoldMessenger.of(ctx).showSnackBar(
         SnackBar(
           content: Text('${ids.length} سند با موفقیت حذف شد'),
           backgroundColor: Colors.green,

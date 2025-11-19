@@ -3103,6 +3103,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'If enabled, an installment plan will be saved with the invoice';
 
   @override
+  String get installmentsSettingsSubtitle =>
+      'Manage installment plans and sales conditions';
+
+  @override
   String get installmentsCount => 'Number of installments';
 
   @override
@@ -3971,6 +3975,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get creditSettingsTitle => 'Customer credit';
 
   @override
+  String get creditSettingsSubtitle =>
+      'Configure credit limits and delay policies';
+
+  @override
   String get creditEnableTitle => 'Enable credit';
 
   @override
@@ -4263,4 +4271,150 @@ class AppLocalizationsEn extends AppLocalizations {
   String taxRemoveSelectedErrorWithMessage(String error) {
     return 'Failed to remove selected invoices: $error';
   }
+
+  @override
+  String get documentMonetizationTitle => 'Packages and Tariffs';
+
+  @override
+  String get documentMonetizationSubtitle =>
+      'Packages, per-document fees and volume settlement';
+
+  @override
+  String get subscriptionPackages => 'Subscription Packages';
+
+  @override
+  String get noActivePackage =>
+      'No active package has been registered for this business.';
+
+  @override
+  String get noPackageAvailable =>
+      'Currently no package is available for purchase.';
+
+  @override
+  String get activePackage => 'Active Package';
+
+  @override
+  String get autoRenewActive => 'Auto-renewal is active';
+
+  @override
+  String get periodAmount => 'Period Amount';
+
+  @override
+  String get expiryDate => 'Expiry Date';
+
+  @override
+  String get duration => 'Duration';
+
+  @override
+  String get month => 'month';
+
+  @override
+  String get free => 'Free';
+
+  @override
+  String get activate => 'Activate';
+
+  @override
+  String get activating => 'Activating...';
+
+  @override
+  String activatePackage(String name) {
+    return 'Activate $name';
+  }
+
+  @override
+  String get packageDuration => 'Package Duration';
+
+  @override
+  String get packagePrice => 'Price';
+
+  @override
+  String get autoRenewAtEnd => 'Auto-renewal at end of period';
+
+  @override
+  String get confirmAndActivate => 'Confirm and Activate';
+
+  @override
+  String get invalidPackageId => 'Invalid package ID';
+
+  @override
+  String get packageActivatedSuccess => 'Package activated successfully';
+
+  @override
+  String get packageActivationError => 'Package activation failed';
+
+  @override
+  String get activePolicies => 'Active Policies';
+
+  @override
+  String get noPolicyDefined => 'No policy has been defined';
+
+  @override
+  String get noInvoice => 'No invoice exists';
+
+  @override
+  String get chargeType => 'Type';
+
+  @override
+  String get pay => 'Pay';
+
+  @override
+  String get paymentSuccess => 'Payment completed';
+
+  @override
+  String get paymentError => 'Payment failed';
+
+  @override
+  String get finalizeVolume => 'Finalize Volume Period';
+
+  @override
+  String get volumeFinalized => 'Volume calculations finalized';
+
+  @override
+  String get volumeFinalizeError => 'Volume period calculation failed';
+
+  @override
+  String get statusActive => 'Active';
+
+  @override
+  String get statusPending => 'Pending';
+
+  @override
+  String get statusExpired => 'Expired';
+
+  @override
+  String get statusCancelled => 'Cancelled';
+
+  @override
+  String get statusAwaitingPayment => 'Awaiting Payment';
+
+  @override
+  String get statusPaid => 'Paid';
+
+  @override
+  String get statusInvoiced => 'Invoiced';
+
+  @override
+  String get chargeTypePerDocument => 'Per Document';
+
+  @override
+  String get chargeTypeVolumeCycle => 'Volume Cycle';
+
+  @override
+  String get chargeTypeSubscriptionFee => 'Subscription Fee';
+
+  @override
+  String get policyTypeFree => 'Free';
+
+  @override
+  String get policyTypeSubscription => 'Unlimited Package';
+
+  @override
+  String get policyTypeVolume => 'Volume';
+
+  @override
+  String get policyTypePerDocument => 'Per Document';
+
+  @override
+  String get policyTypeHybrid => 'Hybrid';
 }

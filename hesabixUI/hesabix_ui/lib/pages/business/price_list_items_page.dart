@@ -204,7 +204,8 @@ class _PriceListItemsPageState extends State<PriceListItemsPage> {
                     priceListId: widget.priceListId,
                     payload: payload,
                   );
-                  if (mounted) Navigator.of(ctx).pop(true);
+                  if (!ctx.mounted) return;
+                  Navigator.of(ctx).pop(true);
                   _load();
                 } catch (e) {
                   String message = t.operationFailed;

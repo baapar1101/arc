@@ -133,27 +133,22 @@ class PermissionUsageExample extends StatelessWidget {
 
   void _addPerson() {
     // منطق اضافه کردن شخص
-    print('اضافه کردن شخص جدید');
   }
 
   void _editPerson() {
     // منطق ویرایش شخص
-    print('ویرایش شخص');
   }
 
   void _deletePerson() {
     // منطق حذف شخص
-    print('حذف شخص');
   }
 
   void _viewReports() {
     // منطق مشاهده گزارش‌ها
-    print('مشاهده گزارش‌ها');
   }
 
   void _exportReports() {
     // منطق صادرات گزارش
-    print('صادرات گزارش');
   }
 }
 
@@ -208,10 +203,8 @@ class ExamplePermissionWidget extends StatelessWidget {
   }
 
   void _openSettings() {
-    print('باز کردن تنظیمات');
   }
 
   void _openAdminPanel() {
-    print('باز کردن پنل مدیریت');
   }
 }

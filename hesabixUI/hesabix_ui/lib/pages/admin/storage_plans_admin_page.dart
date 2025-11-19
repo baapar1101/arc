@@ -221,7 +221,7 @@ class _StoragePlansAdminPageState extends State<StoragePlansAdminPage> {
                                 const SizedBox(width: 16),
                                 Expanded(
                                   child: DropdownButtonFormField<String>(
-                                    value: selectedPeriod,
+                                    initialValue: selectedPeriod,
                                     decoration: InputDecoration(
                                       labelText: 'دوره',
                                       prefixIcon: const Icon(Icons.calendar_today_outlined),
@@ -272,7 +272,7 @@ class _StoragePlansAdminPageState extends State<StoragePlansAdminPage> {
                             ],
                             const SizedBox(height: 20),
                             DropdownButtonFormField<int>(
-                              value: selectedCurrencyId,
+                              initialValue: selectedCurrencyId,
                               decoration: InputDecoration(
                                 labelText: 'ارز',
                                 prefixIcon: const Icon(Icons.currency_exchange_outlined),
@@ -483,25 +483,23 @@ class _StoragePlansAdminPageState extends State<StoragePlansAdminPage> {
                     await _planService.createPlan(data);
                   }
 
-                  if (mounted) {
-                    Navigator.pop(context);
-                    _load();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(isEdit ? 'پلن با موفقیت به‌روزرسانی شد' : 'پلن با موفقیت ایجاد شد'),
-                        backgroundColor: Colors.green,
-                      ),
-                    );
-                  }
+                  if (!context.mounted) return;
+                  Navigator.pop(context);
+                  _load();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(isEdit ? 'پلن با موفقیت به‌روزرسانی شد' : 'پلن با موفقیت ایجاد شد'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
                 } catch (e) {
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('خطا: $e'),
-                        backgroundColor: Colors.red,
-                      ),
-                    );
-                  }
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('خطا: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
                 }
                           },
                           icon: Icon(isEdit ? Icons.save_outlined : Icons.add_circle_outline),

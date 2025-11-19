@@ -459,7 +459,6 @@ class _TransactionDialogState extends State<TransactionDialog> {
         }
       }
     } catch (e) {
-      print('خطا در لود کردن حساب انتخاب شده: $e');
     }
   }
 
@@ -499,7 +498,6 @@ class _TransactionDialogState extends State<TransactionDialog> {
       
     } catch (e) {
       // در صورت خطا، لیست‌ها خالی باقی می‌مانند
-      print('خطا در لود کردن داده‌ها: $e');
     } finally {
       setState(() {
         _isLoading = false;

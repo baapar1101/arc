@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from typing import Any, Dict, List, Callable
-from datetime import datetime
+from datetime import datetime, date, timedelta
 
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, func
@@ -9,7 +9,11 @@ from sqlalchemy import and_, func
 from adapters.db.models.document import Document
 from adapters.db.models.invoice_item_line import InvoiceItemLine
 from adapters.db.models.currency import Currency
+from adapters.db.models.check import Check, CheckStatus, CheckType
+from adapters.db.models.person import Person
 from app.services.invoice_service import INVOICE_SALES
+from app.core.calendar import CalendarConverter, CalendarType
+import jdatetime
 
 # ----------------------------
 # Responsive columns per breakpoint
@@ -57,6 +61,51 @@ DEFAULT_WIDGET_DEFINITIONS: List[Dict[str, Any]] = [
             "xl": {"colSpan": 12, "rowSpan": 4},
         },
         "cache_ttl": 15,
+    },
+    {
+        "key": "checks_today",
+        "title": "چک‌های امروز",
+        "icon": "account_balance_wallet",
+        "version": 1,
+        "permissions_required": ["checks.view"],
+        "defaults": {
+            "xs": {"colSpan": 4, "rowSpan": 3},
+            "sm": {"colSpan": 6, "rowSpan": 3},
+            "md": {"colSpan": 4, "rowSpan": 3},
+            "lg": {"colSpan": 4, "rowSpan": 3},
+            "xl": {"colSpan": 4, "rowSpan": 3},
+        },
+        "cache_ttl": 60,
+    },
+    {
+        "key": "checks_tomorrow",
+        "title": "چک‌های فردا",
+        "icon": "account_balance_wallet",
+        "version": 1,
+        "permissions_required": ["checks.view"],
+        "defaults": {
+            "xs": {"colSpan": 4, "rowSpan": 3},
+            "sm": {"colSpan": 6, "rowSpan": 3},
+            "md": {"colSpan": 4, "rowSpan": 3},
+            "lg": {"colSpan": 4, "rowSpan": 3},
+            "xl": {"colSpan": 4, "rowSpan": 3},
+        },
+        "cache_ttl": 60,
+    },
+    {
+        "key": "checks_this_month",
+        "title": "چک‌های این ماه",
+        "icon": "account_balance_wallet",
+        "version": 1,
+        "permissions_required": ["checks.view"],
+        "defaults": {
+            "xs": {"colSpan": 4, "rowSpan": 4},
+            "sm": {"colSpan": 6, "rowSpan": 4},
+            "md": {"colSpan": 8, "rowSpan": 4},
+            "lg": {"colSpan": 8, "rowSpan": 4},
+            "xl": {"colSpan": 8, "rowSpan": 4},
+        },
+        "cache_ttl": 60,
     },
 ]
 
@@ -290,6 +339,9 @@ def _resolve_latest_sales_invoices(
 WIDGET_RESOLVERS: Dict[str, WidgetResolver] = {
     "latest_sales_invoices": _resolve_latest_sales_invoices,
     "sales_bar_chart": lambda db, business_id, user_id, filters: _resolve_sales_bar_chart(db, business_id, filters),
+    "checks_today": lambda db, business_id, user_id, filters: _resolve_checks_today(db, business_id, filters),
+    "checks_tomorrow": lambda db, business_id, user_id, filters: _resolve_checks_tomorrow(db, business_id, filters),
+    "checks_this_month": lambda db, business_id, user_id, filters: _resolve_checks_this_month(db, business_id, filters),
 }
 
 
@@ -299,18 +351,22 @@ def get_widgets_batch_data(
     user_id: int,
     widget_keys: List[str],
     filters: Dict[str, Any],
+    calendar_type: str = "gregorian",
 ) -> Dict[str, Any]:
     """
     Returns a map: { widget_key: data or error } for requested widget_keys.
+    calendar_type: "jalali" or "gregorian" - used for date calculations in check widgets
     """
     result: Dict[str, Any] = {}
+    filters_with_calendar = dict(filters or {})
+    filters_with_calendar["calendar_type"] = calendar_type
     for key in widget_keys:
         resolver = WIDGET_RESOLVERS.get(key)
         if not resolver:
             result[key] = {"error": "UNKNOWN_WIDGET"}
             continue
         try:
-            result[key] = resolver(db, business_id, user_id, filters or {})
+            result[key] = resolver(db, business_id, user_id, filters_with_calendar)
         except Exception as ex:
             # Avoid breaking the whole dashboard; return error per widget
             result[key] = {"error": str(ex)}
@@ -434,6 +490,242 @@ def _resolve_sales_bar_chart(db: Session, business_id: int, filters: Dict[str, A
         "from": start_date.isoformat(),
         "to": end_date.isoformat(),
         "group": group,
+    }
+
+
+def _resolve_checks_by_due_date(
+    db: Session, business_id: int, target_date: datetime.date, limit: int = 15
+) -> Dict[str, Any]:
+    """
+    Helper function to resolve checks by due date.
+    Returns checks that are not CLEARED and have due_date matching target_date.
+    """
+    from sqlalchemy import or_
+    
+    # Query checks with due_date matching target_date, excluding CLEARED status
+    q = (
+        db.query(
+            Check.id,
+            Check.check_number,
+            Check.amount,
+            Check.currency_id,
+            Check.type,
+            Check.status,
+            Check.due_date,
+            Check.person_id,
+            Person.alias_name.label("person_name"),
+            Currency.code.label("currency_code"),
+            Currency.title.label("currency_title"),
+        )
+        .outerjoin(Person, Person.id == Check.person_id)
+        .outerjoin(Currency, Currency.id == Check.currency_id)
+        .filter(
+            and_(
+                Check.business_id == business_id,
+                func.date(Check.due_date) == target_date,
+                or_(
+                    Check.status != CheckStatus.CLEARED,
+                    Check.status.is_(None),
+                ),
+            )
+        )
+        .order_by(Check.due_date.asc(), Check.amount.desc())
+        .limit(limit)
+    )
+    
+    rows = q.all()
+    items: List[Dict[str, Any]] = []
+    totals_by_currency: Dict[str, float] = {}
+    
+    for row in rows:
+        currency_code = row.currency_code or "UNKNOWN"
+        currency_title = row.currency_title or currency_code
+        amount = float(row.amount)
+        
+        items.append({
+            "id": int(row.id),
+            "check_number": row.check_number,
+            "amount": amount,
+            "currency_id": int(row.currency_id) if row.currency_id else None,
+            "currency_code": currency_code,
+            "currency_title": currency_title,
+            "type": row.type.name.lower() if row.type else None,
+            "status": row.status.name if row.status else None,
+            "due_date": row.due_date.isoformat() if row.due_date else None,
+            "person_id": int(row.person_id) if row.person_id else None,
+            "person_name": row.person_name,
+        })
+        
+        # Aggregate totals by currency
+        if currency_code not in totals_by_currency:
+            totals_by_currency[currency_code] = 0.0
+        totals_by_currency[currency_code] += amount
+    
+    return {
+        "items": items,
+        "totals_by_currency": totals_by_currency,
+        "count": len(items),
+    }
+
+
+def _get_date_by_calendar(calendar_type: str, is_tomorrow: bool = False) -> date:
+    """
+    Get today or tomorrow date based on user's calendar type.
+    If jalali, calculates in jalali calendar and converts to gregorian for DB query.
+    """
+    if calendar_type == "jalali":
+        jalali_now = jdatetime.datetime.now()
+        if is_tomorrow:
+            # Get tomorrow in jalali calendar
+            jalali_tomorrow = jalali_now + timedelta(days=1)
+            # Convert to gregorian for DB query
+            gregorian_tomorrow = jdatetime.datetime.to_gregorian(jalali_tomorrow)
+            return date(gregorian_tomorrow.year, gregorian_tomorrow.month, gregorian_tomorrow.day)
+        else:
+            # Convert today to gregorian for DB query
+            gregorian_today = jdatetime.datetime.to_gregorian(jalali_now)
+            return date(gregorian_today.year, gregorian_today.month, gregorian_today.day)
+    else:
+        # Gregorian calendar
+        if is_tomorrow:
+            return date.today() + timedelta(days=1)
+        else:
+            return date.today()
+
+
+def _get_month_range_by_calendar(calendar_type: str) -> tuple[date, date]:
+    """
+    Get start and end date of current month based on user's calendar type.
+    Returns gregorian dates for DB query.
+    """
+    if calendar_type == "jalali":
+        jalali_now = jdatetime.datetime.now()
+        # Start of current jalali month
+        jalali_start = jdatetime.datetime(jalali_now.year, jalali_now.month, 1)
+        # End of current jalali month
+        days_in_month = jdatetime.j_days_in_month[jalali_now.month - 1]
+        if jalali_now.month == 12 and jalali_now.isleap():
+            days_in_month = 30  # Leap year in jalali
+        jalali_end = jdatetime.datetime(jalali_now.year, jalali_now.month, days_in_month)
+        
+        # Convert to gregorian
+        greg_start = jdatetime.datetime.to_gregorian(jalali_start)
+        greg_end = jdatetime.datetime.to_gregorian(jalali_end)
+        return (
+            date(greg_start.year, greg_start.month, greg_start.day),
+            date(greg_end.year, greg_end.month, greg_end.day),
+        )
+    else:
+        # Gregorian calendar
+        today = date.today()
+        start_date = date(today.year, today.month, 1)
+        if today.month == 12:
+            end_date = date(today.year + 1, 1, 1) - timedelta(days=1)
+        else:
+            end_date = date(today.year, today.month + 1, 1) - timedelta(days=1)
+        return (start_date, end_date)
+
+
+def _resolve_checks_today(db: Session, business_id: int, filters: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Returns checks due today (excluding CLEARED status).
+    Uses user's calendar type to determine "today".
+    """
+    calendar_type = str(filters.get("calendar_type", "gregorian")).lower()
+    today = _get_date_by_calendar(calendar_type, is_tomorrow=False)
+    limit = int(filters.get("limit", 15))
+    return _resolve_checks_by_due_date(db, business_id, today, limit)
+
+
+def _resolve_checks_tomorrow(db: Session, business_id: int, filters: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Returns checks due tomorrow (excluding CLEARED status).
+    Uses user's calendar type to determine "tomorrow".
+    """
+    calendar_type = str(filters.get("calendar_type", "gregorian")).lower()
+    tomorrow = _get_date_by_calendar(calendar_type, is_tomorrow=True)
+    limit = int(filters.get("limit", 15))
+    return _resolve_checks_by_due_date(db, business_id, tomorrow, limit)
+
+
+def _resolve_checks_this_month(db: Session, business_id: int, filters: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Returns checks due this month (excluding CLEARED status).
+    Uses user's calendar type to determine current month.
+    """
+    from sqlalchemy import or_
+    
+    calendar_type = str(filters.get("calendar_type", "gregorian")).lower()
+    start_date, end_date = _get_month_range_by_calendar(calendar_type)
+    
+    limit = int(filters.get("limit", 15))
+    
+    # Query checks with due_date in this month, excluding CLEARED status
+    q = (
+        db.query(
+            Check.id,
+            Check.check_number,
+            Check.amount,
+            Check.currency_id,
+            Check.type,
+            Check.status,
+            Check.due_date,
+            Check.person_id,
+            Person.alias_name.label("person_name"),
+            Currency.code.label("currency_code"),
+            Currency.title.label("currency_title"),
+        )
+        .outerjoin(Person, Person.id == Check.person_id)
+        .outerjoin(Currency, Currency.id == Check.currency_id)
+        .filter(
+            and_(
+                Check.business_id == business_id,
+                func.date(Check.due_date) >= start_date,
+                func.date(Check.due_date) <= end_date,
+                or_(
+                    Check.status != CheckStatus.CLEARED,
+                    Check.status.is_(None),
+                ),
+            )
+        )
+        .order_by(Check.due_date.asc(), Check.amount.desc())
+        .limit(limit)
+    )
+    
+    rows = q.all()
+    items: List[Dict[str, Any]] = []
+    totals_by_currency: Dict[str, float] = {}
+    
+    for row in rows:
+        currency_code = row.currency_code or "UNKNOWN"
+        currency_title = row.currency_title or currency_code
+        amount = float(row.amount)
+        
+        items.append({
+            "id": int(row.id),
+            "check_number": row.check_number,
+            "amount": amount,
+            "currency_id": int(row.currency_id) if row.currency_id else None,
+            "currency_code": currency_code,
+            "currency_title": currency_title,
+            "type": row.type.name.lower() if row.type else None,
+            "status": row.status.name if row.status else None,
+            "due_date": row.due_date.isoformat() if row.due_date else None,
+            "person_id": int(row.person_id) if row.person_id else None,
+            "person_name": row.person_name,
+        })
+        
+        # Aggregate totals by currency
+        if currency_code not in totals_by_currency:
+            totals_by_currency[currency_code] = 0.0
+        totals_by_currency[currency_code] += amount
+    
+    return {
+        "items": items,
+        "totals_by_currency": totals_by_currency,
+        "count": len(items),
+        "start_date": start_date.isoformat(),
+        "end_date": end_date.isoformat(),
     }
 
 

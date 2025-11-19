@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+// ignore: avoid_web_libraries_in_flutter
+import 'dart:html' as html;
 import '../../core/date_utils.dart';
 import '../../core/calendar_controller.dart';
+import '../../core/api_client.dart';
 
-class TransferDetailsDialog extends StatelessWidget {
+class TransferDetailsDialog extends StatefulWidget {
   final Map<String, dynamic> document;
   final CalendarController calendarController;
   const TransferDetailsDialog({
@@ -10,6 +13,13 @@ class TransferDetailsDialog extends StatelessWidget {
     required this.document,
     required this.calendarController,
   });
+
+  @override
+  State<TransferDetailsDialog> createState() => _TransferDetailsDialogState();
+}
+
+class _TransferDetailsDialogState extends State<TransferDetailsDialog> {
+  bool _isGeneratingPdf = false;
 
   String _typeFa(String? t) {
     switch (t) {
@@ -31,19 +41,77 @@ class TransferDetailsDialog extends StatelessWidget {
     return '$typeFa $nameStr'.trim();
   }
 
+  Future<void> _generatePdf() async {
+    setState(() {
+      _isGeneratingPdf = true;
+    });
+
+    try {
+      final api = ApiClient();
+      final documentId = widget.document['id'] as int?;
+      if (documentId == null) {
+        throw Exception('شناسه سند یافت نشد');
+      }
+      
+      final path = '/transfers/$documentId/pdf';
+      final bytes = await api.downloadPdf(path);
+      await _savePdfFile(bytes, widget.document['code'] as String? ?? 'transfer');
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('فایل PDF با موفقیت تولید شد'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('خطا در تولید PDF: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isGeneratingPdf = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _savePdfFile(List<int> bytes, String filename) async {
+    try {
+      final name = filename.endsWith('.pdf') ? filename : '$filename.pdf';
+      final blob = html.Blob([bytes], 'application/pdf');
+      final url = html.Url.createObjectUrlFromBlob(blob);
+      html.AnchorElement(href: url)
+        ..setAttribute('download', name)
+        ..click();
+      html.Url.revokeObjectUrl(url);
+      // ignore: avoid_print
+    } catch (e) {
+      // ignore: avoid_print
+      rethrow;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final lines = List<Map<String, dynamic>>.from(document['account_lines'] as List? ?? const []);
-    final code = document['code'] as String? ?? '';
-    final dateStr = document['document_date'] as String? ?? '';
+    final lines = List<Map<String, dynamic>>.from(widget.document['account_lines'] as List? ?? const []);
+    final code = widget.document['code'] as String? ?? '';
+    final dateStr = widget.document['document_date'] as String? ?? '';
     final date = DateTime.tryParse(dateStr);
-    final total = (document['total_amount'] as num?)?.toStringAsFixed(0) ?? '0';
+    final total = (widget.document['total_amount'] as num?)?.toStringAsFixed(0) ?? '0';
     
     // Get source and destination info
-    final sourceType = document['source_type'] as String?;
-    final sourceName = document['source_name'] as String?;
-    final destinationType = document['destination_type'] as String?;
-    final destinationName = document['destination_name'] as String?;
+    final sourceType = widget.document['source_type'] as String?;
+    final sourceName = widget.document['source_name'] as String?;
+    final destinationType = widget.document['destination_type'] as String?;
+    final destinationName = widget.document['destination_name'] as String?;
     
     final sourceText = _formatSourceDestination(sourceType, sourceName);
     final destinationText = _formatSourceDestination(destinationType, destinationName);
@@ -72,7 +140,7 @@ class TransferDetailsDialog extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      Chip(label: Text('تاریخ: ${HesabixDateUtils.formatForDisplay(date, calendarController.isJalali)}')),
+                      Chip(label: Text('تاریخ: ${HesabixDateUtils.formatForDisplay(date, widget.calendarController.isJalali)}')),
                       const SizedBox(width: 8),
                       Chip(label: Text('مبلغ کل: $total ریال')),
                     ],
@@ -159,12 +227,26 @@ class TransferDetailsDialog extends StatelessWidget {
             const Divider(height: 1),
             Padding(
               padding: const EdgeInsets.all(12),
-              child: Align(
-                alignment: Alignment.centerRight,
-                child: FilledButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('بستن'),
-                ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: _isGeneratingPdf ? null : _generatePdf,
+                    icon: _isGeneratingPdf
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.picture_as_pdf),
+                    label: Text(_isGeneratingPdf ? 'در حال تولید...' : 'خروجی PDF'),
+                  ),
+                  const SizedBox(width: 12),
+                  FilledButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('بستن'),
+                  ),
+                ],
               ),
             )
           ],

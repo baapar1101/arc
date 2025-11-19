@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../core/calendar_controller.dart';
 import '../../core/date_utils.dart' show HesabixDateUtils;
@@ -15,6 +14,7 @@ import '../../widgets/banking/currency_picker_widget.dart';
 import '../../core/auth_store.dart';
 import '../../core/api_client.dart';
 import '../../services/receipt_payment_service.dart';
+import '../../services/invoice_service.dart';
 import '../../utils/number_normalizer.dart';
 
 class ReceiptsPaymentsPage extends StatefulWidget {
@@ -229,6 +229,9 @@ class _BulkSettlementDialogState extends State<_BulkSettlementDialog> {
     _isReceipt = widget.initial?.isReceipt ?? widget.isReceipt;
     _selectedCurrencyId = widget.businessInfo?.defaultCurrency?.id;
     if (widget.initial != null) {
+      // تبدیل personLines از ReceiptPaymentDocument به _PersonLine
+      // widget.initial!.personLines از نوع List<PersonLine> است (از ReceiptPaymentDocument)
+      // اما در واقع از نوع List<_PersonLine> است چون initial از نوع _BulkSettlementDraft است
       _personLines.addAll(widget.initial!.personLines);
       _centerTransactions.addAll(widget.initial!.centerTransactions);
     }
@@ -318,7 +321,9 @@ class _BulkSettlementDialogState extends State<_BulkSettlementDialog> {
                     Expanded(
                       child: _PersonsPanel(
                         businessId: widget.businessId,
+                        isReceipt: _isReceipt,
                         lines: _personLines,
+                        selectedCurrencyId: _selectedCurrencyId,
                         onChanged: (ls) => setState(() {
                           _personLines.clear();
                           _personLines.addAll(ls);
@@ -397,12 +402,25 @@ class _BulkSettlementDialogState extends State<_BulkSettlementDialog> {
       final service = ReceiptPaymentService(widget.apiClient);
       
       // تبدیل personLines به فرمت مورد نیاز API
-      final personLinesData = _personLines.map((line) => {
-        'person_id': int.parse(line.personId!),
-        'person_name': line.personName,
-        'amount': line.amount,
-        if (line.description != null && line.description!.isNotEmpty)
-          'description': line.description,
+      final personLinesData = _personLines.map((line) {
+        final personLine = <String, dynamic>{
+          'person_id': int.parse(line.personId!),
+          'person_name': line.personName,
+          'amount': line.amount,
+          if (line.description != null && line.description!.isNotEmpty)
+            'description': line.description,
+        };
+        
+        // اضافه کردن اطلاعات فاکتور در extra_info
+        if (line.linkToInvoice && line.invoiceId != null) {
+          personLine['extra_info'] = {
+            'invoice_id': line.invoiceId,
+            'invoice_code': line.invoiceCode,
+            'link_to_invoice': true,
+          };
+        }
+        
+        return personLine;
       }).toList();
       
       // تبدیل centerTransactions به فرمت مورد نیاز API
@@ -487,12 +505,16 @@ class _BulkSettlementDialogState extends State<_BulkSettlementDialog> {
 
 class _PersonsPanel extends StatefulWidget {
   final int businessId;
+  final bool isReceipt;
   final List<_PersonLine> lines;
   final ValueChanged<List<_PersonLine>> onChanged;
+  final int? selectedCurrencyId;
   const _PersonsPanel({
     required this.businessId,
+    required this.isReceipt,
     required this.lines,
     required this.onChanged,
+    this.selectedCurrencyId,
   });
 
   @override
@@ -533,7 +555,9 @@ class _PersonsPanelState extends State<_PersonsPanel> {
                       final line = widget.lines[i];
                       return _PersonLineTile(
                         businessId: widget.businessId,
+                        isReceipt: widget.isReceipt,
                         line: line,
+                        selectedCurrencyId: widget.selectedCurrencyId,
                         onChanged: (l) {
                           final newLines = List<_PersonLine>.from(widget.lines);
                           newLines[i] = l;
@@ -556,14 +580,18 @@ class _PersonsPanelState extends State<_PersonsPanel> {
 
 class _PersonLineTile extends StatefulWidget {
   final int businessId;
+  final bool isReceipt;
   final _PersonLine line;
   final ValueChanged<_PersonLine> onChanged;
   final VoidCallback onDelete;
+  final int? selectedCurrencyId;
   const _PersonLineTile({
     required this.businessId,
+    required this.isReceipt,
     required this.line,
     required this.onChanged,
     required this.onDelete,
+    this.selectedCurrencyId,
   });
 
   @override
@@ -573,12 +601,28 @@ class _PersonLineTile extends StatefulWidget {
 class _PersonLineTileState extends State<_PersonLineTile> {
   final _amountController = TextEditingController();
   final _descController = TextEditingController();
+  List<Map<String, dynamic>> _invoices = [];
+  bool _loadingInvoices = false;
 
   @override
   void initState() {
     super.initState();
     _amountController.text = widget.line.amount == 0 ? '' : formatNumberForInput(widget.line.amount);
     _descController.text = widget.line.description ?? '';
+    if (widget.line.linkToInvoice && widget.line.personId != null) {
+      _loadInvoices();
+    }
+  }
+
+  @override
+  void didUpdateWidget(_PersonLineTile oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // اگر شخص تغییر کرد و لینک فاکتور فعال است، فاکتورها را دوباره لود کن
+    if (widget.line.linkToInvoice && 
+        widget.line.personId != null && 
+        widget.line.personId != oldWidget.line.personId) {
+      _loadInvoices();
+    }
   }
 
   @override
@@ -586,6 +630,238 @@ class _PersonLineTileState extends State<_PersonLineTile> {
     _amountController.dispose();
     _descController.dispose();
     super.dispose();
+  }
+
+  /// محاسبه مانده فاکتور بر اساس تراکنش‌های مرتبط
+  Future<double> _calculateInvoiceRemaining(Map<String, dynamic> invoice) async {
+    try {
+      final invoiceId = (invoice['id'] as num?)?.toInt();
+      if (invoiceId == null) return 0;
+      
+      // دریافت مبلغ کل فاکتور
+      final totalAmount = _getInvoiceTotal(invoice);
+      
+      // دریافت لیست اسناد دریافت/پرداخت مرتبط
+      final receiptPaymentService = ReceiptPaymentService(ApiClient());
+      double totalPaid = 0;
+      
+      // 1. بررسی از طریق links.receipt_payment_document_ids
+      final extraInfo = invoice['extra_info'] as Map<String, dynamic>?;
+      if (extraInfo != null) {
+        final links = extraInfo['links'] as Map<String, dynamic>?;
+        if (links != null) {
+          final receiptPaymentIds = links['receipt_payment_document_ids'] as List<dynamic>?;
+          if (receiptPaymentIds != null && receiptPaymentIds.isNotEmpty) {
+            for (final id in receiptPaymentIds) {
+              try {
+                final docId = id is int ? id : int.tryParse(id.toString());
+                if (docId == null) continue;
+                
+                final doc = await receiptPaymentService.getById(docId);
+                if (doc == null) continue;
+                
+                // مجموع account_lines (بدون کارمزد)
+                for (final accountLine in doc.accountLines) {
+                  final isCommission = accountLine.extraInfo?['is_commission_line'] == true;
+                  if (!isCommission) {
+                    totalPaid += accountLine.amount;
+                  }
+                }
+              } catch (e) {
+                // ادامه در صورت خطا
+              }
+            }
+          }
+        }
+      }
+      
+      // 2. بررسی از طریق جستجو در اسناد دریافت/پرداخت که invoice_id دارند
+      try {
+        final receiptPaymentList = await receiptPaymentService.listReceiptsPayments(
+          businessId: widget.businessId,
+          skip: 0,
+          take: 1000,
+        );
+        
+        final items = (receiptPaymentList['items'] as List<dynamic>?) ?? [];
+        final Set<int> processedDocIds = {};
+        
+        // محاسبه receipt_payment_document_ids برای جلوگیری از تکرار
+        if (extraInfo != null) {
+          final links = extraInfo['links'] as Map<String, dynamic>?;
+          if (links != null) {
+            final receiptPaymentIds = links['receipt_payment_document_ids'] as List<dynamic>?;
+            if (receiptPaymentIds != null) {
+              for (final id in receiptPaymentIds) {
+                final docId = id is int ? id : int.tryParse(id.toString());
+                if (docId != null) {
+                  processedDocIds.add(docId);
+                }
+              }
+            }
+          }
+        }
+        
+        for (final item in items) {
+          try {
+            final docId = (item['id'] as num?)?.toInt();
+            if (docId == null || processedDocIds.contains(docId)) continue;
+            
+            // بررسی person_lines برای invoice_id
+            final personLines = item['person_lines'] as List<dynamic>?;
+            if (personLines == null) continue;
+            
+            bool hasInvoiceLink = false;
+            for (final pl in personLines) {
+              final plExtraInfo = pl['extra_info'] as Map<String, dynamic>?;
+              if (plExtraInfo != null) {
+                final plInvoiceId = plExtraInfo['invoice_id'];
+                if (plInvoiceId is int && plInvoiceId == invoiceId) {
+                  hasInvoiceLink = true;
+                  break;
+                } else if (plInvoiceId is num && plInvoiceId.toInt() == invoiceId) {
+                  hasInvoiceLink = true;
+                  break;
+                }
+              }
+            }
+            
+            if (!hasInvoiceLink) continue;
+            
+            // دریافت جزئیات کامل سند
+            final doc = await receiptPaymentService.getById(docId);
+            if (doc == null) continue;
+            
+            processedDocIds.add(docId);
+            
+            // مجموع account_lines (بدون کارمزد)
+            for (final accountLine in doc.accountLines) {
+              final isCommission = accountLine.extraInfo?['is_commission_line'] == true;
+              if (!isCommission) {
+                totalPaid += accountLine.amount;
+              }
+            }
+          } catch (e) {
+            // ادامه در صورت خطا
+          }
+        }
+      } catch (e) {
+        // در صورت خطا در جستجو، فقط از links استفاده می‌کنیم
+      }
+      
+      return totalAmount - totalPaid;
+    } catch (e) {
+      return 0;
+    }
+  }
+
+  /// استخراج مبلغ کل فاکتور
+  double _getInvoiceTotal(Map<String, dynamic> invoice) {
+    try {
+      // اول از total_amount
+      if (invoice['total_amount'] != null) {
+        final total = invoice['total_amount'];
+        if (total is num) return total.toDouble();
+        if (total is String) return double.tryParse(total) ?? 0;
+      }
+      
+      // سپس از extra_info.totals.net
+      final extraInfo = invoice['extra_info'] as Map<String, dynamic>?;
+      if (extraInfo != null) {
+        final totals = extraInfo['totals'] as Map<String, dynamic>?;
+        if (totals != null && totals['net'] != null) {
+          final net = totals['net'];
+          if (net is num) return net.toDouble();
+          if (net is String) return double.tryParse(net) ?? 0;
+        }
+      }
+      
+      // در نهایت از total
+      if (invoice['total'] != null) {
+        final total = invoice['total'];
+        if (total is num) return total.toDouble();
+        if (total is String) return double.tryParse(total) ?? 0;
+      }
+      
+      return 0;
+    } catch (e) {
+      return 0;
+    }
+  }
+
+  Future<void> _loadInvoices() async {
+    if (widget.line.personId == null) return;
+    
+    setState(() {
+      _loadingInvoices = true;
+    });
+
+    try {
+      final invoiceService = InvoiceService(apiClient: ApiClient());
+      
+      // تعیین نوع فاکتورهای مناسب
+      final List<String> invoiceTypes;
+      if (widget.isReceipt) {
+        // برای دریافت: فاکتورهای فروش و برگشت از خرید
+        invoiceTypes = ['invoice_sales', 'invoice_purchase_return'];
+      } else {
+        // برای پرداخت: فاکتورهای خرید و برگشت از فروش
+        invoiceTypes = ['invoice_purchase', 'invoice_sales_return'];
+      }
+
+      final filters = <String, dynamic>{
+        'document_type': invoiceTypes,
+        'person_id': int.tryParse(widget.line.personId!) ?? 0,
+        'is_proforma': false, // فقط فاکتورهای قطعی
+      };
+      
+      // اضافه کردن فیلتر ارز اگر انتخاب شده باشد
+      if (widget.selectedCurrencyId != null) {
+        filters['currency_id'] = widget.selectedCurrencyId;
+      }
+
+      final result = await invoiceService.searchInvoices(
+        businessId: widget.businessId,
+        page: 1,
+        limit: 100,
+        filters: filters,
+      );
+
+      if (mounted) {
+        final items = (result['items'] as List<dynamic>?)
+            ?.map((item) => Map<String, dynamic>.from(item as Map))
+            .toList() ?? [];
+        
+        // محاسبه مانده برای هر فاکتور و فیلتر کردن فاکتورهای تسویه شده
+        final List<Map<String, dynamic>> validInvoices = [];
+        for (final invoice in items) {
+          final remaining = await _calculateInvoiceRemaining(invoice);
+          // فقط فاکتورهایی که مانده > 0 دارند (تسویه نشده‌اند)
+          if (remaining > 0.01) { // tolerance برای خطای ممیز شناور
+            validInvoices.add({
+              ...invoice,
+              '_remaining': remaining,
+            });
+          }
+        }
+        
+        setState(() {
+          _invoices = validInvoices;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _invoices = [];
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _loadingInvoices = false;
+        });
+      }
+    }
   }
 
   @override
@@ -612,7 +888,17 @@ class _PersonLineTileState extends State<_PersonLineTile> {
                           )
                         : null,
                     onChanged: (opt) {
-                      widget.onChanged(widget.line.copyWith(personId: opt?.id?.toString(), personName: opt?.displayName));
+                      widget.onChanged(widget.line.copyWith(
+                        personId: opt?.id?.toString(), 
+                        personName: opt?.displayName,
+                        // اگر شخص تغییر کرد و لینک فاکتور فعال است، فاکتورها را reset کن
+                        invoiceId: opt == null ? null : widget.line.invoiceId,
+                        invoiceCode: opt == null ? null : widget.line.invoiceCode,
+                      ));
+                      // اگر شخص انتخاب شد و لینک فاکتور فعال است، فاکتورها را لود کن
+                      if (opt != null && widget.line.linkToInvoice) {
+                        Future.microtask(() => _loadInvoices());
+                      }
                     },
                     label: t.people,
                     hintText: t.search,
@@ -659,6 +945,125 @@ class _PersonLineTileState extends State<_PersonLineTile> {
               ),
               onChanged: (v) => widget.onChanged(widget.line.copyWith(description: v.trim().isEmpty ? null : v.trim())),
             ),
+            const SizedBox(height: 8),
+            // سوئیچ لینک به فاکتور
+            SwitchListTile(
+              title: const Text('لینک به فاکتور'),
+              subtitle: Text(widget.isReceipt 
+                  ? 'این دریافت را به فاکتور فروش مرتبط کن'
+                  : 'این پرداخت را به فاکتور خرید مرتبط کن'),
+              value: widget.line.linkToInvoice,
+              onChanged: widget.line.personId != null
+                  ? (value) {
+                      widget.onChanged(widget.line.copyWith(
+                        linkToInvoice: value,
+                        invoiceId: value ? null : null,
+                        invoiceCode: value ? null : null,
+                      ));
+                      if (value) {
+                        _loadInvoices();
+                      }
+                    }
+                  : null,
+            ),
+            // Dropdown انتخاب فاکتور (فقط اگر سوئیچ فعال باشد)
+            if (widget.line.linkToInvoice && widget.line.personId != null) ...[
+              const SizedBox(height: 8),
+              DropdownButtonFormField<int>(
+                value: widget.line.invoiceId,
+                isExpanded: true,
+                decoration: InputDecoration(
+                  labelText: 'فاکتور',
+                  hintText: _loadingInvoices ? 'در حال بارگذاری...' : 'انتخاب فاکتور',
+                  border: const OutlineInputBorder(),
+                ),
+                items: _loadingInvoices
+                    ? [
+                        const DropdownMenuItem<int>(
+                          value: null,
+                          child: Center(child: CircularProgressIndicator()),
+                        )
+                      ]
+                    : _invoices.map((invoice) {
+                        final id = (invoice['id'] as num?)?.toInt();
+                        final code = invoice['code']?.toString() ?? '';
+                        final total = _getInvoiceTotal(invoice);
+                        final remaining = (invoice['_remaining'] as num?)?.toDouble() ?? (total - 0);
+                        final dateStr = invoice['document_date']?.toString();
+                        final date = dateStr != null ? DateTime.tryParse(dateStr) : null;
+                        final dateDisplay = date != null ? HesabixDateUtils.formatForDisplay(date, true) : '';
+                        
+                        return DropdownMenuItem<int>(
+                          value: id,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                code,
+                                style: const TextStyle(fontWeight: FontWeight.bold),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              Text(
+                                dateDisplay.isNotEmpty 
+                                    ? 'تاریخ: $dateDisplay'
+                                    : '',
+                                style: Theme.of(context).textTheme.bodySmall,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              Text(
+                                'مبلغ کل: ${formatWithThousands(total)}',
+                                style: Theme.of(context).textTheme.bodySmall,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              Text(
+                                'مانده: ${formatWithThousands(remaining)}',
+                                style: TextStyle(
+                                  color: remaining > 0 
+                                      ? Theme.of(context).colorScheme.primary
+                                      : Theme.of(context).colorScheme.error,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                selectedItemBuilder: (context) {
+                  // نمایش کد فاکتور انتخاب شده در dropdown
+                  if (widget.line.invoiceId == null) {
+                    return [
+                      const Text(
+                        'انتخاب فاکتور',
+                        overflow: TextOverflow.ellipsis,
+                      )
+                    ];
+                  }
+                  final selectedInvoice = _invoices.firstWhere(
+                    (inv) => (inv['id'] as num?)?.toInt() == widget.line.invoiceId,
+                    orElse: () => <String, dynamic>{},
+                  );
+                  final code = selectedInvoice['code']?.toString() ?? '';
+                  return [
+                    Text(
+                      code.isNotEmpty ? code : 'انتخاب فاکتور',
+                      overflow: TextOverflow.ellipsis,
+                    )
+                  ];
+                },
+                onChanged: (invoiceId) {
+                  final invoice = _invoices.firstWhere(
+                    (inv) => (inv['id'] as num?)?.toInt() == invoiceId,
+                    orElse: () => <String, dynamic>{},
+                  );
+                  widget.onChanged(widget.line.copyWith(
+                    invoiceId: invoiceId,
+                    invoiceCode: invoice['code']?.toString(),
+                  ));
+                },
+              ),
+            ],
           ],
         ),
       ),
@@ -703,17 +1108,39 @@ class _PersonLine {
   final String? personName;
   final double amount;
   final String? description;
+  final bool linkToInvoice;
+  final int? invoiceId;
+  final String? invoiceCode;
 
-  const _PersonLine({this.personId, this.personName, required this.amount, this.description});
+  const _PersonLine({
+    this.personId, 
+    this.personName, 
+    required this.amount, 
+    this.description,
+    this.linkToInvoice = false,
+    this.invoiceId,
+    this.invoiceCode,
+  });
 
   factory _PersonLine.empty() => const _PersonLine(amount: 0);
 
-  _PersonLine copyWith({String? personId, String? personName, double? amount, String? description}) {
+  _PersonLine copyWith({
+    String? personId, 
+    String? personName, 
+    double? amount, 
+    String? description,
+    bool? linkToInvoice,
+    int? invoiceId,
+    String? invoiceCode,
+  }) {
     return _PersonLine(
       personId: personId ?? this.personId,
       personName: personName ?? this.personName,
       amount: amount ?? this.amount,
       description: description ?? this.description,
+      linkToInvoice: linkToInvoice ?? this.linkToInvoice,
+      invoiceId: invoiceId ?? this.invoiceId,
+      invoiceCode: invoiceCode ?? this.invoiceCode,
     );
   }
 }

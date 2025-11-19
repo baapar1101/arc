@@ -1415,6 +1415,7 @@
   ,
   "installmentsTitle": "فروش اقساطی",
   "installmentsSubtitle": "در صورت فعال‌سازی، طرح اقساط همراه فاکتور ذخیره می‌شود",
+  "installmentsSettingsSubtitle": "مدیریت پلن‌های اقساط و شرایط فروش",
   "installmentsCount": "تعداد اقساط",
   "downPayment": "پیش‌پرداخت",
   "interestRatePercent": "درصد سود کل دوره (%)",
@@ -1548,6 +1549,7 @@
   "savedSuccessfully": "با موفقیت ذخیره شد",
   "currencyToman": "تومان",
   "creditSettingsTitle": "اعتبار کاربران",
+  "creditSettingsSubtitle": "تنظیم سقف اعتبار و سیاست‌های تاخیر",
   "creditEnableTitle": "فعال‌سازی اعتبار",
   "creditEnableSubtitle": "بررسی سقف اعتبار مشتریان در فروش",
   "creditDefaultLimit": "سقف اعتبار پیش‌فرض",
@@ -1735,6 +1737,69 @@
         "type": "String"
       }
     }
-  }
+  },
+
+  "documentMonetizationTitle": "پکیج‌ها و تعرفه‌ها",
+  "documentMonetizationSubtitle": "پکیج‌ها، هزینه ثبت هر سند و تسویه حجمی",
+  "subscriptionPackages": "پکیج‌های اشتراک",
+  "noActivePackage": "هیچ پکیج فعالی برای این کسب‌وکار ثبت نشده است.",
+  "noPackageAvailable": "در حال حاضر هیچ پکیجی برای خرید فعال نشده است.",
+  "activePackage": "پکیج فعال",
+  "status": "وضعیت",
+  "autoRenewActive": "تمدید خودکار فعال است",
+  "periodAmount": "مبلغ دوره",
+  "expiryDate": "تاریخ انقضا",
+  "duration": "مدت",
+  "month": "ماه",
+  "amount": "مبلغ",
+  "free": "رایگان",
+  "active": "فعال",
+  "activate": "فعال‌سازی",
+  "activating": "در حال فعال‌سازی...",
+  "activatePackage": "فعال‌سازی {name}",
+  "@activatePackage": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "packageDuration": "مدت پکیج",
+  "packagePrice": "مبلغ",
+  "autoRenewAtEnd": "تمدید خودکار در پایان دوره",
+  "cancel": "انصراف",
+  "confirmAndActivate": "تأیید و فعال‌سازی",
+  "invalidPackageId": "شناسه پکیج نامعتبر است",
+  "packageActivatedSuccess": "پکیج با موفقیت فعال شد",
+  "packageActivationError": "فعال‌سازی پکیج با خطا مواجه شد",
+  "activePolicies": "سیاست‌های فعال",
+  "noPolicyDefined": "سیاستی تعریف نشده است",
+  "type": "نوع",
+  "priority": "اولویت",
+  "invoices": "صورتحساب‌ها",
+  "noInvoice": "صورتحسابی وجود ندارد",
+  "chargeType": "نوع",
+  "pay": "پرداخت",
+  "paymentSuccess": "پرداخت انجام شد",
+  "paymentError": "پرداخت با خطا مواجه شد",
+  "finalizeVolume": "محاسبه دوره حجمی",
+  "volumeFinalized": "محاسبات حجمی نهایی شد",
+  "volumeFinalizeError": "محاسبه دوره حجمی با خطا مواجه شد",
+  "refresh": "به‌روزرسانی",
+  "statusActive": "فعال",
+  "statusPending": "در انتظار",
+  "statusExpired": "منقضی شده",
+  "statusCancelled": "لغو شده",
+  "statusAwaitingPayment": "در انتظار پرداخت",
+  "statusPaid": "پرداخت شده",
+  "statusInvoiced": "صورت‌حساب شده",
+  "chargeTypePerDocument": "تک سند",
+  "chargeTypeVolumeCycle": "دوره حجمی",
+  "chargeTypeSubscriptionFee": "هزینه اشتراک",
+  "policyTypeFree": "رایگان",
+  "policyTypeSubscription": "پکیج نامحدود",
+  "policyTypeVolume": "حجمی",
+  "policyTypePerDocument": "تک سند",
+  "policyTypeHybrid": "ترکیبی"
 }
 

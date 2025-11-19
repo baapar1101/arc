@@ -37,6 +37,8 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
       _isLoading = true;
     });
 
+    if (!context.mounted) return;
+    final ctx = context;
     try {
       final apiClient = ApiClient();
       final response = await apiClient.changePassword(
@@ -46,27 +48,28 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
       );
 
       if (response.statusCode == 200 && response.data?['success'] == true) {
-        if (mounted) {
-          ScaffoldMessenger.of(Navigator.of(context, rootNavigator: true).context).showSnackBar(
-            SnackBar(
-              content: Text(AppLocalizations.of(context).changePasswordSuccess),
-              backgroundColor: Colors.green,
-              behavior: SnackBarBehavior.floating,
-              margin: const EdgeInsets.all(16),
-              duration: const Duration(seconds: 2),
-            ),
-          );
-          _clearForm();
-        }
+        if (!ctx.mounted) return;
+        final navigatorContext = Navigator.of(ctx, rootNavigator: true).context;
+        ScaffoldMessenger.of(navigatorContext).showSnackBar(
+          SnackBar(
+            content: Text(AppLocalizations.of(ctx).changePasswordSuccess),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+            margin: const EdgeInsets.all(16),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+        _clearForm();
       } else {
         // نمایش پیام خطای دقیق از سرور
+        if (!ctx.mounted) return;
         final errorData = response.data?['error'];
-        final errorMessage = errorData?['message'] ?? AppLocalizations.of(context).changePasswordFailed;
+        final errorMessage = errorData?['message'] ?? AppLocalizations.of(ctx).changePasswordFailed;
         _showError(errorMessage);
       }
     } catch (e) {
-      if (mounted) {
-        _showError(AppLocalizations.of(context).changePasswordFailed);
+      if (ctx.mounted) {
+        _showError(AppLocalizations.of(ctx).changePasswordFailed);
       }
     } finally {
       if (mounted) {

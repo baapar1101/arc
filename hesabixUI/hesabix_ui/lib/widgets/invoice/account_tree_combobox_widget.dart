@@ -65,7 +65,6 @@ class _AccountTreeComboboxWidgetState extends State<AccountTreeComboboxWidget> {
         _accountTree = items;
       });
     } catch (e) {
-      print('خطا در لود کردن درخت حساب‌ها: $e');
       setState(() {
         _accountTree = [];
       });
@@ -497,7 +496,7 @@ class _TreeNodeWidget extends StatelessWidget {
         ),
         decoration: BoxDecoration(
           color: isSelected
-              ? theme.colorScheme.primaryContainer.withOpacity(0.5)
+              ? theme.colorScheme.primaryContainer.withValues(alpha: 0.5)
               : null,
           border: Border(
             right: isSelected

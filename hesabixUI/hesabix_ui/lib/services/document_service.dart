@@ -2,10 +2,12 @@ import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/models/document_model.dart';
+import 'document_policy_guard.dart';
 
 /// سرویس مدیریت اسناد حسابداری
 class DocumentService {
   final ApiClient _apiClient;
+  late final DocumentPolicyGuard _policyGuard = DocumentPolicyGuard(_apiClient);
 
   DocumentService(this._apiClient);
 
@@ -248,6 +250,13 @@ class DocumentService {
         throw Exception(validationError);
       }
 
+      await _policyGuard.ensureAllowed(
+        businessId: businessId,
+        documentType: 'manual',
+        documentDate: request.documentDate,
+        amount: _calculateManualAmount(request.lines),
+      );
+
       final response = await _apiClient.post(
         '/businesses/$businessId/documents/manual',
         data: request.toJson(),
@@ -297,5 +306,16 @@ class DocumentService {
       rethrow;
     }
   }
+}
+
+num _calculateManualAmount(List<DocumentLineCreateRequest> lines) {
+  double debit = 0;
+  double credit = 0;
+  for (final line in lines) {
+    debit += line.debit;
+    credit += line.credit;
+  }
+  final amount = debit.abs() > credit.abs() ? debit.abs() : credit.abs();
+  return amount;
 }
 

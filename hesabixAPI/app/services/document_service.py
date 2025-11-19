@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from adapters.db.repositories.document_repository import DocumentRepository
 from app.core.responses import ApiError
+from app.services.document_monetization_service import process_document_usage_for_document
 
 logger = logging.getLogger(__name__)
 
@@ -427,7 +428,17 @@ def create_manual_document(
         document = repo.create_document(document_data)
         
         # دریافت جزئیات کامل سند (با روابط)
-        return repo.get_document_details(document.id)
+        result = repo.get_document_details(document.id)
+
+        try:
+            process_document_usage_for_document(db, document.id)
+        except Exception as monetization_error:
+            logger.warning(
+                "document_monetization_processing_failed",
+                extra={"document_id": document.id, "error": str(monetization_error)},
+            )
+        
+        return result
         
     except Exception as e:
         logger.error(f"Error creating manual document: {str(e)}")

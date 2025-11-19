@@ -2,9 +2,12 @@ import 'package:dio/dio.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/models/expense_income_document.dart';
 
+import 'document_policy_guard.dart';
+
 /// سرویس CRUD اسناد هزینه/درآمد
 class ExpenseIncomeService {
   final ApiClient _apiClient;
+  late final DocumentPolicyGuard _policyGuard = DocumentPolicyGuard(_apiClient);
 
   ExpenseIncomeService(this._apiClient);
 
@@ -20,6 +23,15 @@ class ExpenseIncomeService {
     Map<String, dynamic>? extraInfo,
   }) async {
     try {
+      final amount = _sumItemAmounts(itemLines);
+
+      await _policyGuard.ensureAllowed(
+        businessId: businessId,
+        documentType: documentType,
+        documentDate: documentDate,
+        amount: amount,
+      );
+
       // تبدیل itemLines به فرمت API
       final itemLinesData = itemLines.map((line) => {
         'account_id': line.accountId,
@@ -353,4 +365,12 @@ class ExpenseIncomeService {
         return type;
     }
   }
+}
+
+num _sumItemAmounts(List<ItemLineData> lines) {
+  num sum = 0;
+  for (final line in lines) {
+    sum += line.amount;
+  }
+  return sum.abs();
 }

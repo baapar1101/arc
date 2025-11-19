@@ -138,19 +138,10 @@ class BusinessDashboardService {
 
   /// دریافت اطلاعات کسب و کار همراه با دسترسی‌های کاربر
   Future<BusinessWithPermission> getBusinessWithPermissions(int businessId) async {
-    print('=== getBusinessWithPermissions START ===');
-    print('Business ID: $businessId');
-    
     try {
-      print('Calling API: /api/v1/business/$businessId/info-with-permissions');
       final response = await _apiClient.post<Map<String, dynamic>>(
         '/api/v1/business/$businessId/info-with-permissions',
       );
-
-      print('API Response received:');
-      print('  - Success: ${response.data?['success']}');
-      print('  - Message: ${response.data?['message']}');
-      print('  - Data: ${response.data?['data']}');
 
       if (response.data?['success'] == true) {
         final data = response.data!['data'] as Map<String, dynamic>;
@@ -181,15 +172,7 @@ class BusinessDashboardService {
         final role = data['role'] as String? ?? 'عضو';
         final hasAccess = data['has_access'] as bool? ?? false;
         
-        print('Parsed data:');
-        print('  - Business Info: $businessInfo');
-        print('  - User Permissions: $userPermissions');
-        print('  - Is Owner: $isOwner');
-        print('  - Role: $role');
-        print('  - Has Access: $hasAccess');
-        
         if (!hasAccess) {
-          print('Access denied by API');
           throw Exception('دسترسی غیرمجاز به این کسب و کار');
         }
         
@@ -214,25 +197,11 @@ class BusinessDashboardService {
           Map<String, dynamic>.from(combined),
         );
         
-        print('BusinessWithPermission created:');
-        print('  - Name: ${businessWithPermission.name}');
-        print('  - ID: ${businessWithPermission.id}');
-        print('  - Is Owner: ${businessWithPermission.isOwner}');
-        print('  - Role: ${businessWithPermission.role}');
-        print('  - Permissions: ${businessWithPermission.permissions}');
-        
-        print('=== getBusinessWithPermissions END ===');
         return businessWithPermission;
       } else {
-        print('API returned error: ${response.data?['message']}');
         throw Exception('Failed to load business info: ${response.data?['message']}');
       }
     } on DioException catch (e) {
-      print('DioException occurred:');
-      print('  - Status Code: ${e.response?.statusCode}');
-      print('  - Response Data: ${e.response?.data}');
-      print('  - Message: ${e.message}');
-      
       if (e.response?.statusCode == 403) {
         throw Exception('دسترسی غیرمجاز به این کسب و کار');
       } else if (e.response?.statusCode == 404) {
@@ -241,7 +210,6 @@ class BusinessDashboardService {
         throw Exception('خطا در بارگذاری اطلاعات کسب و کار: ${e.message}');
       }
     } catch (e) {
-      print('General Exception: $e');
       throw Exception('خطا در بارگذاری اطلاعات کسب و کار: $e');
     }
   }

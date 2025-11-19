@@ -133,21 +133,22 @@ class StorageConfigListWidgetState extends State<StorageConfigListWidget> {
           throw Exception(errorMessage);
         }
       } catch (e) {
-        String errorMessage = AppLocalizations.of(context).error;
+        if (!context.mounted) return;
+        final ctx = context;
+        String errorMessage = AppLocalizations.of(ctx).error;
         
         // بررسی نوع خطا
         if (e.toString().contains('STORAGE_CONFIG_HAS_FILES')) {
-          errorMessage = AppLocalizations.of(context).cannotDeleteDefault;
+          errorMessage = AppLocalizations.of(ctx).cannotDeleteDefault;
         } else if (e.toString().contains('STORAGE_CONFIG_NOT_FOUND')) {
-          errorMessage = AppLocalizations.of(context).noEmailConfigurations;
+          errorMessage = AppLocalizations.of(ctx).noEmailConfigurations;
         } else if (e.toString().contains('FORBIDDEN')) {
-          errorMessage = AppLocalizations.of(context).accessDenied;
+          errorMessage = AppLocalizations.of(ctx).accessDenied;
         } else {
           errorMessage = e.toString().replaceFirst('Exception: ', '');
         }
         
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(ctx).showSnackBar(
           SnackBar(
             content: Text(errorMessage),
             backgroundColor: Colors.red,
@@ -163,11 +164,12 @@ class StorageConfigListWidgetState extends State<StorageConfigListWidget> {
       final api = ApiClient();
       final response = await api.put('/api/v1/admin/files/storage-configs/$configId/set-default');
       
-      if (!mounted) return;
+      if (!context.mounted) return;
+      final ctx = context;
       if (response.data != null && response.data['success'] == true) {
-          ScaffoldMessenger.of(context).showSnackBar(
+          ScaffoldMessenger.of(ctx).showSnackBar(
             SnackBar(
-              content: Text(AppLocalizations.of(context).defaultSetSuccessfully),
+              content: Text(AppLocalizations.of(ctx).defaultSetSuccessfully),
               backgroundColor: Colors.green,
             ),
           );
@@ -175,13 +177,14 @@ class StorageConfigListWidgetState extends State<StorageConfigListWidget> {
         // Refresh the list
         loadStorageConfigs();
       } else {
-        throw Exception(response.data?['message'] ?? AppLocalizations.of(context).defaultSetFailed);
+        throw Exception(response.data?['message'] ?? AppLocalizations.of(ctx).defaultSetFailed);
       }
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      if (!context.mounted) return;
+      final ctx2 = context;
+      ScaffoldMessenger.of(ctx2).showSnackBar(
         SnackBar(
-          content: Text('${AppLocalizations.of(context).defaultSetFailed}: $e'),
+          content: Text('${AppLocalizations.of(ctx2).defaultSetFailed}: $e'),
           backgroundColor: Colors.red,
         ),
       );

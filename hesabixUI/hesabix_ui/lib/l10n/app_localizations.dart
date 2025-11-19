@@ -6110,6 +6110,12 @@ abstract class AppLocalizations {
   /// **'If enabled, an installment plan will be saved with the invoice'**
   String get installmentsSubtitle;
 
+  /// No description provided for @installmentsSettingsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage installment plans and sales conditions'**
+  String get installmentsSettingsSubtitle;
+
   /// No description provided for @installmentsCount.
   ///
   /// In en, this message translates to:
@@ -7718,6 +7724,12 @@ abstract class AppLocalizations {
   /// **'Customer credit'**
   String get creditSettingsTitle;
 
+  /// No description provided for @creditSettingsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Configure credit limits and delay policies'**
+  String get creditSettingsSubtitle;
+
   /// No description provided for @creditEnableTitle.
   ///
   /// In en, this message translates to:
@@ -8233,6 +8245,288 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Failed to remove selected invoices: {error}'**
   String taxRemoveSelectedErrorWithMessage(String error);
+
+  /// No description provided for @documentMonetizationTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Packages and Tariffs'**
+  String get documentMonetizationTitle;
+
+  /// No description provided for @documentMonetizationSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Packages, per-document fees and volume settlement'**
+  String get documentMonetizationSubtitle;
+
+  /// No description provided for @subscriptionPackages.
+  ///
+  /// In en, this message translates to:
+  /// **'Subscription Packages'**
+  String get subscriptionPackages;
+
+  /// No description provided for @noActivePackage.
+  ///
+  /// In en, this message translates to:
+  /// **'No active package has been registered for this business.'**
+  String get noActivePackage;
+
+  /// No description provided for @noPackageAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Currently no package is available for purchase.'**
+  String get noPackageAvailable;
+
+  /// No description provided for @activePackage.
+  ///
+  /// In en, this message translates to:
+  /// **'Active Package'**
+  String get activePackage;
+
+  /// No description provided for @autoRenewActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-renewal is active'**
+  String get autoRenewActive;
+
+  /// No description provided for @periodAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Period Amount'**
+  String get periodAmount;
+
+  /// No description provided for @expiryDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Expiry Date'**
+  String get expiryDate;
+
+  /// No description provided for @duration.
+  ///
+  /// In en, this message translates to:
+  /// **'Duration'**
+  String get duration;
+
+  /// No description provided for @month.
+  ///
+  /// In en, this message translates to:
+  /// **'month'**
+  String get month;
+
+  /// No description provided for @free.
+  ///
+  /// In en, this message translates to:
+  /// **'Free'**
+  String get free;
+
+  /// No description provided for @activate.
+  ///
+  /// In en, this message translates to:
+  /// **'Activate'**
+  String get activate;
+
+  /// No description provided for @activating.
+  ///
+  /// In en, this message translates to:
+  /// **'Activating...'**
+  String get activating;
+
+  /// No description provided for @activatePackage.
+  ///
+  /// In en, this message translates to:
+  /// **'Activate {name}'**
+  String activatePackage(String name);
+
+  /// No description provided for @packageDuration.
+  ///
+  /// In en, this message translates to:
+  /// **'Package Duration'**
+  String get packageDuration;
+
+  /// No description provided for @packagePrice.
+  ///
+  /// In en, this message translates to:
+  /// **'Price'**
+  String get packagePrice;
+
+  /// No description provided for @autoRenewAtEnd.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-renewal at end of period'**
+  String get autoRenewAtEnd;
+
+  /// No description provided for @confirmAndActivate.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm and Activate'**
+  String get confirmAndActivate;
+
+  /// No description provided for @invalidPackageId.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid package ID'**
+  String get invalidPackageId;
+
+  /// No description provided for @packageActivatedSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Package activated successfully'**
+  String get packageActivatedSuccess;
+
+  /// No description provided for @packageActivationError.
+  ///
+  /// In en, this message translates to:
+  /// **'Package activation failed'**
+  String get packageActivationError;
+
+  /// No description provided for @activePolicies.
+  ///
+  /// In en, this message translates to:
+  /// **'Active Policies'**
+  String get activePolicies;
+
+  /// No description provided for @noPolicyDefined.
+  ///
+  /// In en, this message translates to:
+  /// **'No policy has been defined'**
+  String get noPolicyDefined;
+
+  /// No description provided for @noInvoice.
+  ///
+  /// In en, this message translates to:
+  /// **'No invoice exists'**
+  String get noInvoice;
+
+  /// No description provided for @chargeType.
+  ///
+  /// In en, this message translates to:
+  /// **'Type'**
+  String get chargeType;
+
+  /// No description provided for @pay.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay'**
+  String get pay;
+
+  /// No description provided for @paymentSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment completed'**
+  String get paymentSuccess;
+
+  /// No description provided for @paymentError.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment failed'**
+  String get paymentError;
+
+  /// No description provided for @finalizeVolume.
+  ///
+  /// In en, this message translates to:
+  /// **'Finalize Volume Period'**
+  String get finalizeVolume;
+
+  /// No description provided for @volumeFinalized.
+  ///
+  /// In en, this message translates to:
+  /// **'Volume calculations finalized'**
+  String get volumeFinalized;
+
+  /// No description provided for @volumeFinalizeError.
+  ///
+  /// In en, this message translates to:
+  /// **'Volume period calculation failed'**
+  String get volumeFinalizeError;
+
+  /// No description provided for @statusActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Active'**
+  String get statusActive;
+
+  /// No description provided for @statusPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending'**
+  String get statusPending;
+
+  /// No description provided for @statusExpired.
+  ///
+  /// In en, this message translates to:
+  /// **'Expired'**
+  String get statusExpired;
+
+  /// No description provided for @statusCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancelled'**
+  String get statusCancelled;
+
+  /// No description provided for @statusAwaitingPayment.
+  ///
+  /// In en, this message translates to:
+  /// **'Awaiting Payment'**
+  String get statusAwaitingPayment;
+
+  /// No description provided for @statusPaid.
+  ///
+  /// In en, this message translates to:
+  /// **'Paid'**
+  String get statusPaid;
+
+  /// No description provided for @statusInvoiced.
+  ///
+  /// In en, this message translates to:
+  /// **'Invoiced'**
+  String get statusInvoiced;
+
+  /// No description provided for @chargeTypePerDocument.
+  ///
+  /// In en, this message translates to:
+  /// **'Per Document'**
+  String get chargeTypePerDocument;
+
+  /// No description provided for @chargeTypeVolumeCycle.
+  ///
+  /// In en, this message translates to:
+  /// **'Volume Cycle'**
+  String get chargeTypeVolumeCycle;
+
+  /// No description provided for @chargeTypeSubscriptionFee.
+  ///
+  /// In en, this message translates to:
+  /// **'Subscription Fee'**
+  String get chargeTypeSubscriptionFee;
+
+  /// No description provided for @policyTypeFree.
+  ///
+  /// In en, this message translates to:
+  /// **'Free'**
+  String get policyTypeFree;
+
+  /// No description provided for @policyTypeSubscription.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlimited Package'**
+  String get policyTypeSubscription;
+
+  /// No description provided for @policyTypeVolume.
+  ///
+  /// In en, this message translates to:
+  /// **'Volume'**
+  String get policyTypeVolume;
+
+  /// No description provided for @policyTypePerDocument.
+  ///
+  /// In en, this message translates to:
+  /// **'Per Document'**
+  String get policyTypePerDocument;
+
+  /// No description provided for @policyTypeHybrid.
+  ///
+  /// In en, this message translates to:
+  /// **'Hybrid'**
+  String get policyTypeHybrid;
 }
 
 class _AppLocalizationsDelegate

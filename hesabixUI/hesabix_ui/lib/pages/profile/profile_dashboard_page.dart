@@ -49,7 +49,9 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> {
         _error = null;
       });
       final defs = await _service.getWidgetDefinitions();
-      final bp = _currentBreakpoint(MediaQuery.of(context).size.width);
+      if (!context.mounted) return;
+      final ctx = context;
+      final bp = _currentBreakpoint(MediaQuery.of(ctx).size.width);
       var layout = await _service.getLayoutProfile(breakpoint: bp);
       // اطمینان از حضور ویجت‌های جدید پیش‌فرض در چیدمان
       final existingKeys = layout.items.map((e) => e.key).toSet();
@@ -341,7 +343,6 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> {
         'profile_recent_businesses': _recentBusinessesWidget,
         'profile_announcements': _announcementsWidget,
         'profile_support_tickets': _supportTicketsWidget,
-        'profile_onboarding_checklist': _onboardingChecklistWidget,
       };
 
   Widget _buildCard({required String title, Widget? trailing, required Widget child}) {
@@ -355,7 +356,7 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> {
             decoration: BoxDecoration(
               color: Theme.of(context).colorScheme.surfaceContainerHighest,
               border: Border(
-                bottom: BorderSide(color: Theme.of(context).dividerColor.withOpacity(0.08)),
+                bottom: BorderSide(color: Theme.of(context).dividerColor.withValues(alpha: 0.08)),
               ),
             ),
             child: Row(
@@ -447,9 +448,8 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> {
               OutlinedButton.icon(
                 onPressed: () async {
                   await _reloadAnnouncements(onlyUnread: _annOnlyUnread);
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('اعلان‌ها به‌روز شد')));
-                  }
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('اعلان‌ها به‌روز شد')));
                 },
                 icon: const Icon(Icons.refresh, size: 18),
                 label: const Text('بازخوانی'),
@@ -510,13 +510,11 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> {
                               setState(() => _annBusyIds.add(annId));
                               await _markAnnouncementRead(annId);
                               await _reloadAnnouncements(onlyUnread: _annOnlyUnread);
-                              if (mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('به‌عنوان خوانده‌شده علامت خورد')));
-                              }
+                              if (!context.mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('به‌عنوان خوانده‌شده علامت خورد')));
                             } catch (e) {
-                              if (mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطا: $e')));
-                              }
+                              if (!context.mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطا: $e')));
                             } finally {
                               if (mounted && annId != null) setState(() => _annBusyIds.remove(annId));
                             }
@@ -533,13 +531,11 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> {
                               setState(() => _annBusyIds.add(annId));
                               await _dismissAnnouncement(annId);
                               await _reloadAnnouncements(onlyUnread: _annOnlyUnread);
-                              if (mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('اعلان پنهان شد')));
-                              }
+                              if (!context.mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('اعلان پنهان شد')));
                             } catch (e) {
-                              if (mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطا: $e')));
-                              }
+                              if (!context.mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطا: $e')));
                             } finally {
                               if (mounted && annId != null) setState(() => _annBusyIds.remove(annId));
                             }
@@ -604,64 +600,6 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> {
           ),
         ),
       ],
-    );
-  }
-
-  Widget _onboardingChecklistWidget(BuildContext context, dynamic data, DashboardLayoutItem item, {VoidCallback? onRefresh}) {
-    final theme = Theme.of(context);
-    final items = (data is Map && data['items'] is List) ? List<Map<String, dynamic>>.from(data['items'] as List) : const <Map<String, dynamic>>[];
-    int total = items.length;
-    int done = items.where((e) => (e['done'] ?? false) == true).length;
-    double ratio = (total == 0) ? 0 : (done / total);
-    return Padding(
-      padding: const EdgeInsets.all(12.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.flag),
-              const SizedBox(width: 8),
-              Text('پیشرفت: ${(ratio * 100).round()}%', style: theme.textTheme.titleSmall),
-            ],
-          ),
-          const SizedBox(height: 8),
-          LinearProgressIndicator(value: ratio),
-          const SizedBox(height: 12),
-          if (items.isEmpty)
-            Center(child: Text('موردی ثبت نشده است', style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)))
-          else
-            ...items.map((it) {
-              final title = '${it['title'] ?? '-'}';
-              final done = (it['done'] ?? false) == true;
-              return CheckboxListTile(
-                value: done,
-                onChanged: (v) {
-                  // بروزرسانی محلی وضعیت انجام‌شدن آیتم
-                  final list = List<Map<String, dynamic>>.from(items);
-                  final idx = list.indexOf(it);
-                  if (idx >= 0) {
-                    list[idx] = Map<String, dynamic>.from(list[idx])..['done'] = v == true;
-                    setState(() {
-                      _data['profile_onboarding_checklist'] = {'items': list};
-                    });
-                  }
-                },
-                controlAffinity: ListTileControlAffinity.leading,
-                dense: true,
-                title: Text(title),
-              );
-            }),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton.icon(
-              onPressed: onRefresh,
-              icon: const Icon(Icons.refresh),
-              label: const Text('بازخوانی'),
-            ),
-          ),
-        ],
-      ),
     );
   }
 

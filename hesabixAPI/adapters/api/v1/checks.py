@@ -16,6 +16,8 @@ from adapters.api.v1.schema_models.check import (
     CheckBounceRequest,
     CheckPayRequest,
     CheckDepositRequest,
+    CheckReconciliationCalculateRequest,
+    CheckReconciliationCreateRequest,
 )
 from app.services.check_service import (
     create_check,
@@ -29,6 +31,14 @@ from app.services.check_service import (
     bounce_check,
     pay_check,
     deposit_check,
+    get_check_history_and_documents,
+)
+from app.services.check_reconciliation_service import (
+    calculate_checks_reconciliation,
+    create_reconciliation,
+    get_reconciliation_by_id,
+    list_reconciliations,
+    delete_reconciliation,
 )
 
 
@@ -94,13 +104,9 @@ async def create_check_endpoint(
     _: None = Depends(require_business_management_dep),
 ):
     payload: Dict[str, Any] = body.model_dump(exclude_unset=True)
-    # اگر کاربر درخواست ثبت سند همزمان داد، باید دسترسی نوشتن حسابداری داشته باشد
-    try:
-        if bool(payload.get("auto_post")) and not ctx.has_any_permission("accounting", "write"):
-            raise ApiError("FORBIDDEN", "Missing permission: accounting.write for auto_post", http_status=403)
-    except Exception:
-        # در صورت هرگونه خطای غیرمنتظره در بررسی، اجازه ادامه نمی‌دهیم
-        raise
+    # ثبت سند حسابداری الزامی است - بررسی دسترسی نوشتن حسابداری
+    if not ctx.has_any_permission("accounting", "write"):
+        raise ApiError("FORBIDDEN", "Missing permission: accounting.write (required for check creation)", http_status=403)
     created = create_check(db, business_id, ctx.get_user_id(), payload)
     return success_response(data=format_datetime_fields(created, request), request=request, message="CHECK_CREATED")
 @router.post(
@@ -126,8 +132,9 @@ async def endorse_check_endpoint(
         biz_id = None
     if biz_id is not None and not ctx.can_access_business(biz_id):
         raise ApiError("FORBIDDEN", "Access denied", http_status=403)
-    if bool(payload.get("auto_post")) and not ctx.has_any_permission("accounting", "write"):
-        raise ApiError("FORBIDDEN", "Missing permission: accounting.write for auto_post", http_status=403)
+    # ثبت سند حسابداری الزامی است - بررسی دسترسی نوشتن حسابداری
+    if not ctx.has_any_permission("accounting", "write"):
+        raise ApiError("FORBIDDEN", "Missing permission: accounting.write (required for check actions)", http_status=403)
     result = endorse_check(db, check_id, ctx.get_user_id(), payload)
     return success_response(data=format_datetime_fields(result, request), request=request, message="CHECK_ENDORSED")
 
@@ -154,8 +161,9 @@ async def clear_check_endpoint(
         biz_id = None
     if biz_id is not None and not ctx.can_access_business(biz_id):
         raise ApiError("FORBIDDEN", "Access denied", http_status=403)
-    if bool(payload.get("auto_post")) and not ctx.has_any_permission("accounting", "write"):
-        raise ApiError("FORBIDDEN", "Missing permission: accounting.write for auto_post", http_status=403)
+    # ثبت سند حسابداری الزامی است - بررسی دسترسی نوشتن حسابداری
+    if not ctx.has_any_permission("accounting", "write"):
+        raise ApiError("FORBIDDEN", "Missing permission: accounting.write (required for check actions)", http_status=403)
     result = clear_check(db, check_id, ctx.get_user_id(), payload)
     return success_response(data=format_datetime_fields(result, request), request=request, message="CHECK_CLEARED")
 
@@ -182,8 +190,9 @@ async def return_check_endpoint(
         biz_id = None
     if biz_id is not None and not ctx.can_access_business(biz_id):
         raise ApiError("FORBIDDEN", "Access denied", http_status=403)
-    if bool(payload.get("auto_post")) and not ctx.has_any_permission("accounting", "write"):
-        raise ApiError("FORBIDDEN", "Missing permission: accounting.write for auto_post", http_status=403)
+    # ثبت سند حسابداری الزامی است - بررسی دسترسی نوشتن حسابداری
+    if not ctx.has_any_permission("accounting", "write"):
+        raise ApiError("FORBIDDEN", "Missing permission: accounting.write (required for check actions)", http_status=403)
     result = return_check(db, check_id, ctx.get_user_id(), payload)
     return success_response(data=format_datetime_fields(result, request), request=request, message="CHECK_RETURNED")
 
@@ -210,8 +219,9 @@ async def bounce_check_endpoint(
         biz_id = None
     if biz_id is not None and not ctx.can_access_business(biz_id):
         raise ApiError("FORBIDDEN", "Access denied", http_status=403)
-    if bool(payload.get("auto_post")) and not ctx.has_any_permission("accounting", "write"):
-        raise ApiError("FORBIDDEN", "Missing permission: accounting.write for auto_post", http_status=403)
+    # ثبت سند حسابداری الزامی است - بررسی دسترسی نوشتن حسابداری
+    if not ctx.has_any_permission("accounting", "write"):
+        raise ApiError("FORBIDDEN", "Missing permission: accounting.write (required for check actions)", http_status=403)
     result = bounce_check(db, check_id, ctx.get_user_id(), payload)
     return success_response(data=format_datetime_fields(result, request), request=request, message="CHECK_BOUNCED")
 
@@ -238,8 +248,9 @@ async def pay_check_endpoint(
         biz_id = None
     if biz_id is not None and not ctx.can_access_business(biz_id):
         raise ApiError("FORBIDDEN", "Access denied", http_status=403)
-    if bool(payload.get("auto_post")) and not ctx.has_any_permission("accounting", "write"):
-        raise ApiError("FORBIDDEN", "Missing permission: accounting.write for auto_post", http_status=403)
+    # ثبت سند حسابداری الزامی است - بررسی دسترسی نوشتن حسابداری
+    if not ctx.has_any_permission("accounting", "write"):
+        raise ApiError("FORBIDDEN", "Missing permission: accounting.write (required for check actions)", http_status=403)
     result = pay_check(db, check_id, ctx.get_user_id(), payload)
     return success_response(data=format_datetime_fields(result, request), request=request, message="CHECK_PAID")
 
@@ -266,8 +277,9 @@ async def deposit_check_endpoint(
         biz_id = None
     if biz_id is not None and not ctx.can_access_business(biz_id):
         raise ApiError("FORBIDDEN", "Access denied", http_status=403)
-    if bool(payload.get("auto_post")) and not ctx.has_any_permission("accounting", "write"):
-        raise ApiError("FORBIDDEN", "Missing permission: accounting.write for auto_post", http_status=403)
+    # ثبت سند حسابداری الزامی است - بررسی دسترسی نوشتن حسابداری
+    if not ctx.has_any_permission("accounting", "write"):
+        raise ApiError("FORBIDDEN", "Missing permission: accounting.write (required for check actions)", http_status=403)
     result = deposit_check(db, check_id, ctx.get_user_id(), payload)
     return success_response(data=format_datetime_fields(result, request), request=request, message="CHECK_DEPOSITED")
 
@@ -296,6 +308,39 @@ async def get_check_endpoint(
     return success_response(data=format_datetime_fields(result, request), request=request, message="CHECK_DETAILS")
 
 
+@router.get(
+    "/checks/{check_id}/history",
+    summary="سوابق چک و اسناد حسابداری",
+    description="دریافت سوابق چک و اسناد حسابداری مرتبط",
+)
+async def get_check_history_endpoint(
+    request: Request,
+    check_id: int,
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    # بررسی دسترسی
+    check = get_check_by_id(db, check_id)
+    if not check:
+        raise ApiError("CHECK_NOT_FOUND", "Check not found", http_status=404)
+    try:
+        biz_id = int(check.get("business_id"))
+    except Exception:
+        biz_id = None
+    if biz_id is not None and not ctx.can_access_business(biz_id):
+        raise ApiError("FORBIDDEN", "Access denied", http_status=403)
+    
+    result = get_check_history_and_documents(db, check_id)
+    
+    # فرمت کردن تاریخ‌ها
+    if result.get("history"):
+        result["history"] = [format_datetime_fields(item, request) for item in result["history"]]
+    if result.get("documents"):
+        result["documents"] = [format_datetime_fields(item, request) for item in result["documents"]]
+    
+    return success_response(data=result, request=request, message="CHECK_HISTORY_FETCHED")
+
+
 @router.put(
     "/checks/{check_id}",
     summary="ویرایش چک",
@@ -309,16 +354,21 @@ async def update_check_endpoint(
     ctx: AuthContext = Depends(get_current_user),
     _: None = Depends(require_business_management_dep),
 ):
-    payload: Dict[str, Any] = body.model_dump(exclude_unset=True)
-    result = update_check(db, check_id, payload)
-    if result is None:
+    # بررسی دسترسی قبل از update
+    before = get_check_by_id(db, check_id)
+    if not before:
         raise ApiError("CHECK_NOT_FOUND", "Check not found", http_status=404)
     try:
-        biz_id = int(result.get("business_id"))
+        biz_id = int(before.get("business_id"))
     except Exception:
         biz_id = None
     if biz_id is not None and not ctx.can_access_business(biz_id):
         raise ApiError("FORBIDDEN", "Access denied", http_status=403)
+    
+    payload: Dict[str, Any] = body.model_dump(exclude_unset=True)
+    result = update_check(db, check_id, payload)
+    if result is None:
+        raise ApiError("CHECK_NOT_FOUND", "Check not found", http_status=404)
     return success_response(data=format_datetime_fields(result, request), request=request, message="CHECK_UPDATED")
 
 
@@ -342,9 +392,739 @@ async def delete_check_endpoint(
             biz_id = None
         if biz_id is not None and not ctx.can_access_business(biz_id):
             raise ApiError("FORBIDDEN", "Access denied", http_status=403)
-    ok = delete_check(db, check_id)
-    if not ok:
-        raise ApiError("CHECK_NOT_FOUND", "Check not found", http_status=404)
+    # بررسی دسترسی حسابداری برای حذف اسناد مرتبط
+    if not ctx.has_any_permission("accounting", "write"):
+        raise ApiError("FORBIDDEN", "Missing permission: accounting.write (required for check deletion)", http_status=403)
+    delete_check(db, check_id, user_id=ctx.get_user_id())
     return success_response(data=None, request=request, message="CHECK_DELETED")
+
+
+# =====================
+# Reconciliation Endpoints
+# =====================
+
+@router.post(
+    "/businesses/{business_id}/checks/reconciliations/calculate",
+    summary="محاسبه راس چک‌ها",
+    description="محاسبه راس چک‌ها بدون ذخیره",
+)
+@require_business_access("business_id")
+async def calculate_reconciliation_endpoint(
+    request: Request,
+    business_id: int,
+    body: CheckReconciliationCalculateRequest = Body(...),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    payload: Dict[str, Any] = body.model_dump(exclude_unset=True)
+    result = calculate_checks_reconciliation(
+        db,
+        business_id,
+        payload.get("check_ids", []),
+        payload.get("base_date"),
+        payload.get("currency_id"),
+    )
+    return success_response(data=format_datetime_fields(result, request), request=request, message="RECONCILIATION_CALCULATED")
+
+
+@router.post(
+    "/businesses/{business_id}/checks/reconciliations",
+    summary="ایجاد جلسه راس‌گیری",
+    description="ایجاد و ذخیره جلسه راس‌گیری چک‌ها",
+)
+@require_business_access("business_id")
+async def create_reconciliation_endpoint(
+    request: Request,
+    business_id: int,
+    body: CheckReconciliationCreateRequest = Body(...),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    payload: Dict[str, Any] = body.model_dump(exclude_unset=True)
+    result = create_reconciliation(db, business_id, ctx.get_user_id(), payload)
+    return success_response(data=format_datetime_fields(result, request), request=request, message="RECONCILIATION_CREATED")
+
+
+@router.post(
+    "/businesses/{business_id}/checks/reconciliations/list",
+    summary="لیست جلسات راس‌گیری",
+    description="دریافت لیست جلسات راس‌گیری با جستجو/فیلتر",
+)
+@require_business_access("business_id")
+async def list_reconciliations_endpoint(
+    request: Request,
+    business_id: int,
+    query_info: QueryInfo,
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    query_dict: Dict[str, Any] = {
+        "take": query_info.take,
+        "skip": query_info.skip,
+        "sort_by": query_info.sort_by,
+        "sort_desc": query_info.sort_desc,
+        "search": query_info.search,
+        "search_fields": query_info.search_fields,
+        "filters": query_info.filters,
+    }
+    result = list_reconciliations(db, business_id, query_dict)
+    result["items"] = [format_datetime_fields(item, request) for item in result.get("items", [])]
+    return success_response(data=result, request=request, message="RECONCILIATIONS_LIST_FETCHED")
+
+
+@router.get(
+    "/checks/reconciliations/{reconciliation_id}",
+    summary="جزئیات جلسه راس‌گیری",
+    description="دریافت جزئیات یک جلسه راس‌گیری",
+)
+async def get_reconciliation_endpoint(
+    request: Request,
+    reconciliation_id: int,
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    result = get_reconciliation_by_id(db, reconciliation_id)
+    if not result:
+        raise ApiError("RECONCILIATION_NOT_FOUND", "جلسه راس‌گیری پیدا نشد", http_status=404)
+    try:
+        biz_id = int(result.get("business_id"))
+    except Exception:
+        biz_id = None
+    if biz_id is not None and not ctx.can_access_business(biz_id):
+        raise ApiError("FORBIDDEN", "Access denied", http_status=403)
+    return success_response(data=format_datetime_fields(result, request), request=request, message="RECONCILIATION_DETAILS")
+
+
+@router.delete(
+    "/checks/reconciliations/{reconciliation_id}",
+    summary="حذف جلسه راس‌گیری",
+    description="حذف یک جلسه راس‌گیری",
+)
+async def delete_reconciliation_endpoint(
+    request: Request,
+    reconciliation_id: int,
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    result = get_reconciliation_by_id(db, reconciliation_id)
+    if result:
+        try:
+            biz_id = int(result.get("business_id"))
+        except Exception:
+            biz_id = None
+        if biz_id is not None and not ctx.can_access_business(biz_id):
+            raise ApiError("FORBIDDEN", "Access denied", http_status=403)
+    delete_reconciliation(db, reconciliation_id)
+    return success_response(data=None, request=request, message="RECONCILIATION_DELETED")
+
+
+# =====================
+# Export Endpoints
+# =====================
+
+@router.post(
+    "/businesses/{business_id}/checks/export/excel",
+    summary="خروجی Excel لیست چک‌ها",
+    description="خروجی Excel لیست چک‌ها با قابلیت فیلتر، انتخاب سطرها و رعایت ترتیب/نمایش ستون‌ها",
+)
+@require_business_access("business_id")
+async def export_checks_excel(
+    business_id: int,
+    request: Request,
+    body: Dict[str, Any] = Body(...),
+    auth_context: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """خروجی Excel لیست چک‌ها"""
+    import json
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from fastapi.responses import Response
+    from app.core.i18n import negotiate_locale, locale_dependency, Translator
+    from app.core.calendar import CalendarConverter, get_calendar_type_from_header
+    import datetime as dt_module
+    
+    # Get locale and translator
+    locale = negotiate_locale(request.headers.get("Accept-Language"))
+    translator = await locale_dependency(request)
+    is_fa = locale == 'fa'
+    
+    # Get calendar type
+    calendar_type = get_calendar_type_from_header(request.headers.get("X-Calendar-Type"))
+    if not calendar_type:
+        calendar_type = "jalali" if is_fa else "gregorian"
+    
+    # Build query dict from flat body
+    max_export_records = 10000
+    take_value = min(int(body.get("take", 1000)), max_export_records)
+    
+    query_dict = {
+        "take": take_value,
+        "skip": int(body.get("skip", 0)),
+        "sort_by": body.get("sort_by"),
+        "sort_desc": bool(body.get("sort_desc", False)),
+        "search": body.get("search"),
+        "search_fields": body.get("search_fields"),
+        "filters": body.get("filters"),
+    }
+    
+    # Handle person_id from body
+    if body.get("person_id") is not None:
+        try:
+            query_dict["person_id"] = int(body.get("person_id"))
+        except Exception:
+            pass
+
+    result = list_checks(db, business_id, query_dict)
+    items = result.get('items', [])
+    items = [format_datetime_fields(item, request) for item in items]
+    
+    # Check if we hit the limit
+    if len(items) >= max_export_records:
+        warning_item = {
+            "row_number": "⚠️",
+            "type": translator.t("warning", "هشدار"),
+            "check_number": translator.t("max_export_limit", "حداکثر ۱۰,۰۰۰ رکورد قابل export است"),
+            "person_name": "",
+            "amount": "",
+            "due_date": "",
+            "status": "",
+        }
+        items.append(warning_item)
+
+    # Handle selected rows
+    selected_only = bool(body.get('selected_only', False))
+    selected_indices = body.get('selected_indices')
+    if selected_only and selected_indices is not None:
+        indices = None
+        if isinstance(selected_indices, str):
+            try:
+                indices = json.loads(selected_indices)
+            except (json.JSONDecodeError, TypeError):
+                indices = None
+        elif isinstance(selected_indices, list):
+            indices = selected_indices
+        if isinstance(indices, list):
+            items = [items[i] for i in indices if isinstance(i, int) and 0 <= i < len(items)]
+
+    # Helper functions
+    def format_date_for_export(item_dict: dict, date_key: str) -> str:
+        """Format date based on calendar type (date only, no time)"""
+        value = item_dict.get(date_key)
+        if value is None:
+            return ""
+        
+        # If it's already a string (formatted by format_datetime_fields), extract date only
+        if isinstance(value, str):
+            # Remove time part if exists (format: "YYYY-MM-DD" or "YYYY/MM/DD" or "YYYY-MM-DD HH:MM:SS" or "YYYY/MM/DD HH:MM:SS")
+            if ' ' in value or 'T' in value:
+                # Extract date part only (remove time)
+                date_part = value.split(' ')[0].split('T')[0]
+                return date_part
+            return value
+        
+        # If it's a dict (from _formatted field), use date_only
+        if isinstance(value, dict):
+            date_only = value.get("date_only")
+            if date_only:
+                return str(date_only)
+            # Fallback to formatted and extract date part
+            formatted = value.get("formatted", "")
+            if formatted:
+                date_part = str(formatted).split(' ')[0].split('T')[0]
+                return date_part
+        
+        # If it's a datetime object, format it based on calendar type
+        try:
+            if isinstance(value, dt_module.datetime):
+                formatted = CalendarConverter.format_datetime(value, calendar_type)
+                return formatted.get("date_only", "") or formatted.get("formatted", "").split(' ')[0]
+        except Exception:
+            pass
+        
+        # Fallback
+        return str(value) if value else ""
+    
+    def format_number_for_display(value) -> str:
+        """Format number with thousands separator and remove .0"""
+        try:
+            if value is None:
+                return ""
+            v = float(value)
+            s = f"{v:,.2f}"
+            # Trim trailing .00 or trailing zeros
+            if "." in s:
+                s = s.rstrip("0").rstrip(".")
+            return s
+        except Exception:
+            return str(value) if value is not None else ""
+    
+    def translate_status(status: str) -> str:
+        """Translate check status"""
+        if not status:
+            return ""
+        status_map = {
+            'RECEIVED_ON_HAND': translator.t('check_status_received_on_hand', 'در دست (دریافتی)'),
+            'TRANSFERRED_ISSUED': translator.t('check_status_transferred_issued', 'صادر شده (پرداختنی)'),
+            'DEPOSITED': translator.t('check_status_deposited', 'سپرده به بانک'),
+            'CLEARED': translator.t('check_status_cleared', 'پاس/وصول شده'),
+            'ENDORSED': translator.t('check_status_endorsed', 'واگذار شده'),
+            'RETURNED': translator.t('check_status_returned', 'عودت شده'),
+            'BOUNCED': translator.t('check_status_bounced', 'برگشت خورده'),
+            'CANCELLED': translator.t('check_status_cancelled', 'ابطال'),
+        }
+        return status_map.get(status.upper(), status)
+    
+    def translate_type(check_type: str) -> str:
+        """Translate check type"""
+        if not check_type:
+            return ""
+        type_map = {
+            'received': translator.t('check_type_received', 'دریافتی'),
+            'transferred': translator.t('check_type_transferred', 'واگذار شده'),
+        }
+        return type_map.get(check_type.lower(), check_type)
+
+    # Prepare headers based on export_columns (add row number at the beginning)
+    headers: list = []
+    keys: list = []
+    
+    # Always add row number as first column
+    headers.append(translator.t('row_number', 'ردیف'))
+    keys.append('row_number')
+    
+    export_columns = body.get('export_columns')
+    if export_columns:
+        for col in export_columns:
+            key = col.get('key')
+            label = col.get('label', key)
+            if key and key != 'row_number':  # Skip row_number if already added
+                keys.append(str(key))
+                headers.append(str(label))
+    else:
+        # Default columns for checks
+        default_columns = [
+            ('type', translator.t('check_type', 'نوع')),
+            ('person_name', translator.t('person', 'شخص')),
+            ('issue_date', translator.t('issue_date', 'تاریخ صدور')),
+            ('due_date', translator.t('due_date', 'تاریخ سررسید')),
+            ('check_number', translator.t('check_number', 'شماره چک')),
+            ('sayad_code', translator.t('sayad_code', 'شناسه صیاد')),
+            ('bank_name', translator.t('bank', 'بانک')),
+            ('branch_name', translator.t('branch', 'شعبه')),
+            ('amount', translator.t('amount', 'مبلغ')),
+            ('currency', translator.t('currency', 'ارز')),
+            ('status', translator.t('status', 'وضعیت')),
+        ]
+        for key, label in default_columns:
+            if items and key in items[0]:
+                keys.append(key)
+                headers.append(label)
+
+    # Create workbook
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "چک‌ها"
+    
+    # Header style
+    header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+    header_font = Font(bold=True, color="FFFFFF", size=11)
+    header_alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    border = Border(
+        left=Side(style='thin'),
+        right=Side(style='thin'),
+        top=Side(style='thin'),
+        bottom=Side(style='thin')
+    )
+    
+    # Write headers
+    for col_idx, header in enumerate(headers, start=1):
+        cell = ws.cell(row=1, column=col_idx, value=header)
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = header_alignment
+        cell.border = border
+    
+    # Write data with formatting
+    date_keys = {'issue_date', 'due_date'}
+    amount_keys = {'amount'}
+    for row_idx, item in enumerate(items, start=2):
+        for col_idx, key in enumerate(keys, start=1):
+            if key == 'row_number':
+                value = row_idx - 1  # Row number (starting from 1)
+            else:
+                value = item.get(key, '')
+                # Format dates (date only, no time)
+                if key in date_keys:
+                    value = format_date_for_export(item, key)
+                # Format numbers with thousands separator
+                elif key in amount_keys:
+                    value = format_number_for_display(value)
+                # Translate status and type
+                elif key == 'status':
+                    value = translate_status(str(value) if value else '')
+                elif key == 'type':
+                    value = translate_type(str(value) if value else '')
+                # Format None values
+                elif value is None:
+                    value = ''
+                else:
+                    value = str(value) if value is not None else ''
+            
+            cell = ws.cell(row=row_idx, column=col_idx, value=value)
+            cell.border = border
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+    
+    # Auto-adjust column widths
+    for col_idx, header in enumerate(headers, start=1):
+        max_length = len(header)
+        for row_idx in range(2, len(items) + 2):
+            cell_value = ws.cell(row=row_idx, column=col_idx).value
+            if cell_value:
+                max_length = max(max_length, len(str(cell_value)))
+        ws.column_dimensions[ws.cell(row=1, column=col_idx).column_letter].width = min(max_length + 2, 50)
+    
+    # Save to bytes
+    from io import BytesIO
+    output = BytesIO()
+    wb.save(output)
+    output.seek(0)
+    
+    return Response(
+        content=output.read(),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename=checks_{business_id}.xlsx"}
+    )
+
+
+@router.post(
+    "/businesses/{business_id}/checks/export/pdf",
+    summary="خروجی PDF لیست چک‌ها",
+    description="خروجی PDF لیست چک‌ها با قابلیت فیلتر، انتخاب سطرها و رعایت ترتیب/نمایش ستون‌ها",
+)
+@require_business_access("business_id")
+async def export_checks_pdf(
+    business_id: int,
+    request: Request,
+    body: Dict[str, Any] = Body(...),
+    auth_context: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """خروجی PDF لیست چک‌ها"""
+    from weasyprint import HTML, CSS
+    from weasyprint.text.fonts import FontConfiguration
+    from app.core.i18n import negotiate_locale, locale_dependency, Translator
+    from app.core.calendar import CalendarConverter, get_calendar_type_from_header
+    from html import escape
+    from fastapi.responses import Response
+    import json
+    import datetime as dt_module
+    
+    # Get locale and translator
+    locale = negotiate_locale(request.headers.get("Accept-Language"))
+    translator = await locale_dependency(request)
+    is_rtl = locale.startswith('fa')
+    is_fa = locale == 'fa'
+    
+    # Get calendar type
+    calendar_type = get_calendar_type_from_header(request.headers.get("X-Calendar-Type"))
+    if not calendar_type:
+        calendar_type = "jalali" if is_fa else "gregorian"
+    
+    # Build query dict from flat body
+    max_export_records = 10000
+    take_value = min(int(body.get("take", 1000)), max_export_records)
+    
+    query_dict = {
+        "take": take_value,
+        "skip": int(body.get("skip", 0)),
+        "sort_by": body.get("sort_by"),
+        "sort_desc": bool(body.get("sort_desc", False)),
+        "search": body.get("search"),
+        "search_fields": body.get("search_fields"),
+        "filters": body.get("filters"),
+    }
+    
+    # Handle person_id from body
+    if body.get("person_id") is not None:
+        try:
+            query_dict["person_id"] = int(body.get("person_id"))
+        except Exception:
+            pass
+
+    result = list_checks(db, business_id, query_dict)
+    items = result.get('items', [])
+    items = [format_datetime_fields(item, request) for item in items]
+    
+    # Check if we hit the limit
+    if len(items) >= max_export_records:
+        warning_item = {
+            "row_number": "⚠️",
+            "type": translator.t("warning", "هشدار"),
+            "check_number": translator.t("max_export_limit", "حداکثر ۱۰,۰۰۰ رکورد قابل export است"),
+            "person_name": "",
+            "amount": "",
+            "due_date": "",
+            "status": "",
+        }
+        items.append(warning_item)
+
+    # Handle selected rows
+    selected_only = bool(body.get('selected_only', False))
+    selected_indices = body.get('selected_indices')
+    if selected_only and selected_indices is not None:
+        indices = None
+        if isinstance(selected_indices, str):
+            try:
+                indices = json.loads(selected_indices)
+            except (json.JSONDecodeError, TypeError):
+                indices = None
+        elif isinstance(selected_indices, list):
+            indices = selected_indices
+        if isinstance(indices, list):
+            items = [items[i] for i in indices if isinstance(i, int) and 0 <= i < len(items)]
+
+    # Helper functions
+    def format_date_for_export(item_dict: dict, date_key: str) -> str:
+        """Format date based on calendar type (date only, no time)"""
+        value = item_dict.get(date_key)
+        if value is None:
+            return ""
+        
+        # If it's already a string (formatted by format_datetime_fields), extract date only
+        if isinstance(value, str):
+            # Remove time part if exists (format: "YYYY-MM-DD" or "YYYY/MM/DD" or "YYYY-MM-DD HH:MM:SS" or "YYYY/MM/DD HH:MM:SS")
+            if ' ' in value or 'T' in value:
+                # Extract date part only (remove time)
+                date_part = value.split(' ')[0].split('T')[0]
+                return date_part
+            return value
+        
+        # If it's a dict (from _formatted field), use date_only
+        if isinstance(value, dict):
+            date_only = value.get("date_only")
+            if date_only:
+                return str(date_only)
+            # Fallback to formatted and extract date part
+            formatted = value.get("formatted", "")
+            if formatted:
+                date_part = str(formatted).split(' ')[0].split('T')[0]
+                return date_part
+        
+        # If it's a datetime object, format it based on calendar type
+        try:
+            if isinstance(value, dt_module.datetime):
+                formatted = CalendarConverter.format_datetime(value, calendar_type)
+                return formatted.get("date_only", "") or formatted.get("formatted", "").split(' ')[0]
+        except Exception:
+            pass
+        
+        # Fallback
+        return str(value) if value else ""
+    
+    def format_number_for_display(value) -> str:
+        """Format number with thousands separator and remove .0"""
+        try:
+            if value is None:
+                return ""
+            v = float(value)
+            s = f"{v:,.2f}"
+            # Trim trailing .00 or trailing zeros
+            if "." in s:
+                s = s.rstrip("0").rstrip(".")
+            return s
+        except Exception:
+            return str(value) if value is not None else ""
+    
+    def translate_status(status: str) -> str:
+        """Translate check status"""
+        if not status:
+            return ""
+        status_map = {
+            'RECEIVED_ON_HAND': translator.t('check_status_received_on_hand', 'در دست (دریافتی)'),
+            'TRANSFERRED_ISSUED': translator.t('check_status_transferred_issued', 'صادر شده (پرداختنی)'),
+            'DEPOSITED': translator.t('check_status_deposited', 'سپرده به بانک'),
+            'CLEARED': translator.t('check_status_cleared', 'پاس/وصول شده'),
+            'ENDORSED': translator.t('check_status_endorsed', 'واگذار شده'),
+            'RETURNED': translator.t('check_status_returned', 'عودت شده'),
+            'BOUNCED': translator.t('check_status_bounced', 'برگشت خورده'),
+            'CANCELLED': translator.t('check_status_cancelled', 'ابطال'),
+        }
+        return status_map.get(status.upper(), status)
+    
+    def translate_type(check_type: str) -> str:
+        """Translate check type"""
+        if not check_type:
+            return ""
+        type_map = {
+            'received': translator.t('check_type_received', 'دریافتی'),
+            'transferred': translator.t('check_type_transferred', 'واگذار شده'),
+        }
+        return type_map.get(check_type.lower(), check_type)
+
+    # Prepare headers based on export_columns (add row number at the beginning)
+    headers: list = []
+    keys: list = []
+    
+    # Always add row number as first column
+    headers.append(translator.t('row_number', 'ردیف'))
+    keys.append('row_number')
+    
+    export_columns = body.get('export_columns')
+    if export_columns:
+        for col in export_columns:
+            key = col.get('key')
+            label = col.get('label', key)
+            if key and key != 'row_number':  # Skip row_number if already added
+                keys.append(str(key))
+                headers.append(str(label))
+    else:
+        # Default columns for checks
+        default_columns = [
+            ('type', translator.t('check_type', 'نوع')),
+            ('person_name', translator.t('person', 'شخص')),
+            ('issue_date', translator.t('issue_date', 'تاریخ صدور')),
+            ('due_date', translator.t('due_date', 'تاریخ سررسید')),
+            ('check_number', translator.t('check_number', 'شماره چک')),
+            ('sayad_code', translator.t('sayad_code', 'شناسه صیاد')),
+            ('bank_name', translator.t('bank', 'بانک')),
+            ('branch_name', translator.t('branch', 'شعبه')),
+            ('amount', translator.t('amount', 'مبلغ')),
+            ('currency', translator.t('currency', 'ارز')),
+            ('status', translator.t('status', 'وضعیت')),
+        ]
+        for key, label in default_columns:
+            if items and key in items[0]:
+                keys.append(key)
+                headers.append(label)
+    
+    # Format generated date based on calendar
+    try:
+        _now = dt_module.datetime.now()
+        _fd = CalendarConverter.format_datetime(_now, calendar_type)
+        generated_at = _fd.get("formatted") or _fd.get("date_only") or _now.strftime('%Y/%m/%d %H:%M')
+    except Exception:
+        generated_at = dt_module.datetime.now().strftime('%Y/%m/%d %H:%M')
+    
+    # Build HTML table
+    title_text = translator.t('checks_list', 'لیست چک‌ها')
+    date_keys = {'issue_date', 'due_date'}
+    amount_keys = {'amount'}
+    
+    html_content = f"""
+    <!DOCTYPE html>
+    <html dir="{'rtl' if is_rtl else 'ltr'}" lang="{locale}">
+    <head>
+        <meta charset="UTF-8">
+        <style>
+            @page {{
+                size: A4 landscape;
+                margin: 1cm;
+            }}
+            body {{
+                font-family: {'Arial, sans-serif' if not is_rtl else 'Tahoma, Arial, sans-serif'};
+                font-size: 9pt;
+                direction: {'rtl' if is_rtl else 'ltr'};
+            }}
+            table {{
+                width: 100%;
+                border-collapse: collapse;
+                margin-top: 10px;
+            }}
+            th {{
+                background-color: #366092;
+                color: white;
+                padding: 8px;
+                text-align: center;
+                font-weight: bold;
+                border: 1px solid #ddd;
+            }}
+            td {{
+                padding: 6px;
+                text-align: center;
+                border: 1px solid #ddd;
+            }}
+            tr:nth-child(even) {{
+                background-color: #f9f9f9;
+            }}
+            .header {{
+                text-align: center;
+                margin-bottom: 20px;
+            }}
+            .header h1 {{
+                margin: 0;
+                font-size: 18pt;
+            }}
+            .amount {{
+                text-align: left;
+                direction: ltr;
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="header">
+            <h1>{escape(title_text)}</h1>
+            <p>{translator.t('generated_at', 'تاریخ گزارش')}: {escape(generated_at)}</p>
+        </div>
+        <table>
+            <thead>
+                <tr>
+    """
+    
+    for header in headers:
+        html_content += f'<th>{escape(str(header))}</th>'
+    
+    html_content += """
+                </tr>
+            </thead>
+            <tbody>
+    """
+    
+    for idx, item in enumerate(items, 1):
+        html_content += '<tr>'
+        for key in keys:
+            if key == 'row_number':
+                value = str(idx)
+            else:
+                value = item.get(key, '')
+                # Format dates (date only, no time)
+                if key in date_keys:
+                    value = format_date_for_export(item, key)
+                # Format numbers with thousands separator
+                elif key in amount_keys:
+                    value = format_number_for_display(value)
+                # Translate status and type
+                elif key == 'status':
+                    value = translate_status(str(value) if value else '')
+                elif key == 'type':
+                    value = translate_type(str(value) if value else '')
+                # Format None values
+                elif value is None:
+                    value = ''
+                else:
+                    value = str(value) if value is not None else ''
+            
+            # Use amount class for numeric columns
+            cell_class = ' class="amount"' if key in amount_keys else ''
+            html_content += f'<td{cell_class}>{escape(str(value))}</td>'
+        html_content += '</tr>'
+    
+    html_content += """
+            </tbody>
+        </table>
+    </body>
+    </html>
+    """
+    
+    # Generate PDF
+    font_config = FontConfiguration()
+    html_doc = HTML(string=html_content)
+    pdf_bytes = html_doc.write_pdf(font_config=font_config)
+    
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename=checks_{business_id}.pdf"}
+    )
 
 

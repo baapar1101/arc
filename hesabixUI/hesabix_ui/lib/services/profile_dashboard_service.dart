@@ -168,20 +168,6 @@ class ProfileDashboardService {
           'xl': {'colSpan': 4, 'rowSpan': 2},
         },
       ),
-      DashboardWidgetDefinition(
-        key: 'profile_onboarding_checklist',
-        title: 'چک‌لیست شروع',
-        icon: 'checklist',
-        version: 1,
-        permissionsRequired: const <String>[],
-        defaults: {
-          'xs': {'colSpan': 1, 'rowSpan': 2},
-          'sm': {'colSpan': 2, 'rowSpan': 2},
-          'md': {'colSpan': 4, 'rowSpan': 2},
-          'lg': {'colSpan': 4, 'rowSpan': 2},
-          'xl': {'colSpan': 4, 'rowSpan': 2},
-        },
-      ),
     ];
     return DashboardDefinitionsResponse(columns: columns, items: items);
   }
@@ -264,14 +250,6 @@ class ProfileDashboardService {
               'status': 'بسته',
               'updated_at': DateTime.now().subtract(const Duration(days: 2)).toIso8601String(),
             },
-          ],
-        };
-      } else if (k == 'profile_onboarding_checklist') {
-        out[k] = {
-          'items': <Map<String, dynamic>>[
-            {'key': 'create_business', 'title': 'ایجاد اولین کسب‌وکار', 'done': false},
-            {'key': 'add_person', 'title': 'افزودن اولین مخاطب', 'done': false},
-            {'key': 'issue_invoice', 'title': 'صدور اولین فاکتور', 'done': false},
           ],
         };
       }

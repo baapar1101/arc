@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Optional, Literal
+from typing import Optional, Literal, List
 from pydantic import BaseModel, Field, field_validator
 
 
@@ -15,8 +15,7 @@ class CheckCreateRequest(BaseModel):
     branch_name: Optional[str] = Field(default=None, max_length=255)
     amount: float = Field(..., gt=0)
     currency_id: int = Field(..., ge=1)
-    # گزینه‌های حسابداری
-    auto_post: Optional[bool] = Field(default=False)
+    # گزینه‌های حسابداری (ثبت سند همیشه انجام می‌شود)
     document_date: Optional[str] = None
     document_description: Optional[str] = Field(default=None, max_length=500)
 
@@ -83,21 +82,18 @@ class CheckEndorseRequest(BaseModel):
     target_person_id: int = Field(..., ge=1)
     document_date: Optional[str] = None
     description: Optional[str] = Field(default=None, max_length=500)
-    auto_post: bool = Field(default=True)
 
 
 class CheckClearRequest(BaseModel):
     bank_account_id: int = Field(..., ge=1)
     document_date: Optional[str] = None
     description: Optional[str] = Field(default=None, max_length=500)
-    auto_post: bool = Field(default=True)
 
 
 class CheckReturnRequest(BaseModel):
     target_person_id: Optional[int] = Field(default=None, ge=1)
     document_date: Optional[str] = None
     description: Optional[str] = Field(default=None, max_length=500)
-    auto_post: bool = Field(default=True)
 
 
 class CheckBounceRequest(BaseModel):
@@ -106,19 +102,64 @@ class CheckBounceRequest(BaseModel):
     expense_amount: Optional[float] = Field(default=None, gt=0)
     document_date: Optional[str] = None
     description: Optional[str] = Field(default=None, max_length=500)
-    auto_post: bool = Field(default=True)
 
 
 class CheckPayRequest(BaseModel):
     bank_account_id: int = Field(..., ge=1)
     document_date: Optional[str] = None
     description: Optional[str] = Field(default=None, max_length=500)
-    auto_post: bool = Field(default=True)
 
 
 class CheckDepositRequest(BaseModel):
-    bank_account_id: int = Field(..., ge=1)
+    # bank_account_id در schema اجباری است اما در منطق استفاده نمی‌شود
+    # برای سازگاری با schema، آن را اختیاری می‌کنیم
+    bank_account_id: Optional[int] = Field(default=None, ge=1)
     document_date: Optional[str] = None
     description: Optional[str] = Field(default=None, max_length=500)
-    auto_post: bool = Field(default=True)
+
+
+# =====================
+# Reconciliation Schemas
+# =====================
+
+class CheckReconciliationCalculateRequest(BaseModel):
+    check_ids: List[int] = Field(..., min_items=2)
+    base_date: str
+    currency_id: Optional[int] = Field(default=None, ge=1)
+
+
+class CheckReconciliationCreateRequest(BaseModel):
+    name: str = Field(..., min_length=1, max_length=255)
+    check_ids: List[int] = Field(..., min_items=2)
+    base_date: str
+    description: Optional[str] = Field(default=None, max_length=1000)
+
+
+class CheckReconciliationItemResponse(BaseModel):
+    id: int
+    check_id: int
+    check_number: Optional[str]
+    person_name: Optional[str]
+    amount: float
+    due_date: Optional[str]
+    days_to_maturity: int
+    weighted_value: float
+
+
+class CheckReconciliationResponse(BaseModel):
+    id: int
+    business_id: int
+    name: str
+    base_date: str
+    calculated_average_days: float
+    calculated_date: str
+    total_amount: float
+    check_count: int
+    currency_id: int
+    currency: Optional[str]
+    description: Optional[str]
+    created_by_user_id: int
+    created_at: str
+    updated_at: str
+    items: List[CheckReconciliationItemResponse]
 

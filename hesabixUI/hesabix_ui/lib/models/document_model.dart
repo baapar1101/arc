@@ -20,6 +20,7 @@ class DocumentModel {
   final String? currencyCode;
   final String? currencySymbol;
   final String? createdByName;
+  final String? documentTypeName;
 
   // محاسبات
   final double totalDebit;
@@ -58,6 +59,7 @@ class DocumentModel {
     this.currencyCode,
     this.currencySymbol,
     this.createdByName,
+    this.documentTypeName,
     required this.totalDebit,
     required this.totalCredit,
     required this.linesCount,
@@ -90,6 +92,7 @@ class DocumentModel {
       currencyCode: json['currency_code'] as String?,
       currencySymbol: json['currency_symbol'] as String?,
       createdByName: json['created_by_name'] as String?,
+      documentTypeName: json['document_type_name'] as String?,
       totalDebit: (json['total_debit'] as num?)?.toDouble() ?? 0.0,
       totalCredit: (json['total_credit'] as num?)?.toDouble() ?? 0.0,
       linesCount: json['lines_count'] as int? ?? 0,
@@ -138,6 +141,12 @@ class DocumentModel {
 
   /// دریافت نام فارسی نوع سند
   String getDocumentTypeName() {
+    // اگر document_type_name از سرور آمده باشد، از آن استفاده کن
+    if (documentTypeName != null && documentTypeName!.isNotEmpty) {
+      return documentTypeName!;
+    }
+    
+    // در غیر این صورت از switch case استفاده کن
     switch (documentType) {
       case 'expense':
         return 'هزینه';
@@ -153,6 +162,26 @@ class DocumentModel {
         return 'سند دستی';
       case 'invoice':
         return 'فاکتور';
+      case 'invoice_sales':
+        return 'فروش';
+      case 'invoice_sales_return':
+        return 'برگشت از فروش';
+      case 'invoice_purchase':
+        return 'خرید';
+      case 'invoice_purchase_return':
+        return 'برگشت از خرید';
+      case 'invoice_direct_consumption':
+        return 'مصرف مستقیم';
+      case 'invoice_production':
+        return 'تولید';
+      case 'invoice_waste':
+        return 'ضایعات';
+      case 'inventory_transfer':
+        return 'انتقال موجودی';
+      case 'production':
+        return 'تولید';
+      case 'opening_balance':
+        return 'موجودی اولیه';
       default:
         return documentType;
     }

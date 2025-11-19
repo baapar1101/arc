@@ -455,12 +455,14 @@ def post_dashboard_widgets_data(
 ) -> dict:
     widget_keys = payload.get("widget_keys") or []
     filters = payload.get("filters") or {}
+    calendar_type = ctx.calendar_type if hasattr(ctx, 'calendar_type') else "gregorian"
     data = get_widgets_batch_data(
         db=db,
         business_id=business_id,
         user_id=ctx.get_user_id(),
         widget_keys=[str(k) for k in widget_keys],
         filters=filters,
+        calendar_type=calendar_type,
     )
     formatted = format_datetime_fields(data, request)
     return success_response(formatted, request)

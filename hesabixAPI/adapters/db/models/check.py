@@ -86,5 +86,57 @@ class Check(Base):
     person = relationship("Person", lazy="joined")
     currency = relationship("Currency")
     last_action_document = relationship("Document")
+    reconciliation_items = relationship("CheckReconciliationItem", back_populates="check", cascade="all, delete-orphan")
+
+
+class CheckReconciliation(Base):
+    __tablename__ = "check_reconciliations"
+    __table_args__ = (
+        Index('ix_check_reconciliations_business', 'business_id'),
+        Index('ix_check_reconciliations_created_at', 'created_at'),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    business_id: Mapped[int] = mapped_column(Integer, ForeignKey("businesses.id", ondelete="CASCADE"), nullable=False, index=True)
+    
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    base_date: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    calculated_average_days: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
+    calculated_date: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    total_amount: Mapped[float] = mapped_column(Numeric(18, 2), nullable=False)
+    check_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    currency_id: Mapped[int] = mapped_column(Integer, ForeignKey("currencies.id", ondelete="RESTRICT"), nullable=False, index=True)
+    description: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    created_by_user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+    
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    
+    # روابط
+    business = relationship("Business", backref="check_reconciliations")
+    currency = relationship("Currency")
+    created_by_user = relationship("User")
+    items: Mapped[list["CheckReconciliationItem"]] = relationship("CheckReconciliationItem", back_populates="reconciliation", cascade="all, delete-orphan")
+
+
+class CheckReconciliationItem(Base):
+    __tablename__ = "check_reconciliation_items"
+    __table_args__ = (
+        Index('ix_check_reconciliation_items_reconciliation', 'reconciliation_id'),
+        Index('ix_check_reconciliation_items_check', 'check_id'),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    reconciliation_id: Mapped[int] = mapped_column(Integer, ForeignKey("check_reconciliations.id", ondelete="CASCADE"), nullable=False, index=True)
+    check_id: Mapped[int] = mapped_column(Integer, ForeignKey("checks.id", ondelete="CASCADE"), nullable=False, index=True)
+    
+    days_to_maturity: Mapped[int] = mapped_column(Integer, nullable=False)
+    weighted_value: Mapped[float] = mapped_column(Numeric(18, 2), nullable=False)
+    
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    
+    # روابط
+    reconciliation: Mapped["CheckReconciliation"] = relationship("CheckReconciliation", back_populates="items")
+    check: Mapped["Check"] = relationship("Check", back_populates="reconciliation_items")
 
 

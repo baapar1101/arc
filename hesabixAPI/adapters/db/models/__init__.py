@@ -46,3 +46,11 @@ from .warehouse import Warehouse  # noqa: F401
 from .product_bom import ProductBOM, ProductBOMItem, ProductBOMOutput, ProductBOMOperation  # noqa: F401
 from .ping_pong_score import PingPongScore  # noqa: F401
 from .storage_plan import StoragePlan, BusinessStorageSubscription, StorageInvoice, StorageUsageTransaction  # noqa: F401
+from .document_monetization import (  # noqa: F401
+	DocumentSubscriptionPlan,
+	BusinessDocumentSubscription,
+	DocumentUsagePolicy,
+	DocumentUsageCharge,
+	DocumentUsagePeriod,
+	DocumentUsageCursor,
+)

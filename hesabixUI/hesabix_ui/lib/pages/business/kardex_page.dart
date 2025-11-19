@@ -25,7 +25,6 @@ import 'package:hesabix_ui/services/check_service.dart';
 import 'package:hesabix_ui/services/warehouse_service.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/widgets/document/document_details_dialog.dart';
-import 'dart:ui' show FontFeature;
 import 'dart:async';
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -47,7 +46,6 @@ class _KardexPageState extends State<KardexPage> {
   final GlobalKey _addFilterBtnKey = GlobalKey();
   void _log(String msg) {
     // ignore: avoid_print
-    print('[KardexPage] ' + msg);
   }
 
   // Unified filter picker control
@@ -307,8 +305,10 @@ class _KardexPageState extends State<KardexPage> {
 
       _updateRouteQuery();
     } catch (e) {
-      final t = AppLocalizations.of(context);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.presetApplyError('$e'))));
+      if (!context.mounted) return;
+      final ctx = context;
+      final t = AppLocalizations.of(ctx);
+      ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(t.presetApplyError('$e'))));
     }
   }
 
@@ -392,7 +392,16 @@ class _KardexPageState extends State<KardexPage> {
         TextColumn(
           'document_type',
           t.documentType,
-          formatter: (item) => (item as Map<String, dynamic>)['document_type']?.toString(),
+          formatter: (item) {
+            final map = item as Map<String, dynamic>;
+            // اول document_type_name را بررسی کن
+            final typeName = map['document_type_name']?.toString();
+            if (typeName != null && typeName.isNotEmpty && typeName != map['document_type']?.toString()) {
+              return typeName;
+            }
+            // در غیر این صورت از document_type استفاده کن
+            return map['document_type']?.toString() ?? '';
+          },
           filterType: ColumnFilterType.multiSelect,
           filterOptions: [
             FilterOption(value: 'invoice_sales', label: t.invoiceTypeSales),
@@ -516,10 +525,10 @@ class _KardexPageState extends State<KardexPage> {
           final m = item as Map<String, dynamic>;
           final mv = (m['movement'] ?? '').toString().toLowerCase();
           if (mv == 'in') {
-            return Colors.green.withOpacity(0.06);
+            return Colors.green.withValues(alpha: 0.06);
           }
           if (mv == 'out') {
-            return Colors.red.withOpacity(0.06);
+            return Colors.red.withValues(alpha: 0.06);
           }
         } catch (_) {}
         return null;

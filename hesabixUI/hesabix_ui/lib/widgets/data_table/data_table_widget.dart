@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:math' as math;
-import 'dart:typed_data';
 import 'dart:ui' show FontFeature;
 import 'package:flutter/foundation.dart';
 import 'package:file_saver/file_saver.dart';
@@ -610,6 +609,17 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
       widget.config.onRowSelectionChanged!(_selectedRows);
     }
   }
+  
+  // متد کمکی برای دریافت ردیف‌های انتخاب شده بر اساس شاخص‌ها
+  List<T> _getItemsByIndices(Set<int> indices) {
+    final list = <T>[];
+    for (final i in indices) {
+      if (i >= 0 && i < _items.length) {
+        list.add(_items[i]);
+      }
+    }
+    return list;
+  }
 
   Future<void> _openColumnSettingsDialog() async {
     if (!widget.config.enableColumnSettings || _columnSettings == null) return;
@@ -874,7 +884,6 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
         ext: extension,
       );
     } catch (e) {
-      print('Error saving file: $e');
       rethrow;
     }
   }
@@ -883,9 +892,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
   Future<void> _downloadPdf(dynamic data, String filename) async {
     try {
       await _saveBytesToDownloads(data, filename);
-      print('✅ PDF downloaded successfully: $filename');
     } catch (e) {
-      print('❌ Error downloading PDF: $e');
       rethrow;
     }
   }
@@ -893,9 +900,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
   Future<void> _downloadExcel(dynamic data, String filename) async {
     try {
       await _saveBytesToDownloads(data, filename);
-      print('✅ Excel downloaded successfully: $filename');
     } catch (e) {
-      print('❌ Error downloading Excel: $e');
       rethrow;
     }
   }
@@ -926,10 +931,11 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     ].join('|');
     final cached = _textWidthCache[key];
     if (cached != null) return cached;
+    final textScaler = TextScaler.linear(textScaleFactor);
     final painter = TextPainter(
       text: TextSpan(text: text, style: style),
       textDirection: textDirection,
-      textScaleFactor: textScaleFactor,
+      textScaler: textScaler,
       locale: locale,
       maxLines: 1,
     )..layout(minWidth: 0, maxWidth: double.infinity);
@@ -943,7 +949,8 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
 
   double _measureHeaderTextWidth(String text, TextStyle style) {
     final dir = Directionality.of(context);
-    final scale = MediaQuery.maybeOf(context)?.textScaleFactor ?? 1.0;
+    final textScaler = MediaQuery.maybeOf(context)?.textScaler ?? const TextScaler.linear(1.0);
+    final scale = textScaler.scale(1.0);
     final locale = Localizations.localeOf(context);
     return _measureTextWidthAdvanced(
       text: text,
@@ -2380,7 +2387,8 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
         text = column.formatter!(item) ?? '';
       }
       if (text.isEmpty) continue;
-      final scale = MediaQuery.maybeOf(context)?.textScaleFactor ?? 1.0;
+      final textScaler = MediaQuery.maybeOf(context)?.textScaler ?? const TextScaler.linear(1.0);
+      final scale = textScaler.scale(1.0);
       final locale = Localizations.localeOf(context);
       final w = _measureTextWidthAdvanced(
         text: text,

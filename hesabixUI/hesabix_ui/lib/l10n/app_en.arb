@@ -1165,6 +1165,7 @@
   ,
   "installmentsTitle": "Installment sale",
   "installmentsSubtitle": "If enabled, an installment plan will be saved with the invoice",
+  "installmentsSettingsSubtitle": "Manage installment plans and sales conditions",
   "installmentsCount": "Number of installments",
   "downPayment": "Down payment",
   "interestRatePercent": "Total period interest (%)",
@@ -1507,6 +1508,7 @@
   "savedSuccessfully": "Saved successfully",
   "currencyToman": "Toman",
   "creditSettingsTitle": "Customer credit",
+  "creditSettingsSubtitle": "Configure credit limits and delay policies",
   "creditEnableTitle": "Enable credit",
   "creditEnableSubtitle": "Check customer credit limit during sales",
   "creditDefaultLimit": "Default credit limit",
@@ -1694,6 +1696,69 @@
         "type": "String"
       }
     }
-  }
+  },
+
+  "documentMonetizationTitle": "Packages and Tariffs",
+  "documentMonetizationSubtitle": "Packages, per-document fees and volume settlement",
+  "subscriptionPackages": "Subscription Packages",
+  "noActivePackage": "No active package has been registered for this business.",
+  "noPackageAvailable": "Currently no package is available for purchase.",
+  "activePackage": "Active Package",
+  "status": "Status",
+  "autoRenewActive": "Auto-renewal is active",
+  "periodAmount": "Period Amount",
+  "expiryDate": "Expiry Date",
+  "duration": "Duration",
+  "month": "month",
+  "amount": "Amount",
+  "free": "Free",
+  "active": "Active",
+  "activate": "Activate",
+  "activating": "Activating...",
+  "activatePackage": "Activate {name}",
+  "@activatePackage": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "packageDuration": "Package Duration",
+  "packagePrice": "Price",
+  "autoRenewAtEnd": "Auto-renewal at end of period",
+  "cancel": "Cancel",
+  "confirmAndActivate": "Confirm and Activate",
+  "invalidPackageId": "Invalid package ID",
+  "packageActivatedSuccess": "Package activated successfully",
+  "packageActivationError": "Package activation failed",
+  "activePolicies": "Active Policies",
+  "noPolicyDefined": "No policy has been defined",
+  "type": "Type",
+  "priority": "Priority",
+  "invoices": "Invoices",
+  "noInvoice": "No invoice exists",
+  "chargeType": "Type",
+  "pay": "Pay",
+  "paymentSuccess": "Payment completed",
+  "paymentError": "Payment failed",
+  "finalizeVolume": "Finalize Volume Period",
+  "volumeFinalized": "Volume calculations finalized",
+  "volumeFinalizeError": "Volume period calculation failed",
+  "refresh": "Refresh",
+  "statusActive": "Active",
+  "statusPending": "Pending",
+  "statusExpired": "Expired",
+  "statusCancelled": "Cancelled",
+  "statusAwaitingPayment": "Awaiting Payment",
+  "statusPaid": "Paid",
+  "statusInvoiced": "Invoiced",
+  "chargeTypePerDocument": "Per Document",
+  "chargeTypeVolumeCycle": "Volume Cycle",
+  "chargeTypeSubscriptionFee": "Subscription Fee",
+  "policyTypeFree": "Free",
+  "policyTypeSubscription": "Unlimited Package",
+  "policyTypeVolume": "Volume",
+  "policyTypePerDocument": "Per Document",
+  "policyTypeHybrid": "Hybrid"
 }
 

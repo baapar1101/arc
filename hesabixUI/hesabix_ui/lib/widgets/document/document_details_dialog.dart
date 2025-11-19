@@ -5,6 +5,7 @@ import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/utils/number_formatters.dart' show formatWithThousands;
 import 'package:hesabix_ui/services/warehouse_service.dart';
+// ignore: avoid_web_libraries_in_flutter
 import 'dart:html' as html;
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/services/report_template_service.dart';
@@ -316,10 +317,8 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> {
         ..click();
       html.Url.revokeObjectUrl(url);
       // ignore: avoid_print
-      print('✅ PDF downloaded successfully: $name');
     } catch (e) {
       // ignore: avoid_print
-      print('❌ Error downloading PDF: $e');
     }
   }
 
@@ -428,7 +427,6 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> {
           }
         } catch (e) {
           // اگر خطا رخ داد، ادامه بده
-          print('Error loading payment document $id: $e');
         }
       }
       
@@ -502,13 +500,13 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> {
                                             businessId: _document!.businessId,
                                             docId: it['id'],
                                           );
-                                          if (!mounted) return;
+                                          if (!context.mounted) return;
                                           ScaffoldMessenger.of(context).showSnackBar(
                                             const SnackBar(content: Text('حواله پست شد')),
                                           );
                                           _loadDocument();
                                         } catch (e) {
-                                          if (!mounted) return;
+                                          if (!context.mounted) return;
                                           ScaffoldMessenger.of(context).showSnackBar(
                                             SnackBar(content: Text('خطا در پست حواله: $e')),
                                           );
@@ -1049,8 +1047,8 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> {
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
                       color: isReceipt 
-                          ? Colors.green.withOpacity(0.1)
-                          : Colors.red.withOpacity(0.1),
+                          ? Colors.green.withValues(alpha: 0.1)
+                          : Colors.red.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(

@@ -56,12 +56,15 @@ class _BusinessBackupPageState extends State<BusinessBackupPage> {
     setState(() {
       _creating = true;
     });
+    if (!context.mounted) return;
+    final ctx = context;
     try {
       final jobId = await _service.startBackupAsync(widget.businessId);
-      _startJob(jobId, AppLocalizations.of(context).inProgress);
+      if (!ctx.mounted) return;
+      _startJob(jobId, AppLocalizations.of(ctx).inProgress);
       _startPollingJob();
-      if (mounted) {
-        _showSnackBar(AppLocalizations.of(context).inProgress);
+      if (ctx.mounted) {
+        _showSnackBar(AppLocalizations.of(ctx).inProgress);
       }
     } catch (e) {
       _showSnackBar('$e');
@@ -77,9 +80,12 @@ class _BusinessBackupPageState extends State<BusinessBackupPage> {
   void _startPollingJob() {
     _pollTimer?.cancel();
     if (_currentJobId == null || _currentJobId!.isEmpty) return;
+    if (!context.mounted) return;
+    final ctx = context;
     _pollTimer = Timer.periodic(const Duration(seconds: 1), (timer) async {
       try {
         final st = await _service.getJobStatus(_currentJobId!);
+        if (!ctx.mounted) return;
         setState(() {
           _jobProgress = (st['progress'] as int?) ?? _jobProgress;
           _jobMessage = (st['message'] as String?) ?? _jobMessage;
@@ -91,15 +97,16 @@ class _BusinessBackupPageState extends State<BusinessBackupPage> {
             _jobRunning = false;
           });
           await _load();
-          if (mounted) {
-            _showSnackBar(AppLocalizations.of(context).operationSuccessful);
+          if (ctx.mounted) {
+            _showSnackBar(AppLocalizations.of(ctx).operationSuccessful);
           }
         } else if (state == 'failed') {
           timer.cancel();
           setState(() {
             _jobRunning = false;
           });
-          final err = (st['error'] as String?) ?? AppLocalizations.of(context).error;
+          if (!ctx.mounted) return;
+          final err = (st['error'] as String?) ?? AppLocalizations.of(ctx).error;
           _showSnackBar(err);
         }
       } catch (_) {}
@@ -214,7 +221,7 @@ class _BusinessBackupPageState extends State<BusinessBackupPage> {
     final colorScheme = theme.colorScheme;
     final message = _jobMessage ?? t.inProgress;
     return Card(
-      color: isActive ? colorScheme.surfaceContainerHighest : colorScheme.surfaceVariant.withOpacity(0.4),
+      color: isActive ? colorScheme.surfaceContainerHighest : colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(

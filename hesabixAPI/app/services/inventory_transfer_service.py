@@ -13,6 +13,7 @@ from adapters.db.models.currency import Currency
 from adapters.db.models.fiscal_year import FiscalYear
 from adapters.db.models.product import Product
 from app.core.responses import ApiError
+from app.services.document_monetization_service import ensure_document_policy_allows_creation
 
 # از توابع موجود برای تاریخ و کنترل موجودی استفاده می‌کنیم
 from app.services.invoice_service import _parse_iso_date, _get_current_fiscal_year, _ensure_stock_sufficient
@@ -103,6 +104,14 @@ def create_inventory_transfer(
 
     # ایجاد سند بدون ثبت حسابداری
     doc_code = _build_transfer_code(db, business_id)
+
+    ensure_document_policy_allows_creation(
+        db,
+        business_id,
+        document_type=DOCUMENT_TYPE_INVENTORY_TRANSFER,
+        document_date=document_date,
+        amount=Decimal(0),
+    )
     document = Document(
         business_id=business_id,
         fiscal_year_id=fiscal_year.id,

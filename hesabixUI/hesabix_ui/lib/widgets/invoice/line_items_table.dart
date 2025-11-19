@@ -975,10 +975,13 @@ class _UnitPriceCellState extends State<_UnitPriceCell> {
     final List<Map<String, dynamic>> result = <Map<String, dynamic>>[];
     
     // گزینه ۱: قیمت پایه (بر اساس نوع فاکتور و تبدیل واحد)
+    if (!context.mounted) return result;
+    final ctx = context;
     try {
       final resolved = await widget.resolver();
+      if (!ctx.mounted) return result;
       result.add(<String, dynamic>{
-        'label': AppLocalizations.of(context).baseEstimatedPrice,
+        'label': AppLocalizations.of(ctx).baseEstimatedPrice,
         'price': resolved.unitPrice,
       });
     } catch (_) {}
@@ -988,13 +991,16 @@ class _UnitPriceCellState extends State<_UnitPriceCell> {
     final currencyId = widget.currencyId;
     
     if (productId != null && currencyId != null) {
+      if (!ctx.mounted) return result;
       try {
         final res = await _pls.listPriceLists(businessId: widget.businessId, limit: 50);
+        if (!ctx.mounted) return result;
         final lists = (res['items'] as List?)?.cast<dynamic>().map((e) => Map<String, dynamic>.from(e as Map)).toList() ?? const <Map<String, dynamic>>[];
         
         for (final pl in lists) {
           final plId = pl['id'] as int?;
-          final plName = pl['name']?.toString() ?? AppLocalizations.of(context).priceListLabel;
+          if (!ctx.mounted) return result;
+          final plName = pl['name']?.toString() ?? AppLocalizations.of(ctx).priceListLabel;
           if (plId == null) continue;
           
           try {
@@ -1019,7 +1025,8 @@ class _UnitPriceCellState extends State<_UnitPriceCell> {
               }
               
               if (price == null || price <= 0) continue;
-              final unitLabel = AppLocalizations.of(context).mainUnitLabel; // چون unit_id null است، یعنی واحد اصلی
+              if (!ctx.mounted) return result;
+              final unitLabel = AppLocalizations.of(ctx).mainUnitLabel; // چون unit_id null است، یعنی واحد اصلی
               result.add(<String, dynamic>{
                 'label': '$plName - $unitLabel',
                 'price': price,

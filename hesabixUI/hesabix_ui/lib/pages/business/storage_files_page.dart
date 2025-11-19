@@ -5,6 +5,7 @@ import 'package:hesabix_ui/services/business_storage_service.dart';
 import 'package:hesabix_ui/utils/number_formatters.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:dio/dio.dart';
+// ignore: avoid_web_libraries_in_flutter
 import 'dart:html' as html;
 
 /// صفحه مدیریت فایل‌های کسب‌وکار
@@ -128,7 +129,6 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
         planId: planId,
       );
       final invoice = (result['invoice'] as Map?)?.cast<String, dynamic>();
-      final payment = (result['payment'] as Map?)?.cast<String, dynamic>();
       final invoiceStatus = invoice?['status']?.toString().toLowerCase();
       final bool isPaid = invoiceStatus == 'paid';
       

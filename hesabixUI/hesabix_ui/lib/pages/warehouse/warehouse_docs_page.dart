@@ -56,13 +56,13 @@ class _WarehouseDocsPageState extends State<WarehouseDocsPage> {
                           onPressed: (it['status'] == 'draft') ? () async {
                             try {
                               await _svc.postDoc(businessId: widget.businessId, docId: it['id']);
-                              if (!mounted) return;
+                              if (!context.mounted) return;
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(content: Text('حواله پست شد')),
                               );
                               _load();
                             } catch (e) {
-                              if (!mounted) return;
+                              if (!context.mounted) return;
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(content: Text('خطا در پست حواله: $e')),
                               );

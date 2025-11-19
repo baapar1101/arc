@@ -104,9 +104,12 @@ class _BusinessRestorePageState extends State<BusinessRestorePage> {
   void _startPollingJob() {
     _pollTimer?.cancel();
     if (_currentJobId == null || _currentJobId!.isEmpty) return;
+    if (!context.mounted) return;
+    final ctx = context;
     _pollTimer = Timer.periodic(const Duration(seconds: 1), (timer) async {
       try {
         final st = await _service.getJobStatus(_currentJobId!);
+        if (!ctx.mounted) return;
         setState(() {
           _jobProgress = (st['progress'] as int?) ?? _jobProgress;
           _jobMessage = (st['message'] as String?) ?? _jobMessage;
@@ -118,13 +121,15 @@ class _BusinessRestorePageState extends State<BusinessRestorePage> {
             _jobRunning = false;
           });
           await _load();
-          _showSnackBar(AppLocalizations.of(context).operationSuccessful);
+          if (!ctx.mounted) return;
+          _showSnackBar(AppLocalizations.of(ctx).operationSuccessful);
         } else if (state == 'failed') {
           timer.cancel();
           setState(() {
             _jobRunning = false;
           });
-          final err = (st['error'] as String?) ?? AppLocalizations.of(context).error;
+          if (!ctx.mounted) return;
+          final err = (st['error'] as String?) ?? AppLocalizations.of(ctx).error;
           _showSnackBar(err);
         }
       } catch (_) {}
@@ -278,7 +283,7 @@ class _BusinessRestorePageState extends State<BusinessRestorePage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             DropdownButtonFormField<String>(
-              value: _selectedBackupId,
+              initialValue: _selectedBackupId,
               isExpanded: true,
               items: _items
                   .map(

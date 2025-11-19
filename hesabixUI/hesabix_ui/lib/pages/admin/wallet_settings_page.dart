@@ -82,7 +82,7 @@ class _WalletSettingsPageState extends State<WalletSettingsPage> {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         DropdownButtonFormField<String>(
-                          value: _selectedCurrencyCode,
+                          initialValue: _selectedCurrencyCode,
                           decoration: InputDecoration(labelText: t.walletBaseCurrency),
                           items: _currencies
                               .map((c) => DropdownMenuItem<String>(

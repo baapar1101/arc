@@ -5,6 +5,7 @@ import 'package:flutter/widgets.dart';
 import '../config/app_config.dart';
 import '../utils/number_normalizer.dart';
 import 'auth_store.dart';
+import '../services/errors/api_error.dart';
 import 'calendar_controller.dart';
 
 class ApiClientOptions {
@@ -128,21 +129,44 @@ class ApiClient {
           }
           if (kDebugMode) {
             // ignore: avoid_print
-            print('[API][REQ] ${options.method} ${options.uri}');
           }
           handler.next(options);
         },
         onResponse: (response, handler) {
           if (kDebugMode) {
             // ignore: avoid_print
-            print('[API][RES] ${response.statusCode} ${response.requestOptions.uri}');
           }
           handler.next(response);
         },
         onError: (error, handler) {
+          final response = error.response;
+          if (response != null) {
+            try {
+              final data = response.data;
+              if (data is Map<String, dynamic>) {
+                final success = data['success'];
+                final errorObj = data['error'];
+                if (success == false && errorObj is Map<String, dynamic>) {
+                  final apiError = ApiErrorDetails(
+                    code: errorObj['code'] as String?,
+                    message: errorObj['message'] as String?,
+                    details: errorObj,
+                  );
+                  handler.reject(DioException(
+                    requestOptions: error.requestOptions,
+                    error: apiError,
+                    response: response,
+                    type: error.type,
+                  ));
+                  return;
+                }
+              }
+            } catch (_) {
+              // ignore parsing failures
+            }
+          }
           if (kDebugMode) {
             // ignore: avoid_print
-            print('[API][ERR] ${error.message} ${error.requestOptions.uri}');
           }
           handler.next(error);
         },

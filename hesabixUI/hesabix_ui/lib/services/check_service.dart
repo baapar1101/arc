@@ -35,6 +35,11 @@ class CheckService {
     return (res.data?['data'] as Map<String, dynamic>? ?? <String, dynamic>{});
   }
 
+  Future<Map<String, dynamic>> getHistory(int checkId) async {
+    final res = await _client.get<Map<String, dynamic>>('/api/v1/checks/checks/$checkId/history');
+    return (res.data?['data'] as Map<String, dynamic>? ?? <String, dynamic>{});
+  }
+
   Future<Map<String, dynamic>> create({required int businessId, required Map<String, dynamic> payload}) async {
     final res = await _client.post<Map<String, dynamic>>(
       '/api/v1/checks/businesses/$businessId/checks/create',
@@ -97,6 +102,57 @@ class CheckService {
   Future<Map<String, dynamic>> deposit({required int checkId, required Map<String, dynamic> body}) async {
     final res = await _client.post<Map<String, dynamic>>('/api/v1/checks/checks/$checkId/actions/deposit', data: body);
     return (res.data?['data'] as Map<String, dynamic>? ?? <String, dynamic>{});
+  }
+
+  // ===== Reconciliation =====
+  Future<Map<String, dynamic>> calculateReconciliation({required int businessId, required Map<String, dynamic> body}) async {
+    final res = await _client.post<Map<String, dynamic>>(
+      '/api/v1/checks/businesses/$businessId/checks/reconciliations/calculate',
+      data: body,
+    );
+    return (res.data?['data'] as Map<String, dynamic>? ?? <String, dynamic>{});
+  }
+
+  Future<Map<String, dynamic>> createReconciliation({required int businessId, required Map<String, dynamic> body}) async {
+    final res = await _client.post<Map<String, dynamic>>(
+      '/api/v1/checks/businesses/$businessId/checks/reconciliations',
+      data: body,
+    );
+    return (res.data?['data'] as Map<String, dynamic>? ?? <String, dynamic>{});
+  }
+
+  Future<Map<String, dynamic>> listReconciliations({required int businessId, required Map<String, dynamic> queryInfo}) async {
+    try {
+      final res = await _client.post<Map<String, dynamic>>(
+        '/api/v1/checks/businesses/$businessId/checks/reconciliations/list',
+        data: queryInfo,
+      );
+      final data = res.data ?? <String, dynamic>{};
+      data['items'] ??= <dynamic>[];
+      return data;
+    } catch (e) {
+      return {
+        'items': <dynamic>[],
+        'pagination': {
+          'total': 0,
+          'page': 1,
+          'per_page': queryInfo['take'] ?? 10,
+          'total_pages': 0,
+          'has_next': false,
+          'has_prev': false,
+        },
+        'query_info': queryInfo,
+      };
+    }
+  }
+
+  Future<Map<String, dynamic>> getReconciliationById(int id) async {
+    final res = await _client.get<Map<String, dynamic>>('/api/v1/checks/reconciliations/$id');
+    return (res.data?['data'] as Map<String, dynamic>? ?? <String, dynamic>{});
+  }
+
+  Future<void> deleteReconciliation(int id) async {
+    await _client.delete<Map<String, dynamic>>('/api/v1/checks/reconciliations/$id');
   }
 }
 

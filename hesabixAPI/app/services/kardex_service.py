@@ -271,14 +271,42 @@ def list_kardex_lines(db: Session, business_id: int, query: Dict[str, Any]) -> D
         # production: both in/out ممکن است
         return None
 
+    def _get_document_type_name(doc_type: str | None) -> str:
+        """تبدیل document_type به نام چندزبانه"""
+        if not doc_type:
+            return ""
+        doc_type = doc_type.strip()
+        mapping = {
+            "invoice_sales": "فروش",
+            "invoice_sales_return": "برگشت از فروش",
+            "invoice_purchase": "خرید",
+            "invoice_purchase_return": "برگشت از خرید",
+            "invoice_direct_consumption": "مصرف مستقیم",
+            "invoice_production": "تولید",
+            "invoice_waste": "ضایعات",
+            "inventory_transfer": "انتقال موجودی",
+            "production": "تولید",
+            "opening_balance": "موجودی اولیه",
+            "expense": "هزینه",
+            "income": "درآمد",
+            "receipt": "دریافت",
+            "payment": "پرداخت",
+            "transfer": "انتقال",
+            "manual": "سند دستی",
+            "invoice": "فاکتور",
+        }
+        return mapping.get(doc_type, doc_type)
+
     items: List[Dict[str, Any]] = []
     for line, doc in rows:
+        doc_type = getattr(doc, "document_type", None)
         item: Dict[str, Any] = {
             "line_id": line.id,
             "document_id": doc.id,
             "document_code": getattr(doc, "code", None),
             "document_date": getattr(doc, "document_date", None),
-            "document_type": getattr(doc, "document_type", None),
+            "document_type": doc_type,
+            "document_type_name": _get_document_type_name(doc_type),
             "description": line.description,
             "debit": float(line.debit or 0),
             "credit": float(line.credit or 0),

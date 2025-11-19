@@ -15,6 +15,7 @@ from adapters.api.v1.schemas import (
     BusinessListResponse, BusinessSummaryResponse, PaginationInfo
 )
 from app.core.responses import format_datetime_fields
+from app.services.document_monetization_service import apply_default_policies_to_business
 
 
 def create_business(db: Session, business_data: BusinessCreateRequest, owner_id: int) -> Dict[str, Any]:
@@ -85,6 +86,15 @@ def create_business(db: Session, business_data: BusinessCreateRequest, owner_id:
         db.commit()
 
     db.refresh(created_business)
+
+    # اعمال خودکار سیاست‌های پیش‌فرض درآمدزایی اسناد
+    try:
+        apply_default_policies_to_business(db, created_business.id, user_id=owner_id)
+    except Exception as e:
+        # در صورت خطا، لاگ می‌کنیم اما ایجاد کسب‌وکار را متوقف نمی‌کنیم
+        import structlog
+        logger = structlog.get_logger()
+        logger.warning("failed_to_apply_default_policies", business_id=created_business.id, error=str(e))
 
     # تبدیل به response format
     return _business_to_dict(created_business)

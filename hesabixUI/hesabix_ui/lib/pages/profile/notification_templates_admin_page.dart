@@ -112,9 +112,10 @@ class _NotificationTemplatesAdminPageState extends State<NotificationTemplatesAd
                             body: bodyCtrl.text,
                             context: const <String, dynamic>{},
                           );
-                          if (!mounted) return;
+                          if (!context.mounted) return;
+                          final ctx = context;
                           await showDialog(
-                            context: context,
+                            context: ctx,
                             builder: (ctx) => AlertDialog(
                               title: const Text('پیش‌نمایش'),
                               content: SizedBox(
@@ -138,7 +139,7 @@ class _NotificationTemplatesAdminPageState extends State<NotificationTemplatesAd
                             ),
                           );
                         } catch (e) {
-                          if (!mounted) return;
+                          if (!context.mounted) return;
                           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطا در پیش‌نمایش: $e')));
                         }
                       },
@@ -177,11 +178,11 @@ class _NotificationTemplatesAdminPageState extends State<NotificationTemplatesAd
                       isActive: isActive,
                     );
                   }
-                  if (mounted) Navigator.of(context).pop(true);
+                  if (!context.mounted) return;
+                  Navigator.of(context).pop(true);
                 } catch (e) {
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطا: $e')));
-                  }
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطا: $e')));
                 }
               },
               child: const Text('ذخیره'),

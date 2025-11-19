@@ -105,6 +105,8 @@ class _PaymentGatewaysPageState extends State<PaymentGatewaysPage> {
 
   Future<void> _submitCreate(BuildContext dialogCtx) async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
+    if (!context.mounted) return;
+    final ctx = context;
     try {
       await _service.createAdmin(
         provider: _provider,
@@ -113,23 +115,23 @@ class _PaymentGatewaysPageState extends State<PaymentGatewaysPage> {
         isSandbox: _isSandbox,
         config: _buildConfig(),
       );
-      if (mounted) {
-        Navigator.of(dialogCtx).pop();
-        final t = AppLocalizations.of(context);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.save)));
-      }
+      if (!ctx.mounted) return;
+      Navigator.of(dialogCtx).pop();
+      final t = AppLocalizations.of(ctx);
+      ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(t.save)));
       await _load();
     } catch (e) {
-      if (mounted) {
-        final t = AppLocalizations.of(context);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${t.error}: $e')));
-      }
+      if (!ctx.mounted) return;
+      final t = AppLocalizations.of(ctx);
+      ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text('${t.error}: $e')));
     }
   }
 
   Future<void> _submitUpdate(BuildContext dialogCtx) async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
     if (_editingId == null) return;
+    if (!context.mounted) return;
+    final ctx = context;
     try {
       await _service.updateAdmin(
         gatewayId: _editingId!,
@@ -139,17 +141,15 @@ class _PaymentGatewaysPageState extends State<PaymentGatewaysPage> {
         isSandbox: _isSandbox,
         config: _buildConfig(),
       );
-      if (mounted) {
-        Navigator.of(dialogCtx).pop();
-        final t = AppLocalizations.of(context);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.updated)));
-      }
+      if (!ctx.mounted) return;
+      Navigator.of(dialogCtx).pop();
+      final t = AppLocalizations.of(ctx);
+      ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(t.updated)));
       await _load();
     } catch (e) {
-      if (mounted) {
-        final t = AppLocalizations.of(context);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${t.error}: $e')));
-      }
+      if (!ctx.mounted) return;
+      final t = AppLocalizations.of(ctx);
+      ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text('${t.error}: $e')));
     }
   }
 
@@ -178,7 +178,7 @@ class _PaymentGatewaysPageState extends State<PaymentGatewaysPage> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   DropdownButtonFormField<String>(
-                    value: _provider,
+                    initialValue: _provider,
                     decoration: const InputDecoration(labelText: 'Provider'),
                     items: const [
                       DropdownMenuItem(value: 'zarinpal', child: Text('Zarinpal')),
@@ -288,18 +288,18 @@ class _PaymentGatewaysPageState extends State<PaymentGatewaysPage> {
   }
 
   Future<void> _delete(int id) async {
+    if (!context.mounted) return;
+    final ctx = context;
     try {
       await _service.deleteAdmin(id);
       await _load();
-      if (mounted) {
-        final t = AppLocalizations.of(context);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.deletedSuccessfully)));
-      }
+      if (!ctx.mounted) return;
+      final t = AppLocalizations.of(ctx);
+      ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(t.deletedSuccessfully)));
     } catch (e) {
-      if (mounted) {
-        final t = AppLocalizations.of(context);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${t.error}: $e')));
-      }
+      if (!ctx.mounted) return;
+      final t = AppLocalizations.of(ctx);
+      ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text('${t.error}: $e')));
     }
   }
 
@@ -317,7 +317,7 @@ class _PaymentGatewaysPageState extends State<PaymentGatewaysPage> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   DropdownButtonFormField<String>(
-                    value: _provider,
+                    initialValue: _provider,
                     decoration: const InputDecoration(labelText: 'Provider'),
                     items: const [
                       DropdownMenuItem(value: 'zarinpal', child: Text('Zarinpal')),

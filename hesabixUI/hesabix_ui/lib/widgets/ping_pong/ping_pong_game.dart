@@ -44,7 +44,7 @@ class _PingPongGameState extends State<PingPongGame>
   double _ballY = gameHeight / 2;
   double _ballVelocityX = 0;
   double _ballVelocityY = 0;
-  double _baseBallSpeed = 2.0;
+  final double _baseBallSpeed = 2.0;
   
   // حالت قهرمان
   bool _heroModeActive = false;
@@ -285,7 +285,7 @@ class _PingPongGameState extends State<PingPongGame>
                         borderRadius: BorderRadius.circular(8),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.2),
+                            color: Colors.black.withValues(alpha: 0.2),
                             blurRadius: 10,
                           ),
                         ],
@@ -378,7 +378,7 @@ class _GamePainter extends CustomPainter {
       paint.shader = LinearGradient(
         colors: [
           theme.colorScheme.secondary,
-          theme.colorScheme.secondary.withOpacity(0.7),
+          theme.colorScheme.secondary.withValues(alpha: 0.7),
         ],
         begin: Alignment.bottomCenter,
         end: Alignment.topCenter,
@@ -390,7 +390,7 @@ class _GamePainter extends CustomPainter {
       
       // افکت درخشش
       paint.shader = null;
-      paint.color = Colors.white.withOpacity(0.3);
+      paint.color = Colors.white.withValues(alpha: 0.3);
       paint.style = PaintingStyle.stroke;
       paint.strokeWidth = 2;
       canvas.drawRect(
@@ -420,7 +420,7 @@ class _GamePainter extends CustomPainter {
     );
     
     // سایه توپ
-    paint.color = Colors.black.withOpacity(0.2);
+    paint.color = Colors.black.withValues(alpha: 0.2);
     canvas.drawCircle(
       Offset(ballX + ballSize / 2 + 2, ballY + ballSize / 2 + 2),
       ballSize / 2,

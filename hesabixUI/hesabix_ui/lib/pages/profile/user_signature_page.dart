@@ -132,7 +132,7 @@ class _UserSignaturePageState extends State<UserSignaturePage> {
                     decoration: BoxDecoration(
                       border: Border.all(color: cs.outlineVariant),
                       borderRadius: BorderRadius.circular(8),
-                      color: cs.surfaceVariant.withOpacity(0.2),
+                      color: cs.surfaceContainerHighest.withValues(alpha: 0.2),
                     ),
                     alignment: Alignment.center,
                     child: _signatureBytes != null

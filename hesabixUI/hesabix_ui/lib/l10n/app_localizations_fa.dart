@@ -88,7 +88,7 @@ class AppLocalizationsFa extends AppLocalizations {
   String get captcha => 'کد امنیتی';
 
   @override
-  String get refresh => 'بروزرسانی';
+  String get refresh => 'به‌روزرسانی';
 
   @override
   String get captchaRequired => 'کد امنیتی الزامی است.';
@@ -1835,7 +1835,7 @@ class AppLocalizationsFa extends AppLocalizations {
   String get cash => 'صندوق';
 
   @override
-  String get invoices => 'فاکتورها';
+  String get invoices => 'صورتحساب‌ها';
 
   @override
   String get expensesIncome => 'هزینه و درآمد';
@@ -3082,6 +3082,10 @@ class AppLocalizationsFa extends AppLocalizations {
       'در صورت فعال‌سازی، طرح اقساط همراه فاکتور ذخیره می‌شود';
 
   @override
+  String get installmentsSettingsSubtitle =>
+      'مدیریت پلن‌های اقساط و شرایط فروش';
+
+  @override
   String get installmentsCount => 'تعداد اقساط';
 
   @override
@@ -3946,6 +3950,9 @@ class AppLocalizationsFa extends AppLocalizations {
   String get creditSettingsTitle => 'اعتبار کاربران';
 
   @override
+  String get creditSettingsSubtitle => 'تنظیم سقف اعتبار و سیاست‌های تاخیر';
+
+  @override
   String get creditEnableTitle => 'فعال‌سازی اعتبار';
 
   @override
@@ -4239,4 +4246,150 @@ class AppLocalizationsFa extends AppLocalizations {
   String taxRemoveSelectedErrorWithMessage(String error) {
     return 'خطا در حذف فاکتورهای انتخاب‌شده: $error';
   }
+
+  @override
+  String get documentMonetizationTitle => 'پکیج‌ها و تعرفه‌ها';
+
+  @override
+  String get documentMonetizationSubtitle =>
+      'پکیج‌ها، هزینه ثبت هر سند و تسویه حجمی';
+
+  @override
+  String get subscriptionPackages => 'پکیج‌های اشتراک';
+
+  @override
+  String get noActivePackage =>
+      'هیچ پکیج فعالی برای این کسب‌وکار ثبت نشده است.';
+
+  @override
+  String get noPackageAvailable =>
+      'در حال حاضر هیچ پکیجی برای خرید فعال نشده است.';
+
+  @override
+  String get activePackage => 'پکیج فعال';
+
+  @override
+  String get autoRenewActive => 'تمدید خودکار فعال است';
+
+  @override
+  String get periodAmount => 'مبلغ دوره';
+
+  @override
+  String get expiryDate => 'تاریخ انقضا';
+
+  @override
+  String get duration => 'مدت';
+
+  @override
+  String get month => 'ماه';
+
+  @override
+  String get free => 'رایگان';
+
+  @override
+  String get activate => 'فعال‌سازی';
+
+  @override
+  String get activating => 'در حال فعال‌سازی...';
+
+  @override
+  String activatePackage(String name) {
+    return 'فعال‌سازی $name';
+  }
+
+  @override
+  String get packageDuration => 'مدت پکیج';
+
+  @override
+  String get packagePrice => 'مبلغ';
+
+  @override
+  String get autoRenewAtEnd => 'تمدید خودکار در پایان دوره';
+
+  @override
+  String get confirmAndActivate => 'تأیید و فعال‌سازی';
+
+  @override
+  String get invalidPackageId => 'شناسه پکیج نامعتبر است';
+
+  @override
+  String get packageActivatedSuccess => 'پکیج با موفقیت فعال شد';
+
+  @override
+  String get packageActivationError => 'فعال‌سازی پکیج با خطا مواجه شد';
+
+  @override
+  String get activePolicies => 'سیاست‌های فعال';
+
+  @override
+  String get noPolicyDefined => 'سیاستی تعریف نشده است';
+
+  @override
+  String get noInvoice => 'صورتحسابی وجود ندارد';
+
+  @override
+  String get chargeType => 'نوع';
+
+  @override
+  String get pay => 'پرداخت';
+
+  @override
+  String get paymentSuccess => 'پرداخت انجام شد';
+
+  @override
+  String get paymentError => 'پرداخت با خطا مواجه شد';
+
+  @override
+  String get finalizeVolume => 'محاسبه دوره حجمی';
+
+  @override
+  String get volumeFinalized => 'محاسبات حجمی نهایی شد';
+
+  @override
+  String get volumeFinalizeError => 'محاسبه دوره حجمی با خطا مواجه شد';
+
+  @override
+  String get statusActive => 'فعال';
+
+  @override
+  String get statusPending => 'در انتظار';
+
+  @override
+  String get statusExpired => 'منقضی شده';
+
+  @override
+  String get statusCancelled => 'لغو شده';
+
+  @override
+  String get statusAwaitingPayment => 'در انتظار پرداخت';
+
+  @override
+  String get statusPaid => 'پرداخت شده';
+
+  @override
+  String get statusInvoiced => 'صورت‌حساب شده';
+
+  @override
+  String get chargeTypePerDocument => 'تک سند';
+
+  @override
+  String get chargeTypeVolumeCycle => 'دوره حجمی';
+
+  @override
+  String get chargeTypeSubscriptionFee => 'هزینه اشتراک';
+
+  @override
+  String get policyTypeFree => 'رایگان';
+
+  @override
+  String get policyTypeSubscription => 'پکیج نامحدود';
+
+  @override
+  String get policyTypeVolume => 'حجمی';
+
+  @override
+  String get policyTypePerDocument => 'تک سند';
+
+  @override
+  String get policyTypeHybrid => 'ترکیبی';
 }

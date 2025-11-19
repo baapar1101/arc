@@ -274,18 +274,16 @@ class _PriceListsPageState extends State<PriceListsPage> {
                   businessId: widget.businessId,
                   payload: {'name': name.trim()},
                 );
-                if (mounted) {
-                  Navigator.of(ctx).pop(true);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('لیست قیمت با موفقیت ایجاد شد')),
-                  );
-                }
+                if (!ctx.mounted) return;
+                Navigator.of(ctx).pop(true);
+                ScaffoldMessenger.of(ctx).showSnackBar(
+                  const SnackBar(content: Text('لیست قیمت با موفقیت ایجاد شد')),
+                );
               } catch (e) {
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('خطا در ایجاد لیست قیمت: $e')),
-                  );
-                }
+                if (!ctx.mounted) return;
+                ScaffoldMessenger.of(ctx).showSnackBar(
+                  SnackBar(content: Text('خطا در ایجاد لیست قیمت: $e')),
+                );
               }
             },
             child: const Text('ایجاد'),
@@ -350,18 +348,16 @@ class _PriceListsPageState extends State<PriceListsPage> {
                     'is_active': isActive,
                   },
                 );
-                if (mounted) {
-                  Navigator.of(ctx).pop(true);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('لیست قیمت با موفقیت بروزرسانی شد')),
-                  );
-                }
+                if (!ctx.mounted) return;
+                Navigator.of(ctx).pop(true);
+                ScaffoldMessenger.of(ctx).showSnackBar(
+                  const SnackBar(content: Text('لیست قیمت با موفقیت بروزرسانی شد')),
+                );
               } catch (e) {
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('خطا در ویرایش لیست قیمت: $e')),
-                  );
-                }
+                if (!ctx.mounted) return;
+                ScaffoldMessenger.of(ctx).showSnackBar(
+                  SnackBar(content: Text('خطا در ویرایش لیست قیمت: $e')),
+                );
               }
             },
             child: const Text('ذخیره'),
@@ -429,24 +425,28 @@ class _PriceListsPageState extends State<PriceListsPage> {
     );
 
     if (confirmed == true) {
+      if (!context.mounted) return;
+      final ctx = context;
       try {
         final success = await _svc.deletePriceList(
           businessId: widget.businessId,
           priceListId: priceListId,
         );
         
+        if (!ctx.mounted) return;
         if (success) {
-          ScaffoldMessenger.of(context).showSnackBar(
+          ScaffoldMessenger.of(ctx).showSnackBar(
             SnackBar(content: Text('لیست قیمت "$priceListName" با موفقیت حذف شد')),
           );
           _loadPriceLists(); // Refresh the list
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
+          ScaffoldMessenger.of(ctx).showSnackBar(
             const SnackBar(content: Text('خطا در حذف لیست قیمت')),
           );
         }
       } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        if (!ctx.mounted) return;
+        ScaffoldMessenger.of(ctx).showSnackBar(
           SnackBar(content: Text('خطا در حذف لیست قیمت: $e')),
         );
       }
