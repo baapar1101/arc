@@ -973,6 +973,10 @@
   "leadTimeDays": "Lead time (days)",
   
   "pricing": "Pricing",
+  "productName": "Product name",
+  "barcode": "Barcode",
+  "generalInformation": "General information",
+  "imageNotAvailable": "Image not available",
   "salesPrice": "Sales price",
   "salesPriceNote": "Sales price note",
   "purchasePrice": "Purchase price",
@@ -1373,6 +1377,43 @@
   "notificationsAdvancedSave": "Save advanced settings",
   "notificationsAdvancedSaveSuccess": "Advanced notification settings saved.",
   "notificationsAdvancedSaveError": "Failed to save advanced notification settings.",
+  "notificationsTelegramConnectionStatus": "Connection status",
+  "notificationsTelegramConnected": "Connected",
+  "notificationsTelegramNotConnected": "Not connected",
+  "notificationsTelegramConnectButton": "Connect Telegram",
+  "notificationsTelegramDisconnectButton": "Disconnect",
+  "notificationsTelegramConnecting": "Connecting...",
+  "notificationsTelegramConnectionWarning": "To enable Telegram notifications, please connect first.",
+  "notificationsTelegramConnectionSuccess": "Telegram connection established successfully.",
+  "notificationsTelegramConnectionError": "Failed to connect Telegram.",
+  "notificationsTelegramDisconnectSuccess": "Telegram connection disconnected.",
+  "notificationsTelegramDisconnectError": "Failed to disconnect Telegram.",
+  "notificationsTelegramLinkExpired": "Connection link expired. Please create a new link.",
+  "notificationsTelegramLinkInstructions": "Click the link below or open the bot in Telegram and send /start {token}.",
+  "notificationsTelegramLinkExpiresIn": "This link expires in {minutes} minutes.",
+  "notificationsTelegramConnectedSince": "Connected since {date}",
+  "@notificationsTelegramLinkExpiresIn": {
+    "placeholders": {
+      "minutes": {
+        "type": "int",
+        "format": "decimalPattern"
+      }
+    }
+  },
+  "@notificationsTelegramConnectedSince": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "@notificationsTelegramLinkInstructions": {
+    "placeholders": {
+      "token": {
+        "type": "String"
+      }
+    }
+  },
   "templateBuilderNew": "Visual Builder (New)",
   "templateBuilderEdit": "Visual Builder (Edit)",
   "undo": "Undo",

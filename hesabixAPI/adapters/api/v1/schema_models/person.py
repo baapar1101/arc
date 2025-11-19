@@ -253,3 +253,64 @@ class PersonSummaryResponse(BaseModel):
     by_type: dict = Field(..., description="تعداد بر اساس نوع")
     active_persons: int = Field(..., description="تعداد اشخاص فعال")
     inactive_persons: int = Field(..., description="تعداد اشخاص غیرفعال")
+
+
+class PersonShareLinkOptions(BaseModel):
+    """تنظیمات محتوای لینک اشتراک"""
+    include_ledger: bool = Field(
+        default=True,
+        description="آیا کارت حساب (تراکنش‌ها) برای مشتری نمایش داده شود",
+    )
+    include_invoices: bool = Field(
+        default=True, description="آیا فهرست فاکتورها نمایش داده شود"
+    )
+    documents_limit: int = Field(
+        default=50,
+        ge=10,
+        le=200,
+        description="حداکثر تعداد ردیف برای لیست‌ها",
+    )
+
+
+class PersonShareLinkCreateRequest(BaseModel):
+    """درخواست ایجاد یا به‌روزرسانی لینک اشتراک"""
+    expires_in_hours: Optional[int] = Field(
+        default=None,
+        ge=1,
+        le=720,
+        description="مدت اعتبار لینک (ساعت). در صورت عدم ارسال از مقدار پیش‌فرض تنظیمات استفاده می‌شود.",
+    )
+    max_view_count: Optional[int] = Field(
+        default=None,
+        ge=1,
+        le=1000,
+        description="حداکثر تعداد بازدید مجاز. خالی یعنی بدون محدودیت.",
+    )
+    replace_existing: bool = Field(
+        default=True,
+        description="در صورت وجود لینک فعال، ابتدا لغو و لینک جدید ایجاد شود",
+    )
+    options: PersonShareLinkOptions = Field(
+        default_factory=PersonShareLinkOptions,
+        description="تنظیمات محتوای قابل نمایش برای مشتری",
+    )
+
+
+class PersonShareLinkResponse(BaseModel):
+    """پاسخ اطلاعات لینک اشتراک"""
+    id: int
+    business_id: int
+    person_id: int
+    code: str
+    short_url: str
+    created_at: str
+    expires_at: Optional[str]
+    revoked_at: Optional[str]
+    last_view_at: Optional[str]
+    view_count: int
+    max_view_count: Optional[int]
+    is_active: bool
+    is_expired: bool
+    status: str
+    remaining_hours: Optional[float]
+    options: PersonShareLinkOptions

@@ -319,21 +319,21 @@ class _TransferFormDialogState extends State<TransferFormDialog> {
                     }
                   },
                   style: ButtonStyle(
-                    backgroundColor: MaterialStateProperty.resolveWith((states) {
-                      if (states.contains(MaterialState.selected)) {
+                    backgroundColor: WidgetStateProperty.resolveWith((states) {
+                      if (states.contains(WidgetState.selected)) {
                         return Theme.of(context).primaryColor;
                       }
                       return Colors.transparent;
                     }),
-                    foregroundColor: MaterialStateProperty.resolveWith((states) {
-                      if (states.contains(MaterialState.selected)) {
+                    foregroundColor: WidgetStateProperty.resolveWith((states) {
+                      if (states.contains(WidgetState.selected)) {
                         return Colors.white;
                       }
                       return Theme.of(context).colorScheme.onSurface;
                     }),
-                    minimumSize: MaterialStateProperty.all(const Size(0, 44)),
-                    padding: MaterialStateProperty.all(const EdgeInsets.symmetric(horizontal: 12)),
-                    shape: MaterialStateProperty.all(
+                    minimumSize: WidgetStateProperty.all(const Size(0, 44)),
+                    padding: WidgetStateProperty.all(const EdgeInsets.symmetric(horizontal: 12)),
+                    shape: WidgetStateProperty.all(
                       RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),

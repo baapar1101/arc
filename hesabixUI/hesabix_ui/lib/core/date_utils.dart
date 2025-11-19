@@ -6,12 +6,24 @@ class HesabixDateUtils {
   static String formatForDisplay(DateTime? date, bool isJalali) {
     if (date == null) return '';
     
+    final local = date.toLocal();
     if (isJalali) {
-      final jalali = Jalali.fromDateTime(date);
+      final jalali = Jalali.fromDateTime(local);
       return '${jalali.year}/${jalali.month.toString().padLeft(2, '0')}/${jalali.day.toString().padLeft(2, '0')}';
     } else {
-      return '${date.year}/${date.month.toString().padLeft(2, '0')}/${date.day.toString().padLeft(2, '0')}';
+      return '${local.year}/${local.month.toString().padLeft(2, '0')}/${local.day.toString().padLeft(2, '0')}';
     }
+  }
+
+  static String formatDateTime(DateTime? date, bool isJalali) {
+    if (date == null) return '-';
+    final local = date.toLocal();
+    final datePart = formatForDisplay(local, isJalali);
+    final timePart = '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
+    if (datePart.isEmpty) {
+      return timePart;
+    }
+    return '$datePart $timePart';
   }
 
   /// Convert DateTime to Jalali string with month name for display

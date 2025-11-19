@@ -28,6 +28,7 @@ class InvoiceTransactionsWidget extends StatefulWidget {
   final CalendarController calendarController;
   final InvoiceType invoiceType;
   final int? selectedCurrencyId;
+  final CheckPickerMode checkPickerMode;
 
   const InvoiceTransactionsWidget({
     super.key,
@@ -37,6 +38,7 @@ class InvoiceTransactionsWidget extends StatefulWidget {
     required this.calendarController,
     required this.invoiceType,
     this.selectedCurrencyId,
+    this.checkPickerMode = CheckPickerMode.any,
   });
 
   @override
@@ -332,6 +334,7 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
         calendarController: widget.calendarController,
         invoiceType: widget.invoiceType,
         selectedCurrencyId: widget.selectedCurrencyId,
+        checkPickerMode: widget.checkPickerMode,
         onSave: (newTransaction) {
           if (index != null) {
             // ویرایش تراکنش موجود
@@ -357,6 +360,7 @@ class TransactionDialog extends StatefulWidget {
   final ValueChanged<InvoiceTransaction> onSave;
   final InvoiceType invoiceType;
   final int? selectedCurrencyId;
+  final CheckPickerMode checkPickerMode;
 
   const TransactionDialog({
     super.key,
@@ -366,6 +370,7 @@ class TransactionDialog extends StatefulWidget {
     required this.invoiceType,
     this.selectedCurrencyId,
     required this.onSave,
+    this.checkPickerMode = CheckPickerMode.any,
   });
 
   @override
@@ -395,6 +400,7 @@ class _TransactionDialogState extends State<TransactionDialog> {
   String? _selectedPettyCashId;
   String? _selectedCheckId;
   int? _selectedCheckCurrencyId;
+  String? _selectedCheckNumber;
   String? _selectedPersonId;
   AccountTreeNode? _selectedAccount;
   
@@ -424,6 +430,7 @@ class _TransactionDialogState extends State<TransactionDialog> {
     _selectedCashRegisterId = widget.transaction?.cashRegisterId;
     _selectedPettyCashId = widget.transaction?.pettyCashId;
     _selectedCheckId = widget.transaction?.checkId;
+    _selectedCheckNumber = widget.transaction?.checkNumber;
     _selectedPersonId = widget.transaction?.personId;
     
     // اگر حساب انتخاب شده است، باید آن را از API دریافت کنیم
@@ -458,7 +465,11 @@ class _TransactionDialogState extends State<TransactionDialog> {
           }
         }
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
+      if (mounted) {
+        debugPrint('Failed to load selected account: $e');
+        debugPrint('$stackTrace');
+      }
     }
   }
 
@@ -793,39 +804,37 @@ class _TransactionDialogState extends State<TransactionDialog> {
     );
   }
 
-  Widget _buildCheckFields() {
+  Widget _buildCheckFields({
+    CheckPickerMode? pickerMode,
+    String label = 'چک *',
+    String hintText = 'جست‌وجو و انتخاب چک',
+  }) {
     return CheckComboboxWidget(
       businessId: widget.businessId,
       selectedCheckId: _selectedCheckId,
+      selectedCheckNumber: _selectedCheckNumber,
       filterCurrencyId: widget.selectedCurrencyId,
-      onChanged: (opt) {
-        setState(() {
-          _selectedCheckId = opt?.id;
-          _selectedCheckCurrencyId = opt?.currencyId;
-        });
-      },
-      label: 'چک *',
-      hintText: 'جست‌وجو و انتخاب چک',
+      mode: pickerMode ?? widget.checkPickerMode,
+      onChanged: _onCheckSelected,
+      label: label,
+      hintText: hintText,
     );
   }
 
   Widget _buildCheckExpenseFields() {
-    return DropdownButtonFormField<String>(
-      initialValue: _selectedCheckId,
-      decoration: const InputDecoration(
-        labelText: 'خرج چک *',
-        border: OutlineInputBorder(),
-      ),
-      items: const [
-        DropdownMenuItem(value: 'expense1', child: Text('خرج چک شماره 123456')),
-        DropdownMenuItem(value: 'expense2', child: Text('خرج چک شماره 789012')),
-      ],
-      onChanged: (value) {
-        setState(() {
-          _selectedCheckId = value;
-        });
-      },
+    return _buildCheckFields(
+      pickerMode: CheckPickerMode.payment,
+      label: 'خرج چک *',
+      hintText: 'انتخاب چک خرج‌شده',
     );
+  }
+
+  void _onCheckSelected(CheckOption? option) {
+    setState(() {
+      _selectedCheckId = option?.id;
+      _selectedCheckCurrencyId = option?.currencyId;
+      _selectedCheckNumber = option?.number;
+    });
   }
 
   Widget _buildPersonFields() {
@@ -968,7 +977,7 @@ class _TransactionDialogState extends State<TransactionDialog> {
       pettyCashId: _selectedPettyCashId,
       pettyCashName: _getPettyCashName(_selectedPettyCashId),
       checkId: _selectedCheckId,
-      checkNumber: _getCheckNumber(_selectedCheckId),
+      checkNumber: _selectedCheckNumber,
       personId: _selectedPersonId,
       personName: _getPersonName(_selectedPersonId),
       accountId: _selectedAccount?.id.toString(),
@@ -1010,14 +1019,6 @@ class _TransactionDialogState extends State<TransactionDialog> {
       orElse: () => <String, dynamic>{},
     );
     return pettyCash['name']?.toString();
-  }
-
-  String? _getCheckNumber(String? id) {
-    switch (id) {
-      case 'check1': return '123456';
-      case 'check2': return '789012';
-      default: return null;
-    }
   }
 
   String? _getPersonName(String? id) {

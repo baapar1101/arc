@@ -5144,6 +5144,30 @@ abstract class AppLocalizations {
   /// **'Pricing'**
   String get pricing;
 
+  /// No description provided for @productName.
+  ///
+  /// In en, this message translates to:
+  /// **'Product name'**
+  String get productName;
+
+  /// No description provided for @barcode.
+  ///
+  /// In en, this message translates to:
+  /// **'Barcode'**
+  String get barcode;
+
+  /// No description provided for @generalInformation.
+  ///
+  /// In en, this message translates to:
+  /// **'General information'**
+  String get generalInformation;
+
+  /// No description provided for @imageNotAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Image not available'**
+  String get imageNotAvailable;
+
   /// No description provided for @salesPrice.
   ///
   /// In en, this message translates to:
@@ -7123,6 +7147,96 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Failed to save advanced notification settings.'**
   String get notificationsAdvancedSaveError;
+
+  /// No description provided for @notificationsTelegramConnectionStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection status'**
+  String get notificationsTelegramConnectionStatus;
+
+  /// No description provided for @notificationsTelegramConnected.
+  ///
+  /// In en, this message translates to:
+  /// **'Connected'**
+  String get notificationsTelegramConnected;
+
+  /// No description provided for @notificationsTelegramNotConnected.
+  ///
+  /// In en, this message translates to:
+  /// **'Not connected'**
+  String get notificationsTelegramNotConnected;
+
+  /// No description provided for @notificationsTelegramConnectButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect Telegram'**
+  String get notificationsTelegramConnectButton;
+
+  /// No description provided for @notificationsTelegramDisconnectButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Disconnect'**
+  String get notificationsTelegramDisconnectButton;
+
+  /// No description provided for @notificationsTelegramConnecting.
+  ///
+  /// In en, this message translates to:
+  /// **'Connecting...'**
+  String get notificationsTelegramConnecting;
+
+  /// No description provided for @notificationsTelegramConnectionWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'To enable Telegram notifications, please connect first.'**
+  String get notificationsTelegramConnectionWarning;
+
+  /// No description provided for @notificationsTelegramConnectionSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Telegram connection established successfully.'**
+  String get notificationsTelegramConnectionSuccess;
+
+  /// No description provided for @notificationsTelegramConnectionError.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to connect Telegram.'**
+  String get notificationsTelegramConnectionError;
+
+  /// No description provided for @notificationsTelegramDisconnectSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Telegram connection disconnected.'**
+  String get notificationsTelegramDisconnectSuccess;
+
+  /// No description provided for @notificationsTelegramDisconnectError.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to disconnect Telegram.'**
+  String get notificationsTelegramDisconnectError;
+
+  /// No description provided for @notificationsTelegramLinkExpired.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection link expired. Please create a new link.'**
+  String get notificationsTelegramLinkExpired;
+
+  /// No description provided for @notificationsTelegramLinkInstructions.
+  ///
+  /// In en, this message translates to:
+  /// **'Click the link below or open the bot in Telegram and send /start {token}.'**
+  String notificationsTelegramLinkInstructions(String token);
+
+  /// No description provided for @notificationsTelegramLinkExpiresIn.
+  ///
+  /// In en, this message translates to:
+  /// **'This link expires in {minutes} minutes.'**
+  String notificationsTelegramLinkExpiresIn(int minutes);
+
+  /// No description provided for @notificationsTelegramConnectedSince.
+  ///
+  /// In en, this message translates to:
+  /// **'Connected since {date}'**
+  String notificationsTelegramConnectedSince(String date);
 
   /// No description provided for @templateBuilderNew.
   ///

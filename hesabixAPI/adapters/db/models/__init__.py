@@ -9,6 +9,7 @@ from .business import Business  # noqa: F401
 from .business_print_settings import BusinessPrintSettings  # noqa: F401
 from .business_permission import BusinessPermission  # noqa: F401
 from .person import Person, PersonBankAccount  # noqa: F401
+from .person_share_link import PersonShareLink  # noqa: F401
 # Business user models removed - using business_permissions instead
 
 # Import support models

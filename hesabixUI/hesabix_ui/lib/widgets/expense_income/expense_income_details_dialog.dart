@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/core/api_client.dart';
@@ -6,8 +7,7 @@ import 'package:hesabix_ui/models/expense_income_document.dart';
 import 'package:hesabix_ui/services/expense_income_service.dart';
 import 'package:hesabix_ui/utils/number_formatters.dart' show formatWithThousands;
 import 'package:hesabix_ui/core/date_utils.dart' show HesabixDateUtils;
-// ignore: avoid_web_libraries_in_flutter
-import 'dart:html' as html;
+import 'package:hesabix_ui/utils/web/web_utils.dart' as web_utils;
 
 /// دیالوگ مشاهده جزئیات سند هزینه/درآمد
 class ExpenseIncomeDetailsDialog extends StatefulWidget {
@@ -137,7 +137,7 @@ class _ExpenseIncomeDetailsDialogState extends State<ExpenseIncomeDetailsDialog>
             _buildInfoRow('تاریخ ثبت', HesabixDateUtils.formatForDisplay(doc.registeredAt, widget.calendarController.isJalali)),
             _buildInfoRow('ارز', doc.currencyCode ?? 'نامشخص'),
             _buildInfoRow('ایجادکننده', doc.createdByName ?? 'نامشخص'),
-            _buildInfoRow('مبلغ کل', formatWithThousands(doc.totalAmount) + ' ریال'),
+            _buildInfoRow('مبلغ کل', '${formatWithThousands(doc.totalAmount)} ریال'),
             if (doc.description != null && doc.description!.isNotEmpty)
               _buildInfoRow('توضیحات', doc.description!),
           ],
@@ -227,7 +227,7 @@ class _ExpenseIncomeDetailsDialogState extends State<ExpenseIncomeDetailsDialog>
             ),
           ),
           Text(
-            formatWithThousands(line.amount) + ' ریال',
+            '${formatWithThousands(line.amount)} ریال',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
               fontWeight: FontWeight.w500,
             ),
@@ -297,7 +297,7 @@ class _ExpenseIncomeDetailsDialogState extends State<ExpenseIncomeDetailsDialog>
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(
-                    formatWithThousands(line.amount) + ' ریال',
+                    '${formatWithThousands(line.amount)} ریال',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       fontWeight: FontWeight.w500,
                     ),
@@ -399,17 +399,14 @@ class _ExpenseIncomeDetailsDialogState extends State<ExpenseIncomeDetailsDialog>
   }
 
   Future<void> _savePdfFile(List<int> bytes, String filename) async {
-    try {
-      // استفاده از dart:html برای دانلود فایل در وب
-      final blob = html.Blob([bytes]);
-      final url = html.Url.createObjectUrlFromBlob(blob);
-      html.AnchorElement(href: url)
-        ..setAttribute('download', filename.endsWith('.pdf') ? filename : '$filename.pdf')
-        ..click();
-      html.Url.revokeObjectUrl(url);
-      
-    } catch (e) {
-      rethrow;
+    if (kIsWeb) {
+      await web_utils.saveBytesAsFileWeb(
+        bytes,
+        filename.endsWith('.pdf') ? filename : '$filename.pdf',
+        mimeType: 'application/pdf',
+      );
+    } else {
+      throw UnsupportedError('دانلود فایل فقط در نسخه وب پشتیبانی می‌شود');
     }
   }
 }

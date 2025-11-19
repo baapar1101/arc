@@ -405,13 +405,6 @@ class _ProductBasicInfoSectionState extends State<ProductBasicInfoSection> {
               ),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 8),
-            Radio<String>(
-              value: value,
-              groupValue: widget.formData.itemType,
-              onChanged: (val) => _updateFormData(widget.formData.copyWith(itemType: val ?? 'کالا')),
-              activeColor: Theme.of(context).primaryColor,
-            ),
           ],
         ),
       ),

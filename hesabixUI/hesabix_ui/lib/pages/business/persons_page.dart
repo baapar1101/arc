@@ -11,6 +11,7 @@ import '../../widgets/permission/permission_widgets.dart';
 import '../../models/person_model.dart';
 import '../../services/person_service.dart';
 import '../../core/auth_store.dart';
+import 'person_details_dialog.dart';
 
 class PersonsPage extends StatefulWidget {
   final int businessId;
@@ -507,6 +508,11 @@ class _PersonsPageState extends State<PersonsPage> {
           );
         }),
       ],
+      onRowTap: (item) {
+        if (item is Person) {
+          _showPersonDetails(item);
+        }
+      },
     );
   }
 
@@ -593,5 +599,17 @@ class _PersonsPageState extends State<PersonsPage> {
         );
       }
     }
+  }
+
+  void _showPersonDetails(Person person) {
+    if (person.id == null) return;
+    showDialog(
+      context: context,
+      builder: (context) => PersonDetailsDialog(
+        businessId: widget.businessId,
+        person: person,
+        authStore: widget.authStore,
+      ),
+    );
   }
 }

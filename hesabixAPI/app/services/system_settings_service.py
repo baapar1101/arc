@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Optional, Dict, Any, List
 import json
+from urllib.parse import urlparse
 
 from sqlalchemy.orm import Session
 from sqlalchemy import select
@@ -9,6 +10,7 @@ from sqlalchemy import select
 from adapters.db.models.system_setting import SystemSetting
 from adapters.db.models.currency import Currency
 from app.core.responses import ApiError
+from app.core.settings import get_settings
 
 
 WALLET_BASE_CURRENCY_KEY = "wallet_base_currency_code"
@@ -21,6 +23,14 @@ NOTIFY_SMS_PROVIDER = "sms_provider_name"
 NOTIFY_SMS_API_KEY = "sms_api_key"
 NOTIFY_SMS_SENDER = "sms_sender"
 DEFAULT_DOCUMENT_POLICIES_KEY = "default_document_monetization_policies"
+SHARE_LINK_PUBLIC_APP_URL_KEY = "share_link_public_app_url"
+
+
+def _default_share_link_base_url() -> str:
+	full = (get_settings().share_link_public_app_url or "").strip().rstrip("/")
+	if full.lower().endswith("/public"):
+		return full[:-len("/public")].rstrip("/") or full
+	return full
 
 
 def _get_setting(db: Session, key: str) -> Optional[SystemSetting]:
@@ -91,6 +101,7 @@ def set_wallet_base_currency_code(db: Session, code: str) -> Dict[str, Any]:
 	if not currency:
 		raise ApiError("CURRENCY_NOT_FOUND", f"ارز با کد {code} یافت نشد", http_status=404)
 	_upsert_setting_string(db, WALLET_BASE_CURRENCY_KEY, code)
+	db.commit()
 	return {
 		"wallet_base_currency_code": code,
 		"wallet_base_currency_id": currency.id,
@@ -131,7 +142,32 @@ def set_notifications_settings(
 		_upsert_setting_string(db, NOTIFY_SMS_API_KEY, sms_api_key)
 	if sms_sender is not None:
 		_upsert_setting_string(db, NOTIFY_SMS_SENDER, sms_sender)
+	db.commit()
 	return get_notifications_settings(db)
+
+
+def get_share_link_settings(db: Session) -> Dict[str, Any]:
+	default_url = _default_share_link_base_url()
+	obj = _get_setting(db, SHARE_LINK_PUBLIC_APP_URL_KEY)
+	value = (obj.value_string or "").strip() if obj and obj.value_string else default_url
+	return {
+		"public_app_url": value or default_url,
+	}
+
+
+def set_share_link_settings(db: Session, *, public_app_url: str) -> Dict[str, Any]:
+	url = (public_app_url or "").strip()
+	if not url:
+		raise ApiError("PUBLIC_APP_URL_REQUIRED", "آدرس مقصد لینک اشتراک الزامی است", http_status=400)
+	parsed = urlparse(url)
+	if parsed.scheme not in ("http", "https"):
+		raise ApiError("INVALID_PUBLIC_APP_URL", "آدرس باید با http یا https شروع شود", http_status=400)
+	normalized = url.rstrip("/")
+	if normalized.lower().endswith("/public"):
+		normalized = normalized[:-len("/public")].rstrip("/")
+	_upsert_setting_string(db, SHARE_LINK_PUBLIC_APP_URL_KEY, normalized or url)
+	db.commit()
+	return get_share_link_settings(db)
 
 
 def get_default_document_policies(db: Session) -> List[Dict[str, Any]]:

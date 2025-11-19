@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
@@ -15,6 +16,7 @@ import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
 import 'package:hesabix_ui/widgets/date_input_field.dart';
 // removed duplicate import
 import 'package:hesabix_ui/widgets/invoice/invoice_transactions_widget.dart';
+import 'package:hesabix_ui/widgets/invoice/check_combobox_widget.dart';
 import 'package:hesabix_ui/widgets/banking/currency_picker_widget.dart';
 import 'package:hesabix_ui/utils/number_formatters.dart' show formatWithThousands;
 import 'package:hesabix_ui/core/date_utils.dart' show HesabixDateUtils;
@@ -23,8 +25,7 @@ import 'package:hesabix_ui/models/invoice_type_model.dart';
 import 'package:hesabix_ui/utils/number_normalizer.dart';
 // removed duplicate import
 import 'package:hesabix_ui/models/business_dashboard_models.dart';
-// ignore: avoid_web_libraries_in_flutter
-import 'dart:html' as html;
+import 'package:hesabix_ui/utils/web/web_utils.dart' as web_utils;
 
 /// صفحه لیست اسناد دریافت و پرداخت با ویجت جدول
 class ReceiptsPaymentsListPage extends StatefulWidget {
@@ -767,13 +768,12 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog> {
   void initState() {
     super.initState();
     // بارگذاری استراتژی پیش‌فرض از localStorage
-    try {
-      final key = 'installment_strategy_${widget.businessId}';
-      final v = html.window.localStorage[key];
-      _defaultInstallmentSelectionStrategy = (v == 'nearest_due' || v == 'prefer_partial') ? (v!) : 'first_remaining';
-    } catch (_) {
-      _defaultInstallmentSelectionStrategy = 'first_remaining';
-    }
+    final key = 'installment_strategy_${widget.businessId}';
+    final storedStrategy = web_utils.getLocalStorageValue(key);
+    _defaultInstallmentSelectionStrategy =
+        (storedStrategy == 'nearest_due' || storedStrategy == 'prefer_partial')
+            ? storedStrategy!
+            : 'first_remaining';
     final initial = widget.initialDocument;
     if (initial != null) {
       // حالت ویرایش: پرکردن اولیه از سند
@@ -1004,6 +1004,7 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog> {
                           businessId: widget.businessId,
                           calendarController: widget.calendarController,
                           invoiceType: InvoiceType.sales,
+                          checkPickerMode: _isReceipt ? CheckPickerMode.receipt : CheckPickerMode.payment,
                         ),
                       ),
                     ),
@@ -2283,7 +2284,7 @@ class _PersonLineTileState extends State<_PersonLineTile> {
                                   onPressed: () {
                                     try {
                                       final key = 'installment_strategy_${ancestor.widget.businessId}';
-                                      html.window.localStorage[key] = temp;
+                                      web_utils.setLocalStorageValue(key, temp);
                                       ancestor.setState(() {
                                         ancestor._defaultInstallmentSelectionStrategy = temp;
                                       });
@@ -2993,17 +2994,14 @@ class _ReceiptPaymentViewDialogState extends State<ReceiptPaymentViewDialog> {
   }
 
   Future<void> _savePdfFile(List<int> bytes, String filename) async {
-    try {
-      // استفاده از dart:html برای دانلود فایل در وب
-      final blob = html.Blob([bytes]);
-      final url = html.Url.createObjectUrlFromBlob(blob);
-      html.AnchorElement(href: url)
-        ..setAttribute('download', filename.endsWith('.pdf') ? filename : '$filename.pdf')
-        ..click();
-      html.Url.revokeObjectUrl(url);
-      
-    } catch (e) {
-      rethrow;
+    if (kIsWeb) {
+      await web_utils.saveBytesAsFileWeb(
+        bytes,
+        filename.endsWith('.pdf') ? filename : '$filename.pdf',
+        mimeType: 'application/pdf',
+      );
+    } else {
+      throw UnsupportedError('PDF download is only supported on web.');
     }
   }
 }

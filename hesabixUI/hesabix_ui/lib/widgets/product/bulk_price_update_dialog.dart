@@ -400,86 +400,74 @@ class _BulkPriceUpdateDialogState extends State<BulkPriceUpdateDialog> {
 
   Widget _buildUpdateTypeSection() {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: RadioListTile<BulkPriceUpdateType>(
-                title: const Text('درصدی'),
-                subtitle: const Text('مثلاً 10%'),
-                value: BulkPriceUpdateType.percentage,
-                groupValue: _updateType,
-                onChanged: (value) {
-                  setState(() => _updateType = value!);
-                  _updateValueController();
-                },
-              ),
+        SegmentedButton<BulkPriceUpdateType>(
+          segments: const [
+            ButtonSegment(
+              value: BulkPriceUpdateType.percentage,
+              label: Text('درصدی'),
+              icon: Icon(Icons.percent),
             ),
-            Expanded(
-              child: RadioListTile<BulkPriceUpdateType>(
-                title: const Text('مقداری'),
-                subtitle: const Text('مثلاً 1000'),
-                value: BulkPriceUpdateType.amount,
-                groupValue: _updateType,
-                onChanged: (value) {
-                  setState(() => _updateType = value!);
-                  _updateValueController();
-                },
-              ),
+            ButtonSegment(
+              value: BulkPriceUpdateType.amount,
+              label: Text('مقداری'),
+              icon: Icon(Icons.numbers),
             ),
           ],
+          selected: {_updateType},
+          onSelectionChanged: (selection) {
+            final newValue = selection.first;
+            setState(() => _updateType = newValue);
+            _updateValueController();
+          },
         ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            Expanded(
-              child: RadioListTile<BulkPriceUpdateDirection>(
-                title: const Text('افزایش'),
-                value: BulkPriceUpdateDirection.increase,
-                groupValue: _direction,
-                onChanged: (value) => setState(() => _direction = value!),
-              ),
+        const SizedBox(height: 12),
+        SegmentedButton<BulkPriceUpdateDirection>(
+          segments: const [
+            ButtonSegment(
+              value: BulkPriceUpdateDirection.increase,
+              label: Text('افزایش'),
+              icon: Icon(Icons.trending_up),
             ),
-            Expanded(
-              child: RadioListTile<BulkPriceUpdateDirection>(
-                title: const Text('کاهش'),
-                value: BulkPriceUpdateDirection.decrease,
-                groupValue: _direction,
-                onChanged: (value) => setState(() => _direction = value!),
-              ),
+            ButtonSegment(
+              value: BulkPriceUpdateDirection.decrease,
+              label: Text('کاهش'),
+              icon: Icon(Icons.trending_down),
             ),
           ],
+          selected: {_direction},
+          onSelectionChanged: (selection) {
+            setState(() => _direction = selection.first);
+          },
         ),
       ],
     );
   }
 
   Widget _buildTargetSection() {
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          child: RadioListTile<BulkPriceUpdateTarget>(
-            title: const Text('قیمت فروش'),
-            value: BulkPriceUpdateTarget.salesPrice,
-            groupValue: _target,
-            onChanged: (value) => setState(() => _target = value!),
-          ),
-        ),
-        Expanded(
-          child: RadioListTile<BulkPriceUpdateTarget>(
-            title: const Text('قیمت خرید'),
-            value: BulkPriceUpdateTarget.purchasePrice,
-            groupValue: _target,
-            onChanged: (value) => setState(() => _target = value!),
-          ),
-        ),
-        Expanded(
-          child: RadioListTile<BulkPriceUpdateTarget>(
-            title: const Text('هر دو'),
-            value: BulkPriceUpdateTarget.both,
-            groupValue: _target,
-            onChanged: (value) => setState(() => _target = value!),
-          ),
+        SegmentedButton<BulkPriceUpdateTarget>(
+          segments: const [
+            ButtonSegment(
+              value: BulkPriceUpdateTarget.salesPrice,
+              label: Text('قیمت فروش'),
+            ),
+            ButtonSegment(
+              value: BulkPriceUpdateTarget.purchasePrice,
+              label: Text('قیمت خرید'),
+            ),
+            ButtonSegment(
+              value: BulkPriceUpdateTarget.both,
+              label: Text('هر دو'),
+            ),
+          ],
+          selected: {_target},
+          onSelectionChanged: (selection) {
+            setState(() => _target = selection.first);
+          },
         ),
       ],
     );

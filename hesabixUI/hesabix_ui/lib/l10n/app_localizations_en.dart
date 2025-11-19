@@ -2601,6 +2601,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get pricing => 'Pricing';
 
   @override
+  String get productName => 'Product name';
+
+  @override
+  String get barcode => 'Barcode';
+
+  @override
+  String get generalInformation => 'General information';
+
+  @override
+  String get imageNotAvailable => 'Image not available';
+
+  @override
   String get salesPrice => 'Sales price';
 
   @override
@@ -3657,6 +3669,67 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get notificationsAdvancedSaveError =>
       'Failed to save advanced notification settings.';
+
+  @override
+  String get notificationsTelegramConnectionStatus => 'Connection status';
+
+  @override
+  String get notificationsTelegramConnected => 'Connected';
+
+  @override
+  String get notificationsTelegramNotConnected => 'Not connected';
+
+  @override
+  String get notificationsTelegramConnectButton => 'Connect Telegram';
+
+  @override
+  String get notificationsTelegramDisconnectButton => 'Disconnect';
+
+  @override
+  String get notificationsTelegramConnecting => 'Connecting...';
+
+  @override
+  String get notificationsTelegramConnectionWarning =>
+      'To enable Telegram notifications, please connect first.';
+
+  @override
+  String get notificationsTelegramConnectionSuccess =>
+      'Telegram connection established successfully.';
+
+  @override
+  String get notificationsTelegramConnectionError =>
+      'Failed to connect Telegram.';
+
+  @override
+  String get notificationsTelegramDisconnectSuccess =>
+      'Telegram connection disconnected.';
+
+  @override
+  String get notificationsTelegramDisconnectError =>
+      'Failed to disconnect Telegram.';
+
+  @override
+  String get notificationsTelegramLinkExpired =>
+      'Connection link expired. Please create a new link.';
+
+  @override
+  String notificationsTelegramLinkInstructions(String token) {
+    return 'Click the link below or open the bot in Telegram and send /start $token.';
+  }
+
+  @override
+  String notificationsTelegramLinkExpiresIn(int minutes) {
+    final intl.NumberFormat minutesNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String minutesString = minutesNumberFormat.format(minutes);
+
+    return 'This link expires in $minutesString minutes.';
+  }
+
+  @override
+  String notificationsTelegramConnectedSince(String date) {
+    return 'Connected since $date';
+  }
 
   @override
   String get templateBuilderNew => 'Visual Builder (New)';

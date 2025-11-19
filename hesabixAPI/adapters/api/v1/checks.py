@@ -473,7 +473,7 @@ async def list_reconciliations_endpoint(
 
 
 @router.get(
-    "/checks/reconciliations/{reconciliation_id}",
+    "/reconciliations/{reconciliation_id}",
     summary="جزئیات جلسه راس‌گیری",
     description="دریافت جزئیات یک جلسه راس‌گیری",
 )
@@ -496,7 +496,7 @@ async def get_reconciliation_endpoint(
 
 
 @router.delete(
-    "/checks/reconciliations/{reconciliation_id}",
+    "/reconciliations/{reconciliation_id}",
     summary="حذف جلسه راس‌گیری",
     description="حذف یک جلسه راس‌گیری",
 )

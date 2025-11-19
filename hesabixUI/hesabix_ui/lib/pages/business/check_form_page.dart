@@ -10,6 +10,7 @@ import '../../services/check_service.dart';
 import '../../services/person_service.dart';
 import '../../models/person_model.dart';
 import '../../utils/number_normalizer.dart';
+import '../../utils/number_formatters.dart';
 
 class CheckFormDialog extends StatefulWidget {
   final int businessId;
@@ -82,6 +83,7 @@ class _CheckFormDialogState extends State<CheckFormDialog> {
   final _docDescCtrl = TextEditingController();
 
   bool _loading = false;
+  bool _isFormattingAmount = false;
 
   @override
   void initState() {
@@ -94,6 +96,7 @@ class _CheckFormDialogState extends State<CheckFormDialog> {
     if (widget.checkId != null) {
       _loadData();
     }
+    _amountCtrl.addListener(_handleAmountInput);
   }
 
   @override
@@ -102,6 +105,7 @@ class _CheckFormDialogState extends State<CheckFormDialog> {
     _sayadCtrl.dispose();
     _bankCtrl.dispose();
     _branchCtrl.dispose();
+    _amountCtrl.removeListener(_handleAmountInput);
     _amountCtrl.dispose();
     _docDescCtrl.dispose();
     super.dispose();
@@ -132,6 +136,7 @@ class _CheckFormDialogState extends State<CheckFormDialog> {
         _branchCtrl.text = (data['branch_name'] ?? '') as String;
         final amount = data['amount'];
         _amountCtrl.text = amount == null ? '' : amount.toString();
+        _formatAmountControllerValue();
         final issue = data['issue_date'] as String?;
         final due = data['due_date'] as String?;
         _issueDate = issue != null ? DateTime.tryParse(issue) : _issueDate;
@@ -146,6 +151,36 @@ class _CheckFormDialogState extends State<CheckFormDialog> {
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  void _handleAmountInput() {
+    if (_isFormattingAmount) return;
+    _formatAmountControllerValue();
+  }
+
+  void _formatAmountControllerValue() {
+    final raw = _amountCtrl.text.replaceAll(',', '').trim();
+    if (raw.isEmpty) {
+      _amountCtrl.value = TextEditingValue(
+        text: '',
+        selection: const TextSelection.collapsed(offset: 0),
+      );
+      return;
+    }
+
+    final normalized = toEnglishDigits(raw);
+    final value = num.tryParse(normalized);
+    if (value == null) return;
+
+    final formatted = formatWithThousands(value);
+    if (formatted == _amountCtrl.text) return;
+
+    _isFormattingAmount = true;
+    _amountCtrl.value = TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
+    );
+    _isFormattingAmount = false;
   }
 
   String? _validate() {

@@ -55,6 +55,7 @@ from adapters.api.v1.integrations.telegram import router as telegram_integration
 from adapters.api.v1.notifications import router as notifications_router
 from adapters.api.v1.admin.notification_templates import router as admin_notification_templates_router
 from adapters.api.v1.notifications_ws import router as notifications_ws_router
+from adapters.api.v1.public_share_links import router as public_share_links_router
 from adapters.api.v1.business_backups import router as business_backups_router
 from adapters.api.v1.business.document_monetization import router as business_document_monetization_router
 from adapters.api.v1.jobs import router as jobs_router
@@ -376,6 +377,8 @@ def create_app() -> FastAPI:
     application.include_router(payment_callbacks_router, prefix=settings.api_v1_prefix)
     # Announcements
     application.include_router(announcements_router, prefix=settings.api_v1_prefix)
+    # Public share links (no prefix to allow short /p/{code})
+    application.include_router(public_share_links_router)
     
     # Support endpoints
     application.include_router(support_tickets_router, prefix=f"{settings.api_v1_prefix}/support")

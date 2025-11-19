@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/services/business_storage_service.dart';
 import 'package:hesabix_ui/utils/number_formatters.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:dio/dio.dart';
-// ignore: avoid_web_libraries_in_flutter
-import 'dart:html' as html;
+import 'package:hesabix_ui/utils/web/web_utils.dart' as web_utils;
 
 /// صفحه مدیریت فایل‌های کسب‌وکار
 class StorageFilesPage extends StatefulWidget {
@@ -409,12 +409,18 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
 
   Future<void> _downloadZip() async {
     try {
-      final url = '/api/v1/business/${widget.businessId}/storage/export-zip';
-      if (_selectedModuleContext != null) {
-        final fullUrl = '$url?module_context=$_selectedModuleContext';
-        html.window.open(fullUrl, '_blank');
+      final baseUrl = '/api/v1/business/${widget.businessId}/storage/export-zip';
+      final url = _selectedModuleContext != null ? '$baseUrl?module_context=$_selectedModuleContext' : baseUrl;
+      if (kIsWeb) {
+        web_utils.openUrlInNewTabWeb(url);
       } else {
-        html.window.open(url, '_blank');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('دانلود فایل فقط در نسخه وب پشتیبانی می‌شود'),
+            ),
+          );
+        }
       }
     } catch (e) {
       if (mounted) {

@@ -96,7 +96,7 @@ class _ProductBomSectionState extends State<ProductBomSection> {
               ? const Center(child: Text('هنوز فرمولی تعریف نشده است'))
               : ListView.separated(
                   itemCount: _items.length,
-                  separatorBuilder: (_, __) => const Divider(height: 1),
+                  separatorBuilder: (_, separatorIndex) => const Divider(height: 1),
                   itemBuilder: (ctx, idx) {
                     final bom = _items[idx];
                     return ListTile(

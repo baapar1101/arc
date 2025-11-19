@@ -667,7 +667,7 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
         Text(AppLocalizations.of(context).creditPersonPolicyTitle, style: const TextStyle(fontWeight: FontWeight.bold)),
         const SizedBox(height: 8),
         DropdownButtonFormField<String>(
-          value: _creditCheckMode,
+          initialValue: _creditCheckMode,
           items: [
             DropdownMenuItem(value: 'inherit', child: Text(AppLocalizations.of(context).creditCheckModeInherit)),
             DropdownMenuItem(value: 'enabled', child: Text(AppLocalizations.of(context).creditCheckModeEnabled)),

@@ -1,5 +1,6 @@
 import '../core/api_client.dart';
 import '../models/person_model.dart';
+import '../models/person_share_link.dart';
 
 class PersonService {
   final ApiClient _apiClient;
@@ -195,5 +196,62 @@ class PersonService {
   /// دریافت اطلاعات جستجو
   Map<String, dynamic> getQueryInfo(Map<String, dynamic> data) {
     return data['query_info'] ?? {};
+  }
+
+  /// دریافت لینک اشتراک فعال شخص (در صورت وجود)
+  Future<PersonShareLink?> getPersonShareLink(int personId) async {
+    try {
+      final response = await _apiClient.get(
+        '/api/v1/persons/persons/$personId/share-link',
+      );
+      final data = response.data['data'] as Map<String, dynamic>? ?? const {};
+      final linkJson = data['link'];
+      if (linkJson == null) return null;
+      return PersonShareLink.fromJson(
+        Map<String, dynamic>.from(linkJson as Map),
+      );
+    } catch (e) {
+      throw Exception('خطا در دریافت لینک اشتراک: $e');
+    }
+  }
+
+  /// ایجاد یا بروزرسانی لینک اشتراک
+  Future<PersonShareLink> createPersonShareLink({
+    required int personId,
+    int? expiresInHours,
+    int? maxViewCount,
+    bool replaceExisting = true,
+    required PersonShareLinkOptionsModel options,
+  }) async {
+    try {
+      final payload = <String, dynamic>{
+        'replace_existing': replaceExisting,
+        'options': options.toJson(),
+      };
+      if (expiresInHours != null) {
+        payload['expires_in_hours'] = expiresInHours;
+      }
+      if (maxViewCount != null) {
+        payload['max_view_count'] = maxViewCount;
+      }
+      final response = await _apiClient.post(
+        '/api/v1/persons/persons/$personId/share-link',
+        data: payload,
+      );
+      return PersonShareLink.fromJson(
+        Map<String, dynamic>.from(response.data['data'] as Map),
+      );
+    } catch (e) {
+      throw Exception('خطا در ایجاد لینک اشتراک: $e');
+    }
+  }
+
+  /// لغو لینک اشتراک فعال
+  Future<void> revokePersonShareLink(int personId) async {
+    try {
+      await _apiClient.delete('/api/v1/persons/persons/$personId/share-link');
+    } catch (e) {
+      throw Exception('خطا در لغو لینک اشتراک: $e');
+    }
   }
 }

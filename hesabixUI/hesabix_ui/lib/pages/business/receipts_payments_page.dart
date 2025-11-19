@@ -5,6 +5,7 @@ import '../../core/date_utils.dart' show HesabixDateUtils;
 import '../../utils/number_formatters.dart' show formatWithThousands;
 import '../../widgets/invoice/person_combobox_widget.dart';
 import '../../widgets/invoice/invoice_transactions_widget.dart';
+import '../../widgets/invoice/check_combobox_widget.dart';
 import '../../widgets/date_input_field.dart';
 import '../../models/invoice_transaction.dart';
 import '../../models/invoice_type_model.dart';
@@ -343,6 +344,7 @@ class _BulkSettlementDialogState extends State<_BulkSettlementDialog> {
                           businessId: widget.businessId,
                           calendarController: widget.calendarController,
                           invoiceType: InvoiceType.sales,
+                          checkPickerMode: _isReceipt ? CheckPickerMode.receipt : CheckPickerMode.payment,
                         ),
                       ),
                     ),

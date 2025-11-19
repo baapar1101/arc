@@ -1,7 +1,4 @@
-import 'dart:async';
-// ignore: avoid_web_libraries_in_flutter
-import 'dart:html' as html;
-import 'dart:typed_data';
+import 'package:file_picker/file_picker.dart';
 
 class PickedFileData {
   final String name;
@@ -11,41 +8,15 @@ class PickedFileData {
 
 class FilePickerBridge {
   static Future<PickedFileData?> pickExcel() async {
-    try {
-      final input = html.FileUploadInputElement()
-        ..accept = '.xlsx'
-        ..multiple = false;
-      
-      input.click();
-      
-      final completer = Completer<PickedFileData?>();
-      
-      input.onChange.listen((e) {
-        final files = input.files;
-        if (files != null && files.isNotEmpty) {
-          final file = files.first;
-          final reader = html.FileReader();
-          
-          reader.onLoad.listen((e) {
-            final bytes = reader.result as Uint8List;
-            completer.complete(PickedFileData(file.name, bytes.toList()));
-          });
-          
-          reader.onError.listen((e) {
-            completer.complete(null);
-          });
-          
-          reader.readAsArrayBuffer(file);
-        } else {
-          completer.complete(null);
-        }
-      });
-      
-      return await completer.future;
-    } catch (e) {
-      return null;
-    }
+    final res = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: const ['xlsx'],
+      withData: true,
+    );
+    if (res == null || res.files.isEmpty) return null;
+    final pf = res.files.first;
+    final bytes = pf.bytes;
+    if (bytes == null || bytes.isEmpty) return null;
+    return PickedFileData(pf.name, bytes);
   }
 }
-
-

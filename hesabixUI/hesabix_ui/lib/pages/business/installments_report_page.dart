@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
-// ignore: avoid_web_libraries_in_flutter
-import 'dart:html' as html;
+import 'package:hesabix_ui/utils/web/web_utils.dart' as web_utils;
 import 'package:hesabix_ui/widgets/invoice/person_combobox_widget.dart';
 import 'package:hesabix_ui/models/person_model.dart';
 import 'package:hesabix_ui/core/api_client.dart';
@@ -275,16 +275,21 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
         ),
       );
       final data = bytes.data ?? <int>[];
-      // Save in web
-      final blob = html.Blob([data], 'text/csv');
-      final url = html.Url.createObjectUrlFromBlob(blob);
-      final a = html.AnchorElement(href: url)
-        ..download = 'installments_${widget.businessId}.csv'
-        ..style.display = 'none';
-      html.document.body?.append(a);
-      a.click();
-      a.remove();
-      html.Url.revokeObjectUrl(url);
+      if (kIsWeb) {
+        await web_utils.saveBytesAsFileWeb(
+          data,
+          'installments_${widget.businessId}.csv',
+          mimeType: 'text/csv',
+        );
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('دانلود فایل فقط در نسخه وب پشتیبانی می‌شود'),
+            ),
+          );
+        }
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

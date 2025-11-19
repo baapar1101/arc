@@ -196,9 +196,9 @@ class _BomEditorDialogState extends State<BomEditorDialog> with SingleTickerProv
           Expanded(
             child: ListView.separated(
               itemCount: _items.length,
-              separatorBuilder: (_, __) => const Divider(height: 1),
-              itemBuilder: (ctx, i) {
-                final it = _items[i];
+              separatorBuilder: (separatorContext, separatorIndex) => const Divider(height: 1),
+              itemBuilder: (context, index) {
+                final it = _items[index];
                 final lineCtrl = TextEditingController(text: it.lineNo.toString());
                 final qtyCtrl = TextEditingController(text: it.qtyPer.toString());
                 final uomCtrl = TextEditingController(text: it.uom ?? '');
@@ -208,35 +208,35 @@ class _BomEditorDialogState extends State<BomEditorDialog> with SingleTickerProv
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   child: Row(
                     children: [
-                      _num(lineCtrl, 'ردیف', (v) => _updateItem(i, lineNo: int.tryParse(v))),
+                      _num(lineCtrl, 'ردیف', (v) => _updateItem(index, lineNo: int.tryParse(v))),
                       const SizedBox(width: 8),
                       Expanded(
                         flex: 2,
                         child: ProductComboboxWidget(
                           businessId: widget.businessId,
-                          selectedProduct: _itemSelectedProducts[i],
+                          selectedProduct: _itemSelectedProducts[index],
                           label: 'کالا',
                           hintText: 'جست‌وجوی کالا',
-                          onChanged: (p) {
+                          onChanged: (product) {
                             setState(() {
-                              _itemSelectedProducts[i] = p;
-                              final pid = p == null ? null : (p['id'] as int?);
+                              _itemSelectedProducts[index] = product;
+                              final pid = product == null ? null : (product['id'] as int?);
                               if (pid != null) {
-                                _updateItem(i, componentProductId: pid);
+                                _updateItem(index, componentProductId: pid);
                               }
                             });
                           },
                         ),
                       ),
                       const SizedBox(width: 8),
-                      _num(qtyCtrl, 'مقدار برای 1 واحد', (v) => _updateItem(i, qtyPer: double.tryParse(v))),
+                      _num(qtyCtrl, 'مقدار برای 1 واحد', (v) => _updateItem(index, qtyPer: double.tryParse(v))),
                       const SizedBox(width: 8),
-                      _text(uomCtrl, 'واحد', (v) => _updateItem(i, uom: v.isEmpty ? null : v)),
+                      _text(uomCtrl, 'واحد', (v) => _updateItem(index, uom: v.isEmpty ? null : v)),
                       const SizedBox(width: 8),
-                      _num(wastCtrl, 'پرت (%)', (v) => _updateItem(i, wastagePercent: double.tryParse(v))),
+                      _num(wastCtrl, 'پرت (%)', (v) => _updateItem(index, wastagePercent: double.tryParse(v))),
                       const SizedBox(width: 8),
-                      _text(substCtrl, 'گروه جایگزین', (v) => _updateItem(i, substituteGroup: v.isEmpty ? null : v)),
-                      IconButton(onPressed: () => setState(() { _items.removeAt(i); _itemSelectedProducts.removeAt(i); }), icon: const Icon(Icons.delete_outline)),
+                      _text(substCtrl, 'گروه جایگزین', (v) => _updateItem(index, substituteGroup: v.isEmpty ? null : v)),
+                      IconButton(onPressed: () => setState(() { _items.removeAt(index); _itemSelectedProducts.removeAt(index); }), icon: const Icon(Icons.delete_outline)),
                     ],
                   ),
                 );
@@ -273,9 +273,9 @@ class _BomEditorDialogState extends State<BomEditorDialog> with SingleTickerProv
           Expanded(
             child: ListView.separated(
               itemCount: _outputs.length,
-              separatorBuilder: (_, __) => const Divider(height: 1),
-              itemBuilder: (ctx, i) {
-                final ot = _outputs[i];
+              separatorBuilder: (separatorContext, separatorIndex) => const Divider(height: 1),
+              itemBuilder: (context, index) {
+                final ot = _outputs[index];
                 final lineCtrl = TextEditingController(text: ot.lineNo.toString());
                 final ratioCtrl = TextEditingController(text: ot.ratio.toString());
                 final uomCtrl = TextEditingController(text: ot.uom ?? '');
@@ -283,31 +283,31 @@ class _BomEditorDialogState extends State<BomEditorDialog> with SingleTickerProv
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   child: Row(
                     children: [
-                      _num(lineCtrl, 'ردیف', (v) => _updateOutput(i, lineNo: int.tryParse(v))),
+                      _num(lineCtrl, 'ردیف', (v) => _updateOutput(index, lineNo: int.tryParse(v))),
                       const SizedBox(width: 8),
                       Expanded(
                         flex: 2,
                         child: ProductComboboxWidget(
                           businessId: widget.businessId,
-                          selectedProduct: _outputSelectedProducts[i],
+                          selectedProduct: _outputSelectedProducts[index],
                           label: 'محصول خروجی',
                           hintText: 'جست‌وجوی محصول خروجی',
-                          onChanged: (p) {
+                          onChanged: (product) {
                             setState(() {
-                              _outputSelectedProducts[i] = p;
-                              final pid = p == null ? null : (p['id'] as int?);
+                              _outputSelectedProducts[index] = product;
+                              final pid = product == null ? null : (product['id'] as int?);
                               if (pid != null) {
-                                _updateOutput(i, outputProductId: pid);
+                                _updateOutput(index, outputProductId: pid);
                               }
                             });
                           },
                         ),
                       ),
                       const SizedBox(width: 8),
-                      _num(ratioCtrl, 'نسبت', (v) => _updateOutput(i, ratio: double.tryParse(v))),
+                      _num(ratioCtrl, 'نسبت', (v) => _updateOutput(index, ratio: double.tryParse(v))),
                       const SizedBox(width: 8),
-                      _text(uomCtrl, 'واحد', (v) => _updateOutput(i, uom: v.isEmpty ? null : v)),
-                      IconButton(onPressed: () => setState(() { _outputs.removeAt(i); _outputSelectedProducts.removeAt(i); }), icon: const Icon(Icons.delete_outline)),
+                      _text(uomCtrl, 'واحد', (v) => _updateOutput(index, uom: v.isEmpty ? null : v)),
+                      IconButton(onPressed: () => setState(() { _outputs.removeAt(index); _outputSelectedProducts.removeAt(index); }), icon: const Icon(Icons.delete_outline)),
                     ],
                   ),
                 );
@@ -343,9 +343,9 @@ class _BomEditorDialogState extends State<BomEditorDialog> with SingleTickerProv
           Expanded(
             child: ListView.separated(
               itemCount: _operations.length,
-              separatorBuilder: (_, __) => const Divider(height: 1),
-              itemBuilder: (ctx, i) {
-                final op = _operations[i];
+              separatorBuilder: (separatorContext, separatorIndex) => const Divider(height: 1),
+              itemBuilder: (context, index) {
+                final op = _operations[index];
                 final lineCtrl = TextEditingController(text: op.lineNo.toString());
                 final nameCtrl = TextEditingController(text: op.operationName);
                 final fixedCtrl = TextEditingController(text: op.costFixed?.toString() ?? '');
@@ -356,18 +356,18 @@ class _BomEditorDialogState extends State<BomEditorDialog> with SingleTickerProv
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   child: Row(
                     children: [
-                      _num(lineCtrl, 'ردیف', (v) => _updateOperation(i, lineNo: int.tryParse(v))),
+                      _num(lineCtrl, 'ردیف', (v) => _updateOperation(index, lineNo: int.tryParse(v))),
                       const SizedBox(width: 8),
-                      _text(nameCtrl, 'نام عملیات', (v) => _updateOperation(i, operationName: v)),
+                      _text(nameCtrl, 'نام عملیات', (v) => _updateOperation(index, operationName: v)),
                       const SizedBox(width: 8),
-                      _num(fixedCtrl, 'هزینه ثابت', (v) => _updateOperation(i, costFixed: double.tryParse(v))),
+                      _num(fixedCtrl, 'هزینه ثابت', (v) => _updateOperation(index, costFixed: double.tryParse(v))),
                       const SizedBox(width: 8),
-                      _num(perCtrl, 'هزینه واحد', (v) => _updateOperation(i, costPerUnit: double.tryParse(v))),
+                      _num(perCtrl, 'هزینه واحد', (v) => _updateOperation(index, costPerUnit: double.tryParse(v))),
                       const SizedBox(width: 8),
-                      _text(uomCtrl, 'واحد هزینه', (v) => _updateOperation(i, costUom: v.isEmpty ? null : v)),
+                      _text(uomCtrl, 'واحد هزینه', (v) => _updateOperation(index, costUom: v.isEmpty ? null : v)),
                       const SizedBox(width: 8),
-                      _text(wcCtrl, 'ایستگاه کاری', (v) => _updateOperation(i, workCenter: v.isEmpty ? null : v)),
-                      IconButton(onPressed: () => setState(() => _operations.removeAt(i)), icon: const Icon(Icons.delete_outline)),
+                      _text(wcCtrl, 'ایستگاه کاری', (v) => _updateOperation(index, workCenter: v.isEmpty ? null : v)),
+                      IconButton(onPressed: () => setState(() => _operations.removeAt(index)), icon: const Icon(Icons.delete_outline)),
                     ],
                   ),
                 );

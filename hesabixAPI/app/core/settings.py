@@ -50,6 +50,14 @@ class Settings(BaseSettings):
 	sms_api_key: str | None = None
 	sms_sender: str | None = None
 
+	# Share link / public card settings
+	share_link_code_length: int = 9
+	share_link_default_ttl_hours: int = 168  # 7 days
+	share_link_max_ttl_hours: int = 720      # 30 days
+	share_link_public_base_url: str = "https://app.hesabix.com/p"
+	share_link_secret: str = "change_me_share_link"
+	share_link_public_app_url: str = "https://app.hesabix.com/public"
+
 	@property
 	def mysql_dsn(self) -> str:
 		return (

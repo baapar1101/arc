@@ -14,6 +14,8 @@ from app.services.system_settings_service import (
 	set_wallet_base_currency_code,
 	get_notifications_settings,
 	set_notifications_settings,
+	get_share_link_settings,
+	set_share_link_settings,
 )
 
 
@@ -80,6 +82,45 @@ def get_notifications_settings_endpoint(
 		raise ApiError("FORBIDDEN", "Missing permission: system_settings", http_status=403)
 	data = get_notifications_settings(db)
 	return success_response(data, request)
+
+
+class ShareLinkSettingsPayload(BaseModel):
+	public_app_url: str
+
+
+@router.get(
+	"/share-links",
+	summary="دریافت تنظیمات لینک‌های اشتراک عمومی",
+	description="بازگرداندن آدرس مقصدی که لینک کوتاه پس از کلیک به آن هدایت می‌شود (افزونه Flutter Web).",
+)
+def get_share_link_settings_endpoint(
+	request: Request,
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	if not ctx.has_any_permission("system_settings", "superadmin"):
+		from app.core.responses import ApiError
+		raise ApiError("FORBIDDEN", "Missing permission: system_settings", http_status=403)
+	data = get_share_link_settings(db)
+	return success_response(data, request)
+
+
+@router.put(
+	"/share-links",
+	summary="تنظیم آدرس اپلیکیشن عمومی لینک اشتراک",
+	description="ثبت آدرس مقصد برای نمایش کارت حساب (مثلاً https://app.hesabix.com/public).",
+)
+def set_share_link_settings_endpoint(
+	payload: ShareLinkSettingsPayload,
+	request: Request,
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	if not ctx.has_any_permission("system_settings", "superadmin"):
+		from app.core.responses import ApiError
+		raise ApiError("FORBIDDEN", "Missing permission: system_settings", http_status=403)
+	data = set_share_link_settings(db, public_app_url=payload.public_app_url)
+	return success_response(data, request, message="SHARE_LINK_PUBLIC_APP_URL_UPDATED")
 
 
 @router.put(

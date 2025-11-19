@@ -140,9 +140,9 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
                       ? const Center(child: CircularProgressIndicator())
                       : ListView.separated(
                           itemCount: _items.length,
-                          separatorBuilder: (_, __) => const Divider(height: 1),
-                          itemBuilder: (c, i) {
-                            final it = _items[i];
+                          separatorBuilder: (separatorContext, separatorIndex) => const Divider(height: 1),
+                          itemBuilder: (context, index) {
+                            final it = _items[index];
                             final code = it['code']?.toString() ?? '';
                             final name = it['name']?.toString() ?? '';
                             final itemType = it['item_type']?.toString() ?? '';

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-// ignore: avoid_web_libraries_in_flutter
-import 'dart:html' as html;
+import 'package:flutter/foundation.dart';
 import '../../core/date_utils.dart';
 import '../../core/calendar_controller.dart';
 import '../../core/api_client.dart';
+import 'package:hesabix_ui/utils/web/web_utils.dart' as web_utils;
 
 class TransferDetailsDialog extends StatefulWidget {
   final Map<String, dynamic> document;
@@ -84,18 +84,14 @@ class _TransferDetailsDialogState extends State<TransferDetailsDialog> {
   }
 
   Future<void> _savePdfFile(List<int> bytes, String filename) async {
-    try {
-      final name = filename.endsWith('.pdf') ? filename : '$filename.pdf';
-      final blob = html.Blob([bytes], 'application/pdf');
-      final url = html.Url.createObjectUrlFromBlob(blob);
-      html.AnchorElement(href: url)
-        ..setAttribute('download', name)
-        ..click();
-      html.Url.revokeObjectUrl(url);
-      // ignore: avoid_print
-    } catch (e) {
-      // ignore: avoid_print
-      rethrow;
+    if (kIsWeb) {
+      await web_utils.saveBytesAsFileWeb(
+        bytes,
+        filename.endsWith('.pdf') ? filename : '$filename.pdf',
+        mimeType: 'application/pdf',
+      );
+    } else {
+      throw UnsupportedError('دانلود فایل فقط در نسخه وب پشتیبانی می‌شود');
     }
   }
 
@@ -190,7 +186,7 @@ class _TransferDetailsDialogState extends State<TransferDetailsDialog> {
             Expanded(
               child: ListView.separated(
                 itemCount: lines.length,
-                separatorBuilder: (_, __) => const Divider(height: 1),
+                separatorBuilder: (_, separatorIndex) => const Divider(height: 1),
                 itemBuilder: (context, i) {
                   final l = lines[i];
                   final name = (l['account_name'] as String?) ?? '';

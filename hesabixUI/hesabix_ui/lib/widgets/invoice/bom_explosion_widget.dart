@@ -344,7 +344,7 @@ class _BomExplosionWidgetState extends State<BomExplosionWidget> {
             else if (_boms.isNotEmpty) ...[
               // انتخاب فرمول
               DropdownButtonFormField<ProductBOM>(
-                value: _selectedBom,
+                initialValue: _selectedBom,
                 decoration: const InputDecoration(
                   labelText: 'فرمول تولید',
                   border: OutlineInputBorder(),

@@ -717,7 +717,7 @@ class _CounterpartyLineTileState extends State<_CounterpartyLineTile> {
               children: [
                 Expanded(
                   child: DropdownButtonFormField<TransactionType>(
-                    value: widget.line.transactionType,
+                    initialValue: widget.line.transactionType,
                     decoration: const InputDecoration(
                       labelText: 'نوع تراکنش',
                     ),

@@ -579,11 +579,11 @@ def _get_date_by_calendar(calendar_type: str, is_tomorrow: bool = False) -> date
             # Get tomorrow in jalali calendar
             jalali_tomorrow = jalali_now + timedelta(days=1)
             # Convert to gregorian for DB query
-            gregorian_tomorrow = jdatetime.datetime.to_gregorian(jalali_tomorrow)
+            gregorian_tomorrow = jalali_tomorrow.togregorian()
             return date(gregorian_tomorrow.year, gregorian_tomorrow.month, gregorian_tomorrow.day)
         else:
             # Convert today to gregorian for DB query
-            gregorian_today = jdatetime.datetime.to_gregorian(jalali_now)
+            gregorian_today = jalali_now.togregorian()
             return date(gregorian_today.year, gregorian_today.month, gregorian_today.day)
     else:
         # Gregorian calendar
@@ -609,8 +609,8 @@ def _get_month_range_by_calendar(calendar_type: str) -> tuple[date, date]:
         jalali_end = jdatetime.datetime(jalali_now.year, jalali_now.month, days_in_month)
         
         # Convert to gregorian
-        greg_start = jdatetime.datetime.to_gregorian(jalali_start)
-        greg_end = jdatetime.datetime.to_gregorian(jalali_end)
+        greg_start = jalali_start.togregorian()
+        greg_end = jalali_end.togregorian()
         return (
             date(greg_start.year, greg_start.month, greg_start.day),
             date(greg_end.year, greg_end.month, greg_end.day),

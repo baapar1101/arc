@@ -2582,6 +2582,18 @@ class AppLocalizationsFa extends AppLocalizations {
   String get pricing => 'قیمت‌گذاری';
 
   @override
+  String get productName => 'نام کالا';
+
+  @override
+  String get barcode => 'بارکد';
+
+  @override
+  String get generalInformation => 'اطلاعات عمومی';
+
+  @override
+  String get imageNotAvailable => 'تصویر موجود نیست';
+
+  @override
   String get salesPrice => 'قیمت فروش';
 
   @override
@@ -3632,6 +3644,64 @@ class AppLocalizationsFa extends AppLocalizations {
   @override
   String get notificationsAdvancedSaveError =>
       'ذخیرهٔ تنظیمات پیشرفتهٔ اعلان انجام نشد.';
+
+  @override
+  String get notificationsTelegramConnectionStatus => 'وضعیت اتصال';
+
+  @override
+  String get notificationsTelegramConnected => 'متصل';
+
+  @override
+  String get notificationsTelegramNotConnected => 'قطع شده';
+
+  @override
+  String get notificationsTelegramConnectButton => 'اتصال به تلگرام';
+
+  @override
+  String get notificationsTelegramDisconnectButton => 'قطع اتصال';
+
+  @override
+  String get notificationsTelegramConnecting => 'در حال اتصال...';
+
+  @override
+  String get notificationsTelegramConnectionWarning =>
+      'برای فعال شدن ناتیفیکیشن‌های تلگرام، ابتدا اتصال را برقرار کنید.';
+
+  @override
+  String get notificationsTelegramConnectionSuccess =>
+      'اتصال تلگرام با موفقیت برقرار شد.';
+
+  @override
+  String get notificationsTelegramConnectionError => 'خطا در اتصال تلگرام.';
+
+  @override
+  String get notificationsTelegramDisconnectSuccess => 'اتصال تلگرام قطع شد.';
+
+  @override
+  String get notificationsTelegramDisconnectError => 'خطا در قطع اتصال تلگرام.';
+
+  @override
+  String get notificationsTelegramLinkExpired =>
+      'لینک اتصال منقضی شد. لطفاً لینک جدید ایجاد کنید.';
+
+  @override
+  String notificationsTelegramLinkInstructions(String token) {
+    return 'روی لینک زیر کلیک کنید یا در تلگرام ربات را باز کرده و دستور /start $token را ارسال کنید.';
+  }
+
+  @override
+  String notificationsTelegramLinkExpiresIn(int minutes) {
+    final intl.NumberFormat minutesNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String minutesString = minutesNumberFormat.format(minutes);
+
+    return 'این لینک تا $minutesString دقیقه دیگر معتبر است.';
+  }
+
+  @override
+  String notificationsTelegramConnectedSince(String date) {
+    return 'متصل از $date';
+  }
 
   @override
   String get templateBuilderNew => 'سازنده بصری (جدید)';

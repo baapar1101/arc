@@ -1,3 +1,4 @@
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
@@ -5,6 +6,8 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../core/api_client.dart';
 import '../../services/notifications_service.dart';
 import '../../services/admin_system_settings_service.dart';
+import '../../services/telegram_integration_service.dart';
+import 'package:intl/intl.dart';
 
 class NotificationsSettingsPage extends StatefulWidget {
   const NotificationsSettingsPage({super.key});
@@ -16,6 +19,7 @@ class NotificationsSettingsPage extends StatefulWidget {
 class _NotificationsSettingsPageState extends State<NotificationsSettingsPage> {
   final _svc = NotificationsService(ApiClient());
   final _adminSvc = AdminSystemSettingsService(ApiClient());
+  final _telegramSvc = TelegramIntegrationService(ApiClient());
   bool _loading = true;
   String? _error;
   bool _telegram = true;
@@ -23,6 +27,14 @@ class _NotificationsSettingsPageState extends State<NotificationsSettingsPage> {
   bool _sms = true;
   bool _inapp = true;
   bool _saving = false;
+  // Telegram connection state
+  bool _telegramLinked = false;
+  String? _telegramConnectedAt;
+  bool _telegramLoading = false;
+  bool _telegramConnecting = false;
+  String? _telegramLinkToken;
+  String? _telegramDeepLink;
+  DateTime? _telegramLinkExpiresAt;
   // Admin advanced config
   final _tgTokenCtrl = TextEditingController();
   final _tgUsernameCtrl = TextEditingController();
@@ -59,6 +71,8 @@ class _NotificationsSettingsPageState extends State<NotificationsSettingsPage> {
         _error = null;
       });
       final s = await _svc.getSettings();
+      // Load telegram connection status
+      await _loadTelegramStatus();
       // Load admin config (ignore errors silently if no permission)
       try {
         final admin = await _adminSvc.getNotificationsConfig();
@@ -89,6 +103,100 @@ class _NotificationsSettingsPageState extends State<NotificationsSettingsPage> {
     }
   }
 
+  Future<void> _loadTelegramStatus() async {
+    try {
+      setState(() => _telegramLoading = true);
+      final status = await _telegramSvc.getStatus();
+      if (!mounted) return;
+      setState(() {
+        _telegramLinked = status['linked'] == true;
+        _telegramConnectedAt = status['connected_at']?.toString();
+        _telegramLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _telegramLinked = false;
+        _telegramLoading = false;
+      });
+    }
+  }
+
+  Future<void> _connectTelegram(AppLocalizations t) async {
+    try {
+      setState(() => _telegramConnecting = true);
+      final linkData = await _telegramSvc.createLink();
+      if (!mounted) return;
+      setState(() {
+        _telegramLinkToken = linkData['link_token']?.toString();
+        _telegramDeepLink = linkData['deep_link']?.toString();
+        final expiresAtStr = linkData['expires_at']?.toString();
+        if (expiresAtStr != null) {
+          _telegramLinkExpiresAt = DateTime.tryParse(expiresAtStr);
+        }
+        _telegramConnecting = false;
+      });
+      // Start polling for connection status
+      _pollTelegramStatus(t);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _telegramConnecting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${t.notificationsTelegramConnectionError}\n$e')),
+      );
+    }
+  }
+
+  Future<void> _pollTelegramStatus(AppLocalizations t) async {
+    int attempts = 0;
+    const maxAttempts = 120; // 10 minutes max (5 seconds * 120)
+    while (attempts < maxAttempts && mounted) {
+      await Future.delayed(const Duration(seconds: 5));
+      await _loadTelegramStatus();
+      if (_telegramLinked) {
+        setState(() {
+          _telegramLinkToken = null;
+          _telegramDeepLink = null;
+          _telegramLinkExpiresAt = null;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(t.notificationsTelegramConnectionSuccess)),
+        );
+        break;
+      }
+      attempts++;
+    }
+    if (!_telegramLinked && mounted) {
+      setState(() {
+        _telegramLinkToken = null;
+        _telegramDeepLink = null;
+        _telegramLinkExpiresAt = null;
+      });
+    }
+  }
+
+  Future<void> _disconnectTelegram(AppLocalizations t) async {
+    try {
+      setState(() => _telegramLoading = true);
+      await _telegramSvc.unlink();
+      if (!mounted) return;
+      setState(() {
+        _telegramLinked = false;
+        _telegramConnectedAt = null;
+        _telegramLoading = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(t.notificationsTelegramDisconnectSuccess)),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _telegramLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${t.notificationsTelegramDisconnectError}\n$e')),
+      );
+    }
+  }
+
   static const String _defaultRealtimeEndpoint = 'wss://api.hesabix.com/ws/notifications?api_key=YOUR_API_KEY';
 
   Future<void> _save(AppLocalizations t) async {
@@ -112,6 +220,12 @@ class _NotificationsSettingsPageState extends State<NotificationsSettingsPage> {
   }
 
   Future<void> _testChannel(String channel, String channelLabel, AppLocalizations t) async {
+    if (channel == 'telegram' && !_telegramLinked) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(t.notificationsTelegramConnectionWarning)),
+      );
+      return;
+    }
     try {
       await _svc.sendTest(channel);
       if (!mounted) return;
@@ -374,23 +488,186 @@ class _NotificationsSettingsPageState extends State<NotificationsSettingsPage> {
           ),
           const SizedBox(height: 8),
           for (var i = 0; i < options.length; i++) ...[
-            SwitchListTile.adaptive(
-              value: options[i].enabled,
-              onChanged: options[i].onChanged,
-              title: Text(options[i].title),
-              subtitle: Text(options[i].description),
-              secondary: Icon(
-                options[i].icon,
-                color: options[i].enabled ? colorScheme.primary : colorScheme.onSurfaceVariant,
+            if (options[i].key == 'telegram') ...[
+              _buildTelegramChannelTile(t, theme, colorScheme, options[i]),
+            ] else ...[
+              SwitchListTile.adaptive(
+                value: options[i].enabled,
+                onChanged: options[i].onChanged,
+                title: Text(options[i].title),
+                subtitle: Text(options[i].description),
+                secondary: Icon(
+                  options[i].icon,
+                  color: options[i].enabled ? colorScheme.primary : colorScheme.onSurfaceVariant,
+                ),
+                activeColor: colorScheme.primary,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16),
               ),
-              activeColor: colorScheme.primary,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-            ),
+            ],
             if (i != options.length - 1) const Divider(height: 1),
           ],
           const SizedBox(height: 8),
         ],
       ),
+    );
+  }
+
+  Widget _buildTelegramChannelTile(AppLocalizations t, ThemeData theme, ColorScheme colorScheme, _ChannelOption option) {
+    return Column(
+      children: [
+        SwitchListTile.adaptive(
+          value: option.enabled,
+          onChanged: option.onChanged,
+          title: Text(option.title),
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(option.description),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Icon(
+                    _telegramLinked ? Icons.check_circle : Icons.cancel,
+                    size: 16,
+                    color: _telegramLinked ? Colors.green : Colors.red,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    _telegramLinked ? t.notificationsTelegramConnected : t.notificationsTelegramNotConnected,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: _telegramLinked ? Colors.green : Colors.red,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  if (_telegramLinked && _telegramConnectedAt != null) ...[
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        t.notificationsTelegramConnectedSince(
+                          DateFormat('yyyy/MM/dd').format(DateTime.parse(_telegramConnectedAt!)),
+                        ),
+                        style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              if (option.enabled && !_telegramLinked) ...[
+                const SizedBox(height: 4),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.warning_amber_rounded, size: 16, color: Colors.orange),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          t.notificationsTelegramConnectionWarning,
+                          style: theme.textTheme.bodySmall?.copyWith(color: Colors.orange.shade700),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
+          secondary: Icon(
+            option.icon,
+            color: option.enabled ? colorScheme.primary : colorScheme.onSurfaceVariant,
+          ),
+          activeColor: colorScheme.primary,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(
+            children: [
+              if (_telegramLinked) ...[
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _telegramLoading ? null : () => _disconnectTelegram(t),
+                    icon: _telegramLoading
+                        ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                        : const Icon(Icons.link_off, size: 18),
+                    label: Text(t.notificationsTelegramDisconnectButton),
+                  ),
+                ),
+              ] else ...[
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: (_telegramConnecting || _telegramLoading) ? null : () => _connectTelegram(t),
+                    icon: _telegramConnecting || _telegramLoading
+                        ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                        : const Icon(Icons.link, size: 18),
+                    label: Text(_telegramConnecting ? t.notificationsTelegramConnecting : t.notificationsTelegramConnectButton),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        if (_telegramLinkToken != null) ...[
+          const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: colorScheme.outline.withValues(alpha: 0.2)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    t.notificationsTelegramLinkInstructions(_telegramLinkToken!),
+                    style: theme.textTheme.bodySmall,
+                  ),
+                  if (_telegramDeepLink != null) ...[
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: SelectableText(
+                            _telegramDeepLink!,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              fontFamily: 'monospace',
+                              color: colorScheme.primary,
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: t.copyLink,
+                          onPressed: () => _copyToClipboard(_telegramDeepLink!, t.copied),
+                          icon: const Icon(Icons.copy_all_outlined, size: 18),
+                        ),
+                      ],
+                    ),
+                  ],
+                  if (_telegramLinkExpiresAt != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      t.notificationsTelegramLinkExpiresIn(
+                        _telegramLinkExpiresAt!.difference(DateTime.now()).inMinutes,
+                      ),
+                      style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ],
+        const SizedBox(height: 8),
+      ],
     );
   }
 
@@ -561,7 +838,7 @@ class _NotificationsSettingsPageState extends State<NotificationsSettingsPage> {
         helperMaxLines: 3,
         border: const OutlineInputBorder(),
       ),
-      textDirection: TextDirection.ltr,
+      textDirection: ui.TextDirection.ltr,
       textInputAction: TextInputAction.next,
       enableSuggestions: false,
       autocorrect: false,

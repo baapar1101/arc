@@ -36,6 +36,7 @@ import 'pages/admin/wallet_settings_page.dart';
 import 'pages/admin/payment_gateways_page.dart';
 import 'pages/admin/storage_plans_admin_page.dart';
 import 'pages/admin/document_monetization_page.dart';
+import 'pages/admin/share_link_settings_page.dart';
 import 'pages/business/invoices_list_page.dart';
 import 'pages/business/tax_workspace_page.dart';
 import 'pages/business/new_invoice_page.dart';
@@ -83,6 +84,7 @@ import 'pages/business/storage_files_page.dart';
 import 'pages/business/document_monetization_page.dart';
 import 'pages/business/backup/backup_page.dart';
 import 'pages/business/backup/restore_page.dart';
+import 'pages/public/public_person_share_link_page.dart';
 
 void main() {
   // Use path-based routing instead of hash routing
@@ -310,6 +312,7 @@ class _MyAppState extends State<MyApp> {
       initialLocation: currentInitialLocation,
       redirect: (context, state) async {
         final currentPath = state.uri.path;
+        final isPublicRoute = currentPath.startsWith('/public');
         
         // اگر authStore هنوز load نشده، منتظر بمان
         if (_authStore == null) {
@@ -320,11 +323,12 @@ class _MyAppState extends State<MyApp> {
         
         // اگر API key ندارد
         if (!hasKey) {
-          // اگر در login نیست، به login برود
+          if (isPublicRoute) {
+            return null;
+          }
           if (currentPath != '/login') {
             return '/login';
           }
-          // اگر در login است، بماند
           return null;
         }
         
@@ -354,7 +358,8 @@ class _MyAppState extends State<MyApp> {
         // برای سایر صفحات (شامل صفحات profile و business)، redirect نکن (بماند)
         // این مهم است: اگر کاربر در صفحات profile یا business است، بماند
         // ذخیره مسیر فعلی به عنوان آخرین URL معتبر
-        if (currentPath.isNotEmpty &&
+        if (!isPublicRoute &&
+            currentPath.isNotEmpty &&
             currentPath != '/' &&
             currentPath != '/login' &&
             (currentPath.startsWith('/user/profile/') || currentPath.startsWith('/business/'))) {
@@ -367,6 +372,13 @@ class _MyAppState extends State<MyApp> {
         return null;
       },
       routes: <RouteBase>[
+        GoRoute(
+          path: '/public/person-link/:code',
+          name: 'public_person_share_link',
+          builder: (context, state) => PublicPersonShareLinkPage(
+            code: state.pathParameters['code'] ?? '',
+          ),
+        ),
         GoRoute(
           path: '/login',
           name: 'login',
@@ -515,6 +527,20 @@ class _MyAppState extends State<MyApp> {
                       return PermissionGuard.buildAccessDeniedPage();
                     }
                     return const SystemConfigurationPage();
+                  },
+                ),
+                GoRoute(
+                  path: 'share-links',
+                  name: 'system_settings_share_links',
+                  builder: (context, state) {
+                    if (_authStore == null) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    final allowed = _authStore!.isSuperAdmin || _authStore!.hasAppPermission('system_settings');
+                    if (!allowed) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    return const ShareLinkSettingsPage();
                   },
                 ),
                 GoRoute(

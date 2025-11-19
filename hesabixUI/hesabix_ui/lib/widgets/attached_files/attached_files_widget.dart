@@ -1,19 +1,23 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:hesabix_ui/services/business_storage_service.dart';
 import 'package:hesabix_ui/core/api_client.dart';
-// ignore: avoid_web_libraries_in_flutter
-import 'dart:html' as html;
+import 'package:hesabix_ui/utils/web/web_utils.dart' as web_utils;
 
 /// کلید برای دسترسی به state از خارج (برای refresh)
 class AttachedFilesWidgetKey {
-  _AttachedFilesWidgetState? _state;
-  
-  void attach(_AttachedFilesWidgetState state) {
-    _state = state;
+  VoidCallback? _refreshCallback;
+
+  void attach(VoidCallback refreshCallback) {
+    _refreshCallback = refreshCallback;
   }
-  
+
+  void detach() {
+    _refreshCallback = null;
+  }
+
   void refresh() {
-    _state?.refresh();
+    _refreshCallback?.call();
   }
 }
 
@@ -72,7 +76,7 @@ class _AttachedFilesWidgetState extends State<AttachedFilesWidget> {
   void initState() {
     super.initState();
     _storageService = BusinessStorageService(ApiClient());
-    widget.refreshKey?.attach(this);
+    widget.refreshKey?.attach(refresh);
     if (widget.autoLoad) {
       _loadFiles();
     }
@@ -80,7 +84,7 @@ class _AttachedFilesWidgetState extends State<AttachedFilesWidget> {
   
   @override
   void dispose() {
-    widget.refreshKey?._state = null;
+    widget.refreshKey?.detach();
     super.dispose();
   }
 
@@ -131,12 +135,19 @@ class _AttachedFilesWidgetState extends State<AttachedFilesWidget> {
       );
 
       if (bytes.isNotEmpty) {
-        final blob = html.Blob([bytes], 'application/octet-stream');
-        final url = html.Url.createObjectUrlFromBlob(blob);
-        html.AnchorElement(href: url)
-          ..setAttribute('download', filename)
-          ..click();
-        html.Url.revokeObjectUrl(url);
+        if (kIsWeb) {
+          await web_utils.saveBytesAsFileWeb(
+            bytes,
+            filename,
+            mimeType: 'application/octet-stream',
+          );
+        } else {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('دانلود فایل فقط در نسخه وب پشتیبانی می‌شود')),
+            );
+          }
+        }
       }
     } catch (e) {
       if (mounted) {

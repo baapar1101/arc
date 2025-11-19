@@ -8,7 +8,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 from datetime import datetime, date
 from decimal import Decimal
 import logging
@@ -22,6 +22,7 @@ from adapters.db.models.document_line import DocumentLine
 from adapters.db.models.account import Account
 from adapters.db.models.person import Person
 from adapters.db.models.currency import Currency
+from adapters.db.models.check import Check, CheckType, CheckStatus
 from adapters.db.models.user import User
 from adapters.db.models.fiscal_year import FiscalYear
 from app.core.responses import ApiError
@@ -43,6 +44,9 @@ ACCOUNT_TYPE_CASH = "cash_register"         # صندوق
 ACCOUNT_TYPE_BANK = "bank"         # بانک
 ACCOUNT_TYPE_CHECK_RECEIVED = "check"  # اسناد دریافتنی (چک دریافتی)
 ACCOUNT_TYPE_CHECK_PAYABLE = "check"  # اسناد پرداختنی (چک پرداختی)
+
+ALLOWED_RECEIPT_CHECK_STATUSES = {CheckStatus.RECEIVED_ON_HAND}
+ALLOWED_PAYMENT_CHECK_STATUSES = {CheckStatus.TRANSFERRED_ISSUED}
 
 
 def _parse_iso_date(dt: str | datetime | date) -> date:
@@ -173,6 +177,93 @@ def _get_person_account(
     return _get_fixed_account_by_code(db, account_code)
 
 
+def _validate_check_transaction_line(
+    db: Session,
+    *,
+    business_id: int,
+    account_line: Dict[str, Any],
+    is_receipt: bool,
+    document_currency_id: int,
+    amount_decimal: Decimal,
+    exclude_document_id: Optional[int] = None,
+) -> Tuple[Check, int]:
+    """اعتبارسنجی الزامات انتخاب چک برای سطر دریافت/پرداخت"""
+    check_id_raw = account_line.get("check_id")
+    if not check_id_raw:
+        raise ApiError(
+            "CHECK_ID_REQUIRED",
+            "برای تراکنش از نوع چک، انتخاب چک الزامی است",
+            http_status=400,
+        )
+    try:
+        check_id = int(check_id_raw)
+    except Exception:
+        raise ApiError("CHECK_ID_INVALID", "شناسه چک نامعتبر است", http_status=400)
+
+    check = (
+        db.query(Check)
+        .filter(
+            and_(
+                Check.id == check_id,
+                Check.business_id == business_id,
+            )
+        )
+        .first()
+    )
+    if not check:
+        raise ApiError("CHECK_NOT_FOUND", "چک انتخاب‌شده یافت نشد", http_status=404)
+
+    expected_type = CheckType.RECEIVED if is_receipt else CheckType.TRANSFERRED
+    if check.type != expected_type:
+        raise ApiError(
+            "CHECK_TYPE_MISMATCH",
+            "نوع چک با نوع سند هم‌خوانی ندارد",
+            http_status=400,
+        )
+
+    allowed_statuses = ALLOWED_RECEIPT_CHECK_STATUSES if is_receipt else ALLOWED_PAYMENT_CHECK_STATUSES
+    if check.status not in allowed_statuses:
+        raise ApiError(
+            "CHECK_STATUS_INVALID",
+            "وضعیت فعلی چک اجازه استفاده در این سند را نمی‌دهد",
+            http_status=409,
+        )
+
+    if int(check.currency_id) != int(document_currency_id):
+        raise ApiError(
+            "CHECK_CURRENCY_MISMATCH",
+            "ارز چک با ارز سند دریافت/پرداخت یکسان نیست",
+            http_status=400,
+        )
+
+    if amount_decimal != Decimal(str(check.amount)):
+        raise ApiError(
+            "CHECK_AMOUNT_MISMATCH",
+            "مبلغ تراکنش با مبلغ ثبت‌شده چک برابر نیست",
+            http_status=400,
+        )
+
+    existing_q = (
+        db.query(DocumentLine)
+        .join(Document, DocumentLine.document_id == Document.id)
+        .filter(
+            DocumentLine.check_id == check_id,
+            Document.document_type.in_([DOCUMENT_TYPE_RECEIPT, DOCUMENT_TYPE_PAYMENT]),
+        )
+    )
+    if exclude_document_id:
+        existing_q = existing_q.filter(Document.id != exclude_document_id)
+
+    if existing_q.first():
+        raise ApiError(
+            "CHECK_ALREADY_LINKED",
+            "این چک قبلاً در سند دریافت/پرداخت دیگری استفاده شده است",
+            http_status=409,
+        )
+
+    return check, check_id
+
+
 def create_receipt_payment(
     db: Session,
     business_id: int,
@@ -228,6 +319,7 @@ def create_receipt_payment(
     currency = db.query(Currency).filter(Currency.id == int(currency_id)).first()
     if not currency:
         raise ApiError("CURRENCY_NOT_FOUND", "Currency not found", http_status=404)
+    currency_id = int(currency_id)
     
     # دریافت سال مالی فعلی
     logger.info(f"دریافت سال مالی فعلی برای business_id={business_id}")
@@ -504,6 +596,9 @@ def create_receipt_payment(
                 description = str(description_raw).strip() or None
         
         transaction_type = account_line.get("transaction_type")
+        normalized_transaction_type = transaction_type
+        if transaction_type == "check_expense":
+            normalized_transaction_type = "check"
         transaction_date = account_line.get("transaction_date")
         commission = account_line.get("commission")
         
@@ -520,22 +615,36 @@ def create_receipt_payment(
         # تعیین حساب بر اساس transaction_type
         account = None
         
-        if transaction_type == "bank":
+        check_id_val: Optional[int] = None
+        if normalized_transaction_type == "check":
+            check_obj, check_id_val = _validate_check_transaction_line(
+                db,
+                business_id=business_id,
+                account_line=account_line,
+                is_receipt=is_receipt,
+                document_currency_id=currency_id,
+                amount_decimal=amount,
+            )
+            account_line["check_id"] = check_id_val
+            if not account_line.get("check_number"):
+                account_line["check_number"] = check_obj.check_number
+
+        if normalized_transaction_type == "bank":
             # برای بانک، از حساب بانک استفاده کن
             account_code = "10203"  # بانک
             logger.info(f"انتخاب حساب بانک با کد: {account_code}")
             account = _get_fixed_account_by_code(db, account_code)
-        elif transaction_type == "cash_register":
+        elif normalized_transaction_type == "cash_register":
             # برای صندوق، از حساب صندوق استفاده کن
             account_code = "10202"  # صندوق
             logger.info(f"انتخاب حساب صندوق با کد: {account_code}")
             account = _get_fixed_account_by_code(db, account_code)
-        elif transaction_type == "petty_cash":
+        elif normalized_transaction_type == "petty_cash":
             # برای تنخواهگردان، از حساب تنخواهگردان استفاده کن
             account_code = "10201"  # تنخواه گردان
             logger.info(f"انتخاب حساب تنخواهگردان با کد: {account_code}")
             account = _get_fixed_account_by_code(db, account_code)
-        elif transaction_type == "check":
+        elif normalized_transaction_type == "check":
             # برای چک، بر اساس نوع سند از کد مناسب استفاده کن
             if is_receipt:
                 account_code = "10403"  # اسناد دریافتنی (چک دریافتی)
@@ -543,12 +652,12 @@ def create_receipt_payment(
                 account_code = "20202"  # اسناد پرداختنی (چک پرداختی)
             logger.info(f"انتخاب حساب چک با کد: {account_code}")
             account = _get_fixed_account_by_code(db, account_code)
-        elif transaction_type == "person":
+        elif normalized_transaction_type == "person":
             # برای شخص، از حساب شخص عمومی استفاده کن
             account_code = "20201"  # حساب‌های پرداختنی
             logger.info(f"انتخاب حساب شخص با کد: {account_code}")
             account = _get_fixed_account_by_code(db, account_code)
-        elif transaction_type == "wallet":
+        elif normalized_transaction_type == "wallet":
             # کیف‌پول (حساب نزد پرداخت‌یار)
             account_code = "10204"
             logger.info(f"انتخاب حساب کیف‌پول با کد: {account_code}")
@@ -599,26 +708,26 @@ def create_receipt_payment(
             extra_info["transaction_date"] = transaction_date
         if commission:
             extra_info["commission"] = float(commission)
-        
+
         # اطلاعات اضافی بر اساس نوع تراکنش
-        if transaction_type == "bank":
+        if normalized_transaction_type == "bank":
             if account_line.get("bank_id"):
                 extra_info["bank_id"] = account_line.get("bank_id")
             if account_line.get("bank_name"):
                 extra_info["bank_name"] = account_line.get("bank_name")
-        elif transaction_type == "cash_register":
+        elif normalized_transaction_type == "cash_register":
             if account_line.get("cash_register_id"):
                 extra_info["cash_register_id"] = account_line.get("cash_register_id")
             if account_line.get("cash_register_name"):
                 extra_info["cash_register_name"] = account_line.get("cash_register_name")
-        elif transaction_type == "petty_cash":
+        elif normalized_transaction_type == "petty_cash":
             if account_line.get("petty_cash_id"):
                 extra_info["petty_cash_id"] = account_line.get("petty_cash_id")
             if account_line.get("petty_cash_name"):
                 extra_info["petty_cash_name"] = account_line.get("petty_cash_name")
-        elif transaction_type == "check":
+        elif normalized_transaction_type == "check":
             if account_line.get("check_id"):
-                extra_info["check_id"] = account_line.get("check_id")
+                extra_info["check_id"] = int(account_line.get("check_id"))
             if account_line.get("check_number"):
                 extra_info["check_number"] = account_line.get("check_number")
         
@@ -647,6 +756,13 @@ def create_receipt_payment(
             except (ValueError, TypeError):
                 logger.warning(f"خطا در تبدیل person_id: {account_line.get('person_id')}")
         
+        resolved_check_id = check_id_val
+        if resolved_check_id is None and account_line.get("check_id"):
+            try:
+                resolved_check_id = int(account_line.get("check_id"))
+            except Exception:
+                resolved_check_id = None
+
         line = DocumentLine(
             document_id=document.id,
             account_id=account.id,
@@ -654,7 +770,7 @@ def create_receipt_payment(
             bank_account_id=bank_account_id,
             cash_register_id=account_line.get("cash_register_id"),
             petty_cash_id=account_line.get("petty_cash_id"),
-            check_id=account_line.get("check_id"),
+            check_id=resolved_check_id,
             quantity=account_line.get("quantity"),
             debit=debit_amount,
             credit=credit_amount,
@@ -677,24 +793,27 @@ def create_receipt_payment(
                 
             commission_amount = Decimal(str(commission))
             transaction_type = account_line.get("transaction_type")
+            normalized_transaction_type = transaction_type
+            if transaction_type == "check_expense":
+                normalized_transaction_type = "check"
             logger.info(f"ایجاد خط کارمزد برای تراکنش {i+1}: مبلغ={commission_amount}, نوع={transaction_type}")
             
             # تعیین حساب کارمزد بر اساس نوع تراکنش
             commission_account = None
             commission_account_code = None
             
-            if transaction_type == "bank":
+            if normalized_transaction_type == "bank":
                 commission_account_code = "10203"  # بانک
-            elif transaction_type == "cash_register":
+            elif normalized_transaction_type == "cash_register":
                 commission_account_code = "10202"  # صندوق
-            elif transaction_type == "petty_cash":
+            elif normalized_transaction_type == "petty_cash":
                 commission_account_code = "10201"  # تنخواه گردان
-            elif transaction_type == "check":
+            elif normalized_transaction_type == "check":
                 if is_receipt:
                     commission_account_code = "10403"  # اسناد دریافتنی
                 else:
                     commission_account_code = "20202"  # اسناد پرداختنی
-            elif transaction_type == "person":
+            elif normalized_transaction_type == "person":
                 commission_account_code = "20201"  # حساب‌های پرداختنی
             
             if commission_account_code:
@@ -706,6 +825,13 @@ def create_receipt_payment(
                 # در پرداخت: کارمزد به حساب اضافه می‌شود (debit)
                 commission_debit = commission_amount if not is_receipt else Decimal(0)
                 commission_credit = commission_amount if is_receipt else Decimal(0)
+
+                commission_check_id = None
+                if account_line.get("check_id"):
+                    try:
+                        commission_check_id = int(account_line.get("check_id"))
+                    except Exception:
+                        commission_check_id = None
                 
                 commission_line = DocumentLine(
                     document_id=document.id,
@@ -713,7 +839,7 @@ def create_receipt_payment(
                     bank_account_id=account_line.get("bank_id"),
                     cash_register_id=account_line.get("cash_register_id"),
                     petty_cash_id=account_line.get("petty_cash_id"),
-                    check_id=account_line.get("check_id"),
+                    check_id=commission_check_id,
                     debit=commission_debit,
                     credit=commission_credit,
                     description=f"کارمزد تراکنش {transaction_type}",
@@ -1321,6 +1447,9 @@ def update_receipt_payment(
             continue
         description = (account_line.get("description") or "").strip() or None
         transaction_type = account_line.get("transaction_type")
+        normalized_transaction_type = transaction_type
+        if transaction_type == "check_expense":
+            normalized_transaction_type = "check"
         transaction_date = account_line.get("transaction_date")
         commission = account_line.get("commission")
         if commission:
@@ -1328,15 +1457,30 @@ def update_receipt_payment(
 
         # انتخاب حساب بر اساس transaction_type یا account_id
         account = None
-        if transaction_type == "bank":
+        check_id_val: Optional[int] = None
+        if normalized_transaction_type == "check":
+            check_obj, check_id_val = _validate_check_transaction_line(
+                db,
+                business_id=document.business_id,
+                account_line=account_line,
+                is_receipt=is_receipt,
+                document_currency_id=currency_id,
+                amount_decimal=amount,
+                exclude_document_id=document.id,
+            )
+            account_line["check_id"] = check_id_val
+            if not account_line.get("check_number"):
+                account_line["check_number"] = check_obj.check_number
+
+        if normalized_transaction_type == "bank":
             account = _get_fixed_account_by_code(db, "10203")
-        elif transaction_type == "cash_register":
+        elif normalized_transaction_type == "cash_register":
             account = _get_fixed_account_by_code(db, "10202")
-        elif transaction_type == "petty_cash":
+        elif normalized_transaction_type == "petty_cash":
             account = _get_fixed_account_by_code(db, "10201")
-        elif transaction_type == "check":
+        elif normalized_transaction_type == "check":
             account = _get_fixed_account_by_code(db, "10403" if is_receipt else "20202")
-        elif transaction_type == "person":
+        elif normalized_transaction_type == "person":
             account = _get_fixed_account_by_code(db, "20201")
         elif account_line.get("account_id"):
             account = db.query(Account).filter(
@@ -1355,24 +1499,24 @@ def update_receipt_payment(
             extra_info["transaction_date"] = transaction_date
         if commission:
             extra_info["commission"] = float(commission)
-        if transaction_type == "bank":
+        if normalized_transaction_type == "bank":
             if account_line.get("bank_id"):
                 extra_info["bank_id"] = account_line.get("bank_id")
             if account_line.get("bank_name"):
                 extra_info["bank_name"] = account_line.get("bank_name")
-        elif transaction_type == "cash_register":
+        elif normalized_transaction_type == "cash_register":
             if account_line.get("cash_register_id"):
                 extra_info["cash_register_id"] = account_line.get("cash_register_id")
             if account_line.get("cash_register_name"):
                 extra_info["cash_register_name"] = account_line.get("cash_register_name")
-        elif transaction_type == "petty_cash":
+        elif normalized_transaction_type == "petty_cash":
             if account_line.get("petty_cash_id"):
                 extra_info["petty_cash_id"] = account_line.get("petty_cash_id")
             if account_line.get("petty_cash_name"):
                 extra_info["petty_cash_name"] = account_line.get("petty_cash_name")
-        elif transaction_type == "check":
+        elif normalized_transaction_type == "check":
             if account_line.get("check_id"):
-                extra_info["check_id"] = account_line.get("check_id")
+                extra_info["check_id"] = int(account_line.get("check_id"))
             if account_line.get("check_number"):
                 extra_info["check_number"] = account_line.get("check_number")
 
@@ -1393,6 +1537,13 @@ def update_receipt_payment(
             except Exception:
                 person_id_for_line = None
 
+        resolved_check_id = check_id_val
+        if resolved_check_id is None and account_line.get("check_id"):
+            try:
+                resolved_check_id = int(account_line.get("check_id"))
+            except Exception:
+                resolved_check_id = None
+
         line = DocumentLine(
             document_id=document.id,
             account_id=account.id,
@@ -1400,7 +1551,7 @@ def update_receipt_payment(
             bank_account_id=bank_account_id,
             cash_register_id=account_line.get("cash_register_id"),
             petty_cash_id=account_line.get("petty_cash_id"),
-            check_id=account_line.get("check_id"),
+            check_id=resolved_check_id,
             quantity=account_line.get("quantity"),
             debit=debit_amount,
             credit=credit_amount,
@@ -1417,28 +1568,37 @@ def update_receipt_payment(
                 continue
             commission_amount = Decimal(str(commission))
             transaction_type = account_line.get("transaction_type")
+            normalized_transaction_type = transaction_type
+            if transaction_type == "check_expense":
+                normalized_transaction_type = "check"
             commission_account_code = None
-            if transaction_type == "bank":
+            if normalized_transaction_type == "bank":
                 commission_account_code = "10203"
-            elif transaction_type == "cash_register":
+            elif normalized_transaction_type == "cash_register":
                 commission_account_code = "10202"
-            elif transaction_type == "petty_cash":
+            elif normalized_transaction_type == "petty_cash":
                 commission_account_code = "10201"
-            elif transaction_type == "check":
+            elif normalized_transaction_type == "check":
                 commission_account_code = "10403" if is_receipt else "20202"
-            elif transaction_type == "person":
+            elif normalized_transaction_type == "person":
                 commission_account_code = "20201"
             if commission_account_code:
                 commission_account = _get_fixed_account_by_code(db, commission_account_code)
                 commission_debit = commission_amount if not is_receipt else Decimal(0)
                 commission_credit = commission_amount if is_receipt else Decimal(0)
+                commission_check_id = None
+                if account_line.get("check_id"):
+                    try:
+                        commission_check_id = int(account_line.get("check_id"))
+                    except Exception:
+                        commission_check_id = None
                 db.add(DocumentLine(
                     document_id=document.id,
                     account_id=commission_account.id,
                     bank_account_id=account_line.get("bank_id"),
                     cash_register_id=account_line.get("cash_register_id"),
                     petty_cash_id=account_line.get("petty_cash_id"),
-                    check_id=account_line.get("check_id"),
+                    check_id=commission_check_id,
                     debit=commission_debit,
                     credit=commission_credit,
                     description=f"کارمزد تراکنش {transaction_type}",

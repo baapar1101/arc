@@ -1,17 +1,21 @@
 import 'dart:typed_data';
 import 'package:dio/dio.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../widgets/data_table/data_table_widget.dart';
 import '../../widgets/data_table/data_table_config.dart';
 import '../../widgets/product/product_form_dialog.dart';
 import '../../widgets/product/bulk_price_update_dialog.dart';
 import '../../widgets/product/product_import_dialog.dart';
+import '../../widgets/attached_files/attached_files_widget.dart';
+import '../../services/business_storage_service.dart';
 import '../../core/api_client.dart';
 import '../../config/app_config.dart';
 import '../../core/auth_store.dart';
-import 'price_lists_page.dart';
 import '../../utils/number_formatters.dart';
+import 'price_lists_page.dart';
 
 class ProductsPage extends StatefulWidget {
   final int businessId;
@@ -23,8 +27,738 @@ class ProductsPage extends StatefulWidget {
   State<ProductsPage> createState() => _ProductsPageState();
 }
 
+class _InfoTileData {
+  final String label;
+  final String value;
+  final IconData icon;
+  
+  const _InfoTileData({
+    required this.label,
+    required this.value,
+    required this.icon,
+  });
+}
+
 class _ProductsPageState extends State<ProductsPage> {
+  static const _productModuleContext = 'products';
   final GlobalKey _tableKey = GlobalKey();
+  late final BusinessStorageService _storageService;
+  
+  @override
+  void initState() {
+    super.initState();
+    _storageService = BusinessStorageService(ApiClient());
+  }
+  
+  String? _buildFullImageUrl(String? imageUrl) {
+    if (imageUrl == null || imageUrl.isEmpty) return null;
+    if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
+      return imageUrl;
+    }
+    final baseUrl = AppConfig.apiBaseUrl.replaceAll(RegExp(r'/+$'), '');
+    return '$baseUrl${imageUrl.startsWith('/') ? imageUrl : '/$imageUrl'}';
+  }
+  
+  String _stringValue(dynamic value, {String fallback = '-'}) {
+    if (value == null) return fallback;
+    if (value is String) {
+      if (value.trim().isEmpty) return fallback;
+      return value;
+    }
+    return value.toString();
+  }
+  
+  String _formatNumber(dynamic value, {int decimalPlaces = 0}) {
+    if (value is num) {
+      return formatWithThousands(value, decimalPlaces: decimalPlaces);
+    }
+    return '-';
+  }
+  
+  String _formatPercent(dynamic value) {
+    if (value is num) {
+      final doubleValue = value.toDouble();
+      final isInt = doubleValue.truncateToDouble() == doubleValue;
+      final formatted = isInt ? doubleValue.toStringAsFixed(0) : doubleValue.toStringAsFixed(2);
+      return '$formatted%';
+    }
+    return '-';
+  }
+  
+  String _resolveDateField(Map<String, dynamic> product, String key) {
+    final formattedKey = '${key}_formatted';
+    final rawKey = '${key}_raw';
+    
+    final formatted = product[formattedKey];
+    if (formatted is Map && formatted['formatted'] != null && formatted['formatted'].toString().isNotEmpty) {
+      return formatted['formatted'].toString();
+    }
+    final base = product[key];
+    if (base is String && base.isNotEmpty) return base;
+    final raw = product[rawKey];
+    if (raw is String && raw.isNotEmpty) return raw;
+    return '-';
+  }
+  
+  Widget _buildSectionCard(ThemeData theme, String title, Widget child) {
+    return Card(
+      elevation: 0,
+      margin: EdgeInsets.zero,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 12),
+            child,
+          ],
+        ),
+      ),
+    );
+  }
+  
+  Widget _buildInfoGrid(ThemeData theme, List<_InfoTileData> items) {
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+        maxCrossAxisExtent: 260,
+        mainAxisSpacing: 12,
+        crossAxisSpacing: 12,
+        childAspectRatio: 2.15,
+      ),
+      itemCount: items.length,
+      itemBuilder: (context, index) {
+        final item = items[index];
+        return Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(item.icon, size: 18, color: theme.colorScheme.primary),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      item.label,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                item.value.isEmpty ? '-' : item.value,
+                style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+  
+  Widget _buildHeaderChip(
+    ThemeData theme, {
+    required String label,
+    IconData? icon,
+    Color? iconColor,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: theme.dividerColor),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[
+            Icon(icon, size: 16, color: iconColor ?? theme.colorScheme.onSurfaceVariant),
+            const SizedBox(width: 6),
+          ],
+          Text(
+            label,
+            style: theme.textTheme.bodySmall,
+          ),
+        ],
+      ),
+    );
+  }
+  
+  Widget _buildProductDialogHeader({
+    required BuildContext context,
+    required AppLocalizations t,
+    required String title,
+    required String code,
+    required String serviceType,
+    required String trackingLabel,
+    required String barcode,
+  }) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest,
+        border: Border(
+          bottom: BorderSide(color: theme.dividerColor),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 28,
+                backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.1),
+                child: Icon(Icons.inventory_2_outlined, color: theme.colorScheme.primary),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                    ),
+                    Text(
+                      '${t.code}: $code',
+                      style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                onPressed: () => Navigator.of(context).pop(),
+                icon: const Icon(Icons.close),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              if (serviceType.isNotEmpty && serviceType != '-')
+                _buildHeaderChip(
+                  theme,
+                  label: '${t.category}: $serviceType',
+                  icon: Icons.category_outlined,
+                ),
+              _buildHeaderChip(
+                theme,
+                label: trackingLabel,
+                icon: Icons.inventory_2_outlined,
+              ),
+              if (barcode.isNotEmpty && barcode != '-')
+                _buildHeaderChip(
+                  theme,
+                  label: barcode,
+                  icon: Icons.qr_code,
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+  
+  Widget _buildProductOverviewTab({
+    required BuildContext dialogContext,
+    required Map<String, dynamic> product,
+    required String? fullImageUrl,
+    required String code,
+    required String category,
+    required String description,
+    required String trackingLabel,
+    required String serviceType,
+    required String barcode,
+    required AppLocalizations t,
+  }) {
+    final theme = Theme.of(dialogContext);
+    final generalItems = [
+      _InfoTileData(label: t.code, value: code, icon: Icons.confirmation_number_outlined),
+      _InfoTileData(label: t.service, value: serviceType, icon: Icons.category_outlined),
+      _InfoTileData(label: t.category, value: category, icon: Icons.layers_outlined),
+      _InfoTileData(label: t.barcode, value: barcode, icon: Icons.qr_code),
+      _InfoTileData(label: t.createdAt, value: _resolveDateField(product, 'created_at'), icon: Icons.calendar_today_outlined),
+      _InfoTileData(label: t.updatedAt, value: _resolveDateField(product, 'updated_at'), icon: Icons.update),
+    ];
+    
+    final pricingItems = [
+      _InfoTileData(label: t.salesPrice, value: _formatNumber(product['base_sales_price']), icon: Icons.price_change),
+      _InfoTileData(label: t.purchasePrice, value: _formatNumber(product['base_purchase_price']), icon: Icons.shopping_bag_outlined),
+      _InfoTileData(label: t.salesTaxRate, value: _formatPercent(product['sales_tax_rate']), icon: Icons.percent),
+      _InfoTileData(label: t.purchaseTaxRate, value: _formatPercent(product['purchase_tax_rate']), icon: Icons.percent_outlined),
+      _InfoTileData(label: t.taxCode, value: _stringValue(product['tax_code']), icon: Icons.receipt_long),
+    ];
+    
+    final inventoryItems = [
+      _InfoTileData(label: t.inventoryControl, value: trackingLabel, icon: Icons.inventory_2_outlined),
+      _InfoTileData(label: t.reorderPoint, value: _formatNumber(product['reorder_point']), icon: Icons.low_priority),
+      _InfoTileData(label: t.minOrderQty, value: _formatNumber(product['min_order_qty']), icon: Icons.numbers),
+    ];
+    
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (fullImageUrl != null) ...[
+                _buildProductImagePreview(dialogContext, fullImageUrl, t.imageNotAvailable),
+                const SizedBox(width: 20),
+              ],
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildSectionCard(theme, t.generalInformation, _buildInfoGrid(theme, generalItems)),
+                    const SizedBox(height: 16),
+                    _buildSectionCard(theme, t.pricing, _buildInfoGrid(theme, pricingItems)),
+                    const SizedBox(height: 16),
+                    _buildSectionCard(theme, t.inventory, _buildInfoGrid(theme, inventoryItems)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _buildSectionCard(
+            theme,
+            t.description,
+            Text(
+              description.isEmpty ? '-' : description,
+              style: theme.textTheme.bodyMedium,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  Widget _buildProductImagePreview(BuildContext context, String imageUrl, String fallbackLabel) {
+    final theme = Theme.of(context);
+    return SizedBox(
+      width: 240,
+      child: Card(
+        elevation: 0,
+        clipBehavior: Clip.antiAlias,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: AspectRatio(
+          aspectRatio: 1,
+          child: FutureBuilder<List<int>>(
+            future: _loadImageWithAuth(imageUrl),
+            builder: (ctx, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                return Container(
+                  color: theme.colorScheme.surfaceVariant,
+                  alignment: Alignment.center,
+                  child: Text(fallbackLabel, textAlign: TextAlign.center),
+                );
+              }
+              return InkWell(
+                onTap: () => _showImageDialog(context, imageUrl),
+                child: Image.memory(
+                  Uint8List.fromList(snapshot.data!),
+                  fit: BoxFit.cover,
+                ),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+  
+  Future<void> _attachProductFile({
+    required BuildContext dialogContext,
+    required Map<String, dynamic> product,
+    required AttachedFilesWidgetKey refreshKey,
+    required void Function(bool uploading) onUploadingChanged,
+  }) async {
+    final productId = product['id'];
+    if (productId == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(dialogContext).showSnackBar(
+          const SnackBar(content: Text('برای الصاق فایل، ابتدا کالا باید ذخیره شود')),
+        );
+      }
+      return;
+    }
+    
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.any,
+      withData: true,
+    );
+    if (result == null || result.files.isEmpty) return;
+    
+    final file = result.files.first;
+    if (file.bytes == null) return;
+    
+    onUploadingChanged(true);
+    
+    try {
+      await _storageService.uploadFile(
+        businessId: widget.businessId,
+        fileBytes: file.bytes!,
+        filename: file.name,
+        moduleContext: _productModuleContext,
+        contextId: productId.toString(),
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(dialogContext).showSnackBar(
+        const SnackBar(
+          content: Text('فایل با موفقیت الصاق شد'),
+          backgroundColor: Colors.green,
+        ),
+      );
+      refreshKey.refresh();
+    } on DioException catch (e) {
+      if (!mounted) return;
+      await _handleProductFileUploadError(dialogContext, e);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(dialogContext).showSnackBar(
+        SnackBar(
+          content: Text('خطا در آپلود فایل: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      onUploadingChanged(false);
+    }
+  }
+  
+  Future<void> _handleProductFileUploadError(BuildContext context, DioException e) async {
+    final response = e.response;
+    if (response != null && response.data is Map) {
+      final data = Map<String, dynamic>.from(response.data as Map);
+      final error = data['error'];
+      if (error is Map && error['code'] == 'STORAGE_LIMIT_EXCEEDED') {
+        await _showStorageLimitDialog(context, Map<String, dynamic>.from(error));
+        return;
+      }
+      String message = 'خطا در آپلود فایل';
+      if (data['message'] is String) {
+        message = data['message'] as String;
+      } else if (error is Map && error['message'] is String) {
+        message = error['message'] as String;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('خطا در آپلود فایل: ${e.message}'),
+        backgroundColor: Colors.red,
+      ),
+    );
+  }
+  
+  Future<void> _showStorageLimitDialog(BuildContext context, Map<String, dynamic> error) async {
+    final totalLimit = (error['total_limit_gb'] as num?)?.toDouble() ?? 0.0;
+    final currentUsage = (error['current_usage_gb'] as num?)?.toDouble() ?? 0.0;
+    final available = (error['available_gb'] as num?)?.toDouble() ?? 0.0;
+    final overUsage = (error['over_usage_gb'] as num?)?.toDouble() ?? 0.0;
+    final required = (error['required_gb'] as num?)?.toDouble() ?? 0.0;
+    
+    await showDialog(
+      context: context,
+      builder: (ctx) {
+        final theme = Theme.of(ctx);
+        return AlertDialog(
+          title: Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: Colors.orange.shade600),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  'محدودیت ذخیره‌سازی',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  error['message'] as String? ?? 'حجم فایل از محدودیت ذخیره‌سازی تجاوز می‌کند',
+                  style: theme.textTheme.bodyLarge,
+                ),
+                const SizedBox(height: 20),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildStorageInfoRow(theme, 'محدودیت کل', '${totalLimit.toStringAsFixed(3)} GB'),
+                      _buildStorageInfoRow(theme, 'استفاده شده', '${currentUsage.toStringAsFixed(3)} GB'),
+                      _buildStorageInfoRow(theme, 'فضای باقی‌مانده', '${available.toStringAsFixed(3)} GB'),
+                      const Divider(height: 24),
+                      _buildStorageInfoRow(theme, 'حجم مورد نیاز', '${required.toStringAsFixed(3)} GB', highlight: true),
+                      _buildStorageInfoRow(theme, 'کمبود فضا', '${overUsage.toStringAsFixed(3)} GB', highlight: true, isError: true),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'برای آپلود فایل، پلن ذخیره‌سازی را ارتقا دهید یا فایل کوچکتری انتخاب کنید.',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.75),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('متوجه شدم'),
+            ),
+            FilledButton.icon(
+              onPressed: () {
+                Navigator.of(ctx).pop();
+                ctx.go('/business/${widget.businessId}/storage-files');
+              },
+              icon: const Icon(Icons.storage_outlined),
+              label: const Text('مدیریت ذخیره‌سازی'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+  
+  Widget _buildStorageInfoRow(ThemeData theme, String label, String value, {bool highlight = false, bool isError = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          Text(
+            value,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              fontWeight: highlight ? FontWeight.bold : FontWeight.normal,
+              color: isError
+                  ? Colors.red
+                  : highlight
+                      ? theme.colorScheme.primary
+                      : theme.colorScheme.onSurface,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  Future<void> _showProductDetailsDialog(Map<String, dynamic> product) async {
+    final t = AppLocalizations.of(context);
+    final fullImageUrl = _buildFullImageUrl(product['image_url'] as String?);
+    final attachmentsKey = AttachedFilesWidgetKey();
+    bool uploadingFile = false;
+    
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (dialogContext, setDialogState) {
+            final theme = Theme.of(dialogContext);
+            final title = _stringValue(product['name'], fallback: t.productName);
+            final code = _stringValue(product['code']);
+            final description = _stringValue(product['description']);
+            final category = _stringValue(product['category_name']);
+            final tracking = product['track_inventory'] == true ? t.yes : t.no;
+            final serviceType = _stringValue(product['item_type']);
+            final barcode = _stringValue(product['barcode']);
+            final productId = product['id'];
+            
+            Widget buildDocumentsTab() {
+              final canUpload = widget.authStore.canWriteSection('products');
+              if (productId == null) {
+                return Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Text(
+                      'برای الصاق فایل، ابتدا کالا باید ذخیره شود.',
+                      style: theme.textTheme.bodyMedium,
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                );
+              }
+              
+              return Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      'فایل‌ها و مستندات مرتبط با کالا',
+                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 12),
+                    Expanded(
+                      child: AttachedFilesWidget(
+                        refreshKey: attachmentsKey,
+                        businessId: widget.businessId,
+                        moduleContext: _productModuleContext,
+                        contextId: productId.toString(),
+                        allowDelete: canUpload,
+                      ),
+                    ),
+                    if (canUpload) ...[
+                      const SizedBox(height: 12),
+                      Align(
+                        alignment: AlignmentDirectional.centerEnd,
+                        child: FilledButton.icon(
+                          onPressed: uploadingFile
+                              ? null
+                              : () => _attachProductFile(
+                                    dialogContext: dialogContext,
+                                    product: product,
+                                    refreshKey: attachmentsKey,
+                                    onUploadingChanged: (value) {
+                                      setDialogState(() => uploadingFile = value);
+                                    },
+                                  ),
+                          icon: uploadingFile
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              : const Icon(Icons.upload_file),
+                          label: const Text('افزودن فایل'),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              );
+            }
+            
+            return Dialog(
+              insetPadding: const EdgeInsets.all(24),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              child: DefaultTabController(
+                length: 2,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: 900,
+                    maxHeight: MediaQuery.of(dialogContext).size.height * 0.9,
+                  ),
+                  child: Column(
+                    children: [
+                      _buildProductDialogHeader(
+                        context: dialogContext,
+                        t: t,
+                        title: title,
+                        code: code,
+                        serviceType: serviceType,
+                        trackingLabel: tracking,
+                        barcode: barcode,
+                      ),
+                      Material(
+                        color: theme.colorScheme.surfaceContainerHighest,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            TabBar(
+                              labelColor: theme.colorScheme.primary,
+                              indicatorColor: theme.colorScheme.primary,
+                              isScrollable: true,
+                              tabs: [
+                                Tab(
+                                  icon: const Icon(Icons.info_outline),
+                                  text: t.productGeneralInfo,
+                                ),
+                                Tab(
+                                  icon: const Icon(Icons.attach_file),
+                                  text: t.documents,
+                                ),
+                              ],
+                            ),
+                            Divider(height: 1, color: theme.dividerColor),
+                          ],
+                        ),
+                      ),
+                      Expanded(
+                        child: TabBarView(
+                          children: [
+                            _buildProductOverviewTab(
+                              dialogContext: dialogContext,
+                              product: product,
+                              fullImageUrl: fullImageUrl,
+                              code: code,
+                              category: category,
+                              description: description,
+                              trackingLabel: tracking,
+                              serviceType: serviceType,
+                              barcode: barcode,
+                              t: t,
+                            ),
+                            buildDocumentsTab(),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
   
   /// نمایش دیالوگ تصویر
   void _showImageDialog(BuildContext context, String imageUrl) {
@@ -202,16 +936,9 @@ class _ProductsPageState extends State<ProductsPage> {
               sortable: false,
               searchable: false,
               builder: (item, index) {
-                final imageUrl = item['image_url'] as String?;
-                if (imageUrl == null || imageUrl.isEmpty) {
+                final fullUrl = _buildFullImageUrl(item['image_url'] as String?);
+                if (fullUrl == null) {
                   return const Center(child: SizedBox.shrink());
-                }
-                // ساخت URL کامل
-                String fullUrl = imageUrl;
-                if (!imageUrl.startsWith('http://') && !imageUrl.startsWith('https://')) {
-                  // اگر URL نسبی است، base URL را اضافه می‌کنیم
-                  final baseUrl = AppConfig.apiBaseUrl.replaceAll(RegExp(r'/+$'), '');
-                  fullUrl = '$baseUrl${imageUrl.startsWith('/') ? imageUrl : '/$imageUrl'}';
                 }
                 // استفاده از Builder برای دسترسی به context
                 return Builder(
@@ -524,6 +1251,7 @@ class _ProductsPageState extends State<ProductsPage> {
               ),
             ),
           ],
+          onRowTap: (item) => _showProductDetailsDialog(item),
         ),
         fromJson: (json) => json,
       ),

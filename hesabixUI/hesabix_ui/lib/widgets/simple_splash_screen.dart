@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'dart:async';
 import '../core/auth_store.dart';
 import '../l10n/app_localizations.dart';
@@ -98,6 +99,9 @@ class _SimpleSplashScreenState extends State<SimpleSplashScreen>
             widget.authStore!.saveLastUrl(currentUrl);
           }
         } catch (e) {
+          if (kDebugMode) {
+            debugPrint('Failed to persist last URL on splash screen: $e');
+          }
         }
       }
       

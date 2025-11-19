@@ -101,7 +101,7 @@ class _CashRegisterComboboxWidgetState extends State<CashRegisterComboboxWidget>
     if (m == null) return '';
     final code = (m['code'] ?? '').toString();
     final title = (m['title'] ?? '').toString();
-    if (code.isNotEmpty && title.isNotEmpty) return '$code';
+    if (code.isNotEmpty && title.isNotEmpty) return code;
     return code.isNotEmpty ? code : title;
   }
 

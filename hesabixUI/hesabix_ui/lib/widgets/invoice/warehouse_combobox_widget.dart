@@ -62,7 +62,7 @@ class _WarehouseComboboxWidgetState extends State<WarehouseComboboxWidget> {
       );
     }
     return DropdownButtonFormField<int>(
-      value: widget.selectedWarehouseId,
+      initialValue: widget.selectedWarehouseId,
       isDense: true,
       decoration: const InputDecoration(
         isDense: true,

@@ -45,6 +45,13 @@ class _SystemSettingsPageState extends State<SystemSettingsPage> {
         route: '/user/profile/system-settings/configuration',
       ),
       SettingsItem(
+        title: 'لینک‌های اشتراک',
+        description: 'تعیین آدرس مقصد نمایش کارت حساب در لینک‌های عمومی',
+        icon: Icons.link_outlined,
+        color: const Color(0xFF8E24AA),
+        route: '/user/profile/system-settings/share-links',
+      ),
+      SettingsItem(
         title: 'تنظیمات کیف‌پول',
         description: 'تعیین ارز پایه و سیاست‌ها',
         icon: Icons.account_balance_wallet_outlined,

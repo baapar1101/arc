@@ -449,31 +449,309 @@ class _CheckDetailsDialogState extends State<CheckDetailsDialog> with SingleTick
     final personName = data['person_name']?.toString() ?? '-';
     final issueDate = _formatDate(data['issue_date']);
     final dueDate = _formatDate(data['due_date']);
-    final sayadCode = data['sayad_code']?.toString() ?? '-';
-    final bankName = data['bank_name']?.toString() ?? '-';
-    final branchName = data['branch_name']?.toString() ?? '-';
-    final amount = data['amount'];
-    final amountStr = amount != null ? formatWithThousands(amount) : '-';
+    final sayadCode = data['sayad_code']?.toString();
+    final bankName = data['bank_name']?.toString();
+    final branchName = data['branch_name']?.toString();
     final currency = data['currency']?.toString() ?? '-';
     final status = _formatStatus(data['status']?.toString() ?? '');
     final typeLabel = type == 'received' ? 'دریافتی' : (type == 'transferred' ? 'واگذار شده' : '-');
+    final amountValue = data['amount'];
+    final amountStr = _formatAmount(amountValue);
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildDetailRow('نوع چک', typeLabel),
-          _buildDetailRow('شخص', personName),
-          _buildDetailRow('تاریخ صدور', issueDate),
-          _buildDetailRow('تاریخ سررسید', dueDate),
-          _buildDetailRow('شماره چک', checkNumber),
-          if (sayadCode != '-') _buildDetailRow('شناسه صیاد', sayadCode),
-          if (bankName != '-') _buildDetailRow('بانک', bankName),
-          if (branchName != '-') _buildDetailRow('شعبه', branchName),
-          _buildDetailRow('مبلغ', '$amountStr $currency'),
-          _buildDetailRow('وضعیت', status),
+          _buildSummaryHero(
+            theme: theme,
+            amount: amountStr,
+            currency: currency,
+            status: status,
+            typeLabel: typeLabel,
+            checkNumber: checkNumber,
+          ),
+          const SizedBox(height: 24),
+          Text(
+            'اطلاعات کلیدی',
+            style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: [
+              _buildInfoCard(
+                theme,
+                title: 'شخص مرتبط',
+                value: personName,
+                icon: Icons.person_outline,
+              ),
+              _buildInfoCard(
+                theme,
+                title: 'شماره چک',
+                value: checkNumber,
+                icon: Icons.confirmation_number,
+              ),
+              _buildInfoCard(
+                theme,
+                title: 'تاریخ صدور',
+                value: issueDate,
+                icon: Icons.event_available,
+              ),
+              _buildInfoCard(
+                theme,
+                title: 'تاریخ سررسید',
+                value: dueDate,
+                icon: Icons.event_note,
+              ),
+              if (sayadCode != null && sayadCode.isNotEmpty)
+                _buildInfoCard(
+                  theme,
+                  title: 'شناسه صیاد',
+                  value: sayadCode,
+                  icon: Icons.qr_code_2,
+                ),
+              if (bankName != null && bankName.isNotEmpty)
+                _buildInfoCard(
+                  theme,
+                  title: 'بانک',
+                  value: bankName,
+                  icon: Icons.account_balance,
+                ),
+              if (branchName != null && branchName.isNotEmpty)
+                _buildInfoCard(
+                  theme,
+                  title: 'شعبه',
+                  value: branchName,
+                  icon: Icons.location_city,
+                ),
+            ],
+          ),
+          const SizedBox(height: 28),
+          _buildTimelineSection(theme, issueDate, dueDate),
         ],
+      ),
+    );
+  }
+
+  Widget _buildSummaryHero({
+    required ThemeData theme,
+    required String amount,
+    required String currency,
+    required String status,
+    required String typeLabel,
+    required String checkNumber,
+  }) {
+    final gradient = LinearGradient(
+      colors: [
+        theme.colorScheme.primary,
+        theme.colorScheme.primary.withValues(alpha: 0.7),
+      ],
+      begin: Alignment.topRight,
+      end: Alignment.bottomLeft,
+    );
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+      decoration: BoxDecoration(
+        gradient: gradient,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: theme.colorScheme.primary.withValues(alpha: 0.25),
+            blurRadius: 20,
+            offset: const Offset(0, 12),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'چک شماره $checkNumber',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              _buildChip(status, theme, color: Colors.white, textColor: theme.colorScheme.primary),
+              const SizedBox(width: 8),
+              _buildChip(typeLabel, theme, color: Colors.white.withValues(alpha: 0.2)),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                amount,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                currency,
+                style: const TextStyle(
+                  color: Colors.white70,
+                  fontSize: 16,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoCard(
+    ThemeData theme, {
+    required String title,
+    required String value,
+    required IconData icon,
+  }) {
+    return Container(
+      width: 250,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        color: theme.colorScheme.surfaceContainerHighest,
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.primary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: theme.colorScheme.primary),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  value,
+                  style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTimelineSection(ThemeData theme, String issueDate, String dueDate) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'زمان‌بندی چک',
+          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 16),
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: theme.colorScheme.outlineVariant),
+          ),
+          child: Row(
+            children: [
+              _buildTimelineNode(
+                theme,
+                title: 'صدور',
+                date: issueDate,
+                icon: Icons.event_available,
+              ),
+              Expanded(
+                child: Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 8),
+                  height: 4,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        theme.colorScheme.primary,
+                        theme.colorScheme.secondary,
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+              ),
+              _buildTimelineNode(
+                theme,
+                title: 'سررسید',
+                date: dueDate,
+                icon: Icons.event_note,
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTimelineNode(ThemeData theme, {required String title, required String date, required IconData icon}) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.primary.withValues(alpha: 0.12),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, color: theme.colorScheme.primary),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          title,
+          style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          date,
+          style: theme.textTheme.bodySmall,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildChip(String label, ThemeData theme, {Color? color, Color? textColor}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: color ?? theme.colorScheme.primaryContainer,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: textColor ?? theme.colorScheme.onPrimaryContainer,
+          fontWeight: FontWeight.w600,
+        ),
       ),
     );
   }
@@ -681,25 +959,9 @@ class _CheckDetailsDialogState extends State<CheckDetailsDialog> with SingleTick
     );
   }
 
-  Widget _buildDetailRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 120,
-            child: Text(
-              '$label:',
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
-          ),
-          Expanded(
-            child: Text(value),
-          ),
-        ],
-      ),
-    );
+  String _formatAmount(num? value) {
+    if (value == null) return '-';
+    return formatWithThousands(value);
   }
 
   String _formatDate(dynamic value) {

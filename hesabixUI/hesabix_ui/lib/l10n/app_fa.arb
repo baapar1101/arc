@@ -1039,6 +1039,10 @@
   "leadTimeDays": "زمان تحویل (روز)",
   
   "pricing": "قیمت‌گذاری",
+  "productName": "نام کالا",
+  "barcode": "بارکد",
+  "generalInformation": "اطلاعات عمومی",
+  "imageNotAvailable": "تصویر موجود نیست",
   "salesPrice": "قیمت فروش",
   "salesPriceNote": "توضیح قیمت فروش",
   "purchasePrice": "قیمت خرید",
@@ -1214,6 +1218,43 @@
   "notificationsAdvancedSave": "ذخیرهٔ تنظیمات پیشرفته",
   "notificationsAdvancedSaveSuccess": "تنظیمات پیشرفتهٔ اعلان ذخیره شد.",
   "notificationsAdvancedSaveError": "ذخیرهٔ تنظیمات پیشرفتهٔ اعلان انجام نشد.",
+  "notificationsTelegramConnectionStatus": "وضعیت اتصال",
+  "notificationsTelegramConnected": "متصل",
+  "notificationsTelegramNotConnected": "قطع شده",
+  "notificationsTelegramConnectButton": "اتصال به تلگرام",
+  "notificationsTelegramDisconnectButton": "قطع اتصال",
+  "notificationsTelegramConnecting": "در حال اتصال...",
+  "notificationsTelegramConnectionWarning": "برای فعال شدن ناتیفیکیشن‌های تلگرام، ابتدا اتصال را برقرار کنید.",
+  "notificationsTelegramConnectionSuccess": "اتصال تلگرام با موفقیت برقرار شد.",
+  "notificationsTelegramConnectionError": "خطا در اتصال تلگرام.",
+  "notificationsTelegramDisconnectSuccess": "اتصال تلگرام قطع شد.",
+  "notificationsTelegramDisconnectError": "خطا در قطع اتصال تلگرام.",
+  "notificationsTelegramLinkExpired": "لینک اتصال منقضی شد. لطفاً لینک جدید ایجاد کنید.",
+  "notificationsTelegramLinkInstructions": "روی لینک زیر کلیک کنید یا در تلگرام ربات را باز کرده و دستور /start {token} را ارسال کنید.",
+  "notificationsTelegramLinkExpiresIn": "این لینک تا {minutes} دقیقه دیگر معتبر است.",
+  "notificationsTelegramConnectedSince": "متصل از {date}",
+  "@notificationsTelegramLinkExpiresIn": {
+    "placeholders": {
+      "minutes": {
+        "type": "int",
+        "format": "decimalPattern"
+      }
+    }
+  },
+  "@notificationsTelegramConnectedSince": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "@notificationsTelegramLinkInstructions": {
+    "placeholders": {
+      "token": {
+        "type": "String"
+      }
+    }
+  },
   "@notificationsTestButton": {
     "placeholders": {
       "channel": {

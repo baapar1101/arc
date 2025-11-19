@@ -945,9 +945,9 @@ class _UnitPriceCellState extends State<_UnitPriceCell> {
                   constraints: const BoxConstraints(maxHeight: 400),
                   child: ListView.separated(
                     itemCount: options.length,
-                    separatorBuilder: (_, __) => const Divider(height: 1),
-                    itemBuilder: (c, i) {
-                      final opt = options[i];
+                    separatorBuilder: (separatorContext, separatorIndex) => const Divider(height: 1),
+                    itemBuilder: (context, index) {
+                      final opt = options[index];
                       final price = (opt['price'] as num?) ?? 0;
                       final label = (opt['label'] as String?) ?? '';
                       return ListTile(

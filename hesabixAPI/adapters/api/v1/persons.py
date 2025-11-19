@@ -6,8 +6,13 @@ from typing import Dict, Any, List, Optional
 
 from adapters.db.session import get_db
 from adapters.api.v1.schema_models.person import (
-    PersonCreateRequest, PersonUpdateRequest, PersonResponse,
-    PersonListResponse, PersonSummaryResponse, PersonBankAccountCreateRequest
+    PersonCreateRequest,
+    PersonUpdateRequest,
+    PersonResponse,
+    PersonListResponse,
+    PersonSummaryResponse,
+    PersonBankAccountCreateRequest,
+    PersonShareLinkCreateRequest,
 )
 from adapters.api.v1.schemas import QueryInfo, SuccessResponse
 from app.core.responses import success_response, format_datetime_fields
@@ -15,8 +20,18 @@ from app.core.auth_dependency import get_current_user, AuthContext
 from app.core.permissions import require_business_management_dep
 from app.core.i18n import negotiate_locale
 from app.services.person_service import (
-    create_person, get_person_by_id, get_persons_by_business,
-    update_person, delete_person, get_person_summary
+    create_person,
+    get_person_by_id,
+    get_persons_by_business,
+    update_person,
+    delete_person,
+    get_person_summary,
+)
+from app.services.person_share_link_service import (
+    create_share_link as create_person_share_link_service,
+    get_active_share_link_for_person,
+    revoke_share_link as revoke_person_share_link_service,
+    serialize_share_link,
 )
 from adapters.db.models.person import Person
 from adapters.db.models.business import Business
@@ -862,6 +877,93 @@ async def delete_person_endpoint(
         raise HTTPException(status_code=404, detail="شخص یافت نشد")
     
     return success_response(message="شخص با موفقیت حذف شد", request=request)
+
+
+@router.get(
+    "/persons/{person_id}/share-link",
+    summary="وضعیت لینک اشتراک شخص",
+    response_model=SuccessResponse,
+)
+async def get_person_share_link_endpoint(
+    request: Request,
+    person_id: int,
+    db: Session = Depends(get_db),
+    auth_context: AuthContext = Depends(get_current_user),
+    _: None = Depends(require_business_management_dep),
+):
+    person = db.query(Person).filter(Person.id == person_id).first()
+    if not person:
+        raise HTTPException(status_code=404, detail="شخص یافت نشد")
+    link = get_active_share_link_for_person(db, person.business_id, person.id)
+    return success_response(
+        data={"link": serialize_share_link(link, request_base_url=str(request.base_url))},
+        request=request,
+        message="وضعیت لینک اشتراک",
+    )
+
+
+@router.post(
+    "/persons/{person_id}/share-link",
+    summary="ایجاد یا بروزرسانی لینک اشتراک",
+    response_model=SuccessResponse,
+)
+async def create_person_share_link_endpoint(
+    request: Request,
+    person_id: int,
+    payload: PersonShareLinkCreateRequest,
+    db: Session = Depends(get_db),
+    auth_context: AuthContext = Depends(get_current_user),
+    _: None = Depends(require_business_management_dep),
+):
+    person = db.query(Person).filter(Person.id == person_id).first()
+    if not person:
+        raise HTTPException(status_code=404, detail="شخص یافت نشد")
+
+    link = create_person_share_link_service(
+        db,
+        business_id=person.business_id,
+        person_id=person.id,
+        user_id=auth_context.get_user_id(),
+        expires_in_hours=payload.expires_in_hours,
+        max_view_count=payload.max_view_count,
+        options=payload.options.model_dump(),
+        replace_existing=payload.replace_existing,
+    )
+    return success_response(
+        data=serialize_share_link(link, request_base_url=str(request.base_url)),
+        request=request,
+        message="لینک اشتراک ایجاد شد",
+    )
+
+
+@router.delete(
+    "/persons/{person_id}/share-link",
+    summary="لغو لینک اشتراک شخص",
+    response_model=SuccessResponse,
+)
+async def revoke_person_share_link_endpoint(
+    request: Request,
+    person_id: int,
+    db: Session = Depends(get_db),
+    auth_context: AuthContext = Depends(get_current_user),
+    _: None = Depends(require_business_management_dep),
+):
+    person = db.query(Person).filter(Person.id == person_id).first()
+    if not person:
+        raise HTTPException(status_code=404, detail="شخص یافت نشد")
+    revoked = revoke_person_share_link_service(
+        db,
+        business_id=person.business_id,
+        person_id=person.id,
+        user_id=auth_context.get_user_id(),
+    )
+    if not revoked:
+        raise HTTPException(status_code=404, detail="لینک فعالی برای لغو وجود ندارد")
+    return success_response(
+        data=None,
+        message="لینک اشتراک لغو شد",
+        request=request,
+    )
 
 
 @router.get("/businesses/{business_id}/persons/summary",

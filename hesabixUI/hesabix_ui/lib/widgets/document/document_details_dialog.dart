@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:hesabix_ui/models/document_model.dart';
 import 'package:hesabix_ui/services/document_service.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/utils/number_formatters.dart' show formatWithThousands;
 import 'package:hesabix_ui/services/warehouse_service.dart';
-// ignore: avoid_web_libraries_in_flutter
-import 'dart:html' as html;
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/services/report_template_service.dart';
 import 'package:hesabix_ui/services/receipt_payment_service.dart';
@@ -17,6 +16,8 @@ import 'package:file_picker/file_picker.dart';
 import 'package:dio/dio.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/widgets/attached_files/attached_files_widget.dart';
+import 'package:hesabix_ui/utils/web/web_utils.dart' as web_utils;
+import 'package:intl/intl.dart';
 
 /// دیالوگ نمایش جزئیات کامل سند حسابداری
 class DocumentDetailsDialog extends StatefulWidget {
@@ -33,9 +34,11 @@ class DocumentDetailsDialog extends StatefulWidget {
   State<DocumentDetailsDialog> createState() => _DocumentDetailsDialogState();
 }
 
-class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> {
+class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with SingleTickerProviderStateMixin {
+  late TabController _tabController;
   late DocumentService _service;
   DocumentModel? _document;
+  Map<String, dynamic>? _rawDocumentData; // داده‌های خام برای دسترسی به product_lines و account_lines
   bool _isLoading = true;
   String? _errorMessage;
   bool _isGeneratingPdf = false;
@@ -61,6 +64,8 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> {
     super.initState();
     _service = DocumentService(ApiClient());
     _storageService = BusinessStorageService(ApiClient());
+    // تعداد تب‌ها: اطلاعات، محصولات (فقط برای فاکتور)، حساب‌ها، فایل‌ها
+    _tabController = TabController(length: 4, vsync: this);
     _loadDocument();
   }
   
@@ -308,17 +313,15 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> {
   }
 
   Future<void> _savePdfFile(List<int> bytes, String filename) async {
-    try {
+    if (kIsWeb) {
       final name = filename.endsWith('.pdf') ? filename : '$filename.pdf';
-      final blob = html.Blob([bytes], 'application/pdf');
-      final url = html.Url.createObjectUrlFromBlob(blob);
-      html.AnchorElement(href: url)
-        ..setAttribute('download', name)
-        ..click();
-      html.Url.revokeObjectUrl(url);
-      // ignore: avoid_print
-    } catch (e) {
-      // ignore: avoid_print
+      await web_utils.saveBytesAsFileWeb(
+        bytes,
+        name,
+        mimeType: 'application/pdf',
+      );
+    } else {
+      throw UnsupportedError('دانلود فایل فقط در نسخه وب پشتیبانی می‌شود');
     }
   }
 
@@ -330,11 +333,26 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> {
 
     try {
       final doc = await _service.getDocument(widget.documentId);
+      // دریافت داده‌های خام برای دسترسی به product_lines و account_lines
+      final api = ApiClient();
+      final rawResponse = await api.get('/documents/${widget.documentId}');
+      Map<String, dynamic>? rawData;
+      if (rawResponse.data['success'] == true) {
+        rawData = rawResponse.data['data'] as Map<String, dynamic>?;
+      }
       if (mounted) {
         setState(() {
           _document = doc;
+          _rawDocumentData = rawData;
           _isLoading = false;
         });
+        // تنظیم مجدد TabController بر اساس نوع سند
+        final isInvoice = doc.documentType.startsWith('invoice');
+        final tabCount = isInvoice ? 4 : 3; // اگر فاکتور است 4 تب، وگرنه 3 تب
+        if (_tabController.length != tabCount) {
+          _tabController.dispose();
+          _tabController = TabController(length: tabCount, vsync: this);
+        }
       }
       // اگر سند از نوع فاکتور باشد، قالب‌های چاپ فاکتور را بارگذاری کن
       try {
@@ -446,81 +464,59 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> {
   }
 
   @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
     return Dialog(
+      insetPadding: const EdgeInsets.all(24),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 1100),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: _isLoading
-              ? const SizedBox(height: 240, child: Center(child: CircularProgressIndicator()))
-              : _errorMessage != null
-                  ? SizedBox(height: 240, child: Center(child: Text(_errorMessage!)))
-                  : SingleChildScrollView(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          // هدر
-                          _buildHeader(theme),
-
-                          // محتوای اصلی
-                          Expanded(
-                            child: _isLoading
-                                ? const Center(child: CircularProgressIndicator())
-                                : _errorMessage != null
-                                    ? _buildError()
-                                    : _buildContent(theme),
-                          ),
-
-                          // فوتر
-                          _buildFooter(),
-                          const SizedBox(height: 16),
-                          if (_relatedWhDocs.isNotEmpty) ...[
-                            Text('حواله‌های مرتبط', style: Theme.of(context).textTheme.titleMedium),
-                            const SizedBox(height: 8),
-                            Card(
-                              child: ListView.separated(
-                                shrinkWrap: true,
-                                physics: const NeverScrollableScrollPhysics(),
-                                itemCount: _relatedWhDocs.length,
-                                separatorBuilder: (_, __) => const Divider(height: 1),
-                                itemBuilder: (context, index) {
-                                  final it = _relatedWhDocs[index] as Map<String, dynamic>;
-                                  return ListTile(
-                                    dense: true,
-                                    title: Text('${it['code'] ?? '-'} • ${it['doc_type'] ?? ''} • ${it['status'] ?? ''}'),
-                                    subtitle: Text(it['document_date'] ?? ''),
-                                    trailing: IconButton(
-                                      icon: const Icon(Icons.publish),
-                                      onPressed: (it['status'] == 'draft') ? () async {
-                                        try {
-                                          await _warehouseService.postDoc(
-                                            businessId: _document!.businessId,
-                                            docId: it['id'],
-                                          );
-                                          if (!context.mounted) return;
-                                          ScaffoldMessenger.of(context).showSnackBar(
-                                            const SnackBar(content: Text('حواله پست شد')),
-                                          );
-                                          _loadDocument();
-                                        } catch (e) {
-                                          if (!context.mounted) return;
-                                          ScaffoldMessenger.of(context).showSnackBar(
-                                            SnackBar(content: Text('خطا در پست حواله: $e')),
-                                          );
-                                        }
-                                      } : null,
-                                    ),
-                                  );
-                                },
-                              ),
-                            ),
+        constraints: const BoxConstraints(maxWidth: 1100, maxHeight: 820),
+        child: Column(
+          children: [
+            _buildHeader(theme),
+            Material(
+              color: theme.colorScheme.surface,
+              child: TabBar(
+                controller: _tabController,
+                isScrollable: true,
+                tabs: [
+                  const Tab(icon: Icon(Icons.info_outline), text: 'اطلاعات سند'),
+                  if (_document != null && _document!.documentType.startsWith('invoice'))
+                    const Tab(icon: Icon(Icons.shopping_cart), text: 'محصولات'),
+                  const Tab(icon: Icon(Icons.account_balance), text: 'حساب‌ها'),
+                  const Tab(icon: Icon(Icons.attach_file), text: 'فایل‌ها'),
+                ],
+              ),
+            ),
+            Expanded(
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _errorMessage != null
+                      ? _buildError()
+                      : TabBarView(
+                          controller: _tabController,
+                          children: [
+                            _buildInfoTab(theme),
+                            if (_document != null && _document!.documentType.startsWith('invoice'))
+                              _buildProductsTab(theme)
+                            else
+                              _buildAccountsTab(theme),
+                            if (_document != null && _document!.documentType.startsWith('invoice'))
+                              _buildAccountsTab(theme)
+                            else
+                              _buildAttachmentsTab(theme),
+                            _buildAttachmentsTab(theme),
                           ],
-                        ],
-                      ),
-                    ),
+                        ),
+            ),
+            _buildFooter(),
+          ],
         ),
       ),
     );
@@ -528,46 +524,117 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> {
 
   /// ساخت هدر دیالوگ
   Widget _buildHeader(ThemeData theme) {
+    final formatter = NumberFormat('#,##0');
+    final isInvoice = _document?.documentType.startsWith('invoice') ?? false;
+    final balance = (_document?.totalCredit ?? 0) - (_document?.totalDebit ?? 0);
+    final balanceColor = balance > 0
+        ? Colors.green
+        : balance < 0
+            ? Colors.red
+            : theme.colorScheme.onSurfaceVariant;
+
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
       decoration: BoxDecoration(
-        color: theme.colorScheme.primaryContainer,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+        color: theme.colorScheme.surfaceContainerHighest,
+        border: Border(
+          bottom: BorderSide(color: theme.dividerColor),
+        ),
       ),
       child: Row(
         children: [
-          Icon(
-            Icons.description,
-            size: 28,
-            color: theme.colorScheme.onPrimaryContainer,
+          CircleAvatar(
+            radius: 24,
+            backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.1),
+            child: Text(
+              (_document?.code ?? '?').isNotEmpty ? (_document?.code ?? '?')[0] : '?',
+              style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.primary),
+            ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  'جزئیات سند ${_document?.code ?? ''}',
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: theme.colorScheme.onPrimaryContainer,
-                  ),
+                  _document?.code ?? 'در حال بارگذاری...',
+                  style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                 ),
-                if (_document != null)
-                  Text(
-                    _document!.getDocumentTypeName(),
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.onPrimaryContainer.withValues(alpha: 0.8),
-                    ),
-                  ),
+                const SizedBox(height: 4),
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 4,
+                  children: [
+                    if (_document != null)
+                      _buildHeaderChip(
+                        _document!.getDocumentTypeName(),
+                        theme,
+                      ),
+                    if (_document?.documentDateRaw != null)
+                      _buildHeaderChip(
+                        'تاریخ: ${_document!.documentDateRaw}',
+                        theme,
+                        icon: Icons.calendar_today,
+                      ),
+                    if (isInvoice && _document != null)
+                      _buildHeaderChip(
+                        'مبلغ: ${formatter.format((_document!.extraInfo?['totals']?['net'] as num?)?.toDouble() ?? 0)}',
+                        theme,
+                        icon: Icons.attach_money,
+                        iconColor: balanceColor,
+                      ),
+                    if (_document?.statusText != null)
+                      _buildHeaderChip(
+                        'وضعیت: ${_document!.statusText}',
+                        theme,
+                        icon: Icons.circle,
+                        iconColor: balanceColor,
+                      ),
+                    if (_isLoading)
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: const [
+                          SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                          SizedBox(width: 6),
+                          Text('در حال بروزرسانی...'),
+                        ],
+                      ),
+                  ],
+                ),
               ],
             ),
           ),
           IconButton(
+            onPressed: () => Navigator.of(context).pop(),
             icon: const Icon(Icons.close),
-            onPressed: () => Navigator.pop(context),
-            color: theme.colorScheme.onPrimaryContainer,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeaderChip(String text, ThemeData theme, {IconData? icon, Color? iconColor}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: theme.dividerColor),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[
+            Icon(icon, size: 16, color: iconColor ?? theme.colorScheme.onSurfaceVariant),
+            const SizedBox(width: 6),
+          ],
+          Text(
+            text,
+            style: theme.textTheme.bodySmall,
           ),
         ],
       ),
@@ -603,113 +670,412 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> {
     );
   }
 
-  /// ساخت محتوای اصلی
-  Widget _buildContent(ThemeData theme) {
-    if (_document == null) return const SizedBox();
+  /// ساخت تب اطلاعات
+  Widget _buildInfoTab(ThemeData theme) {
+    if (_errorMessage != null) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.error_outline, color: Colors.red, size: 48),
+            const SizedBox(height: 12),
+            Text(_errorMessage!),
+            const SizedBox(height: 12),
+            FilledButton(onPressed: _loadDocument, child: const Text('تلاش مجدد')),
+          ],
+        ),
+      );
+    }
+
+    final document = _document;
+    if (document == null) {
+      return const Center(child: Text('اطلاعاتی برای نمایش وجود ندارد.'));
+    }
+
+    final isInvoice = document.documentType.startsWith('invoice');
+    final totals = document.extraInfo?['totals'] as Map<String, dynamic>?;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // اطلاعات هدر سند
-          _buildDocumentHeader(theme),
-
-          const SizedBox(height: 24),
-
-          // جدول سطرهای سند
-          _buildLinesTable(theme),
-
-          const SizedBox(height: 16),
-
-          // جمع کل
-          _buildTotals(theme),
-
-          // تراکنش‌های پرداخت (فقط برای فاکتورها)
-          if (_document != null && _document!.documentType.startsWith('invoice')) ...[
+          if (isInvoice && totals != null) ...[
+            _buildFinancialSummaryCard(theme, totals),
+            const SizedBox(height: 24),
+          ],
+          _buildSectionHeader('مشخصات پایه'),
+          _buildInfoGrid([
+            _InfoRow('شماره سند', document.code),
+            _InfoRow('نوع سند', document.getDocumentTypeName()),
+            _InfoRow('تاریخ سند', document.documentDateRaw ?? '-'),
+            _InfoRow('سال مالی', document.fiscalYearTitle ?? '-'),
+            _InfoRow('ارز', document.currencyCode ?? '-'),
+            _InfoRow('وضعیت', document.statusText),
+            _InfoRow('ایجادکننده', document.createdByName ?? '-'),
+            if (document.description != null && document.description!.isNotEmpty)
+              _InfoRow('توضیحات', document.description!),
+          ]),
+          if (isInvoice) ...[
             const SizedBox(height: 24),
             _buildPaymentTransactions(theme),
           ],
-          
-          // فایل‌های الصاق شده
-          const SizedBox(height: 24),
-          _buildAttachedFiles(theme),
+          if (_relatedWhDocs.isNotEmpty) ...[
+            const SizedBox(height: 24),
+            _buildSectionHeader('حواله‌های مرتبط'),
+            Card(
+              child: ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: _relatedWhDocs.length,
+                separatorBuilder: (_, __) => const Divider(height: 1),
+                itemBuilder: (context, index) {
+                  final it = _relatedWhDocs[index] as Map<String, dynamic>;
+                  return ListTile(
+                    dense: true,
+                    title: Text('${it['code'] ?? '-'} • ${it['doc_type'] ?? ''} • ${it['status'] ?? ''}'),
+                    subtitle: Text(it['document_date'] ?? ''),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.publish),
+                      onPressed: (it['status'] == 'draft') ? () async {
+                        try {
+                          await _warehouseService.postDoc(
+                            businessId: document.businessId,
+                            docId: it['id'],
+                          );
+                          if (!context.mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('حواله پست شد')),
+                          );
+                          _loadDocument();
+                        } catch (e) {
+                          if (!context.mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('خطا در پست حواله: $e')),
+                          );
+                        }
+                      } : null,
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
         ],
       ),
     );
   }
-  
-  /// ساخت بخش فایل‌های الصاق شده
-  Widget _buildAttachedFiles(ThemeData theme) {
-    if (_document == null) return const SizedBox.shrink();
-    
-    return AttachedFilesWidget(
-      refreshKey: _attachedFilesKey,
-      businessId: _document!.businessId,
-      moduleContext: 'accounting',
-      contextId: _document!.id.toString(),
-      title: 'فایل‌های الصاق شده',
-      autoLoad: true,
-      allowDelete: false, // در دیالوگ مشاهده، حذف مجاز نیست
-      onFilesLoaded: (files) {
-        // می‌توانید عملیات اضافی انجام دهید
-      },
+
+  Widget _buildSectionHeader(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Text(
+        title,
+        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+      ),
     );
   }
 
-  /// ساخت اطلاعات هدر سند
-  Widget _buildDocumentHeader(ThemeData theme) {
+  Widget _buildInfoGrid(List<_InfoRow> rows) {
+    final visibleRows = rows.where((row) => row.value != null && row.value!.trim().isNotEmpty && row.value != '-').toList();
+    if (visibleRows.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return Wrap(
+      spacing: 12,
+      runSpacing: 12,
+      children: visibleRows.map((row) => _InfoTile(row: row)).toList(),
+    );
+  }
+
+  Widget _buildFinancialSummaryCard(ThemeData theme, Map<String, dynamic> totals) {
+    final formatter = NumberFormat('#,##0');
+    final gross = (totals['gross'] as num?)?.toDouble() ?? 0.0;
+    final discount = (totals['discount'] as num?)?.toDouble() ?? 0.0;
+    final tax = (totals['tax'] as num?)?.toDouble() ?? 0.0;
+    final net = (totals['net'] as num?)?.toDouble() ?? 0.0;
+
     return Card(
-      elevation: 2,
+      margin: EdgeInsets.zero,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'اطلاعات سند',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+              'خلاصه مالی فاکتور',
+              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
             ),
-            const Divider(),
-            const SizedBox(height: 8),
-            _buildInfoRow('شماره سند:', _document!.code),
-            _buildInfoRow('نوع سند:', _document!.getDocumentTypeName()),
-            _buildInfoRow('تاریخ سند:', _document!.documentDateRaw ?? '-'),
-            _buildInfoRow('سال مالی:', _document!.fiscalYearTitle ?? '-'),
-            _buildInfoRow('ارز:', _document!.currencyCode ?? '-'),
-            _buildInfoRow('وضعیت:', _document!.statusText),
-            _buildInfoRow('ایجادکننده:', _document!.createdByName ?? '-'),
-            if (_document!.description != null && _document!.description!.isNotEmpty)
-              _buildInfoRow('توضیحات:', _document!.description!),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: [
+                _buildSummaryStat(
+                  theme,
+                  label: 'جمع کل',
+                  value: gross,
+                  color: theme.colorScheme.primary,
+                  icon: Icons.receipt_long,
+                  formatter: formatter,
+                ),
+                _buildSummaryStat(
+                  theme,
+                  label: 'تخفیف',
+                  value: discount,
+                  color: Colors.orange,
+                  icon: Icons.discount,
+                  formatter: formatter,
+                ),
+                _buildSummaryStat(
+                  theme,
+                  label: 'مالیات',
+                  value: tax,
+                  color: Colors.blue,
+                  icon: Icons.account_balance,
+                  formatter: formatter,
+                ),
+                _buildSummaryStat(
+                  theme,
+                  label: 'خالص',
+                  value: net,
+                  color: Colors.green[700],
+                  icon: Icons.account_balance_wallet,
+                  formatter: formatter,
+                ),
+              ],
+            ),
           ],
         ),
       ),
     );
   }
 
-  /// ساخت یک ردیف اطلاعات
-  Widget _buildInfoRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+  Widget _buildSummaryStat(
+    ThemeData theme, {
+    required String label,
+    required double value,
+    required Color? color,
+    required IconData icon,
+    required NumberFormat formatter,
+  }) {
+    final display = formatter.format(value);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+      ),
       child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: color ?? theme.colorScheme.primary),
+          const SizedBox(width: 10),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: theme.textTheme.bodySmall),
+              Text(
+                display,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: color ?? theme.colorScheme.primary,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// ساخت تب محصولات
+  Widget _buildProductsTab(ThemeData theme) {
+    if (_document == null || _rawDocumentData == null) {
+      return const Center(child: Text('اطلاعاتی برای نمایش وجود ندارد.'));
+    }
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: 120,
+          _buildProductLinesTable(theme),
+        ],
+      ),
+    );
+  }
+
+  /// ساخت تب حساب‌ها
+  Widget _buildAccountsTab(ThemeData theme) {
+    if (_document == null) {
+      return const Center(child: Text('اطلاعاتی برای نمایش وجود ندارد.'));
+    }
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildLinesTable(theme),
+          const SizedBox(height: 16),
+          _buildTotals(theme),
+        ],
+      ),
+    );
+  }
+
+  /// ساخت تب فایل‌ها
+  Widget _buildAttachmentsTab(ThemeData theme) {
+    if (_document == null) {
+      return const Center(child: Text('برای الصاق فایل نیاز به شناسه معتبر سند است.'));
+    }
+
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: AttachedFilesWidget(
+              refreshKey: _attachedFilesKey,
+              businessId: _document!.businessId,
+              moduleContext: 'accounting',
+              contextId: _document!.id.toString(),
+              title: 'فایل‌های الصاق شده',
+              autoLoad: true,
+              allowDelete: false,
+            ),
+          ),
+          const SizedBox(height: 16),
+          FilledButton.icon(
+            onPressed: _uploadingFile ? null : _attachFile,
+            icon: _uploadingFile
+                ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                : const Icon(Icons.attach_file),
+            label: Text(_uploadingFile ? 'در حال آپلود...' : 'افزودن فایل'),
+          ),
+        ],
+      ),
+    );
+  }
+  
+
+
+  /// ساخت جدول سطرهای محصول (فقط برای فاکتورها)
+  Widget _buildProductLinesTable(ThemeData theme) {
+    final productLines = _rawDocumentData?['product_lines'] as List<dynamic>?;
+    
+    if (productLines == null || productLines.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Card(
+      elevation: 2,
+      margin: const EdgeInsets.only(bottom: 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16),
             child: Text(
-              label,
-              style: const TextStyle(
-                fontWeight: FontWeight.w600,
-                color: Colors.grey,
+              'سطرهای محصول',
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
               ),
             ),
           ),
-          Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(fontWeight: FontWeight.w500),
+          const Divider(height: 1),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: DataTable(
+              headingRowColor: WidgetStateProperty.all(
+                theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
+              ),
+              columns: const [
+                DataColumn(label: Text('ردیف', style: TextStyle(fontWeight: FontWeight.bold))),
+                DataColumn(label: Text('محصول', style: TextStyle(fontWeight: FontWeight.bold))),
+                DataColumn(label: Text('تعداد', style: TextStyle(fontWeight: FontWeight.bold))),
+                DataColumn(label: Text('واحد', style: TextStyle(fontWeight: FontWeight.bold))),
+                DataColumn(label: Text('قیمت واحد', style: TextStyle(fontWeight: FontWeight.bold))),
+                DataColumn(label: Text('تخفیف', style: TextStyle(fontWeight: FontWeight.bold))),
+                DataColumn(label: Text('مالیات', style: TextStyle(fontWeight: FontWeight.bold))),
+                DataColumn(label: Text('جمع', style: TextStyle(fontWeight: FontWeight.bold))),
+                DataColumn(label: Text('توضیحات', style: TextStyle(fontWeight: FontWeight.bold))),
+              ],
+              rows: productLines.asMap().entries.map((entry) {
+                final index = entry.key;
+                final line = entry.value as Map<String, dynamic>;
+                final extraInfo = line['extra_info'] as Map<String, dynamic>?;
+                final quantity = (line['quantity'] as num?)?.toDouble() ?? 0.0;
+                final unitPrice = (extraInfo?['unit_price'] as num?)?.toDouble() ?? 0.0;
+                final discount = (extraInfo?['line_discount'] as num?)?.toDouble() ?? 0.0;
+                final tax = (extraInfo?['tax_amount'] as num?)?.toDouble() ?? 0.0;
+                final lineTotal = (extraInfo?['line_total'] as num?)?.toDouble() ?? 0.0;
+                final unit = extraInfo?['unit'] as String? ?? '-';
+                
+                return DataRow(
+                  cells: [
+                    DataCell(Text('${index + 1}')),
+                    DataCell(
+                      SizedBox(
+                        width: 200,
+                        child: Text(
+                          line['product_name'] as String? ?? '-',
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ),
+                    DataCell(
+                      Text(
+                        formatWithThousands(quantity.toInt()),
+                        textDirection: TextDirection.ltr,
+                        style: const TextStyle(fontFamily: 'monospace'),
+                      ),
+                    ),
+                    DataCell(Text(unit)),
+                    DataCell(
+                      Text(
+                        formatWithThousands(unitPrice.toInt()),
+                        textDirection: TextDirection.ltr,
+                        style: const TextStyle(fontFamily: 'monospace'),
+                      ),
+                    ),
+                    DataCell(
+                      Text(
+                        discount > 0 ? formatWithThousands(discount.toInt()) : '-',
+                        textDirection: TextDirection.ltr,
+                        style: const TextStyle(fontFamily: 'monospace', color: Colors.orange),
+                      ),
+                    ),
+                    DataCell(
+                      Text(
+                        tax > 0 ? formatWithThousands(tax.toInt()) : '-',
+                        textDirection: TextDirection.ltr,
+                        style: const TextStyle(fontFamily: 'monospace', color: Colors.blue),
+                      ),
+                    ),
+                    DataCell(
+                      Text(
+                        formatWithThousands(lineTotal.toInt()),
+                        textDirection: TextDirection.ltr,
+                        style: const TextStyle(fontFamily: 'monospace', color: Colors.green, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                    DataCell(
+                      SizedBox(
+                        width: 200,
+                        child: Text(
+                          line['description'] as String? ?? '-',
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 2,
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              }).toList(),
             ),
           ),
         ],
@@ -719,7 +1085,14 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> {
 
   /// ساخت جدول سطرهای سند
   Widget _buildLinesTable(ThemeData theme) {
-    final lines = _document!.lines ?? [];
+    // استفاده از account_lines از داده‌های خام اگر lines خالی است
+    List<dynamic> lines = _document!.lines ?? [];
+    if (lines.isEmpty && _rawDocumentData != null) {
+      final accountLines = _rawDocumentData!['account_lines'] as List<dynamic>?;
+      if (accountLines != null) {
+        lines = accountLines;
+      }
+    }
 
     if (lines.isEmpty) {
       return Card(
@@ -768,6 +1141,34 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> {
               rows: lines.asMap().entries.map((entry) {
                 final index = entry.key;
                 final line = entry.value;
+                
+                // پشتیبانی از هر دو نوع DocumentLineModel و Map
+                String accountName;
+                String? counterpartyName;
+                double debit;
+                double credit;
+                String? description;
+                
+                if (line is DocumentLineModel) {
+                  accountName = line.fullAccountName;
+                  counterpartyName = line.counterpartyName;
+                  debit = line.debit;
+                  credit = line.credit;
+                  description = line.description;
+                } else if (line is Map<String, dynamic>) {
+                  accountName = '${line['account_code'] ?? ''} - ${line['account_name'] ?? '-'}';
+                  counterpartyName = line['person_name'] as String?;
+                  debit = (line['debit'] as num?)?.toDouble() ?? 0.0;
+                  credit = (line['credit'] as num?)?.toDouble() ?? 0.0;
+                  description = line['description'] as String?;
+                } else {
+                  accountName = '-';
+                  counterpartyName = null;
+                  debit = 0.0;
+                  credit = 0.0;
+                  description = null;
+                }
+                
                 return DataRow(
                   cells: [
                     DataCell(Text('${index + 1}')),
@@ -775,7 +1176,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> {
                       SizedBox(
                         width: 200,
                         child: Text(
-                          line.fullAccountName,
+                          accountName,
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
@@ -784,36 +1185,36 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> {
                       SizedBox(
                         width: 150,
                         child: Text(
-                          line.counterpartyName ?? '-',
+                          counterpartyName ?? '-',
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ),
                     DataCell(
                       Text(
-                        line.debit > 0 ? formatWithThousands(line.debit.toInt()) : '-',
+                        debit > 0 ? formatWithThousands(debit.toInt()) : '-',
+                        textDirection: TextDirection.ltr,
                         style: const TextStyle(
                           fontFamily: 'monospace',
                           color: Colors.red,
                         ),
-                        textDirection: TextDirection.ltr,
                       ),
                     ),
                     DataCell(
                       Text(
-                        line.credit > 0 ? formatWithThousands(line.credit.toInt()) : '-',
+                        credit > 0 ? formatWithThousands(credit.toInt()) : '-',
+                        textDirection: TextDirection.ltr,
                         style: const TextStyle(
                           fontFamily: 'monospace',
                           color: Colors.green,
                         ),
-                        textDirection: TextDirection.ltr,
                       ),
                     ),
                     DataCell(
                       SizedBox(
                         width: 200,
                         child: Text(
-                          line.description ?? '-',
+                          description ?? '-',
                           overflow: TextOverflow.ellipsis,
                           maxLines: 2,
                         ),
@@ -831,6 +1232,56 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> {
 
   /// ساخت بخش جمع کل
   Widget _buildTotals(ThemeData theme) {
+    final isInvoice = _document?.documentType.startsWith('invoice') ?? false;
+    final totals = _document?.extraInfo?['totals'] as Map<String, dynamic>?;
+    
+    if (isInvoice && totals != null) {
+      // برای فاکتورها: نمایش خلاصه مالی کامل
+      final gross = (totals['gross'] as num?)?.toDouble() ?? 0.0;
+      final discount = (totals['discount'] as num?)?.toDouble() ?? 0.0;
+      final tax = (totals['tax'] as num?)?.toDouble() ?? 0.0;
+      final net = (totals['net'] as num?)?.toDouble() ?? 0.0;
+      
+      return Card(
+        elevation: 2,
+        color: theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // خلاصه مالی فاکتور
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _buildTotalItem('جمع کل (قبل از تخفیف)', formatWithThousands(gross.toInt()), theme.colorScheme.primary),
+                  Container(width: 2, height: 40, color: theme.dividerColor),
+                  _buildTotalItem('تخفیف', formatWithThousands(discount.toInt()), Colors.orange),
+                  Container(width: 2, height: 40, color: theme.dividerColor),
+                  _buildTotalItem('مالیات', formatWithThousands(tax.toInt()), Colors.blue),
+                  Container(width: 2, height: 40, color: theme.dividerColor),
+                  _buildTotalItem('خالص', formatWithThousands(net.toInt()), Colors.green),
+                ],
+              ),
+              const Divider(height: 24),
+              // جمع بدهکار و بستانکار
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _buildTotalItem('جمع بدهکار', formatWithThousands(_document!.totalDebit.toInt()), Colors.red),
+                  Container(width: 2, height: 40, color: theme.dividerColor),
+                  _buildTotalItem('جمع بستانکار', formatWithThousands(_document!.totalCredit.toInt()), Colors.green),
+                  Container(width: 2, height: 40, color: theme.dividerColor),
+                  _buildTotalItem('تعداد سطرها', '${_document!.linesCount}', theme.colorScheme.secondary),
+                ],
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    
+    // برای سایر اسناد: نمایش ساده
     return Card(
       elevation: 2,
       color: theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
@@ -884,13 +1335,13 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> {
         const SizedBox(height: 8),
         Text(
           value,
+          textDirection: TextDirection.ltr,
           style: TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 18,
             color: color,
             fontFamily: 'monospace',
           ),
-          textDirection: TextDirection.ltr,
         ),
       ],
     );
@@ -1123,12 +1574,12 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> {
         Expanded(
           child: Text(
             value,
+            textDirection: isAmount ? TextDirection.ltr : null,
             style: TextStyle(
               fontWeight: isAmount ? FontWeight.bold : FontWeight.normal,
               fontSize: 12,
               fontFamily: isAmount ? 'monospace' : null,
             ),
-            textDirection: isAmount ? TextDirection.ltr : null,
           ),
         ),
       ],
@@ -1215,6 +1666,44 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> {
           ElevatedButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('بستن'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InfoRow {
+  final String label;
+  final String? value;
+
+  const _InfoRow(this.label, this.value);
+}
+
+class _InfoTile extends StatelessWidget {
+  final _InfoRow row;
+
+  const _InfoTile({required this.row});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final displayValue = (row.value == null || row.value!.trim().isEmpty) ? '-' : row.value!;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: theme.dividerColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(row.label, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+          const SizedBox(height: 6),
+          Text(
+            displayValue,
+            style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
           ),
         ],
       ),
