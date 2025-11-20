@@ -1,18 +1,102 @@
-from typing import Dict, Any
+from typing import Dict, Any, List
 from fastapi import APIRouter, Depends, Request, Body, Response
+from sqlalchemy import and_, or_, exists
 from sqlalchemy.orm import Session
 
 from adapters.db.session import get_db
 from app.core.auth_dependency import get_current_user, AuthContext
 from app.core.permissions import require_business_access
-from app.core.responses import success_response
+from app.core.responses import success_response, ApiError
 from adapters.db.models.document import Document
+from adapters.db.models.invoice_item_line import InvoiceItemLine
+from adapters.db.models.person import Person
 from adapters.db.models.warehouse_document import WarehouseDocument
 from adapters.db.models.warehouse_document_line import WarehouseDocumentLine
-from app.services.warehouse_service import create_from_invoice, post_warehouse_document, warehouse_document_to_dict, create_manual_warehouse_document, update_warehouse_document, update_warehouse_document_line, delete_warehouse_document, cancel_warehouse_document
+from app.services.invoice_service import (
+	INVOICE_SALES,
+	INVOICE_SALES_RETURN,
+	INVOICE_PURCHASE,
+	INVOICE_PURCHASE_RETURN,
+	INVOICE_DIRECT_CONSUMPTION,
+	INVOICE_PRODUCTION,
+	INVOICE_WASTE,
+)
+from app.services.warehouse_service import create_from_invoice, post_warehouse_document, warehouse_document_to_dict, create_manual_warehouse_document, update_warehouse_document, update_warehouse_document_line, delete_warehouse_document, cancel_warehouse_document, bulk_delete_warehouse_documents
 
 
 router = APIRouter(prefix="/warehouse-docs", tags=["warehouse_docs"])
+
+
+_INVOICE_SOURCE_CONFIG: Dict[str, Dict[str, Any]] = {
+	"sales": {
+		"invoice_types": [INVOICE_SALES],
+		"doc_type": "issue",
+		"movement": "out",
+	},
+	"purchase": {
+		"invoice_types": [INVOICE_PURCHASE],
+		"doc_type": "receipt",
+		"movement": "in",
+	},
+	"sales_return": {
+		"invoice_types": [INVOICE_SALES_RETURN],
+		"doc_type": "receipt",
+		"movement": "in",
+	},
+	"purchase_return": {
+		"invoice_types": [INVOICE_PURCHASE_RETURN],
+		"doc_type": "issue",
+		"movement": "out",
+	},
+	"waste": {
+		"invoice_types": [INVOICE_WASTE],
+		"doc_type": "issue",
+		"movement": "out",
+	},
+	"direct_consumption": {
+		"invoice_types": [INVOICE_DIRECT_CONSUMPTION],
+		"doc_type": "issue",
+		"movement": "out",
+	},
+	"production": {
+		"invoice_types": [INVOICE_PRODUCTION],
+		"doc_type": "issue",
+		"movement": None,
+	},
+}
+
+
+def _resolve_doc_type(invoice_type: str, movement: str | None, override: str | None = None) -> str:
+	if override:
+		return override
+	if movement == "in":
+		return "receipt"
+	if movement == "out":
+		return "issue"
+	if invoice_type in (INVOICE_SALES, INVOICE_PURCHASE_RETURN, INVOICE_WASTE, INVOICE_DIRECT_CONSUMPTION):
+		return "issue"
+	if invoice_type in (INVOICE_PURCHASE, INVOICE_SALES_RETURN):
+		return "receipt"
+	if invoice_type == INVOICE_PRODUCTION:
+		return "issue"
+	return "issue"
+
+
+def _load_invoice_lines(db: Session, invoice_id: int) -> List[Dict[str, Any]]:
+	rows = (
+		db.query(InvoiceItemLine)
+		.filter(InvoiceItemLine.document_id == invoice_id)
+		.order_by(InvoiceItemLine.id.asc())
+		.all()
+	)
+	lines: List[Dict[str, Any]] = []
+	for row in rows:
+		lines.append({
+			"product_id": row.product_id,
+			"quantity": float(row.quantity or 0),
+			"extra_info": row.extra_info or {},
+		})
+	return lines
 
 
 @router.post("/business/{business_id}/from-invoice/{invoice_id}")
@@ -27,17 +111,226 @@ def create_warehouse_doc_from_invoice(
 ) -> Dict[str, Any]:
 	"""ایجاد حواله از فاکتور."""
 	if not ctx.has_business_permission("inventory", "write"):
-		from app.core.responses import ApiError
 		raise ApiError("FORBIDDEN", "Missing business permission: inventory.write", http_status=403)
 	inv = db.query(Document).filter(Document.id == invoice_id).first()
 	if not inv or inv.business_id != business_id:
-		from app.core.responses import ApiError
 		raise ApiError("DOCUMENT_NOT_FOUND", "Invoice document not found", http_status=404)
-	lines = payload.get("lines") or []
-	wh_type = payload.get("doc_type") or ("issue" if inv.document_type in ("invoice_sales", "invoice_purchase_return", "invoice_waste", "invoice_direct_consumption") else "receipt")
+
+	lines = payload.get("lines")
+	if not isinstance(lines, list) or not lines:
+		lines = _load_invoice_lines(db, invoice_id)
+	if not lines:
+		raise ApiError("LINES_REQUIRED", "هیچ کالایی برای این فاکتور ثبت نشده است", http_status=400)
+
+	movement_filter = str(payload.get("movement") or "").strip().lower()
+	if movement_filter not in ("", "in", "out"):
+		movement_filter = ""
+	if movement_filter:
+		filtered = [
+			ln for ln in lines
+			if (ln.get("extra_info") or {}).get("movement") == movement_filter
+		]
+		if not filtered:
+			raise ApiError("NO_LINES_FOR_MOVEMENT", "هیچ خطی با حرکت انتخاب‌شده یافت نشد", http_status=400)
+		lines = filtered
+
+	doc_type_override = payload.get("doc_type")
+	wh_type = _resolve_doc_type(inv.document_type, movement_filter or None, doc_type_override)
+
 	wh = create_from_invoice(db, business_id, inv, lines, wh_type, ctx.get_user_id())
 	db.commit()
 	return success_response(data={"id": wh.id, "code": wh.code, "status": wh.status}, request=request)
+
+
+@router.post("/business/{business_id}/sources/invoices/search")
+@require_business_access("business_id")
+def search_invoice_sources_for_warehouse(
+	request: Request,
+	business_id: int,
+	payload: Dict[str, Any] = Body(default={}),
+	ctx: AuthContext = Depends(get_current_user),
+	db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+	"""فهرست فاکتورهایی که می‌توان برای آن‌ها حواله انبار ایجاد کرد."""
+	if not ctx.can_read_section("inventory"):
+		raise ApiError("FORBIDDEN", "Missing business permission: inventory.read", http_status=403)
+
+	body = payload or {}
+	source_key = str(body.get("invoice_type") or "sales").strip().lower()
+	cfg = _INVOICE_SOURCE_CONFIG.get(source_key)
+	if not cfg:
+		raise ApiError("INVALID_INVOICE_TYPE", "نوع فاکتور معتبر نیست", http_status=400)
+
+	def _to_bool(val: Any) -> bool:
+		if isinstance(val, bool):
+			return val
+		if isinstance(val, (int, float)):
+			return bool(val)
+		if isinstance(val, str):
+			return val.strip().lower() in ("1", "true", "yes", "on")
+		return False
+
+	try:
+		take = int(body.get("take") or 20)
+	except Exception:
+		take = 20
+	take = max(1, min(100, take))
+
+	try:
+		skip = int(body.get("skip") or 0)
+	except Exception:
+		skip = 0
+	skip = max(0, skip)
+
+	search_term = str(body.get("search") or "").strip()
+	include_completed = _to_bool(body.get("include_completed"))
+
+	q = db.query(Document).filter(
+		and_(
+			Document.business_id == business_id,
+			Document.document_type.in_(cfg["invoice_types"]),
+			Document.is_proforma == False,  # noqa: E712
+		)
+	)
+
+	if search_term:
+		pattern = f"%{search_term}%"
+		q = q.filter(Document.code.ilike(pattern))
+
+	wh_exists = exists().where(
+		and_(
+			WarehouseDocument.business_id == business_id,
+			WarehouseDocument.source_type == "invoice",
+			WarehouseDocument.source_document_id == Document.id,
+		)
+	)
+
+	wh_non_posted_exists = exists().where(
+		and_(
+			WarehouseDocument.business_id == business_id,
+			WarehouseDocument.source_type == "invoice",
+			WarehouseDocument.source_document_id == Document.id,
+			WarehouseDocument.status != "posted",
+		)
+	)
+
+	if not include_completed:
+		q = q.filter(or_(~wh_exists, wh_non_posted_exists))
+
+	total = q.count()
+	rows = (
+		q.order_by(Document.document_date.desc(), Document.id.desc())
+		.offset(skip)
+		.limit(take)
+		.all()
+	)
+
+	invoice_ids = [doc.id for doc in rows]
+	warehouse_map: Dict[int, List[WarehouseDocument]] = {}
+	if invoice_ids:
+		wh_rows = (
+			db.query(WarehouseDocument)
+			.filter(
+				and_(
+					WarehouseDocument.business_id == business_id,
+					WarehouseDocument.source_type == "invoice",
+					WarehouseDocument.source_document_id.in_(invoice_ids),
+				)
+			)
+			.all()
+		)
+		for wh in wh_rows:
+			warehouse_map.setdefault(int(wh.source_document_id or 0), []).append(wh)
+
+	person_ids = []
+	for doc in rows:
+		extra = doc.extra_info or {}
+		pid = extra.get("person_id")
+		if pid:
+			try:
+				person_ids.append(int(pid))
+			except Exception:
+				continue
+	person_ids = list({pid for pid in person_ids})
+	person_map: Dict[int, str] = {}
+	if person_ids:
+		person_rows = (
+			db.query(Person.id, Person.alias_name, Person.first_name, Person.last_name, Person.company_name)
+			.filter(and_(Person.id.in_(person_ids), Person.business_id == business_id))
+			.all()
+		)
+		for prow in person_rows:
+			name = prow.alias_name
+			if not name:
+				parts = filter(None, [getattr(prow, "first_name", None), getattr(prow, "last_name", None)])
+				joined = " ".join(parts).strip()
+				name = joined or getattr(prow, "company_name", None) or ""
+			person_map[int(prow.id)] = name
+
+	items: List[Dict[str, Any]] = []
+	for doc in rows:
+		extra = doc.extra_info or {}
+		person_name = extra.get("person_name")
+		person_id = extra.get("person_id")
+		if not person_name and person_id:
+			try:
+				person_name = person_map.get(int(person_id))
+			except Exception:
+				person_name = None
+
+		totals = extra.get("totals") if isinstance(extra, dict) else None
+		net_amount = None
+		if isinstance(totals, dict):
+			try:
+				net_amount = float(totals.get("net") or 0)
+			except Exception:
+				net_amount = None
+
+		wh_list = warehouse_map.get(doc.id, [])
+		statuses = [wh.status for wh in wh_list]
+		state = "missing"
+		if wh_list:
+			has_posted = any(st == "posted" for st in statuses)
+			has_draft = any(st == "draft" for st in statuses)
+			if has_posted and has_draft:
+				state = "partial"
+			elif has_posted:
+				state = "posted"
+			elif has_draft:
+				state = "draft"
+			else:
+				state = statuses[0] or "unknown"
+
+		items.append({
+			"invoice_id": doc.id,
+			"code": doc.code,
+			"document_date": doc.document_date.isoformat(),
+			"invoice_type": doc.document_type,
+			"person_name": person_name,
+			"person_id": person_id,
+			"net_amount": net_amount,
+			"warehouse_state": state,
+			"warehouse_doc_type_hint": cfg.get("doc_type"),
+			"warehouse_documents": [
+				{
+					"id": wh.id,
+					"code": wh.code,
+					"status": wh.status,
+					"doc_type": wh.doc_type,
+				}
+				for wh in wh_list
+			],
+		})
+
+	response = {
+		"items": items,
+		"total": total,
+		"take": take,
+		"skip": skip,
+		"page": (skip // take) + 1,
+		"total_pages": (total + take - 1) // take if take else 1,
+	}
+	return success_response(data=response, request=request)
 
 
 @router.post("/business/{business_id}/create")
@@ -51,7 +344,6 @@ def create_warehouse_doc_manual(
 ) -> Dict[str, Any]:
 	"""ایجاد حواله انبار دستی."""
 	if not ctx.has_business_permission("inventory", "write"):
-		from app.core.responses import ApiError
 		raise ApiError("FORBIDDEN", "Missing business permission: inventory.write", http_status=403)
 	wh = create_manual_warehouse_document(db, business_id, ctx.get_user_id(), payload)
 	db.commit()
@@ -69,7 +361,6 @@ def post_warehouse_doc_endpoint(
 ) -> Dict[str, Any]:
 	"""پست کردن حواله."""
 	if not ctx.has_business_permission("inventory", "write"):
-		from app.core.responses import ApiError
 		raise ApiError("FORBIDDEN", "Missing business permission: inventory.write", http_status=403)
 	res = post_warehouse_document(db, wh_id)
 	db.commit()
@@ -87,11 +378,9 @@ def get_warehouse_doc(
 ) -> Dict[str, Any]:
 	"""دریافت جزئیات حواله."""
 	if not ctx.can_read_section("inventory"):
-		from app.core.responses import ApiError
 		raise ApiError("FORBIDDEN", "Missing business permission: inventory.read", http_status=403)
 	wh = db.query(WarehouseDocument).filter(WarehouseDocument.id == wh_id).first()
 	if not wh or wh.business_id != business_id:
-		from app.core.responses import ApiError
 		raise ApiError("NOT_FOUND", "Warehouse document not found", http_status=404)
 	return success_response(data={"item": warehouse_document_to_dict(db, wh)}, request=request)
 
@@ -108,7 +397,6 @@ def update_warehouse_doc(
 ) -> Dict[str, Any]:
 	"""ویرایش حواله انبار (فقط draft)."""
 	if not ctx.has_business_permission("inventory", "write"):
-		from app.core.responses import ApiError
 		raise ApiError("FORBIDDEN", "Missing business permission: inventory.write", http_status=403)
 	wh = update_warehouse_document(db, business_id, wh_id, ctx.get_user_id(), payload)
 	db.commit()
@@ -128,7 +416,6 @@ def update_warehouse_doc_line(
 ) -> Dict[str, Any]:
 	"""به‌روزرسانی یک خط حواله."""
 	if not ctx.has_business_permission("inventory", "write"):
-		from app.core.responses import ApiError
 		raise ApiError("FORBIDDEN", "Missing business permission: inventory.write", http_status=403)
 	wline = update_warehouse_document_line(db, business_id, wh_id, line_id, payload)
 	db.commit()
@@ -153,7 +440,6 @@ def search_warehouse_docs(
 ) -> Dict[str, Any]:
 	"""جستجو و فیلتر حواله‌ها."""
 	if not ctx.can_read_section("inventory"):
-		from app.core.responses import ApiError
 		raise ApiError("FORBIDDEN", "Missing business permission: inventory.read", http_status=403)
 	from app.services.transfer_service import _parse_iso_date as _parse_date
 	from sqlalchemy import or_
@@ -267,11 +553,31 @@ def delete_warehouse_doc(
 ) -> Dict[str, Any]:
 	"""حذف حواله انبار (فقط draft)."""
 	if not ctx.has_business_permission("inventory", "delete"):
-		from app.core.responses import ApiError
 		raise ApiError("FORBIDDEN", "Missing business permission: inventory.delete", http_status=403)
 	deleted = delete_warehouse_document(db, business_id, wh_id)
 	db.commit()
 	return success_response(data={"deleted": deleted}, request=request)
+
+
+@router.post("/business/{business_id}/bulk-delete")
+@require_business_access("business_id")
+def bulk_delete_warehouse_docs(
+	request: Request,
+	business_id: int,
+	payload: Dict[str, Any] = Body(default={}),
+	ctx: AuthContext = Depends(get_current_user),
+	db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+	"""حذف گروهی حواله‌های انبار (فقط draft)."""
+	if not ctx.has_business_permission("inventory", "delete"):
+		raise ApiError("FORBIDDEN", "Missing business permission: inventory.delete", http_status=403)
+	doc_ids = payload.get("ids") or payload.get("doc_ids") or []
+	if not isinstance(doc_ids, list) or not doc_ids:
+		raise ApiError("INVALID_PAYLOAD", "ids list is required", http_status=400)
+	doc_ids = [int(d) for d in doc_ids if d]
+	result = bulk_delete_warehouse_documents(db, business_id, doc_ids)
+	db.commit()
+	return success_response(data=result, request=request)
 
 
 @router.post("/business/{business_id}/{wh_id}/cancel")
@@ -285,7 +591,6 @@ def cancel_warehouse_doc(
 ) -> Dict[str, Any]:
 	"""لغو حواله posted با ایجاد حواله معکوس."""
 	if not ctx.has_business_permission("inventory", "write"):
-		from app.core.responses import ApiError
 		raise ApiError("FORBIDDEN", "Missing business permission: inventory.write", http_status=403)
 	cancel_wh = cancel_warehouse_document(db, business_id, wh_id, ctx.get_user_id())
 	db.commit()
@@ -303,7 +608,6 @@ async def get_warehouse_doc_pdf(
 ) -> Response:
 	"""چاپ حواله انبار به صورت PDF."""
 	if not ctx.can_read_section("inventory"):
-		from app.core.responses import ApiError
 		raise ApiError("FORBIDDEN", "Missing business permission: inventory.read", http_status=403)
 	from weasyprint import HTML
 	from weasyprint.text.fonts import FontConfiguration
@@ -314,7 +618,6 @@ async def get_warehouse_doc_pdf(
 	
 	wh = db.query(WarehouseDocument).filter(WarehouseDocument.id == wh_id).first()
 	if not wh or wh.business_id != business_id:
-		from app.core.responses import ApiError
 		raise ApiError("NOT_FOUND", "Warehouse document not found", http_status=404)
 	
 	# دریافت اطلاعات کامل حواله
@@ -496,7 +799,6 @@ async def get_warehouse_doc_pdf(
 		import logging
 		logger = logging.getLogger(__name__)
 		logger.error(f"PDF generation failed: {e}", exc_info=True)
-		from app.core.responses import ApiError
 		raise ApiError("PDF_GENERATION_ERROR", "خطا در تولید فایل PDF", http_status=500)
 	
 	def _slugify(text: str) -> str:

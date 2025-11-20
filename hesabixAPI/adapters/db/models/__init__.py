@@ -55,3 +55,12 @@ from .document_monetization import (  # noqa: F401
 	DocumentUsagePeriod,
 	DocumentUsageCursor,
 )
+# AI models
+from .ai_config import AIConfig, AIProvider  # noqa: F401
+from .ai_plan import AIPlan, AIPlanType  # noqa: F401
+from .ai_subscription import UserAISubscription, SubscriptionType  # noqa: F401
+from .ai_invoice import AIInvoice, AIInvoiceType, AIInvoiceStatus  # noqa: F401
+from .ai_usage_log import AIUsageLog, PaymentMethod  # noqa: F401
+from .ai_chat_session import AIChatSession  # noqa: F401
+from .ai_chat_message import AIChatMessage, MessageRole  # noqa: F401
+from .ai_prompt import AIPrompt, PromptRole, PromptType  # noqa: F401

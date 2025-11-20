@@ -18,6 +18,8 @@ from adapters.db.session import get_db
 from app.core.auth_dependency import get_current_user, AuthContext
 from app.core.responses import success_response, ApiError
 from app.services.file_storage_service import FileStorageService
+from app.services.file_dependency_service import FileDependencyService
+from adapters.db.models.file_storage import FileStorage
 from app.services.storage_subscription_service import (
 	subscribe_to_plan,
 	get_active_subscriptions,
@@ -41,6 +43,44 @@ import io
 
 
 router = APIRouter(prefix="/business/{business_id}/storage", tags=["business-storage"])
+
+
+@router.get(
+	"/files/{file_id}/usage",
+	summary="لیست وابستگی‌های فایل",
+	description="نمایش موجودیت‌هایی که از این فایل استفاده می‌کنند",
+)
+async def get_file_usage_endpoint(
+	business_id: int,
+	file_id: str,
+	request: Request,
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	if not ctx.can_access_business(business_id):
+		raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار ندارید", http_status=403)
+
+	file_storage = db.query(FileStorage).filter(
+		FileStorage.id == file_id,
+		FileStorage.business_id == business_id,
+		FileStorage.deleted_at.is_(None),
+	).first()
+
+	if not file_storage:
+		raise ApiError("FILE_NOT_FOUND", "فایل یافت نشد", http_status=404)
+
+	dependency_service = FileDependencyService(db)
+	dependencies = dependency_service.get_dependencies(file_storage)
+
+	return success_response({
+		"file": {
+			"id": str(file_storage.id),
+			"name": file_storage.original_name,
+			"module_context": file_storage.module_context,
+			"context_id": file_storage.context_id,
+		},
+		"dependencies": [dep.to_dict() for dep in dependencies],
+	}, request)
 
 
 @router.get(
@@ -451,7 +491,6 @@ def list_files_endpoint(
 	if not ctx.can_access_business(business_id):
 		raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار ندارید", http_status=403)
 	
-	from adapters.db.models.file_storage import FileStorage
 	from sqlalchemy import and_
 	
 	# ساخت فیلترها
@@ -662,7 +701,6 @@ async def delete_file_endpoint(
 	if not ctx.can_access_business(business_id):
 		raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار ندارید", http_status=403)
 	
-	from adapters.db.models.file_storage import FileStorage
 	from uuid import UUID
 	
 	# بررسی وجود فایل و تعلق آن به کسب‌وکار
@@ -677,6 +715,10 @@ async def delete_file_endpoint(
 	if not file_storage:
 		raise ApiError("FILE_NOT_FOUND", "فایل یافت نشد", http_status=404)
 	
+	dependency_service = FileDependencyService(db)
+	dependencies = dependency_service.get_dependencies(file_storage)
+	cleared_dependencies = dependency_service.cleanup_dependencies(file_storage)
+	
 	# حذف فایل
 	storage = FileStorageService(db)
 	try:
@@ -686,5 +728,9 @@ async def delete_file_endpoint(
 	except Exception as e:
 		raise ApiError("DELETE_ERROR", f"خطا در حذف فایل: {str(e)}", http_status=500)
 	
-	return success_response({"ok": True}, request, "فایل با موفقیت حذف شد")
+	return success_response({
+		"ok": True,
+		"dependencies": [dep.to_dict() for dep in dependencies],
+		"cleaned": [dep.to_dict() for dep in cleared_dependencies],
+	}, request, "فایل با موفقیت حذف شد")
 

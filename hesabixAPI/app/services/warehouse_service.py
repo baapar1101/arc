@@ -775,6 +775,42 @@ def delete_warehouse_document(db: Session, business_id: int, wh_id: int) -> bool
 	return True
 
 
+def bulk_delete_warehouse_documents(db: Session, business_id: int, doc_ids: List[int]) -> Dict[str, Any]:
+	"""حذف گروهی حواله‌های انبار؛ فقط حواله‌های draft و متعلق به همان کسب‌وکار حذف می‌شوند."""
+	if not doc_ids:
+		return {"deleted_count": 0, "total_requested": 0, "skipped": [], "errors": []}
+	
+	deleted_count = 0
+	skipped: List[Dict[str, Any]] = []
+	errors: List[Dict[str, Any]] = []
+	
+	for doc_id in doc_ids:
+		try:
+			wh = db.query(WarehouseDocument).filter(WarehouseDocument.id == doc_id).first()
+			if not wh:
+				errors.append({"id": doc_id, "reason": "NOT_FOUND"})
+				continue
+			if wh.business_id != business_id:
+				errors.append({"id": doc_id, "reason": "BUSINESS_MISMATCH"})
+				continue
+			if wh.status != "draft":
+				skipped.append({"id": doc_id, "code": wh.code, "status": wh.status})
+				continue
+			
+			db.delete(wh)
+			deleted_count += 1
+		except Exception as exc:
+			errors.append({"id": doc_id, "reason": str(exc)})
+	
+	db.flush()
+	return {
+		"deleted_count": deleted_count,
+		"total_requested": len(doc_ids),
+		"skipped": skipped,
+		"errors": errors,
+	}
+
+
 def cancel_warehouse_document(db: Session, business_id: int, wh_id: int, user_id: int) -> WarehouseDocument:
 	"""لغو حواله posted با ایجاد حواله معکوس."""
 	wh = db.query(WarehouseDocument).filter(WarehouseDocument.id == wh_id).first()

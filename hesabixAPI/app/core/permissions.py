@@ -9,17 +9,23 @@ from adapters.db.session import get_db
 from fastapi import Request
 
 
+def _extract_auth_context(args, kwargs):
+    """جستجوی AuthContext در آرگومان‌های تابع"""
+    for value in kwargs.values():
+        if isinstance(value, AuthContext):
+            return value
+    for value in args:
+        if isinstance(value, AuthContext):
+            return value
+    return None
+
+
 def require_app_permission(permission: str):
     """Decorator برای بررسی دسترسی در سطح اپلیکیشن"""
     def decorator(func: Callable) -> Callable:
         @wraps(func)
         async def wrapper(*args, **kwargs) -> Any:
-            # پیدا کردن AuthContext در kwargs
-            ctx = None
-            for key, value in kwargs.items():
-                if isinstance(value, AuthContext):
-                    ctx = value
-                    break
+            ctx = _extract_auth_context(args, kwargs)
             
             if not ctx:
                 raise ApiError("UNAUTHORIZED", "Authentication required", http_status=401)
@@ -65,12 +71,7 @@ def require_superadmin():
     def decorator(func: Callable) -> Callable:
         @wraps(func)
         async def wrapper(*args, **kwargs) -> Any:
-            # پیدا کردن AuthContext در kwargs (از Depends(get_current_user))
-            ctx = None
-            for key, value in kwargs.items():
-                if isinstance(value, AuthContext):
-                    ctx = value
-                    break
+            ctx = _extract_auth_context(args, kwargs)
             
             if not ctx:
                 raise ApiError("UNAUTHORIZED", "Authentication required", http_status=401)

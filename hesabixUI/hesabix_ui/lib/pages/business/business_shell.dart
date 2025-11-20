@@ -25,6 +25,7 @@ import '../../widgets/transfer/transfer_form_dialog.dart';
 import '../../widgets/expense_income/expense_income_form_dialog.dart';
 import '../../widgets/warehouse/warehouse_form_dialog.dart';
 import '../../widgets/warehouse/warehouse_document_form_dialog.dart';
+import '../../widgets/ai/ai_chat_dialog.dart';
 import 'check_form_page.dart';
 
 class BusinessShell extends StatefulWidget {
@@ -55,6 +56,7 @@ class _BusinessShellState extends State<BusinessShell> {
   bool _isBankingExpanded = false;
   bool _isAccountingMenuExpanded = false;
   bool _isWarehouseManagementExpanded = false;
+  bool _isAIExpanded = false;
   final BusinessDashboardService _businessService = BusinessDashboardService(ApiClient());
   final List<Map<String, dynamic>> _notifications = <Map<String, dynamic>>[];
   int _unreadCount = 0;
@@ -483,6 +485,39 @@ class _BusinessShellState extends State<BusinessShell> {
         hasAddButton: false,
       ),
       _MenuItem(
+        label: 'هوش مصنوعی',
+        icon: Icons.smart_toy_outlined,
+        selectedIcon: Icons.smart_toy,
+        path: null, // برای منوی بازشونده
+        type: _MenuItemType.expandable,
+        children: [
+          _MenuItem(
+            label: 'چت با AI',
+            icon: Icons.chat_bubble_outline,
+            selectedIcon: Icons.chat_bubble,
+            path: '/business/${widget.businessId}/ai/chat',
+            type: _MenuItemType.simple,
+            hasAddButton: false,
+          ),
+          _MenuItem(
+            label: 'اشتراک AI',
+            icon: Icons.subscriptions_outlined,
+            selectedIcon: Icons.subscriptions,
+            path: '/business/${widget.businessId}/ai/subscription',
+            type: _MenuItemType.simple,
+            hasAddButton: false,
+          ),
+          _MenuItem(
+            label: 'آمار استفاده',
+            icon: Icons.bar_chart_outlined,
+            selectedIcon: Icons.bar_chart,
+            path: '/business/${widget.businessId}/ai/usage',
+            type: _MenuItemType.simple,
+            hasAddButton: false,
+          ),
+        ],
+      ),
+      _MenuItem(
         label: t.others,
         icon: Icons.more_horiz,
         selectedIcon: Icons.more_horiz,
@@ -534,6 +569,7 @@ class _BusinessShellState extends State<BusinessShell> {
             if (item.label == t.banking) _isBankingExpanded = true;
             if (item.label == t.accountingMenu) _isAccountingMenuExpanded = true;
             if (item.label == t.warehouseManagement) _isWarehouseManagementExpanded = true;
+            if (item.label == 'هوش مصنوعی') _isAIExpanded = true;
             break;
           }
         }
@@ -591,6 +627,7 @@ class _BusinessShellState extends State<BusinessShell> {
           if (item.label == t.banking) _isBankingExpanded = !_isBankingExpanded;
           if (item.label == t.accountingMenu) _isAccountingMenuExpanded = !_isAccountingMenuExpanded;
           if (item.label == t.warehouseManagement) _isWarehouseManagementExpanded = !_isWarehouseManagementExpanded;
+          if (item.label == 'هوش مصنوعی') _isAIExpanded = !_isAIExpanded;
         });
       }
     }
@@ -778,6 +815,7 @@ class _BusinessShellState extends State<BusinessShell> {
       if (item.label == t.banking) return _isBankingExpanded;
       if (item.label == t.accountingMenu) return _isAccountingMenuExpanded;
       if (item.label == t.warehouseManagement) return _isWarehouseManagementExpanded;
+      if (item.label == 'هوش مصنوعی') return _isAIExpanded;
       return false;
     }
 
@@ -856,6 +894,17 @@ class _BusinessShellState extends State<BusinessShell> {
                 ),
             ],
           ),
+        ),
+        IconButton(
+          tooltip: 'چت سریع با AI',
+          onPressed: () {
+            AIChatDialog.show(
+              context,
+              authStore: widget.authStore,
+              businessId: widget.businessId,
+            );
+          },
+          icon: const Icon(Icons.smart_toy_outlined),
         ),
         CombinedUserMenuButton(
           authStore: widget.authStore,
@@ -1094,6 +1143,7 @@ class _BusinessShellState extends State<BusinessShell> {
                                 if (item.label == t.banking) _isBankingExpanded = !_isBankingExpanded;
                                 if (item.label == t.accountingMenu) _isAccountingMenuExpanded = !_isAccountingMenuExpanded;
                                 if (item.label == t.warehouseManagement) _isWarehouseManagementExpanded = !_isWarehouseManagementExpanded;
+                                if (item.label == 'هوش مصنوعی') _isAIExpanded = !_isAIExpanded;
                               });
                             } else {
                               onSelect(menuIndex);
@@ -1306,6 +1356,7 @@ class _BusinessShellState extends State<BusinessShell> {
                           if (item.label == t.banking) _isBankingExpanded = expanded;
                           if (item.label == t.accountingMenu) _isAccountingMenuExpanded = expanded;
                           if (item.label == t.warehouseManagement) _isWarehouseManagementExpanded = expanded;
+                          if (item.label == 'هوش مصنوعی') _isAIExpanded = expanded;
                         });
                       },
                       children: visibleChildren.map((child) {
@@ -1492,6 +1543,10 @@ class _BusinessShellState extends State<BusinessShell> {
     if (label == t.taxpayers) return 'settings';
     if (label == t.settings) return 'settings';
     if (label == t.pluginMarketplace) return 'marketplace';
+    if (label == 'هوش مصنوعی' || label == 'AI Tools') return 'ai';
+    if (label == 'چت با AI' || label == 'AI Chat') return 'ai';
+    if (label == 'اشتراک AI' || label == 'AI Subscription') return 'ai';
+    if (label == 'آمار استفاده' || label == 'AI Usage') return 'ai';
     return null;
   }
 

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../services/petty_cash_service.dart';
 import '../../core/api_client.dart';
 import '../../services/currency_service.dart';
+import '../../widgets/banking/petty_cash_form_dialog.dart';
 
 class PettyCashOption {
   final String id;
@@ -180,6 +181,27 @@ class _PettyCashComboboxWidgetState extends State<PettyCashComboboxWidget> {
     }
   }
 
+  Future<void> _addNewPettyCash() async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => PettyCashFormDialog(
+        businessId: widget.businessId,
+        onSuccess: () {},
+      ),
+    );
+    
+    if (result == true && mounted) {
+      // Refresh لیست
+      await _performSearch(_latestQuery);
+      
+      // پیدا کردن آخرین آیتم اضافه شده (احتمالاً آخرین آیتم در لیست)
+      if (_items.isNotEmpty) {
+        final lastItem = _items.last;
+        widget.onChanged(lastItem);
+      }
+    }
+  }
+
   void _openPicker() {
     showModalBottomSheet(
       context: context,
@@ -201,6 +223,7 @@ class _PettyCashComboboxWidgetState extends State<PettyCashComboboxWidget> {
               widget.onChanged(opt);
               Navigator.pop(context);
             },
+            onAddNew: _addNewPettyCash,
           );
         },
       ),
@@ -261,6 +284,7 @@ class _PettyCashPickerBottomSheet extends StatelessWidget {
   final ValueChanged<String> onSearchChanged;
   final ValueChanged<PettyCashOption?> onSelected;
   final String Function(int?)? currencyLabelBuilder;
+  final VoidCallback? onAddNew;
 
   const _PettyCashPickerBottomSheet({
     required this.label,
@@ -273,6 +297,7 @@ class _PettyCashPickerBottomSheet extends StatelessWidget {
     required this.onSearchChanged,
     required this.currencyLabelBuilder,
     required this.onSelected,
+    this.onAddNew,
   });
 
   @override
@@ -288,6 +313,13 @@ class _PettyCashPickerBottomSheet extends StatelessWidget {
             children: [
               Text(label, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
               const Spacer(),
+              if (onAddNew != null)
+                IconButton(
+                  onPressed: onAddNew,
+                  icon: const Icon(Icons.add),
+                  tooltip: 'افزودن تنخواه گردان جدید',
+                  color: colorScheme.primary,
+                ),
               IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close)),
             ],
           ),

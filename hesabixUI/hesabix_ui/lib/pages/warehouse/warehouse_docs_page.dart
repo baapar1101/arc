@@ -108,6 +108,94 @@ class _WarehouseDocsPageState extends State<WarehouseDocsPage> {
     }
   }
 
+  Future<void> _deleteWarehouseDoc(
+    WarehouseDocument doc,
+    AppLocalizations t,
+  ) async {
+    if (doc.id == null) return;
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(t.deleteWarehouseDocument),
+        content: Text('آیا از حذف حواله ${doc.code} مطمئن هستید؟'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(t.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(t.deleteWarehouseDocument),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+
+    try {
+      await _svc.deleteDoc(businessId: widget.businessId, docId: doc.id!);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${t.deleteWarehouseDocument}: ${t.operationSuccessful}')),
+      );
+      _refreshTable();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${t.operationFailed}: $e')),
+      );
+    }
+  }
+
+  Future<void> _bulkDeleteSelected(AppLocalizations t) async {
+    final dynamic state = _tableKey.currentState;
+    final selectedItems = state?.getSelectedItems() as List<dynamic>? ?? const <dynamic>[];
+    if (selectedItems.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.noRowsSelectedError)));
+      }
+      return;
+    }
+
+    final drafts = selectedItems.whereType<WarehouseDocument>().where((doc) => doc.id != null && doc.status == 'draft').toList();
+    if (drafts.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('هیچ حواله پیش‌نویسی برای حذف انتخاب نشده است')));
+      }
+      return;
+    }
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(t.deleteWarehouseDocument),
+        content: Text('آیا از حذف ${drafts.length} حواله پیش‌نویس مطمئن هستید؟'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t.cancel)),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(t.delete)),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+
+    try {
+      final ids = drafts.map((e) => e.id!).toList();
+      final result = await _svc.bulkDeleteDocs(businessId: widget.businessId, ids: ids);
+      if (!mounted) return;
+      final deleted = result['deleted_count'] ?? 0;
+      final skipped = (result['skipped'] as List<dynamic>? ?? const []).length;
+      final errors = (result['errors'] as List<dynamic>? ?? const []).length;
+      final buffer = StringBuffer('$deleted حواله حذف شد');
+      if (skipped > 0) buffer.write(' | $skipped مورد به دلیل وضعیت نامعتبر حذف نشد');
+      if (errors > 0) buffer.write(' | $errors خطا');
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(buffer.toString())));
+      _refreshTable();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${t.operationFailed}: $e')));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
@@ -140,6 +228,8 @@ class _WarehouseDocsPageState extends State<WarehouseDocsPage> {
           dateRangeField: 'document_date',
           enableDateRangeFilter: true,
           showFiltersButton: true,
+          enableRowSelection: true,
+          enableMultiRowSelection: true,
           customHeaderActions: [
             Tooltip(
               message: t.createWarehouseDocument,
@@ -154,6 +244,13 @@ class _WarehouseDocsPageState extends State<WarehouseDocsPage> {
                   );
                 },
                 icon: const Icon(Icons.add),
+              ),
+            ),
+            Tooltip(
+              message: t.deleteWarehouseDocument,
+              child: IconButton(
+                onPressed: () => _bulkDeleteSelected(t),
+                icon: const Icon(Icons.delete_sweep_outlined),
               ),
             ),
           ],
@@ -209,6 +306,24 @@ class _WarehouseDocsPageState extends State<WarehouseDocsPage> {
                   }
                 },
                 enabled: true,
+              ),
+              DataTableAction(
+                icon: Icons.delete,
+                label: t.deleteWarehouseDocument,
+                isDestructive: true,
+                onTap: (item) {
+                  if (item is! WarehouseDocument || item.id == null) {
+                    return;
+                  }
+                  if (item.status != 'draft') {
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('فقط حواله‌های پیش‌نویس قابل حذف هستند')),
+                    );
+                    return;
+                  }
+                  _deleteWarehouseDoc(item, t);
+                },
               ),
             ]),
             TextColumn(

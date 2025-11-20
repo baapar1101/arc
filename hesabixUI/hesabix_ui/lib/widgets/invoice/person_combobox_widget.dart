@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../services/person_service.dart';
 import '../../models/person_model.dart';
+import '../../widgets/person/person_form_dialog.dart';
 
 class PersonComboboxWidget extends StatefulWidget {
   final int businessId;
@@ -160,6 +161,27 @@ class _PersonComboboxWidgetState extends State<PersonComboboxWidget> {
     widget.onChanged(person);
   }
 
+  Future<void> _addNewPerson() async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => PersonFormDialog(
+        businessId: widget.businessId,
+        onSuccess: () {},
+      ),
+    );
+    
+    if (result == true && mounted) {
+      // Refresh لیست
+      await _performSearch(_latestQuery);
+      
+      // پیدا کردن آخرین آیتم اضافه شده (احتمالاً آخرین آیتم در لیست)
+      if (_persons.isNotEmpty) {
+        final lastPerson = _persons.last;
+        _selectPerson(lastPerson);
+      }
+    }
+  }
+
   void _showPersonPicker() {
     showModalBottomSheet(
       context: context,
@@ -182,6 +204,7 @@ class _PersonComboboxWidgetState extends State<PersonComboboxWidget> {
             label: widget.label,
             searchHint: widget.searchHint ?? 'جست‌وجو در اشخاص...',
             personTypes: widget.personTypes,
+            onAddNew: _addNewPerson,
           );
         },
       ),
@@ -264,6 +287,7 @@ class _PersonPickerBottomSheet extends StatefulWidget {
   final String label;
   final String searchHint;
   final List<String>? personTypes;
+  final VoidCallback? onAddNew;
 
   const _PersonPickerBottomSheet({
     required this.persons,
@@ -277,6 +301,7 @@ class _PersonPickerBottomSheet extends StatefulWidget {
     required this.label,
     required this.searchHint,
     this.personTypes,
+    this.onAddNew,
   });
 
   @override
@@ -303,6 +328,13 @@ class _PersonPickerBottomSheetState extends State<_PersonPickerBottomSheet> {
                 ),
               ),
               const Spacer(),
+              if (widget.onAddNew != null)
+                IconButton(
+                  onPressed: widget.onAddNew,
+                  icon: const Icon(Icons.add),
+                  tooltip: 'افزودن شخص جدید',
+                  color: theme.colorScheme.primary,
+                ),
               IconButton(
                 onPressed: () => Navigator.pop(context),
                 icon: const Icon(Icons.close),

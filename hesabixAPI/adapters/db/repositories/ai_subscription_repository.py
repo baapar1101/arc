@@ -1,0 +1,102 @@
+from typing import Optional, List
+from sqlalchemy.orm import Session
+from sqlalchemy import and_, func
+from datetime import datetime, timedelta
+from adapters.db.models.ai_subscription import UserAISubscription
+from adapters.db.repositories.base_repo import BaseRepository
+
+
+class AISubscriptionRepository(BaseRepository[UserAISubscription]):
+    def __init__(self, db: Session):
+        super().__init__(db, UserAISubscription)
+    
+    def get_active_subscription(
+        self,
+        user_id: int,
+        business_id: Optional[int] = None
+    ) -> Optional[UserAISubscription]:
+        """دریافت اشتراک فعال کاربر"""
+        query = self.db.query(self.model_class).filter(
+            and_(
+                self.model_class.user_id == user_id,
+                self.model_class.is_active == True,  # noqa: E712
+                self.model_class.period_start <= datetime.utcnow()
+            )
+        )
+        
+        if business_id:
+            query = query.filter(self.model_class.business_id == business_id)
+        else:
+            query = query.filter(self.model_class.business_id == None)  # noqa: E711
+        
+        # بررسی انقضا
+        query = query.filter(
+            (self.model_class.period_end == None) |  # noqa: E711
+            (self.model_class.period_end >= datetime.utcnow())
+        )
+        
+        return query.first()
+    
+    def get_user_subscriptions(
+        self,
+        user_id: int,
+        business_id: Optional[int] = None
+    ) -> List[UserAISubscription]:
+        """دریافت تمام اشتراک‌های کاربر"""
+        query = self.db.query(self.model_class).filter(
+            self.model_class.user_id == user_id
+        )
+        
+        if business_id:
+            query = query.filter(self.model_class.business_id == business_id)
+        else:
+            query = query.filter(self.model_class.business_id == None)  # noqa: E711
+        
+        return query.order_by(self.model_class.created_at.desc()).all()
+    
+    def get_subscriptions_needing_reset(self) -> List[UserAISubscription]:
+        """دریافت اشتراک‌هایی که باید reset شوند (ماهانه)"""
+        # اشتراک‌هایی که last_reset_at ندارند یا بیش از 30 روز گذشته reset شده‌اند
+        cutoff_date = datetime.utcnow() - timedelta(days=30)
+        
+        query = self.db.query(self.model_class).filter(
+            and_(
+                self.model_class.is_active == True,  # noqa: E712
+                (
+                    (self.model_class.last_reset_at == None) |  # noqa: E711
+                    (self.model_class.last_reset_at < cutoff_date)
+                )
+            )
+        )
+        
+        return query.all()
+    
+    def get_subscriptions_expiring_soon(self, days: int = 7) -> List[UserAISubscription]:
+        """دریافت اشتراک‌هایی که در حال انقضا هستند"""
+        from datetime import timedelta
+        now = datetime.utcnow()
+        future_date = now + timedelta(days=days)
+        
+        query = self.db.query(self.model_class).filter(
+            and_(
+                self.model_class.is_active == True,  # noqa: E712
+                self.model_class.expires_at != None,  # noqa: E711
+                self.model_class.expires_at >= now,
+                self.model_class.expires_at <= future_date
+            )
+        )
+        
+        return query.all()
+    
+    def get_expired_subscriptions(self) -> List[UserAISubscription]:
+        """دریافت اشتراک‌های منقضی شده"""
+        query = self.db.query(self.model_class).filter(
+            and_(
+                self.model_class.is_active == True,  # noqa: E712
+                self.model_class.expires_at != None,  # noqa: E711
+                self.model_class.expires_at < datetime.utcnow()
+            )
+        )
+        
+        return query.all()
+

@@ -47,6 +47,17 @@ class WarehouseService {
     return Map<String, dynamic>.from(res.data?['data'] ?? const {});
   }
 
+  Future<Map<String, dynamic>> searchInvoiceSources({
+    required int businessId,
+    required Map<String, dynamic> payload,
+  }) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/warehouse-docs/business/$businessId/sources/invoices/search',
+      data: payload,
+    );
+    return Map<String, dynamic>.from(res.data?['data'] ?? const {});
+  }
+
   Future<Map<String, dynamic>> postDoc({
     required int businessId,
     required int docId,
@@ -150,6 +161,17 @@ class WarehouseService {
     final res = await _api.post<Map<String, dynamic>>(
       '/api/v1/warehouses/business/$businessId/stock-report',
       data: query ?? const {},
+    );
+    return Map<String, dynamic>.from(res.data?['data'] ?? const {});
+  }
+
+  Future<Map<String, dynamic>> bulkDeleteDocs({
+    required int businessId,
+    required List<int> ids,
+  }) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/warehouse-docs/business/$businessId/bulk-delete',
+      data: {'ids': ids},
     );
     return Map<String, dynamic>.from(res.data?['data'] ?? const {});
   }

@@ -1,6 +1,9 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../services/check_service.dart';
+import '../../core/auth_store.dart';
+import '../../core/calendar_controller.dart';
+import '../../pages/business/check_form_page.dart';
 
 enum CheckPickerMode { any, receipt, payment }
 
@@ -36,6 +39,8 @@ class CheckComboboxWidget extends StatefulWidget {
   final String hintText;
   final int? filterCurrencyId;
   final CheckPickerMode mode;
+  final AuthStore? authStore;
+  final CalendarController? calendarController;
 
   const CheckComboboxWidget({
     super.key,
@@ -47,6 +52,8 @@ class CheckComboboxWidget extends StatefulWidget {
     this.hintText = 'جست‌وجو و انتخاب چک',
     this.filterCurrencyId,
     this.mode = CheckPickerMode.any,
+    this.authStore,
+    this.calendarController,
   });
 
   @override
@@ -256,6 +263,41 @@ class _CheckComboboxWidgetState extends State<CheckComboboxWidget> {
     }
   }
 
+  Future<void> _addNewCheck() async {
+    if (widget.authStore == null || widget.calendarController == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('برای افزودن چک جدید، AuthStore و CalendarController مورد نیاز است')),
+      );
+      return;
+    }
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => CheckFormDialog(
+        businessId: widget.businessId,
+        authStore: widget.authStore!,
+        calendarController: widget.calendarController,
+        onSuccess: () {},
+      ),
+    );
+    
+    if (result == true && mounted) {
+      // Refresh لیست
+      await _performSearch(_latestQuery);
+      
+      // پیدا کردن آخرین آیتم اضافه شده (احتمالاً آخرین آیتم در لیست)
+      if (_items.isNotEmpty) {
+        final lastItem = _items.last;
+        if (mounted) {
+          setState(() {
+            _selectedOption = lastItem;
+          });
+        }
+        widget.onChanged(lastItem);
+      }
+    }
+  }
+
   void _openPicker() {
     showModalBottomSheet(
       context: context,
@@ -281,6 +323,7 @@ class _CheckComboboxWidgetState extends State<CheckComboboxWidget> {
               widget.onChanged(opt);
               Navigator.pop(context);
             },
+            onAddNew: _addNewCheck,
           );
         },
       ),
@@ -339,6 +382,7 @@ class _CheckPickerBottomSheet extends StatelessWidget {
   final bool hasSearched;
   final ValueChanged<String> onSearchChanged;
   final ValueChanged<CheckOption?> onSelected;
+  final VoidCallback? onAddNew;
 
   const _CheckPickerBottomSheet({
     required this.label,
@@ -350,6 +394,7 @@ class _CheckPickerBottomSheet extends StatelessWidget {
     required this.hasSearched,
     required this.onSearchChanged,
     required this.onSelected,
+    this.onAddNew,
   });
 
   @override
@@ -365,6 +410,16 @@ class _CheckPickerBottomSheet extends StatelessWidget {
             children: [
               Text(label, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
               const Spacer(),
+              IconButton(
+                onPressed: onAddNew ?? () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('برای افزودن چک جدید، AuthStore و CalendarController مورد نیاز است')),
+                  );
+                },
+                icon: const Icon(Icons.add),
+                tooltip: 'افزودن چک جدید',
+                color: colorScheme.primary,
+              ),
               IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close)),
             ],
           ),

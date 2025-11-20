@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../services/cash_register_service.dart';
 import '../../core/api_client.dart';
 import '../../services/currency_service.dart';
+import '../../widgets/banking/cash_register_form_dialog.dart';
 
 class CashRegisterOption {
   final String id;
@@ -180,6 +181,27 @@ class _CashRegisterComboboxWidgetState extends State<CashRegisterComboboxWidget>
     }
   }
 
+  Future<void> _addNewCashRegister() async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => CashRegisterFormDialog(
+        businessId: widget.businessId,
+        onSuccess: () {},
+      ),
+    );
+    
+    if (result == true && mounted) {
+      // Refresh لیست
+      await _performSearch(_latestQuery);
+      
+      // پیدا کردن آخرین آیتم اضافه شده (احتمالاً آخرین آیتم در لیست)
+      if (_items.isNotEmpty) {
+        final lastItem = _items.last;
+        widget.onChanged(lastItem);
+      }
+    }
+  }
+
   void _openPicker() {
     showModalBottomSheet(
       context: context,
@@ -201,6 +223,7 @@ class _CashRegisterComboboxWidgetState extends State<CashRegisterComboboxWidget>
               widget.onChanged(opt);
               Navigator.pop(context);
             },
+            onAddNew: _addNewCashRegister,
           );
         },
       ),
@@ -261,6 +284,7 @@ class _CashRegisterPickerBottomSheet extends StatelessWidget {
   final ValueChanged<String> onSearchChanged;
   final ValueChanged<CashRegisterOption?> onSelected;
   final String Function(int?)? currencyLabelBuilder;
+  final VoidCallback? onAddNew;
 
   const _CashRegisterPickerBottomSheet({
     required this.label,
@@ -273,6 +297,7 @@ class _CashRegisterPickerBottomSheet extends StatelessWidget {
     required this.onSearchChanged,
     required this.currencyLabelBuilder,
     required this.onSelected,
+    this.onAddNew,
   });
 
   @override
@@ -288,6 +313,13 @@ class _CashRegisterPickerBottomSheet extends StatelessWidget {
             children: [
               Text(label, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
               const Spacer(),
+              if (onAddNew != null)
+                IconButton(
+                  onPressed: onAddNew,
+                  icon: const Icon(Icons.add),
+                  tooltip: 'افزودن صندوق جدید',
+                  color: colorScheme.primary,
+                ),
               IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close)),
             ],
           ),

@@ -87,6 +87,12 @@ import 'pages/business/document_monetization_page.dart';
 import 'pages/business/backup/backup_page.dart';
 import 'pages/business/backup/restore_page.dart';
 import 'pages/public/public_person_share_link_page.dart';
+import 'pages/admin/ai_settings_page.dart';
+import 'pages/admin/ai_plans_admin_page.dart';
+import 'pages/admin/ai_prompts_admin_page.dart';
+import 'pages/business/ai_chat_page.dart';
+import 'pages/business/ai_subscription_page.dart';
+import 'pages/business/ai_usage_page.dart';
 
 void main() {
   // Use path-based routing instead of hash routing
@@ -593,6 +599,48 @@ class _MyAppState extends State<MyApp> {
                   },
                 ),
                 GoRoute(
+                  path: 'ai-settings',
+                  name: 'system_settings_ai_settings',
+                  builder: (context, state) {
+                    if (_authStore == null) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    final allowed = _authStore!.isSuperAdmin || _authStore!.hasAppPermission('system_settings');
+                    if (!allowed) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    return const AISettingsPage();
+                  },
+                ),
+                GoRoute(
+                  path: 'ai-plans',
+                  name: 'system_settings_ai_plans',
+                  builder: (context, state) {
+                    if (_authStore == null) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    final allowed = _authStore!.isSuperAdmin || _authStore!.hasAppPermission('system_settings');
+                    if (!allowed) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    return const AIPlansAdminPage();
+                  },
+                ),
+                GoRoute(
+                  path: 'ai-prompts',
+                  name: 'system_settings_ai_prompts',
+                  builder: (context, state) {
+                    if (_authStore == null) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    final allowed = _authStore!.isSuperAdmin || _authStore!.hasAppPermission('system_settings');
+                    if (!allowed) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    return const AIPromptsAdminPage();
+                  },
+                ),
+                GoRoute(
                   path: 'announcements',
                   name: 'system_settings_announcements',
                   builder: (context, state) {
@@ -787,6 +835,45 @@ class _MyAppState extends State<MyApp> {
                 final businessId = int.parse(state.pathParameters['business_id']!);
                 return NoTransitionPage(
                   child: WalletPage(
+                    businessId: businessId,
+                    authStore: _authStore!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/ai/chat',
+              name: 'business_ai_chat',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return NoTransitionPage(
+                  child: AIChatPage(
+                    businessId: businessId,
+                    authStore: _authStore!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/ai/subscription',
+              name: 'business_ai_subscription',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return NoTransitionPage(
+                  child: AISubscriptionPage(
+                    businessId: businessId,
+                    authStore: _authStore!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/ai/usage',
+              name: 'business_ai_usage',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return NoTransitionPage(
+                  child: AIUsagePage(
                     businessId: businessId,
                     authStore: _authStore!,
                   ),

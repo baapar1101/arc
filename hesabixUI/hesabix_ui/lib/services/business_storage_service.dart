@@ -66,6 +66,25 @@ class BusinessStorageService {
     await _api.delete('/api/v1/business/$businessId/storage/files/$fileId');
   }
 
+  /// دریافت وابستگی‌های فایل
+  Future<Map<String, dynamic>> getFileUsage({
+    required int businessId,
+    required String fileId,
+  }) async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/business/$businessId/storage/files/$fileId/usage',
+    );
+    final body = res.data as Map<String, dynamic>;
+    final data = body['data'] as Map<String, dynamic>? ?? {};
+    return {
+      'file': data['file'] is Map ? Map<String, dynamic>.from(data['file'] as Map) : <String, dynamic>{},
+      'dependencies': (data['dependencies'] as List?)
+              ?.map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e as Map))
+              .toList() ??
+          const <Map<String, dynamic>>[],
+    };
+  }
+
   /// تغییر نام فایل
   Future<Map<String, dynamic>> renameFile({
     required int businessId,

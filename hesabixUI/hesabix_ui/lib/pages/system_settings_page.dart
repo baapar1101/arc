@@ -114,6 +114,27 @@ class _SystemSettingsPageState extends State<SystemSettingsPage> {
         color: const Color(0xFF1976D2),
         route: '/user/profile/system-settings/businesses',
       ),
+      SettingsItem(
+        title: 'تنظیمات AI',
+        description: 'پیکربندی Provider، مدل و API Key',
+        icon: Icons.smart_toy_outlined,
+        color: const Color(0xFF9C27B0),
+        route: '/user/profile/system-settings/ai-settings',
+      ),
+      SettingsItem(
+        title: 'پلن‌های AI',
+        description: 'مدیریت پلن‌های استفاده از AI و تعیین قیمت‌ها',
+        icon: Icons.subscriptions_outlined,
+        color: const Color(0xFF673AB7),
+        route: '/user/profile/system-settings/ai-plans',
+      ),
+      SettingsItem(
+        title: 'Prompt های AI',
+        description: 'مدیریت Prompt های پیش‌فرض برای نقش‌های مختلف',
+        icon: Icons.text_fields_outlined,
+        color: const Color(0xFF5E35B1),
+        route: '/user/profile/system-settings/ai-prompts',
+      ),
     ];
   }
 

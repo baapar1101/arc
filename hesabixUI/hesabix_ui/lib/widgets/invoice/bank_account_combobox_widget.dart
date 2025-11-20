@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../services/bank_account_service.dart';
 import '../../core/api_client.dart';
 import '../../services/currency_service.dart';
+import '../../widgets/banking/bank_account_form_dialog.dart';
 
 class BankAccountOption {
   final String id;
@@ -184,6 +185,27 @@ class _BankAccountComboboxWidgetState extends State<BankAccountComboboxWidget> {
     }
   }
 
+  Future<void> _addNewBankAccount() async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => BankAccountFormDialog(
+        businessId: widget.businessId,
+        onSuccess: () {},
+      ),
+    );
+    
+    if (result == true && mounted) {
+      // Refresh لیست
+      await _performSearch(_latestQuery);
+      
+      // پیدا کردن آخرین آیتم اضافه شده (احتمالاً آخرین آیتم در لیست)
+      if (_items.isNotEmpty) {
+        final lastItem = _items.last;
+        widget.onChanged(lastItem);
+      }
+    }
+  }
+
   void _openPicker() {
     showModalBottomSheet(
       context: context,
@@ -205,6 +227,7 @@ class _BankAccountComboboxWidgetState extends State<BankAccountComboboxWidget> {
               widget.onChanged(opt);
               Navigator.pop(context);
             },
+            onAddNew: _addNewBankAccount,
           );
         },
       ),
@@ -265,6 +288,7 @@ class _BankPickerBottomSheet extends StatelessWidget {
   final ValueChanged<String> onSearchChanged;
   final ValueChanged<BankAccountOption?> onSelected;
   final String Function(int?)? currencyLabelBuilder;
+  final VoidCallback? onAddNew;
 
   const _BankPickerBottomSheet({
     required this.label,
@@ -277,6 +301,7 @@ class _BankPickerBottomSheet extends StatelessWidget {
     required this.onSearchChanged,
     required this.currencyLabelBuilder,
     required this.onSelected,
+    this.onAddNew,
   });
 
   @override
@@ -292,6 +317,13 @@ class _BankPickerBottomSheet extends StatelessWidget {
             children: [
               Text(label, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
               const Spacer(),
+              if (onAddNew != null)
+                IconButton(
+                  onPressed: onAddNew,
+                  icon: const Icon(Icons.add),
+                  tooltip: 'افزودن حساب بانکی جدید',
+                  color: colorScheme.primary,
+                ),
               IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close)),
             ],
           ),

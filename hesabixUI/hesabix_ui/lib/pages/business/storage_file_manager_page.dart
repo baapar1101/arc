@@ -6,6 +6,8 @@ import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/services/business_storage_service.dart';
 import 'package:hesabix_ui/utils/web/web_utils.dart' as web_utils;
 import 'package:file_picker/file_picker.dart';
+import 'package:file_saver/file_saver.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// صفحه فایل منیجر برای مدیریت فایل‌های کسب‌وکار
 class StorageFileManagerPage extends StatefulWidget {
@@ -33,6 +35,157 @@ class _StorageFileManagerPageState extends State<StorageFileManagerPage> {
     super.initState();
     _storageService = BusinessStorageService(ApiClient());
     _load();
+    _checkAndShowHelp();
+  }
+
+  Future<void> _checkAndShowHelp() async {
+    final prefs = await SharedPreferences.getInstance();
+    final key = 'file_manager_help_shown_${widget.businessId}';
+    final helpShown = prefs.getBool(key) ?? false;
+    
+    if (!helpShown && mounted) {
+      // کمی تاخیر برای اینکه صفحه کاملاً لود شود
+      await Future.delayed(const Duration(milliseconds: 500));
+      if (mounted) {
+        _showHelpDialog();
+      }
+    }
+  }
+
+  Future<void> _showHelpDialog() async {
+    final theme = Theme.of(context);
+    bool dontShowAgain = false;
+
+    await showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Row(
+            children: [
+              Icon(Icons.help_outline, color: theme.colorScheme.primary),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text('راهنمای فایل منیجر'),
+              ),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildHelpItem(
+                  icon: Icons.folder,
+                  title: 'ورود به پوشه',
+                  description: 'برای مشاهده فایل‌های یک بخش، روی پوشه مورد نظر کلیک کنید.',
+                  theme: theme,
+                ),
+                const SizedBox(height: 16),
+                _buildHelpItem(
+                  icon: Icons.edit,
+                  title: 'تغییر نام فایل',
+                  description: 'برای تغییر نام فایل، روی فایل کلیک راست کنید (یا long press) و گزینه "تغییر نام" را انتخاب کنید.\nنکته: فرمت فایل (مثل .pdf) قابل تغییر نیست.',
+                  theme: theme,
+                ),
+                const SizedBox(height: 16),
+                _buildHelpItem(
+                  icon: Icons.download,
+                  title: 'دانلود فایل',
+                  description: 'برای دانلود فایل، روی فایل کلیک راست کنید (یا long press) و گزینه "دانلود" را انتخاب کنید.',
+                  theme: theme,
+                ),
+                const SizedBox(height: 16),
+                _buildHelpItem(
+                  icon: Icons.delete,
+                  title: 'حذف فایل',
+                  description: 'برای حذف فایل، روی فایل کلیک راست کنید (یا long press) و گزینه "حذف" را انتخاب کنید.',
+                  theme: theme,
+                ),
+                const SizedBox(height: 16),
+                _buildHelpItem(
+                  icon: Icons.image,
+                  title: 'پیش‌نمایش عکس',
+                  description: 'برای مشاهده پیش‌نمایش عکس‌ها، روی فایل عکس کلیک کنید.',
+                  theme: theme,
+                ),
+                const SizedBox(height: 16),
+                CheckboxListTile(
+                  value: dontShowAgain,
+                  onChanged: (value) {
+                    setDialogState(() {
+                      dontShowAgain = value ?? false;
+                    });
+                  },
+                  title: const Text('دیگر نشان نده'),
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () async {
+                if (dontShowAgain) {
+                  final prefs = await SharedPreferences.getInstance();
+                  final key = 'file_manager_help_shown_${widget.businessId}';
+                  await prefs.setBool(key, true);
+                }
+                Navigator.pop(context);
+              },
+              child: const Text('متوجه شدم'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHelpItem({
+    required IconData icon,
+    required String title,
+    required String description,
+    required ThemeData theme,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.primaryContainer,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(
+            icon,
+            color: theme.colorScheme.primary,
+            size: 24,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                description,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
   }
 
   Future<void> _load() async {
@@ -134,27 +287,11 @@ class _StorageFileManagerPageState extends State<StorageFileManagerPage> {
     }
   }
 
-  Future<void> _deleteFile(String fileId) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('حذف فایل'),
-        content: const Text('آیا از حذف این فایل اطمینان دارید؟'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('لغو'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('حذف'),
-          ),
-        ],
-      ),
-    );
-
+  Future<void> _deleteFile(Map<String, dynamic> file) async {
+    final confirmed = await _showDeleteConfirmation(file);
     if (confirmed != true) return;
+
+    final fileId = file['id'] as String;
 
     try {
       await _storageService.deleteFile(
@@ -182,23 +319,137 @@ class _StorageFileManagerPageState extends State<StorageFileManagerPage> {
     }
   }
 
+  Future<bool?> _showDeleteConfirmation(Map<String, dynamic> file) async {
+    List<Map<String, dynamic>> dependencies = <Map<String, dynamic>>[];
+    String? usageError;
+    try {
+      final usage = await _storageService.getFileUsage(
+        businessId: widget.businessId,
+        fileId: file['id'] as String,
+      );
+      dependencies = (usage['dependencies'] as List?)
+              ?.map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e as Map))
+              .toList() ??
+          <Map<String, dynamic>>[];
+    } catch (e) {
+      usageError = '$e';
+    }
+
+    if (!mounted) return false;
+
+    final theme = Theme.of(context);
+
+    return showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('حذف فایل'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'آیا از حذف "${file['original_name'] ?? ''}" اطمینان دارید؟',
+              style: theme.textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 16),
+            if (usageError != null)
+              Text(
+                'خطا در دریافت وابستگی‌ها: $usageError',
+                style: theme.textTheme.bodySmall?.copyWith(color: Colors.red),
+              )
+            else if (dependencies.isEmpty)
+              Text(
+                'این فایل در هیچ بخشی استفاده نشده است.',
+                style: theme.textTheme.bodySmall,
+              )
+            else ...[
+              Text(
+                'این فایل در بخش‌های زیر استفاده شده است:',
+                style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                height: 150,
+                child: ListView.builder(
+                  itemCount: dependencies.length,
+                  itemBuilder: (context, index) {
+                    final dep = dependencies[index];
+                    return ListTile(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(Icons.link, color: theme.colorScheme.primary, size: 20),
+                      title: Text(dep['description'] as String? ?? '-', style: theme.textTheme.bodyMedium),
+                      subtitle: Text(
+                        '${dep['module'] ?? ''} • ${dep['entity_type'] ?? ''} • ${dep['entity_id'] ?? ''}',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'با حذف فایل، لینک‌های بالا به صورت خودکار پاک می‌شوند.',
+                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+              ),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('لغو'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('حذف'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _renameFile(Map<String, dynamic> file) async {
     final currentName = file['original_name'] as String? ?? '';
     final fileId = file['id'] as String;
 
-    final newNameController = TextEditingController(text: currentName);
+    // استخراج extension از نام فعلی
+    final extension = _getFileExtension(currentName);
+    final nameWithoutExtension = _removeFileExtension(currentName);
+
+    final newNameController = TextEditingController(text: nameWithoutExtension);
     
     final result = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('تغییر نام فایل'),
-        content: TextField(
-          controller: newNameController,
-          decoration: const InputDecoration(
-            labelText: 'نام جدید',
-            border: OutlineInputBorder(),
-          ),
-          autofocus: true,
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              controller: newNameController,
+              decoration: InputDecoration(
+                labelText: 'نام جدید',
+                hintText: 'نام فایل (بدون فرمت)',
+                border: const OutlineInputBorder(),
+                suffixText: extension.isNotEmpty ? extension : null,
+              ),
+              autofocus: true,
+            ),
+            if (extension.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                'فرمت فایل: $extension',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                ),
+              ),
+            ],
+          ],
         ),
         actions: [
           TextButton(
@@ -209,7 +460,11 @@ class _StorageFileManagerPageState extends State<StorageFileManagerPage> {
             onPressed: () {
               final newName = newNameController.text.trim();
               if (newName.isNotEmpty) {
-                Navigator.pop(context, newName);
+                // اضافه کردن extension به نام جدید
+                final finalName = extension.isNotEmpty 
+                    ? '$newName$extension'
+                    : newName;
+                Navigator.pop(context, finalName);
               }
             },
             child: const Text('ذخیره'),
@@ -220,11 +475,14 @@ class _StorageFileManagerPageState extends State<StorageFileManagerPage> {
 
     if (result == null || result.isEmpty || result == currentName) return;
 
+    // اطمینان از اینکه extension تغییر نکرده است
+    final finalName = _ensureCorrectExtension(result, extension);
+
     try {
       await _storageService.renameFile(
         businessId: widget.businessId,
         fileId: fileId,
-        newName: result,
+        newName: finalName,
       );
       if (mounted) {
         _load();
@@ -247,20 +505,68 @@ class _StorageFileManagerPageState extends State<StorageFileManagerPage> {
     }
   }
 
+  String _getFileExtension(String filename) {
+    final lastDot = filename.lastIndexOf('.');
+    if (lastDot == -1 || lastDot == filename.length - 1) {
+      return '';
+    }
+    return filename.substring(lastDot);
+  }
+
+  String _removeFileExtension(String filename) {
+    final lastDot = filename.lastIndexOf('.');
+    if (lastDot == -1) {
+      return filename;
+    }
+    return filename.substring(0, lastDot);
+  }
+
+  String _ensureCorrectExtension(String filename, String originalExtension) {
+    if (originalExtension.isEmpty) {
+      return filename;
+    }
+    
+    final currentExtension = _getFileExtension(filename);
+    if (currentExtension.toLowerCase() != originalExtension.toLowerCase()) {
+      // اگر extension تغییر کرده، آن را با extension اصلی جایگزین می‌کنیم
+      final nameWithoutExtension = _removeFileExtension(filename);
+      return '$nameWithoutExtension$originalExtension';
+    }
+    
+    return filename;
+  }
+
   Future<void> _downloadFile(Map<String, dynamic> file) async {
     final fileId = file['id'] as String;
+    final fileName = file['original_name'] as String? ?? 'file';
+    final mimeType = file['mime_type'] as String? ?? 'application/octet-stream';
     
     try {
-      // برای وب، از URL مستقیم استفاده می‌کنیم
-      if (mounted) {
-        final baseUrl = '/api/v1/business/${widget.businessId}/storage/files/$fileId/download';
-        if (kIsWeb) {
-          web_utils.openUrlInNewTabWeb(baseUrl);
-        } else {
-          // برای موبایل، می‌توانیم فایل را ذخیره کنیم
+      final bytes = await _storageService.downloadFile(
+        businessId: widget.businessId,
+        fileId: fileId,
+      );
+
+      if (bytes.isEmpty) {
+        throw Exception('فایل خالی است');
+      }
+
+      if (kIsWeb) {
+        await web_utils.saveBytesAsFileWeb(bytes, fileName, mimeType: mimeType);
+      } else {
+        final uint8Bytes = bytes is Uint8List ? bytes : Uint8List.fromList(bytes);
+        final extension = _getFileExtension(fileName).replaceFirst('.', '');
+        final safeExt = extension.isEmpty ? 'bin' : extension;
+        await FileSaver.instance.saveFile(
+          name: fileName,
+          bytes: uint8Bytes,
+          ext: safeExt,
+        );
+        if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('دانلود فایل فقط در نسخه وب پشتیبانی می‌شود'),
+              content: Text('فایل با موفقیت ذخیره شد'),
+              backgroundColor: Colors.green,
             ),
           );
         }
@@ -428,6 +734,11 @@ class _StorageFileManagerPageState extends State<StorageFileManagerPage> {
           onPressed: () => context.go('/business/${widget.businessId}/storage-files'),
         ),
         actions: [
+          IconButton(
+            onPressed: _showHelpDialog,
+            icon: const Icon(Icons.help_outline),
+            tooltip: 'راهنما',
+          ),
           IconButton(
             onPressed: _load,
             icon: const Icon(Icons.refresh),
@@ -759,7 +1070,7 @@ class _StorageFileManagerPageState extends State<StorageFileManagerPage> {
               title: const Text('حذف', style: TextStyle(color: Colors.red)),
               onTap: () {
                 Navigator.pop(context);
-                _deleteFile(file['id'] as String);
+                _deleteFile(file);
               },
             ),
           ],

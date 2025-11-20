@@ -6,6 +6,7 @@ import '../../models/person_model.dart';
 import '../../models/account_tree_node.dart';
 import '../../core/date_utils.dart';
 import '../../core/calendar_controller.dart';
+import '../../core/auth_store.dart';
 import '../../utils/number_formatters.dart';
 import '../../services/bank_account_service.dart';
 import '../../services/cash_register_service.dart';
@@ -29,6 +30,7 @@ class InvoiceTransactionsWidget extends StatefulWidget {
   final InvoiceType invoiceType;
   final int? selectedCurrencyId;
   final CheckPickerMode checkPickerMode;
+  final AuthStore? authStore;
 
   const InvoiceTransactionsWidget({
     super.key,
@@ -39,6 +41,7 @@ class InvoiceTransactionsWidget extends StatefulWidget {
     required this.invoiceType,
     this.selectedCurrencyId,
     this.checkPickerMode = CheckPickerMode.any,
+    this.authStore,
   });
 
   @override
@@ -335,6 +338,7 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
         invoiceType: widget.invoiceType,
         selectedCurrencyId: widget.selectedCurrencyId,
         checkPickerMode: widget.checkPickerMode,
+        authStore: widget.authStore,
         onSave: (newTransaction) {
           if (index != null) {
             // ویرایش تراکنش موجود
@@ -361,6 +365,7 @@ class TransactionDialog extends StatefulWidget {
   final InvoiceType invoiceType;
   final int? selectedCurrencyId;
   final CheckPickerMode checkPickerMode;
+  final AuthStore? authStore;
 
   const TransactionDialog({
     super.key,
@@ -371,6 +376,7 @@ class TransactionDialog extends StatefulWidget {
     this.selectedCurrencyId,
     required this.onSave,
     this.checkPickerMode = CheckPickerMode.any,
+    this.authStore,
   });
 
   @override
@@ -818,6 +824,8 @@ class _TransactionDialogState extends State<TransactionDialog> {
       onChanged: _onCheckSelected,
       label: label,
       hintText: hintText,
+      authStore: widget.authStore,
+      calendarController: widget.calendarController,
     );
   }
 

@@ -718,7 +718,7 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
                           ),
                           trailing: IconButton(
                             icon: const Icon(Icons.delete_outline, color: Colors.red),
-                            onPressed: () => _deleteFile(file['id']),
+                            onPressed: () => _deleteFile(file),
                           ),
                         ),
                         if (!isLast) const Divider(height: 1),
@@ -1079,32 +1079,14 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
     return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
   }
 
-  Future<void> _deleteFile(String fileId) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('حذف فایل'),
-        content: const Text('آیا از حذف این فایل اطمینان دارید؟'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('لغو'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('حذف'),
-          ),
-        ],
-      ),
-    );
-
+  Future<void> _deleteFile(Map<String, dynamic> file) async {
+    final confirmed = await _showDeleteConfirmation(file);
     if (confirmed != true) return;
 
     try {
       await _storageService.deleteFile(
         businessId: widget.businessId,
-        fileId: fileId,
+        fileId: file['id'] as String,
       );
       if (mounted) {
         _load();
@@ -1125,5 +1107,98 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
         );
       }
     }
+  }
+
+  Future<bool?> _showDeleteConfirmation(Map<String, dynamic> file) async {
+    List<Map<String, dynamic>> dependencies = <Map<String, dynamic>>[];
+    String? usageError;
+    try {
+      final usage = await _storageService.getFileUsage(
+        businessId: widget.businessId,
+        fileId: file['id'] as String,
+      );
+      dependencies = (usage['dependencies'] as List?)
+              ?.map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e as Map))
+              .toList() ??
+          <Map<String, dynamic>>[];
+    } catch (e) {
+      usageError = '$e';
+    }
+
+    if (!mounted) return false;
+
+    final theme = Theme.of(context);
+
+    return showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('حذف فایل'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'آیا از حذف "${file['original_name'] ?? ''}" اطمینان دارید؟',
+              style: theme.textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 16),
+            if (usageError != null)
+              Text(
+                'خطا در دریافت وابستگی‌ها: $usageError',
+                style: theme.textTheme.bodySmall?.copyWith(color: Colors.red),
+              )
+            else if (dependencies.isEmpty)
+              Text(
+                'این فایل در هیچ بخشی استفاده نشده است.',
+                style: theme.textTheme.bodySmall,
+              )
+            else ...[
+              Text(
+                'این فایل در بخش‌های زیر استفاده شده است:',
+                style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                height: 150,
+                child: ListView.builder(
+                  itemCount: dependencies.length,
+                  itemBuilder: (context, index) {
+                    final dep = dependencies[index];
+                    return ListTile(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(Icons.link, color: theme.colorScheme.primary, size: 20),
+                      title: Text(dep['description'] as String? ?? '-', style: theme.textTheme.bodyMedium),
+                      subtitle: Text(
+                        '${dep['module'] ?? ''} • ${dep['entity_type'] ?? ''} • ${dep['entity_id'] ?? ''}',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'با حذف فایل، لینک‌های بالا به صورت خودکار پاک می‌شوند.',
+                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+              ),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('لغو'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('حذف'),
+          ),
+        ],
+      ),
+    );
   }
 }

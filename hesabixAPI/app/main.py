@@ -381,6 +381,8 @@ def create_app() -> FastAPI:
     # Support endpoints
     application.include_router(support_tickets_router, prefix=f"{settings.api_v1_prefix}/support")
     application.include_router(support_operator_router, prefix=f"{settings.api_v1_prefix}/support/operator")
+    from adapters.api.v1.support.ai_tickets import router as support_ai_router
+    application.include_router(support_ai_router, prefix=settings.api_v1_prefix)
     application.include_router(support_categories_router, prefix=f"{settings.api_v1_prefix}/metadata/categories")
     application.include_router(support_priorities_router, prefix=f"{settings.api_v1_prefix}/metadata/priorities")
     application.include_router(support_statuses_router, prefix=f"{settings.api_v1_prefix}/metadata/statuses")
@@ -397,6 +399,22 @@ def create_app() -> FastAPI:
     application.include_router(admin_announcements_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_notification_templates_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_document_monetization_router, prefix=settings.api_v1_prefix)
+    # AI endpoints
+    from adapters.api.v1.admin.ai_settings import router as admin_ai_settings_router
+    from adapters.api.v1.admin.ai_plans import router as admin_ai_plans_router
+    from adapters.api.v1.admin.ai_prompts import router as admin_ai_prompts_router
+    application.include_router(admin_ai_settings_router, prefix=settings.api_v1_prefix)
+    application.include_router(admin_ai_plans_router, prefix=settings.api_v1_prefix)
+    application.include_router(admin_ai_prompts_router, prefix=settings.api_v1_prefix)
+    # User AI endpoints
+    from adapters.api.v1.ai.chat import router as ai_chat_router
+    from adapters.api.v1.ai.subscription import router as ai_subscription_router
+    from adapters.api.v1.ai.prompts import router as ai_prompts_router
+    from adapters.api.v1.ai.usage import router as ai_usage_router
+    application.include_router(ai_chat_router, prefix=settings.api_v1_prefix)
+    application.include_router(ai_subscription_router, prefix=settings.api_v1_prefix)
+    application.include_router(ai_prompts_router, prefix=settings.api_v1_prefix)
+    application.include_router(ai_usage_router, prefix=settings.api_v1_prefix)
 
     register_error_handlers(application)
 
@@ -411,6 +429,18 @@ def create_app() -> FastAPI:
         asyncio.create_task(storage_subscription_check_loop(6))
         # Document monetization processor
         asyncio.create_task(document_monetization_loop(10))
+        # AI background jobs
+        from app.services.ai_background_jobs import (
+            ai_quota_reset_loop,
+            ai_chat_cleanup_loop,
+            ai_subscription_check_loop
+        )
+        # AI quota reset: هر 24 ساعت یکبار
+        asyncio.create_task(ai_quota_reset_loop(24))
+        # AI chat cleanup: هر 24 ساعت یکبار
+        asyncio.create_task(ai_chat_cleanup_loop(24))
+        # AI subscription check: هر 6 ساعت یکبار
+        asyncio.create_task(ai_subscription_check_loop(6))
 
     @application.middleware("http")
     async def log_slow_requests(request: Request, call_next):
