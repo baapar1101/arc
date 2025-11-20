@@ -578,22 +578,113 @@ async def upload_file_endpoint(
 		)
 		return success_response(saved, request, "فایل با موفقیت آپلود شد")
 	except HTTPException as e:
-		# اگر خطای محدودیت ذخیره‌سازی باشد، جزئیات را برمی‌گردانیم
-		if e.status_code == 400 and isinstance(e.detail, dict) and e.detail.get("error") == "STORAGE_LIMIT_EXCEEDED":
-			# ساخت detail با تمام جزئیات
-			error_detail = {
-				"success": False,
-				"error": {
-					"code": "STORAGE_LIMIT_EXCEEDED",
-					"message": e.detail.get("message", "حجم فایل از محدودیت ذخیره‌سازی تجاوز می‌کند"),
-					"total_limit_gb": e.detail.get("total_limit_gb"),
-					"current_usage_gb": e.detail.get("current_usage_gb"),
-					"available_gb": e.detail.get("available_gb"),
-					"required_gb": e.detail.get("required_gb"),
-					"over_usage_gb": e.detail.get("over_usage_gb"),
+			# اگر خطای محدودیت ذخیره‌سازی باشد، جزئیات را برمی‌گردانیم
+			if e.status_code == 400 and isinstance(e.detail, dict) and e.detail.get("error") == "STORAGE_LIMIT_EXCEEDED":
+				# ساخت detail با تمام جزئیات
+				error_detail = {
+					"success": False,
+					"error": {
+						"code": "STORAGE_LIMIT_EXCEEDED",
+						"message": e.detail.get("message", "حجم فایل از محدودیت ذخیره‌سازی تجاوز می‌کند"),
+						"total_limit_gb": e.detail.get("total_limit_gb"),
+						"current_usage_gb": e.detail.get("current_usage_gb"),
+						"available_gb": e.detail.get("available_gb"),
+						"required_gb": e.detail.get("required_gb"),
+						"over_usage_gb": e.detail.get("over_usage_gb"),
+					}
 				}
-			}
-			# استفاده از HTTPException مستقیم برای حفظ جزئیات
-			raise HTTPException(status_code=400, detail=error_detail)
-		raise
+				# استفاده از HTTPException مستقیم برای حفظ جزئیات
+				raise HTTPException(status_code=400, detail=error_detail)
+			raise
+
+
+@router.put(
+	"/files/{file_id}/rename",
+	summary="تغییر نام فایل",
+	description="تغییر نام فایل الصاق شده به کسب‌وکار",
+)
+async def rename_file_endpoint(
+	business_id: int,
+	file_id: str,
+	request: Request,
+	new_name: str = Body(..., embed=True),
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	"""تغییر نام فایل"""
+	# بررسی دسترسی به کسب‌وکار
+	if not ctx.can_access_business(business_id):
+		raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار ندارید", http_status=403)
+	
+	from adapters.db.models.file_storage import FileStorage
+	
+	# بررسی وجود فایل و تعلق آن به کسب‌وکار
+	file_storage = db.query(FileStorage).filter(
+		and_(
+			FileStorage.id == file_id,
+			FileStorage.business_id == business_id,
+			FileStorage.deleted_at.is_(None),
+		)
+	).first()
+	
+	if not file_storage:
+		raise ApiError("FILE_NOT_FOUND", "فایل یافت نشد", http_status=404)
+	
+	# بررسی اعتبار نام جدید
+	if not new_name or not new_name.strip():
+		raise ApiError("INVALID_NAME", "نام فایل نمی‌تواند خالی باشد", http_status=400)
+	
+	# تغییر نام
+	file_storage.original_name = new_name.strip()
+	db.commit()
+	db.refresh(file_storage)
+	
+	return success_response({
+		"id": str(file_storage.id),
+		"original_name": file_storage.original_name,
+	}, request, "نام فایل با موفقیت تغییر یافت")
+
+
+@router.delete(
+	"/files/{file_id}",
+	summary="حذف فایل",
+	description="حذف فایل الصاق شده به کسب‌وکار",
+)
+async def delete_file_endpoint(
+	business_id: int,
+	file_id: str,
+	request: Request,
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	"""حذف فایل"""
+	# بررسی دسترسی به کسب‌وکار
+	if not ctx.can_access_business(business_id):
+		raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار ندارید", http_status=403)
+	
+	from adapters.db.models.file_storage import FileStorage
+	from uuid import UUID
+	
+	# بررسی وجود فایل و تعلق آن به کسب‌وکار
+	file_storage = db.query(FileStorage).filter(
+		and_(
+			FileStorage.id == file_id,
+			FileStorage.business_id == business_id,
+			FileStorage.deleted_at.is_(None),
+		)
+	).first()
+	
+	if not file_storage:
+		raise ApiError("FILE_NOT_FOUND", "فایل یافت نشد", http_status=404)
+	
+	# حذف فایل
+	storage = FileStorageService(db)
+	try:
+		success = await storage.delete_file(UUID(file_id))
+		if not success:
+			raise ApiError("DELETE_ERROR", "خطا در حذف فایل", http_status=500)
+	except Exception as e:
+		raise ApiError("DELETE_ERROR", f"خطا در حذف فایل: {str(e)}", http_status=500)
+	
+	return success_response({"ok": True}, request, "فایل با موفقیت حذف شد")
 

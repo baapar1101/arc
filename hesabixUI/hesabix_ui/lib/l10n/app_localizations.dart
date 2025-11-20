@@ -2960,12 +2960,6 @@ abstract class AppLocalizations {
   /// **'Warehouse Management'**
   String get warehouses;
 
-  /// No description provided for @shipments.
-  ///
-  /// In en, this message translates to:
-  /// **'Shipments'**
-  String get shipments;
-
   /// No description provided for @inquiries.
   ///
   /// In en, this message translates to:
@@ -8641,6 +8635,150 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Hybrid'**
   String get policyTypeHybrid;
+
+  /// No description provided for @warehouseDocuments.
+  ///
+  /// In en, this message translates to:
+  /// **'Warehouse Documents'**
+  String get warehouseDocuments;
+
+  /// No description provided for @warehouseDocument.
+  ///
+  /// In en, this message translates to:
+  /// **'Warehouse Document'**
+  String get warehouseDocument;
+
+  /// No description provided for @warehouseDocumentCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Document Code'**
+  String get warehouseDocumentCode;
+
+  /// No description provided for @warehouseDocumentType.
+  ///
+  /// In en, this message translates to:
+  /// **'Document Type'**
+  String get warehouseDocumentType;
+
+  /// No description provided for @warehouseDocumentStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Status'**
+  String get warehouseDocumentStatus;
+
+  /// No description provided for @warehouseDocumentDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Document Date'**
+  String get warehouseDocumentDate;
+
+  /// No description provided for @warehouseDocumentFrom.
+  ///
+  /// In en, this message translates to:
+  /// **'From Warehouse'**
+  String get warehouseDocumentFrom;
+
+  /// No description provided for @warehouseDocumentTo.
+  ///
+  /// In en, this message translates to:
+  /// **'To Warehouse'**
+  String get warehouseDocumentTo;
+
+  /// No description provided for @warehouseDocumentTotalQuantity.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Quantity'**
+  String get warehouseDocumentTotalQuantity;
+
+  /// No description provided for @warehouseDocumentTotalAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Amount'**
+  String get warehouseDocumentTotalAmount;
+
+  /// No description provided for @docTypeReceipt.
+  ///
+  /// In en, this message translates to:
+  /// **'Receipt'**
+  String get docTypeReceipt;
+
+  /// No description provided for @docTypeIssue.
+  ///
+  /// In en, this message translates to:
+  /// **'Issue'**
+  String get docTypeIssue;
+
+  /// No description provided for @docTypeTransfer.
+  ///
+  /// In en, this message translates to:
+  /// **'Transfer'**
+  String get docTypeTransfer;
+
+  /// No description provided for @docTypeAdjustment.
+  ///
+  /// In en, this message translates to:
+  /// **'Adjustment'**
+  String get docTypeAdjustment;
+
+  /// No description provided for @docTypeProductionIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Production In'**
+  String get docTypeProductionIn;
+
+  /// No description provided for @docTypeProductionOut.
+  ///
+  /// In en, this message translates to:
+  /// **'Production Out'**
+  String get docTypeProductionOut;
+
+  /// No description provided for @statusDraft.
+  ///
+  /// In en, this message translates to:
+  /// **'Draft'**
+  String get statusDraft;
+
+  /// No description provided for @statusPosted.
+  ///
+  /// In en, this message translates to:
+  /// **'Posted'**
+  String get statusPosted;
+
+  /// No description provided for @createWarehouseDocument.
+  ///
+  /// In en, this message translates to:
+  /// **'Create Manual Document'**
+  String get createWarehouseDocument;
+
+  /// No description provided for @postWarehouseDocument.
+  ///
+  /// In en, this message translates to:
+  /// **'Post Document'**
+  String get postWarehouseDocument;
+
+  /// No description provided for @cancelWarehouseDocument.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel Document'**
+  String get cancelWarehouseDocument;
+
+  /// No description provided for @deleteWarehouseDocument.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Document'**
+  String get deleteWarehouseDocument;
+
+  /// No description provided for @viewWarehouseDocument.
+  ///
+  /// In en, this message translates to:
+  /// **'View Details'**
+  String get viewWarehouseDocument;
+
+  /// No description provided for @printWarehouseDocument.
+  ///
+  /// In en, this message translates to:
+  /// **'Print PDF'**
+  String get printWarehouseDocument;
 }
 
 class _AppLocalizationsDelegate

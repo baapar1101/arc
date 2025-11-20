@@ -1,7 +1,7 @@
 # Removed __future__ annotations to fix OpenAPI schema generation
 
 from typing import Dict, Any
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, Body
 from sqlalchemy.orm import Session
 
 from adapters.db.session import get_db
@@ -200,8 +200,7 @@ async def update_product_endpoint(
     request: Request,
     business_id: int,
     product_id: int,
-    payload: ProductUpdateRequest = None,
-    file: UploadFile = File(None),
+    file: UploadFile | None = File(None),
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
@@ -220,6 +219,7 @@ async def update_product_endpoint(
     
     image_file_id = None
     old_image_file_id = product.image_file_id
+    payload: ProductUpdateRequest | None = None
     
     # اگر multipart/form-data است، فایل و داده‌ها را از form می‌خوانیم
     if is_multipart:
@@ -272,7 +272,26 @@ async def update_product_endpoint(
         except Exception as e:
             raise ApiError("INVALID_PAYLOAD", f"خطا در پردازش داده‌ها: {str(e)}", http_status=400)
     else:
-        # اگر JSON است، فایل را از پارامتر file می‌خوانیم
+        # اگر JSON است، payload را از body می‌خوانیم
+        try:
+            body_data = await request.json()
+            # اگر default_warehouse_id در body_data وجود دارد (حتی اگر null باشد)، آن را به صورت صریح set می‌کنیم
+            # تا Pydantic آن را در fields_set قرار دهد
+            default_warehouse_id_value = body_data.get('default_warehouse_id')
+            if 'default_warehouse_id' in body_data:
+                # اگر null است، آن را به صورت صریح None set می‌کنیم
+                body_data['default_warehouse_id'] = default_warehouse_id_value
+            payload = ProductUpdateRequest(**body_data)
+            # اضافه کردن به fields_set برای Pydantic v2 (حتی اگر null باشد)
+            if 'default_warehouse_id' in body_data:
+                if hasattr(payload, 'model_fields_set'):
+                    payload.model_fields_set.add('default_warehouse_id')
+                elif hasattr(payload, '__fields_set__'):
+                    payload.__fields_set__.add('default_warehouse_id')
+        except Exception as e:
+            raise ApiError("INVALID_PAYLOAD", f"خطا در پردازش داده‌های JSON: {str(e)}", http_status=400)
+        
+        # اگر فایل هم ارسال شده، آن را پردازش می‌کنیم
         if file and file.filename:
             # بررسی فرمت فایل
             allowed_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'}

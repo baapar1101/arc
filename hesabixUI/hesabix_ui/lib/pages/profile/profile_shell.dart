@@ -317,6 +317,7 @@ class _ProfileShellState extends State<ProfileShell> {
       _Dest(t.businesses, Icons.business, Icons.business, '/user/profile/businesses'),
       _Dest(t.support, Icons.support_agent, Icons.support_agent, '/user/profile/support'),
       _Dest(t.marketing, Icons.campaign, Icons.campaign, '/user/profile/marketing'),
+      _Dest('اعلان‌ها و نوتیفیکیشن', Icons.notifications_outlined, Icons.notifications, '/user/profile/notifications'),
       _Dest('امضا و تصویر کاربر', Icons.border_color, Icons.border_color, '/user/profile/signature'),
       _Dest(t.changePassword, Icons.password, Icons.password, '/user/profile/change-password'),
     ];
@@ -368,12 +369,8 @@ class _ProfileShellState extends State<ProfileShell> {
     }
 
     // Brand top bar with contrast color
-    final Color appBarBg = Theme.of(context).brightness == Brightness.dark
-        ? scheme.surfaceContainerHighest
-        : scheme.primary;
-    final Color appBarFg = Theme.of(context).brightness == Brightness.dark
-        ? scheme.onSurfaceVariant
-        : scheme.onPrimary;
+    final Color appBarBg = const Color(0xFF0D47A1); // آبی تیره
+    final Color appBarFg = Colors.white;
 
     final appBar = AppBar(
       backgroundColor: appBarBg,

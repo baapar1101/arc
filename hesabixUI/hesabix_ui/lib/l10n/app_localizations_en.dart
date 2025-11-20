@@ -1484,9 +1484,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get warehouses => 'Warehouse Management';
 
   @override
-  String get shipments => 'Shipments';
-
-  @override
   String get inquiries => 'Inquiries';
 
   @override
@@ -4490,4 +4487,76 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get policyTypeHybrid => 'Hybrid';
+
+  @override
+  String get warehouseDocuments => 'Warehouse Documents';
+
+  @override
+  String get warehouseDocument => 'Warehouse Document';
+
+  @override
+  String get warehouseDocumentCode => 'Document Code';
+
+  @override
+  String get warehouseDocumentType => 'Document Type';
+
+  @override
+  String get warehouseDocumentStatus => 'Status';
+
+  @override
+  String get warehouseDocumentDate => 'Document Date';
+
+  @override
+  String get warehouseDocumentFrom => 'From Warehouse';
+
+  @override
+  String get warehouseDocumentTo => 'To Warehouse';
+
+  @override
+  String get warehouseDocumentTotalQuantity => 'Total Quantity';
+
+  @override
+  String get warehouseDocumentTotalAmount => 'Total Amount';
+
+  @override
+  String get docTypeReceipt => 'Receipt';
+
+  @override
+  String get docTypeIssue => 'Issue';
+
+  @override
+  String get docTypeTransfer => 'Transfer';
+
+  @override
+  String get docTypeAdjustment => 'Adjustment';
+
+  @override
+  String get docTypeProductionIn => 'Production In';
+
+  @override
+  String get docTypeProductionOut => 'Production Out';
+
+  @override
+  String get statusDraft => 'Draft';
+
+  @override
+  String get statusPosted => 'Posted';
+
+  @override
+  String get createWarehouseDocument => 'Create Manual Document';
+
+  @override
+  String get postWarehouseDocument => 'Post Document';
+
+  @override
+  String get cancelWarehouseDocument => 'Cancel Document';
+
+  @override
+  String get deleteWarehouseDocument => 'Delete Document';
+
+  @override
+  String get viewWarehouseDocument => 'View Details';
+
+  @override
+  String get printWarehouseDocument => 'Print PDF';
 }

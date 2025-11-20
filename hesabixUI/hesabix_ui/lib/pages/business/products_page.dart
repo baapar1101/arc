@@ -15,6 +15,7 @@ import '../../core/api_client.dart';
 import '../../config/app_config.dart';
 import '../../core/auth_store.dart';
 import '../../utils/number_formatters.dart';
+import '../../utils/date_formatters.dart';
 import 'price_lists_page.dart';
 
 class ProductsPage extends StatefulWidget {
@@ -315,8 +316,21 @@ class _ProductsPageState extends State<ProductsPage> {
       _InfoTileData(label: t.taxCode, value: _stringValue(product['tax_code']), icon: Icons.receipt_long),
     ];
     
+    // Format default warehouse name
+    String defaultWarehouseDisplay = '-';
+    final warehouseName = product['default_warehouse_name'] as String?;
+    final warehouseCode = product['default_warehouse_code'] as String?;
+    if (warehouseName != null && warehouseName.isNotEmpty) {
+      if (warehouseCode != null && warehouseCode.isNotEmpty) {
+        defaultWarehouseDisplay = '$warehouseCode - $warehouseName';
+      } else {
+        defaultWarehouseDisplay = warehouseName;
+      }
+    }
+    
     final inventoryItems = [
       _InfoTileData(label: t.inventoryControl, value: trackingLabel, icon: Icons.inventory_2_outlined),
+      _InfoTileData(label: 'انبار پیش‌فرض', value: defaultWarehouseDisplay, icon: Icons.warehouse_outlined),
       _InfoTileData(label: t.reorderPoint, value: _formatNumber(product['reorder_point']), icon: Icons.low_priority),
       _InfoTileData(label: t.minOrderQty, value: _formatNumber(product['min_order_qty']), icon: Icons.numbers),
     ];
@@ -925,6 +939,9 @@ class _ProductsPageState extends State<ProductsPage> {
           businessId: widget.businessId,
           reportModuleKey: 'products',
           reportSubtype: 'list',
+          showBackButton: true,
+          onBack: () => Navigator.of(context).maybePop(),
+          showTableIcon: false,
           showRowNumbers: true,
           enableRowSelection: true,
           enableMultiRowSelection: true,
@@ -1010,6 +1027,22 @@ class _ProductsPageState extends State<ProductsPage> {
               width: ColumnWidth.small,
               formatter: (row) => (row['track_inventory'] == true) ? t.yes : t.no,
             ),
+            TextColumn(
+              'default_warehouse_name',
+              'انبار پیش‌فرض',
+              width: ColumnWidth.medium,
+              formatter: (row) {
+                final warehouseName = row['default_warehouse_name'] as String?;
+                final warehouseCode = row['default_warehouse_code'] as String?;
+                if (warehouseName == null || warehouseName.isEmpty) {
+                  return '-';
+                }
+                if (warehouseCode != null && warehouseCode.isNotEmpty) {
+                  return '$warehouseCode - $warehouseName';
+                }
+                return warehouseName;
+              },
+            ),
             NumberColumn('reorder_point', t.reorderPoint, width: ColumnWidth.small, decimalPlaces: 0),
             NumberColumn('min_order_qty', t.minOrderQty, width: ColumnWidth.small, decimalPlaces: 0),
             // Taxes
@@ -1022,14 +1055,26 @@ class _ProductsPageState extends State<ProductsPage> {
               t.createdAt,
               width: ColumnWidth.medium,
               formatter: (row) {
+                // First try to get date_only from formatted object
                 final dynamic caf = row['created_at_formatted'];
-                if (caf is Map && caf['formatted'] != null && caf['formatted'].toString().isNotEmpty) {
-                  return caf['formatted'].toString();
+                if (caf is Map) {
+                  final dateOnly = caf['date_only'];
+                  if (dateOnly != null && dateOnly.toString().isNotEmpty) {
+                    return dateOnly.toString();
+                  }
+                }
+                // Fallback to other fields using DateFormatters
+                if (caf != null) {
+                  return DateFormatters.formatServerDateOnly(caf);
                 }
                 final dynamic ca = row['created_at'];
-                if (ca is String && ca.isNotEmpty) return ca;
+                if (ca != null) {
+                  return DateFormatters.formatServerDateOnly(ca);
+                }
                 final dynamic car = row['created_at_raw'];
-                if (car is String && car.isNotEmpty) return car;
+                if (car != null) {
+                  return DateFormatters.formatServerDateOnly(car);
+                }
                 return '-';
               },
             ),
@@ -1040,14 +1085,26 @@ class _ProductsPageState extends State<ProductsPage> {
               width: ColumnWidth.medium,
               sortable: false,
               formatter: (row) {
+                // First try to get date_only from formatted object
                 final dynamic uaf = row['updated_at_formatted'];
-                if (uaf is Map && uaf['formatted'] != null && uaf['formatted'].toString().isNotEmpty) {
-                  return uaf['formatted'].toString();
+                if (uaf is Map) {
+                  final dateOnly = uaf['date_only'];
+                  if (dateOnly != null && dateOnly.toString().isNotEmpty) {
+                    return dateOnly.toString();
+                  }
+                }
+                // Fallback to other fields using DateFormatters
+                if (uaf != null) {
+                  return DateFormatters.formatServerDateOnly(uaf);
                 }
                 final dynamic ua = row['updated_at'];
-                if (ua is String && ua.isNotEmpty) return ua;
+                if (ua != null) {
+                  return DateFormatters.formatServerDateOnly(ua);
+                }
                 final dynamic uar = row['updated_at_raw'];
-                if (uar is String && uar.isNotEmpty) return uar;
+                if (uar != null) {
+                  return DateFormatters.formatServerDateOnly(uar);
+                }
                 return '-';
               },
             ),

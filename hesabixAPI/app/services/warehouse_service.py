@@ -34,6 +34,34 @@ def _build_wh_code(prefix_base: str) -> str:
 	return f"{prefix_base}-{today.strftime('%Y%m%d')}-{int(datetime.utcnow().timestamp())%100000}"
 
 
+def _generate_auto_warehouse_code(db: Session, business_id: int) -> str:
+	"""تولید کد خودکار برای انبار: WH-00001, WH-00002, ..."""
+	from sqlalchemy import func, select
+	
+	# دریافت آخرین کد انبار
+	last_warehouse = (
+		db.query(Warehouse)
+		.filter(Warehouse.business_id == business_id)
+		.order_by(Warehouse.id.desc())
+		.first()
+	)
+	
+	if last_warehouse and last_warehouse.code:
+		# استخراج عدد از آخر کد (فرمت WH-00001)
+		import re
+		numbers = re.findall(r'\d+', last_warehouse.code)
+		if numbers:
+			try:
+				last_number = int(numbers[-1])
+				return f"WH-{last_number + 1:05d}"
+			except ValueError:
+				pass
+	
+	# اگر انبار قبلی نداشت یا فرمت نامعتبر بود
+	max_id = db.execute(select(func.max(Warehouse.id))).scalar() or 0
+	return f"WH-{max_id + 1:05d}"
+
+
 def create_from_invoice(
 	db: Session,
 	business_id: int,
@@ -79,10 +107,342 @@ def create_from_invoice(
 	return wh
 
 
+def create_manual_warehouse_document(
+	db: Session,
+	business_id: int,
+	user_id: int,
+	data: Dict[str, Any],
+) -> WarehouseDocument:
+	"""ایجاد حواله انبار دستی (بدون فاکتور)."""
+	from datetime import date as date_type
+	
+	# اعتبارسنجی ورودی
+	doc_type = data.get("doc_type")
+	if not doc_type or doc_type not in ("receipt", "issue", "transfer", "adjustment", "production_in", "production_out"):
+		raise ApiError("INVALID_DOC_TYPE", "نوع حواله معتبر نیست", http_status=400)
+	
+	document_date_str = data.get("document_date")
+	if not document_date_str:
+		raise ApiError("DATE_REQUIRED", "تاریخ حواله الزامی است", http_status=400)
+	
+	try:
+		document_date = date_type.fromisoformat(document_date_str) if isinstance(document_date_str, str) else document_date_str
+	except Exception:
+		raise ApiError("INVALID_DATE", "فرمت تاریخ معتبر نیست", http_status=400)
+	
+	lines_data = data.get("lines", [])
+	if not lines_data:
+		raise ApiError("LINES_REQUIRED", "حواله باید حداقل یک خط داشته باشد", http_status=400)
+	
+	# بررسی انبارها برای انواع مختلف حواله
+	warehouse_id_from = data.get("warehouse_id_from")
+	warehouse_id_to = data.get("warehouse_id_to")
+	
+	if doc_type == "transfer":
+		if not warehouse_id_from or not warehouse_id_to:
+			raise ApiError("WAREHOUSES_REQUIRED", "برای حواله انتقال، انبار مبدا و مقصد الزامی است", http_status=400)
+		if int(warehouse_id_from) == int(warehouse_id_to):
+			raise ApiError("INVALID_WAREHOUSES", "انبار مبدا و مقصد نمی‌توانند یکسان باشند", http_status=400)
+	elif doc_type in ("issue", "production_out"):
+		if not warehouse_id_from:
+			raise ApiError("WAREHOUSE_REQUIRED", "برای حواله خروج، انبار الزامی است", http_status=400)
+	elif doc_type in ("receipt", "production_in"):
+		if not warehouse_id_to:
+			raise ApiError("WAREHOUSE_REQUIRED", "برای حواله ورود، انبار الزامی است", http_status=400)
+	
+	# بررسی انبارها در business
+	if warehouse_id_from:
+		wh_from = db.query(Warehouse).filter(and_(Warehouse.id == int(warehouse_id_from), Warehouse.business_id == business_id)).first()
+		if not wh_from:
+			raise ApiError("WAREHOUSE_NOT_FOUND", "انبار مبدا یافت نشد", http_status=404)
+	
+	if warehouse_id_to:
+		wh_to = db.query(Warehouse).filter(and_(Warehouse.id == int(warehouse_id_to), Warehouse.business_id == business_id)).first()
+		if not wh_to:
+			raise ApiError("WAREHOUSE_NOT_FOUND", "انبار مقصد یافت نشد", http_status=404)
+	
+	# بررسی سال مالی
+	fy = _get_current_fiscal_year(db, business_id)
+	if document_date < fy.start_date or (fy.end_date and document_date > fy.end_date):
+		raise ApiError("DATE_OUT_OF_RANGE", f"تاریخ باید در بازه سال مالی ({fy.start_date} تا {fy.end_date or 'نامحدود'}) باشد", http_status=400)
+	
+	# ایجاد حواله
+	code = _build_wh_code("WH")
+	wh = WarehouseDocument(
+		business_id=business_id,
+		fiscal_year_id=fy.id,
+		code=code,
+		document_date=document_date,
+		status="draft",
+		doc_type=doc_type,
+		warehouse_id_from=int(warehouse_id_from) if warehouse_id_from else None,
+		warehouse_id_to=int(warehouse_id_to) if warehouse_id_to else None,
+		source_type="manual",
+		source_document_id=None,
+		created_by_user_id=user_id,
+		extra_info=data.get("extra_info"),
+	)
+	db.add(wh)
+	db.flush()
+	
+	# ایجاد خطوط
+	for i, ln in enumerate(lines_data, start=1):
+		pid = ln.get("product_id")
+		if not pid:
+			raise ApiError("PRODUCT_REQUIRED", f"خط {i}: شناسه محصول الزامی است", http_status=400)
+		
+		qty = Decimal(str(ln.get("quantity") or 0))
+		if qty <= 0:
+			raise ApiError("INVALID_QUANTITY", f"خط {i}: تعداد باید مثبت باشد", http_status=400)
+		
+		# بررسی محصول
+		product = db.query(Product).filter(and_(Product.id == int(pid), Product.business_id == business_id)).first()
+		if not product:
+			raise ApiError("PRODUCT_NOT_FOUND", f"خط {i}: محصول یافت نشد", http_status=404)
+		
+		# تعیین movement و warehouse_id بر اساس نوع حواله
+		if doc_type == "transfer":
+			# برای انتقال: یک خط out از مبدا و یک خط in به مقصد
+			# در اینجا فقط یک خط ایجاد می‌کنیم که movement آن بر اساس warehouse_id در خط مشخص می‌شود
+			line_wh_from = ln.get("warehouse_id_from") or warehouse_id_from
+			line_wh_to = ln.get("warehouse_id_to") or warehouse_id_to
+			if not line_wh_from or not line_wh_to:
+				raise ApiError("WAREHOUSES_REQUIRED", f"خط {i}: برای انتقال، انبار مبدا و مقصد باید مشخص باشد", http_status=400)
+			
+			# ایجاد خط خروج از مبدا
+			wline_out = WarehouseDocumentLine(
+				warehouse_document_id=wh.id,
+				product_id=int(pid),
+				warehouse_id=int(line_wh_from),
+				movement="out",
+				quantity=qty,
+				extra_info=ln.get("extra_info") or {},
+			)
+			db.add(wline_out)
+			
+			# ایجاد خط ورود به مقصد
+			wline_in = WarehouseDocumentLine(
+				warehouse_document_id=wh.id,
+				product_id=int(pid),
+				warehouse_id=int(line_wh_to),
+				movement="in",
+				quantity=qty,
+				extra_info=ln.get("extra_info") or {},
+			)
+			db.add(wline_in)
+		else:
+			# برای سایر انواع: movement بر اساس doc_type
+			if doc_type in ("issue", "production_out"):
+				movement = "out"
+				line_wh = ln.get("warehouse_id") or warehouse_id_from
+			elif doc_type in ("receipt", "production_in"):
+				movement = "in"
+				line_wh = ln.get("warehouse_id") or warehouse_id_to
+			elif doc_type == "adjustment":
+				# برای تعدیل: movement از خط گرفته می‌شود
+				movement = ln.get("movement", "in")
+				if movement not in ("in", "out"):
+					raise ApiError("INVALID_MOVEMENT", f"خط {i}: movement باید 'in' یا 'out' باشد", http_status=400)
+				line_wh = ln.get("warehouse_id") or warehouse_id_to or warehouse_id_from
+			else:
+				movement = "in"
+				line_wh = ln.get("warehouse_id") or warehouse_id_to
+			
+			if not line_wh:
+				raise ApiError("WAREHOUSE_REQUIRED", f"خط {i}: انبار الزامی است", http_status=400)
+			
+			# بررسی انبار
+			wh_check = db.query(Warehouse).filter(and_(Warehouse.id == int(line_wh), Warehouse.business_id == business_id)).first()
+			if not wh_check:
+				raise ApiError("WAREHOUSE_NOT_FOUND", f"خط {i}: انبار یافت نشد", http_status=404)
+			
+			wline = WarehouseDocumentLine(
+				warehouse_document_id=wh.id,
+				product_id=int(pid),
+				warehouse_id=int(line_wh),
+				movement=movement,
+				quantity=qty,
+				extra_info=ln.get("extra_info") or {},
+			)
+			db.add(wline)
+	
+	db.flush()
+	return wh
+
+
+def update_warehouse_document(
+	db: Session,
+	business_id: int,
+	wh_id: int,
+	user_id: int,
+	data: Dict[str, Any],
+) -> WarehouseDocument:
+	"""ویرایش حواله انبار (فقط draft)."""
+	from datetime import date as date_type
+	
+	wh = db.query(WarehouseDocument).filter(WarehouseDocument.id == wh_id).first()
+	if not wh or wh.business_id != business_id:
+		raise ApiError("NOT_FOUND", "Warehouse document not found", http_status=404)
+	
+	if wh.status != "draft":
+		raise ApiError("NOT_EDITABLE", "فقط حواله‌های draft قابل ویرایش هستند", http_status=400)
+	
+	# به‌روزرسانی فیلدهای اصلی
+	if "document_date" in data:
+		document_date_str = data.get("document_date")
+		try:
+			document_date = date_type.fromisoformat(document_date_str) if isinstance(document_date_str, str) else document_date_str
+		except Exception:
+			raise ApiError("INVALID_DATE", "فرمت تاریخ معتبر نیست", http_status=400)
+		
+		fy = _get_current_fiscal_year(db, business_id)
+		if document_date < fy.start_date or (fy.end_date and document_date > fy.end_date):
+			raise ApiError("DATE_OUT_OF_RANGE", f"تاریخ باید در بازه سال مالی باشد", http_status=400)
+		wh.document_date = document_date
+	
+	if "warehouse_id_from" in data:
+		wh.warehouse_id_from = int(data["warehouse_id_from"]) if data["warehouse_id_from"] else None
+		if wh.warehouse_id_from:
+			wh_check = db.query(Warehouse).filter(and_(Warehouse.id == wh.warehouse_id_from, Warehouse.business_id == business_id)).first()
+			if not wh_check:
+				raise ApiError("WAREHOUSE_NOT_FOUND", "انبار مبدا یافت نشد", http_status=404)
+	
+	if "warehouse_id_to" in data:
+		wh.warehouse_id_to = int(data["warehouse_id_to"]) if data["warehouse_id_to"] else None
+		if wh.warehouse_id_to:
+			wh_check = db.query(Warehouse).filter(and_(Warehouse.id == wh.warehouse_id_to, Warehouse.business_id == business_id)).first()
+			if not wh_check:
+				raise ApiError("WAREHOUSE_NOT_FOUND", "انبار مقصد یافت نشد", http_status=404)
+	
+	if "extra_info" in data:
+		wh.extra_info = data["extra_info"]
+	
+	wh.touch()
+	db.flush()
+	
+	# به‌روزرسانی خطوط در صورت ارسال
+	if "lines" in data:
+		lines_data = data.get("lines")
+		if lines_data is not None:
+			# حذف خطوط قدیمی
+			db.query(WarehouseDocumentLine).filter(WarehouseDocumentLine.warehouse_document_id == wh.id).delete()
+			db.flush()
+			
+			# ایجاد خطوط جدید
+			for i, ln in enumerate(lines_data, start=1):
+				pid = ln.get("product_id")
+				if not pid:
+					raise ApiError("PRODUCT_REQUIRED", f"خط {i}: شناسه محصول الزامی است", http_status=400)
+				
+				qty = Decimal(str(ln.get("quantity") or 0))
+				if qty <= 0:
+					raise ApiError("INVALID_QUANTITY", f"خط {i}: تعداد باید مثبت باشد", http_status=400)
+				
+				# بررسی محصول
+				product = db.query(Product).filter(and_(Product.id == int(pid), Product.business_id == business_id)).first()
+				if not product:
+					raise ApiError("PRODUCT_NOT_FOUND", f"خط {i}: محصول یافت نشد", http_status=404)
+				
+				movement = ln.get("movement", "in")
+				if movement not in ("in", "out"):
+					raise ApiError("INVALID_MOVEMENT", f"خط {i}: movement باید 'in' یا 'out' باشد", http_status=400)
+				
+				line_wh = ln.get("warehouse_id")
+				if not line_wh:
+					# اگر انبار در خط مشخص نشده، از حواله استفاده کن
+					line_wh = wh.warehouse_id_to if movement == "in" else wh.warehouse_id_from
+				
+				if not line_wh:
+					raise ApiError("WAREHOUSE_REQUIRED", f"خط {i}: انبار الزامی است", http_status=400)
+				
+				# بررسی انبار
+				wh_check = db.query(Warehouse).filter(and_(Warehouse.id == int(line_wh), Warehouse.business_id == business_id)).first()
+				if not wh_check:
+					raise ApiError("WAREHOUSE_NOT_FOUND", f"خط {i}: انبار یافت نشد", http_status=404)
+				
+				wline = WarehouseDocumentLine(
+					warehouse_document_id=wh.id,
+					product_id=int(pid),
+					warehouse_id=int(line_wh),
+					movement=movement,
+					quantity=qty,
+					extra_info=ln.get("extra_info") or {},
+				)
+				db.add(wline)
+			
+			db.flush()
+	
+	return wh
+
+
+def update_warehouse_document_line(
+	db: Session,
+	business_id: int,
+	wh_id: int,
+	line_id: int,
+	data: Dict[str, Any],
+) -> WarehouseDocumentLine:
+	"""به‌روزرسانی یک خط حواله (مثلاً برای تعیین انبار)."""
+	wh = db.query(WarehouseDocument).filter(WarehouseDocument.id == wh_id).first()
+	if not wh or wh.business_id != business_id:
+		raise ApiError("NOT_FOUND", "Warehouse document not found", http_status=404)
+	
+	if wh.status != "draft":
+		raise ApiError("NOT_EDITABLE", "فقط حواله‌های draft قابل ویرایش هستند", http_status=400)
+	
+	wline = db.query(WarehouseDocumentLine).filter(
+		and_(
+			WarehouseDocumentLine.id == line_id,
+			WarehouseDocumentLine.warehouse_document_id == wh_id
+		)
+	).first()
+	
+	if not wline:
+		raise ApiError("LINE_NOT_FOUND", "خط حواله یافت نشد", http_status=404)
+	
+	# به‌روزرسانی فیلدها
+	if "warehouse_id" in data:
+		warehouse_id = data.get("warehouse_id")
+		if warehouse_id:
+			wh_check = db.query(Warehouse).filter(and_(Warehouse.id == int(warehouse_id), Warehouse.business_id == business_id)).first()
+			if not wh_check:
+				raise ApiError("WAREHOUSE_NOT_FOUND", "انبار یافت نشد", http_status=404)
+			wline.warehouse_id = int(warehouse_id)
+		else:
+			wline.warehouse_id = None
+	
+	if "quantity" in data:
+		qty = Decimal(str(data.get("quantity") or 0))
+		if qty <= 0:
+			raise ApiError("INVALID_QUANTITY", "تعداد باید مثبت باشد", http_status=400)
+		wline.quantity = qty
+	
+	if "movement" in data:
+		movement = data.get("movement")
+		if movement not in ("in", "out"):
+			raise ApiError("INVALID_MOVEMENT", "movement باید 'in' یا 'out' باشد", http_status=400)
+		wline.movement = movement
+	
+	if "extra_info" in data:
+		wline.extra_info = data.get("extra_info")
+	
+	wh.touch()
+	db.flush()
+	return wline
+
+
 def post_warehouse_document(db: Session, wh_id: int) -> Dict[str, Any]:
-	"""پست حواله: کنترل کسری برای خروج‌ها و محاسبه COGS ساده (fallback به unit_price).
-	در پایان، در صورت وجود لینک به فاکتور منبع، سطرهای حسابداری COGS/Inventory را به همان سند اضافه می‌کند.
+	"""پست حواله: کنترل کسری برای خروج‌ها و به‌روزرسانی موجودی انبار.
+	اگر doc_type='transfer' باشد، یک سند حسابداری هم ایجاد می‌شود.
+	توجه: محاسبات COGS و ثبت سطرهای حسابداری در بخش فاکتورها انجام می‌شود.
 	"""
+	from app.services.invoice_service import _ensure_stock_sufficient, _get_current_fiscal_year
+	from adapters.db.models.document import Document
+	from adapters.db.models.document_line import DocumentLine
+	from adapters.db.models.currency import Currency
+	from app.services.document_monetization_service import ensure_document_policy_allows_creation
+	from datetime import datetime
+	
 	wh = db.query(WarehouseDocument).filter(WarehouseDocument.id == wh_id).first()
 	if not wh:
 		raise ApiError("NOT_FOUND", "Warehouse document not found", http_status=404)
@@ -90,93 +450,156 @@ def post_warehouse_document(db: Session, wh_id: int) -> Dict[str, Any]:
 		return {"id": wh.id, "status": wh.status}
 
 	lines = db.query(WarehouseDocumentLine).filter(WarehouseDocumentLine.warehouse_document_id == wh.id).all()
-	# کنترل کسری برای خروج‌ها (اگر allow_negative_stock نباشد)
+	if not lines:
+		raise ApiError("NO_LINES", "حواله باید حداقل یک خط داشته باشد", http_status=400)
+	
+	# کنترل کسری برای خروج‌ها
+	outgoing_lines = []
 	for ln in lines:
 		if ln.movement == "out":
-			# در این نسخه اولیه صرفاً چک نرم (بدون ایندکس کاردکس): اگر quantity<=0 خطا
 			if not ln.quantity or Decimal(str(ln.quantity)) <= 0:
-				raise ApiError("INVALID_QUANTITY", "Quantity must be positive", http_status=400)
+				raise ApiError("INVALID_QUANTITY", "تعداد باید مثبت باشد", http_status=400)
+			
+			if not ln.warehouse_id:
+				raise ApiError("WAREHOUSE_REQUIRED", "برای خطوط خروج، انبار باید مشخص باشد", http_status=400)
+			
+			# بررسی اینکه محصول کنترل موجودی دارد یا نه
+			product = db.query(Product).filter(Product.id == ln.product_id).first()
+			if product and product.track_inventory:
+				outgoing_lines.append({
+					"product_id": ln.product_id,
+					"quantity": float(ln.quantity),
+					"extra_info": {
+						"warehouse_id": ln.warehouse_id,
+						"movement": "out",
+						"inventory_tracked": True,
+					},
+				})
+	
+	# کنترل کسری موجودی با استفاده از تابع موجود
+	if outgoing_lines:
+		try:
+			_ensure_stock_sufficient(
+				db,
+				wh.business_id,
+				wh.document_date,
+				outgoing_lines,
+				exclude_document_id=None,  # این حواله هنوز پست نشده
+			)
+		except ApiError as e:
+			# خطای کسری موجودی را به صورت واضح نمایش بده
+			raise ApiError("INSUFFICIENT_STOCK", str(e.message), http_status=409)
 
-	# محاسبه cogs_amount (ساده)
-	for ln in lines:
-		qty = Decimal(str(ln.quantity or 0))
-		if qty <= 0:
-			continue
-		if ln.cogs_amount is None:
-			unit = Decimal(str((ln.cost_price or 0)))
-			if unit <= 0:
-				# تلاش برای fallback از extra_info.unit_price
-				u = None
-				try:
-					u = Decimal(str((ln.extra_info or {}).get("unit_price", 0)))
-				except Exception:
-					u = Decimal(0)
-				unit = u
-			ln.cogs_amount = unit * qty
-
+	# تغییر وضعیت به posted
 	wh.status = "posted"
 	wh.touch()
 	db.flush()
-
-	# در صورت اتصال به فاکتور، بر اساس نوع فاکتور سطرهای حسابداری ثبت کن
-	if wh.source_type == "invoice" and wh.source_document_id:
-		inv: Document = db.query(Document).filter(Document.id == int(wh.source_document_id)).first()
-		if inv:
-			# حساب‌ها
-			def get_fixed(db: Session, code: str) -> Account:
-				return db.query(Account).filter(and_(Account.business_id == None, Account.code == code)).first()  # noqa: E711
-			acc_inventory = get_fixed(db, "10102")
-			acc_inventory_finished = get_fixed(db, "10102")
-			acc_cogs = get_fixed(db, "40001")
-			acc_direct = get_fixed(db, "70406")
-			acc_waste = get_fixed(db, "70407")
-			acc_wip = get_fixed(db, "10106")
-			acc_grni = get_fixed(db, "30101")  # Goods Received Not Invoiced
-
-			inv_type = inv.document_type
-			# جمع مبالغ بر اساس حرکت
-			out_total = Decimal(0)
-			in_total = Decimal(0)
-			for ln in lines:
-				amt = Decimal(str(ln.cogs_amount or 0))
-				if ln.movement == "out":
-					out_total += amt
-				elif ln.movement == "in":
-					in_total += amt
-
-			if inv_type == "invoice_sales":
-				if out_total > 0:
-					db.add(DocumentLine(document_id=inv.id, account_id=acc_cogs.id, debit=out_total, credit=Decimal(0), description="بهای تمام‌شده (پست حواله فروش)"))
-					db.add(DocumentLine(document_id=inv.id, account_id=acc_inventory.id, debit=Decimal(0), credit=out_total, description="خروج موجودی (پست حواله فروش)"))
-			elif inv_type == "invoice_sales_return":
-				if in_total > 0:
-					db.add(DocumentLine(document_id=inv.id, account_id=acc_inventory.id, debit=in_total, credit=Decimal(0), description="ورود موجودی (پست حواله برگشت از فروش)"))
-					db.add(DocumentLine(document_id=inv.id, account_id=acc_cogs.id, debit=Decimal(0), credit=in_total, description="تعدیل بهای تمام‌شده (پست حواله برگشت از فروش)"))
-			elif inv_type == "invoice_direct_consumption":
-				if out_total > 0:
-					db.add(DocumentLine(document_id=inv.id, account_id=acc_direct.id, debit=out_total, credit=Decimal(0), description="مصرف مستقیم (پست حواله)"))
-					db.add(DocumentLine(document_id=inv.id, account_id=acc_inventory.id, debit=Decimal(0), credit=out_total, description="خروج موجودی (مصرف مستقیم)"))
-			elif inv_type == "invoice_waste":
-				if out_total > 0:
-					db.add(DocumentLine(document_id=inv.id, account_id=acc_waste.id, debit=out_total, credit=Decimal(0), description="ضایعات (پست حواله)"))
-					db.add(DocumentLine(document_id=inv.id, account_id=acc_inventory.id, debit=Decimal(0), credit=out_total, description="خروج موجودی (ضایعات)"))
-			elif inv_type == "invoice_purchase":
-				if in_total > 0:
-					db.add(DocumentLine(document_id=inv.id, account_id=acc_inventory.id, debit=in_total, credit=Decimal(0), description="ورود موجودی خرید (پست حواله)"))
-					db.add(DocumentLine(document_id=inv.id, account_id=acc_grni.id, debit=Decimal(0), credit=in_total, description="ثبت GRNI خرید"))
-			elif inv_type == "invoice_purchase_return":
-				if out_total > 0:
-					db.add(DocumentLine(document_id=inv.id, account_id=acc_grni.id, debit=out_total, credit=Decimal(0), description="ثبت GRNI برگشت خرید"))
-					db.add(DocumentLine(document_id=inv.id, account_id=acc_inventory.id, debit=Decimal(0), credit=out_total, description="خروج موجودی برگشت خرید (پست حواله)"))
-			elif inv_type == "invoice_production":
-				# مواد مصرفی (out): بدهکار WIP، بستانکار موجودی
-				if out_total > 0:
-					db.add(DocumentLine(document_id=inv.id, account_id=acc_wip.id, debit=out_total, credit=Decimal(0), description="انتقال مواد به کاردرجریان (پست حواله)"))
-					db.add(DocumentLine(document_id=inv.id, account_id=acc_inventory.id, debit=Decimal(0), credit=out_total, description="خروج مواد اولیه (پست حواله)"))
-				# کالای ساخته شده (in): بدهکار موجودی ساخته‌شده، بستانکار WIP
-				if in_total > 0:
-					db.add(DocumentLine(document_id=inv.id, account_id=acc_inventory_finished.id, debit=in_total, credit=Decimal(0), description="ورود کالای ساخته‌شده (پست حواله)"))
-					db.add(DocumentLine(document_id=inv.id, account_id=acc_wip.id, debit=Decimal(0), credit=in_total, description="انتقال از کاردرجریان (پست حواله)"))
+	
+	# اگر doc_type='transfer' باشد، یک سند حسابداری ایجاد کن
+	if wh.doc_type == "transfer":
+		# دریافت currency_id (از business یا default)
+		currency = db.query(Currency).filter(Currency.business_id == wh.business_id).first()
+		if not currency:
+			# استفاده از currency پیش‌فرض
+			currency = db.query(Currency).filter(Currency.code == "IRR").first()
+		if not currency:
+			raise ApiError("CURRENCY_NOT_FOUND", "Currency not found", http_status=404)
+		
+		fiscal_year = _get_current_fiscal_year(db, wh.business_id)
+		
+		# ساخت کد سند (مشابه inventory_transfer_service)
+		today = datetime.now().date()
+		prefix = f"ITR-{today.strftime('%Y%m%d')}"
+		last_doc = db.query(Document).filter(
+			and_(
+				Document.business_id == wh.business_id,
+				Document.code.like(f"{prefix}-%"),
+			)
+		).order_by(Document.code.desc()).first()
+		if last_doc:
+			try:
+				last_num = int(last_doc.code.split("-")[-1])
+				next_num = last_num + 1
+			except Exception:
+				next_num = 1
+		else:
+			next_num = 1
+		doc_code = f"{prefix}-{next_num:04d}"
+		
+		# بررسی policy
+		ensure_document_policy_allows_creation(
+			db,
+			wh.business_id,
+			document_type="inventory_transfer",
+			document_date=wh.document_date,
+			amount=Decimal(0),
+		)
+		
+		# ایجاد سند حسابداری
+		accounting_doc = Document(
+			business_id=wh.business_id,
+			fiscal_year_id=fiscal_year.id,
+			code=doc_code,
+			document_type="inventory_transfer",
+			document_date=wh.document_date,
+			currency_id=currency.id,
+			created_by_user_id=wh.created_by_user_id,
+			registered_at=datetime.utcnow(),
+			is_proforma=False,
+			description=(wh.extra_info.get("description") if wh.extra_info and isinstance(wh.extra_info, dict) else None),
+			extra_info={
+				"source": "warehouse_document",
+				"warehouse_document_id": wh.id,
+			},
+		)
+		db.add(accounting_doc)
+		db.flush()
+		
+		# ایجاد خطوط حسابداری از خطوط حواله
+		# برای transfer: یک خط out از مبدا و یک خط in به مقصد
+		for wline in lines:
+			if wline.movement == "out":
+				# خط خروج از انبار مبدا
+				db.add(DocumentLine(
+					document_id=accounting_doc.id,
+					product_id=wline.product_id,
+					quantity=wline.quantity,
+					debit=Decimal(0),
+					credit=Decimal(0),
+					description=None,
+					extra_info={
+						"movement": "out",
+						"warehouse_id": wline.warehouse_id,
+						"inventory_tracked": True,
+					},
+				))
+			elif wline.movement == "in":
+				# خط ورود به انبار مقصد
+				db.add(DocumentLine(
+					document_id=accounting_doc.id,
+					product_id=wline.product_id,
+					quantity=wline.quantity,
+					debit=Decimal(0),
+					credit=Decimal(0),
+					description=None,
+					extra_info={
+						"movement": "in",
+						"warehouse_id": wline.warehouse_id,
+						"inventory_tracked": True,
+					},
+				))
+		
+		# لینک سند حسابداری به Warehouse Document
+		if not wh.extra_info:
+			wh.extra_info = {}
+		elif not isinstance(wh.extra_info, dict):
+			wh.extra_info = {}
+		wh.extra_info["accounting_document_id"] = accounting_doc.id
+		db.flush()
+	
+	# توجه: محاسبات COGS و ثبت سطرهای حسابداری در بخش فاکتورها انجام می‌شود
+	# بخش انبارداری فقط مسئولیت مدیریت موجودی فیزیکی را دارد
+	
 	return {"id": wh.id, "status": wh.status}
 
 
@@ -202,8 +625,6 @@ def warehouse_document_to_dict(db: Session, wh: WarehouseDocument) -> Dict[str, 
 				"warehouse_id": ln.warehouse_id,
 				"movement": ln.movement,
 				"quantity": float(ln.quantity),
-				"cost_price": float(ln.cost_price) if ln.cost_price is not None else None,
-				"cogs_amount": float(ln.cogs_amount) if ln.cogs_amount is not None else None,
 				"extra_info": ln.extra_info,
 			}
 			for ln in lines
@@ -218,6 +639,10 @@ def _to_dict(obj: Warehouse) -> Dict[str, Any]:
 		"code": obj.code,
 		"name": obj.name,
 		"description": obj.description,
+		"warehouse_keeper": obj.warehouse_keeper,
+		"phone": obj.phone,
+		"address": obj.address,
+		"postal_code": obj.postal_code,
 		"is_default": obj.is_default,
 		"created_at": obj.created_at,
 		"updated_at": obj.updated_at,
@@ -225,16 +650,27 @@ def _to_dict(obj: Warehouse) -> Dict[str, Any]:
 
 
 def create_warehouse(db: Session, business_id: int, payload: WarehouseCreateRequest) -> Dict[str, Any]:
-	code = payload.code.strip()
+	# تولید خودکار کد در صورت عدم ارسال
+	if payload.code is None or not payload.code.strip():
+		code = _generate_auto_warehouse_code(db, business_id)
+	else:
+		code = payload.code.strip()
+	
+	# بررسی تکراری بودن کد
 	dup = db.query(Warehouse).filter(and_(Warehouse.business_id == business_id, Warehouse.code == code)).first()
 	if dup:
 		raise ApiError("DUPLICATE_WAREHOUSE_CODE", "کد انبار تکراری است", http_status=400)
+	
 	repo = WarehouseRepository(db)
 	obj = repo.create(
 		business_id=business_id,
 		code=code,
 		name=payload.name.strip(),
 		description=payload.description,
+		warehouse_keeper=payload.warehouse_keeper.strip() if payload.warehouse_keeper else None,
+		phone=payload.phone.strip() if payload.phone else None,
+		address=payload.address.strip() if payload.address else None,
+		postal_code=payload.postal_code.strip() if payload.postal_code else None,
 		is_default=bool(payload.is_default),
 	)
 	if obj.is_default:
@@ -268,9 +704,13 @@ def update_warehouse(db: Session, business_id: int, warehouse_id: int, payload: 
 
 	updated = repo.update(
 		warehouse_id,
-		code=payload.code.strip() if isinstance(payload.code, str) else None,
+		code=payload.code.strip() if isinstance(payload.code, str) and payload.code.strip() else None,
 		name=payload.name.strip() if isinstance(payload.name, str) else None,
 		description=payload.description,
+		warehouse_keeper=payload.warehouse_keeper.strip() if isinstance(payload.warehouse_keeper, str) and payload.warehouse_keeper.strip() else None,
+		phone=payload.phone.strip() if isinstance(payload.phone, str) and payload.phone.strip() else None,
+		address=payload.address.strip() if isinstance(payload.address, str) and payload.address.strip() else None,
+		postal_code=payload.postal_code.strip() if isinstance(payload.postal_code, str) and payload.postal_code.strip() else None,
 		is_default=payload.is_default if payload.is_default is not None else None,
 	)
 	if not updated:
@@ -318,5 +758,196 @@ def query_warehouses(db: Session, business_id: int, query_info: QueryInfo) -> Di
 		"page": page,
 		"limit": limit,
 		"total_pages": total_pages,
+	}
+
+
+def delete_warehouse_document(db: Session, business_id: int, wh_id: int) -> bool:
+	"""حذف حواله انبار (فقط draft)."""
+	wh = db.query(WarehouseDocument).filter(WarehouseDocument.id == wh_id).first()
+	if not wh or wh.business_id != business_id:
+		raise ApiError("NOT_FOUND", "Warehouse document not found", http_status=404)
+	
+	if wh.status != "draft":
+		raise ApiError("NOT_DELETABLE", "فقط حواله‌های draft قابل حذف هستند", http_status=400)
+	
+	db.delete(wh)
+	db.flush()
+	return True
+
+
+def cancel_warehouse_document(db: Session, business_id: int, wh_id: int, user_id: int) -> WarehouseDocument:
+	"""لغو حواله posted با ایجاد حواله معکوس."""
+	wh = db.query(WarehouseDocument).filter(WarehouseDocument.id == wh_id).first()
+	if not wh or wh.business_id != business_id:
+		raise ApiError("NOT_FOUND", "Warehouse document not found", http_status=404)
+	
+	if wh.status != "posted":
+		raise ApiError("NOT_CANCELLABLE", "فقط حواله‌های posted قابل لغو هستند", http_status=400)
+	
+	# ایجاد حواله معکوس
+	lines = db.query(WarehouseDocumentLine).filter(WarehouseDocumentLine.warehouse_document_id == wh.id).all()
+	if not lines:
+		raise ApiError("NO_LINES", "حواله خطی ندارد", http_status=400)
+	
+	fy = _get_current_fiscal_year(db, business_id)
+	code = _build_wh_code("WH-CANCEL")
+	
+	# تعیین نوع حواله معکوس
+	reverse_doc_type = wh.doc_type
+	if wh.doc_type == "receipt":
+		reverse_doc_type = "issue"
+	elif wh.doc_type == "issue":
+		reverse_doc_type = "receipt"
+	# برای transfer و adjustment همان نوع باقی می‌ماند
+	
+	cancel_wh = WarehouseDocument(
+		business_id=business_id,
+		fiscal_year_id=fy.id,
+		code=code,
+		document_date=wh.document_date,
+		status="draft",  # حواله معکوس به صورت draft ایجاد می‌شود
+		doc_type=reverse_doc_type,
+		warehouse_id_from=wh.warehouse_id_to,  # معکوس
+		warehouse_id_to=wh.warehouse_id_from,  # معکوس
+		source_type="manual",
+		source_document_id=wh.id,  # لینک به حواله اصلی
+		created_by_user_id=user_id,
+		extra_info={
+			"cancels_warehouse_document_id": wh.id,
+			"cancellation_reason": "لغو حواله",
+		},
+	)
+	db.add(cancel_wh)
+	db.flush()
+	
+	# ایجاد خطوط معکوس
+	for ln in lines:
+		reverse_movement = "in" if ln.movement == "out" else "out"
+		reverse_wh = ln.warehouse_id  # برای transfer باید معکوس شود
+		
+		# برای transfer، انبار باید معکوس شود
+		if wh.doc_type == "transfer":
+			# پیدا کردن خط جفت (out/in) برای تعیین انبار معکوس
+			if ln.movement == "out":
+				reverse_wh = wh.warehouse_id_to
+			else:
+				reverse_wh = wh.warehouse_id_from
+		
+		cancel_line = WarehouseDocumentLine(
+			warehouse_document_id=cancel_wh.id,
+			product_id=ln.product_id,
+			warehouse_id=reverse_wh,
+			movement=reverse_movement,
+			quantity=ln.quantity,
+			extra_info={
+				"cancels_line_id": ln.id,
+				**(ln.extra_info or {}),
+			},
+		)
+		db.add(cancel_line)
+	
+	# تغییر وضعیت حواله اصلی به cancelled
+	wh.status = "cancelled"
+	wh.touch()
+	
+	db.flush()
+	return cancel_wh
+
+
+def get_warehouse_stock_report(
+	db: Session,
+	business_id: int,
+	query: Dict[str, Any],
+) -> Dict[str, Any]:
+	"""گزارش موجودی انبار به تفکیک محصول و انبار."""
+	from app.services.invoice_service import _compute_available_stock
+	from datetime import date as date_type
+	
+	# پارامترهای ورودی
+	product_ids = query.get("product_ids", [])
+	warehouse_ids = query.get("warehouse_ids", [])
+	as_of_date_str = query.get("as_of_date")
+	include_zero = bool(query.get("include_zero", False))
+	
+	# تبدیل تاریخ
+	as_of_date = datetime.now().date()
+	if as_of_date_str:
+		try:
+			as_of_date = date_type.fromisoformat(as_of_date_str) if isinstance(as_of_date_str, str) else as_of_date_str
+		except Exception:
+			pass
+	
+	# دریافت لیست محصولات
+	if product_ids:
+		products = db.query(Product).filter(
+			and_(
+				Product.business_id == business_id,
+				Product.id.in_([int(p) for p in product_ids]),
+				Product.track_inventory == True,
+			)
+		).all()
+	else:
+		products = db.query(Product).filter(
+			and_(
+				Product.business_id == business_id,
+				Product.track_inventory == True,
+			)
+		).all()
+	
+	# دریافت لیست انبارها
+	if warehouse_ids:
+		warehouses = db.query(Warehouse).filter(
+			and_(
+				Warehouse.business_id == business_id,
+				Warehouse.id.in_([int(w) for w in warehouse_ids]),
+			)
+		).all()
+	else:
+		warehouses = db.query(Warehouse).filter(Warehouse.business_id == business_id).all()
+	
+	# اگر انباری وجود ندارد، یک رکورد "بدون انبار" اضافه کن
+	items = []
+	
+	for product in products:
+		if warehouse_ids:
+			# فقط انبارهای انتخاب شده
+			wh_list = [w for w in warehouses if w.id in [int(wid) for wid in warehouse_ids]]
+		else:
+			wh_list = warehouses
+		
+		# اگر انباری انتخاب نشده، موجودی کل را محاسبه کن
+		if not wh_list:
+			stock = _compute_available_stock(db, business_id, product.id, None, as_of_date)
+			if include_zero or stock > 0:
+				items.append({
+					"product_id": product.id,
+					"product_code": product.code,
+					"product_name": product.name,
+					"warehouse_id": None,
+					"warehouse_code": None,
+					"warehouse_name": "بدون انبار / کل",
+					"quantity": float(stock),
+					"unit": product.unit or "",
+				})
+		else:
+			# موجودی به تفکیک انبار
+			for warehouse in wh_list:
+				stock = _compute_available_stock(db, business_id, product.id, warehouse.id, as_of_date)
+				if include_zero or stock > 0:
+					items.append({
+						"product_id": product.id,
+						"product_code": product.code,
+						"product_name": product.name,
+						"warehouse_id": warehouse.id,
+						"warehouse_code": warehouse.code,
+						"warehouse_name": warehouse.name,
+						"quantity": float(stock),
+						"unit": product.unit or "",
+					})
+	
+	return {
+		"items": items,
+		"as_of_date": as_of_date.isoformat(),
+		"total_items": len(items),
 	}
 

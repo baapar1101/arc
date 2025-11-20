@@ -5,22 +5,27 @@ import 'package:flutter/services.dart';
 import '../../../models/product_form_data.dart';
 import '../../../utils/number_normalizer.dart';
 import '../../../utils/product_form_validator.dart';
+import '../../../widgets/invoice/warehouse_combobox_widget.dart';
 
 class ProductPricingInventorySection extends StatelessWidget {
+  final int businessId;
   final ProductFormData formData;
   final ValueChanged<ProductFormData> onChanged;
   final List<Map<String, dynamic>> priceLists;
   final List<Map<String, dynamic>> currencies;
+  final List<Map<String, dynamic>> warehouses;
   final List<Map<String, dynamic>> draftPriceItems;
   final void Function(Map<String, dynamic> item) onAddOrUpdatePriceItem;
   final void Function(Map<String, dynamic> item) onDeletePriceItem;
 
   const ProductPricingInventorySection({
     super.key,
+    required this.businessId,
     required this.formData,
     required this.onChanged,
     required this.priceLists,
     required this.currencies,
+    required this.warehouses,
     required this.draftPriceItems,
     required this.onAddOrUpdatePriceItem,
     required this.onDeletePriceItem,
@@ -28,11 +33,16 @@ class ProductPricingInventorySection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // اگر نوع کالا "خدمت" است، بخش کنترل موجودی را نمایش نده
+    final isService = formData.itemType == 'خدمت';
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _buildInventorySection(context),
-        const SizedBox(height: 24),
+        if (!isService) ...[
+          _buildInventorySection(context),
+          const SizedBox(height: 24),
+        ],
         _buildPricingSection(context),
         const SizedBox(height: 24),
         _buildPerPriceListPricing(context),
@@ -52,6 +62,17 @@ class ProductPricingInventorySection extends StatelessWidget {
           title: Text(t.inventoryControl),
         ),
         if (formData.trackInventory) ...[
+          const SizedBox(height: 16),
+          WarehouseComboboxWidget(
+            businessId: businessId,
+            selectedWarehouseId: formData.defaultWarehouseId,
+            onChanged: (warehouseId) {
+              _updateFormData(formData.copyWith(defaultWarehouseId: warehouseId));
+            },
+            label: 'انبار پیش‌فرض',
+            hintText: 'انتخاب انبار پیش‌فرض',
+            isRequired: false,
+          ),
           const SizedBox(height: 16),
           Row(
             children: [

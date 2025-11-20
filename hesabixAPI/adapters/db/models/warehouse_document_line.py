@@ -15,8 +15,6 @@ class WarehouseDocumentLine(Base):
 	warehouse_id = Column(Integer, nullable=True, index=True)
 	movement = Column(String(8), nullable=False)  # in|out
 	quantity = Column(Numeric(18, 6), nullable=False)
-	cost_price = Column(Numeric(18, 6), nullable=True)
-	cogs_amount = Column(Numeric(18, 6), nullable=True)
 	extra_info = Column(JSON, nullable=True)
 
 	document = relationship("WarehouseDocument", back_populates="lines")

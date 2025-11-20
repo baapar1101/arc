@@ -80,6 +80,12 @@ class ProductAttributeItem {
       return v.trim().isEmpty ? null : v;
     }
     if (v is Map<String, dynamic>) {
+      // First try to get date_only (without time)
+      final dateOnly = v['date_only'];
+      if (dateOnly != null && dateOnly.toString().isNotEmpty) {
+        return dateOnly.toString();
+      }
+      // Fallback to formatted if date_only is not available
       final s = (v['formatted'] ?? v['date_time'] ?? '').toString();
       return s.isEmpty ? null : s;
     }
@@ -121,6 +127,9 @@ class _ProductAttributesPageState extends State<ProductAttributesPage> {
     return DataTableConfig<ProductAttributeItem>(
       endpoint: '/api/v1/product-attributes/business/${widget.businessId}/search',
       title: t.productAttributes,
+      showBackButton: true,
+      onBack: () => Navigator.of(context).maybePop(),
+      showTableIcon: false,
       columns: [
         TextColumn('title', t.title, width: ColumnWidth.large, formatter: (e) => e.title),
         TextColumn('description', t.description, width: ColumnWidth.extraLarge, formatter: (e) => e.description ?? '-'),
@@ -148,12 +157,11 @@ class _ProductAttributesPageState extends State<ProductAttributesPage> {
   }
 
   static String _formatDate(DateTime dt, BuildContext context) {
+    // Only show date, without time
     final y = dt.year.toString().padLeft(4, '0');
     final m = dt.month.toString().padLeft(2, '0');
     final d = dt.day.toString().padLeft(2, '0');
-    final hh = dt.hour.toString().padLeft(2, '0');
-    final mm = dt.minute.toString().padLeft(2, '0');
-    return '$y/$m/$d $hh:$mm';
+    return '$y/$m/$d';
   }
 
   static String _formatDateFromItem(ProductAttributeItem e, BuildContext context, {required bool isUpdated}) {

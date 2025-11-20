@@ -185,7 +185,10 @@ class _AttachedFilesWidgetState extends State<AttachedFilesWidget> {
 
     try {
       final fileId = file['id'] as String;
-      await _storageService.deleteFile(fileId);
+      await _storageService.deleteFile(
+        businessId: widget.businessId,
+        fileId: fileId,
+      );
       
       if (mounted) {
         setState(() {

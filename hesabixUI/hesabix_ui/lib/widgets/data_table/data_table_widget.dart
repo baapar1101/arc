@@ -89,7 +89,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
   late ScrollController _horizontalScrollController;
   
   // Density (row height)
-  bool _dense = false;
+  bool _dense = true;
   
   // Keyboard focus and navigation
   final FocusNode _tableFocusNode = FocusNode(debugLabel: 'DataTableFocus');
@@ -159,7 +159,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final key = 'data_table_density_${widget.config.effectiveTableId}';
-      final dense = prefs.getBool(key) ?? false;
+      final dense = prefs.getBool(key) ?? true; // Default to dense mode
       if (mounted) setState(() => _dense = dense);
     } catch (_) {}
   }
@@ -609,17 +609,6 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
       widget.config.onRowSelectionChanged!(_selectedRows);
     }
   }
-  
-  // متد کمکی برای دریافت ردیف‌های انتخاب شده بر اساس شاخص‌ها
-  List<T> _getItemsByIndices(Set<int> indices) {
-    final list = <T>[];
-    for (final i in indices) {
-      if (i >= 0 && i < _items.length) {
-        list.add(_items[i]);
-      }
-    }
-    return list;
-  }
 
   Future<void> _openColumnSettingsDialog() async {
     if (!widget.config.enableColumnSettings || _columnSettings == null) return;
@@ -963,36 +952,20 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
 
   double _getHeaderAffordancePadding(DataTableColumn column) {
     double padding = 0.0;
-    // Container padding (left + right)
-    padding += 16.0;
+    // Container padding (left + right) - reduced
+    padding += 12.0;
     // Left group: sort icon spacing + icon (always shows when sortable)
     final bool showSortIcon = widget.config.enableSorting && column.sortable;
     if (showSortIcon) {
-      padding += 4.0;  // gap between text and icon
-      padding += 16.0; // icon width
+      padding += 3.0;  // gap between text and icon - reduced
+      padding += 12.0; // icon width - reduced
     }
-    // Gap between left group and search button
-    padding += 8.0;
-    // Search button chip
-    final bool showSearch = widget.config.showColumnSearch && column.searchable;
-    if (showSearch) {
-      padding += 4.0;   // left padding
-      padding += 13.0;  // icon
-      padding += 4.0;   // right padding
-      padding += 2.0;   // border thickness approx
-    }
-    // Resize handle (gap + handle width)
+    // Resize edge areas (6px each side, but only need minimal space as they're overlay)
     if (widget.config.enableColumnSettings) {
-      padding += 6.0;   // gap
-      padding += 12.0;  // handle
+      padding += 2.0;   // minimal space for right edge
     }
-    // Settings menu (gap + icon)
-    if (widget.config.enableColumnSettings) {
-      padding += 4.0;   // gap
-      padding += 16.0;  // icon
-    }
-    // Safety margin
-    padding += 8.0;
+    // Safety margin - reduced
+    padding += 4.0;
     return padding;
   }
 
@@ -1075,7 +1048,6 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
             // Search
             if (widget.config.showSearch) ...[
               _buildSearch(t, theme),
-              const SizedBox(height: 12),
             ],
             
             // Active Filters
@@ -1104,7 +1076,6 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                 },
                 onClearAll: _clearAllFilters,
               ),
-              const SizedBox(height: 10),
             ],
             
             // Selection toolbar
@@ -1135,7 +1106,6 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                   ],
                 ),
               ),
-              const SizedBox(height: 10),
             ],
             
             // Data Table
@@ -2066,7 +2036,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
         data: DataTableThemeData(
           headingRowColor: WidgetStatePropertyAll(
             widget.config.headerBackgroundColor ??
-            theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
+            theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.7),
           ),
           headingTextStyle: theme.textTheme.titleSmall?.copyWith(
             fontWeight: FontWeight.w700,
@@ -2075,7 +2045,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
           dividerThickness: 0.8,
         ),
         child: DataTable2(
-          columnSpacing: 12,
+          columnSpacing: 0,
           horizontalMargin: 10,
           minWidth: widget.config.minTableWidth ?? 600,
           horizontalScrollController: _horizontalScrollController,
@@ -2407,7 +2377,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
 }
 
 /// Column header with search functionality
-class _ColumnHeaderWithSearch extends StatelessWidget {
+class _ColumnHeaderWithSearch extends StatefulWidget {
   final String text;
   final String sortBy;
   final String? currentSort;
@@ -2447,9 +2417,17 @@ class _ColumnHeaderWithSearch extends StatelessWidget {
   });
 
   @override
+  State<_ColumnHeaderWithSearch> createState() => _ColumnHeaderWithSearchState();
+}
+
+class _ColumnHeaderWithSearchState extends State<_ColumnHeaderWithSearch> {
+  bool _isHovered = false;
+  bool _isHoveringRightEdge = false;
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isActive = currentSort == sortBy;
+    final isActive = widget.currentSort == widget.sortBy;
     
     Alignment _mapTextAlign(TextAlign align) {
       switch (align) {
@@ -2463,169 +2441,224 @@ class _ColumnHeaderWithSearch extends StatelessWidget {
       }
     }
     
+    final bool showColumnSettings = widget.onPinLeft != null || 
+                                    widget.onPinRight != null || 
+                                    widget.onUnpin != null || 
+                                    widget.onHide != null;
+    final bool canResize = widget.onResizeDrag != null;
+    // Show menu if there are column settings or search is available (always show menu on hover)
+    final bool showMenu = showColumnSettings || (_isHovered || widget.hasActiveFilter);
+    
+    // Common button size and padding
+    const double buttonIconSize = 16.0;
+    const double buttonPadding = 6.0;
+    const double buttonSize = buttonIconSize + (buttonPadding * 2);
+    
     return Tooltip(
-      message: 'کلیک برای مرتب‌سازی • آیکون ذره‌بین برای جستجو • درگ برای تغییر عرض',
-      child: InkWell(
-        onTap: enabled
-            ? () {
-                final keys = HardwareKeyboard.instance.logicalKeysPressed;
-                final additive = keys.contains(LogicalKeyboardKey.shiftLeft) || keys.contains(LogicalKeyboardKey.shiftRight);
-                onSort(sortBy, additive);
-              }
-            : null,
-        overlayColor: WidgetStatePropertyAll(theme.colorScheme.primary.withValues(alpha: 0.05)),
-        borderRadius: BorderRadius.circular(8),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 6.0, horizontal: 8.0),
-          decoration: BoxDecoration(
-            color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-              color: (isActive || hasActiveFilter)
-                  ? theme.colorScheme.primary.withValues(alpha: 0.25)
-                  : theme.dividerColor.withValues(alpha: 0.3),
+      message: 'کلیک برای مرتب‌سازی • راست‌کلیک برای منوی تنظیمات • درگ لبه راست برای تغییر عرض',
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _isHovered = true),
+        onExit: (_) => setState(() {
+          _isHovered = false;
+          _isHoveringRightEdge = false;
+        }),
+        child: InkWell(
+          onTap: widget.enabled
+              ? () {
+                  final keys = HardwareKeyboard.instance.logicalKeysPressed;
+                  final additive = keys.contains(LogicalKeyboardKey.shiftLeft) || keys.contains(LogicalKeyboardKey.shiftRight);
+                  widget.onSort(widget.sortBy, additive);
+                }
+              : null,
+          overlayColor: WidgetStatePropertyAll(theme.colorScheme.primary.withValues(alpha: 0.05)),
+          borderRadius: BorderRadius.zero,
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 6.0),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.7),
             ),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.max,
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Align(
-                  alignment: _mapTextAlign(headerTextAlign),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Flexible(
-                        child: Tooltip(
-                          message: text,
-                          waitDuration: const Duration(milliseconds: 400),
-                          child: Text(
-                            text,
-                            textAlign: headerTextAlign,
-                            style: theme.textTheme.titleSmall?.copyWith(
-                              fontWeight: FontWeight.w700,
-                              color: isActive ? theme.colorScheme.primary : theme.colorScheme.onSurface,
+            child: Stack(
+              children: [
+                // Main content: text and sort icon
+                Padding(
+                  padding: EdgeInsets.only(
+                    right: showMenu 
+                        ? (canResize ? buttonSize + 6.0 : buttonSize)
+                        : (canResize ? 6.0 : 0),
+                  ),
+                  child: Align(
+                    alignment: _mapTextAlign(widget.headerTextAlign),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Flexible(
+                          child: Tooltip(
+                            message: widget.text,
+                            waitDuration: const Duration(milliseconds: 400),
+                            child: Text(
+                              widget.text,
+                              textAlign: widget.headerTextAlign,
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w700,
+                                color: isActive ? theme.colorScheme.primary : theme.colorScheme.onSurface,
+                              ),
+                              overflow: TextOverflow.ellipsis,
                             ),
-                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        if (widget.enabled) ...[
+                          const SizedBox(width: 3),
+                          if (isActive)
+                            Icon(
+                              widget.sortDesc ? Icons.arrow_downward : Icons.arrow_upward,
+                              size: 12,
+                              color: theme.colorScheme.primary,
+                            )
+                          else
+                            Icon(
+                              Icons.unfold_more,
+                              size: 12,
+                              color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+                            ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+                // Column settings menu (shown on hover or when filter is active)
+                if (showMenu)
+                  Positioned(
+                    right: canResize ? 6.0 : 0,
+                    top: 0,
+                    bottom: 0,
+                    child: Tooltip(
+                      message: 'تنظیمات ستون',
+                      waitDuration: const Duration(milliseconds: 400),
+                      child: PopupMenuButton<String>(
+                        padding: EdgeInsets.zero,
+                        child: Container(
+                          width: buttonSize,
+                          height: buttonSize,
+                          padding: const EdgeInsets.all(buttonPadding),
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Icon(
+                            Icons.more_vert,
+                            size: buttonIconSize,
+                            color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
+                          ),
+                        ),
+                        onSelected: (value) {
+                          switch (value) {
+                            case 'search':
+                              widget.onSearch();
+                              break;
+                            case 'pinLeft':
+                              widget.onPinLeft?.call();
+                              break;
+                            case 'pinRight':
+                              widget.onPinRight?.call();
+                              break;
+                            case 'unpin':
+                              widget.onUnpin?.call();
+                              break;
+                            case 'hide':
+                              widget.onHide?.call();
+                              break;
+                            case 'reset':
+                              widget.onResetColumns?.call();
+                              break;
+                          }
+                        },
+                        itemBuilder: (context) => [
+                          // Always show search option (onSearch is always provided)
+                          PopupMenuItem(
+                            value: 'search',
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.search,
+                                  size: 16,
+                                  color: widget.hasActiveFilter 
+                                      ? theme.colorScheme.primary
+                                      : theme.iconTheme.color,
+                                ),
+                                const SizedBox(width: 8),
+                                Text('جست‌وجو'),
+                                if (widget.hasActiveFilter) ...[
+                                  const Spacer(),
+                                  Container(
+                                    width: 6,
+                                    height: 6,
+                                    decoration: BoxDecoration(
+                                      color: theme.colorScheme.primary,
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                          if (showColumnSettings)
+                            const PopupMenuDivider(),
+                          if (widget.onPinLeft != null)
+                            const PopupMenuItem(value: 'pinLeft', child: Text('پین چپ')),
+                          if (widget.onPinRight != null)
+                            const PopupMenuItem(value: 'pinRight', child: Text('پین راست')),
+                          if (widget.onUnpin != null)
+                            const PopupMenuItem(value: 'unpin', child: Text('برداشتن پین')),
+                          if (widget.onUnpin != null || widget.onPinLeft != null || widget.onPinRight != null)
+                            const PopupMenuDivider(),
+                          if (widget.onHide != null)
+                            const PopupMenuItem(value: 'hide', child: Text('مخفی کردن ستون')),
+                          if (widget.onResetColumns != null) ...[
+                            const PopupMenuDivider(),
+                            const PopupMenuItem(value: 'reset', child: Text('بازنشانی ستون‌ها')),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                // Right edge resize area (only right side)
+                if (canResize)
+                  Positioned(
+                    right: 0,
+                    top: 0,
+                    bottom: 0,
+                    child: MouseRegion(
+                      cursor: SystemMouseCursors.resizeLeftRight,
+                      onEnter: (_) => setState(() => _isHoveringRightEdge = true),
+                      onExit: (_) => setState(() => _isHoveringRightEdge = false),
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onHorizontalDragUpdate: (details) => widget.onResizeDrag!(details.delta.dx),
+                        onHorizontalDragEnd: (_) => widget.onResizeDragEnd?.call(),
+                        onDoubleTap: widget.onAutoFit,
+                        child: Container(
+                          width: 6,
+                          decoration: BoxDecoration(
+                            color: _isHoveringRightEdge 
+                                ? theme.colorScheme.primary.withValues(alpha: 0.1)
+                                : Colors.transparent,
+                            border: Border(
+                              right: BorderSide(
+                                color: _isHoveringRightEdge 
+                                    ? theme.colorScheme.primary.withValues(alpha: 0.5)
+                                    : (_isHovered 
+                                        ? theme.dividerColor.withValues(alpha: 0.3)
+                                        : Colors.transparent),
+                                width: 2,
+                              ),
+                            ),
                           ),
                         ),
                       ),
-                      if (enabled) ...[
-                        const SizedBox(width: 4),
-                        if (isActive)
-                          Icon(
-                            sortDesc ? Icons.arrow_downward : Icons.arrow_upward,
-                            size: 14,
-                            color: theme.colorScheme.primary,
-                          )
-                        else
-                          Icon(
-                            Icons.unfold_more,
-                            size: 14,
-                            color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
-                          ),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              // Search button
-              Tooltip(
-                message: 'جست‌وجوی ستون',
-                waitDuration: const Duration(milliseconds: 400),
-                child: InkWell(
-                  onTap: onSearch,
-                  borderRadius: BorderRadius.circular(10),
-                  child: Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(
-                      color: hasActiveFilter 
-                          ? theme.colorScheme.primaryContainer
-                          : theme.colorScheme.surface.withValues(alpha: 0.7),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: hasActiveFilter 
-                            ? theme.colorScheme.primary.withValues(alpha: 0.35)
-                            : theme.dividerColor.withValues(alpha: 0.25),
-                      ),
-                    ),
-                    child: Icon(
-                      Icons.search,
-                      size: 13,
-                      color: hasActiveFilter 
-                          ? theme.colorScheme.onPrimaryContainer
-                          : theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.75),
                     ),
                   ),
-                ),
-              ),
-              if (onResizeDrag != null) ...[
-                const SizedBox(width: 6),
-                MouseRegion(
-                  cursor: SystemMouseCursors.resizeLeftRight,
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onHorizontalDragUpdate: (details) => onResizeDrag!(details.delta.dx),
-                    onHorizontalDragEnd: (_) => onResizeDragEnd?.call(),
-                    onDoubleTap: onAutoFit,
-                    child: Container(
-                      width: 12,
-                      height: 28,
-                      alignment: Alignment.center,
-                      child: Container(
-                        width: 2,
-                        height: 20,
-                        color: Theme.of(context).dividerColor.withValues(alpha: 0.4),
-                      ),
-                    ),
-                  ),
-                ),
               ],
-              if (onPinLeft != null || onPinRight != null || onUnpin != null || onHide != null) ...[
-                const SizedBox(width: 4),
-                PopupMenuButton<String>(
-                  padding: EdgeInsets.zero,
-                  tooltip: 'تنظیمات ستون',
-                  icon: Icon(Icons.more_vert, size: 16, color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7)),
-                  onSelected: (value) {
-                    switch (value) {
-                      case 'pinLeft':
-                        onPinLeft?.call();
-                        break;
-                      case 'pinRight':
-                        onPinRight?.call();
-                        break;
-                      case 'unpin':
-                        onUnpin?.call();
-                        break;
-                      case 'hide':
-                        onHide?.call();
-                        break;
-                      case 'reset':
-                        onResetColumns?.call();
-                        break;
-                    }
-                  },
-                  itemBuilder: (context) => [
-                    if (onPinLeft != null)
-                      const PopupMenuItem(value: 'pinLeft', child: Text('پین چپ')),
-                    if (onPinRight != null)
-                      const PopupMenuItem(value: 'pinRight', child: Text('پین راست')),
-                    if (onUnpin != null)
-                      const PopupMenuItem(value: 'unpin', child: Text('برداشتن پین')),
-                    const PopupMenuDivider(),
-                    if (onHide != null)
-                      const PopupMenuItem(value: 'hide', child: Text('مخفی کردن ستون')),
-                    if (onResetColumns != null) ...[
-                      const PopupMenuDivider(),
-                      const PopupMenuItem(value: 'reset', child: Text('بازنشانی ستون‌ها')),
-                    ],
-                  ],
-                ),
-              ],
-            ],
+            ),
           ),
         ),
       ),

@@ -85,6 +85,74 @@ class WarehouseService {
     );
     return Map<String, dynamic>.from(res.data?['data'] ?? const {});
   }
+
+  Future<Map<String, dynamic>> createManual({
+    required int businessId,
+    required Map<String, dynamic> payload,
+  }) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/warehouse-docs/business/$businessId/create',
+      data: payload,
+    );
+    return Map<String, dynamic>.from(res.data?['data'] ?? const {});
+  }
+
+  Future<Map<String, dynamic>> updateDoc({
+    required int businessId,
+    required int docId,
+    required Map<String, dynamic> payload,
+  }) async {
+    final res = await _api.put<Map<String, dynamic>>(
+      '/api/v1/warehouse-docs/business/$businessId/$docId',
+      data: payload,
+    );
+    return Map<String, dynamic>.from(res.data?['data'] ?? const {});
+  }
+
+  Future<Map<String, dynamic>> updateLine({
+    required int businessId,
+    required int docId,
+    required int lineId,
+    required Map<String, dynamic> payload,
+  }) async {
+    final res = await _api.put<Map<String, dynamic>>(
+      '/api/v1/warehouse-docs/business/$businessId/$docId/lines/$lineId',
+      data: payload,
+    );
+    return Map<String, dynamic>.from(res.data?['data'] ?? const {});
+  }
+
+  Future<bool> deleteDoc({
+    required int businessId,
+    required int docId,
+  }) async {
+    final res = await _api.delete<Map<String, dynamic>>(
+      '/api/v1/warehouse-docs/business/$businessId/$docId',
+    );
+    return res.statusCode == 200 && (res.data?['data']?['deleted'] == true);
+  }
+
+  Future<Map<String, dynamic>> cancelDoc({
+    required int businessId,
+    required int docId,
+  }) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/warehouse-docs/business/$businessId/$docId/cancel',
+      data: const {},
+    );
+    return Map<String, dynamic>.from(res.data?['data'] ?? const {});
+  }
+
+  Future<Map<String, dynamic>> getStockReport({
+    required int businessId,
+    Map<String, dynamic>? query,
+  }) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/warehouses/business/$businessId/stock-report',
+      data: query ?? const {},
+    );
+    return Map<String, dynamic>.from(res.data?['data'] ?? const {});
+  }
 }
 
 

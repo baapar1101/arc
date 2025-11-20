@@ -29,11 +29,21 @@ class _WarehouseComboboxWidgetState extends State<WarehouseComboboxWidget> {
   final WarehouseService _service = WarehouseService();
   List<Warehouse> _items = const <Warehouse>[];
   bool _loading = false;
+  int? _selectedValue;
 
   @override
   void initState() {
     super.initState();
+    _selectedValue = widget.selectedWarehouseId;
     _load();
+  }
+
+  @override
+  void didUpdateWidget(WarehouseComboboxWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.selectedWarehouseId != widget.selectedWarehouseId) {
+      _selectedValue = widget.selectedWarehouseId;
+    }
   }
 
   Future<void> _load() async {
@@ -55,26 +65,57 @@ class _WarehouseComboboxWidgetState extends State<WarehouseComboboxWidget> {
     final theme = Theme.of(context);
     if (_loading) {
       return SizedBox(
-        height: 36,
+        height: 56,
         child: Center(
           child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: theme.colorScheme.primary)),
         ),
       );
     }
-    return DropdownButtonFormField<int>(
-      initialValue: widget.selectedWarehouseId,
-      isDense: true,
-      decoration: const InputDecoration(
-        isDense: true,
-        border: OutlineInputBorder(),
-        contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+    return DropdownButtonFormField<int?>(
+      value: _selectedValue,
+      decoration: InputDecoration(
+        labelText: widget.label,
+        hintText: widget.hintText,
+        border: const OutlineInputBorder(),
+        suffixIcon: _selectedValue != null && !widget.isRequired
+            ? IconButton(
+                icon: const Icon(Icons.clear, size: 18),
+                onPressed: () {
+                  // به‌روزرسانی state داخلی و فراخوانی callback
+                  setState(() {
+                    _selectedValue = null;
+                  });
+                  widget.onChanged(null);
+                },
+                tooltip: 'پاک کردن',
+              )
+            : null,
       ),
-      items: _items.map((w) {
-        final title = (w.code.isNotEmpty) ? '${w.code} - ${w.name}' : w.name;
-        return DropdownMenuItem<int>(value: w.id!, child: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis));
-      }).toList(),
-      onChanged: widget.onChanged,
-      hint: Text(widget.hintText),
+      items: [
+        // گزینه خالی برای پاک کردن
+        if (!widget.isRequired)
+          const DropdownMenuItem<int?>(
+            value: null,
+            child: Text('بدون انبار'),
+          ),
+        // لیست انبارها
+        ..._items.map((w) {
+          final title = (w.code.isNotEmpty) ? '${w.code} - ${w.name}' : w.name;
+          return DropdownMenuItem<int?>(
+            value: w.id!,
+            child: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
+          );
+        }),
+      ],
+      onChanged: (int? value) {
+        setState(() {
+          _selectedValue = value;
+        });
+        widget.onChanged(value);
+      },
+      validator: widget.isRequired
+          ? (value) => value == null ? '${widget.label} الزامی است' : null
+          : null,
     );
   }
 }

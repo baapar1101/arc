@@ -22,7 +22,6 @@ adapters/api/v1/documents.py
 adapters/api/v1/expense_income.py
 adapters/api/v1/fiscal_years.py
 adapters/api/v1/health.py
-adapters/api/v1/inventory_transfers.py
 adapters/api/v1/invoices.py
 adapters/api/v1/jobs.py
 adapters/api/v1/kardex.py
@@ -38,6 +37,7 @@ adapters/api/v1/ping_pong.py
 adapters/api/v1/price_lists.py
 adapters/api/v1/product_attributes.py
 adapters/api/v1/products.py
+adapters/api/v1/public_share_links.py
 adapters/api/v1/receipts_payments.py
 adapters/api/v1/report_templates.py
 adapters/api/v1/schemas.py
@@ -112,6 +112,7 @@ adapters/db/models/notification_config.py
 adapters/db/models/password_reset.py
 adapters/db/models/payment_gateway.py
 adapters/db/models/person.py
+adapters/db/models/person_share_link.py
 adapters/db/models/petty_cash.py
 adapters/db/models/ping_pong_score.py
 adapters/db/models/price_list.py
@@ -199,7 +200,6 @@ app/services/document_service.py
 app/services/email_service.py
 app/services/expense_income_service.py
 app/services/file_storage_service.py
-app/services/inventory_transfer_service.py
 app/services/invoice_service.py
 app/services/job_manager.py
 app/services/kardex_service.py
@@ -209,6 +209,7 @@ app/services/notification_service.py
 app/services/opening_balance_service.py
 app/services/payment_service.py
 app/services/person_service.py
+app/services/person_share_link_service.py
 app/services/petty_cash_service.py
 app/services/price_list_service.py
 app/services/product_attribute_service.py
@@ -262,6 +263,7 @@ migrations/versions/20250117_000008_add_email_config_table.py
 migrations/versions/20250117_000009_add_is_default_to_email_config.py
 migrations/versions/20250119_000001_add_check_reconciliations_tables.py
 migrations/versions/20250120_000001_add_persons_tables.py
+migrations/versions/20250120_000001_add_warehouse_contact_fields.py
 migrations/versions/20250120_000002_add_join_permission.py
 migrations/versions/20250126_000001_add_gift_credit_account.py
 migrations/versions/20250915_000001_init_auth_tables.py
@@ -317,6 +319,8 @@ migrations/versions/20251112_200001_add_credit_settings_and_installment_template
 migrations/versions/20251114_000010_add_business_print_settings.py
 migrations/versions/20251117_050152_add_image_file_id_to_products.py
 migrations/versions/20251118_000001_add_document_monetization.py
+migrations/versions/20251119_000001_add_person_share_links.py
+migrations/versions/20251120_000001_add_default_warehouse_to_products.py
 migrations/versions/27f209ffe151_merge_heads.py
 migrations/versions/4b2ea782bcb3_merge_heads.py
 migrations/versions/5553f8745c6e_add_support_tables.py

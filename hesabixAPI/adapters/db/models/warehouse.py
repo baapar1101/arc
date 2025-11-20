@@ -24,6 +24,11 @@ class Warehouse(Base):
     code: Mapped[str] = mapped_column(String(64), nullable=False, index=True, comment="کد یکتا در هر کسب‌وکار")
     name: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    
+    warehouse_keeper: Mapped[str | None] = mapped_column(String(255), nullable=True, comment="نام انباردار")
+    phone: Mapped[str | None] = mapped_column(String(32), nullable=True, comment="تلفن")
+    address: Mapped[str | None] = mapped_column(Text, nullable=True, comment="آدرس")
+    postal_code: Mapped[str | None] = mapped_column(String(16), nullable=True, comment="کد پستی")
 
     is_default: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, index=True)
 

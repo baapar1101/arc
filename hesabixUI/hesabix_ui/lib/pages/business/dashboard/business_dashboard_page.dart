@@ -14,6 +14,8 @@ import '../../../utils/number_formatters.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:shamsi_date/shamsi_date.dart';
 import 'package:hesabix_ui/widgets/jalali_date_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../../../services/currency_service.dart';
 
 typedef DashboardWidgetBuilder = Widget Function(BuildContext, dynamic, DashboardLayoutItem, {VoidCallback? onRefresh});
 
@@ -431,10 +433,12 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
             icon: const Icon(Icons.refresh),
             onPressed: _reloadDataOnly,
           );
+    // برای ویجت top_selling_products، کل _data را پاس می‌دهیم چون به تنظیمات و فیلترها نیاز دارد
+    final widgetData = item.key == 'top_selling_products' ? _data : data;
     final card = _buildCard(
       title: _titleForKey(item.key),
       trailing: trailing,
-      child: builder(context, data, item, onRefresh: _reloadDataOnly),
+      child: builder(context, widgetData, item, onRefresh: _reloadDataOnly),
     );
     if (!_editMode) return card;
     // دستگیره رزایز افقی در حالت ویرایش (لبه راست کارت)
@@ -551,6 +555,7 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
         'checks_today': _checksTodayWidget,
         'checks_tomorrow': _checksTomorrowWidget,
         'checks_this_month': _checksThisMonthWidget,
+        'top_selling_products': _topSellingProductsWidget,
       };
 
   Widget _buildChecksWidget(BuildContext context, dynamic data, String title, VoidCallback? onRefresh) {
@@ -971,6 +976,24 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
     );
   }
 
+  Widget _topSellingProductsWidget(BuildContext context, dynamic data, DashboardLayoutItem item, {VoidCallback? onRefresh}) {
+    // data در اینجا همان _data است (کل Map) که از _buildGridTile پاس داده شده
+    return _TopSellingProductsWidgetContent(
+      businessId: widget.businessId,
+      data: data,
+      service: _service,
+      onRefresh: onRefresh,
+      onDataUpdate: (updatedData) {
+        if (mounted) {
+          setState(() {
+            // فقط کلید top_selling_products را به‌روزرسانی کن
+            _data['top_selling_products'] = updatedData['top_selling_products'];
+          });
+        }
+      },
+    );
+  }
+
   String _getCheckStatusText(String status) {
     switch (status) {
       case 'RECEIVED_ON_HAND':
@@ -1286,6 +1309,8 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
         return 'چک‌های فردا';
       case 'checks_this_month':
         return 'چک‌های این ماه';
+      case 'top_selling_products':
+        return 'کالاهای پرفروش';
       default:
         return key;
     }
@@ -1327,6 +1352,639 @@ String _gregorianMonthName(int m) {
 }
 
 String _isoDate(DateTime d) => '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+class _TopSellingProductsWidgetContent extends StatefulWidget {
+  final int businessId;
+  final dynamic data;
+  final BusinessDashboardService service;
+  final VoidCallback? onRefresh;
+  final Function(Map<String, dynamic>)? onDataUpdate;
+
+  const _TopSellingProductsWidgetContent({
+    required this.businessId,
+    required this.data,
+    required this.service,
+    this.onRefresh,
+    this.onDataUpdate,
+  });
+
+  @override
+  State<_TopSellingProductsWidgetContent> createState() => _TopSellingProductsWidgetContentState();
+}
+
+class _TopSellingProductsWidgetContentState extends State<_TopSellingProductsWidgetContent> {
+  static const String _settingsKey = 'top_selling_products_settings';
+  
+  String _calculationType = 'amount'; // 'amount' | 'quantity'
+  String _viewType = 'bar'; // 'bar' | 'pie' | 'list'
+  int _limit = 10;
+  int? _currencyId; // ارز انتخاب شده (فقط برای calculation_type == 'amount')
+
+  bool _settingsLoaded = false;
+  bool _loading = false;
+  bool _currenciesLoaded = false;
+  Map<String, dynamic> _localData = {};
+  List<Map<String, dynamic>> _currencies = [];
+  late CurrencyService _currencyService;
+
+  @override
+  void initState() {
+    super.initState();
+    _currencyService = CurrencyService(ApiClient());
+    
+    // کپی داده‌های اولیه از parent
+    // widget.data در واقع همان _data[item.key] است که می‌تواند یک Map باشد یا مستقیماً داده ویجت
+    if (widget.data is Map) {
+      // اگر widget.data یک Map است، باید بررسی کنیم که آیا خودش داده است یا یک Map با کلید top_selling_products
+      final dataMap = widget.data as Map;
+      if (dataMap.containsKey('top_selling_products')) {
+        // widget.data همان _data است که کلید top_selling_products دارد
+        _localData = Map<String, dynamic>.from(dataMap);
+      } else if (dataMap.containsKey('items')) {
+        // widget.data مستقیماً داده ویجت است
+        _localData = {'top_selling_products': dataMap};
+      } else {
+        // داده اولیه را در کلید صحیح قرار بده
+        _localData = {'top_selling_products': dataMap};
+      }
+    } else if (widget.data != null) {
+      // اگر widget.data یک شیء دیگر است، آن را در کلید صحیح قرار بده
+      _localData = {'top_selling_products': widget.data};
+    } else {
+      _localData = <String, dynamic>{};
+    }
+    
+    // بارگذاری ارزها و تنظیمات
+    _loadCurrencies().then((_) {
+      // اگر داده موجود است، از آن استفاده کن و فقط تنظیمات را بارگذاری کن
+      // در غیر این صورت بعد از بارگذاری تنظیمات، داده را از سرور بگیر
+      final hasInitialData = _localData['top_selling_products'] != null;
+      if (hasInitialData) {
+        // داده موجود است، فقط تنظیمات را بارگذاری کن
+        _loadSettingsWithoutReload();
+      } else {
+        // داده موجود نیست، بعد از بارگذاری تنظیمات، داده را از سرور بگیر
+        _loadSettings();
+      }
+    });
+  }
+  
+  Future<void> _loadCurrencies() async {
+    try {
+      final currencies = await _currencyService.listBusinessCurrencies(businessId: widget.businessId);
+      if (!mounted) return;
+      setState(() {
+        _currencies = currencies;
+        _currenciesLoaded = true;
+        
+        // اگر محاسبه مقداری است و ارزی انتخاب نشده و ارز پیش‌فرض موجود است، آن را انتخاب کن
+        if (_calculationType == 'amount' && _currencyId == null && currencies.isNotEmpty) {
+          final defaultCurrency = currencies.firstWhere(
+            (currency) => currency['is_default'] == true,
+            orElse: () => currencies.first,
+          );
+          _currencyId = defaultCurrency['id'] as int?;
+          // تنظیمات را ذخیره کن
+          _saveSettings();
+        }
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _currenciesLoaded = true;
+      });
+    }
+  }
+  
+  Future<void> _loadSettingsWithoutReload() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final settingsJson = prefs.getString('$_settingsKey${widget.businessId}');
+      if (settingsJson != null) {
+        final parts = settingsJson.split('|');
+        if (parts.length >= 3) {
+          setState(() {
+            _calculationType = parts[0];
+            _viewType = parts[1];
+            _limit = int.tryParse(parts[2]) ?? 10;
+            // اگر currency_id هم ذخیره شده بود، آن را بخوان
+            if (parts.length >= 4 && parts[3].isNotEmpty) {
+              _currencyId = int.tryParse(parts[3]);
+            }
+            _settingsLoaded = true;
+          });
+        } else {
+          _settingsLoaded = true;
+        }
+      } else {
+        _settingsLoaded = true;
+      }
+    } catch (_) {
+      _settingsLoaded = true;
+    }
+  }
+
+  Future<void> _loadSettings() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final settingsJson = prefs.getString('$_settingsKey${widget.businessId}');
+      if (settingsJson != null) {
+        // در Flutter از jsonDecode استفاده می‌کنیم
+        // اما برای سادگی، از String.split استفاده می‌کنیم یا یک Map ساده
+        final parts = settingsJson.split('|');
+        if (parts.length >= 3) {
+          setState(() {
+            _calculationType = parts[0];
+            _viewType = parts[1];
+            _limit = int.tryParse(parts[2]) ?? 10;
+            // اگر currency_id هم ذخیره شده بود، آن را بخوان
+            if (parts.length >= 4 && parts[3].isNotEmpty) {
+              _currencyId = int.tryParse(parts[3]);
+            }
+            _settingsLoaded = true;
+          });
+        } else {
+          _settingsLoaded = true;
+        }
+      } else {
+        _settingsLoaded = true;
+      }
+      
+      // اگر داده موجود است، نیازی به reload نیست
+      final hasData = _localData['top_selling_products'] != null;
+      if (!hasData) {
+        _reloadData();
+      }
+    } catch (_) {
+      _settingsLoaded = true;
+      final hasData = _localData['top_selling_products'] != null;
+      if (!hasData) {
+        _reloadData();
+      }
+    }
+  }
+
+  Future<void> _saveSettings() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final settingsJson = '$_calculationType|$_viewType|$_limit|${_currencyId ?? ''}';
+      await prefs.setString('$_settingsKey${widget.businessId}', settingsJson);
+    } catch (_) {}
+  }
+
+  Future<void> _reloadData() async {
+    if (!_settingsLoaded) return;
+    setState(() => _loading = true);
+    try {
+      final filters = <String, dynamic>{
+        'calculation_type': _calculationType,
+        'limit': _limit,
+      };
+      // اگر محاسبه مقداری است و ارزی انتخاب شده، آن را به فیلتر اضافه کن
+      if (_calculationType == 'amount' && _currencyId != null) {
+        filters['currency_id'] = _currencyId;
+      }
+      
+      final d = await widget.service.getWidgetsBatchData(
+        businessId: widget.businessId,
+        widgetKeys: const ['top_selling_products'],
+        filters: filters,
+      );
+      if (!mounted) return;
+      setState(() {
+        _localData['top_selling_products'] = d['top_selling_products'];
+        _loading = false;
+      });
+      // به‌روزرسانی داده در parent
+      if (widget.onDataUpdate != null) {
+        widget.onDataUpdate!(_localData);
+      }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final Map<String, dynamic> payload = (_localData['top_selling_products'] != null)
+        ? (_localData['top_selling_products'] is Map<String, dynamic>)
+            ? Map<String, dynamic>.from(_localData['top_selling_products'] as Map)
+            : const <String, dynamic>{}
+        : const <String, dynamic>{};
+    
+    final List<Map<String, dynamic>> items = (payload['items'] is List)
+        ? List<Map<String, dynamic>>.from(payload['items'])
+        : const <Map<String, dynamic>>[];
+
+    if (_loading || !_settingsLoaded || !_currenciesLoaded) {
+      return const Center(child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2)));
+    }
+
+    Future<void> _changeCalculationType(String type) async {
+      setState(() => _calculationType = type);
+      // اگر به تعدادی تغییر کرد، ارز را پاک کن
+      if (type == 'quantity') {
+        _currencyId = null;
+      } else if (type == 'amount' && _currencyId == null && _currencies.isNotEmpty) {
+        // اگر به مقداری تغییر کرد و ارزی انتخاب نشده، ارز پیش‌فرض را انتخاب کن
+        final defaultCurrency = _currencies.firstWhere(
+          (currency) => currency['is_default'] == true,
+          orElse: () => _currencies.first,
+        );
+        _currencyId = defaultCurrency['id'] as int?;
+      }
+      await _saveSettings();
+      await _reloadData();
+    }
+
+    Future<void> _changeViewType(String type) async {
+      setState(() => _viewType = type);
+      await _saveSettings();
+    }
+
+    Future<void> _changeLimit(int limit) async {
+      setState(() => _limit = limit);
+      await _saveSettings();
+      await _reloadData();
+    }
+
+    Future<void> _changeCurrency(int? currencyId) async {
+      setState(() => _currencyId = currencyId);
+      await _saveSettings();
+      await _reloadData();
+    }
+
+    Widget _buildFilters() {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                // نوع محاسبه
+                ChoiceChip(
+                  label: const Text('مقداری'),
+                  selected: _calculationType == 'amount',
+                  onSelected: (_) => _changeCalculationType('amount'),
+                ),
+                ChoiceChip(
+                  label: const Text('تعدادی'),
+                  selected: _calculationType == 'quantity',
+                  onSelected: (_) => _changeCalculationType('quantity'),
+                ),
+                const SizedBox(width: 12),
+                // نوع نمایش
+                ChoiceChip(
+                  label: const Text('میله‌ای'),
+                  selected: _viewType == 'bar',
+                  onSelected: (_) => _changeViewType('bar'),
+                ),
+                ChoiceChip(
+                  label: const Text('دایره‌ای'),
+                  selected: _viewType == 'pie',
+                  onSelected: (_) => _changeViewType('pie'),
+                ),
+                ChoiceChip(
+                  label: const Text('لیست'),
+                  selected: _viewType == 'list',
+                  onSelected: (_) => _changeViewType('list'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 16,
+              runSpacing: 8,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text('تعداد کالا: '),
+                    const SizedBox(width: 8),
+                    DropdownButton<int>(
+                      value: _limit.clamp(1, 50),
+                      items: [5, 10, 15, 20, 25, 30].map((v) => DropdownMenuItem(value: v, child: Text('$v'))).toList(),
+                      onChanged: (v) {
+                        if (v != null) _changeLimit(v);
+                      },
+                    ),
+                  ],
+                ),
+                // انتخاب ارز (فقط برای محاسبه مقداری)
+                if (_calculationType == 'amount' && _currenciesLoaded) ...[
+                  const Text('ارز: '),
+                  const SizedBox(width: 8),
+                  DropdownButton<int>(
+                    value: _currencyId,
+                    items: _currencies.map((currency) {
+                      final id = currency['id'] as int;
+                      final code = currency['code'] as String? ?? '';
+                      final title = currency['title'] as String? ?? '';
+                      final isDefault = currency['is_default'] == true;
+                      return DropdownMenuItem<int>(
+                        value: id,
+                        child: Text(isDefault ? '$code (پیش‌فرض)' : (title.isNotEmpty ? title : code)),
+                      );
+                    }).toList(),
+                    onChanged: (v) {
+                      _changeCurrency(v);
+                    },
+                    hint: const Text('انتخاب ارز'),
+                  ),
+                ],
+              ],
+            ),
+          ],
+        ),
+      );
+    }
+
+    Widget _buildBarChart() {
+      if (items.isEmpty) {
+        return Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Center(
+            child: Text('داده‌ای برای نمایش نیست', style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+          ),
+        );
+      }
+
+      final bars = <BarChartGroupData>[];
+      double maxY = 0;
+      final List<String> labels = [];
+
+      for (int i = 0; i < items.length; i++) {
+        final item = items[i];
+        final value = _calculationType == 'quantity'
+            ? (item['total_quantity'] as num?)?.toDouble() ?? 0.0
+            : (item['total_amount'] as num?)?.toDouble() ?? 0.0;
+        
+        if (value > maxY) maxY = value;
+        
+        labels.add(item['product_name'] ?? '${item['product_code'] ?? ''}');
+        
+        bars.add(
+          BarChartGroupData(
+            x: i,
+            barRods: [
+              BarChartRodData(
+                toY: value,
+                width: 16,
+                color: theme.colorScheme.primary,
+                borderRadius: BorderRadius.circular(4),
+              ),
+            ],
+          ),
+        );
+      }
+
+      if (maxY <= 0) maxY = 1;
+
+      return SizedBox(
+        height: 280,
+        child: Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: BarChart(
+            BarChartData(
+              gridData: FlGridData(show: true, horizontalInterval: maxY / 4),
+              titlesData: FlTitlesData(
+                leftTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 50,
+                    interval: maxY / 4,
+                    getTitlesWidget: (value, meta) => Padding(
+                      padding: const EdgeInsets.only(right: 4),
+                      child: Text(
+                        formatWithThousands(value, decimalPlaces: _calculationType == 'quantity' ? 0 : 2),
+                        style: theme.textTheme.labelSmall,
+                      ),
+                    ),
+                  ),
+                ),
+                bottomTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    getTitlesWidget: (value, meta) {
+                      final idx = value.toInt();
+                      if (idx < 0 || idx >= labels.length) return const SizedBox.shrink();
+                      return Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: SizedBox(
+                          width: 60,
+                          child: Text(
+                            labels[idx],
+                            style: theme.textTheme.labelSmall,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      );
+                    },
+                    reservedSize: 80,
+                  ),
+                ),
+                rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              ),
+              borderData: FlBorderData(show: false),
+              barGroups: bars,
+              alignment: BarChartAlignment.spaceBetween,
+              maxY: maxY * 1.2,
+            ),
+          ),
+        ),
+      );
+    }
+
+    Widget _buildPieChart() {
+      if (items.isEmpty) {
+        return Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Center(
+            child: Text('داده‌ای برای نمایش نیست', style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+          ),
+        );
+      }
+
+      final colors = [
+        theme.colorScheme.primary,
+        theme.colorScheme.secondary,
+        theme.colorScheme.tertiary,
+        Colors.orange,
+        Colors.purple,
+        Colors.teal,
+        Colors.pink,
+        Colors.indigo,
+        Colors.amber,
+        Colors.cyan,
+      ];
+
+      double total = 0;
+      final List<Map<String, dynamic>> chartData = [];
+      
+      for (final item in items) {
+        final value = _calculationType == 'quantity'
+            ? (item['total_quantity'] as num?)?.toDouble() ?? 0.0
+            : (item['total_amount'] as num?)?.toDouble() ?? 0.0;
+        total += value;
+        chartData.add({
+          'value': value,
+          'label': item['product_name'] ?? '${item['product_code'] ?? ''}',
+          'item': item,
+        });
+      }
+
+      if (total <= 0) {
+        return Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Center(
+            child: Text('داده‌ای برای نمایش نیست', style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+          ),
+        );
+      }
+
+      final sections = <PieChartSectionData>[];
+      for (int i = 0; i < chartData.length; i++) {
+        final data = chartData[i];
+        final percent = (data['value'] as double) / total * 100;
+        sections.add(
+          PieChartSectionData(
+            value: data['value'] as double,
+            title: percent > 5 ? '${percent.toStringAsFixed(1)}%' : '',
+            color: colors[i % colors.length],
+            radius: 80,
+            titleStyle: theme.textTheme.labelSmall?.copyWith(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        );
+      }
+
+      return SizedBox(
+        height: 280,
+        child: Row(
+          children: [
+            Expanded(
+              child: PieChart(
+                PieChartData(
+                  sections: sections,
+                  centerSpaceRadius: 40,
+                ),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: chartData.length,
+                itemBuilder: (context, index) {
+                  final data = chartData[index];
+                  final value = data['value'] as double;
+                  final label = data['label'] as String;
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4.0),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 16,
+                          height: 16,
+                          decoration: BoxDecoration(
+                            color: colors[index % colors.length],
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            label,
+                            style: theme.textTheme.bodySmall,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          formatWithThousands(value, decimalPlaces: _calculationType == 'quantity' ? 0 : 2),
+                          style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    Widget _buildList() {
+      if (items.isEmpty) {
+        return Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Center(
+            child: Text('داده‌ای برای نمایش نیست', style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+          ),
+        );
+      }
+
+      return ListView.separated(
+        physics: const NeverScrollableScrollPhysics(),
+        shrinkWrap: true,
+        itemCount: items.length,
+        separatorBuilder: (_, __) => const Divider(height: 1),
+        itemBuilder: (context, index) {
+          final item = items[index];
+          final productName = item['product_name'] as String? ?? '';
+          final productCode = item['product_code'] as String? ?? '';
+          final value = _calculationType == 'quantity'
+              ? (item['total_quantity'] as num?)?.toDouble() ?? 0.0
+              : (item['total_amount'] as num?)?.toDouble() ?? 0.0;
+          
+          return ListTile(
+            dense: true,
+            leading: CircleAvatar(
+              backgroundColor: theme.colorScheme.primaryContainer,
+              child: Text(
+                '${index + 1}',
+                style: TextStyle(color: theme.colorScheme.onPrimaryContainer),
+              ),
+            ),
+            title: Text(productName.isNotEmpty ? productName : productCode),
+            subtitle: productCode.isNotEmpty && productName != productCode ? Text(productCode) : null,
+            trailing: Text(
+              formatWithThousands(value, decimalPlaces: _calculationType == 'quantity' ? 0 : 2),
+              style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
+            ),
+          );
+        },
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _buildFilters(),
+        Expanded(
+          child: _viewType == 'bar'
+              ? _buildBarChart()
+              : _viewType == 'pie'
+                  ? _buildPieChart()
+                  : _buildList(),
+        ),
+      ],
+    );
+  }
+}
 
 class _GridGuidesPainter extends CustomPainter {
   final int columns;

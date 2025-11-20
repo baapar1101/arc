@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'pages/profile/notifications_settings_page.dart';
+import 'pages/profile/user_notifications_page.dart';
 import 'pages/profile/notification_templates_admin_page.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
@@ -62,7 +63,7 @@ import 'pages/business/expense_income_list_page.dart';
 import 'pages/business/transfers_page.dart';
 import 'pages/business/documents_page.dart';
 import 'pages/business/warehouses_page.dart';
-import 'pages/business/inventory_transfers_page.dart';
+import 'pages/warehouse/warehouse_docs_page.dart';
 import 'pages/business/installments_report_page.dart';
 import 'pages/business/credit_settings_page.dart';
 import 'pages/business/print_settings_page.dart';
@@ -81,6 +82,7 @@ import 'widgets/url_tracker.dart';
 import 'pages/business/opening_balance_page.dart';
 import 'pages/business/report_templates_page.dart';
 import 'pages/business/storage_files_page.dart';
+import 'pages/business/storage_file_manager_page.dart';
 import 'pages/business/document_monetization_page.dart';
 import 'pages/business/backup/backup_page.dart';
 import 'pages/business/backup/restore_page.dart';
@@ -442,6 +444,11 @@ class _MyAppState extends State<MyApp> {
               path: '/user/profile/change-password',
               name: 'profile_change_password',
               builder: (context, state) => const ChangePasswordPage(),
+            ),
+            GoRoute(
+              path: '/user/profile/notifications',
+              name: 'profile_notifications',
+              builder: (context, state) => const UserNotificationsPage(),
             ),
             GoRoute(
               path: '/user/profile/operator',
@@ -1165,14 +1172,13 @@ class _MyAppState extends State<MyApp> {
               },
             ),
             GoRoute(
-              path: '/business/:business_id/inventory-transfers',
-              name: 'business_inventory_transfers',
+              path: '/business/:business_id/warehouse-docs',
+              name: 'business_warehouse_docs',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
                 return NoTransitionPage(
-                  child: InventoryTransfersPage(
+                  child: WarehouseDocsPage(
                     businessId: businessId,
-                    calendarController: _calendarController!,
                   ),
                 );
               },
@@ -1199,6 +1205,18 @@ class _MyAppState extends State<MyApp> {
                 final businessId = int.parse(state.pathParameters['business_id']!);
                 return NoTransitionPage(
                   child: StorageFilesPage(
+                    businessId: businessId,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/storage-files/file-manager',
+              name: 'business_storage_file_manager',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return NoTransitionPage(
+                  child: StorageFileManagerPage(
                     businessId: businessId,
                   ),
                 );

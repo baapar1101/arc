@@ -12,6 +12,7 @@ class Product {
   final num? basePurchasePrice;
   final String? mainUnit;
   final String? secondaryUnit;
+  final int? defaultWarehouseId;
   final bool isActive;
   final DateTime? createdAt;
   final DateTime? updatedAt;
@@ -29,6 +30,7 @@ class Product {
     this.basePurchasePrice,
     this.mainUnit,
     this.secondaryUnit,
+    this.defaultWarehouseId,
     this.isActive = true,
     this.createdAt,
     this.updatedAt,
@@ -48,6 +50,7 @@ class Product {
       basePurchasePrice: json['base_purchase_price'] != null ? num.tryParse(json['base_purchase_price'].toString()) : null,
       mainUnit: json['main_unit'] as String?,
       secondaryUnit: json['secondary_unit'] as String?,
+      defaultWarehouseId: json['default_warehouse_id'] != null ? (json['default_warehouse_id'] as num).toInt() : null,
       isActive: (json['is_active'] ?? true) as bool,
       createdAt: json['created_at'] != null ? DateTime.tryParse(json['created_at'].toString()) : null,
       updatedAt: json['updated_at'] != null ? DateTime.tryParse(json['updated_at'].toString()) : null,
@@ -68,6 +71,7 @@ class Product {
       'base_purchase_price': basePurchasePrice,
       'main_unit': mainUnit,
       'secondary_unit': secondaryUnit,
+      'default_warehouse_id': defaultWarehouseId,
       'is_active': isActive,
       'created_at': createdAt?.toIso8601String(),
       'updated_at': updatedAt?.toIso8601String(),

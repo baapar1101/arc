@@ -39,6 +39,18 @@ def _validate_tax(payload: ProductCreateRequest | ProductUpdateRequest) -> None:
         pass
 
 
+def _validate_item_type_inventory(payload: ProductCreateRequest | ProductUpdateRequest, existing_item_type: Optional[str] = None) -> None:
+    """بررسی می‌کند که برای خدمات، کنترل موجودی غیرفعال باشد"""
+    item_type = getattr(payload, 'item_type', None) or existing_item_type
+    if item_type == ProductItemType.SERVICE.value:
+        # برای خدمات، track_inventory باید false باشد
+        track_inventory = getattr(payload, 'track_inventory', None)
+        if track_inventory is True:
+            raise ApiError("INVALID_INVENTORY_FOR_SERVICE", "برای خدمات نمی‌توان کنترل موجودی را فعال کرد", http_status=400)
+        # برای خدمات، default_warehouse_id باید null باشد
+        # اما به جای validation، در update_product آن را null می‌کنیم
+
+
 def _validate_units(main_unit: Optional[str], secondary_unit: Optional[str], factor: Optional[Decimal]) -> None:
     if secondary_unit and not factor:
         raise ApiError("INVALID_UNIT_FACTOR", "برای واحد فرعی تعیین ضریب تبدیل الزامی است", http_status=400)
@@ -75,6 +87,7 @@ def _upsert_attributes(db: Session, product_id: int, business_id: int, attribute
 def create_product(db: Session, business_id: int, payload: ProductCreateRequest) -> Dict[str, Any]:
     repo = ProductRepository(db)
     _validate_tax(payload)
+    _validate_item_type_inventory(payload)
     # Validate and clean unit strings
     main_unit = _validate_unit_string(payload.main_unit)
     secondary_unit = _validate_unit_string(payload.secondary_unit)
@@ -114,6 +127,7 @@ def create_product(db: Session, business_id: int, payload: ProductCreateRequest)
         tax_code=payload.tax_code,
         tax_unit_id=payload.tax_unit_id,
         image_file_id=payload.image_file_id,
+        default_warehouse_id=payload.default_warehouse_id,
     )
 
     _upsert_attributes(db, obj.id, business_id, payload.attribute_ids)
@@ -168,6 +182,13 @@ def update_product(db: Session, product_id: int, business_id: int, payload: Prod
     _validate_tax(payload)
     # از فیلدهای explicitly-set برای تشخیص پاک‌سازی (None) استفاده کن
     fields_set = getattr(payload, 'model_fields_set', getattr(payload, '__fields_set__', set()))
+    # بررسی نوع کالا (از payload یا مقدار موجود)
+    item_type = payload.item_type if 'item_type' in fields_set else obj.item_type.value if hasattr(obj.item_type, 'value') else str(obj.item_type)
+    _validate_item_type_inventory(payload, existing_item_type=item_type)
+    # برای default_warehouse_id، بررسی می‌کنیم که آیا در fields_set است یا نه
+    default_warehouse_id_updated = 'default_warehouse_id' in fields_set
+    # اگر default_warehouse_id در fields_set است، مقدار آن را استفاده می‌کنیم (حتی اگر null باشد)
+    # در غیر این صورت، مقدار قبلی را نگه می‌داریم
     # Validate and clean unit strings
     main_unit_val = (_validate_unit_string(payload.main_unit) if 'main_unit' in fields_set else obj.main_unit)
     secondary_unit_val = (_validate_unit_string(payload.secondary_unit) if 'secondary_unit' in fields_set else obj.secondary_unit)
@@ -176,7 +197,7 @@ def update_product(db: Session, product_id: int, business_id: int, payload: Prod
 
     updated = repo.update(
         product_id,
-        item_type=payload.item_type,
+        item_type=payload.item_type if payload.item_type is not None else None,
         code=payload.code.strip() if isinstance(payload.code, str) else None,
         name=payload.name.strip() if isinstance(payload.name, str) else None,
         description=payload.description,
@@ -200,6 +221,14 @@ def update_product(db: Session, product_id: int, business_id: int, payload: Prod
         tax_code=payload.tax_code,
         tax_unit_id=payload.tax_unit_id,
         image_file_id=payload.image_file_id if 'image_file_id' in fields_set else None,
+        default_warehouse_id=(
+            None if item_type == ProductItemType.SERVICE.value 
+            else (
+                # اگر default_warehouse_id در fields_set است، مقدار آن را استفاده می‌کنیم (حتی اگر null باشد)
+                payload.default_warehouse_id if default_warehouse_id_updated 
+                else obj.default_warehouse_id
+            )
+        ),
     )
     if not updated:
         return None
@@ -254,6 +283,9 @@ def _to_dict(obj: Product) -> Dict[str, Any]:
         "tax_unit_id": obj.tax_unit_id,
         "image_file_id": obj.image_file_id,
         "image_url": _get_image_url(obj) if obj.image_file_id else None,
+        "default_warehouse_id": obj.default_warehouse_id,
+        "default_warehouse_name": obj.default_warehouse.name if obj.default_warehouse else None,
+        "default_warehouse_code": obj.default_warehouse.code if obj.default_warehouse else None,
         "created_at": obj.created_at,
         "updated_at": obj.updated_at,
     }

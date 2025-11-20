@@ -84,10 +84,14 @@ class Product(Base):
     # عکس کالا
     image_file_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("file_storage.id", ondelete="SET NULL"), nullable=True, index=True)
 
+    # انبار پیش‌فرض
+    default_warehouse_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("warehouses.id", ondelete="SET NULL"), nullable=True, index=True, comment="انبار پیش‌فرض برای کالا")
+
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
     # Relationships
     image_file = relationship("FileStorage", foreign_keys=[image_file_id], lazy="select")
+    default_warehouse = relationship("Warehouse", foreign_keys=[default_warehouse_id], lazy="select")
 
 

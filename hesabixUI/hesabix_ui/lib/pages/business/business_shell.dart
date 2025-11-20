@@ -18,14 +18,13 @@ import '../../core/api_client.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'receipts_payments_list_page.dart' show BulkSettlementDialog;
 import '../../widgets/document/document_form_dialog.dart';
-import '../../services/wallet_service.dart';
-import '../../utils/number_normalizer.dart';
-import '../../services/payment_gateway_service.dart';
-import 'package:url_launcher/url_launcher.dart';
+import '../../widgets/wallet/wallet_top_up_dialog.dart';
 import '../../services/announcements_service.dart';
 import '../../services/notifications_ws_client.dart';
 import '../../widgets/transfer/transfer_form_dialog.dart';
 import '../../widgets/expense_income/expense_income_form_dialog.dart';
+import '../../widgets/warehouse/warehouse_form_dialog.dart';
+import '../../widgets/warehouse/warehouse_document_form_dialog.dart';
 import 'check_form_page.dart';
 
 class BusinessShell extends StatefulWidget {
@@ -179,105 +178,17 @@ class _BusinessShellState extends State<BusinessShell> {
   }
 
     Future<void> showWalletTopUpDialog() async {
-      final t = AppLocalizations.of(context);
-      final formKey = GlobalKey<FormState>();
-      final amountCtrl = TextEditingController();
-      final descCtrl = TextEditingController();
-      final pgService = PaymentGatewayService(ApiClient());
-      List<Map<String, dynamic>> gateways = const <Map<String, dynamic>>[];
-      int? gatewayId;
-      try {
-        gateways = await pgService.listBusinessGateways(widget.businessId);
-        if (gateways.isNotEmpty) {
-          gatewayId = int.tryParse('${gateways.first['id']}');
-        }
-      } catch (_) {}
       if (!context.mounted) return;
-      final ctx = context;
-      final confirmed = await showDialog<bool>(
-        context: ctx,
-        builder: (ctx) => AlertDialog(
-          title: const Text('افزایش اعتبار'),
-          content: Form(
-            key: formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextFormField(
-                  controller: amountCtrl,
-                  decoration: const InputDecoration(labelText: 'مبلغ'),
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [
-                    EnglishDigitsFormatter(),
-                    FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
-                  ],
-                  validator: (v) => (v == null || v.isEmpty) ? 'الزامی' : null,
-                ),
-                const SizedBox(height: 8),
-                TextFormField(
-                  controller: descCtrl,
-                  decoration: const InputDecoration(labelText: 'توضیحات (اختیاری)'),
-                ),
-                const SizedBox(height: 8),
-                if (gateways.isNotEmpty)
-                  DropdownButtonFormField<int>(
-                    initialValue: gatewayId,
-                    decoration: const InputDecoration(labelText: 'درگاه پرداخت'),
-                    items: gateways
-                        .map((g) => DropdownMenuItem<int>(
-                              value: int.tryParse('${g['id']}'),
-                              child: Text('${g['display_name']} (${g['provider']})'),
-                            ))
-                        .toList(),
-                    onChanged: (v) => gatewayId = v,
-                    validator: (v) => (gateways.isNotEmpty && v == null) ? 'انتخاب درگاه الزامی است' : null,
-                  ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(t.cancel)),
-            FilledButton(
-              onPressed: () {
-                if (formKey.currentState?.validate() == true && (gateways.isEmpty || gatewayId != null)) {
-                  Navigator.of(ctx).pop(true);
-                }
-              },
-              child: Text(t.confirm),
-            ),
-          ],
-        ),
+      await WalletTopUpDialog.show(
+        context: context,
+        businessId: widget.businessId,
+        onSuccess: () {
+          // در صورت نیاز می‌توانید callback اضافه کنید
+        },
+        onError: (error) {
+          // خطا در ویجت مدیریت می‌شود
+        },
       );
-      if (confirmed == true) {
-        try {
-          final amount = double.tryParse(amountCtrl.text.replaceAll(',', '')) ?? 0;
-          final data = await WalletService(ApiClient()).topUp(
-            businessId: widget.businessId,
-            amount: amount,
-            description: descCtrl.text,
-            gatewayId: gatewayId,
-          );
-          final paymentUrl = (data['payment_url'] ?? '').toString();
-          if (paymentUrl.isNotEmpty) {
-            try {
-              await launchUrl(Uri.parse(paymentUrl), mode: LaunchMode.externalApplication);
-            } catch (_) {
-              // اگر باز نشد، فقط لینک را کپی کند/نمایش دهد
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('لینک پرداخت: $paymentUrl')));
-              }
-            }
-          } else {
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('لینک پرداخت دریافت نشد')));
-            }
-          }
-        } catch (e) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطا در افزایش اعتبار: $e')));
-          }
-        }
-      }
     }
 
   Future<void> _loadBusinessInfo() async {
@@ -538,12 +449,12 @@ class _BusinessShellState extends State<BusinessShell> {
             hasAddButton: true,
           ),
           _MenuItem(
-            label: t.shipments,
-            icon: Icons.local_shipping,
-            selectedIcon: Icons.local_shipping,
-            path: '/business/${widget.businessId}/inventory-transfers',
+            label: 'حواله‌های انبار',
+            icon: Icons.description,
+            selectedIcon: Icons.description,
+            path: '/business/${widget.businessId}/warehouse-docs',
             type: _MenuItemType.simple,
-            hasAddButton: false,
+            hasAddButton: true,
           ),
         ],
       ),
@@ -827,6 +738,40 @@ class _BusinessShellState extends State<BusinessShell> {
       }
     }
 
+    Future<void> showAddWarehouseDialog() async {
+      final result = await showDialog<bool>(
+        context: context,
+        builder: (context) => WarehouseFormDialog(
+          businessId: widget.businessId,
+          onSuccess: () {
+            // Refresh the warehouses page if it's currently open
+            _refreshCurrentPage();
+          },
+        ),
+      );
+      if (result == true) {
+        // Warehouse was successfully added, refresh the current page
+        _refreshCurrentPage();
+      }
+    }
+
+    Future<void> showAddWarehouseDocumentDialog() async {
+      final result = await showDialog<bool>(
+        context: context,
+        builder: (context) => WarehouseDocumentFormDialog(
+          businessId: widget.businessId,
+          onSuccess: () {
+            // Refresh the warehouse documents page if it's currently open
+            _refreshCurrentPage();
+          },
+        ),
+      );
+      if (result == true) {
+        // Warehouse document was successfully added, refresh the current page
+        _refreshCurrentPage();
+      }
+    }
+
 
     bool isExpanded(_MenuItem item) {
       if (item.label == t.productsAndServices) return _isProductsAndServicesExpanded;
@@ -853,12 +798,8 @@ class _BusinessShellState extends State<BusinessShell> {
 
 
     // Brand top bar with contrast color
-    final Color appBarBg = Theme.of(context).brightness == Brightness.dark
-        ? scheme.surfaceContainerHighest
-        : scheme.primary;
-    final Color appBarFg = Theme.of(context).brightness == Brightness.dark
-        ? scheme.onSurfaceVariant
-        : scheme.onPrimary;
+    final Color appBarBg = const Color(0xFF0D47A1); // آبی تیره
+    final Color appBarFg = Colors.white;
 
     final appBar = AppBar(
       backgroundColor: appBarBg,
@@ -1067,9 +1008,11 @@ class _BusinessShellState extends State<BusinessShell> {
                                         // Show add expense/income dialog
                                         showAddExpenseIncomeDialog();
                                       } else if (child.label == t.warehouses) {
-                                        // Navigate to add warehouse
-                                      } else if (child.label == t.shipments) {
-                                        // Navigate to add shipment
+                                        // Show add warehouse dialog
+                                        showAddWarehouseDialog();
+                                      } else if (child.label == 'حواله‌های انبار') {
+                                        // Show add warehouse document dialog
+                                        showAddWarehouseDocumentDialog();
                                       }
                                     },
                                     child: Container(
@@ -1406,9 +1349,11 @@ class _BusinessShellState extends State<BusinessShell> {
                               // Show add expense/income dialog
                               showAddExpenseIncomeDialog();
                             } else if (child.label == t.warehouses) {
-                              // Navigate to add warehouse
-                            } else if (child.label == t.shipments) {
-                              // Navigate to add shipment
+                              // Show add warehouse dialog
+                              showAddWarehouseDialog();
+                            } else if (child.label == 'حواله‌های انبار') {
+                              // Show add warehouse document dialog
+                              showAddWarehouseDocumentDialog();
                             }
                           },
                           child: Container(
@@ -1542,7 +1487,6 @@ class _BusinessShellState extends State<BusinessShell> {
     if (label == t.openingBalance) return 'opening_balance';
     if (label == t.reports) return 'reports';
     if (label == t.warehouses) return 'warehouses';
-    if (label == t.shipments) return 'warehouse_transfers';
     if (label == t.inquiries) return 'reports';
     if (label == t.storageSpace) return 'storage';
     if (label == t.taxpayers) return 'settings';

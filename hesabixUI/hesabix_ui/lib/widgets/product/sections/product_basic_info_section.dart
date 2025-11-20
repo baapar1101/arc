@@ -362,7 +362,15 @@ class _ProductBasicInfoSectionState extends State<ProductBasicInfoSection> {
     required bool isSelected,
   }) {
     return InkWell(
-      onTap: () => _updateFormData(widget.formData.copyWith(itemType: value)),
+      onTap: () {
+        // اگر نوع کالا به "خدمت" تغییر کرد، کنترل موجودی را غیرفعال کن
+        final newData = widget.formData.copyWith(
+          itemType: value,
+          trackInventory: value == 'خدمت' ? false : widget.formData.trackInventory,
+          defaultWarehouseId: value == 'خدمت' ? null : widget.formData.defaultWarehouseId,
+        );
+        _updateFormData(newData);
+      },
       borderRadius: BorderRadius.circular(12),
       child: Container(
         padding: const EdgeInsets.all(16),

@@ -654,6 +654,14 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
                     icon: const Icon(Icons.download),
                     label: const Text('دانلود ZIP'),
                   ),
+                  const SizedBox(width: 12),
+                  FilledButton.icon(
+                    onPressed: () {
+                      context.go('/business/${widget.businessId}/storage-files/file-manager');
+                    },
+                    icon: const Icon(Icons.folder_open),
+                    label: const Text('فایل منیجر'),
+                  ),
                 ],
               ),
             ),
@@ -1094,7 +1102,10 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
     if (confirmed != true) return;
 
     try {
-      await _storageService.deleteFile(fileId);
+      await _storageService.deleteFile(
+        businessId: widget.businessId,
+        fileId: fileId,
+      );
       if (mounted) {
         _load();
         ScaffoldMessenger.of(context).showSnackBar(

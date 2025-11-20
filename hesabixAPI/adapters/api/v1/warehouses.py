@@ -1,7 +1,7 @@
-from __future__ import annotations
+# Removed __future__ annotations to fix OpenAPI schema generation
 
 from typing import Dict, Any
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, Body
 from sqlalchemy.orm import Session
 
 from adapters.db.session import get_db
@@ -20,6 +20,7 @@ from app.services.warehouse_service import (
     update_warehouse,
     delete_warehouse,
     query_warehouses,
+    get_warehouse_stock_report,
 )
 
 
@@ -31,7 +32,7 @@ router = APIRouter(prefix="/warehouses", tags=["warehouses"])
 def create_warehouse_endpoint(
     request: Request,
     business_id: int,
-    payload: WarehouseCreateRequest,
+    payload: WarehouseCreateRequest = Body(...),
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
@@ -78,7 +79,7 @@ def update_warehouse_endpoint(
     request: Request,
     business_id: int,
     warehouse_id: int,
-    payload: WarehouseUpdateRequest,
+    payload: WarehouseUpdateRequest = Body(...),
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
@@ -134,4 +135,20 @@ def query_warehouses_endpoint(
         "query_info": payload.model_dump(),
     }
     return success_response(data=data, request=request)
+
+
+@router.post("/business/{business_id}/stock-report")
+@require_business_access("business_id")
+def stock_report_endpoint(
+    request: Request,
+    business_id: int,
+    body: Dict[str, Any] = Body(default={}),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """گزارش موجودی انبار."""
+    if not ctx.can_read_section("inventory"):
+        raise ApiError("FORBIDDEN", "Missing business permission: inventory.read", http_status=403)
+    result = get_warehouse_stock_report(db, business_id, body)
+    return success_response(data=result, request=request)
 

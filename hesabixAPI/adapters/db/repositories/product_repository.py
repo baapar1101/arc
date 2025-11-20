@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from typing import Any, Dict, Optional
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import select, and_, or_, func
 
 from .base_repo import BaseRepository
@@ -67,7 +67,9 @@ class ProductRepository(BaseRepository[Product]):
             stmt = stmt.order_by(Product.id.desc() if sort_desc else Product.id.asc())
 
         stmt = stmt.offset(skip).limit(take)
-        rows = list(self.db.execute(stmt).scalars().all())
+        # Load default_warehouse relationship
+        stmt = stmt.options(joinedload(Product.default_warehouse))
+        rows = list(self.db.execute(stmt).unique().scalars().all())
 
         def _to_dict(p: Product) -> dict[str, Any]:
             return {
@@ -98,6 +100,9 @@ class ProductRepository(BaseRepository[Product]):
                 "tax_unit_id": p.tax_unit_id,
                 "image_file_id": p.image_file_id,
                 "image_url": f"/api/v1/business/{p.business_id}/storage/files/{p.image_file_id}/download" if p.image_file_id else None,
+                "default_warehouse_id": p.default_warehouse_id,
+                "default_warehouse_name": p.default_warehouse.name if p.default_warehouse else None,
+                "default_warehouse_code": p.default_warehouse.code if p.default_warehouse else None,
                 "created_at": p.created_at,
                 "updated_at": p.updated_at,
             }
@@ -128,7 +133,7 @@ class ProductRepository(BaseRepository[Product]):
         if not obj:
             return None
         # اجازه بده فیلدهای خاص حتی اگر None باشند هم ست شوند
-        nullable_overrides = {"main_unit_id", "secondary_unit_id", "unit_conversion_factor"}
+        nullable_overrides = {"main_unit_id", "secondary_unit_id", "unit_conversion_factor", "default_warehouse_id"}
         for k, v in data.items():
             if hasattr(obj, k):
                 if k in nullable_overrides:

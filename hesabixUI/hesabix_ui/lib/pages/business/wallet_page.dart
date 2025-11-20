@@ -8,7 +8,6 @@ import '../../widgets/invoice/bank_account_combobox_widget.dart';
 import 'package:hesabix_ui/utils/number_formatters.dart' show formatWithThousands;
 import 'package:go_router/go_router.dart';
 import '../../core/api_client.dart';
-import '../../services/payment_gateway_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:url_launcher/link.dart';
 import 'package:flutter/services.dart';
@@ -19,6 +18,7 @@ import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
 import '../../core/calendar_controller.dart';
 import 'package:hesabix_ui/utils/number_normalizer.dart';
 import '../../core/date_utils.dart' show HesabixDateUtils;
+import '../../widgets/wallet/wallet_top_up_dialog.dart';
 
 class WalletPage extends StatefulWidget {
   final int businessId;
@@ -211,128 +211,21 @@ class _WalletPageState extends State<WalletPage> {
 
   Future<void> _openTopUpDialog() async {
     if (!context.mounted) return;
-    final ctx = context;
-    final t = AppLocalizations.of(ctx);
-    final formKey = GlobalKey<FormState>();
-    final amountCtrl = TextEditingController();
-    final descCtrl = TextEditingController();
-    final pgService = PaymentGatewayService(ApiClient());
-    List<Map<String, dynamic>> gateways = const <Map<String, dynamic>>[];
-    int? gatewayId;
-    try {
-      gateways = await pgService.listBusinessGateways(widget.businessId);
-      if (gateways.isNotEmpty) {
-        gatewayId = int.tryParse('${gateways.first['id']}');
-      }
-    } catch (_) {}
-    if (!ctx.mounted) return;
-    final result = await showDialog<bool>(
-      context: ctx,
-      builder: (ctx) {
-        return AlertDialog(
-          title: Text(t.walletTopUpTitle),
-          content: Form(
-            key: formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextFormField(
-                  controller: amountCtrl,
-                  decoration: InputDecoration(labelText: t.moneyAmount),
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [
-                    EnglishDigitsFormatter(),
-                    FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
-                  ],
-                  validator: (v) => (v == null || v.isEmpty) ? t.required : null,
-                ),
-                const SizedBox(height: 8),
-                TextFormField(
-                  controller: descCtrl,
-                  decoration: InputDecoration(labelText: t.descriptionOptional),
-                ),
-                const SizedBox(height: 8),
-                if (gateways.isNotEmpty)
-                  DropdownButtonFormField<int>(
-                    value: gatewayId,
-                    decoration: InputDecoration(labelText: t.walletPaymentGateway),
-                    items: gateways
-                        .map((g) => DropdownMenuItem<int>(
-                              value: int.tryParse('${g['id']}'),
-                              child: Text('${g['display_name']} (${g['provider']})'),
-                            ))
-                        .toList(),
-                    onChanged: (v) => gatewayId = v,
-                  ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t.cancel)),
-            FilledButton(
-              onPressed: () {
-                if (formKey.currentState?.validate() == true && (gateways.isEmpty || gatewayId != null)) {
-                  Navigator.pop(ctx, true);
-                }
-              },
-              child: Text(t.confirm),
-            ),
-          ],
-        );
+    // دریافت واحد ارز از overview
+    final currencyCode = _overview?['base_currency_code'] ?? 'IRR';
+    final currencyLabel = currencyCode == 'IRR' ? 'تومان' : currencyCode;
+    
+    await WalletTopUpDialog.show(
+      context: context,
+      businessId: widget.businessId,
+      currencyLabel: currencyLabel,
+      onSuccess: () async {
+        await _load();
+      },
+      onError: (error) {
+        // خطا در ویجت مدیریت می‌شود
       },
     );
-    if (result == true) {
-      try {
-        final amount = double.tryParse(amountCtrl.text.replaceAll(',', '')) ?? 0;
-        _showLoadingDialog(t.walletTopUpInitializing);
-        final data = await _service.topUp(
-          businessId: widget.businessId,
-          amount: amount,
-          description: descCtrl.text,
-          gatewayId: gatewayId,
-        );
-        if (mounted) Navigator.of(context).pop(); // close loading
-        final paymentUrl = (data['payment_url'] ?? '').toString();
-        if (paymentUrl.isNotEmpty) {
-          _showLoadingDialog(t.walletRedirectingToGateway);
-          await _openPaymentUrlWithFallback(paymentUrl);
-          if (mounted) Navigator.of(context).pop(); // close loading
-        } else {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.walletTopUpNoPaymentLink)));
-          }
-        }
-        await _load();
-      } catch (e) {
-        if (mounted) {
-          // ensure loading dialog is closed if open
-          Navigator.of(context, rootNavigator: true).maybePop();
-        }
-        String friendly = t.walletGatewayServerError;
-        if (e is DioException) {
-          final status = e.response?.statusCode;
-          final body = e.response?.data;
-          final serverMsg = (body is Map && body['message'] is String) ? (body['message'] as String) : null;
-          final errorCode = (body is Map && body['error_code'] is String) ? (body['error_code'] as String) : null;
-          if (errorCode == 'GATEWAY_INIT_FAILED') {
-            friendly = t.walletGatewayInitFailed;
-          } else if (errorCode == 'INVALID_CONFIG') {
-            friendly = t.walletInvalidGatewayConfig;
-          } else if (errorCode == 'GATEWAY_DISABLED') {
-            friendly = t.walletGatewayDisabled;
-          } else if (errorCode == 'GATEWAY_NOT_FOUND') {
-            friendly = t.walletGatewayNotFound;
-          } else if (status != null && status >= 500) {
-            friendly = t.walletGatewayServerError;
-          } else if (serverMsg != null && serverMsg.isNotEmpty) {
-            friendly = serverMsg;
-          }
-        }
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(friendly)));
-        }
-      }
-    }
   }
 
   Future<void> _openPaymentUrlWithFallback(String url) async {

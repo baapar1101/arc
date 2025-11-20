@@ -1,3 +1,4 @@
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:hesabix_ui/models/document_model.dart';
@@ -17,6 +18,7 @@ import 'package:dio/dio.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/widgets/attached_files/attached_files_widget.dart';
 import 'package:hesabix_ui/utils/web/web_utils.dart' as web_utils;
+import 'package:hesabix_ui/widgets/warehouse/warehouse_document_details_dialog.dart';
 import 'package:intl/intl.dart';
 
 /// دیالوگ نمایش جزئیات کامل سند حسابداری
@@ -335,10 +337,31 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
       final doc = await _service.getDocument(widget.documentId);
       // دریافت داده‌های خام برای دسترسی به product_lines و account_lines
       final api = ApiClient();
-      final rawResponse = await api.get('/documents/${widget.documentId}');
       Map<String, dynamic>? rawData;
-      if (rawResponse.data['success'] == true) {
-        rawData = rawResponse.data['data'] as Map<String, dynamic>?;
+      
+      // برای فاکتورها از endpoint مخصوص فاکتور استفاده کن که product_lines را برمی‌گرداند
+      if (doc.documentType.startsWith('invoice')) {
+        try {
+          final invoiceResponse = await api.get('/invoices/business/${doc.businessId}/${widget.documentId}');
+          if (invoiceResponse.data['success'] == true) {
+            final item = invoiceResponse.data['data']?['item'] as Map<String, dynamic>?;
+            if (item != null) {
+              rawData = item;
+            }
+          }
+        } catch (e) {
+          // اگر خطا رخ داد، از endpoint عمومی استفاده کن
+          final rawResponse = await api.get('/documents/${widget.documentId}');
+          if (rawResponse.data['success'] == true) {
+            rawData = rawResponse.data['data'] as Map<String, dynamic>?;
+          }
+        }
+      } else {
+        // برای سایر اسناد از endpoint عمومی استفاده کن
+        final rawResponse = await api.get('/documents/${widget.documentId}');
+        if (rawResponse.data['success'] == true) {
+          rawData = rawResponse.data['data'] as Map<String, dynamic>?;
+        }
       }
       if (mounted) {
         setState(() {
@@ -718,6 +741,10 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
           ]),
           if (isInvoice) ...[
             const SizedBox(height: 24),
+            _buildCounterpartyInfoCard(theme, document),
+          ],
+          if (isInvoice) ...[
+            const SizedBox(height: 24),
             _buildPaymentTransactions(theme),
           ],
           if (_relatedWhDocs.isNotEmpty) ...[
@@ -735,26 +762,55 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                     dense: true,
                     title: Text('${it['code'] ?? '-'} • ${it['doc_type'] ?? ''} • ${it['status'] ?? ''}'),
                     subtitle: Text(it['document_date'] ?? ''),
-                    trailing: IconButton(
-                      icon: const Icon(Icons.publish),
-                      onPressed: (it['status'] == 'draft') ? () async {
-                        try {
-                          await _warehouseService.postDoc(
-                            businessId: document.businessId,
-                            docId: it['id'],
-                          );
-                          if (!context.mounted) return;
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('حواله پست شد')),
-                          );
-                          _loadDocument();
-                        } catch (e) {
-                          if (!context.mounted) return;
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('خطا در پست حواله: $e')),
-                          );
-                        }
-                      } : null,
+                    onTap: () {
+                      showDialog(
+                        context: context,
+                        builder: (_) => WarehouseDocumentDetailsDialog(
+                          businessId: document.businessId,
+                          documentId: it['id'] as int,
+                        ),
+                      ).then((_) => _loadDocument());
+                    },
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (it['status'] == 'draft')
+                          IconButton(
+                            icon: const Icon(Icons.publish),
+                            onPressed: () async {
+                              try {
+                                await _warehouseService.postDoc(
+                                  businessId: document.businessId,
+                                  docId: it['id'],
+                                );
+                                if (!context.mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('حواله پست شد')),
+                                );
+                                _loadDocument();
+                              } catch (e) {
+                                if (!context.mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('خطا در پست حواله: $e')),
+                                );
+                              }
+                            },
+                            tooltip: 'پست',
+                          ),
+                        IconButton(
+                          icon: const Icon(Icons.visibility),
+                          onPressed: () {
+                            showDialog(
+                              context: context,
+                              builder: (_) => WarehouseDocumentDetailsDialog(
+                                businessId: document.businessId,
+                                documentId: it['id'] as int,
+                              ),
+                            ).then((_) => _loadDocument());
+                          },
+                          tooltip: 'جزئیات',
+                        ),
+                      ],
                     ),
                   );
                 },
@@ -772,6 +828,123 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
       child: Text(
         title,
         style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+      ),
+    );
+  }
+
+  /// استخراج اطلاعات طرف حساب از سند
+  Map<String, String?> _extractCounterpartyInfo(DocumentModel document) {
+    // ابتدا از extraInfo بررسی کن
+    final extraInfo = document.extraInfo;
+    String? personName;
+    String? personCode;
+    String? personMobile;
+    String? personEmail;
+    int? personId;
+
+    if (extraInfo != null) {
+      personId = extraInfo['person_id'] as int?;
+      personName = extraInfo['person_name'] as String?;
+      personCode = extraInfo['person_code'] as String?;
+      personMobile = extraInfo['person_mobile'] as String?;
+      personEmail = extraInfo['person_email'] as String?;
+    }
+
+    // اگر از extraInfo پیدا نشد، از خطوط سند بررسی کن
+    if (personName == null && document.lines != null) {
+      for (final line in document.lines!) {
+        if (line.personName != null && line.personName!.isNotEmpty) {
+          personName = line.personName;
+          personId = line.personId;
+          break;
+        }
+      }
+    }
+
+    // اگر از خطوط سند هم پیدا نشد، از _rawDocumentData بررسی کن
+    if (personName == null && _rawDocumentData != null) {
+      final accountLines = _rawDocumentData!['account_lines'] as List<dynamic>?;
+      if (accountLines != null) {
+        for (final line in accountLines) {
+          if (line is Map<String, dynamic>) {
+            final pName = line['person_name'] as String?;
+            if (pName != null && pName.isNotEmpty) {
+              personName = pName;
+              personId = line['person_id'] as int?;
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    // اگر هنوز پیدا نشد، از _rawDocumentData مستقیم بررسی کن
+    if (personName == null && _rawDocumentData != null) {
+      personName = _rawDocumentData!['person_name'] as String?;
+      personId = _rawDocumentData!['person_id'] as int?;
+      personCode = _rawDocumentData!['person_code'] as String?;
+      personMobile = _rawDocumentData!['person_mobile'] as String?;
+      personEmail = _rawDocumentData!['person_email'] as String?;
+    }
+
+    return {
+      'name': personName,
+      'code': personCode,
+      'mobile': personMobile,
+      'email': personEmail,
+      'id': personId?.toString(),
+    };
+  }
+
+  /// ساخت کارت اطلاعات طرف حساب
+  Widget _buildCounterpartyInfoCard(ThemeData theme, DocumentModel document) {
+    final counterpartyInfo = _extractCounterpartyInfo(document);
+    final personName = counterpartyInfo['name'];
+    
+    // اگر اطلاعات طرف حساب وجود نداشت، چیزی نمایش نده
+    if (personName == null || personName.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    // تعیین نوع طرف حساب بر اساس نوع فاکتور
+    final isSales = document.documentType.contains('sales');
+    final counterpartyType = isSales ? 'مشتری' : 'فروشنده';
+
+    return Card(
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.person_outline,
+                  color: theme.colorScheme.primary,
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'اطلاعات $counterpartyType',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            _buildInfoGrid([
+              _InfoRow('نام', personName),
+              if (counterpartyInfo['code'] != null && counterpartyInfo['code']!.isNotEmpty)
+                _InfoRow('کد', counterpartyInfo['code']!),
+              if (counterpartyInfo['mobile'] != null && counterpartyInfo['mobile']!.isNotEmpty)
+                _InfoRow('موبایل', counterpartyInfo['mobile']!),
+              if (counterpartyInfo['email'] != null && counterpartyInfo['email']!.isNotEmpty)
+                _InfoRow('ایمیل', counterpartyInfo['email']!),
+            ]),
+          ],
+        ),
       ),
     );
   }
@@ -894,6 +1067,26 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
   Widget _buildProductsTab(ThemeData theme) {
     if (_document == null || _rawDocumentData == null) {
       return const Center(child: Text('اطلاعاتی برای نمایش وجود ندارد.'));
+    }
+
+    final productLines = _rawDocumentData?['product_lines'] as List<dynamic>?;
+    
+    if (productLines == null || productLines.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.shopping_cart_outlined, size: 64, color: theme.colorScheme.onSurfaceVariant),
+            const SizedBox(height: 16),
+            Text(
+              'هیچ محصولی در این فاکتور ثبت نشده است',
+              style: theme.textTheme.titleMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+      );
     }
 
     return SingleChildScrollView(
@@ -1030,7 +1223,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                     DataCell(
                       Text(
                         formatWithThousands(quantity.toInt()),
-                        textDirection: TextDirection.ltr,
+                        textDirection: ui.TextDirection.ltr,
                         style: const TextStyle(fontFamily: 'monospace'),
                       ),
                     ),
@@ -1038,28 +1231,28 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                     DataCell(
                       Text(
                         formatWithThousands(unitPrice.toInt()),
-                        textDirection: TextDirection.ltr,
+                        textDirection: ui.TextDirection.ltr,
                         style: const TextStyle(fontFamily: 'monospace'),
                       ),
                     ),
                     DataCell(
                       Text(
                         discount > 0 ? formatWithThousands(discount.toInt()) : '-',
-                        textDirection: TextDirection.ltr,
+                        textDirection: ui.TextDirection.ltr,
                         style: const TextStyle(fontFamily: 'monospace', color: Colors.orange),
                       ),
                     ),
                     DataCell(
                       Text(
                         tax > 0 ? formatWithThousands(tax.toInt()) : '-',
-                        textDirection: TextDirection.ltr,
+                        textDirection: ui.TextDirection.ltr,
                         style: const TextStyle(fontFamily: 'monospace', color: Colors.blue),
                       ),
                     ),
                     DataCell(
                       Text(
                         formatWithThousands(lineTotal.toInt()),
-                        textDirection: TextDirection.ltr,
+                        textDirection: ui.TextDirection.ltr,
                         style: const TextStyle(fontFamily: 'monospace', color: Colors.green, fontWeight: FontWeight.bold),
                       ),
                     ),
@@ -1193,7 +1386,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                     DataCell(
                       Text(
                         debit > 0 ? formatWithThousands(debit.toInt()) : '-',
-                        textDirection: TextDirection.ltr,
+                        textDirection: ui.TextDirection.ltr,
                         style: const TextStyle(
                           fontFamily: 'monospace',
                           color: Colors.red,
@@ -1203,7 +1396,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                     DataCell(
                       Text(
                         credit > 0 ? formatWithThousands(credit.toInt()) : '-',
-                        textDirection: TextDirection.ltr,
+                        textDirection: ui.TextDirection.ltr,
                         style: const TextStyle(
                           fontFamily: 'monospace',
                           color: Colors.green,
@@ -1335,7 +1528,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
         const SizedBox(height: 8),
         Text(
           value,
-          textDirection: TextDirection.ltr,
+          textDirection: ui.TextDirection.ltr,
           style: TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 18,
@@ -1574,7 +1767,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
         Expanded(
           child: Text(
             value,
-            textDirection: isAmount ? TextDirection.ltr : null,
+            textDirection: isAmount ? ui.TextDirection.ltr : null,
             style: TextStyle(
               fontWeight: isAmount ? FontWeight.bold : FontWeight.normal,
               fontSize: 12,
@@ -1601,16 +1794,6 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
       child: Row(
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
-          // دکمه الصاق فایل
-          OutlinedButton.icon(
-            onPressed: _uploadingFile ? null : _attachFile,
-            icon: _uploadingFile
-                ? const SizedBox(
-                    width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                : const Icon(Icons.attach_file),
-            label: Text(_uploadingFile ? 'در حال آپلود...' : 'الصاق فایل'),
-          ),
-          const SizedBox(width: 12),
           // دکمه چاپ PDF
           OutlinedButton.icon(
             onPressed: _isGeneratingPdf ? null : _generatePdf,

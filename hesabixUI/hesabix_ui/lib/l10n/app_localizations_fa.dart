@@ -1473,9 +1473,6 @@ class AppLocalizationsFa extends AppLocalizations {
   String get warehouses => 'مدیریت انبارها';
 
   @override
-  String get shipments => 'حواله‌ها';
-
-  @override
   String get inquiries => 'استعلامات';
 
   @override
@@ -4462,4 +4459,76 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get policyTypeHybrid => 'ترکیبی';
+
+  @override
+  String get warehouseDocuments => 'حواله‌های انبار';
+
+  @override
+  String get warehouseDocument => 'حواله انبار';
+
+  @override
+  String get warehouseDocumentCode => 'کد حواله';
+
+  @override
+  String get warehouseDocumentType => 'نوع حواله';
+
+  @override
+  String get warehouseDocumentStatus => 'وضعیت';
+
+  @override
+  String get warehouseDocumentDate => 'تاریخ حواله';
+
+  @override
+  String get warehouseDocumentFrom => 'از انبار';
+
+  @override
+  String get warehouseDocumentTo => 'به انبار';
+
+  @override
+  String get warehouseDocumentTotalQuantity => 'جمع مقدار';
+
+  @override
+  String get warehouseDocumentTotalAmount => 'جمع مبلغ';
+
+  @override
+  String get docTypeReceipt => 'حواله ورود';
+
+  @override
+  String get docTypeIssue => 'حواله خروج';
+
+  @override
+  String get docTypeTransfer => 'انتقال';
+
+  @override
+  String get docTypeAdjustment => 'تعدیل';
+
+  @override
+  String get docTypeProductionIn => 'ورود تولید';
+
+  @override
+  String get docTypeProductionOut => 'خروج تولید';
+
+  @override
+  String get statusDraft => 'پیش‌نویس';
+
+  @override
+  String get statusPosted => 'پست شده';
+
+  @override
+  String get createWarehouseDocument => 'ایجاد حواله دستی';
+
+  @override
+  String get postWarehouseDocument => 'پست حواله';
+
+  @override
+  String get cancelWarehouseDocument => 'لغو حواله';
+
+  @override
+  String get deleteWarehouseDocument => 'حذف حواله';
+
+  @override
+  String get viewWarehouseDocument => 'مشاهده جزئیات';
+
+  @override
+  String get printWarehouseDocument => 'چاپ PDF';
 }

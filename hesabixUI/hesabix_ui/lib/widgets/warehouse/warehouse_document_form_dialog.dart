@@ -1,0 +1,380 @@
+import 'package:flutter/material.dart';
+import '../../services/warehouse_service.dart';
+import '../../widgets/invoice/product_combobox_widget.dart';
+import '../../widgets/invoice/warehouse_combobox_widget.dart';
+import '../../utils/number_normalizer.dart' show parseFormattedNumber;
+
+class WarehouseDocumentFormDialog extends StatefulWidget {
+  final int businessId;
+  final VoidCallback? onSuccess;
+
+  const WarehouseDocumentFormDialog({
+    super.key,
+    required this.businessId,
+    this.onSuccess,
+  });
+
+  @override
+  State<WarehouseDocumentFormDialog> createState() => _WarehouseDocumentFormDialogState();
+}
+
+class _WarehouseDocumentFormDialogState extends State<WarehouseDocumentFormDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _svc = WarehouseService();
+  
+  String? _docType;
+  DateTime? _documentDate;
+  int? _warehouseIdFrom;
+  int? _warehouseIdTo;
+  final List<Map<String, dynamic>> _lines = [];
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _documentDate = DateTime.now();
+  }
+
+
+  void _addLine() {
+    setState(() {
+      _lines.add({
+        'product_id': null,
+        'warehouse_id': null,
+        'movement': _docType == 'issue' || _docType == 'production_out' ? 'out' : 'in',
+        'quantity': 0.0,
+      });
+    });
+  }
+
+  void _removeLine(int index) {
+    setState(() {
+      _lines.removeAt(index);
+    });
+  }
+
+  void _updateLine(int index, Map<String, dynamic> updates) {
+    setState(() {
+      _lines[index] = {..._lines[index], ...updates};
+    });
+  }
+
+  Future<void> _save() async {
+    if (!_formKey.currentState!.validate()) return;
+    if (_docType == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('لطفاً نوع حواله را انتخاب کنید')),
+      );
+      return;
+    }
+    if (_lines.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('لطفاً حداقل یک خط اضافه کنید')),
+      );
+      return;
+    }
+
+    // اعتبارسنجی خطوط
+    for (var i = 0; i < _lines.length; i++) {
+      final line = _lines[i];
+      if (line['product_id'] == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('خط ${i + 1}: لطفاً محصول را انتخاب کنید')),
+        );
+        return;
+      }
+      if ((line['quantity'] as num?) == null || (line['quantity'] as num) <= 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('خط ${i + 1}: تعداد باید مثبت باشد')),
+        );
+        return;
+      }
+    }
+
+    setState(() => _saving = true);
+    try {
+      final payload = {
+        'doc_type': _docType,
+        'document_date': _documentDate?.toIso8601String().split('T')[0],
+        'warehouse_id_from': _warehouseIdFrom,
+        'warehouse_id_to': _warehouseIdTo,
+        'lines': _lines.map((line) => {
+          'product_id': line['product_id'],
+          'warehouse_id': line['warehouse_id'],
+          'movement': line['movement'],
+          'quantity': line['quantity'],
+        }).toList(),
+      };
+
+      await _svc.createManual(businessId: widget.businessId, payload: payload);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('حواله ایجاد شد')),
+      );
+      Navigator.of(context).pop();
+      widget.onSuccess?.call();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('خطا: $e')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _saving = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('ایجاد حواله دستی'),
+      content: SizedBox(
+        width: MediaQuery.of(context).size.width > 800 ? 700 : 600,
+        child: Form(
+          key: _formKey,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // نوع حواله
+                DropdownButtonFormField<String>(
+                  value: _docType,
+                  decoration: const InputDecoration(
+                    labelText: 'نوع حواله *',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 'receipt', child: Text('حواله ورود')),
+                    DropdownMenuItem(value: 'issue', child: Text('حواله خروج')),
+                    DropdownMenuItem(value: 'transfer', child: Text('انتقال بین انبارها')),
+                    DropdownMenuItem(value: 'adjustment', child: Text('تعدیل موجودی')),
+                    DropdownMenuItem(value: 'production_in', child: Text('ورود تولید')),
+                    DropdownMenuItem(value: 'production_out', child: Text('خروج تولید')),
+                  ],
+                  onChanged: (value) {
+                    setState(() {
+                      _docType = value;
+                      // تنظیم movement برای خطوط موجود
+                      for (var line in _lines) {
+                        if (value == 'issue' || value == 'production_out') {
+                          line['movement'] = 'out';
+                        } else if (value == 'receipt' || value == 'production_in') {
+                          line['movement'] = 'in';
+                        }
+                      }
+                    });
+                  },
+                  validator: (value) => value == null ? 'لطفاً نوع حواله را انتخاب کنید' : null,
+                ),
+                const SizedBox(height: 16),
+                // تاریخ
+                TextFormField(
+                  decoration: const InputDecoration(
+                    labelText: 'تاریخ *',
+                    border: OutlineInputBorder(),
+                  ),
+                  readOnly: true,
+                  controller: TextEditingController(
+                    text: _documentDate != null
+                        ? '${_documentDate!.year}-${_documentDate!.month.toString().padLeft(2, '0')}-${_documentDate!.day.toString().padLeft(2, '0')}'
+                        : '',
+                  ),
+                  onTap: () async {
+                    final date = await showDatePicker(
+                      context: context,
+                      initialDate: _documentDate ?? DateTime.now(),
+                      firstDate: DateTime(2000),
+                      lastDate: DateTime(2100),
+                    );
+                    if (date != null) {
+                      setState(() => _documentDate = date);
+                    }
+                  },
+                  validator: (value) => _documentDate == null ? 'لطفاً تاریخ را انتخاب کنید' : null,
+                ),
+                const SizedBox(height: 16),
+                // انبارها بر اساس نوع حواله
+                if (_docType == 'transfer') ...[
+                  WarehouseComboboxWidget(
+                    businessId: widget.businessId,
+                    selectedWarehouseId: _warehouseIdFrom,
+                    onChanged: (id) => setState(() => _warehouseIdFrom = id),
+                    label: 'انبار مبدا *',
+                  ),
+                  const SizedBox(height: 16),
+                  WarehouseComboboxWidget(
+                    businessId: widget.businessId,
+                    selectedWarehouseId: _warehouseIdTo,
+                    onChanged: (id) => setState(() => _warehouseIdTo = id),
+                    label: 'انبار مقصد *',
+                  ),
+                ] else if (_docType == 'issue' || _docType == 'production_out') ...[
+                  WarehouseComboboxWidget(
+                    businessId: widget.businessId,
+                    selectedWarehouseId: _warehouseIdFrom,
+                    onChanged: (id) => setState(() => _warehouseIdFrom = id),
+                    label: 'انبار *',
+                  ),
+                ] else if (_docType == 'receipt' || _docType == 'production_in') ...[
+                  WarehouseComboboxWidget(
+                    businessId: widget.businessId,
+                    selectedWarehouseId: _warehouseIdTo,
+                    onChanged: (id) => setState(() => _warehouseIdTo = id),
+                    label: 'انبار *',
+                  ),
+                ],
+                const SizedBox(height: 16),
+                // خطوط
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'خطوط حواله',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.add),
+                      onPressed: _addLine,
+                      tooltip: 'افزودن خط',
+                    ),
+                  ],
+                ),
+                if (_lines.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.all(16),
+                    child: Center(child: Text('هیچ خطی وجود ندارد')),
+                  )
+                else
+                  ...List.generate(_lines.length, (index) {
+                    final line = _lines[index];
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      child: Padding(
+                        padding: const EdgeInsets.all(8),
+                        child: Column(
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: ProductComboboxWidget(
+                                    businessId: widget.businessId,
+                                    selectedProduct: line['product_id'] != null
+                                        ? {'id': line['product_id']}
+                                        : null,
+                                    onChanged: (product) {
+                                      _updateLine(index, {
+                                        'product_id': product?['id'],
+                                      });
+                                    },
+                                  ),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.delete_outline),
+                                  onPressed: () => _removeLine(index),
+                                  color: Colors.red,
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                if (_docType == 'adjustment')
+                                  Expanded(
+                                    child: DropdownButtonFormField<String>(
+                                      value: line['movement'] as String?,
+                                      decoration: const InputDecoration(
+                                        labelText: 'نوع حرکت',
+                                        border: OutlineInputBorder(),
+                                        isDense: true,
+                                      ),
+                                      items: const [
+                                        DropdownMenuItem(value: 'in', child: Text('ورود')),
+                                        DropdownMenuItem(value: 'out', child: Text('خروج')),
+                                      ],
+                                      onChanged: (value) {
+                                        if (value != null) {
+                                          _updateLine(index, {'movement': value});
+                                        }
+                                      },
+                                    ),
+                                  ),
+                                if (_docType == 'adjustment') const SizedBox(width: 8),
+                                Expanded(
+                                  child: WarehouseComboboxWidget(
+                                    businessId: widget.businessId,
+                                    selectedWarehouseId: line['warehouse_id'] as int?,
+                                    onChanged: (id) => _updateLine(index, {'warehouse_id': id}),
+                                    label: 'انبار',
+                                    isRequired: true,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: TextFormField(
+                                    decoration: const InputDecoration(
+                                      labelText: 'تعداد *',
+                                      border: OutlineInputBorder(),
+                                      isDense: true,
+                                    ),
+                                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                    initialValue: line['quantity'].toString(),
+                                    onChanged: (value) {
+                                      final qty = parseFormattedNumber(value) ?? 0.0;
+                                      _updateLine(index, {'quantity': qty});
+                                    },
+                                    validator: (value) {
+                                      final qty = parseFormattedNumber(value) ?? 0.0;
+                                      return qty <= 0 ? 'تعداد باید مثبت باشد' : null;
+                                    },
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: TextFormField(
+                                    decoration: const InputDecoration(
+                                      labelText: 'قیمت واحد',
+                                      border: OutlineInputBorder(),
+                                      isDense: true,
+                                    ),
+                                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                    initialValue: line['cost_price'] > 0 ? line['cost_price'].toString() : '',
+                                    onChanged: (value) {
+                                      final price = parseFormattedNumber(value) ?? 0.0;
+                                      _updateLine(index, {'cost_price': price});
+                                    },
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }),
+              ],
+            ),
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _saving ? null : () => Navigator.of(context).pop(),
+          child: const Text('انصراف'),
+        ),
+        FilledButton(
+          onPressed: _saving ? null : _save,
+          child: _saving
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('ذخیره'),
+        ),
+      ],
+    );
+  }
+}
+

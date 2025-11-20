@@ -143,10 +143,12 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       child: ProductPricingInventorySection(
+        businessId: widget.businessId,
         formData: _controller.formData,
         onChanged: _controller.updateFormData,
         priceLists: _controller.priceLists,
         currencies: _controller.currencies,
+        warehouses: _controller.warehouses,
         draftPriceItems: _controller.draftPriceItems,
         onAddOrUpdatePriceItem: (item) {
           _controller.addOrUpdateDraftPriceItem(item);

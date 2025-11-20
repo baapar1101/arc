@@ -399,6 +399,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                     final mainUnit = p['main_unit']?.toString();
                     final secondaryUnit = p['secondary_unit']?.toString();
                     final taxRate = _defaultTaxRateFromProduct(p);
+                    final defaultWarehouseId = _toInt(p['default_warehouse_id']);
                     
                     final updated = item.copyWith(
                       productId: _toInt(p['id']),
@@ -413,6 +414,8 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                       taxRate: taxRate,
                       minOrderQty: _toInt(p['min_order_qty']),
                       trackInventory: p['track_inventory'] == true,
+                      // تنظیم خودکار انبار کالا (اگر انبار قبلاً انتخاب نشده باشد)
+                      warehouseId: item.warehouseId ?? defaultWarehouseId,
                     );
                     final priced = await _resolveUnitPrice(updated, preferManual: false);
                     setState(() => _rows[index] = priced);

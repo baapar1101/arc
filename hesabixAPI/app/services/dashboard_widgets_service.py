@@ -11,6 +11,7 @@ from adapters.db.models.invoice_item_line import InvoiceItemLine
 from adapters.db.models.currency import Currency
 from adapters.db.models.check import Check, CheckStatus, CheckType
 from adapters.db.models.person import Person
+from adapters.db.models.product import Product
 from app.services.invoice_service import INVOICE_SALES
 from app.core.calendar import CalendarConverter, CalendarType
 import jdatetime
@@ -106,6 +107,21 @@ DEFAULT_WIDGET_DEFINITIONS: List[Dict[str, Any]] = [
             "xl": {"colSpan": 8, "rowSpan": 4},
         },
         "cache_ttl": 60,
+    },
+    {
+        "key": "top_selling_products",
+        "title": "کالاهای پرفروش",
+        "icon": "trending_up",
+        "version": 1,
+        "permissions_required": ["invoices.view"],
+        "defaults": {
+            "xs": {"colSpan": 4, "rowSpan": 4},
+            "sm": {"colSpan": 6, "rowSpan": 4},
+            "md": {"colSpan": 6, "rowSpan": 4},
+            "lg": {"colSpan": 6, "rowSpan": 4},
+            "xl": {"colSpan": 6, "rowSpan": 4},
+        },
+        "cache_ttl": 30,
     },
 ]
 
@@ -336,12 +352,112 @@ def _resolve_latest_sales_invoices(
     return {"items": items}
 
 
+def _resolve_top_selling_products(
+    db: Session, business_id: int, user_id: int, filters: Dict[str, Any]
+) -> Dict[str, Any]:
+    """
+    Returns top selling products by quantity or amount.
+    filters:
+      - calculation_type: 'quantity' | 'amount' (default: 'amount')
+      - limit: number of products to return (default: 10)
+      - currency_id: filter by currency (optional, only used when calculation_type is 'amount')
+    """
+    calculation_type = str(filters.get("calculation_type", "amount")).lower()
+    if calculation_type not in ["quantity", "amount"]:
+        calculation_type = "amount"
+    
+    limit_raw = filters.get("limit", 10)
+    try:
+        limit = max(1, min(50, int(limit_raw)))
+    except Exception:
+        limit = 10
+
+    # Query invoice item lines for sales invoices
+    q = (
+        db.query(
+            Product.id.label("product_id"),
+            Product.code.label("product_code"),
+            Product.name.label("product_name"),
+            InvoiceItemLine.quantity,
+            InvoiceItemLine.extra_info,
+            Document.currency_id,
+        )
+        .join(InvoiceItemLine, InvoiceItemLine.product_id == Product.id)
+        .join(Document, Document.id == InvoiceItemLine.document_id)
+        .filter(
+            and_(
+                Document.business_id == business_id,
+                Document.document_type == INVOICE_SALES,
+                Document.is_proforma == False,  # noqa: E712
+            )
+        )
+    )
+    
+    # If calculation_type is 'amount', filter by currency_id if provided
+    currency_id = filters.get("currency_id")
+    if calculation_type == "amount" and currency_id is not None:
+        try:
+            currency_id_int = int(currency_id)
+            q = q.filter(Document.currency_id == currency_id_int)
+        except Exception:
+            pass
+    
+    rows = q.all()
+    
+    # Aggregate by product
+    product_agg: Dict[int, Dict[str, Any]] = {}
+    
+    for row in rows:
+        product_id = int(row.product_id)
+        
+        if product_id not in product_agg:
+            product_agg[product_id] = {
+                "product_id": product_id,
+                "product_code": row.product_code,
+                "product_name": row.product_name,
+                "total_quantity": 0.0,
+                "total_amount": 0.0,
+            }
+        
+        # Extract quantity
+        qty = float(row.quantity) if row.quantity else 0.0
+        product_agg[product_id]["total_quantity"] += qty
+        
+        # Extract amount from extra_info
+        extra_info = row.extra_info or {}
+        line_total = float(extra_info.get("line_total", 0) or 0)
+        product_agg[product_id]["total_amount"] += line_total
+    
+    # Convert to list and sort
+    products_list = list(product_agg.values())
+    
+    if calculation_type == "quantity":
+        products_list.sort(key=lambda x: x["total_quantity"], reverse=True)
+    else:
+        products_list.sort(key=lambda x: x["total_amount"], reverse=True)
+    
+    # Limit results
+    products_list = products_list[:limit]
+    
+    result = {
+        "items": products_list,
+        "calculation_type": calculation_type,
+        "limit": limit,
+    }
+    
+    if currency_id is not None:
+        result["currency_id"] = currency_id
+    
+    return result
+
+
 WIDGET_RESOLVERS: Dict[str, WidgetResolver] = {
     "latest_sales_invoices": _resolve_latest_sales_invoices,
     "sales_bar_chart": lambda db, business_id, user_id, filters: _resolve_sales_bar_chart(db, business_id, filters),
     "checks_today": lambda db, business_id, user_id, filters: _resolve_checks_today(db, business_id, filters),
     "checks_tomorrow": lambda db, business_id, user_id, filters: _resolve_checks_tomorrow(db, business_id, filters),
     "checks_this_month": lambda db, business_id, user_id, filters: _resolve_checks_this_month(db, business_id, filters),
+    "top_selling_products": _resolve_top_selling_products,
 }
 
 

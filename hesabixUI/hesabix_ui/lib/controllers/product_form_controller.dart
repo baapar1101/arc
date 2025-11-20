@@ -6,6 +6,7 @@ import '../services/product_attribute_service.dart';
 import '../services/tax_service.dart';
 import '../services/price_list_service.dart';
 import '../services/currency_service.dart';
+import '../services/warehouse_service.dart';
 import '../core/api_client.dart';
 
 class ProductFormController extends ChangeNotifier {
@@ -18,6 +19,7 @@ class ProductFormController extends ChangeNotifier {
   late final TaxService _taxService;
   late final PriceListService _priceListService;
   late final CurrencyService _currencyService;
+  late final WarehouseService _warehouseService;
 
   ProductFormData _formData = ProductFormData();
   bool _isLoading = false;
@@ -31,6 +33,7 @@ class ProductFormController extends ChangeNotifier {
   List<Map<String, dynamic>> _taxUnits = [];
   List<Map<String, dynamic>> _priceLists = [];
   List<Map<String, dynamic>> _currencies = [];
+  List<Map<String, dynamic>> _warehouses = [];
 
   // Draft price items per price list (for multi-currency)
   final List<Map<String, dynamic>> _draftPriceItems = [];
@@ -53,6 +56,7 @@ class ProductFormController extends ChangeNotifier {
     _taxService = TaxService(apiClient: _apiClient);
     _priceListService = PriceListService(apiClient: _apiClient);
     _currencyService = CurrencyService(_apiClient);
+    _warehouseService = WarehouseService();
   }
 
   // Getters
@@ -65,6 +69,7 @@ class ProductFormController extends ChangeNotifier {
   List<Map<String, dynamic>> get taxUnits => _taxUnits;
   List<Map<String, dynamic>> get priceLists => _priceLists;
   List<Map<String, dynamic>> get currencies => _currencies;
+  List<Map<String, dynamic>> get warehouses => _warehouses;
   List<Map<String, dynamic>> get draftPriceItems => List.unmodifiable(_draftPriceItems);
 
   void addOrUpdateDraftPriceItem(Map<String, dynamic> item) {
@@ -101,6 +106,7 @@ class ProductFormController extends ChangeNotifier {
     try {
       await _loadReferenceData();
       await _loadPriceListsAndCurrencies();
+      await _loadWarehouses();
       
       if (product != null) {
         _editingProductId = product['id'] as int?;
@@ -191,6 +197,20 @@ class ProductFormController extends ChangeNotifier {
       }
     } catch (e) {
       // ignore; optional reference data
+    }
+  }
+
+  Future<void> _loadWarehouses() async {
+    try {
+      final warehouses = await _warehouseService.listWarehouses(businessId: businessId);
+      _warehouses = warehouses.map((w) => {
+        'id': w.id,
+        'code': w.code,
+        'name': w.name,
+        'is_default': w.isDefault,
+      }).toList();
+    } catch (_) {
+      _warehouses = [];
     }
   }
 

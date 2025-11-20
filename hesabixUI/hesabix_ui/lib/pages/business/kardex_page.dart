@@ -408,7 +408,6 @@ class _KardexPageState extends State<KardexPage> {
             FilterOption(value: 'invoice_purchase', label: t.invoiceTypePurchase),
             FilterOption(value: 'invoice_sales_return', label: t.invoiceTypeSalesReturn),
             FilterOption(value: 'invoice_purchase_return', label: t.invoiceTypePurchaseReturn),
-            FilterOption(value: 'inventory_transfer', label: t.warehouseTransfers),
             FilterOption(value: 'invoice_direct_consumption', label: t.invoiceTypeDirectConsumption),
             FilterOption(value: 'invoice_waste', label: t.invoiceTypeWaste),
             FilterOption(value: 'production', label: t.invoiceTypeProduction),

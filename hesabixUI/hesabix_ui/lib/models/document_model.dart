@@ -176,8 +176,6 @@ class DocumentModel {
         return 'تولید';
       case 'invoice_waste':
         return 'ضایعات';
-      case 'inventory_transfer':
-        return 'انتقال موجودی';
       case 'production':
         return 'تولید';
       case 'opening_balance':

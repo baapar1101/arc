@@ -38,6 +38,9 @@ class ProductFormData {
   // Image
   String? imageFileId;
   String? imageUrl;
+  
+  // Warehouse
+  int? defaultWarehouseId;
 
   ProductFormData({
     this.itemType = 'کالا',
@@ -66,6 +69,7 @@ class ProductFormData {
     Set<int>? selectedAttributeIds,
     this.imageFileId,
     this.imageUrl,
+    this.defaultWarehouseId,
   }) : selectedAttributeIds = selectedAttributeIds ?? <int>{};
 
   ProductFormData copyWith({
@@ -95,6 +99,7 @@ class ProductFormData {
     Set<int>? selectedAttributeIds,
     String? imageFileId,
     String? imageUrl,
+    int? defaultWarehouseId,
   }) {
     return ProductFormData(
       itemType: itemType ?? this.itemType,
@@ -123,6 +128,7 @@ class ProductFormData {
       selectedAttributeIds: selectedAttributeIds ?? this.selectedAttributeIds,
       imageFileId: imageFileId ?? this.imageFileId,
       imageUrl: imageUrl ?? this.imageUrl,
+      defaultWarehouseId: defaultWarehouseId ?? this.defaultWarehouseId,
     );
   }
 
@@ -155,9 +161,11 @@ class ProductFormData {
       'tax_unit_id': taxUnitId,
       'attribute_ids': selectedAttributeIds.isEmpty ? null : selectedAttributeIds.toList(),
       'image_file_id': imageFileId,
+      'default_warehouse_id': defaultWarehouseId,
     };
     // Remove only nulls we intentionally kept nullable
-    payload.removeWhere((k, v) => v == null);
+    // اما default_warehouse_id را همیشه نگه می‌داریم (حتی اگر null باشد) تا بک‌اند بتواند آن را به‌روزرسانی کند
+    payload.removeWhere((k, v) => v == null && k != 'default_warehouse_id');
     return payload;
   }
 
@@ -189,6 +197,7 @@ class ProductFormData {
       selectedAttributeIds: _parseAttributeIds(product['attribute_ids']),
       imageFileId: product['image_file_id']?.toString(),
       imageUrl: product['image_url']?.toString(),
+      defaultWarehouseId: _parseInt(product['default_warehouse_id']),
     );
   }
 

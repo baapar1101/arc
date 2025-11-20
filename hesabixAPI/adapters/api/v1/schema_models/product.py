@@ -43,6 +43,8 @@ class ProductCreateRequest(BaseModel):
     attribute_ids: Optional[List[int]] = Field(default=None, description="ویژگی‌های انتخابی برای لینک شدن")
     
     image_file_id: Optional[str] = Field(default=None, description="شناسه فایل عکس کالا")
+    
+    default_warehouse_id: Optional[int] = Field(default=None, description="شناسه انبار پیش‌فرض برای کالا")
 
 
 class ProductUpdateRequest(BaseModel):
@@ -77,6 +79,8 @@ class ProductUpdateRequest(BaseModel):
     attribute_ids: Optional[List[int]] = None
     
     image_file_id: Optional[str] = Field(default=None, description="شناسه فایل عکس کالا")
+    
+    default_warehouse_id: Optional[int] = Field(default=None, description="شناسه انبار پیش‌فرض برای کالا")
 
 
 class ProductResponse(BaseModel):
@@ -107,6 +111,7 @@ class ProductResponse(BaseModel):
     tax_unit_id: Optional[int] = None
     image_file_id: Optional[str] = None
     image_url: Optional[str] = Field(default=None, description="URL برای نمایش عکس")
+    default_warehouse_id: Optional[int] = None
     created_at: str
     updated_at: str
 

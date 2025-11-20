@@ -59,8 +59,25 @@ class BusinessStorageService {
   }
 
   /// حذف فایل
-  Future<void> deleteFile(String fileId) async {
-    await _api.delete('/api/v1/admin/files/$fileId');
+  Future<void> deleteFile({
+    required int businessId,
+    required String fileId,
+  }) async {
+    await _api.delete('/api/v1/business/$businessId/storage/files/$fileId');
+  }
+
+  /// تغییر نام فایل
+  Future<Map<String, dynamic>> renameFile({
+    required int businessId,
+    required String fileId,
+    required String newName,
+  }) async {
+    final res = await _api.put<Map<String, dynamic>>(
+      '/api/v1/business/$businessId/storage/files/$fileId/rename',
+      data: {'new_name': newName},
+    );
+    final body = res.data as Map<String, dynamic>;
+    return Map<String, dynamic>.from(body['data'] as Map);
   }
 
   /// دریافت اطلاعات استفاده از ذخیره‌سازی
