@@ -2530,3 +2530,582 @@ def export_installments_xlsx(
         return content, "text/csv; charset=utf-8", "csv"
 
 
+def get_daily_sales_report(
+    db: Session,
+    business_id: int,
+    fiscal_year_id: Optional[int] = None,
+    currency_id: Optional[int] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    skip: int = 0,
+    take: int = 50,
+) -> Dict[str, Any]:
+    """
+    گزارش فروش روزانه
+    
+    Args:
+        db: نشست پایگاه داده
+        business_id: شناسه کسب‌وکار
+        fiscal_year_id: شناسه سال مالی (اختیاری)
+        currency_id: شناسه ارز (اختیاری)
+        date_from: از تاریخ (اختیاری، فرمت YYYY-MM-DD)
+        date_to: تا تاریخ (اختیاری، فرمت YYYY-MM-DD)
+        skip: تعداد رکوردهای رد شده برای pagination
+        take: تعداد رکوردهای برگشتی
+    
+    Returns:
+        dict: {
+            'items': لیست روزها با آمار فروش,
+            'summary': خلاصه آمار,
+            'pagination': اطلاعات pagination
+        }
+    """
+    from collections import defaultdict
+    
+    # تبدیل تاریخ‌ها
+    date_from_obj = None
+    date_to_obj = None
+    
+    if date_from:
+        try:
+            date_from_obj = _parse_iso_date(date_from)
+        except Exception:
+            pass
+    
+    if date_to:
+        try:
+            date_to_obj = _parse_iso_date(date_to)
+        except Exception:
+            pass
+    
+    # اگر تاریخ‌ها مشخص نشده‌اند، از سال مالی استفاده کن
+    if date_from_obj is None or date_to_obj is None:
+        try:
+            if fiscal_year_id:
+                fiscal_year = db.query(FiscalYear).filter(FiscalYear.id == fiscal_year_id).first()
+            else:
+                fiscal_year = db.query(FiscalYear).filter(
+                    and_(
+                        FiscalYear.business_id == business_id,
+                        FiscalYear.is_last == True
+                    )
+                ).first()
+            
+            if fiscal_year:
+                if date_from_obj is None:
+                    date_from_obj = fiscal_year.start_date
+                if date_to_obj is None:
+                    date_to_obj = fiscal_year.end_date if fiscal_year.end_date else date.today()
+        except Exception:
+            pass
+    
+    # اگر هنوز تاریخ مشخص نشده
+    if date_to_obj is None:
+        date_to_obj = date.today()
+    if date_from_obj is None:
+        date_from_obj = date.today()
+    
+    # Query فاکتورهای فروش
+    sales_query = db.query(
+        Document.document_date,
+        Document.extra_info,
+        Document.currency_id,
+    ).filter(
+        and_(
+            Document.business_id == business_id,
+            Document.document_type == INVOICE_SALES,
+            Document.is_proforma == False,
+            Document.document_date >= date_from_obj,
+            Document.document_date <= date_to_obj,
+        )
+    )
+    
+    if currency_id:
+        sales_query = sales_query.filter(Document.currency_id == currency_id)
+    
+    if fiscal_year_id:
+        sales_query = sales_query.filter(Document.fiscal_year_id == fiscal_year_id)
+    
+    sales_documents = sales_query.order_by(Document.document_date.asc()).all()
+    
+    # گروه‌بندی بر اساس روز
+    daily_stats: Dict[str, Dict[str, Any]] = defaultdict(lambda: {
+        'date': None,
+        'invoice_count': 0,
+        'total_gross': Decimal(0),
+        'total_discount': Decimal(0),
+        'total_tax': Decimal(0),
+        'total_net': Decimal(0),
+    })
+    
+    for doc in sales_documents:
+        doc_date = doc.document_date
+        if not doc_date:
+            continue
+        
+        date_key = doc_date.isoformat()
+        extra_info = doc.extra_info or {}
+        totals = extra_info.get('totals') or {}
+        
+        daily_stats[date_key]['date'] = doc_date.isoformat()
+        daily_stats[date_key]['invoice_count'] += 1
+        daily_stats[date_key]['total_gross'] += Decimal(str(totals.get('gross', 0) or 0))
+        daily_stats[date_key]['total_discount'] += Decimal(str(totals.get('discount', 0) or 0))
+        daily_stats[date_key]['total_tax'] += Decimal(str(totals.get('tax', 0) or 0))
+        daily_stats[date_key]['total_net'] += Decimal(str(totals.get('net', 0) or 0))
+    
+    # تبدیل به لیست و مرتب‌سازی (ترتیب نزولی)
+    items = []
+    for date_key in sorted(daily_stats.keys(), reverse=True):
+        stats = daily_stats[date_key]
+        items.append({
+            'date': stats['date'],
+            'invoice_count': stats['invoice_count'],
+            'total_gross': float(stats['total_gross']),
+            'total_discount': float(stats['total_discount']),
+            'total_tax': float(stats['total_tax']),
+            'total_net': float(stats['total_net']),
+        })
+    
+    total = len(items)
+    current_page = (skip // take) + 1
+    total_pages = (total + take - 1) // take if take > 0 else 1
+    paginated_items = items[skip:skip + take]
+    
+    total_invoice_count = sum(item['invoice_count'] for item in items)
+    total_gross_sum = sum(item['total_gross'] for item in items)
+    total_discount_sum = sum(item['total_discount'] for item in items)
+    total_tax_sum = sum(item['total_tax'] for item in items)
+    total_net_sum = sum(item['total_net'] for item in items)
+    
+    return {
+        'items': paginated_items,
+        'summary': {
+            'total_count': total,
+            'total_invoice_count': total_invoice_count,
+            'total_gross': float(total_gross_sum),
+            'total_discount': float(total_discount_sum),
+            'total_tax': float(total_tax_sum),
+            'total_net': float(total_net_sum),
+        },
+        'pagination': {
+            'total': total,
+            'page': current_page,
+            'per_page': take,
+            'total_pages': total_pages,
+            'has_next': current_page < total_pages,
+            'has_prev': current_page > 1,
+        }
+    }
+
+
+def get_monthly_sales_report(
+    db: Session,
+    business_id: int,
+    fiscal_year_id: Optional[int] = None,
+    currency_id: Optional[int] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    skip: int = 0,
+    take: int = 50,
+) -> Dict[str, Any]:
+    """
+    گزارش فروش ماهانه
+    
+    Args:
+        db: نشست پایگاه داده
+        business_id: شناسه کسب‌وکار
+        fiscal_year_id: شناسه سال مالی (اختیاری)
+        currency_id: شناسه ارز (اختیاری)
+        date_from: از تاریخ (اختیاری، فرمت YYYY-MM-DD)
+        date_to: تا تاریخ (اختیاری، فرمت YYYY-MM-DD)
+        skip: تعداد رکوردهای رد شده برای pagination
+        take: تعداد رکوردهای برگشتی
+    
+    Returns:
+        dict: {
+            'items': لیست ماه‌ها با آمار فروش,
+            'summary': خلاصه آمار,
+            'pagination': اطلاعات pagination
+        }
+    """
+    from collections import defaultdict
+    
+    # تبدیل تاریخ‌ها
+    date_from_obj = None
+    date_to_obj = None
+    
+    if date_from:
+        try:
+            date_from_obj = _parse_iso_date(date_from)
+        except Exception:
+            pass
+    
+    if date_to:
+        try:
+            date_to_obj = _parse_iso_date(date_to)
+        except Exception:
+            pass
+    
+    # اگر تاریخ‌ها مشخص نشده‌اند، از سال مالی استفاده کن
+    if date_from_obj is None or date_to_obj is None:
+        try:
+            if fiscal_year_id:
+                fiscal_year = db.query(FiscalYear).filter(FiscalYear.id == fiscal_year_id).first()
+            else:
+                fiscal_year = db.query(FiscalYear).filter(
+                    and_(
+                        FiscalYear.business_id == business_id,
+                        FiscalYear.is_last == True
+                    )
+                ).first()
+            
+            if fiscal_year:
+                if date_from_obj is None:
+                    date_from_obj = fiscal_year.start_date
+                if date_to_obj is None:
+                    date_to_obj = fiscal_year.end_date if fiscal_year.end_date else date.today()
+        except Exception:
+            pass
+    
+    # اگر هنوز تاریخ مشخص نشده
+    if date_to_obj is None:
+        date_to_obj = date.today()
+    if date_from_obj is None:
+        date_from_obj = date.today()
+    
+    # Query فاکتورهای فروش
+    sales_query = db.query(
+        Document.document_date,
+        Document.extra_info,
+        Document.currency_id,
+    ).filter(
+        and_(
+            Document.business_id == business_id,
+            Document.document_type == INVOICE_SALES,
+            Document.is_proforma == False,
+            Document.document_date >= date_from_obj,
+            Document.document_date <= date_to_obj,
+        )
+    )
+    
+    if currency_id:
+        sales_query = sales_query.filter(Document.currency_id == currency_id)
+    
+    if fiscal_year_id:
+        sales_query = sales_query.filter(Document.fiscal_year_id == fiscal_year_id)
+    
+    sales_documents = sales_query.order_by(Document.document_date.asc()).all()
+    
+    # گروه‌بندی بر اساس ماه
+    monthly_stats: Dict[str, Dict[str, Any]] = defaultdict(lambda: {
+        'year': None,
+        'month': None,
+        'month_key': None,
+        'invoice_count': 0,
+        'total_gross': Decimal(0),
+        'total_discount': Decimal(0),
+        'total_tax': Decimal(0),
+        'total_net': Decimal(0),
+    })
+    
+    for doc in sales_documents:
+        doc_date = doc.document_date
+        if not doc_date:
+            continue
+        
+        # کلید ماه: YYYY-MM
+        month_key = f"{doc_date.year:04d}-{doc_date.month:02d}"
+        extra_info = doc.extra_info or {}
+        totals = extra_info.get('totals') or {}
+        
+        monthly_stats[month_key]['year'] = doc_date.year
+        monthly_stats[month_key]['month'] = doc_date.month
+        monthly_stats[month_key]['month_key'] = month_key
+        monthly_stats[month_key]['invoice_count'] += 1
+        monthly_stats[month_key]['total_gross'] += Decimal(str(totals.get('gross', 0) or 0))
+        monthly_stats[month_key]['total_discount'] += Decimal(str(totals.get('discount', 0) or 0))
+        monthly_stats[month_key]['total_tax'] += Decimal(str(totals.get('tax', 0) or 0))
+        monthly_stats[month_key]['total_net'] += Decimal(str(totals.get('net', 0) or 0))
+    
+    # تبدیل به لیست و مرتب‌سازی (ترتیب نزولی)
+    items = []
+    for month_key in sorted(monthly_stats.keys(), reverse=True):
+        stats = monthly_stats[month_key]
+        # ساخت تاریخ اول ماه برای نمایش
+        try:
+            from datetime import date as date_class
+            first_day_of_month = date_class(stats['year'], stats['month'], 1)
+        except Exception:
+            first_day_of_month = None
+        
+        items.append({
+            'year': stats['year'],
+            'month': stats['month'],
+            'month_key': stats['month_key'],
+            'date': first_day_of_month.isoformat() if first_day_of_month else None,
+            'invoice_count': stats['invoice_count'],
+            'total_gross': float(stats['total_gross']),
+            'total_discount': float(stats['total_discount']),
+            'total_tax': float(stats['total_tax']),
+            'total_net': float(stats['total_net']),
+        })
+    
+    # Pagination
+    total = len(items)
+    current_page = (skip // take) + 1
+    total_pages = (total + take - 1) // take if take > 0 else 1
+    paginated_items = items[skip:skip + take]
+    
+    total_invoice_count = sum(item['invoice_count'] for item in items)
+    total_gross_sum = sum(item['total_gross'] for item in items)
+    total_discount_sum = sum(item['total_discount'] for item in items)
+    total_tax_sum = sum(item['total_tax'] for item in items)
+    total_net_sum = sum(item['total_net'] for item in items)
+    
+    return {
+        'items': paginated_items,
+        'summary': {
+            'total_count': total,
+            'total_invoice_count': total_invoice_count,
+            'total_gross': float(total_gross_sum),
+            'total_discount': float(total_discount_sum),
+            'total_tax': float(total_tax_sum),
+            'total_net': float(total_net_sum),
+        },
+        'pagination': {
+            'total': total,
+            'page': current_page,
+            'per_page': take,
+            'total_pages': total_pages,
+            'has_next': current_page < total_pages,
+            'has_prev': current_page > 1,
+        }
+    }
+
+
+def get_top_customers_report(
+    db: Session,
+    business_id: int,
+    fiscal_year_id: Optional[int] = None,
+    currency_id: Optional[int] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    limit: Optional[int] = None,
+    skip: int = 0,
+    take: int = 50,
+) -> Dict[str, Any]:
+    """
+    گزارش برترین مشتریان بر اساس مبلغ فروش
+    
+    Args:
+        db: نشست پایگاه داده
+        business_id: شناسه کسب‌وکار
+        fiscal_year_id: شناسه سال مالی (اختیاری)
+        currency_id: شناسه ارز (اختیاری)
+        date_from: از تاریخ (اختیاری، فرمت YYYY-MM-DD)
+        date_to: تا تاریخ (اختیاری، فرمت YYYY-MM-DD)
+        limit: تعداد مشتریان برتر (اختیاری، برای pagination)
+        skip: تعداد رکوردهای رد شده برای pagination
+        take: تعداد رکوردهای برگشتی
+    
+    Returns:
+        dict: {
+            'items': لیست مشتریان برتر,
+            'summary': خلاصه آمار,
+            'pagination': اطلاعات pagination
+        }
+    """
+    from collections import defaultdict
+    
+    # تبدیل تاریخ‌ها
+    date_from_obj = None
+    date_to_obj = None
+    
+    if date_from:
+        try:
+            date_from_obj = _parse_iso_date(date_from)
+        except Exception:
+            pass
+    
+    if date_to:
+        try:
+            date_to_obj = _parse_iso_date(date_to)
+        except Exception:
+            pass
+    
+    # اگر تاریخ‌ها مشخص نشده‌اند، از سال مالی استفاده کن
+    if date_from_obj is None or date_to_obj is None:
+        try:
+            if fiscal_year_id:
+                fiscal_year = db.query(FiscalYear).filter(FiscalYear.id == fiscal_year_id).first()
+            else:
+                fiscal_year = db.query(FiscalYear).filter(
+                    and_(
+                        FiscalYear.business_id == business_id,
+                        FiscalYear.is_last == True
+                    )
+                ).first()
+            
+            if fiscal_year:
+                if date_from_obj is None:
+                    date_from_obj = fiscal_year.start_date
+                if date_to_obj is None:
+                    date_to_obj = fiscal_year.end_date if fiscal_year.end_date else date.today()
+        except Exception:
+            pass
+    
+    # اگر هنوز تاریخ مشخص نشده
+    if date_to_obj is None:
+        date_to_obj = date.today()
+    if date_from_obj is None:
+        date_from_obj = date.today()
+    
+    # Query فاکتورهای فروش
+    sales_query = db.query(
+        Document.id,
+        Document.document_date,
+        Document.extra_info,
+        Document.currency_id,
+    ).filter(
+        and_(
+            Document.business_id == business_id,
+            Document.document_type == INVOICE_SALES,
+            Document.is_proforma == False,
+            Document.document_date >= date_from_obj,
+            Document.document_date <= date_to_obj,
+        )
+    )
+    
+    if currency_id:
+        sales_query = sales_query.filter(Document.currency_id == currency_id)
+    
+    if fiscal_year_id:
+        sales_query = sales_query.filter(Document.fiscal_year_id == fiscal_year_id)
+    
+    sales_documents = sales_query.order_by(Document.document_date.asc()).all()
+    
+    # گروه‌بندی بر اساس person_id
+    customer_stats: Dict[int, Dict[str, Any]] = defaultdict(lambda: {
+        'person_id': None,
+        'invoice_count': 0,
+        'total_sales': Decimal(0),
+        'last_sale_date': None,
+    })
+    
+    # دریافت اطلاعات شخص‌ها از پایگاه داده
+    person_ids_set = set()
+    
+    for doc in sales_documents:
+        extra_info = doc.extra_info or {}
+        person_id = extra_info.get('person_id')
+        
+        if person_id is None:
+            continue
+        
+        try:
+            person_id_int = int(person_id)
+        except (ValueError, TypeError):
+            continue
+        
+        person_ids_set.add(person_id_int)
+        
+        # محاسبه مبلغ فروش از extra_info.totals.net
+        totals = extra_info.get('totals') or {}
+        net_amount = Decimal(str(totals.get('net', 0) or 0))
+        
+        customer_stats[person_id_int]['person_id'] = person_id_int
+        customer_stats[person_id_int]['invoice_count'] += 1
+        customer_stats[person_id_int]['total_sales'] += net_amount
+        
+        # به‌روزرسانی آخرین تاریخ فروش
+        doc_date = doc.document_date
+        if doc_date:
+            current_last_date = customer_stats[person_id_int]['last_sale_date']
+            if current_last_date is None or doc_date > current_last_date:
+                customer_stats[person_id_int]['last_sale_date'] = doc_date
+    
+    # دریافت اطلاعات شخص‌ها از پایگاه داده
+    persons_map = {}
+    if person_ids_set:
+        persons = db.query(Person).filter(
+            and_(
+                Person.business_id == business_id,
+                Person.id.in_(list(person_ids_set))
+            )
+        ).all()
+        
+        for person in persons:
+            # ساخت نام نمایشی
+            display_name = person.alias_name or ''
+            if person.company_name:
+                display_name = person.company_name
+            elif person.first_name or person.last_name:
+                parts = []
+                if person.first_name:
+                    parts.append(person.first_name)
+                if person.last_name:
+                    parts.append(person.last_name)
+                display_name = ' '.join(parts) if parts else person.alias_name or ''
+            
+            persons_map[person.id] = {
+                'id': person.id,
+                'code': person.code,
+                'alias_name': person.alias_name,
+                'first_name': person.first_name,
+                'last_name': person.last_name,
+                'company_name': person.company_name,
+                'display_name': display_name,
+            }
+    
+    # تبدیل به لیست و مرتب‌سازی بر اساس مبلغ فروش (ترتیب نزولی)
+    items = []
+    for person_id, stats in customer_stats.items():
+        person_info = persons_map.get(person_id, {})
+        
+        items.append({
+            'person_id': person_id,
+            'person_code': person_info.get('code'),
+            'person_name': person_info.get('display_name', person_info.get('alias_name', '')),
+            'invoice_count': stats['invoice_count'],
+            'total_sales': float(stats['total_sales']),
+            'last_sale_date': stats['last_sale_date'].isoformat() if stats['last_sale_date'] else None,
+        })
+    
+    # مرتب‌سازی بر اساس مبلغ فروش (ترتیب نزولی)
+    items.sort(key=lambda x: x['total_sales'], reverse=True)
+    
+    # اعمال limit اگر مشخص شده باشد
+    if limit is not None and limit > 0:
+        items = items[:limit]
+    
+    # Pagination
+    total = len(items)
+    current_page = (skip // take) + 1
+    total_pages = (total + take - 1) // take if take > 0 else 1
+    paginated_items = items[skip:skip + take]
+    
+    # محاسبه خلاصه
+    total_customers = len(customer_stats)
+    total_invoice_count = sum(item['invoice_count'] for item in items)
+    total_sales_sum = sum(item['total_sales'] for item in items)
+    
+    return {
+        'items': paginated_items,
+        'summary': {
+            'total_count': total,
+            'total_customers': total_customers,
+            'total_invoice_count': total_invoice_count,
+            'total_sales': float(total_sales_sum),
+        },
+        'pagination': {
+            'total': total,
+            'page': current_page,
+            'per_page': take,
+            'total_pages': total_pages,
+            'has_next': current_page < total_pages,
+            'has_prev': current_page > 1,
+        }
+    }
+
+

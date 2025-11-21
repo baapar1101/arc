@@ -11,17 +11,110 @@ from fastapi import APIRouter, Depends, Request, UploadFile, File, Body, Backgro
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import inspect, text
+from pydantic import BaseModel, Field
 
 from adapters.db.session import get_db
 from app.core.auth_dependency import get_current_user, AuthContext
 from app.core.permissions import require_business_access_dep
 from app.core.responses import success_response, ApiError
 from app.services.file_storage_service import FileStorageService
+from app.services.business_service import create_business
+from adapters.api.v1.schemas import BusinessCreateRequest, BusinessType, BusinessField
 import logging
 from app.services.job_manager import JobManager
 
 
 router = APIRouter(prefix="/businesses/{business_id}/backups", tags=["business_backups"])
+
+
+class RestoreBackupRequest(BaseModel):
+    backup_id: str | None = Field(default=None, description="شناسه بکاپ برای بازیابی")
+    mode: str = Field(default="new_business", description="حالت بازیابی: replace یا new_business")
+
+
+def _normalize_business_type(value: Any) -> BusinessType:
+    """
+    تبدیل business_type از بکاپ به BusinessType enum.
+    پشتیبانی از enum name (مثل 'SHOP') و مقدار فارسی (مثل 'مغازه').
+    """
+    if value is None:
+        return BusinessType.COMPANY
+    
+    value_str = str(value).strip()
+    
+    # اگر مقدار فارسی است، مستقیماً استفاده می‌کنیم
+    persian_values = {
+        "شرکت": BusinessType.COMPANY,
+        "مغازه": BusinessType.SHOP,
+        "فروشگاه": BusinessType.STORE,
+        "اتحادیه": BusinessType.UNION,
+        "باشگاه": BusinessType.CLUB,
+        "موسسه": BusinessType.INSTITUTE,
+        "شخصی": BusinessType.INDIVIDUAL,
+    }
+    if value_str in persian_values:
+        return persian_values[value_str]
+    
+    # اگر enum name است (مثل 'SHOP', 'COMPANY')
+    enum_name_to_type = {
+        "COMPANY": BusinessType.COMPANY,
+        "SHOP": BusinessType.SHOP,
+        "STORE": BusinessType.STORE,
+        "UNION": BusinessType.UNION,
+        "CLUB": BusinessType.CLUB,
+        "INSTITUTE": BusinessType.INSTITUTE,
+        "INDIVIDUAL": BusinessType.INDIVIDUAL,
+    }
+    if value_str.upper() in enum_name_to_type:
+        return enum_name_to_type[value_str.upper()]
+    
+    # تلاش برای پیدا کردن در enum
+    try:
+        return BusinessType(value_str)
+    except ValueError:
+        # اگر پیدا نشد، پیش‌فرض شرکت
+        return BusinessType.COMPANY
+
+
+def _normalize_business_field(value: Any) -> BusinessField:
+    """
+    تبدیل business_field از بکاپ به BusinessField enum.
+    پشتیبانی از enum name (مثل 'MANUFACTURING', 'COMMERCIAL', 'TRADING') و مقدار فارسی (مثل 'تولیدی').
+    """
+    if value is None:
+        return BusinessField.OTHER
+    
+    value_str = str(value).strip()
+    
+    # اگر مقدار فارسی است، مستقیماً استفاده می‌کنیم
+    persian_values = {
+        "تولیدی": BusinessField.MANUFACTURING,
+        "بازرگانی": BusinessField.COMMERCIAL,  # در schemas.py این COMMERCIAL است نه TRADING
+        "خدماتی": BusinessField.SERVICE,
+        "سایر": BusinessField.OTHER,
+    }
+    if value_str in persian_values:
+        return persian_values[value_str]
+    
+    # اگر enum name است (مثل 'MANUFACTURING', 'COMMERCIAL', 'TRADING')
+    # توجه: در schemas.py این COMMERCIAL است، اما در db/models ممکن است TRADING باشد
+    enum_name_to_field = {
+        "MANUFACTURING": BusinessField.MANUFACTURING,
+        "COMMERCIAL": BusinessField.COMMERCIAL,  # نام صحیح در schemas.py
+        "TRADING": BusinessField.COMMERCIAL,  # تبدیل TRADING به COMMERCIAL (برای سازگاری)
+        "SERVICE": BusinessField.SERVICE,
+        "OTHER": BusinessField.OTHER,
+    }
+    if value_str.upper() in enum_name_to_field:
+        return enum_name_to_field[value_str.upper()]
+    
+    # تلاش برای پیدا کردن در enum
+    try:
+        return BusinessField(value_str)
+    except ValueError:
+        # اگر پیدا نشد، پیش‌فرض سایر
+        return BusinessField.OTHER
+
 
 def _json_default(o: Any):
     if isinstance(o, (datetime, date)):
@@ -327,9 +420,7 @@ async def delete_backup(
 async def restore_backup(
     request: Request,
     business_id: int,
-    backup_id: str | None = Body(default=None),
     file: UploadFile | None = File(default=None),
-    mode: str = Body(default="new_business", embed=True),
     async_mode: bool = True,
     background: BackgroundTasks = None,
     db: Session = Depends(get_db),
@@ -339,8 +430,56 @@ async def restore_backup(
     بازیابی داده‌ها از بکاپ.
     - پشتیبانی شده: mode == "replace" → جایگزینی کامل داده‌های مرتبط با business_id جاری
     - پشتیبانی نشده فعلاً: mode == "new_business"
+    
+    می‌تواند به صورت JSON (با backup_id) یا form-data (با file) فراخوانی شود.
     """
     logger = logging.getLogger(__name__)
+    
+    # پردازش درخواست: می‌تواند JSON یا form-data باشد
+    backup_id: str | None = None
+    mode: str = "new_business"
+    
+    # بررسی نوع محتوا
+    content_type = request.headers.get("content-type", "").lower()
+    
+    if "application/json" in content_type:
+        # درخواست JSON - پارس کردن از body
+        try:
+            body_data = await request.json()
+            body = RestoreBackupRequest(**body_data)
+            backup_id = body.backup_id
+            mode = body.mode
+        except Exception as e:
+            raise ApiError("INVALID_INPUT", f"Invalid JSON body: {str(e)}")
+    elif "multipart/form-data" in content_type:
+        # درخواست form-data
+        form_data = await request.form()
+        backup_id_str = form_data.get("backup_id")
+        if backup_id_str:
+            backup_id = str(backup_id_str)
+        mode_str = form_data.get("mode")
+        if mode_str:
+            mode = str(mode_str)
+    else:
+        # تلاش برای پارس کردن به عنوان JSON
+        try:
+            body_data = await request.json()
+            body = RestoreBackupRequest(**body_data)
+            backup_id = body.backup_id
+            mode = body.mode
+        except Exception:
+            # اگر JSON نبود، از form-data استفاده می‌کنیم
+            try:
+                form_data = await request.form()
+                backup_id_str = form_data.get("backup_id")
+                if backup_id_str:
+                    backup_id = str(backup_id_str)
+                mode_str = form_data.get("mode")
+                if mode_str:
+                    mode = str(mode_str)
+            except Exception:
+                pass
+    
     if not (backup_id or file):
         raise ApiError("INVALID_INPUT", "backup_id or file is required")
     if mode not in ("replace", "new_business"):
@@ -365,14 +504,26 @@ async def restore_backup(
         jm = JobManager.instance()
         job_id = jm.create("Restore queued")
 
+        # خواندن محتوای فایل قبل از شروع background task
+        # تا از بسته شدن فایل جلوگیری کنیم
+        file_bytes: bytes | None = None
+        if file:
+            try:
+                file_bytes = await file.read()
+            except Exception as e:
+                logger.error(f"Error reading file: {e}")
+                raise ApiError("FILE_READ_ERROR", f"Failed to read uploaded file: {str(e)}")
+
         async def _load_zip() -> bytes:
             if backup_id:
                 from uuid import UUID
                 storage = FileStorageService(db)
                 file_data = await storage.download_file(UUID(backup_id))
                 return file_data["content"]
+            elif file_bytes:
+                return file_bytes
             else:
-                return await file.read()  # type: ignore[union-attr]
+                raise ApiError("NO_FILE_DATA", "No file data available")
 
         def task():
             try:
@@ -390,8 +541,56 @@ async def restore_backup(
                     snapshot_business_id = metadata.get("business_id")
                     if mode == "replace" and int(business_id) != int(snapshot_business_id):
                         raise ApiError("BUSINESS_MISMATCH", "Backup belongs to a different business")
+                    
+                    # برای mode new_business، باید یک کسب‌وکار جدید ایجاد کنیم
+                    new_business_id = business_id
                     if mode == "new_business":
-                        raise ApiError("NOT_SUPPORTED", "new_business mode is not implemented yet")
+                        jm.update(job_id, 20, "Creating new business")
+                        # خواندن اطلاعات کسب‌وکار از بکاپ
+                        try:
+                            business_rows = []
+                            with zf.open("tables/businesses.jsonl", "r") as f:
+                                for raw in f:
+                                    if not raw:
+                                        continue
+                                    business_rows.append(json.loads(raw.decode("utf-8")))
+                            
+                            if not business_rows:
+                                raise ApiError("INVALID_BACKUP", "No business data found in backup")
+                            
+                            # استفاده از اولین ردیف کسب‌وکار (معمولاً فقط یکی وجود دارد)
+                            original_business = business_rows[0]
+                            
+                            # ایجاد کسب‌وکار جدید با اطلاعات بکاپ
+                            # تبدیل به BusinessCreateRequest
+                            business_create_data = BusinessCreateRequest(
+                                name=f"{original_business.get('name', 'کسب‌وکار جدید')} (بازیابی شده)",
+                                business_type=_normalize_business_type(original_business.get('business_type')),
+                                business_field=_normalize_business_field(original_business.get('business_field')),
+                                address=original_business.get('address'),
+                                phone=original_business.get('phone'),
+                                mobile=original_business.get('mobile'),
+                                national_id=original_business.get('national_id'),
+                                registration_number=original_business.get('registration_number'),
+                                economic_id=original_business.get('economic_id'),
+                                country=original_business.get('country'),
+                                province=original_business.get('province'),
+                                city=original_business.get('city'),
+                                postal_code=original_business.get('postal_code'),
+                                default_currency_id=original_business.get('default_currency_id'),
+                                default_credit_limit=float(original_business.get('default_credit_limit')) if original_business.get('default_credit_limit') else None,
+                                check_credit_enabled_by_default=bool(original_business.get('check_credit_enabled_by_default', False)),
+                            )
+                            
+                            # ایجاد کسب‌وکار جدید
+                            new_business = create_business(db, business_create_data, ctx.get_user_id())
+                            new_business_id = new_business['id']
+                            db.commit()
+                            jm.update(job_id, 30, f"New business created (ID: {new_business_id})")
+                        except KeyError:
+                            raise ApiError("INVALID_BACKUP", "businesses.jsonl not found in backup")
+                        except Exception as e:
+                            raise ApiError("BUSINESS_CREATION_FAILED", f"Failed to create new business: {str(e)}")
 
                     tables_info = _discover_scoped_tables(db)
                     target_tables = [t for t in tables_info.keys() if t != "businesses"]
@@ -403,43 +602,64 @@ async def restore_backup(
                         pass
 
                     try:
-                        jm.update(job_id, 40, "Cleaning current data")
-                        for table in target_tables:
-                            cols = tables_info[table]["columns"]
-                            if "business_id" in cols:
-                                conn.execute(text(f"DELETE FROM {table} WHERE business_id = :bid"), {"bid": business_id})
+                        # فقط برای mode replace باید داده‌های قبلی را پاک کنیم
+                        if mode == "replace":
+                            jm.update(job_id, 40, "Cleaning current data")
+                            for table in target_tables:
+                                cols = tables_info[table]["columns"]
+                                if "business_id" in cols:
+                                    conn.execute(text(f"DELETE FROM {table} WHERE business_id = :bid"), {"bid": new_business_id})
+                        else:
+                            jm.update(job_id, 40, "Preparing to restore data")
 
-                        # Update business row if present
-                        jm.update(job_id, 55, "Updating business info")
-                        if "businesses" in tables_info:
-                            try:
-                                rows = []
-                                with zf.open("tables/businesses.jsonl", "r") as f:
-                                    for raw in f:
-                                        if not raw:
-                                            continue
-                                        rows.append(json.loads(raw.decode("utf-8")))
-                                row = next((r for r in rows if int(r.get("id")) == int(business_id)), None)
-                                if row:
-                                    cols = [c for c in tables_info["businesses"]["columns"] if c not in ("id", "created_at", "updated_at")]
-                                    assignments = ", ".join([f"{c} = :{c}" for c in cols])
-                                    params = {c: row.get(c) for c in cols}
-                                    params["id"] = business_id
-                                    conn.execute(text(f"UPDATE businesses SET {assignments} WHERE id = :id"), params)
-                            except KeyError:
-                                pass
+                        # Update business row if present (فقط برای mode replace)
+                        if mode == "replace":
+                            jm.update(job_id, 55, "Updating business info")
+                            if "businesses" in tables_info:
+                                try:
+                                    rows = []
+                                    with zf.open("tables/businesses.jsonl", "r") as f:
+                                        for raw in f:
+                                            if not raw:
+                                                continue
+                                            rows.append(json.loads(raw.decode("utf-8")))
+                                    row = next((r for r in rows if int(r.get("id")) == int(snapshot_business_id)), None)
+                                    if row:
+                                        cols = [c for c in tables_info["businesses"]["columns"] if c not in ("id", "created_at", "updated_at", "owner_id")]
+                                        assignments = ", ".join([f"{c} = :{c}" for c in cols])
+                                        params = {c: row.get(c) for c in cols}
+                                        params["id"] = new_business_id
+                                        conn.execute(text(f"UPDATE businesses SET {assignments} WHERE id = :id"), params)
+                                except KeyError:
+                                    pass
+                        else:
+                            jm.update(job_id, 55, "Preparing business data")
 
                         # Insert data for other tables
                         jm.update(job_id, 70, "Restoring data")
+                        
                         for table in target_tables:
                             try:
                                 zinfo = zf.getinfo(f"tables/{table}.jsonl")
                             except KeyError:
                                 continue
                             col_list = tables_info[table]["columns"]
-                            placeholders = ", ".join([f":{c}" for c in col_list])
-                            columns_sql = ", ".join([f"`{c}`" for c in col_list])
-                            insert_sql = text(f"INSERT INTO {table} ({columns_sql}) VALUES ({placeholders})")
+                            
+                            # برای mode new_business، id را حذف می‌کنیم تا auto-increment کار کند
+                            # و از INSERT IGNORE استفاده می‌کنیم تا از duplicate key errors جلوگیری کنیم
+                            insert_col_list = col_list.copy()
+                            if mode == "new_business" and "id" in insert_col_list:
+                                insert_col_list.remove("id")
+                            
+                            placeholders = ", ".join([f":{c}" for c in insert_col_list])
+                            columns_sql = ", ".join([f"`{c}`" for c in insert_col_list])
+                            
+                            # برای mode new_business از INSERT IGNORE استفاده می‌کنیم
+                            if mode == "new_business":
+                                insert_sql = text(f"INSERT IGNORE INTO {table} ({columns_sql}) VALUES ({placeholders})")
+                            else:
+                                insert_sql = text(f"INSERT INTO {table} ({columns_sql}) VALUES ({placeholders})")
+                            
                             batch: List[Dict[str, Any]] = []
                             with zf.open(f"tables/{table}.jsonl", "r") as f:
                                 for raw in f:
@@ -447,12 +667,18 @@ async def restore_backup(
                                         continue
                                     rec = json.loads(raw.decode("utf-8"))
                                     if "business_id" in rec:
-                                        rec["business_id"] = business_id
-                                    params = {c: rec.get(c) for c in col_list}
+                                        rec["business_id"] = new_business_id
+                                    
+                                    # برای mode new_business، id را حذف می‌کنیم
+                                    if mode == "new_business" and "id" in rec:
+                                        del rec["id"]
+                                    
+                                    params = {c: rec.get(c) for c in insert_col_list}
                                     batch.append(params)
                                     if len(batch) >= 500:
                                         conn.execute(insert_sql, batch)
                                         batch.clear()
+                            
                             if batch:
                                 conn.execute(insert_sql, batch)
 
@@ -469,7 +695,10 @@ async def restore_backup(
                             pass
                         raise
 
-                jm.succeed(job_id, {"restored": True, "mode": mode, "business_id": business_id}, "Restore completed")
+                result_data = {"restored": True, "mode": mode, "business_id": new_business_id}
+                if mode == "new_business":
+                    result_data["new_business_id"] = new_business_id
+                jm.succeed(job_id, result_data, "Restore completed")
             except Exception as e:
                 jm.fail(job_id, str(e), "Restore failed")
 

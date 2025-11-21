@@ -203,19 +203,19 @@ class OpenAIProvider(AIProviderBase):
                             index = tool_call_delta.index
                             if index not in tool_calls_accumulator:
                                 tool_calls_accumulator[index] = {
-                                    "id": tool_call_delta.id,
-                                    "type": tool_call_delta.type,
+                                    "id": tool_call_delta.id or f"call_{index}",
+                                    "type": tool_call_delta.type or "function",
                                     "function": {
                                         "name": "",
                                         "arguments": ""
                                     }
                                 }
                             
-                            # جمع‌آوری نام function
+                            # جمع‌آوری نام function (replace نه append)
                             if tool_call_delta.function and tool_call_delta.function.name:
-                                tool_calls_accumulator[index]["function"]["name"] += tool_call_delta.function.name
+                                tool_calls_accumulator[index]["function"]["name"] = tool_call_delta.function.name
                             
-                            # جمع‌آوری arguments
+                            # جمع‌آوری arguments (append)
                             if tool_call_delta.function and tool_call_delta.function.arguments:
                                 tool_calls_accumulator[index]["function"]["arguments"] += tool_call_delta.function.arguments
             
@@ -230,8 +230,9 @@ class OpenAIProvider(AIProviderBase):
                     "total_tokens": input_tokens_estimate + output_tokens_estimate
                 }
             
-            # تبدیل tool_calls به فرمت مورد نیاز
+            # تبدیل tool_calls به فرمت مورد نیاز (با حفظ id برای tool_call_id)
             function_calls = None
+            tool_call_id_map = {}
             if tool_calls_accumulator:
                 function_calls = []
                 for index in sorted(tool_calls_accumulator.keys()):
@@ -241,8 +242,13 @@ class OpenAIProvider(AIProviderBase):
                     except json.JSONDecodeError:
                         arguments = {}
                     
+                    function_name = tc["function"]["name"]
+                    tool_call_id = tc.get("id", f"call_{index}")
+                    tool_call_id_map[function_name] = tool_call_id
+                    
                     function_calls.append({
-                        "name": tc["function"]["name"],
+                        "id": tool_call_id,
+                        "name": function_name,
                         "arguments": arguments
                     })
             
@@ -253,6 +259,7 @@ class OpenAIProvider(AIProviderBase):
                 },
                 "usage": final_usage,
                 "function_calls": function_calls,
+                "tool_call_id_map": tool_call_id_map,  # برای استفاده در ai_service
                 "done": True
             }
             

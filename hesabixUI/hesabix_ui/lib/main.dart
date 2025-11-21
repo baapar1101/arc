@@ -52,6 +52,11 @@ import 'pages/business/people_transactions_report_page.dart';
 import 'pages/business/item_movements_report_page.dart';
 import 'pages/business/sales_by_product_report_page.dart';
 import 'pages/business/inventory_kardex_report_page.dart';
+import 'pages/business/bank_accounts_turnover_report_page.dart';
+import 'pages/business/cash_petty_turnover_report_page.dart';
+import 'pages/business/daily_sales_report_page.dart';
+import 'pages/business/monthly_sales_report_page.dart';
+import 'pages/business/top_customers_report_page.dart';
 import 'pages/business/persons_page.dart';
 import 'pages/business/product_attributes_page.dart';
 import 'pages/business/products_page.dart';
@@ -1064,6 +1069,71 @@ class _MyAppState extends State<MyApp> {
                 final businessId = int.parse(state.pathParameters['business_id']!);
                 return NoTransitionPage(
                   child: InventoryKardexReportPage(
+                    businessId: businessId,
+                    calendarController: _calendarController!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/reports/bank-accounts-turnover',
+              name: 'business_reports_bank_accounts_turnover',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return NoTransitionPage(
+                  child: BankAccountsTurnoverReportPage(
+                    businessId: businessId,
+                    calendarController: _calendarController!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/reports/cash-petty-turnover',
+              name: 'business_reports_cash_petty_turnover',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return NoTransitionPage(
+                  child: CashPettyTurnoverReportPage(
+                    businessId: businessId,
+                    calendarController: _calendarController!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/reports/daily-sales',
+              name: 'business_reports_daily_sales',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return NoTransitionPage(
+                  child: DailySalesReportPage(
+                    businessId: businessId,
+                    calendarController: _calendarController!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/reports/monthly-sales',
+              name: 'business_reports_monthly_sales',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return NoTransitionPage(
+                  child: MonthlySalesReportPage(
+                    businessId: businessId,
+                    calendarController: _calendarController!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/reports/top-customers',
+              name: 'business_reports_top_customers',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return NoTransitionPage(
+                  child: TopCustomersReportPage(
                     businessId: businessId,
                     calendarController: _calendarController!,
                   ),

@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
+from datetime import datetime, date, timedelta
+from decimal import Decimal
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, func
+from sqlalchemy import and_, or_, func
 
 from adapters.db.models.bank_account import BankAccount
+from adapters.db.models.document import Document
+from adapters.db.models.document_line import DocumentLine
 from app.core.responses import ApiError
 
 
@@ -251,5 +255,277 @@ def bank_account_to_dict(obj: BankAccount) -> Dict[str, Any]:
 		"created_at": obj.created_at.isoformat(),
 		"updated_at": obj.updated_at.isoformat(),
 	}
+
+
+def get_bank_accounts_turnover_report(
+    db: Session,
+    business_id: int,
+    fiscal_year_id: Optional[int] = None,
+    currency_id: Optional[int] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    bank_account_ids: Optional[List[int]] = None,
+    search: Optional[str] = None,
+    skip: int = 0,
+    take: int = 50,
+) -> Dict[str, Any]:
+    """
+    گزارش گردش حساب‌های بانکی
+    
+    نمایش برداشت‌ها و واریزهای هر حساب بانکی در یک بازه زمانی با محاسبه مانده تجمعی
+    
+    Args:
+        db: نشست پایگاه داده
+        business_id: شناسه کسب‌وکار
+        fiscal_year_id: شناسه سال مالی (اختیاری)
+        currency_id: شناسه ارز (اختیاری)
+        date_from: از تاریخ (اختیاری، فرمت YYYY-MM-DD)
+        date_to: تا تاریخ (اختیاری، فرمت YYYY-MM-DD)
+        bank_account_ids: لیست شناسه‌های حساب‌های بانکی (اختیاری)
+        search: جستجو در کد سند یا نام حساب بانکی (اختیاری)
+        skip: تعداد رکوردهای رد شده برای pagination
+        take: تعداد رکوردهای برگشتی
+    
+    Returns:
+        dict: {
+            'items': لیست تراکنش‌ها,
+            'summary': خلاصه آمار,
+            'pagination': اطلاعات pagination
+        }
+    """
+    # Query پایه: DocumentLine join Document و BankAccount
+    query = db.query(
+        DocumentLine,
+        Document,
+        BankAccount
+    ).join(
+        Document, DocumentLine.document_id == Document.id
+    ).outerjoin(
+        BankAccount, DocumentLine.bank_account_id == BankAccount.id
+    ).filter(
+        Document.business_id == business_id,
+        Document.is_proforma == False,  # فقط اسناد قطعی
+        DocumentLine.bank_account_id.isnot(None)  # فقط خطوط با bank_account_id
+    )
+    
+    # فیلتر سال مالی
+    if fiscal_year_id:
+        query = query.filter(Document.fiscal_year_id == fiscal_year_id)
+    
+    # فیلتر ارز
+    if currency_id:
+        query = query.filter(Document.currency_id == currency_id)
+    
+    # فیلتر تاریخ
+    if date_from:
+        try:
+            date_from_obj = datetime.strptime(date_from, '%Y-%m-%d').date()
+            query = query.filter(Document.document_date >= date_from_obj)
+        except ValueError:
+            pass
+    
+    if date_to:
+        try:
+            date_to_obj = datetime.strptime(date_to, '%Y-%m-%d').date()
+            query = query.filter(Document.document_date <= date_to_obj)
+        except ValueError:
+            pass
+    
+    # فیلتر حساب‌های بانکی
+    if bank_account_ids:
+        query = query.filter(DocumentLine.bank_account_id.in_(bank_account_ids))
+    
+    # فیلتر جستجو
+    if search and search.strip():
+        search_filter = or_(
+            Document.code.ilike(f'%{search}%'),
+            BankAccount.code.ilike(f'%{search}%'),
+            BankAccount.name.ilike(f'%{search}%'),
+        )
+        query = query.filter(search_filter)
+    
+    # مرتب‌سازی: تاریخ سند، شناسه سند، شناسه خط
+    query = query.order_by(
+        Document.document_date.asc(),
+        Document.id.asc(),
+        DocumentLine.id.asc()
+    )
+    
+    # دریافت همه نتایج برای محاسبه running balance
+    all_results = query.all()
+    
+    if not all_results:
+        return {
+            'items': [],
+            'summary': {
+                'total_count': 0,
+                'total_deposit': 0.0,
+                'total_withdrawal': 0.0,
+            },
+            'pagination': {
+                'total': 0,
+                'page': 1,
+                'per_page': take,
+                'total_pages': 0,
+                'has_next': False,
+                'has_prev': False,
+            }
+        }
+    
+    # تابع برای تبدیل document_type به نام فارسی
+    def _get_document_type_name(doc_type: str | None) -> str:
+        if not doc_type:
+            return ""
+        doc_type = doc_type.strip()
+        mapping = {
+            "invoice_sales": "فروش",
+            "invoice_sales_return": "برگشت از فروش",
+            "invoice_purchase": "خرید",
+            "invoice_purchase_return": "برگشت از خرید",
+            "invoice_direct_consumption": "مصرف مستقیم",
+            "invoice_production": "تولید",
+            "invoice_waste": "ضایعات",
+            "inventory_transfer": "انتقال موجودی",
+            "production": "تولید",
+            "opening_balance": "موجودی اولیه",
+            "expense": "هزینه",
+            "income": "درآمد",
+            "receipt": "دریافت",
+            "payment": "پرداخت",
+            "transfer": "انتقال",
+            "manual": "سند دستی",
+            "invoice": "فاکتور",
+            "check": "چک",
+        }
+        return mapping.get(doc_type, doc_type)
+    
+    # محاسبه running balance برای هر حساب بانکی و ساخت لیست آیتم‌ها
+    items = []
+    balance_by_account = {}  # {bank_account_id: Decimal}
+    
+    # محاسبه مانده ابتدای دوره برای هر حساب بانکی
+    if date_from:
+        try:
+            date_from_obj = datetime.strptime(date_from, '%Y-%m-%d').date()
+            date_before_from = date_from_obj - timedelta(days=1)
+            
+            # برای هر حساب بانکی، محاسبه مانده تا یک روز قبل از date_from
+            unique_bank_account_ids = list(set(
+                line.bank_account_id for line, doc, ba in all_results 
+                if line.bank_account_id is not None
+            ))
+            
+            for ba_id in unique_bank_account_ids:
+                # محاسبه مجموع واریز (debit) و برداشت (credit) تا date_before_from
+                opening_query = db.query(
+                    func.coalesce(func.sum(DocumentLine.debit), 0).label('total_deposit'),
+                    func.coalesce(func.sum(DocumentLine.credit), 0).label('total_withdrawal')
+                ).join(
+                    Document, DocumentLine.document_id == Document.id
+                ).filter(
+                    Document.business_id == business_id,
+                    Document.is_proforma == False,
+                    DocumentLine.bank_account_id == ba_id,
+                    Document.document_date <= date_before_from
+                )
+                
+                if fiscal_year_id:
+                    opening_query = opening_query.filter(Document.fiscal_year_id == fiscal_year_id)
+                if currency_id:
+                    opening_query = opening_query.filter(Document.currency_id == currency_id)
+                
+                opening_result = opening_query.first()
+                if opening_result:
+                    total_deposit = Decimal(str(opening_result.total_deposit or 0))
+                    total_withdrawal = Decimal(str(opening_result.total_withdrawal or 0))
+                    balance_by_account[ba_id] = total_deposit - total_withdrawal
+                else:
+                    balance_by_account[ba_id] = Decimal(0)
+        except Exception:
+            # در صورت خطا، مانده ابتدا را صفر در نظر بگیر
+            pass
+    
+    total_deposit = Decimal(0)
+    total_withdrawal = Decimal(0)
+    
+    for line, doc, bank_account in all_results:
+        if not bank_account or not line.bank_account_id:
+            continue
+        
+        ba_id = line.bank_account_id
+        
+        # مقدار اولیه برای حساب بانکی اگر وجود نداشته باشد
+        if ba_id not in balance_by_account:
+            balance_by_account[ba_id] = Decimal(0)
+        
+        deposit = Decimal(str(line.debit or 0))
+        withdrawal = Decimal(str(line.credit or 0))
+        
+        # به‌روزرسانی مانده: واریز (debit) اضافه می‌کند، برداشت (credit) کم می‌کند
+        balance_by_account[ba_id] += deposit - withdrawal
+        
+        total_deposit += deposit
+        total_withdrawal += withdrawal
+        
+        document_type_name = _get_document_type_name(doc.document_type)
+        
+        items.append({
+            'bank_account_id': ba_id,
+            'bank_account_code': bank_account.code or '',
+            'bank_account_name': bank_account.name or '',
+            'document_date': doc.document_date.isoformat(),
+            'document_type': doc.document_type,
+            'document_type_name': document_type_name,
+            'document_code': doc.code or '',
+            'document_id': doc.id,
+            'deposit': float(deposit),
+            'withdrawal': float(withdrawal),
+            'balance': float(balance_by_account[ba_id]),
+            'description': line.description or doc.description or '',
+        })
+    
+    # اعمال pagination
+    total = len(items)
+    paginated_items = items[skip:skip + take]
+    
+    total_pages = (total + take - 1) // take if take > 0 else 0
+    current_page = (skip // take) + 1 if take > 0 else 1
+    
+    # محاسبه موجودی فعلی (مجموع مانده آخرین تراکنش هر حساب بانکی)
+    # برای محاسبه دقیق، مانده آخرین تراکنش هر حساب را پیدا می‌کنیم
+    current_balance_by_account = {}  # {bank_account_id: last_balance}
+    
+    # مانده آخرین تراکنش هر حساب را از لیست کامل items پیدا می‌کنیم
+    # (قبل از pagination)
+    for item in items:
+        ba_id = item.get('bank_account_id')
+        balance = item.get('balance')
+        if ba_id is not None and balance is not None:
+            # همیشه آخرین مانده برای هر حساب را نگه می‌داریم
+            try:
+                current_balance_by_account[ba_id] = float(balance)
+            except (ValueError, TypeError):
+                pass
+    
+    # مجموع موجودی فعلی همه حساب‌ها
+    total_current_balance = sum(current_balance_by_account.values())
+    
+    return {
+        'items': paginated_items,
+        'summary': {
+            'total_count': total,
+            'total_deposit': float(total_deposit),
+            'total_withdrawal': float(total_withdrawal),
+            'current_balance': float(total_current_balance),
+        },
+        'pagination': {
+            'total': total,
+            'page': current_page,
+            'per_page': take,
+            'total_pages': total_pages,
+            'has_next': current_page < total_pages,
+            'has_prev': current_page > 1,
+        }
+    }
 
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Dict, Any, List, Optional, AsyncGenerator
 from decimal import Decimal
-from datetime import datetime
+from datetime import datetime, date
 from sqlalchemy.orm import Session
 import json
 import logging
@@ -375,15 +375,46 @@ class AIService:
         if response["message"].get("function_calls"):
             function_results = await self.handle_function_calls_async(response["message"]["function_calls"], session_business_id=session_business_id)
             
-            # اضافه کردن نتایج function calls به messages و ارسال مجدد
+            # ایجاد assistant message با tool_calls برای OpenAI API
+            assistant_msg = {
+                "role": "assistant",
+                "content": response["message"].get("content", None),
+                "tool_calls": []
+            }
+            
+            # ساخت tool_calls به فرمت OpenAI
+            tool_call_ids = {}
+            for idx, call in enumerate(response["message"]["function_calls"]):
+                # استفاده از id از call اگر موجود باشد، در غیر این صورت ساخت id
+                tool_call_id = call.get("id") or f"call_{idx}_{call.get('name', 'unknown')}"
+                tool_call_ids[call.get("name")] = tool_call_id
+                assistant_msg["tool_calls"].append({
+                    "id": tool_call_id,
+                    "type": "function",
+                    "function": {
+                        "name": call.get("name"),
+                        "arguments": json.dumps(call.get("arguments", {}), ensure_ascii=False)
+                    }
+                })
+            
+            # حذف content اگر None باشد
+            if assistant_msg["content"] is None:
+                del assistant_msg["content"]
+            
+            full_messages.append(assistant_msg)
+            
+            # اضافه کردن نتایج function calls به messages
             function_messages = []
             for call in response["message"]["function_calls"]:
                 function_name = call.get("name")
                 result = function_results.get(function_name, {})
+                # تبدیل datetime objects به string برای JSON serialization
+                serialized_result = self._serialize_for_json(result)
+                tool_call_id = call.get("id") or tool_call_ids.get(function_name, f"call_{function_name}")
                 function_messages.append({
                     "role": "tool",
-                    "name": function_name,
-                    "content": json.dumps(result) if isinstance(result, (dict, list)) else str(result)
+                    "tool_call_id": tool_call_id,
+                    "content": json.dumps(serialized_result, ensure_ascii=False) if isinstance(serialized_result, (dict, list)) else str(serialized_result)
                 })
             
             # ارسال مجدد با نتایج function calls
@@ -472,6 +503,7 @@ class AIService:
             accumulated_chunks = []
             final_usage = None
             function_calls = None
+            tool_call_id_map = {}
             
             async for chunk in provider.chat_completion_stream(
                 messages=full_messages,
@@ -495,6 +527,7 @@ class AIService:
                 # بررسی function_calls (در chunk نهایی)
                 if chunk.get("function_calls"):
                     function_calls = chunk["function_calls"]
+                    tool_call_id_map = chunk.get("tool_call_id_map", {})
                 
                 # بررسی done
                 if chunk.get("done", False):
@@ -509,23 +542,45 @@ class AIService:
                 # پردازش function calls به صورت async
                 function_results = await self.handle_function_calls_async(function_calls, session_business_id=session_business_id)
                 
-                # اضافه کردن نتایج function calls به messages
+                # ایجاد assistant message با tool_calls برای OpenAI API
+                assistant_msg = {
+                    "role": "assistant",
+                    "content": accumulated_content or None,
+                    "tool_calls": []
+                }
+                
+                # ساخت tool_calls به فرمت OpenAI با استفاده از id از provider
+                for call in function_calls:
+                    tool_call_id = call.get("id") or f"call_{call.get('name', 'unknown')}"
+                    assistant_msg["tool_calls"].append({
+                        "id": tool_call_id,
+                        "type": "function",
+                        "function": {
+                            "name": call.get("name"),
+                            "arguments": json.dumps(call.get("arguments", {}), ensure_ascii=False)
+                        }
+                    })
+                
+                # حذف content اگر None یا خالی باشد
+                if not assistant_msg["content"]:
+                    del assistant_msg["content"]
+                
+                full_messages.append(assistant_msg)
+                
+                # اضافه کردن نتایج function calls به messages با استفاده از tool_call_id
                 function_messages = []
                 for call in function_calls:
                     function_name = call.get("name")
                     result = function_results.get(function_name, {})
+                    # تبدیل datetime objects به string برای JSON serialization
+                    serialized_result = self._serialize_for_json(result)
+                    tool_call_id = call.get("id") or tool_call_id_map.get(function_name, f"call_{function_name}")
                     function_messages.append({
                         "role": "tool",
-                        "name": function_name,
-                        "content": json.dumps(result) if isinstance(result, (dict, list)) else str(result)
+                        "tool_call_id": tool_call_id,
+                        "content": json.dumps(serialized_result, ensure_ascii=False) if isinstance(serialized_result, (dict, list)) else str(serialized_result)
                     })
                 
-                # اضافه کردن پیام function call به messages
-                full_messages.append({
-                    "role": "assistant",
-                    "content": accumulated_content,
-                    "function_calls": function_calls
-                })
                 full_messages.extend(function_messages)
                 
                 # ارسال مجدد به AI (بدون tools، چون دیگر نیازی نیست)
@@ -662,7 +717,29 @@ class AIService:
         # تبدیل به dictionary
         results = {name: result for name, result in results_list}
         return results
-
+    
+    def _serialize_for_json(self, obj: Any) -> Any:
+        """تبدیل datetime, date و سایر objects به JSON-serializable format"""
+        if isinstance(obj, dict):
+            return {key: self._serialize_for_json(value) for key, value in obj.items()}
+        elif isinstance(obj, list):
+            return [self._serialize_for_json(item) for item in obj]
+        elif isinstance(obj, datetime):
+            return obj.isoformat()
+        elif isinstance(obj, date):
+            return obj.isoformat()
+        elif isinstance(obj, Decimal):
+            # تبدیل Decimal به float برای JSON serialization
+            return float(obj)
+        elif hasattr(obj, '__dict__'):
+            # برای objects دیگر، تلاش می‌کنیم attributes را تبدیل کنیم
+            try:
+                return self._serialize_for_json(obj.__dict__)
+            except:
+                return str(obj)
+        else:
+            return obj
+    
     async def generate_chat_title(self, user_message: str) -> Optional[str]:
         """
         تولید عنوان کوتاه و هوشمند برای گفت‌وگو بر اساس اولین پیام کاربر (async version)

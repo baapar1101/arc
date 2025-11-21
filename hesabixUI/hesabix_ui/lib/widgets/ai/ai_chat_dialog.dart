@@ -263,8 +263,8 @@ class _AIChatDialogState extends State<AIChatDialog> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final media = MediaQuery.of(context).size;
-    final double dialogWidth = media.width > 1000 ? 1000 : media.width * 0.95;
-    final double dialogHeight = media.height > 720 ? 720 : media.height * 0.9;
+    final double dialogWidth = media.width > 1200 ? 1200 : media.width * 0.98;
+    final double dialogHeight = media.height > 900 ? 900 : media.height * 0.95;
 
     return Dialog(
       insetPadding: const EdgeInsets.all(16),
@@ -413,11 +413,16 @@ class _AIChatDialogState extends State<AIChatDialog> {
                                         controller: _messageCtrl,
                                         minLines: 1,
                                         maxLines: 5,
+                                        textInputAction: TextInputAction.send,
                                         decoration: const InputDecoration(
                                           hintText: 'پیام خود را بنویسید...',
                                           border: OutlineInputBorder(),
                                         ),
-                                        onSubmitted: (_) => _sendMessage(),
+                                        onSubmitted: (_) {
+                                          if (!_sending && _messageCtrl.text.trim().isNotEmpty) {
+                                            _sendMessage();
+                                          }
+                                        },
                                       ),
                                     ),
                                     const SizedBox(width: 12),

@@ -21,6 +21,8 @@ from app.services.document_service import (
     create_manual_document,
     update_manual_document,
 )
+from app.services.invoice_service import get_daily_sales_report, get_monthly_sales_report, get_top_customers_report
+from app.core.i18n import negotiate_locale
 from app.services.pdf.template_renderer import render_template
 from adapters.api.v1.schema_models.document import (
     CreateManualDocumentRequest,
@@ -737,5 +739,287 @@ async def update_manual_document_endpoint(
         data=format_datetime_fields(result, request),
         request=request,
         message="MANUAL_DOCUMENT_UPDATED"
+    )
+
+
+@router.post(
+    "/businesses/{business_id}/reports/daily-sales",
+    summary="گزارش فروش روزانه",
+    description="گزارش فروش روزانه با گروه‌بندی بر اساس تاریخ",
+)
+@require_business_access("business_id")
+async def daily_sales_report_endpoint(
+    request: Request,
+    business_id: int,
+    body: Dict[str, Any] = Body(default={}),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """گزارش فروش روزانه"""
+    # بررسی دسترسی
+    if not ctx.can_read_section("reports"):
+        raise ApiError("FORBIDDEN", "Missing business permission: reports.read", http_status=403)
+    
+    # دریافت سال مالی از header یا body
+    fiscal_year_id = None
+    fy_header = request.headers.get('X-Fiscal-Year-ID')
+    if fy_header:
+        try:
+            fiscal_year_id = int(fy_header)
+        except (ValueError, TypeError):
+            pass
+    
+    if body.get('fiscal_year_id'):
+        try:
+            fiscal_year_id = int(body['fiscal_year_id'])
+        except (ValueError, TypeError):
+            pass
+    
+    # استخراج پارامترها از body
+    date_from = body.get('date_from')
+    date_to = body.get('date_to')
+    currency_id = body.get('currency_id')
+    if currency_id is not None:
+        try:
+            currency_id = int(currency_id)
+        except (ValueError, TypeError):
+            currency_id = None
+    
+    # Pagination
+    skip = body.get('skip', 0)
+    take = body.get('take', 50)
+    try:
+        skip = int(skip)
+        take = int(take)
+        if take > 500:
+            take = 500
+        if take < 1:
+            take = 50
+        if skip < 0:
+            skip = 0
+    except (ValueError, TypeError):
+        skip = 0
+        take = 50
+    
+    result = get_daily_sales_report(
+        db=db,
+        business_id=business_id,
+        fiscal_year_id=fiscal_year_id,
+        currency_id=currency_id,
+        date_from=date_from,
+        date_to=date_to,
+        skip=skip,
+        take=take,
+    )
+    
+    items = result.get('items', [])
+    items = [format_datetime_fields(item, request) for item in items]
+    
+    result['items'] = items
+    
+    locale = negotiate_locale(request.headers.get("Accept-Language"))
+    return success_response(
+        data=result,
+        message="Daily sales report retrieved successfully" if locale != 'fa' else "گزارش فروش روزانه با موفقیت دریافت شد",
+        request=request
+    )
+
+
+@router.post(
+    "/businesses/{business_id}/reports/monthly-sales",
+    summary="گزارش فروش ماهانه",
+    description="گزارش فروش ماهانه با گروه‌بندی بر اساس ماه",
+)
+@require_business_access("business_id")
+async def monthly_sales_report_endpoint(
+    request: Request,
+    business_id: int,
+    body: Dict[str, Any] = Body(default={}),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """گزارش فروش ماهانه"""
+    # بررسی دسترسی
+    if not ctx.can_read_section("reports"):
+        raise ApiError("FORBIDDEN", "Missing business permission: reports.read", http_status=403)
+    
+    # دریافت سال مالی از header یا body
+    fiscal_year_id = None
+    fy_header = request.headers.get('X-Fiscal-Year-ID')
+    if fy_header:
+        try:
+            fiscal_year_id = int(fy_header)
+        except (ValueError, TypeError):
+            pass
+    
+    if body.get('fiscal_year_id'):
+        try:
+            fiscal_year_id = int(body['fiscal_year_id'])
+        except (ValueError, TypeError):
+            pass
+    
+    # استخراج پارامترها از body
+    date_from = body.get('date_from')
+    date_to = body.get('date_to')
+    currency_id = body.get('currency_id')
+    if currency_id is not None:
+        try:
+            currency_id = int(currency_id)
+        except (ValueError, TypeError):
+            currency_id = None
+    
+    # Pagination
+    skip = body.get('skip', 0)
+    take = body.get('take', 50)
+    try:
+        skip = int(skip)
+        take = int(take)
+        if take > 500:
+            take = 500
+        if take < 1:
+            take = 50
+        if skip < 0:
+            skip = 0
+    except (ValueError, TypeError):
+        skip = 0
+        take = 50
+    
+    result = get_monthly_sales_report(
+        db=db,
+        business_id=business_id,
+        fiscal_year_id=fiscal_year_id,
+        currency_id=currency_id,
+        date_from=date_from,
+        date_to=date_to,
+        skip=skip,
+        take=take,
+    )
+    
+    items = result.get('items', [])
+    # برای گزارش ماهانه، format_datetime_fields اعمال نمی‌شود
+    # چون month_key یک رشته است و نیازی به فرمت کردن تاریخ نیست
+    # فقط فیلد date را برای استفاده در frontend نگه می‌داریم
+    formatted_items = []
+    for item in items:
+        formatted_item = dict(item)
+        # اگر فیلد date وجود دارد و یک datetime یا date object است، به ISO string تبدیل کن
+        if 'date' in formatted_item and formatted_item['date']:
+            try:
+                from datetime import date as date_class, datetime as dt_class
+                if isinstance(formatted_item['date'], dt_class):
+                    formatted_item['date'] = formatted_item['date'].date().isoformat()
+                elif isinstance(formatted_item['date'], date_class):
+                    formatted_item['date'] = formatted_item['date'].isoformat()
+            except Exception:
+                pass
+        formatted_items.append(formatted_item)
+    
+    result['items'] = formatted_items
+    
+    locale = negotiate_locale(request.headers.get("Accept-Language"))
+    return success_response(
+        data=result,
+        message="Monthly sales report retrieved successfully" if locale != 'fa' else "گزارش فروش ماهانه با موفقیت دریافت شد",
+        request=request
+    )
+
+
+@router.post(
+    "/businesses/{business_id}/reports/top-customers",
+    summary="گزارش برترین مشتریان",
+    description="گزارش برترین مشتریان بر اساس مبلغ فروش",
+)
+@require_business_access("business_id")
+async def top_customers_report_endpoint(
+    request: Request,
+    business_id: int,
+    body: Dict[str, Any] = Body(default={}),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """گزارش برترین مشتریان"""
+    
+    # Extract filters
+    fiscal_year_id = body.get('fiscal_year_id')
+    currency_id = body.get('currency_id')
+    date_from = body.get('date_from')
+    date_to = body.get('date_to')
+    limit = body.get('limit')
+    
+    # Convert fiscal_year_id
+    if fiscal_year_id is not None:
+        try:
+            fiscal_year_id = int(fiscal_year_id)
+        except (ValueError, TypeError):
+            fiscal_year_id = None
+    
+    # Convert currency_id
+    if currency_id is not None:
+        try:
+            currency_id = int(currency_id)
+        except (ValueError, TypeError):
+            currency_id = None
+    
+    # Convert limit
+    if limit is not None:
+        try:
+            limit = int(limit)
+            if limit < 1:
+                limit = None
+        except (ValueError, TypeError):
+            limit = None
+    
+    # Pagination
+    skip = body.get('skip', 0)
+    take = body.get('take', 50)
+    try:
+        skip = int(skip)
+        take = int(take)
+        if take > 500:
+            take = 500
+        if take < 1:
+            take = 50
+        if skip < 0:
+            skip = 0
+    except (ValueError, TypeError):
+        skip = 0
+        take = 50
+    
+    result = get_top_customers_report(
+        db=db,
+        business_id=business_id,
+        fiscal_year_id=fiscal_year_id,
+        currency_id=currency_id,
+        date_from=date_from,
+        date_to=date_to,
+        limit=limit,
+        skip=skip,
+        take=take,
+    )
+    
+    items = result.get('items', [])
+    # برای گزارش برترین مشتریان، format_datetime_fields روی فیلد last_sale_date اعمال می‌شود
+    formatted_items = []
+    for item in items:
+        formatted_item = dict(item)
+        # اگر فیلد last_sale_date وجود دارد، آن را فرمت کن
+        if 'last_sale_date' in formatted_item and formatted_item['last_sale_date']:
+            try:
+                from datetime import date as date_class
+                if isinstance(formatted_item['last_sale_date'], str):
+                    date_obj = date_class.fromisoformat(formatted_item['last_sale_date'])
+                    formatted_dict = format_datetime_fields({'date': date_obj}, request)
+                    formatted_item['last_sale_date'] = formatted_dict.get('date', formatted_item['last_sale_date'])
+            except Exception:
+                pass
+        formatted_items.append(formatted_item)
+    
+    result['items'] = formatted_items
+    
+    locale = negotiate_locale(request.headers.get("Accept-Language"))
+    return success_response(
+        data=result,
+        message="Top customers report retrieved successfully" if locale != 'fa' else "گزارش برترین مشتریان با موفقیت دریافت شد",
+        request=request
     )
 

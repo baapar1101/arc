@@ -55,10 +55,31 @@ class BackupService {
     return (data['job_id'] as String?) ?? '';
   }
 
-  Future<String> startRestoreFromFileAsync(int businessId, String filePath, {String? filename, String mode = 'replace'}) async {
+  Future<String> startRestoreFromFileAsync(
+    int businessId, {
+    String? filePath,
+    Uint8List? fileBytes,
+    String? filename,
+    String mode = 'replace',
+  }) async {
+    MultipartFile file;
+    
+    // اگر bytes موجود باشد (برای وب)، از آن استفاده می‌کنیم
+    if (fileBytes != null) {
+      file = MultipartFile.fromBytes(
+        fileBytes,
+        filename: filename ?? 'backup.hbx',
+      );
+    } else if (filePath != null) {
+      // اگر path موجود باشد (برای موبایل/دسکتاپ)، از آن استفاده می‌کنیم
+      file = await MultipartFile.fromFile(filePath, filename: filename);
+    } else {
+      throw Exception('Either filePath or fileBytes must be provided');
+    }
+    
     final form = FormData.fromMap({
       'mode': mode,
-      'file': await MultipartFile.fromFile(filePath, filename: filename),
+      'file': file,
     });
     final res = await _apiClient.post<Map<String, dynamic>>(
       '/businesses/$businessId/backups/restore',

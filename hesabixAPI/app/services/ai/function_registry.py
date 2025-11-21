@@ -155,6 +155,108 @@ class AIFunctionRegistry:
             required_permissions=["invoices.read"],
             category="invoices"
         ))
+        
+        # اضافه کردن get_invoice_details
+        def get_invoice_details_wrapper(db, business_id, user_id, invoice_id, **kwargs):
+            """Wrapper برای دریافت جزئیات فاکتور"""
+            from app.services.invoice_service import invoice_document_to_dict
+            from adapters.db.models.document import Document
+            
+            document = db.query(Document).filter(
+                Document.id == invoice_id,
+                Document.business_id == business_id
+            ).first()
+            
+            if not document:
+                raise ValueError(f"Invoice {invoice_id} not found")
+            
+            # بررسی نوع سند - باید فاکتور باشد
+            invoice_types = [
+                "invoice_sales", "invoice_sales_return",
+                "invoice_purchase", "invoice_purchase_return",
+                "invoice_direct_consumption", "invoice_production", "invoice_waste"
+            ]
+            if document.document_type not in invoice_types:
+                raise ValueError(f"Document {invoice_id} is not an invoice")
+            
+            return invoice_document_to_dict(db, document)
+        
+        self.register(AIFunction(
+            name="get_invoice_details",
+            description="دریافت جزئیات کامل یک فاکتور شامل اقلام، مالیات، پرداخت‌ها و سایر اطلاعات. شناسه کسب‌وکار به صورت خودکار از جلسه گفت‌وگو گرفته می‌شود.",
+            parameters_schema={
+                "type": "object",
+                "properties": {
+                    "invoice_id": {"type": "integer", "description": "شناسه فاکتور"}
+                },
+                "required": ["invoice_id"]
+            },
+            handler=self._create_handler(get_invoice_details_wrapper),
+            allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
+            required_permissions=["invoices.read"],
+            category="invoices"
+        ))
+        
+        # اضافه کردن create_invoice
+        def create_invoice_wrapper(args: Dict[str, Any], context: Dict[str, Any]) -> Any:
+            """Wrapper برای ایجاد فاکتور"""
+            from app.services.invoice_service import create_invoice
+            
+            db: Session = context["db"]
+            user_context: AuthContext = context["user_context"]
+            business_id = args.get("business_id") or context.get("business_id")
+            user_id = user_context.get_user_id()
+            
+            # ساخت data dict از args
+            data = {
+                "invoice_type": args.get("invoice_type"),
+                "document_date": args.get("document_date"),
+                "currency_id": args.get("currency_id"),
+                "person_id": args.get("person_id"),
+                "description": args.get("description"),
+                "lines": args.get("lines", []),
+                "extra_info": args.get("extra_info", {})
+            }
+            
+            return create_invoice(db, business_id, user_id, data)
+        
+        self.register(AIFunction(
+            name="create_invoice",
+            description="ایجاد یک فاکتور جدید (فروش، خرید و غیره). شناسه کسب‌وکار به صورت خودکار از جلسه گفت‌وگو گرفته می‌شود.",
+            parameters_schema={
+                "type": "object",
+                "properties": {
+                    "invoice_type": {
+                        "type": "string",
+                        "enum": ["invoice_sales", "invoice_purchase", "invoice_sales_return", "invoice_purchase_return"],
+                        "description": "نوع فاکتور"
+                    },
+                    "document_date": {"type": "string", "format": "date", "description": "تاریخ فاکتور"},
+                    "currency_id": {"type": "integer", "description": "شناسه ارز"},
+                    "person_id": {"type": "integer", "description": "شناسه مشتری/تامین‌کننده (برای فاکتورهای طرف شخص)"},
+                    "description": {"type": "string", "description": "توضیحات (اختیاری)"},
+                    "lines": {
+                        "type": "array",
+                        "description": "اقلام فاکتور",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "product_id": {"type": "integer", "description": "شناسه محصول"},
+                                "quantity": {"type": "number", "description": "تعداد"},
+                                "unit_price": {"type": "number", "description": "قیمت واحد"},
+                                "description": {"type": "string", "description": "توضیحات (اختیاری)"}
+                            },
+                            "required": ["product_id", "quantity", "unit_price"]
+                        }
+                    }
+                },
+                "required": ["invoice_type", "document_date", "currency_id", "lines"]
+            },
+            handler=create_invoice_wrapper,
+            allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
+            required_permissions=["invoices.write"],
+            category="invoices"
+        ))
     
     def _register_product_functions(self):
         """ثبت function های مربوط به محصولات"""
@@ -194,10 +296,87 @@ class AIFunctionRegistry:
             required_permissions=["inventory.read"],
             category="products"
         ))
+        
+        # اضافه کردن get_inventory_status
+        def get_inventory_status_wrapper(db, business_id, user_id, **kwargs):
+            """Wrapper برای دریافت وضعیت موجودی"""
+            from app.services.warehouse_service import get_warehouse_stock_report
+            
+            query = {
+                "product_ids": kwargs.get("product_ids", []),
+                "warehouse_ids": kwargs.get("warehouse_ids", []),
+                "as_of_date": kwargs.get("as_of_date"),
+                "include_zero": kwargs.get("include_zero", False)
+            }
+            
+            return get_warehouse_stock_report(db, business_id, query)
+        
+        self.register(AIFunction(
+            name="get_inventory_status",
+            description="دریافت وضعیت موجودی محصولات در انبارها. شناسه کسب‌وکار به صورت خودکار از جلسه گفت‌وگو گرفته می‌شود.",
+            parameters_schema={
+                "type": "object",
+                "properties": {
+                    "product_id": {"type": "integer", "description": "شناسه محصول (اختیاری - اگر مشخص نشود، لیست تمام محصولات)"},
+                    "warehouse_id": {"type": "integer", "description": "شناسه انبار (اختیاری)"},
+                    "as_of_date": {"type": "string", "format": "date", "description": "تاریخ محاسبه موجودی (اختیاری)"},
+                    "include_zero": {"type": "boolean", "description": "نمایش محصولات با موجودی صفر (اختیاری)"}
+                },
+                "required": []
+            },
+            handler=self._create_handler(get_inventory_status_wrapper),
+            allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
+            required_permissions=["inventory.read"],
+            category="products"
+        ))
+        
+        # اضافه کردن get_product_kardex
+        def get_product_kardex_wrapper(db, business_id, user_id, product_id, **kwargs):
+            """Wrapper برای دریافت کاردکس محصول"""
+            from app.services.product_service import get_inventory_kardex_report
+            
+            result = get_inventory_kardex_report(
+                db=db,
+                business_id=business_id,
+                fiscal_year_id=kwargs.get("fiscal_year_id"),
+                date_from=kwargs.get("from_date"),
+                date_to=kwargs.get("to_date"),
+                product_ids=[product_id],
+                warehouse_ids=[kwargs.get("warehouse_id")] if kwargs.get("warehouse_id") else None,
+                category_ids=None,
+                search=None,
+                skip=kwargs.get("skip", 0),
+                take=kwargs.get("take", 100)
+            )
+            
+            return result
+        
+        self.register(AIFunction(
+            name="get_product_kardex",
+            description="دریافت کاردکس (گردش موجودی) یک محصول در انبار. شناسه کسب‌وکار به صورت خودکار از جلسه گفت‌وگو گرفته می‌شود.",
+            parameters_schema={
+                "type": "object",
+                "properties": {
+                    "product_id": {"type": "integer", "description": "شناسه محصول"},
+                    "warehouse_id": {"type": "integer", "description": "شناسه انبار (اختیاری)"},
+                    "from_date": {"type": "string", "format": "date", "description": "تاریخ شروع (اختیاری)"},
+                    "to_date": {"type": "string", "format": "date", "description": "تاریخ پایان (اختیاری)"},
+                    "fiscal_year_id": {"type": "integer", "description": "شناسه سال مالی (اختیاری)"}
+                },
+                "required": ["product_id"]
+            },
+            handler=self._create_handler(get_product_kardex_wrapper),
+            allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
+            required_permissions=["inventory.read"],
+            category="products"
+        ))
     
     def _register_person_functions(self):
         """ثبت function های مربوط به اشخاص (مشتریان/تامین‌کنندگان)"""
-        from app.services.person_service import get_person_by_id
+        from app.services.person_service import get_person_by_id, search_persons, calculate_person_balance
+        from app.services.person_service import get_debtors_report, get_creditors_report
+        from app.services.person_service import create_person, update_person
+        from adapters.api.v1.schema_models.person import PersonCreateRequest, PersonUpdateRequest
         
         def get_person_wrapper(db, business_id, person_id, user_id, **kwargs):
             """Wrapper برای دریافت اطلاعات شخص"""
@@ -218,10 +397,197 @@ class AIFunctionRegistry:
             required_permissions=["persons.read"],
             category="persons"
         ))
+        
+        # اضافه کردن search_persons
+        def search_persons_wrapper(db, business_id, user_id, **kwargs):
+            """Wrapper برای جستجوی اشخاص"""
+            from app.services.person_service import _person_to_dict
+            
+            search_query = kwargs.get("search")
+            page = kwargs.get("page", 1)
+            limit = kwargs.get("limit", 20)
+            
+            persons = search_persons(db, business_id, search_query, page, limit)
+            
+            # تبدیل به dict با استفاده از helper function
+            result = []
+            for person in persons:
+                person_dict = _person_to_dict(person)
+                result.append(person_dict)
+            
+            return result
+        
+        self.register(AIFunction(
+            name="search_persons",
+            description="جستجو در مشتریان و تامین‌کنندگان بر اساس نام، کد، تلفن و سایر فیلترها. شناسه کسب‌وکار به صورت خودکار از جلسه گفت‌وگو گرفته می‌شود.",
+            parameters_schema={
+                "type": "object",
+                "properties": {
+                    "search": {"type": "string", "description": "متن جستجو در نام، کد، تلفن یا ایمیل (اختیاری)"},
+                    "person_type": {"type": "string", "enum": ["customer", "supplier", "both"], "description": "نوع شخص (اختیاری)"},
+                    "city": {"type": "string", "description": "شهر (اختیاری)"},
+                    "page": {"type": "integer", "description": "شماره صفحه (اختیاری، پیش‌فرض: 1)"},
+                    "limit": {"type": "integer", "description": "تعداد نتایج (اختیاری، پیش‌فرض: 20)"}
+                },
+                "required": []
+            },
+            handler=self._create_handler(search_persons_wrapper),
+            allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
+            required_permissions=["persons.read"],
+            category="persons"
+        ))
+        
+        # اضافه کردن get_person_balance
+        def get_person_balance_wrapper(db, business_id, person_id, user_id, **kwargs):
+            """Wrapper برای دریافت موجودی شخص"""
+            fiscal_year_id = kwargs.get("fiscal_year_id")
+            balance, status = calculate_person_balance(db, person_id, fiscal_year_id)
+            
+            return {
+                "person_id": person_id,
+                "balance": balance,
+                "status": status,
+                "fiscal_year_id": fiscal_year_id
+            }
+        
+        self.register(AIFunction(
+            name="get_person_balance",
+            description="دریافت موجودی و بدهی/بستانکاری یک مشتری یا تامین‌کننده. شناسه کسب‌وکار به صورت خودکار از جلسه گفت‌وگو گرفته می‌شود.",
+            parameters_schema={
+                "type": "object",
+                "properties": {
+                    "person_id": {"type": "integer", "description": "شناسه مشتری یا تامین‌کننده"},
+                    "fiscal_year_id": {"type": "integer", "description": "شناسه سال مالی (اختیاری)"}
+                },
+                "required": ["person_id"]
+            },
+            handler=self._create_handler(get_person_balance_wrapper),
+            allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
+            required_permissions=["persons.read"],
+            category="persons"
+        ))
+        
+        # اضافه کردن create_person
+        def create_person_wrapper(args: Dict[str, Any], context: Dict[str, Any]) -> Any:
+            """Wrapper برای ایجاد شخص"""
+            from adapters.api.v1.schema_models.person import PersonCreateRequest
+            from adapters.db.models.person import PersonType
+            
+            db: Session = context["db"]
+            business_id = args.get("business_id") or context.get("business_id")
+            
+            # تبدیل person_type از string به PersonType enum
+            person_type_enum = None
+            person_types_list = None
+            if args.get("person_type"):
+                person_type_str = args.get("person_type").lower()
+                if person_type_str == "customer":
+                    person_type_enum = PersonType.CUSTOMER
+                    person_types_list = [PersonType.CUSTOMER]
+                elif person_type_str == "supplier":
+                    person_type_enum = PersonType.SUPPLIER
+                    person_types_list = [PersonType.SUPPLIER]
+            
+            # ساخت PersonCreateRequest از args
+            # alias_name required است، از name استفاده می‌کنیم
+            name = args.get("name", "")
+            alias_name = name if name else "نامشخص"
+            
+            person_data = PersonCreateRequest(
+                alias_name=alias_name,
+                first_name=args.get("name"),
+                code=args.get("code"),
+                phone=args.get("phone"),
+                email=args.get("email"),
+                address=args.get("address"),
+                economic_id=args.get("tax_id"),  # economic_id معادل tax_id است
+                person_type=person_type_enum,
+                person_types=person_types_list
+            )
+            
+            return create_person(db, business_id, person_data)
+        
+        self.register(AIFunction(
+            name="create_person",
+            description="ایجاد یک مشتری یا تامین‌کننده جدید. شناسه کسب‌وکار به صورت خودکار از جلسه گفت‌وگو گرفته می‌شود.",
+            parameters_schema={
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "description": "نام شخص"},
+                    "person_type": {"type": "string", "enum": ["customer", "supplier"], "description": "نوع شخص"},
+                    "phone": {"type": "string", "description": "تلفن (اختیاری)"},
+                    "email": {"type": "string", "format": "email", "description": "ایمیل (اختیاری)"},
+                    "address": {"type": "string", "description": "آدرس (اختیاری)"},
+                    "tax_id": {"type": "string", "description": "شناسه ملی/کد اقتصادی (اختیاری)"},
+                    "code": {"type": "integer", "description": "کد شخص (اختیاری - در غیر این صورت خودکار تولید می‌شود)"}
+                },
+                "required": ["name", "person_type"]
+            },
+            handler=create_person_wrapper,
+            allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
+            required_permissions=["persons.write"],
+            category="persons"
+        ))
+        
+        # اضافه کردن update_person
+        def update_person_wrapper(args: Dict[str, Any], context: Dict[str, Any]) -> Any:
+            """Wrapper برای ویرایش شخص"""
+            from adapters.api.v1.schema_models.person import PersonUpdateRequest
+            
+            db: Session = context["db"]
+            business_id = args.get("business_id") or context.get("business_id")
+            person_id = args.get("person_id")
+            
+            if not person_id:
+                raise ValueError("person_id is required")
+            
+            # ساخت PersonUpdateRequest از args
+            # فقط فیلدهایی که ارائه شده‌اند را set می‌کنیم
+            update_data = {}
+            if args.get("name"):
+                update_data["alias_name"] = args.get("name")
+                update_data["first_name"] = args.get("name")
+            if args.get("phone"):
+                update_data["phone"] = args.get("phone")
+            if args.get("email"):
+                update_data["email"] = args.get("email")
+            if args.get("address"):
+                update_data["address"] = args.get("address")
+            if args.get("tax_id"):
+                update_data["economic_id"] = args.get("tax_id")  # economic_id معادل tax_id است
+            
+            person_data = PersonUpdateRequest(**update_data)
+            
+            # ترتیب صحیح: update_person(db, person_id, business_id, person_data)
+            return update_person(db, person_id, business_id, person_data)
+        
+        self.register(AIFunction(
+            name="update_person",
+            description="ویرایش اطلاعات یک مشتری یا تامین‌کننده. شناسه کسب‌وکار به صورت خودکار از جلسه گفت‌وگو گرفته می‌شود.",
+            parameters_schema={
+                "type": "object",
+                "properties": {
+                    "person_id": {"type": "integer", "description": "شناسه شخص"},
+                    "name": {"type": "string", "description": "نام جدید (اختیاری)"},
+                    "phone": {"type": "string", "description": "تلفن جدید (اختیاری)"},
+                    "email": {"type": "string", "format": "email", "description": "ایمیل جدید (اختیاری)"},
+                    "address": {"type": "string", "description": "آدرس جدید (اختیاری)"},
+                    "tax_id": {"type": "string", "description": "شناسه ملی/کد اقتصادی جدید (اختیاری)"}
+                },
+                "required": ["person_id"]
+            },
+            handler=update_person_wrapper,
+            allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
+            required_permissions=["persons.write"],
+            category="persons"
+        ))
     
     def _register_financial_functions(self):
         """ثبت function های مربوط به امور مالی"""
         from app.services.business_dashboard_service import get_business_dashboard_data
+        from app.services.person_service import get_debtors_report, get_creditors_report
+        from app.services.receipt_payment_service import list_receipts_payments, create_receipt_payment
+        from app.services.product_service import get_sales_by_product_report
         
         def get_financial_summary_wrapper(args: Dict[str, Any], context: Dict[str, Any]) -> Any:
             """Wrapper برای دریافت خلاصه مالی"""
@@ -240,6 +606,511 @@ class AIFunctionRegistry:
             },
             handler=get_financial_summary_wrapper,
             allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.ADMIN},
+            required_permissions=["reports.read"],
+            category="financial"
+        ))
+        
+        # اضافه کردن get_debtors_report
+        def get_debtors_report_wrapper(db, business_id, user_id, **kwargs):
+            """Wrapper برای گزارش بدهکاران"""
+            return get_debtors_report(
+                db=db,
+                business_id=business_id,
+                fiscal_year_id=kwargs.get("fiscal_year_id"),
+                currency_id=kwargs.get("currency_id"),
+                date_from=kwargs.get("date_from"),
+                date_to=kwargs.get("date_to"),
+                min_balance=kwargs.get("min_balance"),
+                person_ids=kwargs.get("person_ids"),
+                search=kwargs.get("search"),
+                skip=kwargs.get("skip", 0),
+                take=kwargs.get("take", 50)
+            )
+        
+        self.register(AIFunction(
+            name="get_debtors_report",
+            description="گزارش بدهکاران با جزئیات بدهی و تاریخچه. شناسه کسب‌وکار به صورت خودکار از جلسه گفت‌وگو گرفته می‌شود.",
+            parameters_schema={
+                "type": "object",
+                "properties": {
+                    "fiscal_year_id": {"type": "integer", "description": "شناسه سال مالی (اختیاری)"},
+                    "date_from": {"type": "string", "format": "date", "description": "از تاریخ (اختیاری)"},
+                    "date_to": {"type": "string", "format": "date", "description": "تا تاریخ (اختیاری)"},
+                    "min_balance": {"type": "number", "description": "حداقل بدهی (اختیاری)"},
+                    "search": {"type": "string", "description": "جستجو در نام/کد (اختیاری)"}
+                },
+                "required": []
+            },
+            handler=self._create_handler(get_debtors_report_wrapper),
+            allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
+            required_permissions=["reports.read"],
+            category="financial"
+        ))
+        
+        # اضافه کردن get_creditors_report
+        def get_creditors_report_wrapper(db, business_id, user_id, **kwargs):
+            """Wrapper برای گزارش بستانکاران"""
+            return get_creditors_report(
+                db=db,
+                business_id=business_id,
+                fiscal_year_id=kwargs.get("fiscal_year_id"),
+                currency_id=kwargs.get("currency_id"),
+                date_from=kwargs.get("date_from"),
+                date_to=kwargs.get("date_to"),
+                min_balance=kwargs.get("min_balance"),
+                person_ids=kwargs.get("person_ids"),
+                search=kwargs.get("search"),
+                skip=kwargs.get("skip", 0),
+                take=kwargs.get("take", 50)
+            )
+        
+        self.register(AIFunction(
+            name="get_creditors_report",
+            description="گزارش بستانکاران با جزئیات بستانکاری و تاریخچه. شناسه کسب‌وکار به صورت خودکار از جلسه گفت‌وگو گرفته می‌شود.",
+            parameters_schema={
+                "type": "object",
+                "properties": {
+                    "fiscal_year_id": {"type": "integer", "description": "شناسه سال مالی (اختیاری)"},
+                    "date_from": {"type": "string", "format": "date", "description": "از تاریخ (اختیاری)"},
+                    "date_to": {"type": "string", "format": "date", "description": "تا تاریخ (اختیاری)"},
+                    "min_balance": {"type": "number", "description": "حداقل بستانکاری (اختیاری)"},
+                    "search": {"type": "string", "description": "جستجو در نام/کد (اختیاری)"}
+                },
+                "required": []
+            },
+            handler=self._create_handler(get_creditors_report_wrapper),
+            allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
+            required_permissions=["reports.read"],
+            category="financial"
+        ))
+        
+        # اضافه کردن search_receipts_payments
+        def search_receipts_payments_wrapper(db, business_id, user_id, **kwargs):
+            """Wrapper برای جستجوی دریافت/پرداخت‌ها"""
+            query = {
+                "fiscal_year_id": kwargs.get("fiscal_year_id"),
+                "document_type": kwargs.get("type"),  # "receipt" or "payment"
+                "from_date": kwargs.get("from_date"),
+                "to_date": kwargs.get("to_date"),
+                "person_id": kwargs.get("person_id"),
+                "account_type": kwargs.get("account_type"),  # "bank", "cash", "petty_cash"
+                "take": kwargs.get("take", 50),
+                "skip": kwargs.get("skip", 0)
+            }
+            
+            return list_receipts_payments(db, business_id, query)
+        
+        self.register(AIFunction(
+            name="search_receipts_payments",
+            description="جستجو در دریافت/پرداخت‌ها بر اساس تاریخ، نوع، شخص و سایر فیلترها. شناسه کسب‌وکار به صورت خودکار از جلسه گفت‌وگو گرفته می‌شود.",
+            parameters_schema={
+                "type": "object",
+                "properties": {
+                    "from_date": {"type": "string", "format": "date", "description": "تاریخ شروع (اختیاری)"},
+                    "to_date": {"type": "string", "format": "date", "description": "تاریخ پایان (اختیاری)"},
+                    "person_id": {"type": "integer", "description": "شناسه شخص (اختیاری)"},
+                    "type": {"type": "string", "enum": ["receipt", "payment"], "description": "نوع: دریافت یا پرداخت (اختیاری)"},
+                    "account_type": {"type": "string", "enum": ["bank", "cash", "petty_cash"], "description": "نوع حساب: بانکی، نقدی یا خرد (اختیاری)"},
+                    "fiscal_year_id": {"type": "integer", "description": "شناسه سال مالی (اختیاری)"}
+                },
+                "required": []
+            },
+            handler=self._create_handler(search_receipts_payments_wrapper),
+            allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
+            required_permissions=["receipts_payments.read"],
+            category="financial"
+        ))
+        
+        # اضافه کردن create_receipt_payment
+        def create_receipt_payment_wrapper(args: Dict[str, Any], context: Dict[str, Any]) -> Any:
+            """Wrapper برای ایجاد دریافت/پرداخت"""
+            db: Session = context["db"]
+            user_context: AuthContext = context["user_context"]
+            business_id = args.get("business_id") or context.get("business_id")
+            user_id = user_context.get_user_id()
+            
+            # ساخت person_lines و account_lines از پارامترها
+            person_lines = []
+            if args.get("person_id") and args.get("amount"):
+                person_lines.append({
+                    "person_id": args.get("person_id"),
+                    "amount": float(args.get("amount", 0)),
+                    "description": args.get("description", "")
+                })
+            
+            account_lines = []
+            if args.get("account_id") and args.get("amount"):
+                account_lines.append({
+                    "account_id": args.get("account_id"),
+                    "amount": float(args.get("amount", 0)),
+                    "description": args.get("description", "")
+                })
+            
+            data = {
+                "document_type": args.get("type"),  # "receipt" or "payment"
+                "document_date": args.get("document_date"),
+                "currency_id": args.get("currency_id"),
+                "description": args.get("description", ""),
+                "person_lines": person_lines if person_lines else args.get("person_lines", []),
+                "account_lines": account_lines if account_lines else args.get("account_lines", []),
+                "extra_info": args.get("extra_info", {})
+            }
+            
+            return create_receipt_payment(db, business_id, user_id, data)
+        
+        self.register(AIFunction(
+            name="create_receipt_payment",
+            description="ثبت دریافت یا پرداخت نقدی/بانکی. شناسه کسب‌وکار به صورت خودکار از جلسه گفت‌وگو گرفته می‌شود.",
+            parameters_schema={
+                "type": "object",
+                "properties": {
+                    "type": {"type": "string", "enum": ["receipt", "payment"], "description": "نوع: دریافت یا پرداخت"},
+                    "document_date": {"type": "string", "format": "date", "description": "تاریخ سند"},
+                    "currency_id": {"type": "integer", "description": "شناسه ارز"},
+                    "person_id": {"type": "integer", "description": "شناسه شخص (اختیاری)"},
+                    "amount": {"type": "number", "description": "مبلغ"},
+                    "account_id": {"type": "integer", "description": "شناسه حساب بانکی/نقدی"},
+                    "description": {"type": "string", "description": "توضیحات (اختیاری)"}
+                },
+                "required": ["type", "document_date", "currency_id", "amount", "account_id"]
+            },
+            handler=create_receipt_payment_wrapper,
+            allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
+            required_permissions=["receipts_payments.write"],
+            category="financial"
+        ))
+        
+        # اضافه کردن get_sales_report
+        def get_sales_report_wrapper(db, business_id, user_id, **kwargs):
+            """Wrapper برای گزارش فروش"""
+            return get_sales_by_product_report(
+                db=db,
+                business_id=business_id,
+                fiscal_year_id=kwargs.get("fiscal_year_id"),
+                currency_id=kwargs.get("currency_id"),
+                date_from=kwargs.get("from_date"),
+                date_to=kwargs.get("to_date"),
+                product_ids=[kwargs.get("product_id")] if kwargs.get("product_id") else None,
+                category_ids=[kwargs.get("category_id")] if kwargs.get("category_id") else None,
+                warehouse_ids=None,
+                include_zero_sales=kwargs.get("include_zero_sales", False),
+                search=kwargs.get("search"),
+                skip=kwargs.get("skip", 0),
+                take=kwargs.get("take", 50)
+            )
+        
+        self.register(AIFunction(
+            name="get_sales_report",
+            description="گزارش فروش بر اساس تاریخ، محصول، مشتری. شناسه کسب‌وکار به صورت خودکار از جلسه گفت‌وگو گرفته می‌شود.",
+            parameters_schema={
+                "type": "object",
+                "properties": {
+                    "from_date": {"type": "string", "format": "date", "description": "تاریخ شروع"},
+                    "to_date": {"type": "string", "format": "date", "description": "تاریخ پایان"},
+                    "product_id": {"type": "integer", "description": "فیلتر بر اساس محصول (اختیاری)"},
+                    "person_id": {"type": "integer", "description": "فیلتر بر اساس مشتری (اختیاری)"},
+                    "category_id": {"type": "integer", "description": "فیلتر بر اساس دسته‌بندی (اختیاری)"},
+                    "fiscal_year_id": {"type": "integer", "description": "شناسه سال مالی (اختیاری)"}
+                },
+                "required": ["from_date", "to_date"]
+            },
+            handler=self._create_handler(get_sales_report_wrapper),
+            allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
+            required_permissions=["reports.read"],
+            category="financial"
+        ))
+        
+        # اضافه کردن get_purchase_report
+        def get_purchase_report_wrapper(db, business_id, user_id, **kwargs):
+            """Wrapper برای گزارش خرید"""
+            from app.services.product_service import get_sales_by_product_report
+            from app.services.invoice_service import INVOICE_PURCHASE
+            from adapters.db.models.document import Document
+            from adapters.db.models.invoice_item_line import InvoiceItemLine
+            from datetime import date, datetime
+            from decimal import Decimal
+            from sqlalchemy import and_, or_
+            
+            # تبدیل تاریخ‌ها
+            date_from_obj = None
+            date_to_obj = None
+            if kwargs.get("from_date"):
+                try:
+                    date_from_obj = datetime.strptime(kwargs["from_date"], '%Y-%m-%d').date()
+                except ValueError:
+                    pass
+            if kwargs.get("to_date"):
+                try:
+                    date_to_obj = datetime.strptime(kwargs["to_date"], '%Y-%m-%d').date()
+                except ValueError:
+                    pass
+            
+            # دریافت فاکتورهای خرید در بازه زمانی
+            purchase_invoice_query = db.query(Document).filter(
+                and_(
+                    Document.business_id == business_id,
+                    Document.document_type == INVOICE_PURCHASE,
+                    Document.is_proforma == False,
+                )
+            )
+            
+            if date_from_obj:
+                purchase_invoice_query = purchase_invoice_query.filter(Document.document_date >= date_from_obj)
+            if date_to_obj:
+                purchase_invoice_query = purchase_invoice_query.filter(Document.document_date <= date_to_obj)
+            if kwargs.get("fiscal_year_id"):
+                purchase_invoice_query = purchase_invoice_query.filter(Document.fiscal_year_id == kwargs["fiscal_year_id"])
+            if kwargs.get("currency_id"):
+                purchase_invoice_query = purchase_invoice_query.filter(Document.currency_id == kwargs["currency_id"])
+            
+            purchase_invoices = purchase_invoice_query.all()
+            invoice_ids = [inv.id for inv in purchase_invoices]
+            
+            if not invoice_ids:
+                return {
+                    'items': [],
+                    'summary': {'total_count': 0, 'total_quantity': 0.0, 'total_amount': 0.0},
+                    'pagination': {'total': 0, 'page': 1, 'per_page': 50, 'total_pages': 0, 'has_next': False, 'has_prev': False}
+                }
+            
+            # دریافت خطوط فاکتور خرید
+            purchase_lines = db.query(InvoiceItemLine).filter(
+                InvoiceItemLine.document_id.in_(invoice_ids)
+            ).all()
+            
+            # گروه‌بندی خطوط بر اساس product_id
+            product_purchases = {}
+            product_ids_with_purchases = set()
+            
+            for line in purchase_lines:
+                if not line.product_id:
+                    continue
+                
+                product_ids_with_purchases.add(line.product_id)
+                
+                if line.product_id not in product_purchases:
+                    product_purchases[line.product_id] = {
+                        'total_quantity': Decimal(0),
+                        'total_amount': Decimal(0),
+                        'last_purchase_date': None,
+                    }
+                
+                qty = Decimal(str(line.quantity or 0))
+                line_total = Decimal(0)
+                
+                extra_info = line.extra_info or {}
+                if 'line_total' in extra_info and extra_info['line_total'] is not None:
+                    line_total = Decimal(str(extra_info['line_total']))
+                else:
+                    unit_price = Decimal(str(extra_info.get('unit_price', 0) or 0))
+                    line_discount = Decimal(str(extra_info.get('line_discount', 0) or 0))
+                    tax_amount = Decimal(str(extra_info.get('tax_amount', 0) or 0))
+                    if unit_price > 0 and qty > 0:
+                        line_total = (unit_price * qty) - line_discount + tax_amount
+                
+                product_purchases[line.product_id]['total_quantity'] += qty
+                product_purchases[line.product_id]['total_amount'] += line_total
+            
+            # ساخت نتایج
+            items = []
+            for product_id, purchase_data in product_purchases.items():
+                items.append({
+                    'product_id': product_id,
+                    'total_quantity': float(purchase_data['total_quantity']),
+                    'total_amount': float(purchase_data['total_amount']),
+                    'last_purchase_date': purchase_data['last_purchase_date'].isoformat() if purchase_data['last_purchase_date'] else None
+                })
+            
+            # Pagination
+            skip = kwargs.get("skip", 0)
+            take = kwargs.get("take", 50)
+            total = len(items)
+            paginated_items = items[skip:skip + take]
+            total_pages = (total + take - 1) // take if take > 0 else 0
+            current_page = (skip // take) + 1 if take > 0 else 1
+            
+            total_quantity_sum = sum(item.get('total_quantity', 0) for item in items)
+            total_amount_sum = sum(item.get('total_amount', 0) for item in items)
+            
+            return {
+                'items': paginated_items,
+                'summary': {
+                    'total_count': total,
+                    'total_quantity': float(total_quantity_sum),
+                    'total_amount': float(total_amount_sum),
+                },
+                'pagination': {
+                    'total': total,
+                    'page': current_page,
+                    'per_page': take,
+                    'total_pages': total_pages,
+                    'has_next': current_page < total_pages,
+                    'has_prev': current_page > 1,
+                }
+            }
+        
+        self.register(AIFunction(
+            name="get_purchase_report",
+            description="گزارش خرید بر اساس تاریخ، محصول، تامین‌کننده. شناسه کسب‌وکار به صورت خودکار از جلسه گفت‌وگو گرفته می‌شود.",
+            parameters_schema={
+                "type": "object",
+                "properties": {
+                    "from_date": {"type": "string", "format": "date", "description": "تاریخ شروع"},
+                    "to_date": {"type": "string", "format": "date", "description": "تاریخ پایان"},
+                    "product_id": {"type": "integer", "description": "فیلتر بر اساس محصول (اختیاری)"},
+                    "person_id": {"type": "integer", "description": "فیلتر بر اساس تامین‌کننده (اختیاری)"},
+                    "category_id": {"type": "integer", "description": "فیلتر بر اساس دسته‌بندی (اختیاری)"},
+                    "fiscal_year_id": {"type": "integer", "description": "شناسه سال مالی (اختیاری)"}
+                },
+                "required": ["from_date", "to_date"]
+            },
+            handler=self._create_handler(get_purchase_report_wrapper),
+            allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
+            required_permissions=["reports.read"],
+            category="financial"
+        ))
+        
+        # اضافه کردن get_inventory_valuation
+        def get_inventory_valuation_wrapper(db, business_id, user_id, **kwargs):
+            """Wrapper برای محاسبه ارزش موجودی"""
+            from app.services.warehouse_service import get_warehouse_stock_report
+            from adapters.db.models.product import Product
+            from decimal import Decimal
+            
+            # دریافت موجودی
+            query = {
+                "product_ids": [kwargs.get("product_id")] if kwargs.get("product_id") else [],
+                "warehouse_ids": [kwargs.get("warehouse_id")] if kwargs.get("warehouse_id") else [],
+                "as_of_date": kwargs.get("as_of_date"),
+                "include_zero": kwargs.get("include_zero", False)
+            }
+            
+            stock_report = get_warehouse_stock_report(db, business_id, query)
+            
+            # محاسبه ارزش موجودی
+            total_valuation = Decimal(0)
+            items = []
+            
+            for item in stock_report.get("items", []):
+                product_id = item.get("product_id")
+                quantity = Decimal(str(item.get("quantity", 0)))
+                
+                # دریافت محصول
+                product = db.query(Product).filter(Product.id == product_id).first()
+                if not product:
+                    continue
+                
+                # قیمت تمام شده یا قیمت فروش
+                cost_price = Decimal(str(product.cost_price or 0))
+                if cost_price == 0:
+                    cost_price = Decimal(str(product.sale_price or 0))
+                
+                valuation = quantity * cost_price
+                total_valuation += valuation
+                
+                items.append({
+                    "product_id": product_id,
+                    "product_name": product.name,
+                    "quantity": float(quantity),
+                    "cost_price": float(cost_price),
+                    "valuation": float(valuation)
+                })
+            
+            return {
+                "items": items,
+                "total_valuation": float(total_valuation),
+                "currency_id": stock_report.get("currency_id"),
+                "as_of_date": kwargs.get("as_of_date")
+            }
+        
+        self.register(AIFunction(
+            name="get_inventory_valuation",
+            description="محاسبه ارزش موجودی محصولات در انبار بر اساس قیمت تمام شده. شناسه کسب‌وکار به صورت خودکار از جلسه گفت‌وگو گرفته می‌شود.",
+            parameters_schema={
+                "type": "object",
+                "properties": {
+                    "product_id": {"type": "integer", "description": "شناسه محصول (اختیاری - اگر مشخص نشود، تمام محصولات)"},
+                    "warehouse_id": {"type": "integer", "description": "شناسه انبار (اختیاری)"},
+                    "as_of_date": {"type": "string", "format": "date", "description": "تاریخ محاسبه (اختیاری)"},
+                    "include_zero": {"type": "boolean", "description": "نمایش محصولات با موجودی صفر (اختیاری)"}
+                },
+                "required": []
+            },
+            handler=self._create_handler(get_inventory_valuation_wrapper),
+            allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
+            required_permissions=["inventory.read"],
+            category="financial"
+        ))
+        
+        # اضافه کردن get_cash_flow
+        def get_cash_flow_wrapper(db, business_id, user_id, **kwargs):
+            """Wrapper برای گزارش گردش نقدی"""
+            from app.services.receipt_payment_service import list_receipts_payments
+            from decimal import Decimal
+            
+            # دریافت دریافت‌ها و پرداخت‌ها
+            query_receipts = {
+                "document_type": "receipt",
+                "from_date": kwargs.get("from_date"),
+                "to_date": kwargs.get("to_date"),
+                "fiscal_year_id": kwargs.get("fiscal_year_id"),
+                "take": 1000,
+                "skip": 0
+            }
+            
+            query_payments = {
+                "document_type": "payment",
+                "from_date": kwargs.get("from_date"),
+                "to_date": kwargs.get("to_date"),
+                "fiscal_year_id": kwargs.get("fiscal_year_id"),
+                "take": 1000,
+                "skip": 0
+            }
+            
+            receipts_result = list_receipts_payments(db, business_id, query_receipts)
+            payments_result = list_receipts_payments(db, business_id, query_payments)
+            
+            # محاسبه مجموع دریافت‌ها و پرداخت‌ها
+            total_receipts = Decimal(0)
+            total_payments = Decimal(0)
+            
+            for item in receipts_result.get("items", []):
+                # محاسبه از account_lines یا person_lines
+                extra_info = item.get("extra_info", {})
+                total_receipts += Decimal(str(extra_info.get("total_amount", 0) or 0))
+            
+            for item in payments_result.get("items", []):
+                extra_info = item.get("extra_info", {})
+                total_payments += Decimal(str(extra_info.get("total_amount", 0) or 0))
+            
+            net_cash_flow = total_receipts - total_payments
+            
+            return {
+                "period": {
+                    "from_date": kwargs.get("from_date"),
+                    "to_date": kwargs.get("to_date")
+                },
+                "total_receipts": float(total_receipts),
+                "total_payments": float(total_payments),
+                "net_cash_flow": float(net_cash_flow),
+                "receipts_count": receipts_result.get("pagination", {}).get("total", 0),
+                "payments_count": payments_result.get("pagination", {}).get("total", 0)
+            }
+        
+        self.register(AIFunction(
+            name="get_cash_flow",
+            description="گزارش گردش نقدی شامل دریافت‌ها، پرداخت‌ها و خالص گردش نقدی. شناسه کسب‌وکار به صورت خودکار از جلسه گفت‌وگو گرفته می‌شود.",
+            parameters_schema={
+                "type": "object",
+                "properties": {
+                    "from_date": {"type": "string", "format": "date", "description": "تاریخ شروع"},
+                    "to_date": {"type": "string", "format": "date", "description": "تاریخ پایان"},
+                    "fiscal_year_id": {"type": "integer", "description": "شناسه سال مالی (اختیاری)"}
+                },
+                "required": ["from_date", "to_date"]
+            },
+            handler=self._create_handler(get_cash_flow_wrapper),
+            allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
             required_permissions=["reports.read"],
             category="financial"
         ))

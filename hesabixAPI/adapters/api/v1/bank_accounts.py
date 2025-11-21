@@ -18,6 +18,7 @@ from app.services.bank_account_service import (
     get_bank_account_by_id,
     list_bank_accounts,
     bulk_delete_bank_accounts,
+    get_bank_accounts_turnover_report,
 )
 
 router = APIRouter(prefix="/bank-accounts", tags=["bank-accounts"])
@@ -601,6 +602,280 @@ async def export_bank_accounts_pdf(
         headers={
             "Content-Disposition": "attachment; filename=bank_accounts.pdf",
             "Content-Length": str(len(pdf_bytes)),
+            "Access-Control-Expose-Headers": "Content-Disposition",
+        },
+    )
+
+
+@router.post("/businesses/{business_id}/reports/bank-accounts-turnover",
+    summary="گزارش گردش حساب‌های بانکی",
+    description="گزارش برداشت‌ها و واریزهای هر حساب بانکی در یک بازه زمانی",
+)
+@require_business_access("business_id")
+async def bank_accounts_turnover_report_endpoint(
+    request: Request,
+    business_id: int,
+    body: Dict[str, Any] = Body(default={}),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """گزارش گردش حساب‌های بانکی"""
+    # بررسی دسترسی
+    if not ctx.can_read_section("reports"):
+        raise ApiError("FORBIDDEN", "Missing business permission: reports.read", http_status=403)
+    
+    # دریافت سال مالی از header یا body
+    fiscal_year_id = None
+    fy_header = request.headers.get('X-Fiscal-Year-ID')
+    if fy_header:
+        try:
+            fiscal_year_id = int(fy_header)
+        except (ValueError, TypeError):
+            pass
+    
+    if body.get('fiscal_year_id'):
+        try:
+            fiscal_year_id = int(body['fiscal_year_id'])
+        except (ValueError, TypeError):
+            pass
+    
+    if not fiscal_year_id:
+        from adapters.db.models.fiscal_year import FiscalYear
+        from sqlalchemy import and_
+        fiscal_year = db.query(FiscalYear).filter(
+            and_(
+                FiscalYear.business_id == business_id,
+                FiscalYear.is_last == True
+            )
+        ).first()
+        if fiscal_year:
+            fiscal_year_id = fiscal_year.id
+    
+    # استخراج پارامترها از body
+    date_from = body.get('date_from')
+    date_to = body.get('date_to')
+    currency_id = body.get('currency_id')
+    if currency_id is not None:
+        try:
+            currency_id = int(currency_id)
+        except (ValueError, TypeError):
+            currency_id = None
+    
+    bank_account_ids = body.get('bank_account_ids')
+    if bank_account_ids is not None and not isinstance(bank_account_ids, list):
+        bank_account_ids = None
+    
+    search = body.get('search')
+    
+    # Pagination
+    skip = body.get('skip', 0)
+    take = body.get('take', 50)
+    try:
+        skip = int(skip)
+        take = int(take)
+        if take > 500:
+            take = 500
+        if take < 1:
+            take = 50
+        if skip < 0:
+            skip = 0
+    except (ValueError, TypeError):
+        skip = 0
+        take = 50
+    
+    result = get_bank_accounts_turnover_report(
+        db=db,
+        business_id=business_id,
+        fiscal_year_id=fiscal_year_id,
+        currency_id=currency_id,
+        date_from=date_from,
+        date_to=date_to,
+        bank_account_ids=bank_account_ids,
+        search=search,
+        skip=skip,
+        take=take,
+    )
+    
+    items = result.get('items', [])
+    items = [format_datetime_fields(item, request) for item in items]
+    
+    result['items'] = items
+    
+    from app.core.i18n import negotiate_locale
+    locale = negotiate_locale(request.headers.get("Accept-Language"))
+    return success_response(
+        data=result,
+        message="Bank accounts turnover report retrieved successfully" if locale != 'fa' else "گزارش گردش حساب‌های بانکی با موفقیت دریافت شد",
+        request=request
+    )
+
+
+@router.post("/businesses/{business_id}/reports/bank-accounts-turnover/export/excel",
+    summary="خروجی Excel گزارش گردش حساب‌های بانکی",
+    description="خروجی Excel گزارش گردش حساب‌های بانکی با قابلیت فیلتر، انتخاب سطرها و رعایت ترتیب/نمایش ستون‌ها",
+)
+@require_business_access("business_id")
+async def export_bank_accounts_turnover_excel(
+    request: Request,
+    business_id: int,
+    body: Dict[str, Any] = Body(default={}),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """خروجی Excel گزارش گردش حساب‌های بانکی"""
+    from fastapi.responses import Response
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+    import io
+    import datetime
+    from app.core.i18n import negotiate_locale
+    
+    max_export_records = 10000
+    
+    # بررسی دسترسی
+    if not ctx.can_read_section("reports"):
+        raise ApiError("FORBIDDEN", "Missing business permission: reports.read", http_status=403)
+    
+    # دریافت سال مالی از header یا body
+    fiscal_year_id = None
+    fy_header = request.headers.get('X-Fiscal-Year-ID')
+    if fy_header:
+        try:
+            fiscal_year_id = int(fy_header)
+        except (ValueError, TypeError):
+            pass
+    
+    if body.get('fiscal_year_id'):
+        try:
+            fiscal_year_id = int(body['fiscal_year_id'])
+        except (ValueError, TypeError):
+            pass
+    
+    if not fiscal_year_id:
+        from adapters.db.models.fiscal_year import FiscalYear
+        from sqlalchemy import and_
+        fiscal_year = db.query(FiscalYear).filter(
+            and_(
+                FiscalYear.business_id == business_id,
+                FiscalYear.is_last == True
+            )
+        ).first()
+        if fiscal_year:
+            fiscal_year_id = fiscal_year.id
+    
+    # استخراج پارامترها از body
+    date_from = body.get('date_from')
+    date_to = body.get('date_to')
+    currency_id = body.get('currency_id')
+    if currency_id is not None:
+        try:
+            currency_id = int(currency_id)
+        except (ValueError, TypeError):
+            currency_id = None
+    
+    bank_account_ids = body.get('bank_account_ids')
+    if bank_account_ids is not None and not isinstance(bank_account_ids, list):
+        bank_account_ids = None
+    
+    search = body.get('search')
+    
+    # دریافت همه رکوردها برای export
+    result = get_bank_accounts_turnover_report(
+        db=db,
+        business_id=business_id,
+        fiscal_year_id=fiscal_year_id,
+        currency_id=currency_id,
+        date_from=date_from,
+        date_to=date_to,
+        bank_account_ids=bank_account_ids,
+        search=search,
+        skip=0,
+        take=max_export_records,
+    )
+    
+    items = result.get('items', [])
+    items = [format_datetime_fields(item, request) for item in items]
+    
+    locale = negotiate_locale(request.headers.get("Accept-Language"))
+    is_fa = (locale == 'fa')
+    
+    # تعریف ستون‌ها
+    columns = [
+        ('document_date', 'تاریخ' if is_fa else 'Date'),
+        ('document_type_name', 'نوع سند' if is_fa else 'Document Type'),
+        ('document_code', 'شماره سند' if is_fa else 'Document Code'),
+        ('bank_account_code', 'کد حساب' if is_fa else 'Account Code'),
+        ('bank_account_name', 'نام حساب' if is_fa else 'Account Name'),
+        ('deposit', 'واریز' if is_fa else 'Deposit'),
+        ('withdrawal', 'برداشت' if is_fa else 'Withdrawal'),
+        ('balance', 'مانده' if is_fa else 'Balance'),
+        ('description', 'توضیحات' if is_fa else 'Description'),
+    ]
+    
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "BankAccountsTurnover"
+    
+    # RTL برای فارسی
+    if is_fa:
+        try:
+            ws.sheet_view.rightToLeft = True
+        except Exception:
+            pass
+    
+    header_font = Font(bold=True, color="FFFFFF")
+    header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+    header_alignment = Alignment(horizontal="center", vertical="center")
+    border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
+    
+    # Header
+    for col_idx, (key, label) in enumerate(columns, 1):
+        cell = ws.cell(row=1, column=col_idx, value=label)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = header_alignment
+        cell.border = border
+    
+    # Rows
+    for row_idx, item in enumerate(items, 2):
+        for col_idx, (key, _) in enumerate(columns, 1):
+            value = item.get(key, '')
+            if isinstance(value, (int, float)):
+                if key in ('deposit', 'withdrawal', 'balance'):
+                    # Format numbers with thousand separators
+                    value = f"{value:,.2f}"
+            elif value is None:
+                value = ''
+            cell = ws.cell(row=row_idx, column=col_idx, value=value)
+            cell.border = border
+            if is_fa:
+                cell.alignment = Alignment(horizontal="right")
+            elif isinstance(value, str) and value.replace(',', '').replace('.', '').isdigit():
+                cell.alignment = Alignment(horizontal="right")
+    
+    # Auto-width
+    for column in ws.columns:
+        max_length = 0
+        column_letter = column[0].column_letter
+        for cell in column:
+            try:
+                if len(str(cell.value)) > max_length:
+                    max_length = len(str(cell.value))
+            except Exception:
+                pass
+        ws.column_dimensions[column_letter].width = min(max_length + 2, 50)
+    
+    buffer = io.BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+    
+    content = buffer.getvalue()
+    return Response(
+        content=content,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": "attachment; filename=bank_accounts_turnover.xlsx",
+            "Content-Length": str(len(content)),
             "Access-Control-Expose-Headers": "Content-Disposition",
         },
     )

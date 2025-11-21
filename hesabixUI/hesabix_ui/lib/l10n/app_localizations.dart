@@ -4412,11 +4412,335 @@ abstract class AppLocalizations {
   /// **'Replace existing data'**
   String get restoreModeReplace;
 
+  /// No description provided for @restoreWarningTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Security Warning'**
+  String get restoreWarningTitle;
+
+  /// No description provided for @restoreWarningReplace.
+  ///
+  /// In en, this message translates to:
+  /// **'⚠️ Restoring with \"Complete replacement\" mode will DELETE all current business data and replace it with backup data. This action is IRREVERSIBLE!'**
+  String get restoreWarningReplace;
+
+  /// No description provided for @restoreWarningNewBusiness.
+  ///
+  /// In en, this message translates to:
+  /// **'ℹ️ Restoring with \"Create new business\" mode will create a new business with backup data and will NOT affect your current data.'**
+  String get restoreWarningNewBusiness;
+
+  /// No description provided for @restoreSecurityNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Security Notes:'**
+  String get restoreSecurityNote;
+
+  /// No description provided for @restoreSecurityNote1.
+  ///
+  /// In en, this message translates to:
+  /// **'• Create a backup of your current data before restoring'**
+  String get restoreSecurityNote1;
+
+  /// No description provided for @restoreSecurityNote2.
+  ///
+  /// In en, this message translates to:
+  /// **'• Ensure the backup file is valid and belongs to your business'**
+  String get restoreSecurityNote2;
+
+  /// No description provided for @restoreSecurityNote3.
+  ///
+  /// In en, this message translates to:
+  /// **'• Restore may take several minutes, please wait'**
+  String get restoreSecurityNote3;
+
+  /// No description provided for @restoreSecurityNote4.
+  ///
+  /// In en, this message translates to:
+  /// **'• Contact support if you encounter any errors'**
+  String get restoreSecurityNote4;
+
+  /// No description provided for @restoreConfirmReplace.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm Complete Replacement'**
+  String get restoreConfirmReplace;
+
+  /// No description provided for @restoreConfirmReplaceMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to DELETE all current data and replace it with backup data?\n\nThis action is IRREVERSIBLE!'**
+  String get restoreConfirmReplaceMessage;
+
+  /// No description provided for @restoreConfirmNewBusiness.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm New Business Creation'**
+  String get restoreConfirmNewBusiness;
+
+  /// No description provided for @restoreConfirmNewBusinessMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to create a new business with backup data?'**
+  String get restoreConfirmNewBusinessMessage;
+
+  /// No description provided for @restoreSourceTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore Source'**
+  String get restoreSourceTitle;
+
+  /// No description provided for @restoreModeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore Mode'**
+  String get restoreModeTitle;
+
   /// No description provided for @selectBackupFile.
   ///
   /// In en, this message translates to:
   /// **'Select backup file (.hbx)'**
   String get selectBackupFile;
+
+  /// No description provided for @defaultBackupFilename.
+  ///
+  /// In en, this message translates to:
+  /// **'backup.hbx'**
+  String get defaultBackupFilename;
+
+  /// No description provided for @errorUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown error'**
+  String get errorUnknown;
+
+  /// No description provided for @errorConnectionTimeout.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection timeout. Please check your internet connection.'**
+  String get errorConnectionTimeout;
+
+  /// No description provided for @errorReceiveTimeout.
+  ///
+  /// In en, this message translates to:
+  /// **'Receive timeout. Please try again.'**
+  String get errorReceiveTimeout;
+
+  /// No description provided for @errorConnectionError.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection error. Please check your internet connection.'**
+  String get errorConnectionError;
+
+  /// No description provided for @errorSendTimeout.
+  ///
+  /// In en, this message translates to:
+  /// **'Send timeout.'**
+  String get errorSendTimeout;
+
+  /// No description provided for @errorUnknownServer.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown server error'**
+  String get errorUnknownServer;
+
+  /// No description provided for @errorRequestTimeout.
+  ///
+  /// In en, this message translates to:
+  /// **'Request timeout. Please try again.'**
+  String get errorRequestTimeout;
+
+  /// No description provided for @errorInvalidInput.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid input data. Please check the information.'**
+  String get errorInvalidInput;
+
+  /// No description provided for @errorBackupNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup not found.'**
+  String get errorBackupNotFound;
+
+  /// No description provided for @errorBusinessMismatch.
+  ///
+  /// In en, this message translates to:
+  /// **'This backup belongs to a different business.'**
+  String get errorBusinessMismatch;
+
+  /// No description provided for @errorNotSupported.
+  ///
+  /// In en, this message translates to:
+  /// **'This operation is not currently supported.'**
+  String get errorNotSupported;
+
+  /// No description provided for @errorRateLimit.
+  ///
+  /// In en, this message translates to:
+  /// **'Too many requests. Please wait a moment.'**
+  String get errorRateLimit;
+
+  /// No description provided for @errorInvalidBackup.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup file is invalid or corrupted.'**
+  String get errorInvalidBackup;
+
+  /// No description provided for @errorBusinessCreationFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to create new business. Please try again.'**
+  String get errorBusinessCreationFailed;
+
+  /// No description provided for @errorRestoreFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore failed'**
+  String get errorRestoreFailed;
+
+  /// No description provided for @byteUnitB.
+  ///
+  /// In en, this message translates to:
+  /// **'B'**
+  String get byteUnitB;
+
+  /// No description provided for @byteUnitKB.
+  ///
+  /// In en, this message translates to:
+  /// **'KB'**
+  String get byteUnitKB;
+
+  /// No description provided for @byteUnitMB.
+  ///
+  /// In en, this message translates to:
+  /// **'MB'**
+  String get byteUnitMB;
+
+  /// No description provided for @byteUnitGB.
+  ///
+  /// In en, this message translates to:
+  /// **'GB'**
+  String get byteUnitGB;
+
+  /// No description provided for @byteUnitTB.
+  ///
+  /// In en, this message translates to:
+  /// **'TB'**
+  String get byteUnitTB;
+
+  /// No description provided for @backupCompleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup completed'**
+  String get backupCompleted;
+
+  /// No description provided for @restoreCompleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore completed'**
+  String get restoreCompleted;
+
+  /// No description provided for @backupFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup failed'**
+  String get backupFailed;
+
+  /// No description provided for @restoreFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore failed'**
+  String get restoreFailed;
+
+  /// No description provided for @jobStartingBackup.
+  ///
+  /// In en, this message translates to:
+  /// **'Starting backup'**
+  String get jobStartingBackup;
+
+  /// No description provided for @jobCollectingData.
+  ///
+  /// In en, this message translates to:
+  /// **'Collecting data'**
+  String get jobCollectingData;
+
+  /// No description provided for @jobPackagingArchive.
+  ///
+  /// In en, this message translates to:
+  /// **'Packaging archive'**
+  String get jobPackagingArchive;
+
+  /// No description provided for @jobSavingFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Saving file'**
+  String get jobSavingFile;
+
+  /// No description provided for @jobFinalizing.
+  ///
+  /// In en, this message translates to:
+  /// **'Finalizing'**
+  String get jobFinalizing;
+
+  /// No description provided for @jobUploadingFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Uploading file'**
+  String get jobUploadingFile;
+
+  /// No description provided for @jobStartingRestore.
+  ///
+  /// In en, this message translates to:
+  /// **'Starting restore'**
+  String get jobStartingRestore;
+
+  /// No description provided for @jobLoadingBackup.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading backup'**
+  String get jobLoadingBackup;
+
+  /// No description provided for @jobCreatingNewBusiness.
+  ///
+  /// In en, this message translates to:
+  /// **'Creating new business'**
+  String get jobCreatingNewBusiness;
+
+  /// No description provided for @jobNewBusinessCreated.
+  ///
+  /// In en, this message translates to:
+  /// **'New business created'**
+  String get jobNewBusinessCreated;
+
+  /// No description provided for @jobCleaningCurrentData.
+  ///
+  /// In en, this message translates to:
+  /// **'Cleaning current data'**
+  String get jobCleaningCurrentData;
+
+  /// No description provided for @jobPreparingToRestoreData.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing to restore data'**
+  String get jobPreparingToRestoreData;
+
+  /// No description provided for @jobUpdatingBusinessInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Updating business info'**
+  String get jobUpdatingBusinessInfo;
+
+  /// No description provided for @jobPreparingBusinessData.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing business data'**
+  String get jobPreparingBusinessData;
+
+  /// No description provided for @jobRestoringData.
+  ///
+  /// In en, this message translates to:
+  /// **'Restoring data'**
+  String get jobRestoringData;
 
   /// No description provided for @manage.
   ///

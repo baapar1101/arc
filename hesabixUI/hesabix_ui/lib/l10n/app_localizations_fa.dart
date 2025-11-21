@@ -2207,7 +2207,184 @@ class AppLocalizationsFa extends AppLocalizations {
   String get restoreModeReplace => 'جایگزینی کامل';
 
   @override
+  String get restoreWarningTitle => 'هشدار امنیتی';
+
+  @override
+  String get restoreWarningReplace =>
+      '⚠️ بازیابی با حالت «جایگزینی کامل» تمام اطلاعات فعلی کسب‌وکار شما را حذف می‌کند و آن‌ها را با داده‌های فایل پشتیبان جایگزین می‌کند. این عمل غیرقابل بازگشت است!';
+
+  @override
+  String get restoreWarningNewBusiness =>
+      'ℹ️ بازیابی با حالت «ایجاد کسب‌وکار جدید» یک کسب‌وکار جدید با داده‌های فایل پشتیبان ایجاد می‌کند و اطلاعات فعلی شما را تغییر نمی‌دهد.';
+
+  @override
+  String get restoreSecurityNote => 'نکات امنیتی:';
+
+  @override
+  String get restoreSecurityNote1 =>
+      '• قبل از بازیابی، از اطلاعات فعلی خود یک نسخه پشتیبان تهیه کنید';
+
+  @override
+  String get restoreSecurityNote2 =>
+      '• مطمئن شوید که فایل پشتیبان معتبر و مربوط به کسب‌وکار شماست';
+
+  @override
+  String get restoreSecurityNote3 =>
+      '• بازیابی ممکن است چند دقیقه طول بکشد، لطفاً صبر کنید';
+
+  @override
+  String get restoreSecurityNote4 =>
+      '• در صورت بروز خطا، با پشتیبانی تماس بگیرید';
+
+  @override
+  String get restoreConfirmReplace => 'تایید جایگزینی کامل';
+
+  @override
+  String get restoreConfirmReplaceMessage =>
+      'آیا مطمئن هستید که می‌خواهید تمام اطلاعات فعلی را حذف و با داده‌های فایل پشتیبان جایگزین کنید؟\n\nاین عمل غیرقابل بازگشت است!';
+
+  @override
+  String get restoreConfirmNewBusiness => 'تایید ایجاد کسب‌وکار جدید';
+
+  @override
+  String get restoreConfirmNewBusinessMessage =>
+      'آیا مطمئن هستید که می‌خواهید یک کسب‌وکار جدید با داده‌های فایل پشتیبان ایجاد کنید؟';
+
+  @override
+  String get restoreSourceTitle => 'منبع بازیابی';
+
+  @override
+  String get restoreModeTitle => 'حالت بازیابی';
+
+  @override
   String get selectBackupFile => 'انتخاب فایل بکاپ (.hbx)';
+
+  @override
+  String get defaultBackupFilename => 'backup.hbx';
+
+  @override
+  String get errorUnknown => 'خطای نامشخص';
+
+  @override
+  String get errorConnectionTimeout =>
+      'زمان اتصال به سرور به پایان رسید. لطفاً اتصال اینترنت خود را بررسی کنید.';
+
+  @override
+  String get errorReceiveTimeout =>
+      'زمان دریافت پاسخ از سرور به پایان رسید. لطفاً دوباره تلاش کنید.';
+
+  @override
+  String get errorConnectionError =>
+      'خطا در اتصال به سرور. لطفاً اتصال اینترنت خود را بررسی کنید.';
+
+  @override
+  String get errorSendTimeout => 'زمان ارسال درخواست به سرور به پایان رسید.';
+
+  @override
+  String get errorUnknownServer => 'خطای نامشخص در ارتباط با سرور';
+
+  @override
+  String get errorRequestTimeout =>
+      'زمان درخواست به پایان رسید. لطفاً دوباره تلاش کنید.';
+
+  @override
+  String get errorInvalidInput =>
+      'داده‌های ارسالی نامعتبر است. لطفاً اطلاعات را بررسی کنید.';
+
+  @override
+  String get errorBackupNotFound => 'بکاپ مورد نظر یافت نشد.';
+
+  @override
+  String get errorBusinessMismatch => 'این بکاپ متعلق به کسب‌وکار دیگری است.';
+
+  @override
+  String get errorNotSupported => 'این عملیات در حال حاضر پشتیبانی نمی‌شود.';
+
+  @override
+  String get errorRateLimit =>
+      'تعداد درخواست‌های شما بیش از حد مجاز است. لطفاً کمی صبر کنید.';
+
+  @override
+  String get errorInvalidBackup => 'فایل بکاپ نامعتبر است یا آسیب دیده است.';
+
+  @override
+  String get errorBusinessCreationFailed =>
+      'خطا در ایجاد کسب‌وکار جدید. لطفاً دوباره تلاش کنید.';
+
+  @override
+  String get errorRestoreFailed => 'خطا در بازیابی اطلاعات';
+
+  @override
+  String get byteUnitB => 'بایت';
+
+  @override
+  String get byteUnitKB => 'کیلوبایت';
+
+  @override
+  String get byteUnitMB => 'مگابایت';
+
+  @override
+  String get byteUnitGB => 'گیگابایت';
+
+  @override
+  String get byteUnitTB => 'ترابایت';
+
+  @override
+  String get backupCompleted => 'پشتیبان‌گیری با موفقیت انجام شد';
+
+  @override
+  String get restoreCompleted => 'بازیابی با موفقیت انجام شد';
+
+  @override
+  String get backupFailed => 'پشتیبان‌گیری ناموفق بود';
+
+  @override
+  String get restoreFailed => 'بازیابی ناموفق بود';
+
+  @override
+  String get jobStartingBackup => 'شروع پشتیبان‌گیری';
+
+  @override
+  String get jobCollectingData => 'جمع‌آوری داده‌ها';
+
+  @override
+  String get jobPackagingArchive => 'بسته‌بندی آرشیو';
+
+  @override
+  String get jobSavingFile => 'ذخیره فایل';
+
+  @override
+  String get jobFinalizing => 'نهایی‌سازی';
+
+  @override
+  String get jobUploadingFile => 'آپلود فایل';
+
+  @override
+  String get jobStartingRestore => 'شروع بازیابی';
+
+  @override
+  String get jobLoadingBackup => 'بارگذاری بکاپ';
+
+  @override
+  String get jobCreatingNewBusiness => 'ایجاد کسب‌وکار جدید';
+
+  @override
+  String get jobNewBusinessCreated => 'کسب‌وکار جدید ایجاد شد';
+
+  @override
+  String get jobCleaningCurrentData => 'پاک‌سازی داده‌های فعلی';
+
+  @override
+  String get jobPreparingToRestoreData => 'آماده‌سازی برای بازیابی داده‌ها';
+
+  @override
+  String get jobUpdatingBusinessInfo => 'به‌روزرسانی اطلاعات کسب‌وکار';
+
+  @override
+  String get jobPreparingBusinessData => 'آماده‌سازی داده‌های کسب‌وکار';
+
+  @override
+  String get jobRestoringData => 'بازیابی داده‌ها';
 
   @override
   String get manage => 'مدیریت';

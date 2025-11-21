@@ -2221,7 +2221,182 @@ class AppLocalizationsEn extends AppLocalizations {
   String get restoreModeReplace => 'Replace existing data';
 
   @override
+  String get restoreWarningTitle => 'Security Warning';
+
+  @override
+  String get restoreWarningReplace =>
+      '⚠️ Restoring with \"Complete replacement\" mode will DELETE all current business data and replace it with backup data. This action is IRREVERSIBLE!';
+
+  @override
+  String get restoreWarningNewBusiness =>
+      'ℹ️ Restoring with \"Create new business\" mode will create a new business with backup data and will NOT affect your current data.';
+
+  @override
+  String get restoreSecurityNote => 'Security Notes:';
+
+  @override
+  String get restoreSecurityNote1 =>
+      '• Create a backup of your current data before restoring';
+
+  @override
+  String get restoreSecurityNote2 =>
+      '• Ensure the backup file is valid and belongs to your business';
+
+  @override
+  String get restoreSecurityNote3 =>
+      '• Restore may take several minutes, please wait';
+
+  @override
+  String get restoreSecurityNote4 =>
+      '• Contact support if you encounter any errors';
+
+  @override
+  String get restoreConfirmReplace => 'Confirm Complete Replacement';
+
+  @override
+  String get restoreConfirmReplaceMessage =>
+      'Are you sure you want to DELETE all current data and replace it with backup data?\n\nThis action is IRREVERSIBLE!';
+
+  @override
+  String get restoreConfirmNewBusiness => 'Confirm New Business Creation';
+
+  @override
+  String get restoreConfirmNewBusinessMessage =>
+      'Are you sure you want to create a new business with backup data?';
+
+  @override
+  String get restoreSourceTitle => 'Restore Source';
+
+  @override
+  String get restoreModeTitle => 'Restore Mode';
+
+  @override
   String get selectBackupFile => 'Select backup file (.hbx)';
+
+  @override
+  String get defaultBackupFilename => 'backup.hbx';
+
+  @override
+  String get errorUnknown => 'Unknown error';
+
+  @override
+  String get errorConnectionTimeout =>
+      'Connection timeout. Please check your internet connection.';
+
+  @override
+  String get errorReceiveTimeout => 'Receive timeout. Please try again.';
+
+  @override
+  String get errorConnectionError =>
+      'Connection error. Please check your internet connection.';
+
+  @override
+  String get errorSendTimeout => 'Send timeout.';
+
+  @override
+  String get errorUnknownServer => 'Unknown server error';
+
+  @override
+  String get errorRequestTimeout => 'Request timeout. Please try again.';
+
+  @override
+  String get errorInvalidInput =>
+      'Invalid input data. Please check the information.';
+
+  @override
+  String get errorBackupNotFound => 'Backup not found.';
+
+  @override
+  String get errorBusinessMismatch =>
+      'This backup belongs to a different business.';
+
+  @override
+  String get errorNotSupported => 'This operation is not currently supported.';
+
+  @override
+  String get errorRateLimit => 'Too many requests. Please wait a moment.';
+
+  @override
+  String get errorInvalidBackup => 'Backup file is invalid or corrupted.';
+
+  @override
+  String get errorBusinessCreationFailed =>
+      'Failed to create new business. Please try again.';
+
+  @override
+  String get errorRestoreFailed => 'Restore failed';
+
+  @override
+  String get byteUnitB => 'B';
+
+  @override
+  String get byteUnitKB => 'KB';
+
+  @override
+  String get byteUnitMB => 'MB';
+
+  @override
+  String get byteUnitGB => 'GB';
+
+  @override
+  String get byteUnitTB => 'TB';
+
+  @override
+  String get backupCompleted => 'Backup completed';
+
+  @override
+  String get restoreCompleted => 'Restore completed';
+
+  @override
+  String get backupFailed => 'Backup failed';
+
+  @override
+  String get restoreFailed => 'Restore failed';
+
+  @override
+  String get jobStartingBackup => 'Starting backup';
+
+  @override
+  String get jobCollectingData => 'Collecting data';
+
+  @override
+  String get jobPackagingArchive => 'Packaging archive';
+
+  @override
+  String get jobSavingFile => 'Saving file';
+
+  @override
+  String get jobFinalizing => 'Finalizing';
+
+  @override
+  String get jobUploadingFile => 'Uploading file';
+
+  @override
+  String get jobStartingRestore => 'Starting restore';
+
+  @override
+  String get jobLoadingBackup => 'Loading backup';
+
+  @override
+  String get jobCreatingNewBusiness => 'Creating new business';
+
+  @override
+  String get jobNewBusinessCreated => 'New business created';
+
+  @override
+  String get jobCleaningCurrentData => 'Cleaning current data';
+
+  @override
+  String get jobPreparingToRestoreData => 'Preparing to restore data';
+
+  @override
+  String get jobUpdatingBusinessInfo => 'Updating business info';
+
+  @override
+  String get jobPreparingBusinessData => 'Preparing business data';
+
+  @override
+  String get jobRestoringData => 'Restoring data';
 
   @override
   String get manage => 'Manage';

@@ -42,6 +42,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
   List<T> _items = [];
   bool _loadingList = false;
   String? _error;
+  Map<String, dynamic>? _summary;  // Summary from API response
 
   // Pagination state
   int _page = 1;
@@ -276,6 +277,12 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
       if (body is Map<String, dynamic>) {
         final response = DataTableResponse<T>.fromJson(body, widget.fromJson);
         
+        // Extract summary from API response if available
+        Map<String, dynamic>? summaryData;
+        if (body['data'] is Map<String, dynamic>) {
+          summaryData = body['data']['summary'] as Map<String, dynamic>?;
+        }
+        
         if (mounted) {
           setState(() {
             _items = response.items;
@@ -283,6 +290,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
             _limit = response.limit;
             _total = response.total;
             _totalPages = response.totalPages;
+            _summary = summaryData;
             _selectedRows.clear(); // Clear selection when data changes
             _activeRowIndex = _items.isNotEmpty ? 0 : -1;
             _lastSelectedRowIndex = null;
@@ -1536,21 +1544,67 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                   children: widget.config.footerTotals!.entries.map((entry) {
                     final colKey = entry.key;
                     final label = entry.value;
-                    double sum = 0;
-                    for (final it in _items) {
-                      try {
-                        final v = DataTableUtils.getCellValue(it, colKey);
-                        if (v is num) {
-                          sum += v.toDouble();
-                        } else if (v != null) {
-                          final parsed = double.tryParse('$v');
-                          if (parsed != null) sum += parsed;
+                    double value = 0;
+                    
+                    // برای balance، اگر summary.current_balance موجود باشد، از آن استفاده می‌کنیم
+                    // در غیر این صورت، مانده آخرین ردیف صفحه را نمایش می‌دهیم
+                    if (colKey == 'balance') {
+                      // ابتدا از summary استفاده می‌کنیم
+                      if (_summary != null && _summary!['current_balance'] != null) {
+                        try {
+                          final summaryValue = _summary!['current_balance'];
+                          if (summaryValue is num) {
+                            value = summaryValue.toDouble();
+                          } else if (summaryValue != null) {
+                            final parsed = double.tryParse('$summaryValue');
+                            if (parsed != null) value = parsed;
+                          }
+                        } catch (_) {
+                          // در صورت خطا، مانده آخرین ردیف را استفاده می‌کنیم
+                          if (_items.isNotEmpty) {
+                            final lastItem = _items.last;
+                            try {
+                              final v = DataTableUtils.getCellValue(lastItem, colKey);
+                              if (v is num) {
+                                value = v.toDouble();
+                              } else if (v != null) {
+                                final parsed = double.tryParse('$v');
+                                if (parsed != null) value = parsed;
+                              }
+                            } catch (_) {}
+                          }
                         }
-                      } catch (_) {}
+                      } else if (_items.isNotEmpty) {
+                        // اگر summary موجود نباشد، مانده آخرین ردیف را استفاده می‌کنیم
+                        final lastItem = _items.last;
+                        try {
+                          final v = DataTableUtils.getCellValue(lastItem, colKey);
+                          if (v is num) {
+                            value = v.toDouble();
+                          } else if (v != null) {
+                            final parsed = double.tryParse('$v');
+                            if (parsed != null) value = parsed;
+                          }
+                        } catch (_) {}
+                      }
+                    } else {
+                      // برای سایر فیلدها، مجموع را محاسبه می‌کنیم
+                      for (final it in _items) {
+                        try {
+                          final v = DataTableUtils.getCellValue(it, colKey);
+                          if (v is num) {
+                            value += v.toDouble();
+                          } else if (v != null) {
+                            final parsed = double.tryParse('$v');
+                            if (parsed != null) value += parsed;
+                          }
+                        } catch (_) {}
+                      }
                     }
+                    
                     // Format number with thousand separators and remove unnecessary decimals
                     final formattedText = DataTableUtils.formatNumber(
-                      sum,
+                      value,
                       decimalPlaces: 2,
                     );
                     return Container(

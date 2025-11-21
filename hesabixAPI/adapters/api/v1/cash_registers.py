@@ -14,6 +14,7 @@ from app.services.cash_register_service import (
     get_cash_register_by_id,
     list_cash_registers,
     bulk_delete_cash_registers,
+    get_cash_petty_turnover_report,
 )
 
 
@@ -505,6 +506,296 @@ async def export_cash_registers_pdf(
         headers={
             "Content-Disposition": "attachment; filename=cash_registers.pdf",
             "Content-Length": str(len(pdf_bytes)),
+            "Access-Control-Expose-Headers": "Content-Disposition",
+        },
+    )
+
+
+@router.post("/businesses/{business_id}/reports/cash-petty-turnover",
+    summary="گزارش گردش صندوق و تنخواه",
+    description="گزارش برداشت‌ها و واریزهای هر صندوق و تنخواه در یک بازه زمانی",
+)
+@require_business_access("business_id")
+async def cash_petty_turnover_report_endpoint(
+    request: Request,
+    business_id: int,
+    body: Dict[str, Any] = Body(default={}),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """گزارش گردش صندوق و تنخواه"""
+    # بررسی دسترسی
+    if not ctx.can_read_section("reports"):
+        raise ApiError("FORBIDDEN", "Missing business permission: reports.read", http_status=403)
+    
+    # دریافت سال مالی از header یا body
+    fiscal_year_id = None
+    fy_header = request.headers.get('X-Fiscal-Year-ID')
+    if fy_header:
+        try:
+            fiscal_year_id = int(fy_header)
+        except (ValueError, TypeError):
+            pass
+    
+    if body.get('fiscal_year_id'):
+        try:
+            fiscal_year_id = int(body['fiscal_year_id'])
+        except (ValueError, TypeError):
+            pass
+    
+    if not fiscal_year_id:
+        from adapters.db.models.fiscal_year import FiscalYear
+        from sqlalchemy import and_
+        fiscal_year = db.query(FiscalYear).filter(
+            and_(
+                FiscalYear.business_id == business_id,
+                FiscalYear.is_last == True
+            )
+        ).first()
+        if fiscal_year:
+            fiscal_year_id = fiscal_year.id
+    
+    # استخراج پارامترها از body
+    date_from = body.get('date_from')
+    date_to = body.get('date_to')
+    currency_id = body.get('currency_id')
+    if currency_id is not None:
+        try:
+            currency_id = int(currency_id)
+        except (ValueError, TypeError):
+            currency_id = None
+    
+    cash_register_ids = body.get('cash_register_ids')
+    if cash_register_ids is not None and not isinstance(cash_register_ids, list):
+        cash_register_ids = None
+    
+    petty_cash_ids = body.get('petty_cash_ids')
+    if petty_cash_ids is not None and not isinstance(petty_cash_ids, list):
+        petty_cash_ids = None
+    
+    search = body.get('search')
+    
+    # Pagination
+    skip = body.get('skip', 0)
+    take = body.get('take', 50)
+    try:
+        skip = int(skip)
+        take = int(take)
+        if take > 500:
+            take = 500
+        if take < 1:
+            take = 50
+        if skip < 0:
+            skip = 0
+    except (ValueError, TypeError):
+        skip = 0
+        take = 50
+    
+    result = get_cash_petty_turnover_report(
+        db=db,
+        business_id=business_id,
+        fiscal_year_id=fiscal_year_id,
+        currency_id=currency_id,
+        date_from=date_from,
+        date_to=date_to,
+        cash_register_ids=cash_register_ids,
+        petty_cash_ids=petty_cash_ids,
+        search=search,
+        skip=skip,
+        take=take,
+    )
+    
+    items = result.get('items', [])
+    items = [format_datetime_fields(item, request) for item in items]
+    
+    result['items'] = items
+    
+    from app.core.i18n import negotiate_locale
+    locale = negotiate_locale(request.headers.get("Accept-Language"))
+    return success_response(
+        data=result,
+        message="Cash and petty cash turnover report retrieved successfully" if locale != 'fa' else "گزارش گردش صندوق و تنخواه با موفقیت دریافت شد",
+        request=request
+    )
+
+
+@router.post("/businesses/{business_id}/reports/cash-petty-turnover/export/excel",
+    summary="خروجی Excel گزارش گردش صندوق و تنخواه",
+    description="خروجی Excel گزارش گردش صندوق و تنخواه با قابلیت فیلتر، انتخاب سطرها و رعایت ترتیب/نمایش ستون‌ها",
+)
+@require_business_access("business_id")
+async def export_cash_petty_turnover_excel(
+    request: Request,
+    business_id: int,
+    body: Dict[str, Any] = Body(default={}),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """خروجی Excel گزارش گردش صندوق و تنخواه"""
+    from fastapi.responses import Response
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+    import io
+    from app.core.i18n import negotiate_locale
+    
+    max_export_records = 10000
+    
+    # بررسی دسترسی
+    if not ctx.can_read_section("reports"):
+        raise ApiError("FORBIDDEN", "Missing business permission: reports.read", http_status=403)
+    
+    # دریافت سال مالی از header یا body
+    fiscal_year_id = None
+    fy_header = request.headers.get('X-Fiscal-Year-ID')
+    if fy_header:
+        try:
+            fiscal_year_id = int(fy_header)
+        except (ValueError, TypeError):
+            pass
+    
+    if body.get('fiscal_year_id'):
+        try:
+            fiscal_year_id = int(body['fiscal_year_id'])
+        except (ValueError, TypeError):
+            pass
+    
+    if not fiscal_year_id:
+        from adapters.db.models.fiscal_year import FiscalYear
+        from sqlalchemy import and_
+        fiscal_year = db.query(FiscalYear).filter(
+            and_(
+                FiscalYear.business_id == business_id,
+                FiscalYear.is_last == True
+            )
+        ).first()
+        if fiscal_year:
+            fiscal_year_id = fiscal_year.id
+    
+    # استخراج پارامترها از body
+    date_from = body.get('date_from')
+    date_to = body.get('date_to')
+    currency_id = body.get('currency_id')
+    if currency_id is not None:
+        try:
+            currency_id = int(currency_id)
+        except (ValueError, TypeError):
+            currency_id = None
+    
+    cash_register_ids = body.get('cash_register_ids')
+    if cash_register_ids is not None and not isinstance(cash_register_ids, list):
+        cash_register_ids = None
+    
+    petty_cash_ids = body.get('petty_cash_ids')
+    if petty_cash_ids is not None and not isinstance(petty_cash_ids, list):
+        petty_cash_ids = None
+    
+    search = body.get('search')
+    
+    # دریافت همه رکوردها برای export
+    result = get_cash_petty_turnover_report(
+        db=db,
+        business_id=business_id,
+        fiscal_year_id=fiscal_year_id,
+        currency_id=currency_id,
+        date_from=date_from,
+        date_to=date_to,
+        cash_register_ids=cash_register_ids,
+        petty_cash_ids=petty_cash_ids,
+        search=search,
+        skip=0,
+        take=max_export_records,
+    )
+    
+    items = result.get('items', [])
+    items = [format_datetime_fields(item, request) for item in items]
+    
+    locale = negotiate_locale(request.headers.get("Accept-Language"))
+    is_fa = (locale == 'fa')
+    
+    # تعریف ستون‌ها
+    columns = [
+        ('document_date', 'تاریخ' if is_fa else 'Date'),
+        ('document_type_name', 'نوع سند' if is_fa else 'Document Type'),
+        ('document_code', 'شماره سند' if is_fa else 'Document Code'),
+        ('source_type', 'نوع' if is_fa else 'Type'),
+        ('source_code', 'کد' if is_fa else 'Code'),
+        ('source_name', 'نام' if is_fa else 'Name'),
+        ('deposit', 'واریز' if is_fa else 'Deposit'),
+        ('withdrawal', 'برداشت' if is_fa else 'Withdrawal'),
+        ('balance', 'مانده' if is_fa else 'Balance'),
+        ('description', 'توضیحات' if is_fa else 'Description'),
+    ]
+    
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "CashPettyTurnover"
+    
+    # RTL برای فارسی
+    if is_fa:
+        try:
+            ws.sheet_view.rightToLeft = True
+        except Exception:
+            pass
+    
+    header_font = Font(bold=True, color="FFFFFF")
+    header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+    header_alignment = Alignment(horizontal="center", vertical="center")
+    border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
+    
+    # Header
+    for col_idx, (key, label) in enumerate(columns, 1):
+        cell = ws.cell(row=1, column=col_idx, value=label)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = header_alignment
+        cell.border = border
+    
+    # Rows
+    for row_idx, item in enumerate(items, 2):
+        for col_idx, (key, _) in enumerate(columns, 1):
+            value = item.get(key, '')
+            if key == 'source_type':
+                # تبدیل source_type به نام فارسی
+                if value == 'cash_register':
+                    value = 'صندوق' if is_fa else 'Cash Register'
+                elif value == 'petty_cash':
+                    value = 'تنخواه' if is_fa else 'Petty Cash'
+            elif isinstance(value, (int, float)):
+                if key in ('deposit', 'withdrawal', 'balance'):
+                    # Format numbers with thousand separators
+                    value = f"{value:,.2f}"
+            elif value is None:
+                value = ''
+            cell = ws.cell(row=row_idx, column=col_idx, value=value)
+            cell.border = border
+            if is_fa:
+                cell.alignment = Alignment(horizontal="right")
+            elif isinstance(value, str) and value.replace(',', '').replace('.', '').isdigit():
+                cell.alignment = Alignment(horizontal="right")
+    
+    # Auto-width
+    for column in ws.columns:
+        max_length = 0
+        column_letter = column[0].column_letter
+        for cell in column:
+            try:
+                if len(str(cell.value)) > max_length:
+                    max_length = len(str(cell.value))
+            except Exception:
+                pass
+        ws.column_dimensions[column_letter].width = min(max_length + 2, 50)
+    
+    buffer = io.BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+    
+    content = buffer.getvalue()
+    return Response(
+        content=content,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": "attachment; filename=cash_petty_turnover.xlsx",
+            "Content-Length": str(len(content)),
             "Access-Control-Expose-Headers": "Content-Disposition",
         },
     )

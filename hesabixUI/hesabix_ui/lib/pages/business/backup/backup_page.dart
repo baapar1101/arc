@@ -88,7 +88,8 @@ class _BusinessBackupPageState extends State<BusinessBackupPage> {
         if (!ctx.mounted) return;
         setState(() {
           _jobProgress = (st['progress'] as int?) ?? _jobProgress;
-          _jobMessage = (st['message'] as String?) ?? _jobMessage;
+          final rawMessage = (st['message'] as String?) ?? _jobMessage;
+          _jobMessage = _translateJobMessage(rawMessage);
         });
         final state = (st['state'] as String?) ?? '';
         if (state == 'succeeded') {
@@ -265,7 +266,7 @@ class _BusinessBackupPageState extends State<BusinessBackupPage> {
 
   Widget _buildBackupCard(AppLocalizations t, Map<String, dynamic> data) {
     final id = data['id'] as String? ?? '';
-    final name = (data['filename'] as String?) ?? 'backup.hbx';
+    final name = (data['filename'] as String?) ?? t.defaultBackupFilename;
     final size = (data['size'] as int?) ?? 0;
     final createdAt = (data['created_at'] as String?) ?? '';
     return Card(
@@ -314,10 +315,11 @@ class _BusinessBackupPageState extends State<BusinessBackupPage> {
   }
 
   String _formatBytes(int bytes) {
+    final t = AppLocalizations.of(context);
     if (bytes <= 0) {
-      return '0 B';
+      return '0 ${t.byteUnitB}';
     }
-    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    final units = [t.byteUnitB, t.byteUnitKB, t.byteUnitMB, t.byteUnitGB, t.byteUnitTB];
     var value = bytes.toDouble();
     var unitIndex = 0;
     while (value >= 1024 && unitIndex < units.length - 1) {
@@ -325,6 +327,83 @@ class _BusinessBackupPageState extends State<BusinessBackupPage> {
       unitIndex++;
     }
     return '${value.toStringAsFixed(value < 10 && unitIndex > 0 ? 1 : 0)} ${units[unitIndex]}';
+  }
+
+  /// تبدیل پیام‌های job از انگلیسی به پیام‌های چندزبانه
+  String? _translateJobMessage(String? message) {
+    if (message == null || message.isEmpty) {
+      return message;
+    }
+    final t = AppLocalizations.of(context);
+    final lowerMessage = message.toLowerCase().trim();
+    
+    // تبدیل پیام‌های رایج
+    if (lowerMessage == 'backup completed') {
+      return t.backupCompleted;
+    }
+    if (lowerMessage == 'restore completed') {
+      return t.restoreCompleted;
+    }
+    if (lowerMessage == 'backup failed') {
+      return t.backupFailed;
+    }
+    if (lowerMessage == 'restore failed') {
+      return t.restoreFailed;
+    }
+    if (lowerMessage == 'starting backup') {
+      return t.jobStartingBackup;
+    }
+    if (lowerMessage == 'collecting data') {
+      return t.jobCollectingData;
+    }
+    if (lowerMessage == 'packaging archive') {
+      return t.jobPackagingArchive;
+    }
+    if (lowerMessage == 'saving file') {
+      return t.jobSavingFile;
+    }
+    if (lowerMessage == 'finalizing') {
+      return t.jobFinalizing;
+    }
+    if (lowerMessage == 'uploading file') {
+      return t.jobUploadingFile;
+    }
+    if (lowerMessage == 'starting restore') {
+      return t.jobStartingRestore;
+    }
+    if (lowerMessage == 'loading backup') {
+      return t.jobLoadingBackup;
+    }
+    if (lowerMessage == 'creating new business') {
+      return t.jobCreatingNewBusiness;
+    }
+    if (lowerMessage.startsWith('new business created')) {
+      // استخراج ID از پیام (اگر وجود داشته باشد)
+      final idMatch = RegExp(r'\(id:\s*(\d+)\)', caseSensitive: false).firstMatch(message);
+      if (idMatch != null) {
+        final id = idMatch.group(1);
+        return '${t.jobNewBusinessCreated} (ID: $id)';
+      }
+      return t.jobNewBusinessCreated;
+    }
+    if (lowerMessage == 'cleaning current data') {
+      return t.jobCleaningCurrentData;
+    }
+    if (lowerMessage == 'preparing to restore data') {
+      return t.jobPreparingToRestoreData;
+    }
+    if (lowerMessage == 'updating business info') {
+      return t.jobUpdatingBusinessInfo;
+    }
+    if (lowerMessage == 'preparing business data') {
+      return t.jobPreparingBusinessData;
+    }
+    if (lowerMessage == 'restoring data') {
+      return t.jobRestoringData;
+    }
+    
+    // اگر پیام ترجمه نشده، همان پیام اصلی را برمی‌گردانیم
+    return message;
   }
 }
 
