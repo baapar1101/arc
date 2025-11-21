@@ -20,6 +20,8 @@ class QueryInfo(BaseModel):
 	search: Optional[str] = Field(default=None, description="عبارت جستجو")
 	search_fields: Optional[List[str]] = Field(default=None, description="آرایه ای از فیلدهایی که جستجو در آن انجام می گیرد")
 	filters: Optional[List[FilterItem]] = Field(default=None, description="آرایه ای از اشیا برای اعمال فیلتر بر روی لیست")
+	include_inventory: bool = Field(default=False, description="در صورت true، فیلدهای موجودی انبارداری و مالی محاسبه و اضافه می‌شوند")
+	inventory_as_of_date: Optional[str] = Field(default=None, description="تاریخ محاسبه موجودی (فرمت ISO: YYYY-MM-DD). پیش‌فرض: امروز")
 
 
 class CaptchaSolve(BaseModel):

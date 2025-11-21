@@ -14,8 +14,8 @@ class ApiClientOptions {
   final Map<String, dynamic> defaultHeaders;
 
   const ApiClientOptions({
-    this.connectTimeout = const Duration(seconds: 10),
-    this.receiveTimeout = const Duration(seconds: 20),
+    this.connectTimeout = const Duration(seconds: 30),
+    this.receiveTimeout = const Duration(seconds: 30), // timeout 30 ثانیه
     this.defaultHeaders = const <String, dynamic>{'Content-Type': 'application/json'},
   });
 }

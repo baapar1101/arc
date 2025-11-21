@@ -180,6 +180,8 @@ class DocumentModel {
         return 'تولید';
       case 'opening_balance':
         return 'موجودی اولیه';
+      case 'check':
+        return 'چک';
       default:
         return documentType;
     }

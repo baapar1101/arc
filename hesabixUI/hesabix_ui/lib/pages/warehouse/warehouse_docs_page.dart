@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import '../../services/warehouse_service.dart';
+import '../../services/invoice_service.dart';
 import '../../core/api_client.dart';
 import '../../widgets/warehouse/warehouse_document_form_dialog.dart';
 import '../../widgets/warehouse/warehouse_document_details_dialog.dart';
+import '../../widgets/warehouse/warehouse_doc_wizard_dialog.dart';
 import '../../utils/web/web_utils.dart' as web_utils;
 import '../../widgets/data_table/data_table_widget.dart';
 import '../../widgets/data_table/data_table_config.dart';
@@ -21,13 +23,18 @@ class WarehouseDocsPage extends StatefulWidget {
 }
 
 class _WarehouseDocsPageState extends State<WarehouseDocsPage> {
-  final _svc = WarehouseService();
+  late final ApiClient _apiClient;
+  late final WarehouseService _svc;
+  late final InvoiceService _invoiceService;
   final GlobalKey _tableKey = GlobalKey();
   CalendarController? _calendarController;
 
   @override
   void initState() {
     super.initState();
+    _apiClient = ApiClient();
+    _svc = WarehouseService(apiClient: _apiClient);
+    _invoiceService = InvoiceService(apiClient: _apiClient);
     CalendarController.load().then((c) {
       if (mounted) {
         setState(() => _calendarController = c);
@@ -48,6 +55,125 @@ class _WarehouseDocsPageState extends State<WarehouseDocsPage> {
       final current = _tableKey.currentState as dynamic;
       current?.refresh();
     } catch (_) {}
+  }
+
+  Future<void> _onAddNew() async {
+    final wizardResult = await showDialog<WarehouseDocWizardResult>(
+      context: context,
+      builder: (_) => WarehouseDocWizardDialog(
+        businessId: widget.businessId,
+        apiClient: _apiClient,
+      ),
+    );
+    if (wizardResult == null) return;
+    if (wizardResult.isManual) {
+      await showDialog(
+        context: context,
+        builder: (_) => WarehouseDocumentFormDialog(
+          businessId: widget.businessId,
+          onSuccess: () => _refreshTable(),
+        ),
+      );
+      return;
+    }
+    await _handleInvoiceWizardResult(wizardResult);
+  }
+
+  Future<void> _handleInvoiceWizardResult(WarehouseDocWizardResult wizardResult) async {
+    if (wizardResult.invoiceId == null) return;
+    bool loaderDismissed = false;
+    void dismissLoader() {
+      if (!loaderDismissed && mounted) {
+        loaderDismissed = true;
+        Navigator.of(context, rootNavigator: true).pop();
+      }
+    }
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    ).then((_) => loaderDismissed = true);
+
+    try {
+      final invoiceData = await _invoiceService.getInvoice(
+        businessId: widget.businessId,
+        invoiceId: wizardResult.invoiceId!,
+      );
+      dismissLoader();
+      if (!mounted) return;
+      final invoiceItem = Map<String, dynamic>.from(invoiceData['item'] ?? const {});
+      final initialLines = _extractLinesFromInvoice(invoiceItem, wizardResult.docType ?? 'issue');
+      if (initialLines.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('هیچ کالایی برای این فاکتور ثبت نشده است')),
+        );
+        return;
+      }
+      final dateStr = invoiceItem['document_date']?.toString();
+      final initialDate = dateStr == null ? null : DateTime.tryParse(dateStr);
+
+      await showDialog(
+        context: context,
+        builder: (_) => WarehouseDocumentFormDialog(
+          businessId: widget.businessId,
+          initialDocType: wizardResult.docType,
+          lockDocType: true,
+          initialDocumentDate: initialDate,
+          initialLines: initialLines,
+          sourceInvoiceId: wizardResult.invoiceId,
+          sourceInvoiceCode: wizardResult.invoiceCode,
+          sourceInvoiceType: wizardResult.sourceLabel,
+          onSuccess: () => _refreshTable(),
+        ),
+      );
+    } catch (e) {
+      dismissLoader();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('خطا در دریافت فاکتور: $e')),
+      );
+    } finally {
+      dismissLoader();
+    }
+  }
+
+  List<Map<String, dynamic>> _extractLinesFromInvoice(Map<String, dynamic> invoice, String docType) {
+    final movementFallback = docType == 'receipt' ? 'in' : 'out';
+    final rawLines = List<dynamic>.from(invoice['product_lines'] ?? const []);
+    final List<Map<String, dynamic>> result = [];
+    for (final raw in rawLines) {
+      if (raw is! Map) continue;
+      final map = Map<String, dynamic>.from(raw);
+      if (map['product_id'] == null) continue;
+      final qty = _toDouble(map['quantity']);
+      if (qty <= 0) continue;
+      final extra = Map<String, dynamic>.from(map['extra_info'] ?? const {});
+      final warehouseId = _toInt(map['warehouse_id'] ?? extra['warehouse_id']);
+      final movement = (extra['movement'] ?? movementFallback).toString();
+      result.add({
+        'product_id': map['product_id'],
+        'quantity': qty,
+        'warehouse_id': warehouseId,
+        'movement': movement,
+        'extra_info': extra,
+      });
+    }
+    return result;
+  }
+
+  double _toDouble(dynamic value) {
+    if (value is num) return value.toDouble();
+    if (value is String) return double.tryParse(value) ?? 0;
+    return 0;
+  }
+
+  int? _toInt(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    if (value is String && value.isNotEmpty) return int.tryParse(value);
+    return null;
   }
 
   String _getDocTypeLabel(String docType, AppLocalizations t) {
@@ -234,15 +360,7 @@ class _WarehouseDocsPageState extends State<WarehouseDocsPage> {
             Tooltip(
               message: t.createWarehouseDocument,
               child: IconButton(
-                onPressed: () async {
-                  await showDialog(
-                    context: context,
-                    builder: (_) => WarehouseDocumentFormDialog(
-                      businessId: widget.businessId,
-                      onSuccess: () => _refreshTable(),
-                    ),
-                  );
-                },
+                onPressed: _onAddNew,
                 icon: const Icon(Icons.add),
               ),
             ),

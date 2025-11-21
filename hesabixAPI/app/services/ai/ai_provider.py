@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, AsyncGenerator
 from abc import ABC, abstractmethod
 import json
 import logging
@@ -31,6 +31,24 @@ class AIProviderBase(ABC):
     def estimate_tokens(self, text: str) -> int:
         """تخمین تعداد توکن"""
         pass
+    
+    @abstractmethod
+    async def chat_completion_stream(
+        self,
+        messages: List[Dict[str, Any]],
+        model: str,
+        max_tokens: int,
+        temperature: float,
+        tools: Optional[List[Dict[str, Any]]] = None
+    ) -> AsyncGenerator[Dict[str, Any], None]:
+        """
+        ارسال درخواست chat completion به صورت streaming
+        هر chunk شامل:
+        - delta: محتوای جدید (content chunk)
+        - usage: در chunk آخر
+        - done: آیا streaming تمام شده است
+        """
+        pass
 
 
 class OpenAIProvider(AIProviderBase):
@@ -40,7 +58,13 @@ class OpenAIProvider(AIProviderBase):
         super().__init__(api_key, api_base_url or "https://api.openai.com/v1")
         try:
             import openai
+            # استفاده از sync client برای non-streaming
             self.client = openai.OpenAI(
+                api_key=api_key,
+                base_url=api_base_url or None
+            )
+            # استفاده از async client برای streaming
+            self.async_client = openai.AsyncOpenAI(
                 api_key=api_key,
                 base_url=api_base_url or None
             )
@@ -124,6 +148,146 @@ class OpenAIProvider(AIProviderBase):
     def estimate_tokens(self, text: str) -> int:
         """تخمین تعداد توکن (تقریبی: 4 کاراکتر = 1 توکن)"""
         return len(text) // 4
+    
+    async def chat_completion_stream(
+        self,
+        messages: List[Dict[str, Any]],
+        model: str,
+        max_tokens: int,
+        temperature: float,
+        tools: Optional[List[Dict[str, Any]]] = None
+    ) -> AsyncGenerator[Dict[str, Any], None]:
+        """ارسال درخواست به OpenAI به صورت streaming با async client"""
+        try:
+            # استفاده از async client برای streaming
+            stream = await self.async_client.chat.completions.create(
+                model=model,
+                messages=messages,
+                max_tokens=max_tokens,
+                temperature=temperature,
+                tools=tools if tools else None,
+                stream=True
+            )
+            
+            accumulated_content = ""
+            final_usage = None
+            tool_calls_accumulator = {}  # برای جمع‌آوری tool_calls از chunks مختلف
+            
+            async for chunk in stream:
+                # بررسی usage (معمولاً در chunk آخر می‌آید)
+                if chunk.usage:
+                    final_usage = {
+                        "input_tokens": chunk.usage.prompt_tokens,
+                        "output_tokens": chunk.usage.completion_tokens,
+                        "total_tokens": chunk.usage.total_tokens
+                    }
+                
+                # بررسی content chunks
+                if chunk.choices and len(chunk.choices) > 0:
+                    delta = chunk.choices[0].delta
+                    
+                    # محتوای جدید
+                    if delta.content:
+                        accumulated_content += delta.content
+                        yield {
+                            "delta": {
+                                "content": delta.content
+                            },
+                            "usage": None,
+                            "done": False
+                        }
+                    
+                    # بررسی tool_calls - جمع‌آوری از chunks مختلف
+                    if delta.tool_calls:
+                        for tool_call_delta in delta.tool_calls:
+                            index = tool_call_delta.index
+                            if index not in tool_calls_accumulator:
+                                tool_calls_accumulator[index] = {
+                                    "id": tool_call_delta.id,
+                                    "type": tool_call_delta.type,
+                                    "function": {
+                                        "name": "",
+                                        "arguments": ""
+                                    }
+                                }
+                            
+                            # جمع‌آوری نام function
+                            if tool_call_delta.function and tool_call_delta.function.name:
+                                tool_calls_accumulator[index]["function"]["name"] += tool_call_delta.function.name
+                            
+                            # جمع‌آوری arguments
+                            if tool_call_delta.function and tool_call_delta.function.arguments:
+                                tool_calls_accumulator[index]["function"]["arguments"] += tool_call_delta.function.arguments
+            
+            # اگر usage موجود نبود، از accumulated_content تخمین بزن
+            if not final_usage:
+                # تخمین tokens (تقریبی)
+                input_tokens_estimate = self.estimate_tokens("\n".join([msg.get("content", "") for msg in messages]))
+                output_tokens_estimate = self.estimate_tokens(accumulated_content)
+                final_usage = {
+                    "input_tokens": input_tokens_estimate,
+                    "output_tokens": output_tokens_estimate,
+                    "total_tokens": input_tokens_estimate + output_tokens_estimate
+                }
+            
+            # تبدیل tool_calls به فرمت مورد نیاز
+            function_calls = None
+            if tool_calls_accumulator:
+                function_calls = []
+                for index in sorted(tool_calls_accumulator.keys()):
+                    tc = tool_calls_accumulator[index]
+                    try:
+                        arguments = json.loads(tc["function"]["arguments"]) if tc["function"]["arguments"] else {}
+                    except json.JSONDecodeError:
+                        arguments = {}
+                    
+                    function_calls.append({
+                        "name": tc["function"]["name"],
+                        "arguments": arguments
+                    })
+            
+            # ارسال chunk نهایی با usage و function_calls
+            yield {
+                "delta": {
+                    "content": ""
+                },
+                "usage": final_usage,
+                "function_calls": function_calls,
+                "done": True
+            }
+            
+        except Exception as e:
+            logger.error(f"OpenAI streaming API error: {e}", exc_info=True)
+            # تبدیل خطاهای OpenAI به ApiError
+            error_message = str(e)
+            if "model_not_found" in error_message or "model" in error_message.lower():
+                from app.core.responses import ApiError
+                raise ApiError(
+                    "MODEL_NOT_AVAILABLE",
+                    f"مدل '{model}' در دسترس نیست. لطفاً مدل دیگری را در تنظیمات AI انتخاب کنید.",
+                    http_status=400
+                )
+            elif "api_key" in error_message.lower() or "authentication" in error_message.lower():
+                from app.core.responses import ApiError
+                raise ApiError(
+                    "INVALID_API_KEY",
+                    "API Key نامعتبر است. لطفاً API Key را در تنظیمات AI بررسی کنید.",
+                    http_status=400
+                )
+            elif "rate_limit" in error_message.lower() or "quota" in error_message.lower():
+                from app.core.responses import ApiError
+                raise ApiError(
+                    "RATE_LIMIT_EXCEEDED",
+                    "محدودیت استفاده از API رسیده است. لطفاً بعداً تلاش کنید.",
+                    http_status=429
+                )
+            else:
+                from app.core.responses import ApiError
+                raise ApiError(
+                    "AI_PROVIDER_ERROR",
+                    f"خطا در ارتباط با AI Provider: {error_message}",
+                    http_status=500
+                )
 
 
 class AnthropicProvider(AIProviderBase):
@@ -205,6 +369,46 @@ class AnthropicProvider(AIProviderBase):
     def estimate_tokens(self, text: str) -> int:
         """تخمین تعداد توکن"""
         return len(text) // 4
+    
+    async def chat_completion_stream(
+        self,
+        messages: List[Dict[str, Any]],
+        model: str,
+        max_tokens: int,
+        temperature: float,
+        tools: Optional[List[Dict[str, Any]]] = None
+    ) -> AsyncGenerator[Dict[str, Any], None]:
+        """
+        ارسال درخواست به Anthropic به صورت streaming
+        نکته: Anthropic streaming متفاوت است، فعلاً از non-streaming استفاده می‌کنیم
+        """
+        # Fallback به non-streaming برای Anthropic
+        # در آینده می‌توان از Anthropic streaming API استفاده کرد
+        result = self.chat_completion(messages, model, max_tokens, temperature, tools)
+        
+        # شبیه‌سازی streaming با ارسال کل محتوا در یک chunk
+        content = result["message"]["content"]
+        if content:
+            # ارسال به صورت تدریجی (هر 50 کاراکتر یک chunk)
+            chunk_size = 50
+            for i in range(0, len(content), chunk_size):
+                chunk = content[i:i + chunk_size]
+                yield {
+                    "delta": {
+                        "content": chunk
+                    },
+                    "usage": None,
+                    "done": False
+                }
+        
+        # ارسال chunk نهایی با usage
+        yield {
+            "delta": {
+                "content": ""
+            },
+            "usage": result["usage"],
+            "done": True
+        }
 
 
 class LocalProvider(AIProviderBase):
@@ -258,6 +462,85 @@ class LocalProvider(AIProviderBase):
     def estimate_tokens(self, text: str) -> int:
         """تخمین تعداد توکن"""
         return len(text) // 4
+    
+    async def chat_completion_stream(
+        self,
+        messages: List[Dict[str, Any]],
+        model: str,
+        max_tokens: int,
+        temperature: float,
+        tools: Optional[List[Dict[str, Any]]] = None
+    ) -> AsyncGenerator[Dict[str, Any], None]:
+        """ارسال درخواست به مدل محلی به صورت streaming"""
+        import httpx
+        import asyncio
+        
+        try:
+            # استفاده از AsyncClient برای streaming
+            async with httpx.AsyncClient(base_url=self.api_base_url, timeout=120.0) as client:
+                async with client.stream(
+                    "POST",
+                    "/api/chat",
+                    json={
+                        "model": model,
+                        "messages": messages,
+                        "stream": True,
+                        "options": {
+                            "temperature": temperature,
+                            "num_predict": max_tokens
+                        }
+                    }
+                ) as response:
+                    response.raise_for_status()
+                    final_usage = None
+                    
+                    async for line in response.aiter_lines():
+                        if not line:
+                            continue
+                        
+                        try:
+                            # Parse JSON از هر خط
+                            data = json.loads(line)
+                            
+                            # بررسی message chunk
+                            if "message" in data:
+                                message = data["message"]
+                                content = message.get("content", "")
+                                if content:
+                                    yield {
+                                        "delta": {
+                                            "content": content
+                                        },
+                                        "usage": None,
+                                        "done": False
+                                    }
+                            
+                            # بررسی done و usage
+                            if data.get("done", False):
+                                final_usage = {
+                                    "input_tokens": data.get("prompt_eval_count", 0),
+                                    "output_tokens": data.get("eval_count", 0),
+                                    "total_tokens": data.get("prompt_eval_count", 0) + data.get("eval_count", 0)
+                                }
+                                
+                                yield {
+                                    "delta": {
+                                        "content": ""
+                                    },
+                                    "usage": final_usage,
+                                    "done": True
+                                }
+                                break
+                                
+                        except json.JSONDecodeError:
+                            continue
+                        except Exception as e:
+                            logger.warning(f"Error parsing Ollama stream chunk: {e}")
+                            continue
+                            
+        except Exception as e:
+            logger.error(f"Local provider streaming error: {e}", exc_info=True)
+            raise
 
 
 def create_provider(

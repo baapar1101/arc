@@ -91,13 +91,21 @@ def create_from_invoice(
 		qty = Decimal(str(ln.get("quantity") or 0))
 		if not pid or qty <= 0:
 			continue
+
 		extra = ln.get("extra_info") or {}
-		mv = (extra.get("movement") or ("out" if wh_doc_type in ("issue", "production_out") else "in"))
-		# warehouse_id عمداً تعیین نمی‌شود؛ انباردار بعداً مشخص می‌کند
+		movement_override = ln.get("movement")
+		mv = movement_override or extra.get("movement") or ("out" if wh_doc_type in ("issue", "production_out") else "in")
+
+		warehouse_id = ln.get("warehouse_id")
+		try:
+			warehouse_id = int(warehouse_id) if warehouse_id is not None else None
+		except Exception:
+			warehouse_id = None
+
 		wline = WarehouseDocumentLine(
 			warehouse_document_id=wh.id,
 			product_id=int(pid),
-			warehouse_id=None,
+			warehouse_id=warehouse_id,
 			movement=str(mv),
 			quantity=qty,
 			extra_info=extra,
@@ -986,4 +994,60 @@ def get_warehouse_stock_report(
 		"as_of_date": as_of_date.isoformat(),
 		"total_items": len(items),
 	}
+
+
+def get_physical_stock_bulk(
+	db: Session,
+	business_id: int,
+	product_ids: List[int],
+	as_of_date: Optional[date] = None,
+) -> Dict[int, Decimal]:
+	"""
+	محاسبه موجودی انبارداری (فیزیکی) برای لیستی از کالاها.
+	بر اساس حواله‌های انبار با وضعیت posted.
+	بازگشت: Dict[product_id, quantity]
+	"""
+	if not product_ids:
+		return {}
+	
+	if as_of_date is None:
+		as_of_date = datetime.now().date()
+	
+	# دریافت حرکات از حواله‌های انبار با وضعیت posted
+	lines = (
+		db.query(WarehouseDocumentLine, WarehouseDocument)
+		.join(WarehouseDocument, WarehouseDocument.id == WarehouseDocumentLine.warehouse_document_id)
+		.filter(
+			and_(
+				WarehouseDocument.business_id == business_id,
+				WarehouseDocument.status == "posted",
+				WarehouseDocument.document_date <= as_of_date,
+				WarehouseDocumentLine.product_id.in_(product_ids),
+			)
+		)
+		.all()
+	)
+	
+	# محاسبه موجودی
+	stock_dict: Dict[int, Decimal] = {}
+	for line, doc in lines:
+		pid = int(line.product_id)
+		qty = Decimal(str(line.quantity or 0))
+		if qty <= 0:
+			continue
+		
+		if pid not in stock_dict:
+			stock_dict[pid] = Decimal(0)
+		
+		if line.movement == "in":
+			stock_dict[pid] += qty
+		elif line.movement == "out":
+			stock_dict[pid] -= qty
+	
+	# برای کالاهایی که حرکتی نداشتند، مقدار 0 برگردان
+	for pid in product_ids:
+		if pid not in stock_dict:
+			stock_dict[pid] = Decimal(0)
+	
+	return stock_dict
 

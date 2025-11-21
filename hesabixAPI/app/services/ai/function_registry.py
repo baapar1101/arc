@@ -74,16 +74,11 @@ class AIFunctionRegistry:
         
         self.register(AIFunction(
             name="get_business_info",
-            description="دریافت اطلاعات کامل یک کسب‌وکار شامل نام، آدرس، اطلاعات تماس و تنظیمات",
+            description="دریافت اطلاعات کامل کسب‌وکار فعلی شامل نام، آدرس، اطلاعات تماس و تنظیمات. شناسه کسب‌وکار به صورت خودکار از جلسه گفت‌وگو گرفته می‌شود.",
             parameters_schema={
                 "type": "object",
-                "properties": {
-                    "business_id": {
-                        "type": "integer",
-                        "description": "شناسه کسب‌وکار"
-                    }
-                },
-                "required": ["business_id"]
+                "properties": {},
+                "required": []
             },
             handler=self._create_handler(get_business_wrapper),
             allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
@@ -139,21 +134,21 @@ class AIFunctionRegistry:
         
         self.register(AIFunction(
             name="search_invoices",
-            description="جستجو و فیلتر کردن فاکتورها بر اساس تاریخ، نوع، مشتری و سایر فیلترها",
+            description="جستجو و فیلتر کردن فاکتورها بر اساس تاریخ، نوع، مشتری و سایر فیلترها. شناسه کسب‌وکار به صورت خودکار از جلسه گفت‌وگو گرفته می‌شود.",
             parameters_schema={
                 "type": "object",
                 "properties": {
-                    "business_id": {"type": "integer"},
-                    "fiscal_year_id": {"type": "integer"},
-                    "from_date": {"type": "string", "format": "date"},
-                    "to_date": {"type": "string", "format": "date"},
+                    "fiscal_year_id": {"type": "integer", "description": "شناسه سال مالی (اختیاری)"},
+                    "from_date": {"type": "string", "format": "date", "description": "تاریخ شروع (اختیاری)"},
+                    "to_date": {"type": "string", "format": "date", "description": "تاریخ پایان (اختیاری)"},
                     "document_type": {
                         "type": "string",
-                        "enum": ["invoice_sales", "invoice_purchase", "invoice_sales_return"]
+                        "enum": ["invoice_sales", "invoice_purchase", "invoice_sales_return"],
+                        "description": "نوع فاکتور (اختیاری)"
                     },
-                    "person_id": {"type": "integer"}
+                    "person_id": {"type": "integer", "description": "شناسه مشتری/تامین‌کننده (اختیاری)"}
                 },
-                "required": ["business_id"]
+                "required": []
             },
             handler=self._create_handler(search_invoices_wrapper),
             allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
@@ -167,17 +162,16 @@ class AIFunctionRegistry:
         
         self.register(AIFunction(
             name="search_products",
-            description="جستجو در محصولات و کالاها بر اساس نام، کد، دسته‌بندی و سایر فیلترها",
+            description="جستجو در محصولات و کالاها بر اساس نام، کد، دسته‌بندی و سایر فیلترها. شناسه کسب‌وکار به صورت خودکار از جلسه گفت‌وگو گرفته می‌شود.",
             parameters_schema={
                 "type": "object",
                 "properties": {
-                    "business_id": {"type": "integer"},
-                    "search": {"type": "string"},
-                    "category_id": {"type": "integer"},
-                    "item_type": {"type": "string", "enum": ["product", "service"]},
-                    "track_inventory": {"type": "boolean"}
+                    "search": {"type": "string", "description": "متن جستجو (اختیاری)"},
+                    "category_id": {"type": "integer", "description": "شناسه دسته‌بندی (اختیاری)"},
+                    "item_type": {"type": "string", "enum": ["product", "service"], "description": "نوع کالا (اختیاری)"},
+                    "track_inventory": {"type": "boolean", "description": "فقط کالاهای با موجودی (اختیاری)"}
                 },
-                "required": ["business_id"]
+                "required": []
             },
             handler=self._create_handler(list_products),
             allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
@@ -187,14 +181,13 @@ class AIFunctionRegistry:
         
         self.register(AIFunction(
             name="get_product_info",
-            description="دریافت اطلاعات کامل یک محصول یا کالا",
+            description="دریافت اطلاعات کامل یک محصول یا کالا. شناسه کسب‌وکار به صورت خودکار از جلسه گفت‌وگو گرفته می‌شود.",
             parameters_schema={
                 "type": "object",
                 "properties": {
-                    "business_id": {"type": "integer"},
-                    "product_id": {"type": "integer"}
+                    "product_id": {"type": "integer", "description": "شناسه محصول"}
                 },
-                "required": ["business_id", "product_id"]
+                "required": ["product_id"]
             },
             handler=self._create_handler(get_product),
             allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
@@ -212,14 +205,13 @@ class AIFunctionRegistry:
         
         self.register(AIFunction(
             name="get_customer_info",
-            description="دریافت اطلاعات کامل یک مشتری یا تامین‌کننده شامل اطلاعات تماس، اعتبار و تاریخچه",
+            description="دریافت اطلاعات کامل یک مشتری یا تامین‌کننده شامل اطلاعات تماس، اعتبار و تاریخچه. شناسه کسب‌وکار به صورت خودکار از جلسه گفت‌وگو گرفته می‌شود.",
             parameters_schema={
                 "type": "object",
                 "properties": {
-                    "business_id": {"type": "integer"},
-                    "person_id": {"type": "integer"}
+                    "person_id": {"type": "integer", "description": "شناسه مشتری یا تامین‌کننده"}
                 },
-                "required": ["business_id", "person_id"]
+                "required": ["person_id"]
             },
             handler=self._create_handler(get_person_wrapper),
             allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
@@ -240,13 +232,11 @@ class AIFunctionRegistry:
         
         self.register(AIFunction(
             name="get_financial_summary",
-            description="دریافت خلاصه مالی کسب‌وکار شامل درآمد، هزینه، موجودی و سایر آمارها",
+            description="دریافت خلاصه مالی کسب‌وکار فعلی شامل درآمد، هزینه، موجودی و سایر آمارها. شناسه کسب‌وکار به صورت خودکار از جلسه گفت‌وگو گرفته می‌شود.",
             parameters_schema={
                 "type": "object",
-                "properties": {
-                    "business_id": {"type": "integer"}
-                },
-                "required": ["business_id"]
+                "properties": {},
+                "required": []
             },
             handler=get_financial_summary_wrapper,
             allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.ADMIN},
@@ -273,14 +263,39 @@ class AIFunctionRegistry:
         """
         ایجاد wrapper برای service function ها
         این wrapper context (db, user_context) را اضافه می‌کند
+        و business_id را از session inject می‌کند (امنیت)
         """
         def handler(args: Dict[str, Any], context: Dict[str, Any]) -> Any:
             db: Session = context["db"]
             user_context: AuthContext = context["user_context"]
             
-            # اضافه کردن business_id از context اگر در args نیست
-            if "business_id" not in args and context.get("business_id"):
-                args["business_id"] = context["business_id"]
+            # دریافت business_id از session (اولویت) یا context
+            session_business_id = context.get("session_business_id")
+            context_business_id = context.get("business_id")
+            effective_business_id = session_business_id or context_business_id
+            
+            # امنیت: اگر AI یک business_id دیگر بدهد، آن را نادیده می‌گیریم
+            if "business_id" in args:
+                provided_business_id = args.get("business_id")
+                # اگر business_id ارائه شده با session متفاوت باشد، از session استفاده می‌کنیم
+                if provided_business_id != effective_business_id:
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.warning(
+                        f"AI attempted to use business_id {provided_business_id} "
+                        f"but session has {effective_business_id}. Using session business_id."
+                    )
+                # همیشه از session/context استفاده می‌کنیم (امنیت)
+                args["business_id"] = effective_business_id
+            elif effective_business_id:
+                # اگر business_id در args نیست، از context اضافه می‌کنیم
+                args["business_id"] = effective_business_id
+            
+            # Validation: بررسی دسترسی کاربر به business_id
+            if args.get("business_id") and not user_context.can_access_business(args["business_id"]):
+                raise PermissionError(
+                    f"User does not have access to business {args['business_id']}"
+                )
             
             # اضافه کردن user_id از context
             if "user_id" not in args:
@@ -387,17 +402,40 @@ class AIFunctionRegistry:
         context: Dict[str, Any]
     ) -> Any:
         """
-        فراخوانی یک function
+        فراخوانی یک function با validation امنیتی
         """
         if name not in self._functions:
             raise ValueError(f"Function '{name}' not found in registry")
         
         func = self._functions[name]
         user_context: AuthContext = context["user_context"]
-        business_id = context.get("business_id")
+        
+        # دریافت business_id از session (اولویت) یا context
+        session_business_id = context.get("session_business_id")
+        context_business_id = context.get("business_id")
+        effective_business_id = session_business_id or context_business_id
+        
+        # امنیت: اگر AI یک business_id دیگر در arguments بدهد، validation می‌کنیم
+        if "business_id" in arguments:
+            provided_business_id = arguments.get("business_id")
+            if provided_business_id and provided_business_id != effective_business_id:
+                # بررسی دسترسی کاربر به business_id ارائه شده
+                if not user_context.can_access_business(provided_business_id):
+                    raise PermissionError(
+                        f"User does not have access to business {provided_business_id}. "
+                        f"Session business_id is {effective_business_id}"
+                    )
+                # اگر دسترسی دارد اما متفاوت است، warning می‌دهیم
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(
+                    f"Function {name}: AI provided business_id {provided_business_id} "
+                    f"but session has {effective_business_id}. "
+                    f"Handler will use session business_id for security."
+                )
         
         # بررسی نقش
-        user_roles = self._detect_user_role(user_context, business_id)
+        user_roles = self._detect_user_role(user_context, effective_business_id)
         if not (func.allowed_roles & user_roles):
             raise PermissionError(
                 f"User role {user_roles} does not have access to function {name}. "
@@ -408,7 +446,7 @@ class AIFunctionRegistry:
         if func.required_permissions:
             has_access = any(
                 user_context.has_business_permission(perm.split(".")[0], perm.split(".")[1])
-                if "." in perm and business_id else
+                if "." in perm and effective_business_id else
                 user_context.has_app_permission(perm)
                 for perm in func.required_permissions
             )
@@ -416,10 +454,10 @@ class AIFunctionRegistry:
                 raise PermissionError(f"User does not have required permissions for {name}")
         
         # بررسی business context
-        if func.business_context_required and not business_id:
+        if func.business_context_required and not effective_business_id:
             raise ValueError(f"Function {name} requires business context")
         
-        # فراخوانی handler
+        # فراخوانی handler (handler خودش business_id را از session inject می‌کند)
         return func.handler(arguments, context)
 
 

@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from typing import Dict, Any, Optional, List, Tuple
+from datetime import datetime, date, timedelta
 from sqlalchemy.orm import Session
-from sqlalchemy import select, and_, func
+from sqlalchemy import select, and_, or_, func, case
+from sqlalchemy.types import Numeric
 from decimal import Decimal
 
 from app.core.responses import ApiError
@@ -11,6 +13,7 @@ from adapters.db.models.product_attribute import ProductAttribute
 from adapters.db.models.product_attribute_link import ProductAttributeLink
 from adapters.db.repositories.product_repository import ProductRepository
 from adapters.api.v1.schema_models.product import ProductCreateRequest, ProductUpdateRequest
+from adapters.db.models.category import BusinessCategory
 
 
 def _generate_auto_code(db: Session, business_id: int) -> str:
@@ -288,6 +291,906 @@ def _to_dict(obj: Product) -> Dict[str, Any]:
         "default_warehouse_code": obj.default_warehouse.code if obj.default_warehouse else None,
         "created_at": obj.created_at,
         "updated_at": obj.updated_at,
+    }
+
+
+def get_item_movements_report(
+    db: Session,
+    business_id: int,
+    fiscal_year_id: Optional[int] = None,
+    currency_id: Optional[int] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    product_ids: Optional[List[int]] = None,
+    warehouse_ids: Optional[List[int]] = None,
+    category_ids: Optional[List[int]] = None,
+    include_zero_balance: bool = False,
+    search: Optional[str] = None,
+    skip: int = 0,
+    take: int = 50,
+) -> Dict[str, Any]:
+    """
+    گزارش گردش کالا
+    
+    Args:
+        db: نشست پایگاه داده
+        business_id: شناسه کسب‌وکار
+        fiscal_year_id: شناسه سال مالی (اختیاری)
+        currency_id: شناسه ارز (اختیاری)
+        date_from: از تاریخ (اختیاری، فرمت YYYY-MM-DD)
+        date_to: تا تاریخ (اختیاری، فرمت YYYY-MM-DD)
+        product_ids: لیست شناسه‌های کالاها (اختیاری)
+        warehouse_ids: لیست شناسه‌های انبارها (اختیاری)
+        category_ids: لیست شناسه‌های دسته‌بندی‌ها (اختیاری)
+        include_zero_balance: نمایش کالاهای با مانده صفر
+        search: جستجو در کد یا نام کالا (اختیاری)
+        skip: تعداد رکوردهای رد شده برای pagination
+        take: تعداد رکوردهای برگشتی
+    
+    Returns:
+        dict: {
+            'items': لیست کالاها با آمار گردش,
+            'summary': خلاصه آمار,
+            'pagination': اطلاعات pagination
+        }
+    """
+    from app.services.invoice_service import _compute_available_stock, _iter_product_movements
+    
+    # Query پایه: فقط کالاهای با کنترل موجودی
+    # Join با Category برای دریافت نام دسته‌بندی
+    query = db.query(Product).outerjoin(
+        BusinessCategory, Product.category_id == BusinessCategory.id
+    ).filter(
+        Product.business_id == business_id,
+        Product.track_inventory == True,  # فقط کالاهای با کنترل موجودی
+    )
+    
+    # فیلتر کالاها
+    if product_ids:
+        query = query.filter(Product.id.in_(product_ids))
+    
+    # فیلتر دسته‌بندی
+    if category_ids:
+        query = query.filter(Product.category_id.in_(category_ids))
+    
+    # فیلتر جستجو
+    if search and search.strip():
+        search_filter = or_(
+            Product.code.ilike(f'%{search}%'),
+            Product.name.ilike(f'%{search}%'),
+        )
+        query = query.filter(search_filter)
+    
+    # دریافت همه کالاهای فیلتر شده
+    # query محصولات و دسته‌بندی‌ها را با هم برمی‌گرداند
+    results = query.all()
+    products = results
+    
+    # ساخت dict برای دسترسی سریع به category
+    category_dict = {}
+    if results:
+        category_ids_from_results = {p.category_id for p in results if p.category_id}
+        if category_ids_from_results:
+            categories = db.query(BusinessCategory).filter(
+                BusinessCategory.id.in_(list(category_ids_from_results))
+            ).all()
+            for cat in categories:
+                # استخراج نام از title_translations (اول fa، سپس en)
+                title = ''
+                if isinstance(cat.title_translations, dict):
+                    title = cat.title_translations.get('fa') or cat.title_translations.get('en') or cat.title_translations.get('default') or ''
+                category_dict[cat.id] = {
+                    'name': title,
+                    'code': str(cat.id),  # از ID به عنوان code استفاده می‌کنیم
+                }
+    
+    # تبدیل تاریخ‌ها
+    date_from_obj = None
+    date_to_obj = None
+    date_before_from = None
+    
+    if date_from:
+        try:
+            date_from_obj = datetime.strptime(date_from, '%Y-%m-%d').date()
+            date_before_from = date_from_obj - timedelta(days=1)
+        except Exception:
+            pass
+    
+    if date_to:
+        try:
+            date_to_obj = datetime.strptime(date_to, '%Y-%m-%d').date()
+        except Exception:
+            pass
+    
+    # اگر تاریخ‌ها مشخص نشده‌اند، از سال مالی استفاده کن
+    if date_from_obj is None or date_to_obj is None:
+        try:
+            from adapters.db.models.fiscal_year import FiscalYear
+            if fiscal_year_id:
+                fiscal_year = db.query(FiscalYear).filter(FiscalYear.id == fiscal_year_id).first()
+            else:
+                fiscal_year = db.query(FiscalYear).filter(
+                    and_(
+                        FiscalYear.business_id == business_id,
+                        FiscalYear.is_last == True
+                    )
+                ).first()
+            
+            if fiscal_year:
+                if date_from_obj is None:
+                    date_from_obj = fiscal_year.start_date
+                    date_before_from = date_from_obj - timedelta(days=1)
+                if date_to_obj is None:
+                    date_to_obj = fiscal_year.end_date if fiscal_year.end_date else date.today()
+        except Exception:
+            pass
+    
+    # اگر هنوز تاریخ مشخص نشده
+    if date_to_obj is None:
+        date_to_obj = date.today()
+    if date_from_obj is None:
+        date_from_obj = date.today()
+        date_before_from = date_from_obj - timedelta(days=1)
+    
+    # محاسبه گردش برای هر کالا
+    items = []
+    
+    for product in products:
+        # مانده ابتدای دوره (تا یک روز قبل از date_from)
+        opening_balance = Decimal(0)
+        if date_before_from:
+            if warehouse_ids:
+                # محاسبه به تفکیک انبار
+                opening_balance = sum(
+                    _compute_available_stock(db, business_id, product.id, wh_id, date_before_from)
+                    for wh_id in warehouse_ids
+                )
+            else:
+                # محاسبه کل (بدون تفکیک انبار)
+                opening_balance = _compute_available_stock(db, business_id, product.id, None, date_before_from)
+        else:
+            opening_balance = Decimal(0)
+        
+        # محاسبه ورود و خروج در دوره (بین date_from و date_to)
+        total_in = Decimal(0)
+        total_out = Decimal(0)
+        
+        # دریافت حرکات تا date_to
+        movements = _iter_product_movements(
+            db,
+            business_id,
+            [product.id],
+            warehouse_ids,
+            date_to_obj,
+        )
+        
+        # فیلتر حرکات در بازه دوره
+        for mv in movements:
+            mv_date = mv.get("document_date")
+            if not mv_date:
+                continue
+            
+            # فقط حرکات بین date_from و date_to
+            if mv_date < date_from_obj:
+                continue
+            if mv_date > date_to_obj:
+                continue
+            
+            qty = Decimal(str(mv.get("quantity") or 0))
+            movement = mv.get("movement")
+            
+            if movement == "in":
+                total_in += qty
+            elif movement == "out":
+                total_out += qty
+        
+        # مانده انتهای دوره
+        closing_balance = opening_balance + total_in - total_out
+        
+        # اگر include_zero_balance=False و همه مقادیر صفر است، از لیست خارج کن
+        if not include_zero_balance:
+            if opening_balance == 0 and total_in == 0 and total_out == 0 and closing_balance == 0:
+                continue
+        
+        # نام دسته‌بندی
+        category_name = ''
+        if product.category_id and product.category_id in category_dict:
+            category_name = category_dict[product.category_id]['name']
+        
+        items.append({
+            'product_id': product.id,
+            'product_code': product.code or '',
+            'product_name': product.name or '',
+            'unit': product.main_unit or '',
+            'category_name': category_name,
+            'opening_balance': float(opening_balance),
+            'total_in': float(total_in),
+            'total_out': float(total_out),
+            'closing_balance': float(closing_balance),
+        })
+    
+    # مرتب‌سازی بر اساس نام کالا
+    items.sort(key=lambda x: x.get('product_name', ''))
+    
+    # اعمال pagination
+    total = len(items)
+    paginated_items = items[skip:skip + take]
+    
+    total_pages = (total + take - 1) // take if take > 0 else 0
+    current_page = (skip // take) + 1 if take > 0 else 1
+    
+    # محاسبه مجموع‌ها
+    total_opening = sum(item.get('opening_balance', 0) for item in items)
+    total_in_sum = sum(item.get('total_in', 0) for item in items)
+    total_out_sum = sum(item.get('total_out', 0) for item in items)
+    total_closing = sum(item.get('closing_balance', 0) for item in items)
+    
+    return {
+        'items': paginated_items,
+        'summary': {
+            'total_count': total,
+            'total_opening_balance': float(total_opening),
+            'total_in': float(total_in_sum),
+            'total_out': float(total_out_sum),
+            'total_closing_balance': float(total_closing),
+        },
+        'pagination': {
+            'total': total,
+            'page': current_page,
+            'per_page': take,
+            'total_pages': total_pages,
+            'has_next': current_page < total_pages,
+            'has_prev': current_page > 1,
+        }
+    }
+
+
+def get_sales_by_product_report(
+    db: Session,
+    business_id: int,
+    fiscal_year_id: Optional[int] = None,
+    currency_id: Optional[int] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    product_ids: Optional[List[int]] = None,
+    category_ids: Optional[List[int]] = None,
+    warehouse_ids: Optional[List[int]] = None,
+    include_zero_sales: bool = False,
+    search: Optional[str] = None,
+    skip: int = 0,
+    take: int = 50,
+) -> Dict[str, Any]:
+    """
+    گزارش فروش به تفکیک کالا
+    
+    Args:
+        db: نشست پایگاه داده
+        business_id: شناسه کسب‌وکار
+        fiscal_year_id: شناسه سال مالی (اختیاری)
+        currency_id: شناسه ارز (اختیاری)
+        date_from: از تاریخ (اختیاری، فرمت YYYY-MM-DD)
+        date_to: تا تاریخ (اختیاری، فرمت YYYY-MM-DD)
+        product_ids: لیست شناسه‌های کالاها (اختیاری)
+        category_ids: لیست شناسه‌های دسته‌بندی‌ها (اختیاری)
+        warehouse_ids: لیست شناسه‌های انبارها (اختیاری، فعلاً استفاده نمی‌شود)
+        include_zero_sales: نمایش کالاهای با فروش صفر
+        search: جستجو در کد یا نام کالا (اختیاری)
+        skip: تعداد رکوردهای رد شده برای pagination
+        take: تعداد رکوردهای برگشتی
+    
+    Returns:
+        dict: {
+            'items': لیست کالاها با آمار فروش,
+            'summary': خلاصه آمار,
+            'pagination': اطلاعات pagination
+        }
+    """
+    from adapters.db.models.invoice_item_line import InvoiceItemLine
+    from app.services.invoice_service import INVOICE_SALES
+    
+    # Query پایه: فقط کالاها
+    query = db.query(Product).filter(
+        Product.business_id == business_id,
+    )
+    
+    # فیلتر کالاها
+    if product_ids:
+        query = query.filter(Product.id.in_(product_ids))
+    
+    # فیلتر دسته‌بندی
+    if category_ids:
+        query = query.filter(Product.category_id.in_(category_ids))
+    
+    # فیلتر جستجو
+    if search and search.strip():
+        search_filter = or_(
+            Product.code.ilike(f'%{search}%'),
+            Product.name.ilike(f'%{search}%'),
+        )
+        query = query.filter(search_filter)
+    
+    # دریافت همه کالاهای فیلتر شده
+    products = query.all()
+    
+    if not products:
+        return {
+            'items': [],
+            'summary': {
+                'total_count': 0,
+                'total_quantity': 0.0,
+                'total_amount': 0.0,
+            },
+            'pagination': {
+                'total': 0,
+                'page': 1,
+                'per_page': take,
+                'total_pages': 0,
+                'has_next': False,
+                'has_prev': False,
+            }
+        }
+    
+    # تبدیل تاریخ‌ها
+    date_from_obj = None
+    date_to_obj = None
+    
+    if date_from:
+        try:
+            date_from_obj = datetime.strptime(date_from, '%Y-%m-%d').date()
+        except Exception:
+            pass
+    
+    if date_to:
+        try:
+            date_to_obj = datetime.strptime(date_to, '%Y-%m-%d').date()
+        except Exception:
+            pass
+    
+    # اگر تاریخ‌ها مشخص نشده‌اند، از سال مالی استفاده کن
+    if date_from_obj is None or date_to_obj is None:
+        try:
+            from adapters.db.models.fiscal_year import FiscalYear
+            if fiscal_year_id:
+                fiscal_year = db.query(FiscalYear).filter(FiscalYear.id == fiscal_year_id).first()
+            else:
+                fiscal_year = db.query(FiscalYear).filter(
+                    and_(
+                        FiscalYear.business_id == business_id,
+                        FiscalYear.is_last == True
+                    )
+                ).first()
+            
+            if fiscal_year:
+                if date_from_obj is None:
+                    date_from_obj = fiscal_year.start_date
+                if date_to_obj is None:
+                    date_to_obj = fiscal_year.end_date if fiscal_year.end_date else date.today()
+        except Exception:
+            pass
+    
+    # اگر هنوز تاریخ مشخص نشده
+    if date_to_obj is None:
+        date_to_obj = date.today()
+    if date_from_obj is None:
+        date_from_obj = date.today()
+    
+    # دریافت فاکتورهای فروش در بازه زمانی
+    from adapters.db.models.document import Document
+    
+    sales_invoice_query = db.query(Document).filter(
+        and_(
+            Document.business_id == business_id,
+            Document.document_type == INVOICE_SALES,
+            Document.is_proforma == False,
+            Document.document_date >= date_from_obj,
+            Document.document_date <= date_to_obj,
+        )
+    )
+    
+    if currency_id:
+        sales_invoice_query = sales_invoice_query.filter(Document.currency_id == currency_id)
+    
+    if fiscal_year_id:
+        sales_invoice_query = sales_invoice_query.filter(Document.fiscal_year_id == fiscal_year_id)
+    
+    sales_invoices = sales_invoice_query.all()
+    invoice_ids = [inv.id for inv in sales_invoices]
+    
+    if not invoice_ids:
+        # اگر هیچ فاکتور فروشی وجود ندارد، فقط لیست کالاها را برگردان
+        items = []
+        category_dict = {}
+        product_category_ids = {p.category_id for p in products if p.category_id}
+        if product_category_ids:
+            categories = db.query(BusinessCategory).filter(
+                BusinessCategory.id.in_(list(product_category_ids))
+            ).all()
+            for cat in categories:
+                title = ''
+                if isinstance(cat.title_translations, dict):
+                    title = cat.title_translations.get('fa') or cat.title_translations.get('en') or cat.title_translations.get('default') or ''
+                category_dict[cat.id] = title
+        
+        for product in products:
+            category_name = category_dict.get(product.category_id, '') if product.category_id else ''
+            
+            if not include_zero_sales:
+                continue
+            
+            items.append({
+                'product_id': product.id,
+                'product_code': product.code or '',
+                'product_name': product.name or '',
+                'unit': product.main_unit or '',
+                'category_name': category_name,
+                'total_quantity': 0.0,
+                'total_amount': 0.0,
+                'average_price': None,
+                'last_sale_date': None,
+            })
+        
+        return {
+            'items': items[skip:skip + take],
+            'summary': {
+                'total_count': len(items),
+                'total_quantity': 0.0,
+                'total_amount': 0.0,
+            },
+            'pagination': {
+                'total': len(items),
+                'page': (skip // take) + 1 if take > 0 else 1,
+                'per_page': take,
+                'total_pages': (len(items) + take - 1) // take if take > 0 else 0,
+                'has_next': (skip + take) < len(items),
+                'has_prev': skip > 0,
+            }
+        }
+    
+    # دریافت خطوط فاکتور فروش
+    sales_lines = db.query(InvoiceItemLine).filter(
+        InvoiceItemLine.document_id.in_(invoice_ids)
+    ).all()
+    
+    # گروه‌بندی خطوط بر اساس product_id
+    product_sales = {}
+    product_ids_with_sales = set()
+    
+    for line in sales_lines:
+        if not line.product_id:
+            continue
+        
+        product_ids_with_sales.add(line.product_id)
+        
+        if line.product_id not in product_sales:
+            product_sales[line.product_id] = {
+                'total_quantity': Decimal(0),
+                'total_amount': Decimal(0),
+                'last_sale_date': None,
+                'invoice_dates': [],
+            }
+        
+        qty = Decimal(str(line.quantity or 0))
+        line_total = Decimal(0)
+        
+        # محاسبه line_total از extra_info
+        extra_info = line.extra_info or {}
+        
+        # استفاده از line_total از extra_info اگر موجود باشد
+        if 'line_total' in extra_info and extra_info['line_total'] is not None:
+            line_total = Decimal(str(extra_info['line_total']))
+        else:
+            # محاسبه line_total از unit_price، discount و tax
+            unit_price = Decimal(str(extra_info.get('unit_price', 0) or 0))
+            line_discount = Decimal(str(extra_info.get('line_discount', 0) or 0))
+            tax_amount = Decimal(str(extra_info.get('tax_amount', 0) or 0))
+            
+            if unit_price > 0 and qty > 0:
+                line_total = (unit_price * qty) - line_discount + tax_amount
+        
+        product_sales[line.product_id]['total_quantity'] += qty
+        product_sales[line.product_id]['total_amount'] += line_total
+        
+        # پیدا کردن تاریخ آخرین فروش
+        try:
+            invoice = next((inv for inv in sales_invoices if inv.id == line.document_id), None)
+            if invoice:
+                product_sales[line.product_id]['invoice_dates'].append(invoice.document_date)
+        except Exception:
+            pass
+    
+    # پیدا کردن آخرین تاریخ فروش برای هر کالا
+    for product_id in product_sales:
+        dates = product_sales[product_id]['invoice_dates']
+        if dates:
+            product_sales[product_id]['last_sale_date'] = max(dates)
+    
+    # ساخت dict برای دسته‌بندی‌ها
+    category_dict = {}
+    product_category_ids = {p.category_id for p in products if p.category_id}
+    if product_category_ids:
+        categories = db.query(BusinessCategory).filter(
+            BusinessCategory.id.in_(list(product_category_ids))
+        ).all()
+        for cat in categories:
+            title = ''
+            if isinstance(cat.title_translations, dict):
+                title = cat.title_translations.get('fa') or cat.title_translations.get('en') or cat.title_translations.get('default') or ''
+            category_dict[cat.id] = title
+    
+    # ساخت لیست نتایج
+    items = []
+    
+    for product in products:
+        sales_data = product_sales.get(product.id, {})
+        total_quantity = float(sales_data.get('total_quantity', Decimal(0)))
+        total_amount = float(sales_data.get('total_amount', Decimal(0)))
+        last_sale_date = sales_data.get('last_sale_date')
+        
+        # اگر include_zero_sales=False و فروش صفر است، از لیست خارج کن
+        if not include_zero_sales and total_quantity == 0:
+            continue
+        
+        # محاسبه میانگین قیمت
+        average_price = None
+        if total_quantity > 0 and total_amount > 0:
+            average_price = float(total_amount / total_quantity)
+        
+        category_name = category_dict.get(product.category_id, '') if product.category_id else ''
+        
+        items.append({
+            'product_id': product.id,
+            'product_code': product.code or '',
+            'product_name': product.name or '',
+            'unit': product.main_unit or '',
+            'category_name': category_name,
+            'total_quantity': total_quantity,
+            'total_amount': total_amount,
+            'average_price': average_price,
+            'last_sale_date': last_sale_date.isoformat() if last_sale_date else None,
+        })
+    
+    # مرتب‌سازی بر اساس نام کالا
+    items.sort(key=lambda x: x.get('product_name', ''))
+    
+    # اعمال pagination
+    total = len(items)
+    paginated_items = items[skip:skip + take]
+    
+    total_pages = (total + take - 1) // take if take > 0 else 0
+    current_page = (skip // take) + 1 if take > 0 else 1
+    
+    # محاسبه مجموع‌ها
+    total_quantity_sum = sum(item.get('total_quantity', 0) for item in items)
+    total_amount_sum = sum(item.get('total_amount', 0) for item in items)
+    
+    return {
+        'items': paginated_items,
+        'summary': {
+            'total_count': total,
+            'total_quantity': float(total_quantity_sum),
+            'total_amount': float(total_amount_sum),
+        },
+        'pagination': {
+            'total': total,
+            'page': current_page,
+            'per_page': take,
+            'total_pages': total_pages,
+            'has_next': current_page < total_pages,
+            'has_prev': current_page > 1,
+        }
+    }
+
+
+def get_inventory_kardex_report(
+    db: Session,
+    business_id: int,
+    fiscal_year_id: Optional[int] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    product_ids: Optional[List[int]] = None,
+    warehouse_ids: Optional[List[int]] = None,
+    category_ids: Optional[List[int]] = None,
+    search: Optional[str] = None,
+    skip: int = 0,
+    take: int = 50,
+) -> Dict[str, Any]:
+    """
+    گزارش کاردکس موجودی
+    
+    نمایش جزئیات حرکات هر کالا در یک بازه زمانی با محاسبه مانده تجمعی
+    
+    Args:
+        db: نشست پایگاه داده
+        business_id: شناسه کسب‌وکار
+        fiscal_year_id: شناسه سال مالی (اختیاری)
+        date_from: از تاریخ (اختیاری، فرمت YYYY-MM-DD)
+        date_to: تا تاریخ (اختیاری، فرمت YYYY-MM-DD)
+        product_ids: لیست شناسه‌های کالاها (اختیاری)
+        warehouse_ids: لیست شناسه‌های انبارها (اختیاری)
+        category_ids: لیست شناسه‌های دسته‌بندی‌ها (اختیاری)
+        search: جستجو در کد یا نام کالا (اختیاری)
+        skip: تعداد رکوردهای رد شده برای pagination
+        take: تعداد رکوردهای برگشتی
+    
+    Returns:
+        dict: {
+            'items': لیست حرکات کاردکس,
+            'summary': خلاصه آمار,
+            'pagination': اطلاعات pagination
+        }
+    """
+    from datetime import date, timedelta
+    from sqlalchemy import or_
+    from app.services.invoice_service import _iter_product_movements, _compute_available_stock
+    from adapters.db.models.document import Document
+    from adapters.db.models.warehouse import Warehouse
+    from adapters.db.models.category import BusinessCategory
+    
+    # تبدیل تاریخ‌ها
+    date_from_obj = None
+    date_to_obj = None
+    if date_from:
+        try:
+            from datetime import datetime
+            date_from_obj = datetime.strptime(date_from, '%Y-%m-%d').date()
+        except Exception:
+            pass
+    if date_to:
+        try:
+            from datetime import datetime
+            date_to_obj = datetime.strptime(date_to, '%Y-%m-%d').date()
+        except Exception:
+            pass
+    
+    # اگر date_from مشخص نشده، از ابتدای سال مالی استفاده کن
+    if date_from_obj is None and fiscal_year_id:
+        try:
+            from adapters.db.models.fiscal_year import FiscalYear
+            fiscal_year = db.query(FiscalYear).filter(FiscalYear.id == fiscal_year_id).first()
+            if fiscal_year:
+                date_from_obj = fiscal_year.start_date
+        except Exception:
+            pass
+    
+    # اگر date_to مشخص نشده، تا امروز استفاده کن
+    if date_to_obj is None:
+        date_to_obj = date.today()
+    
+    # اگر date_from مشخص نشده، از تاریخ روز استفاده کن
+    if date_from_obj is None:
+        date_from_obj = date.today()
+    
+    # Query کالاها برای فیلتر
+    query = db.query(Product).filter(
+        Product.business_id == business_id,
+        Product.track_inventory == True,  # فقط کالاهای با کنترل موجودی
+        Product.item_type == ProductItemType.PRODUCT,  # فقط کالاها
+    )
+    
+    # فیلتر کالاها
+    if product_ids:
+        query = query.filter(Product.id.in_(product_ids))
+    
+    # فیلتر دسته‌بندی
+    if category_ids:
+        query = query.filter(Product.category_id.in_(category_ids))
+    
+    # فیلتر جستجو
+    if search and search.strip():
+        search_filter = or_(
+            Product.code.ilike(f'%{search}%'),
+            Product.name.ilike(f'%{search}%'),
+        )
+        query = query.filter(search_filter)
+    
+    products = query.all()
+    
+    if not products:
+        return {
+            'items': [],
+            'summary': {
+                'total_count': 0,
+            },
+            'pagination': {
+                'total': 0,
+                'page': 1,
+                'per_page': take,
+                'total_pages': 0,
+                'has_next': False,
+                'has_prev': False,
+            }
+        }
+    
+    product_id_list = [p.id for p in products]
+    
+    # دریافت تمام حرکات تا date_to
+    all_movements = _iter_product_movements(
+        db,
+        business_id,
+        product_id_list,
+        warehouse_ids,
+        date_to_obj,
+    )
+    
+    # فیلتر حرکات در بازه تاریخ و فیلتر انبار
+    filtered_movements = []
+    for mv in all_movements:
+        mv_date = mv.get("document_date")
+        if not mv_date:
+            continue
+        
+        # فیلتر تاریخ
+        if mv_date < date_from_obj:
+            continue
+        if mv_date > date_to_obj:
+            continue
+        
+        # فیلتر انبار
+        if warehouse_ids:
+            mv_wh_id = mv.get("warehouse_id")
+            if mv_wh_id is None:
+                continue
+            if int(mv_wh_id) not in warehouse_ids:
+                continue
+        
+        filtered_movements.append(mv)
+    
+    # دریافت اطلاعات سند برای هر حرکت
+    document_ids = list(set(mv.get("document_id") for mv in filtered_movements if mv.get("document_id")))
+    documents_dict = {}
+    if document_ids:
+        documents = db.query(Document).filter(Document.id.in_(document_ids)).all()
+        for doc in documents:
+            documents_dict[doc.id] = doc
+    
+    # دریافت اطلاعات انبار
+    warehouse_dict = {}
+    if warehouse_ids:
+        warehouses = db.query(Warehouse).filter(Warehouse.id.in_(warehouse_ids)).all()
+        for wh in warehouses:
+            warehouse_dict[wh.id] = wh
+    
+    # تابع برای تبدیل document_type به نام فارسی
+    def _get_document_type_name(doc_type: str | None) -> str:
+        if not doc_type:
+            return ""
+        doc_type = doc_type.strip()
+        mapping = {
+            "invoice_sales": "فروش",
+            "invoice_sales_return": "برگشت از فروش",
+            "invoice_purchase": "خرید",
+            "invoice_purchase_return": "برگشت از خرید",
+            "invoice_direct_consumption": "مصرف مستقیم",
+            "invoice_production": "تولید",
+            "invoice_waste": "ضایعات",
+            "inventory_transfer": "انتقال موجودی",
+            "production": "تولید",
+            "opening_balance": "موجودی اولیه",
+            "expense": "هزینه",
+            "income": "درآمد",
+            "receipt": "دریافت",
+            "payment": "پرداخت",
+            "transfer": "انتقال",
+            "manual": "سند دستی",
+            "invoice": "فاکتور",
+            "check": "چک",
+        }
+        return mapping.get(doc_type, doc_type)
+    
+    # ساخت dict برای کالاها
+    products_dict = {p.id: p for p in products}
+    
+    # ساخت لیست حرکات کاردکس با محاسبه مانده تجمعی
+    kardex_items = []
+    balance_by_product = {}  # {product_id: Decimal}
+    
+    # مرتب‌سازی حرکات بر اساس تاریخ و document_id
+    filtered_movements.sort(key=lambda x: (x.get("document_date"), x.get("document_id"), x.get("product_id")))
+    
+    for mv in filtered_movements:
+        product_id = mv.get("product_id")
+        if not product_id:
+            continue
+        
+        product = products_dict.get(product_id)
+        if not product:
+            continue
+        
+        document_id = mv.get("document_id")
+        document = documents_dict.get(document_id) if document_id else None
+        
+        mv_date = mv.get("document_date")
+        movement = mv.get("movement")  # "in" or "out"
+        quantity = Decimal(str(mv.get("quantity") or 0))
+        cost_price = mv.get("cost_price")
+        warehouse_id = mv.get("warehouse_id")
+        
+        # محاسبه مانده تجمعی
+        if product_id not in balance_by_product:
+            # محاسبه مانده ابتدای دوره
+            if date_from_obj:
+                date_before_from = date_from_obj - timedelta(days=1)
+                balance_by_product[product_id] = _compute_available_stock(
+                    db, business_id, product_id, warehouse_id, date_before_from
+                )
+            else:
+                balance_by_product[product_id] = Decimal(0)
+        
+        # به‌روزرسانی مانده
+        if movement == "in":
+            balance_by_product[product_id] += quantity
+        elif movement == "out":
+            balance_by_product[product_id] -= quantity
+        
+        # محاسبه مبلغ کل
+        total_amount = None
+        if cost_price is not None and quantity > 0:
+            try:
+                total_amount = float(Decimal(str(cost_price)) * quantity)
+            except Exception:
+                pass
+        
+        # اطلاعات انبار
+        warehouse_name = None
+        if warehouse_id and warehouse_id in warehouse_dict:
+            warehouse_name = warehouse_dict[warehouse_id].name
+        
+        # اطلاعات سند
+        document_type_name = ""
+        document_code = ""
+        document_description = None
+        if document:
+            document_type_name = _get_document_type_name(document.document_type)
+            document_code = document.code or ""
+            document_description = document.description
+        
+        kardex_items.append({
+            'product_id': product_id,
+            'product_code': product.code or '',
+            'product_name': product.name or '',
+            'document_date': mv_date.isoformat() if mv_date else None,
+            'document_type': document.document_type if document else None,
+            'document_type_name': document_type_name,
+            'document_code': document_code,
+            'document_id': document_id,
+            'movement': movement,
+            'quantity_in': float(quantity) if movement == "in" else 0.0,
+            'quantity_out': float(quantity) if movement == "out" else 0.0,
+            'balance': float(balance_by_product[product_id]),
+            'unit_price': float(cost_price) if cost_price is not None else None,
+            'total_amount': total_amount,
+            'warehouse_id': warehouse_id,
+            'warehouse_name': warehouse_name,
+            'description': document_description or '',
+        })
+    
+    # مرتب‌سازی بر اساس تاریخ، product_id
+    kardex_items.sort(key=lambda x: (
+        x.get('document_date') or '',
+        x.get('product_id', 0),
+        x.get('document_id', 0),
+    ))
+    
+    # اعمال pagination
+    total = len(kardex_items)
+    paginated_items = kardex_items[skip:skip + take]
+    
+    total_pages = (total + take - 1) // take if take > 0 else 0
+    current_page = (skip // take) + 1 if take > 0 else 1
+    
+    return {
+        'items': paginated_items,
+        'summary': {
+            'total_count': total,
+        },
+        'pagination': {
+            'total': total,
+            'page': current_page,
+            'per_page': take,
+            'total_pages': total_pages,
+            'has_next': current_page < total_pages,
+            'has_prev': current_page > 1,
+        }
     }
 
 

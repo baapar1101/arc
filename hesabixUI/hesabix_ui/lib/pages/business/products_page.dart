@@ -16,6 +16,7 @@ import '../../config/app_config.dart';
 import '../../core/auth_store.dart';
 import '../../utils/number_formatters.dart';
 import '../../utils/date_formatters.dart';
+import '../../services/warehouse_service.dart';
 import 'price_lists_page.dart';
 
 class ProductsPage extends StatefulWidget {
@@ -613,6 +614,20 @@ class _ProductsPageState extends State<ProductsPage> {
     );
   }
   
+  Widget _buildProductStockTab({
+    required BuildContext dialogContext,
+    required int? productId,
+    required bool trackInventory,
+    required AppLocalizations t,
+  }) {
+    return _ProductStockTabWidget(
+      businessId: widget.businessId,
+      productId: productId,
+      trackInventory: trackInventory,
+      t: t,
+    );
+  }
+
   Future<void> _showProductDetailsDialog(Map<String, dynamic> product) async {
     final t = AppLocalizations.of(context);
     final fullImageUrl = _buildFullImageUrl(product['image_url'] as String?);
@@ -703,7 +718,7 @@ class _ProductsPageState extends State<ProductsPage> {
               insetPadding: const EdgeInsets.all(24),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               child: DefaultTabController(
-                length: 2,
+                length: 3,
                 child: ConstrainedBox(
                   constraints: BoxConstraints(
                     maxWidth: 900,
@@ -735,6 +750,10 @@ class _ProductsPageState extends State<ProductsPage> {
                                   text: t.productGeneralInfo,
                                 ),
                                 Tab(
+                                  icon: const Icon(Icons.warehouse_outlined),
+                                  text: t.productStock,
+                                ),
+                                Tab(
                                   icon: const Icon(Icons.attach_file),
                                   text: t.documents,
                                 ),
@@ -757,6 +776,12 @@ class _ProductsPageState extends State<ProductsPage> {
                               trackingLabel: tracking,
                               serviceType: serviceType,
                               barcode: barcode,
+                              t: t,
+                            ),
+                            _buildProductStockTab(
+                              dialogContext: dialogContext,
+                              productId: productId,
+                              trackInventory: product['track_inventory'] == true,
                               t: t,
                             ),
                             buildDocumentsTab(),
@@ -1043,6 +1068,92 @@ class _ProductsPageState extends State<ProductsPage> {
                 return warehouseName;
               },
             ),
+            // موجودی انبارداری (فیزیکی)
+            NumberColumn(
+              'inventory_stock_physical',
+              'موجودی انبارداری',
+              width: ColumnWidth.medium,
+              decimalPlaces: 0,
+              sortable: false,
+              formatter: (row) {
+                if (row['track_inventory'] != true) {
+                  return '-';
+                }
+                final stock = row['inventory_stock_physical'];
+                if (stock == null) {
+                  return '-';
+                }
+                return formatWithThousands(stock, decimalPlaces: 0);
+              },
+            ),
+            // موجودی مالی
+            NumberColumn(
+              'inventory_stock_financial',
+              'موجودی مالی',
+              width: ColumnWidth.medium,
+              decimalPlaces: 0,
+              sortable: false,
+              formatter: (row) {
+                if (row['track_inventory'] != true) {
+                  return '-';
+                }
+                final stock = row['inventory_stock_financial'];
+                if (stock == null) {
+                  return '-';
+                }
+                return formatWithThousands(stock, decimalPlaces: 0);
+              },
+            ),
+            // شارژ انبار
+            CustomColumn(
+              'warehouse_recharge',
+              'نیاز به شارژ انبار',
+              width: ColumnWidth.small,
+              sortable: false,
+              searchable: false,
+              builder: (item, index) {
+                final trackInventory = item['track_inventory'] == true;
+                if (!trackInventory) {
+                  return const Center(child: Text('-'));
+                }
+                
+                final stockFinancial = item['inventory_stock_financial'];
+                final reorderPoint = item['reorder_point'];
+                
+                // اگر موجودی مالی یا نقطه سفارش مجدد null باشد، ضربدر نمایش بده
+                if (stockFinancial == null || reorderPoint == null) {
+                  return const Center(
+                    child: Icon(
+                      Icons.close,
+                      color: Colors.red,
+                      size: 20,
+                    ),
+                  );
+                }
+                
+                final stock = (stockFinancial is num) ? stockFinancial.toDouble() : 0.0;
+                final reorder = (reorderPoint is num) ? reorderPoint.toDouble() : 0.0;
+                
+                // اگر موجودی مالی کمتر از نقطه سفارش مجدد باشد، تیک بزن
+                if (stock < reorder) {
+                  return const Center(
+                    child: Icon(
+                      Icons.check_circle,
+                      color: Colors.green,
+                      size: 20,
+                    ),
+                  );
+                } else {
+                  return const Center(
+                    child: Icon(
+                      Icons.close,
+                      color: Colors.red,
+                      size: 20,
+                    ),
+                  );
+                }
+              },
+            ),
             NumberColumn('reorder_point', t.reorderPoint, width: ColumnWidth.small, decimalPlaces: 0),
             NumberColumn('min_order_qty', t.minOrderQty, width: ColumnWidth.small, decimalPlaces: 0),
             // Taxes
@@ -1308,9 +1419,382 @@ class _ProductsPageState extends State<ProductsPage> {
               ),
             ),
           ],
+          additionalParams: {
+            'include_inventory': true,
+          },
           onRowTap: (item) => _showProductDetailsDialog(item),
         ),
         fromJson: (json) => json,
+      ),
+    );
+  }
+}
+
+class _ProductStockTabWidget extends StatefulWidget {
+  final int businessId;
+  final int? productId;
+  final bool trackInventory;
+  final AppLocalizations t;
+
+  const _ProductStockTabWidget({
+    required this.businessId,
+    required this.productId,
+    required this.trackInventory,
+    required this.t,
+  });
+
+  @override
+  State<_ProductStockTabWidget> createState() => _ProductStockTabWidgetState();
+}
+
+class _ProductStockTabWidgetState extends State<_ProductStockTabWidget> {
+  final WarehouseService _warehouseService = WarehouseService();
+  bool _stockLoading = false;
+  List<dynamic> _stockItems = [];
+  DateTime? _stockAsOfDate = DateTime.now();
+  bool _includeZeroStock = false;
+  double _totalStock = 0.0;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.productId != null && widget.trackInventory) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _loadProductStock();
+      });
+    }
+  }
+
+  Future<void> _loadProductStock() async {
+    if (widget.productId == null || !widget.trackInventory) return;
+
+    setState(() {
+      _stockLoading = true;
+    });
+
+    try {
+      final query = {
+        'product_ids': [widget.productId],
+        'as_of_date': _stockAsOfDate?.toIso8601String().split('T')[0] ??
+            DateTime.now().toIso8601String().split('T')[0],
+        'include_zero': _includeZeroStock,
+      };
+
+      final res = await _warehouseService.getStockReport(
+        businessId: widget.businessId,
+        query: query,
+      );
+
+      final items = List<dynamic>.from(res['items'] ?? []);
+      final total = items.fold<double>(
+        0.0,
+        (sum, item) => sum + ((item['quantity'] as num?)?.toDouble() ?? 0.0),
+      );
+
+      if (mounted) {
+        setState(() {
+          _stockItems = items;
+          _totalStock = total;
+          _stockLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _stockLoading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('خطا در بارگذاری موجودی: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    // If product doesn't track inventory
+    if (!widget.trackInventory) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.inventory_2_outlined,
+                size: 64,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                widget.t.inventoryNotTracked,
+                style: theme.textTheme.bodyLarge,
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // If product ID is null
+    if (widget.productId == null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Text(
+            'برای نمایش موجودی، ابتدا کالا باید ذخیره شود.',
+            style: theme.textTheme.bodyMedium,
+            textAlign: TextAlign.center,
+          ),
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Header with title and refresh button
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                widget.t.productStockInWarehouses,
+                style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+              ),
+              IconButton(
+                icon: _stockLoading
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.refresh),
+                onPressed: _stockLoading ? null : _loadProductStock,
+                tooltip: widget.t.refreshStock,
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // Filters
+          Card(
+            elevation: 0,
+            margin: EdgeInsets.zero,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(color: theme.dividerColor),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextFormField(
+                          decoration: InputDecoration(
+                            labelText: widget.t.stockReportDate,
+                            border: const OutlineInputBorder(),
+                            suffixIcon: const Icon(Icons.calendar_today),
+                          ),
+                          readOnly: true,
+                          controller: TextEditingController(
+                            text: _stockAsOfDate != null
+                                ? '${_stockAsOfDate!.year}-${_stockAsOfDate!.month.toString().padLeft(2, '0')}-${_stockAsOfDate!.day.toString().padLeft(2, '0')}'
+                                : '',
+                          ),
+                          onTap: () async {
+                            final date = await showDatePicker(
+                              context: context,
+                              initialDate: _stockAsOfDate ?? DateTime.now(),
+                              firstDate: DateTime(2000),
+                              lastDate: DateTime(2100),
+                            );
+                            if (date != null) {
+                              setState(() {
+                                _stockAsOfDate = date;
+                              });
+                              _loadProductStock();
+                            }
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      CheckboxListTile(
+                        title: Text(widget.t.showZeroStock),
+                        value: _includeZeroStock,
+                        onChanged: (value) {
+                          setState(() {
+                            _includeZeroStock = value ?? false;
+                          });
+                          _loadProductStock();
+                        },
+                        controlAffinity: ListTileControlAffinity.leading,
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Total stock summary
+          if (_stockItems.isNotEmpty)
+            Card(
+              elevation: 0,
+              margin: EdgeInsets.zero,
+              color: theme.colorScheme.primaryContainer,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      widget.t.totalStock,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: theme.colorScheme.onPrimaryContainer,
+                      ),
+                    ),
+                    Text(
+                      formatWithThousands(_totalStock, decimalPlaces: 2),
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: theme.colorScheme.onPrimaryContainer,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          if (_stockItems.isNotEmpty) const SizedBox(height: 16),
+
+          // Stock table
+          Expanded(
+            child: _stockLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _stockItems.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.warehouse_outlined,
+                              size: 64,
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              widget.t.noStockRecorded,
+                              style: theme.textTheme.bodyLarge,
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
+                      )
+                    : Card(
+                        elevation: 0,
+                        margin: EdgeInsets.zero,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: DataTable(
+                            columns: [
+                              DataColumn(
+                                label: Text(
+                                  widget.t.warehouseCode,
+                                  style: theme.textTheme.titleSmall?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                              DataColumn(
+                                label: Text(
+                                  widget.t.warehouseName,
+                                  style: theme.textTheme.titleSmall?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                              DataColumn(
+                                label: Text(
+                                  widget.t.stockQuantity,
+                                  style: theme.textTheme.titleSmall?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                numeric: true,
+                              ),
+                              DataColumn(
+                                label: Text(
+                                  'واحد',
+                                  style: theme.textTheme.titleSmall?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ],
+                            rows: _stockItems.map<DataRow>((item) {
+                              final quantity = (item['quantity'] as num?)?.toDouble() ?? 0.0;
+                              final isNegative = quantity < 0;
+                              final isLow = quantity > 0 && quantity < 10;
+
+                              return DataRow(
+                                cells: [
+                                  DataCell(
+                                    Text(
+                                      item['warehouse_code']?.toString() ?? '-',
+                                    ),
+                                  ),
+                                  DataCell(
+                                    Text(
+                                      item['warehouse_name']?.toString() ?? '-',
+                                    ),
+                                  ),
+                                  DataCell(
+                                    Text(
+                                      formatWithThousands(quantity, decimalPlaces: 2),
+                                      style: TextStyle(
+                                        color: isNegative
+                                            ? Colors.red
+                                            : isLow
+                                                ? Colors.orange
+                                                : null,
+                                        fontWeight: isNegative || isLow
+                                            ? FontWeight.w600
+                                            : null,
+                                      ),
+                                    ),
+                                  ),
+                                  DataCell(
+                                    Text(
+                                      item['unit']?.toString() ?? '-',
+                                    ),
+                                  ),
+                                ],
+                              );
+                            }).toList(),
+                          ),
+                        ),
+                      ),
+          ),
+        ],
       ),
     );
   }

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/core/auth_store.dart';
+import 'package:hesabix_ui/core/calendar_controller.dart';
+import 'package:hesabix_ui/core/date_utils.dart' show HesabixDateUtils;
 import 'package:hesabix_ui/models/ai_models.dart';
 import 'package:hesabix_ui/services/ai_service.dart';
 
@@ -8,17 +10,20 @@ import 'package:hesabix_ui/services/ai_service.dart';
 class AIChatDialog extends StatefulWidget {
   final int? businessId;
   final AuthStore authStore;
+  final CalendarController? calendarController;
 
   const AIChatDialog({
     super.key,
     this.businessId,
     required this.authStore,
+    this.calendarController,
   });
 
   static Future<void> show(
     BuildContext context, {
     required AuthStore authStore,
     int? businessId,
+    CalendarController? calendarController,
   }) {
     return showDialog(
       context: context,
@@ -26,6 +31,7 @@ class AIChatDialog extends StatefulWidget {
       builder: (_) => AIChatDialog(
         businessId: businessId,
         authStore: authStore,
+        calendarController: calendarController,
       ),
     );
   }
@@ -43,6 +49,9 @@ class _AIChatDialogState extends State<AIChatDialog> {
   final ScrollController _scrollController = ScrollController();
   bool _sessionsLoading = true;
   bool _sending = false;
+  bool _historyCollapsed = true;
+
+  bool get _isJalali => widget.calendarController?.isJalali ?? true;
 
   @override
   void initState() {
@@ -66,6 +75,11 @@ class _AIChatDialogState extends State<AIChatDialog> {
         businessId: widget.businessId,
       );
       setState(() {
+        list.sort((a, b) {
+          final aDate = a.updatedAt ?? a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+          final bDate = b.updatedAt ?? b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+          return bDate.compareTo(aDate);
+        });
         _sessions = list;
         _sessionsLoading = false;
       });
@@ -74,7 +88,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
       }
     } catch (e) {
       setState(() => _sessionsLoading = false);
-      _showError('خطا در بارگذاری جلسات: $e');
+      _showError('خطا در بارگذاری گفت‌وگوها: $e');
     }
   }
 
@@ -92,41 +106,16 @@ class _AIChatDialogState extends State<AIChatDialog> {
     }
   }
 
-  Future<void> _createSession() async {
-    final controller = TextEditingController();
-    final title = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('جلسه جدید'),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(
-            labelText: 'عنوان',
-            hintText: 'مثلاً: سوالات مالیاتی',
-          ),
-          autofocus: true,
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('لغو')),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, controller.text.trim()),
-            child: const Text('ایجاد'),
-          ),
-        ],
-      ),
-    );
-
-    if (title == null || title.isEmpty) return;
-
+  Future<void> _startNewConversation() async {
     try {
       final newSession = await _aiService.createChatSession(
-        title: title,
         businessId: widget.businessId,
       );
       await _loadSessions();
       _selectSession(newSession);
+      _showSnackbar('گفت‌وگوی جدید ایجاد شد');
     } catch (e) {
-      _showError('خطا در ایجاد جلسه: $e');
+      _showError('خطا در آغاز گفت‌وگو: $e');
     }
   }
 
@@ -134,8 +123,8 @@ class _AIChatDialogState extends State<AIChatDialog> {
     final confirm = await showDialog<bool>(
           context: context,
           builder: (context) => AlertDialog(
-            title: const Text('حذف جلسه'),
-            content: const Text('آیا از حذف این جلسه مطمئن هستید؟'),
+            title: const Text('حذف گفت‌وگو'),
+            content: const Text('آیا از حذف این گفت‌وگو مطمئن هستید؟'),
             actions: [
               TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('لغو')),
               FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('حذف')),
@@ -148,8 +137,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
     try {
       await _aiService.deleteChatSession(session.id!);
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('جلسه حذف شد')));
+      _showSnackbar('گفت‌وگو حذف شد');
       await _loadSessions();
       if (_sessions.isNotEmpty) {
         _selectSession(_sessions.first);
@@ -160,7 +148,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
         });
       }
     } catch (e) {
-      _showError('حذف جلسه با خطا مواجه شد: $e');
+      _showError('حذف گفت‌وگو با خطا مواجه شد: $e');
     }
   }
 
@@ -183,31 +171,68 @@ class _AIChatDialogState extends State<AIChatDialog> {
     });
     _scrollToBottom();
 
+    // ایجاد پیام assistant با محتوای خالی برای streaming
+    final assistantMessageIndex = _messages.length;
+    final assistantMessage = AIChatMessage(
+      sessionId: _currentSession!.id!,
+      role: MessageRole.assistant,
+      content: '', // به تدریج پر می‌شود
+      createdAt: DateTime.now(),
+    );
+
+    setState(() {
+      _messages.add(assistantMessage);
+    });
+    _scrollToBottom();
+
     try {
-      final response = await _aiService.sendMessage(
+      String accumulatedContent = '';
+      
+      await for (final chunk in _aiService.sendMessageStream(
         sessionId: _currentSession!.id!,
         content: content,
-      );
-      final msg = response['message'] as Map<String, dynamic>;
-      final usage = response['usage'] as Map<String, dynamic>? ?? {};
-
-      final assistantMessage = AIChatMessage(
-        sessionId: _currentSession!.id!,
-        role: MessageRole.fromString(msg['role'] as String? ?? 'assistant'),
-        content: msg['content'] as String? ?? '',
-        tokensUsed: usage['total_tokens'] as int? ?? 0,
-        createdAt: msg['created_at'] != null
-            ? DateTime.parse(msg['created_at'] as String)
-            : DateTime.now(),
-      );
-
-      setState(() {
-        _messages.add(assistantMessage);
-        _sending = false;
-      });
-      _scrollToBottom();
+        onComplete: (usage, messageId) {
+          // به‌روزرسانی usage stats و message ID
+          setState(() {
+            _messages[assistantMessageIndex] = AIChatMessage(
+              sessionId: _currentSession!.id!,
+              role: MessageRole.assistant,
+              content: accumulatedContent,
+              tokensUsed: usage?['total_tokens'] as int? ?? 0,
+              createdAt: _messages[assistantMessageIndex].createdAt,
+            );
+            _sending = false;
+          });
+          _scrollToBottom();
+        },
+        onError: (error) {
+          setState(() {
+            _sending = false;
+            _messages.removeAt(assistantMessageIndex);
+          });
+          _showError('ارسال پیام ناموفق بود: $error');
+        },
+      )) {
+        accumulatedContent += chunk;
+        
+        // به‌روزرسانی UI به صورت real-time
+        setState(() {
+          _messages[assistantMessageIndex] = AIChatMessage(
+            sessionId: _currentSession!.id!,
+            role: MessageRole.assistant,
+            content: accumulatedContent,
+            createdAt: _messages[assistantMessageIndex].createdAt,
+          );
+        });
+        _scrollToBottom();
+      }
     } catch (e) {
-      setState(() => _sending = false);
+      setState(() {
+        _sending = false;
+        if (_messages.length > assistantMessageIndex) {
+          _messages.removeAt(assistantMessageIndex);
+        }
+      });
       _showError('ارسال پیام ناموفق بود: $e');
     }
   }
@@ -225,6 +250,11 @@ class _AIChatDialogState extends State<AIChatDialog> {
   }
 
   void _showError(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  void _showSnackbar(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
@@ -252,15 +282,13 @@ class _AIChatDialogState extends State<AIChatDialog> {
                   const SizedBox(width: 8),
                   Text(
                     'دستیار هوش مصنوعی',
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                   ),
                   const Spacer(),
                   FilledButton.icon(
-                    onPressed: _createSession,
-                    icon: const Icon(Icons.add),
-                    label: const Text('جلسه جدید'),
+                    onPressed: _startNewConversation,
+                    icon: const Icon(Icons.add_comment),
+                    label: const Text('گفت‌وگوی جدید'),
                   ),
                   const SizedBox(width: 8),
                   IconButton(
@@ -274,50 +302,35 @@ class _AIChatDialogState extends State<AIChatDialog> {
             Expanded(
               child: Row(
                 children: [
-                  SizedBox(
-                    width: 280,
-                    child: Column(
-                      children: [
-                        Expanded(
-                          child: _sessionsLoading
-                              ? const Center(child: CircularProgressIndicator())
-                              : _sessions.isEmpty
-                                  ? const Center(child: Text('جلسه‌ای وجود ندارد'))
-                                  : ListView.builder(
-                                      itemCount: _sessions.length,
-                                      itemBuilder: (context, index) {
-                                        final session = _sessions[index];
-                                        final bool selected =
-                                            _currentSession?.id == session.id;
-                                        return ListTile(
-                                          selected: selected,
-                                          title: Text(
-                                            session.title,
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                          subtitle: session.updatedAt != null
-                                              ? Text(
-                                                  '${session.updatedAt!.year}/${session.updatedAt!.month}/${session.updatedAt!.day}',
-                                                )
-                                              : null,
-                                          trailing: IconButton(
-                                            icon: const Icon(Icons.delete_outline),
-                                            tooltip: 'حذف',
-                                            onPressed: () => _deleteSession(session),
-                                          ),
-                                          onTap: () => _selectSession(session),
-                                        );
-                                      },
-                                    ),
-                        ),
-                      ],
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 250),
+                    width: _historyCollapsed ? 0 : 260,
+                    child: _historyCollapsed
+                        ? const SizedBox.shrink()
+                        : Container(
+                            decoration: BoxDecoration(
+                              border: Border(
+                                right: BorderSide(color: theme.dividerColor),
+                              ),
+                            ),
+                            child: _buildHistoryPanel(theme),
+                          ),
+                  ),
+                  Container(
+                    width: 40,
+                    alignment: Alignment.topCenter,
+                    child: IconButton(
+                      tooltip: _historyCollapsed ? 'نمایش گفت‌وگوها' : 'مخفی‌سازی گفت‌وگوها',
+                      onPressed: () => setState(() => _historyCollapsed = !_historyCollapsed),
+                      icon: Icon(
+                        _historyCollapsed ? Icons.chevron_right : Icons.chevron_left,
+                      ),
                     ),
                   ),
                   const VerticalDivider(width: 1),
                   Expanded(
                     child: _currentSession == null
-                        ? const Center(child: Text('ابتدا یک جلسه را انتخاب کنید'))
+                        ? const Center(child: Text('ابتدا یک گفت‌وگو را انتخاب کنید'))
                         : Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
@@ -336,9 +349,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
                               Expanded(
                                 child: _messages.isEmpty
                                     ? const Center(
-                                        child: Text(
-                                          'پیامی وجود ندارد. گفتگو را آغاز کنید.',
-                                        ),
+                                        child: Text('پیامی وجود ندارد. گفت‌وگو را آغاز کنید.'),
                                       )
                                     : ListView.builder(
                                         controller: _scrollController,
@@ -390,8 +401,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
                               Container(
                                 padding: const EdgeInsets.all(16),
                                 decoration: BoxDecoration(
-                                  color: theme.colorScheme.surfaceVariant
-                                      .withOpacity(0.3),
+                                  color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
                                   border: Border(
                                     top: BorderSide(color: theme.dividerColor),
                                   ),
@@ -417,8 +427,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
                                           ? const SizedBox(
                                               width: 16,
                                               height: 16,
-                                              child:
-                                                  CircularProgressIndicator(strokeWidth: 2),
+                                              child: CircularProgressIndicator(strokeWidth: 2),
                                             )
                                           : const Icon(Icons.send),
                                       label: const Text('ارسال'),
@@ -435,6 +444,39 @@ class _AIChatDialogState extends State<AIChatDialog> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildHistoryPanel(ThemeData theme) {
+    if (_sessionsLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_sessions.isEmpty) {
+      return const Center(child: Text('گفت‌وگویی وجود ندارد'));
+    }
+    return ListView.builder(
+      itemCount: _sessions.length,
+      itemBuilder: (context, index) {
+        final session = _sessions[index];
+        final selected = _currentSession?.id == session.id;
+        final stamp = session.updatedAt ?? session.createdAt ?? DateTime.now();
+        final dateText = HesabixDateUtils.formatForDisplay(stamp, _isJalali);
+        return ListTile(
+          selected: selected,
+          title: Text(
+            session.title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          subtitle: Text(dateText),
+          trailing: IconButton(
+            icon: const Icon(Icons.delete_outline),
+            tooltip: 'حذف گفت‌وگو',
+            onPressed: () => _deleteSession(session),
+          ),
+          onTap: () => _selectSession(session),
+        );
+      },
     );
   }
 }

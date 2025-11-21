@@ -3,7 +3,7 @@ import json
 from sqlalchemy.exc import IntegrityError
 from app.core.responses import ApiError
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_, func
+from sqlalchemy import and_, or_, func, String
 from adapters.db.models.person import Person, PersonBankAccount, PersonType
 from adapters.db.models.business import Business
 from adapters.db.models.document import Document
@@ -761,3 +761,626 @@ def calculate_persons_balances_bulk(
         balances[person_id] = (balance, status)
     
     return balances
+
+
+def get_debtors_report(
+    db: Session,
+    business_id: int,
+    fiscal_year_id: Optional[int] = None,
+    currency_id: Optional[int] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    min_balance: Optional[float] = None,
+    person_ids: Optional[List[int]] = None,
+    search: Optional[str] = None,
+    skip: int = 0,
+    take: int = 50,
+) -> Dict[str, Any]:
+    """
+    گزارش بدهکاران
+    
+    Args:
+        db: نشست پایگاه داده
+        business_id: شناسه کسب‌وکار
+        fiscal_year_id: شناسه سال مالی (اختیاری)
+        date_from: از تاریخ (اختیاری، فرمت YYYY-MM-DD)
+        date_to: تا تاریخ (اختیاری، فرمت YYYY-MM-DD)
+        min_balance: حداقل بدهی (فقط اشخاص با balance <= -min_balance)
+        person_ids: لیست شناسه‌های اشخاص برای فیلتر (اختیاری)
+        search: جستجو در نام/کد (اختیاری)
+        skip: تعداد رکوردهای رد شده برای pagination
+        take: تعداد رکوردهای برگشتی
+    
+    Returns:
+        dict: {
+            'items': لیست بدهکاران,
+            'summary': خلاصه آمار,
+            'pagination': اطلاعات pagination
+        }
+    """
+    from datetime import datetime
+    from sqlalchemy import case
+    
+    # Query پایه برای اشخاص
+    query = db.query(Person).filter(Person.business_id == business_id)
+    
+    # فیلتر بر اساس person_ids
+    if person_ids:
+        query = query.filter(Person.id.in_(person_ids))
+    
+    # فیلتر جستجو
+    if search and search.strip():
+        search_filter = or_(
+            Person.alias_name.ilike(f'%{search}%'),
+            Person.company_name.ilike(f'%{search}%'),
+            Person.first_name.ilike(f'%{search}%'),
+            Person.last_name.ilike(f'%{search}%'),
+            func.cast(Person.code, String).ilike(f'%{search}%'),
+        )
+        query = query.filter(search_filter)
+    
+    # دریافت همه اشخاص
+    all_persons = query.all()
+    
+    if not all_persons:
+        return {
+            'items': [],
+            'summary': {
+                'total_count': 0,
+                'total_debt': 0.0,
+                'average_debt': 0.0,
+            },
+            'pagination': {
+                'total': 0,
+                'page': 1,
+                'per_page': take,
+                'total_pages': 0,
+                'has_next': False,
+                'has_prev': False,
+            }
+        }
+    
+    person_ids_list = [p.id for p in all_persons]
+    
+    # Query برای محاسبه تراز هر شخص با فیلتر تاریخ و ارز
+    balance_query = db.query(
+        DocumentLine.person_id,
+        func.coalesce(func.sum(DocumentLine.credit), 0).label('total_credit'),
+        func.coalesce(func.sum(DocumentLine.debit), 0).label('total_debit'),
+        func.max(Document.document_date).label('last_transaction_date'),
+    ).join(
+        Document, DocumentLine.document_id == Document.id
+    ).filter(
+        DocumentLine.person_id.in_(person_ids_list),
+        Document.is_proforma == False  # فقط اسناد قطعی
+    )
+    
+    # اعمال فیلتر ارز
+    if currency_id:
+        balance_query = balance_query.filter(Document.currency_id == currency_id)
+    
+    # اعمال فیلتر سال مالی
+    if fiscal_year_id:
+        balance_query = balance_query.filter(Document.fiscal_year_id == fiscal_year_id)
+    
+    # اعمال فیلتر تاریخ
+    if date_from:
+        try:
+            date_from_obj = datetime.strptime(date_from, '%Y-%m-%d').date()
+            balance_query = balance_query.filter(Document.document_date >= date_from_obj)
+        except ValueError:
+            pass
+    
+    if date_to:
+        try:
+            date_to_obj = datetime.strptime(date_to, '%Y-%m-%d').date()
+            balance_query = balance_query.filter(Document.document_date <= date_to_obj)
+        except ValueError:
+            pass
+    
+    # Group by person_id
+    balance_query = balance_query.group_by(DocumentLine.person_id)
+    
+    balance_results = balance_query.all()
+    
+    # ساخت دیکشنری ترازها
+    balances_dict: Dict[int, Dict[str, Any]] = {}
+    for person_id in person_ids_list:
+        balances_dict[person_id] = {
+            'balance': 0.0,
+            'total_credit': 0.0,
+            'total_debit': 0.0,
+            'last_transaction_date': None,
+        }
+    
+    for result in balance_results:
+        person_id = result.person_id
+        total_credit = float(result.total_credit or 0)
+        total_debit = float(result.total_debit or 0)
+        balance = total_credit - total_debit
+        
+        balances_dict[person_id] = {
+            'balance': balance,
+            'total_credit': total_credit,
+            'total_debit': total_debit,
+            'last_transaction_date': result.last_transaction_date.isoformat() if result.last_transaction_date else None,
+        }
+    
+    # فیلتر فقط بدهکاران (balance < 0)
+    debtors = []
+    for person in all_persons:
+        balance_info = balances_dict[person.id]
+        balance = balance_info['balance']
+        
+        # فقط بدهکاران (balance < 0)
+        if balance < 0:
+            # فیلتر بر اساس min_balance
+            if min_balance is not None:
+                if abs(balance) < min_balance:
+                    continue
+            
+            person_dict = _person_to_dict(person)
+            person_dict.update(balance_info)
+            
+            # تعیین وضعیت
+            if balance < 0:
+                person_dict['status'] = 'بدهکار'
+            else:
+                person_dict['status'] = 'بالانس'
+            
+            debtors.append(person_dict)
+    
+    # مرتب‌سازی بر اساس balance (از بیشترین بدهی به کمترین)
+    debtors.sort(key=lambda x: x['balance'])
+    
+    # محاسبه خلاصه
+    total_debt = sum(abs(d['balance']) for d in debtors)
+    total_count = len(debtors)
+    average_debt = total_debt / total_count if total_count > 0 else 0.0
+    
+    # اعمال pagination
+    total = len(debtors)
+    paginated_debtors = debtors[skip:skip + take]
+    
+    total_pages = (total + take - 1) // take if take > 0 else 0
+    current_page = (skip // take) + 1 if take > 0 else 1
+    
+    return {
+        'items': paginated_debtors,
+        'summary': {
+            'total_count': total_count,
+            'total_debt': total_debt,
+            'average_debt': average_debt,
+        },
+        'pagination': {
+            'total': total,
+            'page': current_page,
+            'per_page': take,
+            'total_pages': total_pages,
+            'has_next': current_page < total_pages,
+            'has_prev': current_page > 1,
+        }
+    }
+
+
+def get_creditors_report(
+    db: Session,
+    business_id: int,
+    fiscal_year_id: Optional[int] = None,
+    currency_id: Optional[int] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    min_balance: Optional[float] = None,
+    person_ids: Optional[List[int]] = None,
+    search: Optional[str] = None,
+    skip: int = 0,
+    take: int = 50,
+) -> Dict[str, Any]:
+    """
+    گزارش بستانکاران
+    
+    Args:
+        db: نشست پایگاه داده
+        business_id: شناسه کسب‌وکار
+        fiscal_year_id: شناسه سال مالی (اختیاری)
+        currency_id: شناسه ارز (اختیاری)
+        date_from: از تاریخ (اختیاری، فرمت YYYY-MM-DD)
+        date_to: تا تاریخ (اختیاری، فرمت YYYY-MM-DD)
+        min_balance: حداقل بستانکاری (فقط اشخاص با balance >= min_balance)
+        person_ids: لیست شناسه‌های اشخاص برای فیلتر (اختیاری)
+        search: جستجو در نام/کد (اختیاری)
+        skip: تعداد رکوردهای رد شده برای pagination
+        take: تعداد رکوردهای برگشتی
+    
+    Returns:
+        dict: {
+            'items': لیست بستانکاران,
+            'summary': خلاصه آمار,
+            'pagination': اطلاعات pagination
+        }
+    """
+    from datetime import datetime
+    from sqlalchemy import case
+    
+    # Query پایه برای اشخاص
+    query = db.query(Person).filter(Person.business_id == business_id)
+    
+    # فیلتر بر اساس person_ids
+    if person_ids:
+        query = query.filter(Person.id.in_(person_ids))
+    
+    # فیلتر جستجو
+    if search and search.strip():
+        search_filter = or_(
+            Person.alias_name.ilike(f'%{search}%'),
+            Person.company_name.ilike(f'%{search}%'),
+            Person.first_name.ilike(f'%{search}%'),
+            Person.last_name.ilike(f'%{search}%'),
+            func.cast(Person.code, String).ilike(f'%{search}%'),
+        )
+        query = query.filter(search_filter)
+    
+    # دریافت همه اشخاص
+    all_persons = query.all()
+    
+    if not all_persons:
+        return {
+            'items': [],
+            'summary': {
+                'total_count': 0,
+                'total_credit': 0.0,
+                'average_credit': 0.0,
+            },
+            'pagination': {
+                'total': 0,
+                'page': 1,
+                'per_page': take,
+                'total_pages': 0,
+                'has_next': False,
+                'has_prev': False,
+            }
+        }
+    
+    person_ids_list = [p.id for p in all_persons]
+    
+    # Query برای محاسبه تراز هر شخص با فیلتر تاریخ و ارز
+    balance_query = db.query(
+        DocumentLine.person_id,
+        func.coalesce(func.sum(DocumentLine.credit), 0).label('total_credit'),
+        func.coalesce(func.sum(DocumentLine.debit), 0).label('total_debit'),
+        func.max(Document.document_date).label('last_transaction_date'),
+    ).join(
+        Document, DocumentLine.document_id == Document.id
+    ).filter(
+        DocumentLine.person_id.in_(person_ids_list),
+        Document.is_proforma == False  # فقط اسناد قطعی
+    )
+    
+    # اعمال فیلتر ارز
+    if currency_id:
+        balance_query = balance_query.filter(Document.currency_id == currency_id)
+    
+    # اعمال فیلتر سال مالی
+    if fiscal_year_id:
+        balance_query = balance_query.filter(Document.fiscal_year_id == fiscal_year_id)
+    
+    # اعمال فیلتر تاریخ
+    if date_from:
+        try:
+            date_from_obj = datetime.strptime(date_from, '%Y-%m-%d').date()
+            balance_query = balance_query.filter(Document.document_date >= date_from_obj)
+        except ValueError:
+            pass
+    
+    if date_to:
+        try:
+            date_to_obj = datetime.strptime(date_to, '%Y-%m-%d').date()
+            balance_query = balance_query.filter(Document.document_date <= date_to_obj)
+        except ValueError:
+            pass
+    
+    # Group by person_id
+    balance_query = balance_query.group_by(DocumentLine.person_id)
+    
+    balance_results = balance_query.all()
+    
+    # ساخت دیکشنری ترازها
+    balances_dict: Dict[int, Dict[str, Any]] = {}
+    for person_id in person_ids_list:
+        balances_dict[person_id] = {
+            'balance': 0.0,
+            'total_credit': 0.0,
+            'total_debit': 0.0,
+            'last_transaction_date': None,
+        }
+    
+    for result in balance_results:
+        person_id = result.person_id
+        total_credit = float(result.total_credit or 0)
+        total_debit = float(result.total_debit or 0)
+        balance = total_credit - total_debit
+        
+        balances_dict[person_id] = {
+            'balance': balance,
+            'total_credit': total_credit,
+            'total_debit': total_debit,
+            'last_transaction_date': result.last_transaction_date.isoformat() if result.last_transaction_date else None,
+        }
+    
+    # فیلتر فقط بستانکاران (balance > 0)
+    creditors = []
+    for person in all_persons:
+        balance_info = balances_dict[person.id]
+        balance = balance_info['balance']
+        
+        # فقط بستانکاران (balance > 0)
+        if balance > 0:
+            # فیلتر بر اساس min_balance
+            if min_balance is not None:
+                if balance < min_balance:
+                    continue
+            
+            person_dict = _person_to_dict(person)
+            person_dict.update(balance_info)
+            
+            # تعیین وضعیت
+            if balance > 0:
+                person_dict['status'] = 'بستانکار'
+            elif balance == 0:
+                person_dict['status'] = 'بالانس'
+            else:
+                person_dict['status'] = 'بدون تراکنش'
+            
+            creditors.append(person_dict)
+    
+    # مرتب‌سازی بر اساس balance (از بیشترین بستانکاری به کمترین)
+    creditors.sort(key=lambda x: x['balance'], reverse=True)
+    
+    # محاسبه خلاصه
+    total_credit = sum(d['balance'] for d in creditors)
+    total_count = len(creditors)
+    average_credit = total_credit / total_count if total_count > 0 else 0.0
+    
+    # اعمال pagination
+    total = len(creditors)
+    paginated_creditors = creditors[skip:skip + take]
+    
+    total_pages = (total + take - 1) // take if take > 0 else 0
+    current_page = (skip // take) + 1 if take > 0 else 1
+    
+    return {
+        'items': paginated_creditors,
+        'summary': {
+            'total_count': total_count,
+            'total_credit': total_credit,
+            'average_credit': average_credit,
+        },
+        'pagination': {
+            'total': total,
+            'page': current_page,
+            'per_page': take,
+            'total_pages': total_pages,
+            'has_next': current_page < total_pages,
+            'has_prev': current_page > 1,
+        }
+    }
+
+
+def get_people_transactions_report(
+    db: Session,
+    business_id: int,
+    fiscal_year_id: Optional[int] = None,
+    currency_id: Optional[int] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    person_ids: Optional[List[int]] = None,
+    document_type: Optional[str] = None,  # receipt, payment, or None for all
+    search: Optional[str] = None,
+    skip: int = 0,
+    take: int = 50,
+) -> Dict[str, Any]:
+    """
+    گزارش تراکنش‌های اشخاص
+    
+    Args:
+        db: نشست پایگاه داده
+        business_id: شناسه کسب‌وکار
+        fiscal_year_id: شناسه سال مالی (اختیاری)
+        currency_id: شناسه ارز (اختیاری)
+        date_from: از تاریخ (اختیاری، فرمت YYYY-MM-DD)
+        date_to: تا تاریخ (اختیاری، فرمت YYYY-MM-DD)
+        person_ids: لیست شناسه‌های اشخاص برای فیلتر (اختیاری)
+        document_type: نوع سند (receipt, payment) یا None برای همه
+        search: جستجو در کد سند یا نام شخص (اختیاری)
+        skip: تعداد رکوردهای رد شده برای pagination
+        take: تعداد رکوردهای برگشتی
+    
+    Returns:
+        dict: {
+            'items': لیست تراکنش‌ها,
+            'summary': خلاصه آمار,
+            'pagination': اطلاعات pagination
+        }
+    """
+    from datetime import datetime
+    
+    # Query پایه: DocumentLine join Document و Person
+    query = db.query(
+        DocumentLine,
+        Document,
+        Person
+    ).join(
+        Document, DocumentLine.document_id == Document.id
+    ).outerjoin(
+        Person, DocumentLine.person_id == Person.id
+    ).filter(
+        Document.business_id == business_id,
+        Document.is_proforma == False,  # فقط اسناد قطعی
+        DocumentLine.person_id.isnot(None)  # فقط خطوط با person_id
+    )
+    
+    # فیلتر سال مالی
+    if fiscal_year_id:
+        query = query.filter(Document.fiscal_year_id == fiscal_year_id)
+    
+    # فیلتر ارز
+    if currency_id:
+        query = query.filter(Document.currency_id == currency_id)
+    
+    # فیلتر تاریخ
+    if date_from:
+        try:
+            date_from_obj = datetime.strptime(date_from, '%Y-%m-%d').date()
+            query = query.filter(Document.document_date >= date_from_obj)
+        except ValueError:
+            pass
+    
+    if date_to:
+        try:
+            date_to_obj = datetime.strptime(date_to, '%Y-%m-%d').date()
+            query = query.filter(Document.document_date <= date_to_obj)
+        except ValueError:
+            pass
+    
+    # فیلتر اشخاص
+    if person_ids:
+        query = query.filter(DocumentLine.person_id.in_(person_ids))
+    
+    # فیلتر نوع سند - پشتیبانی از همه انواع اسناد
+    if document_type:
+        query = query.filter(Document.document_type == document_type)
+    
+    # فیلتر جستجو
+    if search and search.strip():
+        search_filter = or_(
+            Document.code.ilike(f'%{search}%'),
+            Person.alias_name.ilike(f'%{search}%'),
+            Person.company_name.ilike(f'%{search}%'),
+            Person.first_name.ilike(f'%{search}%'),
+            Person.last_name.ilike(f'%{search}%'),
+        )
+        query = query.filter(search_filter)
+    
+    # مرتب‌سازی: تاریخ سند، کد سند، شناسه خط
+    query = query.order_by(
+        Document.document_date.asc(),
+        Document.id.asc(),
+        DocumentLine.id.asc()
+    )
+    
+    # دریافت همه نتایج برای محاسبه running balance
+    all_results = query.all()
+    
+    if not all_results:
+        return {
+            'items': [],
+            'summary': {
+                'total_count': 0,
+                'total_debit': 0.0,
+                'total_credit': 0.0,
+            },
+            'pagination': {
+                'total': 0,
+                'page': 1,
+                'per_page': take,
+                'total_pages': 0,
+                'has_next': False,
+                'has_prev': False,
+            }
+        }
+    
+    # محاسبه running balance و ساخت لیست آیتم‌ها
+    items = []
+    running_balance = 0.0
+    
+    for line, doc, person in all_results:
+        debit = float(line.debit or 0)
+        credit = float(line.credit or 0)
+        balance_change = credit - debit
+        running_balance += balance_change
+        
+        # نام شخص
+        person_name = None
+        if person:
+            person_name = (
+                person.alias_name or
+                person.company_name or
+                f"{person.first_name or ''} {person.last_name or ''}".strip()
+            )
+        
+        # نوع سند (نام فارسی) - استفاده از mapping کامل
+        def _get_document_type_name(doc_type: str | None) -> str:
+            """تبدیل document_type به نام فارسی"""
+            if not doc_type:
+                return ""
+            doc_type = doc_type.strip()
+            mapping = {
+                "invoice_sales": "فروش",
+                "invoice_sales_return": "برگشت از فروش",
+                "invoice_purchase": "خرید",
+                "invoice_purchase_return": "برگشت از خرید",
+                "invoice_direct_consumption": "مصرف مستقیم",
+                "invoice_production": "تولید",
+                "invoice_waste": "ضایعات",
+                "inventory_transfer": "انتقال موجودی",
+                "production": "تولید",
+                "opening_balance": "موجودی اولیه",
+                "expense": "هزینه",
+                "income": "درآمد",
+                "receipt": "دریافت",
+                "payment": "پرداخت",
+                "transfer": "انتقال",
+                "manual": "سند دستی",
+                "invoice": "فاکتور",
+                "check": "چک",
+            }
+            return mapping.get(doc_type, doc_type)
+        
+        document_type_name = _get_document_type_name(doc.document_type)
+        
+        item_dict = _person_to_dict(person) if person else {}
+        item_dict.update({
+            'line_id': line.id,
+            'document_id': doc.id,
+            'document_code': doc.code,
+            'document_date': doc.document_date.isoformat(),
+            'document_type': doc.document_type,
+            'document_type_name': document_type_name,
+            'person_id': line.person_id,
+            'person_name': person_name,
+            'debit': debit,
+            'credit': credit,
+            'balance_change': balance_change,
+            'running_balance': running_balance,
+            'description': line.description,
+        })
+        items.append(item_dict)
+    
+    # محاسبه خلاصه
+    total_count = len(items)
+    total_debit = sum(item['debit'] for item in items)
+    total_credit = sum(item['credit'] for item in items)
+    
+    # اعمال pagination
+    total = len(items)
+    paginated_items = items[skip:skip + take]
+    
+    total_pages = (total + take - 1) // take if take > 0 else 0
+    current_page = (skip // take) + 1 if take > 0 else 1
+    
+    return {
+        'items': paginated_items,
+        'summary': {
+            'total_count': total_count,
+            'total_debit': total_debit,
+            'total_credit': total_credit,
+        },
+        'pagination': {
+            'total': total,
+            'page': current_page,
+            'per_page': take,
+            'total_pages': total_pages,
+            'has_next': current_page < total_pages,
+            'has_prev': current_page > 1,
+        }
+    }

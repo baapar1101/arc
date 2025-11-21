@@ -3,6 +3,7 @@
 from typing import Dict, Any
 from fastapi import APIRouter, Depends, Request, Body
 from sqlalchemy.orm import Session
+from sqlalchemy import and_
 
 from adapters.db.session import get_db
 from app.core.auth_dependency import get_current_user, AuthContext
@@ -21,6 +22,9 @@ from app.services.product_service import (
     get_product,
     update_product,
     delete_product,
+    get_item_movements_report,
+    get_sales_by_product_report,
+    get_inventory_kardex_report,
 )
 from app.services.bulk_price_update_service import (
     preview_bulk_price_update,
@@ -173,6 +177,8 @@ def search_products_endpoint(
         "sort_desc": query_info.sort_desc,
         "search": query_info.search,
         "filters": query_info.filters,
+        "include_inventory": query_info.include_inventory,
+        "inventory_as_of_date": query_info.inventory_as_of_date,
     })
     return success_response(data=format_datetime_fields(result, request), request=request)
 
@@ -1156,5 +1162,1030 @@ def apply_bulk_price_update_endpoint(
     
     result = apply_bulk_price_update(db, business_id, payload)
     return success_response(data=result, request=request)
+
+
+@router.post("/businesses/{business_id}/reports/item-movements",
+    summary="گزارش گردش کالا",
+    description="گزارش ورود، خروج و مانده کالاها در یک بازه زمانی",
+)
+@require_business_access("business_id")
+async def item_movements_report_endpoint(
+    request: Request,
+    business_id: int,
+    body: Dict[str, Any] = Body(default={}),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """گزارش گردش کالا"""
+    # بررسی دسترسی
+    if not ctx.can_read_section("reports"):
+        raise ApiError("FORBIDDEN", "Missing business permission: reports.read", http_status=403)
+    
+    # دریافت سال مالی از header یا body
+    fiscal_year_id = None
+    fy_header = request.headers.get('X-Fiscal-Year-ID')
+    if fy_header:
+        try:
+            fiscal_year_id = int(fy_header)
+        except (ValueError, TypeError):
+            pass
+    
+    if body.get('fiscal_year_id'):
+        try:
+            fiscal_year_id = int(body['fiscal_year_id'])
+        except (ValueError, TypeError):
+            pass
+    
+    if not fiscal_year_id:
+        from adapters.db.models.fiscal_year import FiscalYear
+        fiscal_year = db.query(FiscalYear).filter(
+            and_(
+                FiscalYear.business_id == business_id,
+                FiscalYear.is_last == True
+            )
+        ).first()
+        if fiscal_year:
+            fiscal_year_id = fiscal_year.id
+    
+    # استخراج پارامترها از body
+    date_from = body.get('date_from')
+    date_to = body.get('date_to')
+    currency_id = body.get('currency_id')
+    if currency_id is not None:
+        try:
+            currency_id = int(currency_id)
+        except (ValueError, TypeError):
+            currency_id = None
+    
+    product_ids = body.get('product_ids')
+    if product_ids is not None and not isinstance(product_ids, list):
+        product_ids = None
+    
+    warehouse_ids = body.get('warehouse_ids')
+    if warehouse_ids is not None and not isinstance(warehouse_ids, list):
+        warehouse_ids = None
+    
+    category_ids = body.get('category_ids')
+    if category_ids is not None and not isinstance(category_ids, list):
+        category_ids = None
+    
+    include_zero_balance = bool(body.get('include_zero_balance', False))
+    search = body.get('search')
+    
+    # Pagination
+    skip = body.get('skip', 0)
+    take = body.get('take', 50)
+    try:
+        skip = int(skip)
+        take = int(take)
+        if take > 500:
+            take = 500
+        if take < 1:
+            take = 50
+        if skip < 0:
+            skip = 0
+    except (ValueError, TypeError):
+        skip = 0
+        take = 50
+    
+    result = get_item_movements_report(
+        db=db,
+        business_id=business_id,
+        fiscal_year_id=fiscal_year_id,
+        currency_id=currency_id,
+        date_from=date_from,
+        date_to=date_to,
+        product_ids=product_ids,
+        warehouse_ids=warehouse_ids,
+        category_ids=category_ids,
+        include_zero_balance=include_zero_balance,
+        search=search,
+        skip=skip,
+        take=take,
+    )
+    
+    items = result.get('items', [])
+    items = [format_datetime_fields(item, request) for item in items]
+    
+    result['items'] = items
+    
+    locale = negotiate_locale(request.headers.get("Accept-Language"))
+    return success_response(
+        data=result,
+        message="Item movements report retrieved successfully" if locale != 'fa' else "گزارش گردش کالا با موفقیت دریافت شد",
+        request=request
+    )
+
+
+@router.post("/businesses/{business_id}/reports/item-movements/export/excel",
+    summary="خروجی Excel گزارش گردش کالا",
+    description="خروجی Excel گزارش گردش کالا با قابلیت فیلتر، انتخاب سطرها و رعایت ترتیب/نمایش ستون‌ها",
+)
+@require_business_access("business_id")
+async def export_item_movements_report_excel(
+    request: Request,
+    business_id: int,
+    body: Dict[str, Any] = Body(default={}),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """خروجی Excel گزارش گردش کالا"""
+    from fastapi.responses import Response
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+    import io
+    import datetime
+    import re
+    
+    # بررسی دسترسی
+    if not ctx.can_read_section("reports"):
+        raise ApiError("FORBIDDEN", "Missing business permission: reports.read", http_status=403)
+    
+    # دریافت سال مالی از header یا body
+    fiscal_year_id = None
+    fy_header = request.headers.get('X-Fiscal-Year-ID')
+    if fy_header:
+        try:
+            fiscal_year_id = int(fy_header)
+        except (ValueError, TypeError):
+            pass
+    
+    if body.get('fiscal_year_id'):
+        try:
+            fiscal_year_id = int(body['fiscal_year_id'])
+        except (ValueError, TypeError):
+            pass
+    
+    if not fiscal_year_id:
+        from adapters.db.models.fiscal_year import FiscalYear
+        fiscal_year = db.query(FiscalYear).filter(
+            and_(
+                FiscalYear.business_id == business_id,
+                FiscalYear.is_last == True
+            )
+        ).first()
+        if fiscal_year:
+            fiscal_year_id = fiscal_year.id
+    
+    # استخراج پارامترها از body
+    date_from = body.get('date_from')
+    date_to = body.get('date_to')
+    currency_id = body.get('currency_id')
+    if currency_id is not None:
+        try:
+            currency_id = int(currency_id)
+        except (ValueError, TypeError):
+            currency_id = None
+    
+    product_ids = body.get('product_ids')
+    if product_ids is not None and not isinstance(product_ids, list):
+        product_ids = None
+    
+    warehouse_ids = body.get('warehouse_ids')
+    if warehouse_ids is not None and not isinstance(warehouse_ids, list):
+        warehouse_ids = None
+    
+    category_ids = body.get('category_ids')
+    if category_ids is not None and not isinstance(category_ids, list):
+        category_ids = None
+    
+    include_zero_balance = bool(body.get('include_zero_balance', False))
+    search = body.get('search')
+    
+    # اعمال فیلتر سطرهای انتخاب شده
+    selected_only = bool(body.get('selected_only', False))
+    selected_indices = body.get('selected_indices')
+    
+    # دریافت گزارش با take بزرگ برای export
+    max_export_records = 10000
+    result = get_item_movements_report(
+        db=db,
+        business_id=business_id,
+        fiscal_year_id=fiscal_year_id,
+        currency_id=currency_id,
+        date_from=date_from,
+        date_to=date_to,
+        product_ids=product_ids,
+        warehouse_ids=warehouse_ids,
+        category_ids=category_ids,
+        include_zero_balance=include_zero_balance,
+        search=search,
+        skip=0,
+        take=max_export_records,
+    )
+    
+    items = result.get('items', [])
+    
+    # فیلتر سطرهای انتخاب شده
+    if selected_only and selected_indices is not None:
+        indices = None
+        if isinstance(selected_indices, str):
+            try:
+                import json as _json
+                indices = _json.loads(selected_indices)
+            except Exception:
+                indices = None
+        elif isinstance(selected_indices, list):
+            indices = selected_indices
+        if isinstance(indices, list):
+            items = [items[i] for i in indices if isinstance(i, int) and 0 <= i < len(items)]
+    
+    # ستون‌های export
+    export_columns = body.get("export_columns")
+    if export_columns and isinstance(export_columns, list):
+        headers = [col.get("label") or col.get("key") for col in export_columns]
+        keys = [col.get("key") for col in export_columns]
+    else:
+        # ستون‌های پیش‌فرض
+        locale = negotiate_locale(request.headers.get("Accept-Language"))
+        is_fa = (locale == 'fa')
+        default_columns = [
+            ('product_code', 'کد کالا' if is_fa else 'Product Code'),
+            ('product_name', 'نام کالا' if is_fa else 'Product Name'),
+            ('unit', 'واحد' if is_fa else 'Unit'),
+            ('category_name', 'دسته‌بندی' if is_fa else 'Category'),
+            ('opening_balance', 'مانده ابتدای دوره' if is_fa else 'Opening Balance'),
+            ('total_in', 'ورود' if is_fa else 'Total In'),
+            ('total_out', 'خروج' if is_fa else 'Total Out'),
+            ('closing_balance', 'مانده انتهای دوره' if is_fa else 'Closing Balance'),
+        ]
+        keys = [k for k, _ in default_columns]
+        headers = [h for _, h in default_columns]
+    
+    # ساخت Excel
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Item Movements"
+    
+    # Locale and RTL/LTR handling for Excel
+    locale = negotiate_locale(request.headers.get("Accept-Language"))
+    if locale == 'fa':
+        try:
+            ws.sheet_view.rightToLeft = True
+        except Exception:
+            pass
+    
+    # Header style
+    header_font = Font(bold=True)
+    header_fill = PatternFill(start_color="DDDDDD", end_color="DDDDDD", fill_type="solid")
+    thin_border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
+    
+    ws.append(headers)
+    for cell in ws[1]:
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = Alignment(horizontal="center")
+        cell.border = thin_border
+    
+    # افزودن ردیف‌های داده
+    for it in items:
+        row = []
+        for k in keys:
+            value = it.get(k)
+            if value is None:
+                row.append('')
+            elif isinstance(value, (int, float)):
+                row.append(float(value))
+            else:
+                row.append(str(value))
+        ws.append(row)
+        for cell in ws[ws.max_row]:
+            cell.border = thin_border
+            # Align data cells based on locale
+            if locale == 'fa':
+                cell.alignment = Alignment(horizontal="right")
+    
+    # Auto width columns
+    try:
+        for column in ws.columns:
+            max_length = 0
+            column_letter = column[0].column_letter
+            for cell in column:
+                try:
+                    if cell.value is not None and len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+                except Exception:
+                    pass
+            ws.column_dimensions[column_letter].width = min(max_length + 2, 50)
+    except Exception:
+        pass
+    
+    output = io.BytesIO()
+    wb.save(output)
+    data = output.getvalue()
+    
+    # Build meaningful filename
+    biz_name = ""
+    try:
+        b = db.query(Business).filter(Business.id == business_id).first()
+        if b is not None:
+            biz_name = b.name or ""
+    except Exception:
+        biz_name = ""
+    
+    def slugify(text: str) -> str:
+        return re.sub(r"[^A-Za-z0-9_-]+", "_", text).strip("_")
+    
+    base = "item_movements"
+    if biz_name:
+        base += f"_{slugify(biz_name)}"
+    if selected_only:
+        base += "_selected"
+    filename = f"{base}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    
+    return Response(
+        content=data,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": f"attachment; filename={filename}",
+            "Content-Length": str(len(data)),
+            "Access-Control-Expose-Headers": "Content-Disposition",
+        },
+    )
+
+
+@router.post("/businesses/{business_id}/reports/sales-by-product",
+    summary="گزارش فروش به تفکیک کالا",
+    description="گزارش عملکرد فروش هر کالا در بازه زمانی",
+)
+@require_business_access("business_id")
+async def sales_by_product_report_endpoint(
+    request: Request,
+    business_id: int,
+    body: Dict[str, Any] = Body(default={}),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """گزارش فروش به تفکیک کالا"""
+    # بررسی دسترسی
+    if not ctx.can_read_section("reports"):
+        raise ApiError("FORBIDDEN", "Missing business permission: reports.read", http_status=403)
+    
+    # دریافت سال مالی از header یا body
+    fiscal_year_id = None
+    fy_header = request.headers.get('X-Fiscal-Year-ID')
+    if fy_header:
+        try:
+            fiscal_year_id = int(fy_header)
+        except (ValueError, TypeError):
+            pass
+    
+    if body.get('fiscal_year_id'):
+        try:
+            fiscal_year_id = int(body['fiscal_year_id'])
+        except (ValueError, TypeError):
+            pass
+    
+    if not fiscal_year_id:
+        from adapters.db.models.fiscal_year import FiscalYear
+        fiscal_year = db.query(FiscalYear).filter(
+            and_(
+                FiscalYear.business_id == business_id,
+                FiscalYear.is_last == True
+            )
+        ).first()
+        if fiscal_year:
+            fiscal_year_id = fiscal_year.id
+    
+    # استخراج پارامترها از body
+    date_from = body.get('date_from')
+    date_to = body.get('date_to')
+    currency_id = body.get('currency_id')
+    if currency_id is not None:
+        try:
+            currency_id = int(currency_id)
+        except (ValueError, TypeError):
+            currency_id = None
+    
+    product_ids = body.get('product_ids')
+    if product_ids is not None and not isinstance(product_ids, list):
+        product_ids = None
+    
+    category_ids = body.get('category_ids')
+    if category_ids is not None and not isinstance(category_ids, list):
+        category_ids = None
+    
+    warehouse_ids = body.get('warehouse_ids')
+    if warehouse_ids is not None and not isinstance(warehouse_ids, list):
+        warehouse_ids = None
+    
+    include_zero_sales = bool(body.get('include_zero_sales', False))
+    search = body.get('search')
+    
+    # Pagination
+    skip = body.get('skip', 0)
+    take = body.get('take', 50)
+    try:
+        skip = int(skip)
+        take = int(take)
+        if take > 500:
+            take = 500
+        if take < 1:
+            take = 50
+        if skip < 0:
+            skip = 0
+    except (ValueError, TypeError):
+        skip = 0
+        take = 50
+    
+    result = get_sales_by_product_report(
+        db=db,
+        business_id=business_id,
+        fiscal_year_id=fiscal_year_id,
+        currency_id=currency_id,
+        date_from=date_from,
+        date_to=date_to,
+        product_ids=product_ids,
+        category_ids=category_ids,
+        warehouse_ids=warehouse_ids,
+        include_zero_sales=include_zero_sales,
+        search=search,
+        skip=skip,
+        take=take,
+    )
+    
+    items = result.get('items', [])
+    items = [format_datetime_fields(item, request) for item in items]
+    
+    result['items'] = items
+    
+    locale = negotiate_locale(request.headers.get("Accept-Language"))
+    return success_response(
+        data=result,
+        message="Sales by product report retrieved successfully" if locale != 'fa' else "گزارش فروش به تفکیک کالا با موفقیت دریافت شد",
+        request=request
+    )
+
+
+@router.post("/businesses/{business_id}/reports/inventory-kardex",
+    summary="گزارش کاردکس موجودی",
+    description="گزارش جزئیات حرکات هر کالا در یک بازه زمانی با محاسبه مانده تجمعی",
+)
+@require_business_access("business_id")
+async def inventory_kardex_report_endpoint(
+    request: Request,
+    business_id: int,
+    body: Dict[str, Any] = Body(default={}),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """گزارش کاردکس موجودی"""
+    # بررسی دسترسی
+    if not ctx.can_read_section("reports"):
+        raise ApiError("FORBIDDEN", "Missing business permission: reports.read", http_status=403)
+    
+    # دریافت سال مالی از header یا body
+    fiscal_year_id = None
+    fy_header = request.headers.get('X-Fiscal-Year-ID')
+    if fy_header:
+        try:
+            fiscal_year_id = int(fy_header)
+        except (ValueError, TypeError):
+            pass
+    
+    if body.get('fiscal_year_id'):
+        try:
+            fiscal_year_id = int(body['fiscal_year_id'])
+        except (ValueError, TypeError):
+            pass
+    
+    if not fiscal_year_id:
+        from adapters.db.models.fiscal_year import FiscalYear
+        fiscal_year = db.query(FiscalYear).filter(
+            and_(
+                FiscalYear.business_id == business_id,
+                FiscalYear.is_last == True
+            )
+        ).first()
+        if fiscal_year:
+            fiscal_year_id = fiscal_year.id
+    
+    # استخراج پارامترها از body
+    date_from = body.get('date_from')
+    date_to = body.get('date_to')
+    product_ids = body.get('product_ids')
+    if product_ids is not None and not isinstance(product_ids, list):
+        product_ids = None
+    
+    warehouse_ids = body.get('warehouse_ids')
+    if warehouse_ids is not None and not isinstance(warehouse_ids, list):
+        warehouse_ids = None
+    
+    category_ids = body.get('category_ids')
+    if category_ids is not None and not isinstance(category_ids, list):
+        category_ids = None
+    
+    search = body.get('search')
+    
+    # Pagination
+    skip = body.get('skip', 0)
+    take = body.get('take', 50)
+    try:
+        skip = int(skip)
+        take = int(take)
+        if take > 500:
+            take = 500
+        if take < 1:
+            take = 50
+        if skip < 0:
+            skip = 0
+    except (ValueError, TypeError):
+        skip = 0
+        take = 50
+    
+    result = get_inventory_kardex_report(
+        db=db,
+        business_id=business_id,
+        fiscal_year_id=fiscal_year_id,
+        date_from=date_from,
+        date_to=date_to,
+        product_ids=product_ids,
+        warehouse_ids=warehouse_ids,
+        category_ids=category_ids,
+        search=search,
+        skip=skip,
+        take=take,
+    )
+    
+    items = result.get('items', [])
+    items = [format_datetime_fields(item, request) for item in items]
+    
+    result['items'] = items
+    
+    locale = negotiate_locale(request.headers.get("Accept-Language"))
+    return success_response(
+        data=result,
+        message="Inventory kardex report retrieved successfully" if locale != 'fa' else "گزارش کاردکس موجودی با موفقیت دریافت شد",
+        request=request
+    )
+
+
+@router.post("/businesses/{business_id}/reports/inventory-kardex/export/excel",
+    summary="خروجی Excel گزارش کاردکس موجودی",
+    description="خروجی Excel گزارش کاردکس موجودی با قابلیت فیلتر، انتخاب سطرها و رعایت ترتیب/نمایش ستون‌ها",
+)
+@require_business_access("business_id")
+async def export_inventory_kardex_report_excel(
+    request: Request,
+    business_id: int,
+    body: Dict[str, Any] = Body(default={}),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """خروجی Excel گزارش کاردکس موجودی"""
+    from fastapi.responses import Response
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+    import io
+    import datetime
+    import re
+    
+    # بررسی دسترسی
+    if not ctx.can_read_section("reports"):
+        raise ApiError("FORBIDDEN", "Missing business permission: reports.read", http_status=403)
+    
+    # دریافت سال مالی از header یا body
+    fiscal_year_id = None
+    fy_header = request.headers.get('X-Fiscal-Year-ID')
+    if fy_header:
+        try:
+            fiscal_year_id = int(fy_header)
+        except (ValueError, TypeError):
+            pass
+    
+    if body.get('fiscal_year_id'):
+        try:
+            fiscal_year_id = int(body['fiscal_year_id'])
+        except (ValueError, TypeError):
+            pass
+    
+    if not fiscal_year_id:
+        from adapters.db.models.fiscal_year import FiscalYear
+        fiscal_year = db.query(FiscalYear).filter(
+            and_(
+                FiscalYear.business_id == business_id,
+                FiscalYear.is_last == True
+            )
+        ).first()
+        if fiscal_year:
+            fiscal_year_id = fiscal_year.id
+    
+    # استخراج پارامترها از body
+    date_from = body.get('date_from')
+    date_to = body.get('date_to')
+    product_ids = body.get('product_ids')
+    if product_ids is not None and not isinstance(product_ids, list):
+        product_ids = None
+    
+    warehouse_ids = body.get('warehouse_ids')
+    if warehouse_ids is not None and not isinstance(warehouse_ids, list):
+        warehouse_ids = None
+    
+    category_ids = body.get('category_ids')
+    if category_ids is not None and not isinstance(category_ids, list):
+        category_ids = None
+    
+    search = body.get('search')
+    
+    # اعمال فیلتر سطرهای انتخاب شده
+    selected_only = bool(body.get('selected_only', False))
+    selected_indices = body.get('selected_indices')
+    
+    # دریافت گزارش با take بزرگ برای export
+    max_export_records = 10000
+    result = get_inventory_kardex_report(
+        db=db,
+        business_id=business_id,
+        fiscal_year_id=fiscal_year_id,
+        date_from=date_from,
+        date_to=date_to,
+        product_ids=product_ids,
+        warehouse_ids=warehouse_ids,
+        category_ids=category_ids,
+        search=search,
+        skip=0,
+        take=max_export_records,
+    )
+    
+    items = result.get('items', [])
+    
+    # فیلتر سطرهای انتخاب شده
+    if selected_only and selected_indices is not None:
+        indices = None
+        if isinstance(selected_indices, str):
+            try:
+                import json as _json
+                indices = _json.loads(selected_indices)
+            except Exception:
+                indices = None
+        elif isinstance(selected_indices, list):
+            indices = selected_indices
+        if isinstance(indices, list):
+            items = [items[i] for i in indices if isinstance(i, int) and 0 <= i < len(items)]
+    
+    # ستون‌های export
+    export_columns = body.get("export_columns")
+    if export_columns and isinstance(export_columns, list):
+        headers = [col.get("label") or col.get("key") for col in export_columns]
+        keys = [col.get("key") for col in export_columns]
+    else:
+        # ستون‌های پیش‌فرض
+        locale = negotiate_locale(request.headers.get("Accept-Language"))
+        is_fa = (locale == 'fa')
+        default_columns = [
+            ('document_date', 'تاریخ' if is_fa else 'Document Date'),
+            ('document_type_name', 'نوع سند' if is_fa else 'Document Type'),
+            ('document_code', 'شماره سند' if is_fa else 'Document Code'),
+            ('product_code', 'کد کالا' if is_fa else 'Product Code'),
+            ('product_name', 'نام کالا' if is_fa else 'Product Name'),
+            ('quantity_in', 'ورود' if is_fa else 'Quantity In'),
+            ('quantity_out', 'خروج' if is_fa else 'Quantity Out'),
+            ('balance', 'مانده' if is_fa else 'Balance'),
+            ('unit_price', 'قیمت واحد' if is_fa else 'Unit Price'),
+            ('total_amount', 'مبلغ کل' if is_fa else 'Total Amount'),
+            ('warehouse_name', 'انبار' if is_fa else 'Warehouse'),
+            ('description', 'توضیحات' if is_fa else 'Description'),
+        ]
+        keys = [k for k, _ in default_columns]
+        headers = [h for _, h in default_columns]
+    
+    # ساخت Excel
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Inventory Kardex"
+    
+    # Locale and RTL/LTR handling for Excel
+    locale = negotiate_locale(request.headers.get("Accept-Language"))
+    if locale == 'fa':
+        try:
+            ws.sheet_view.rightToLeft = True
+        except Exception:
+            pass
+    
+    # Header style
+    header_font = Font(bold=True)
+    header_fill = PatternFill(start_color="DDDDDD", end_color="DDDDDD", fill_type="solid")
+    thin_border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
+    
+    ws.append(headers)
+    for cell in ws[1]:
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = Alignment(horizontal="center")
+        cell.border = thin_border
+    
+    # افزودن ردیف‌های داده
+    for it in items:
+        row = []
+        for k in keys:
+            value = it.get(k)
+            if value is None:
+                row.append('')
+            elif k == 'document_date' and value:
+                # فرمت تاریخ
+                try:
+                    if isinstance(value, str):
+                        date_obj = datetime.datetime.strptime(value.split('T')[0], '%Y-%m-%d').date()
+                        row.append(date_obj)
+                    else:
+                        row.append(str(value))
+                except Exception:
+                    row.append(str(value))
+            elif isinstance(value, (int, float)):
+                row.append(float(value))
+            else:
+                row.append(str(value))
+        ws.append(row)
+        for cell in ws[ws.max_row]:
+            cell.border = thin_border
+            # Align data cells based on locale
+            if locale == 'fa':
+                cell.alignment = Alignment(horizontal="right")
+    
+    # Auto width columns
+    try:
+        for column in ws.columns:
+            max_length = 0
+            column_letter = column[0].column_letter
+            for cell in column:
+                try:
+                    if cell.value is not None and len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+                except Exception:
+                    pass
+            ws.column_dimensions[column_letter].width = min(max_length + 2, 50)
+    except Exception:
+        pass
+    
+    output = io.BytesIO()
+    wb.save(output)
+    data = output.getvalue()
+    
+    # Build meaningful filename
+    biz_name = ""
+    try:
+        from adapters.db.models.business import Business
+        b = db.query(Business).filter(Business.id == business_id).first()
+        if b is not None:
+            biz_name = b.name or ""
+    except Exception:
+        biz_name = ""
+    
+    def slugify(text: str) -> str:
+        return re.sub(r"[^A-Za-z0-9_-]+", "_", text).strip("_")
+    
+    base = "inventory_kardex"
+    if biz_name:
+        base += f"_{slugify(biz_name)}"
+    if selected_only:
+        base += "_selected"
+    filename = f"{base}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    
+    return Response(
+        content=data,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": f"attachment; filename={filename}",
+            "Content-Length": str(len(data)),
+            "Access-Control-Expose-Headers": "Content-Disposition",
+        },
+    )
+
+
+@router.post("/businesses/{business_id}/reports/sales-by-product/export/excel",
+    summary="خروجی Excel گزارش فروش به تفکیک کالا",
+    description="خروجی Excel گزارش فروش به تفکیک کالا با قابلیت فیلتر، انتخاب سطرها و رعایت ترتیب/نمایش ستون‌ها",
+)
+@require_business_access("business_id")
+async def export_sales_by_product_report_excel(
+    request: Request,
+    business_id: int,
+    body: Dict[str, Any] = Body(default={}),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """خروجی Excel گزارش فروش به تفکیک کالا"""
+    from fastapi.responses import Response
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+    import io
+    import datetime
+    import re
+    
+    # بررسی دسترسی
+    if not ctx.can_read_section("reports"):
+        raise ApiError("FORBIDDEN", "Missing business permission: reports.read", http_status=403)
+    
+    # دریافت سال مالی از header یا body
+    fiscal_year_id = None
+    fy_header = request.headers.get('X-Fiscal-Year-ID')
+    if fy_header:
+        try:
+            fiscal_year_id = int(fy_header)
+        except (ValueError, TypeError):
+            pass
+    
+    if body.get('fiscal_year_id'):
+        try:
+            fiscal_year_id = int(body['fiscal_year_id'])
+        except (ValueError, TypeError):
+            pass
+    
+    if not fiscal_year_id:
+        from adapters.db.models.fiscal_year import FiscalYear
+        fiscal_year = db.query(FiscalYear).filter(
+            and_(
+                FiscalYear.business_id == business_id,
+                FiscalYear.is_last == True
+            )
+        ).first()
+        if fiscal_year:
+            fiscal_year_id = fiscal_year.id
+    
+    # استخراج پارامترها از body
+    date_from = body.get('date_from')
+    date_to = body.get('date_to')
+    currency_id = body.get('currency_id')
+    if currency_id is not None:
+        try:
+            currency_id = int(currency_id)
+        except (ValueError, TypeError):
+            currency_id = None
+    
+    product_ids = body.get('product_ids')
+    if product_ids is not None and not isinstance(product_ids, list):
+        product_ids = None
+    
+    category_ids = body.get('category_ids')
+    if category_ids is not None and not isinstance(category_ids, list):
+        category_ids = None
+    
+    warehouse_ids = body.get('warehouse_ids')
+    if warehouse_ids is not None and not isinstance(warehouse_ids, list):
+        warehouse_ids = None
+    
+    include_zero_sales = bool(body.get('include_zero_sales', False))
+    search = body.get('search')
+    
+    # اعمال فیلتر سطرهای انتخاب شده
+    selected_only = bool(body.get('selected_only', False))
+    selected_indices = body.get('selected_indices')
+    
+    # دریافت گزارش با take بزرگ برای export
+    max_export_records = 10000
+    result = get_sales_by_product_report(
+        db=db,
+        business_id=business_id,
+        fiscal_year_id=fiscal_year_id,
+        currency_id=currency_id,
+        date_from=date_from,
+        date_to=date_to,
+        product_ids=product_ids,
+        category_ids=category_ids,
+        warehouse_ids=warehouse_ids,
+        include_zero_sales=include_zero_sales,
+        search=search,
+        skip=0,
+        take=max_export_records,
+    )
+    
+    items = result.get('items', [])
+    
+    # فیلتر سطرهای انتخاب شده
+    if selected_only and selected_indices is not None:
+        indices = None
+        if isinstance(selected_indices, str):
+            try:
+                import json as _json
+                indices = _json.loads(selected_indices)
+            except Exception:
+                indices = None
+        elif isinstance(selected_indices, list):
+            indices = selected_indices
+        if isinstance(indices, list):
+            items = [items[i] for i in indices if isinstance(i, int) and 0 <= i < len(items)]
+    
+    # ستون‌های export
+    export_columns = body.get("export_columns")
+    if export_columns and isinstance(export_columns, list):
+        headers = [col.get("label") or col.get("key") for col in export_columns]
+        keys = [col.get("key") for col in export_columns]
+    else:
+        # ستون‌های پیش‌فرض
+        locale = negotiate_locale(request.headers.get("Accept-Language"))
+        is_fa = (locale == 'fa')
+        default_columns = [
+            ('product_code', 'کد کالا' if is_fa else 'Product Code'),
+            ('product_name', 'نام کالا' if is_fa else 'Product Name'),
+            ('unit', 'واحد' if is_fa else 'Unit'),
+            ('category_name', 'دسته‌بندی' if is_fa else 'Category'),
+            ('total_quantity', 'تعداد فروش' if is_fa else 'Total Quantity'),
+            ('total_amount', 'مبلغ کل فروش' if is_fa else 'Total Amount'),
+            ('average_price', 'میانگین قیمت' if is_fa else 'Average Price'),
+            ('last_sale_date', 'آخرین تاریخ فروش' if is_fa else 'Last Sale Date'),
+        ]
+        keys = [k for k, _ in default_columns]
+        headers = [h for _, h in default_columns]
+    
+    # ساخت Excel
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Sales by Product"
+    
+    # Locale and RTL/LTR handling for Excel
+    locale = negotiate_locale(request.headers.get("Accept-Language"))
+    if locale == 'fa':
+        try:
+            ws.sheet_view.rightToLeft = True
+        except Exception:
+            pass
+    
+    # Header style
+    header_font = Font(bold=True)
+    header_fill = PatternFill(start_color="DDDDDD", end_color="DDDDDD", fill_type="solid")
+    thin_border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
+    
+    ws.append(headers)
+    for cell in ws[1]:
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = Alignment(horizontal="center")
+        cell.border = thin_border
+    
+    # افزودن ردیف‌های داده
+    for it in items:
+        row = []
+        for k in keys:
+            value = it.get(k)
+            if value is None:
+                row.append('')
+            elif k == 'last_sale_date' and value:
+                # فرمت تاریخ
+                try:
+                    if isinstance(value, str):
+                        date_obj = datetime.datetime.strptime(value.split('T')[0], '%Y-%m-%d').date()
+                        row.append(date_obj)
+                    else:
+                        row.append(str(value))
+                except Exception:
+                    row.append(str(value))
+            elif isinstance(value, (int, float)):
+                row.append(float(value))
+            else:
+                row.append(str(value))
+        ws.append(row)
+        for cell in ws[ws.max_row]:
+            cell.border = thin_border
+            # Align data cells based on locale
+            if locale == 'fa':
+                cell.alignment = Alignment(horizontal="right")
+    
+    # Auto width columns
+    try:
+        for column in ws.columns:
+            max_length = 0
+            column_letter = column[0].column_letter
+            for cell in column:
+                try:
+                    if cell.value is not None and len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+                except Exception:
+                    pass
+            ws.column_dimensions[column_letter].width = min(max_length + 2, 50)
+    except Exception:
+        pass
+    
+    output = io.BytesIO()
+    wb.save(output)
+    data = output.getvalue()
+    
+    # Build meaningful filename
+    biz_name = ""
+    try:
+        b = db.query(Business).filter(Business.id == business_id).first()
+        if b is not None:
+            biz_name = b.name or ""
+    except Exception:
+        biz_name = ""
+    
+    def slugify(text: str) -> str:
+        return re.sub(r"[^A-Za-z0-9_-]+", "_", text).strip("_")
+    
+    base = "sales_by_product"
+    if biz_name:
+        base += f"_{slugify(biz_name)}"
+    if selected_only:
+        base += "_selected"
+    filename = f"{base}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    
+    return Response(
+        content=data,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": f"attachment; filename={filename}",
+            "Content-Length": str(len(data)),
+            "Access-Control-Expose-Headers": "Content-Disposition",
+        },
+    )
 
 

@@ -22,6 +22,7 @@ from adapters.db.models.fiscal_year import FiscalYear
 from adapters.db.models.person import Person
 from adapters.db.models.product import Product
 from adapters.db.models.invoice_item_line import InvoiceItemLine
+from app.core.calendar import CalendarConverter, CalendarType
 from app.core.responses import ApiError
 from app.services.document_monetization_service import ensure_document_policy_allows_creation
 from app.services.credit_service import get_business_credit_settings
@@ -188,6 +189,63 @@ def _compute_available_stock(
         elif mv["movement"] == "out":
             bal -= mv["quantity"]
     return bal
+
+
+def get_financial_stock_bulk(
+    db: Session,
+    business_id: int,
+    product_ids: List[int],
+    as_of_date: Optional[date] = None,
+    warehouse_id: Optional[int] = None,
+) -> Dict[int, Decimal]:
+    """
+    محاسبه موجودی مالی برای لیستی از کالاها.
+    بر اساس حرکات موجودی از اسناد مالی (DocumentLine).
+    بازگشت: Dict[product_id, quantity]
+    """
+    if not product_ids:
+        return {}
+    
+    if as_of_date is None:
+        as_of_date = datetime.now().date()
+    
+    # دریافت حرکات از اسناد مالی
+    movements = _iter_product_movements(
+        db,
+        business_id,
+        product_ids,
+        [warehouse_id] if warehouse_id is not None else None,
+        as_of_date,
+        exclude_document_id=None,
+    )
+    
+    # محاسبه موجودی
+    stock_dict: Dict[int, Decimal] = {}
+    for mv in movements:
+        pid = int(mv["product_id"])
+        qty = Decimal(str(mv["quantity"] or 0))
+        if qty <= 0:
+            continue
+        
+        # اگر انبار مشخص شده، فقط حرکات همان انبار را لحاظ کن
+        if warehouse_id is not None and mv.get("warehouse_id") is not None:
+            if int(mv["warehouse_id"]) != int(warehouse_id):
+                continue
+        
+        if pid not in stock_dict:
+            stock_dict[pid] = Decimal(0)
+        
+        if mv["movement"] == "in":
+            stock_dict[pid] += qty
+        elif mv["movement"] == "out":
+            stock_dict[pid] -= qty
+    
+    # برای کالاهایی که حرکتی نداشتند، مقدار 0 برگردان
+    for pid in product_ids:
+        if pid not in stock_dict:
+            stock_dict[pid] = Decimal(0)
+    
+    return stock_dict
 
 
 def _ensure_stock_sufficient(
@@ -854,6 +912,7 @@ def create_invoice(
                     db=db,
                     business_id=business_id,
                     query={"person_id": int(person_id), "status": "overdue"},
+                    disable_pagination=True,
                 )
                 max_overdue = 0
                 for it in inst_data.get("items", []):
@@ -2089,6 +2148,8 @@ def search_installments(
     db: Session,
     business_id: int,
     query: Dict[str, Any],
+    *,
+    disable_pagination: bool = False,
 ) -> Dict[str, Any]:
     """
     جستجوی اقساط به تفکیک ردیف‌های برنامه اقساط در فاکتورهای فروش.
@@ -2118,6 +2179,8 @@ def search_installments(
         skip = int(query.get("skip", 0))
     except Exception:
         skip = 0
+    take = max(1, min(take, 1000))
+    skip = max(0, skip)
 
     fy_start: date | None = None
     fy_end: date | None = None
@@ -2177,6 +2240,13 @@ def search_installments(
     docs = docs_q.order_by(Document.id.desc()).all()
 
     items: List[Dict[str, Any]] = []
+    sum_principal = Decimal(0)
+    sum_interest = Decimal(0)
+    sum_total = Decimal(0)
+    sum_paid = Decimal(0)
+    sum_remaining = Decimal(0)
+    sum_late_fee = Decimal(0)
+    status_counts: Dict[str, int] = {"pending": 0, "partial": 0, "paid": 0, "overdue": 0}
     for doc in docs:
         extra = doc.extra_info or {}
         plan = extra.get("installment_plan") if isinstance(extra, dict) else None
@@ -2189,7 +2259,7 @@ def search_installments(
             except Exception:
                 continue
         # تلاش برای استخراج نام شخص برای نمایش در گزارش
-        person_name = None
+        person_name = (extra.get("person_name") or extra.get("person_title")) if isinstance(extra, dict) else None
         try:
             if extra.get("person_id") is not None:
                 pid = int(extra.get("person_id"))
@@ -2260,14 +2330,21 @@ def search_installments(
                         )
                     except Exception:
                         late_fee_amount = Decimal(0)
+            sum_principal += principal
+            sum_interest += interest
+            sum_total += total
+            sum_paid += paid
+            sum_remaining += remaining
+            sum_late_fee += late_fee_amount
+            status_counts[st] = status_counts.get(st, 0) + 1
             items.append({
                 "invoice_id": int(doc.id),
                 "invoice_code": doc.code,
                 "person_id": extra.get("person_id"),
                 "person_name": person_name,
-                "document_date": doc.document_date.isoformat(),
+                "document_date": doc.document_date,
                 "seq": int(it.get("seq") or 0),
-                "due_date": due.isoformat(),
+                "due_date": due,
                 "principal": float(principal),
                 "interest": float(interest),
                 "total": float(total),
@@ -2278,18 +2355,41 @@ def search_installments(
                 "late_fee_amount": float(late_fee_amount),
             })
 
+    items.sort(key=lambda row: (row["due_date"], row["invoice_id"], row["seq"]))
     total_count = len(items)
-    # صفحه‌بندی
-    page_items = items[skip: skip + take]
+
+    if disable_pagination:
+        page_items = items
+        effective_take = total_count or take
+        effective_skip = 0
+        has_next = False
+    else:
+        page_items = items[skip: skip + take]
+        effective_take = take
+        effective_skip = skip
+        has_next = skip + take < total_count
+
+    stats = {
+        "total_count": total_count,
+        "principal_total": float(sum_principal),
+        "interest_total": float(sum_interest),
+        "amount_total": float(sum_total),
+        "paid_total": float(sum_paid),
+        "remaining_total": float(sum_remaining),
+        "late_fee_total": float(sum_late_fee),
+        "status_breakdown": {k: int(v) for k, v in status_counts.items()},
+    }
+
     return {
         "items": page_items,
         "pagination": {
             "total": total_count,
-            "take": take,
-            "skip": skip,
-            "page": (skip // take) + 1,
-            "has_next": skip + take < total_count,
+            "take": effective_take,
+            "skip": effective_skip,
+            "page": (effective_skip // effective_take) + 1 if effective_take else 1,
+            "has_next": has_next,
         },
+        "stats": stats,
         "filters": {
             "fiscal_year_id": fiscal_year_id,
             "due_from": due_from,
@@ -2301,15 +2401,32 @@ def search_installments(
     }
 
 
+def _format_date_for_calendar(value: Any, calendar_type: CalendarType) -> str | None:
+    if value is None:
+        return None
+    dt_value: datetime | None = None
+    if isinstance(value, datetime):
+        dt_value = value
+    elif isinstance(value, date):
+        dt_value = datetime.combine(value, datetime.min.time())
+    elif isinstance(value, str):
+        return value
+    if dt_value is None:
+        return str(value)
+    formatted = CalendarConverter.format_datetime(dt_value, calendar_type)
+    return formatted.get("date_only") or formatted.get("formatted")
+
+
 def export_installments_csv(
     db: Session,
     business_id: int,
     query: Dict[str, Any],
+    calendar_type: CalendarType = "gregorian",
 ) -> bytes:
     """
     خروجی CSV اقساط بر اساس همان فیلترهای search_installments.
     """
-    data = search_installments(db, business_id, query)
+    data = search_installments(db, business_id, query, disable_pagination=True)
     items = data.get("items") or []
     output = io.StringIO()
     writer = csv.writer(output)
@@ -2337,9 +2454,9 @@ def export_installments_csv(
             it.get("invoice_code"),
             it.get("person_id"),
             it.get("person_name"),
-            it.get("document_date"),
+            _format_date_for_calendar(it.get("document_date"), calendar_type),
             it.get("seq"),
-            it.get("due_date"),
+            _format_date_for_calendar(it.get("due_date"), calendar_type),
             it.get("status"),
             it.get("principal"),
             it.get("interest"),
@@ -2356,6 +2473,7 @@ def export_installments_xlsx(
     db: Session,
     business_id: int,
     query: Dict[str, Any],
+    calendar_type: CalendarType = "gregorian",
 ) -> tuple[bytes, str, str]:
     """
     تلاش برای ساخت فایل XLSX؛ اگر کتابخانه موجود نبود، به CSV برمی‌گردیم.
@@ -2384,16 +2502,16 @@ def export_installments_xlsx(
             "late_fee_amount",
         ]
         ws.append(headers)
-        data = search_installments(db, business_id, query)
+        data = search_installments(db, business_id, query, disable_pagination=True)
         for it in data.get("items", []):
             ws.append([
                 it.get("invoice_id"),
                 it.get("invoice_code"),
                 it.get("person_id"),
                 it.get("person_name"),
-                it.get("document_date"),
+                _format_date_for_calendar(it.get("document_date"), calendar_type),
                 it.get("seq"),
-                it.get("due_date"),
+                _format_date_for_calendar(it.get("due_date"), calendar_type),
                 it.get("status"),
                 it.get("principal"),
                 it.get("interest"),
@@ -2408,7 +2526,7 @@ def export_installments_xlsx(
         return bio.getvalue(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "xlsx"
     except Exception:
         # Fallback: CSV
-        content = export_installments_csv(db, business_id, query)
+        content = export_installments_csv(db, business_id, query, calendar_type=calendar_type)
         return content, "text/csv; charset=utf-8", "csv"
 
 

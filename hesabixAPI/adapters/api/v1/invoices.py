@@ -106,7 +106,8 @@ def search_installments_endpoint(
     }
     """
     result = search_installments(db=db, business_id=business_id, query=payload or {})
-    return success_response(data=result, request=request, message="INSTALLMENTS_LIST_FETCHED")
+    formatted = format_datetime_fields(result, request)
+    return success_response(data=formatted, request=request, message="INSTALLMENTS_LIST_FETCHED")
 
 
 @router.post("/business/{business_id}/installments/export/excel")
@@ -121,7 +122,12 @@ def export_installments_excel_endpoint(
     """
     خروجی XLSX از اقساط (در صورت نبودن کتابخانه، CSV بازگردانده می‌شود).
     """
-    content, mime, ext = export_installments_xlsx(db=db, business_id=business_id, query=payload or {})
+    content, mime, ext = export_installments_xlsx(
+        db=db,
+        business_id=business_id,
+        query=payload or {},
+        calendar_type=ctx.get_calendar_type(),
+    )
     filename = f"installments_{business_id}.{ext}"
     headers = {
         "Content-Disposition": f'attachment; filename="{filename}"',

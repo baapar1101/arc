@@ -372,6 +372,124 @@ class AppLocalizationsEn extends AppLocalizations {
   String get records => 'records';
 
   @override
+  String get installmentsReportTitle => 'Installments report';
+
+  @override
+  String get installmentsFiltersFiscalYear => 'Fiscal year';
+
+  @override
+  String get installmentsFiltersStatus => 'Status';
+
+  @override
+  String get installmentsFiltersDueFrom => 'Due date from';
+
+  @override
+  String get installmentsFiltersDueTo => 'Due date to';
+
+  @override
+  String get installmentsFiltersPerson => 'Person';
+
+  @override
+  String get installmentsFiltersPersonHint => 'Search and select a person';
+
+  @override
+  String get installmentsFiltersInvoice => 'Invoice';
+
+  @override
+  String get installmentsFiltersInvoiceHint => 'Selected invoice number';
+
+  @override
+  String get installmentsFiltersInvoiceButton => 'Select invoice';
+
+  @override
+  String get installmentsStatusAll => 'All statuses';
+
+  @override
+  String get installmentsStatusPending => 'Pending';
+
+  @override
+  String get installmentsStatusPartial => 'Partially paid';
+
+  @override
+  String get installmentsStatusPaid => 'Paid';
+
+  @override
+  String get installmentsStatusOverdue => 'Overdue';
+
+  @override
+  String get installmentsSummaryPrincipal => 'Principal total';
+
+  @override
+  String get installmentsSummaryInterest => 'Interest total';
+
+  @override
+  String get installmentsSummaryTotal => 'Grand total';
+
+  @override
+  String get installmentsSummaryPaid => 'Paid total';
+
+  @override
+  String get installmentsSummaryRemaining => 'Remaining total';
+
+  @override
+  String get installmentsSummaryLateFee => 'Late fee total';
+
+  @override
+  String get installmentsFetchError => 'Failed to load installments';
+
+  @override
+  String get installmentsExportError => 'Export failed';
+
+  @override
+  String get installmentsExportWebOnly =>
+      'File download is only available on the web version';
+
+  @override
+  String get installmentsInvoicePickerTitle => 'Select invoice';
+
+  @override
+  String get installmentsInvoicePickerSearchLabel => 'Search invoice';
+
+  @override
+  String get installmentsTableInvoice => 'Invoice';
+
+  @override
+  String get installmentsTableInstallment => 'Installment';
+
+  @override
+  String get installmentsTablePerson => 'Person';
+
+  @override
+  String get installmentsTableDueDate => 'Due date';
+
+  @override
+  String get installmentsTableStatus => 'Status';
+
+  @override
+  String get installmentsTablePrincipal => 'Principal';
+
+  @override
+  String get installmentsTableInterest => 'Interest';
+
+  @override
+  String get installmentsTableTotal => 'Total';
+
+  @override
+  String get installmentsTablePaid => 'Paid';
+
+  @override
+  String get installmentsTableRemaining => 'Remaining';
+
+  @override
+  String get installmentsTableLateFee => 'Late fee';
+
+  @override
+  String get installmentsTableOverdueDays => 'Overdue days';
+
+  @override
+  String get installmentsRowsPerPage => 'Rows per page';
+
+  @override
   String get test => 'Test';
 
   @override
@@ -2578,6 +2696,39 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get tax => 'Tax';
+
+  @override
+  String get productStock => 'Stock';
+
+  @override
+  String get productStockInWarehouses => 'Product Stock in Warehouses';
+
+  @override
+  String get warehouseCode => 'Warehouse Code';
+
+  @override
+  String get warehouseName => 'Warehouse Name';
+
+  @override
+  String get stockQuantity => 'Quantity';
+
+  @override
+  String get totalStock => 'Total Stock';
+
+  @override
+  String get noStockRecorded => 'No stock recorded';
+
+  @override
+  String get inventoryNotTracked => 'This product does not track inventory';
+
+  @override
+  String get stockReportDate => 'Report Date';
+
+  @override
+  String get showZeroStock => 'Show Zero Stock';
+
+  @override
+  String get refreshStock => 'Refresh Stock';
 
   @override
   String get inventoryControl => 'Inventory control';

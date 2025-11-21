@@ -24,7 +24,7 @@ import '../../services/notifications_ws_client.dart';
 import '../../widgets/transfer/transfer_form_dialog.dart';
 import '../../widgets/expense_income/expense_income_form_dialog.dart';
 import '../../widgets/warehouse/warehouse_form_dialog.dart';
-import '../../widgets/warehouse/warehouse_document_form_dialog.dart';
+import '../../widgets/warehouse/warehouse_doc_wizard_dialog.dart';
 import '../../widgets/ai/ai_chat_dialog.dart';
 import 'check_form_page.dart';
 
@@ -461,14 +461,6 @@ class _BusinessShellState extends State<BusinessShell> {
         ],
       ),
       _MenuItem(
-        label: t.inquiries,
-        icon: Icons.search,
-        selectedIcon: Icons.search,
-        path: '/business/${widget.businessId}/inquiries',
-        type: _MenuItemType.simple,
-        hasAddButton: false,
-      ),
-      _MenuItem(
         label: t.storageSpace,
         icon: Icons.storage,
         selectedIcon: Icons.storage,
@@ -491,14 +483,6 @@ class _BusinessShellState extends State<BusinessShell> {
         path: null, // برای منوی بازشونده
         type: _MenuItemType.expandable,
         children: [
-          _MenuItem(
-            label: 'چت با AI',
-            icon: Icons.chat_bubble_outline,
-            selectedIcon: Icons.chat_bubble,
-            path: '/business/${widget.businessId}/ai/chat',
-            type: _MenuItemType.simple,
-            hasAddButton: false,
-          ),
           _MenuItem(
             label: 'اشتراک AI',
             icon: Icons.subscriptions_outlined,
@@ -793,18 +777,16 @@ class _BusinessShellState extends State<BusinessShell> {
     }
 
     Future<void> showAddWarehouseDocumentDialog() async {
-      final result = await showDialog<bool>(
+      if (!context.mounted) return;
+      final result = await showDialog<WarehouseDocWizardResult>(
         context: context,
-        builder: (context) => WarehouseDocumentFormDialog(
+        builder: (context) => WarehouseDocWizardDialog(
           businessId: widget.businessId,
-          onSuccess: () {
-            // Refresh the warehouse documents page if it's currently open
-            _refreshCurrentPage();
-          },
+          apiClient: ApiClient(),
         ),
       );
-      if (result == true) {
-        // Warehouse document was successfully added, refresh the current page
+      if (result != null) {
+        // Warehouse document wizard was completed, refresh the current page
         _refreshCurrentPage();
       }
     }
@@ -902,6 +884,7 @@ class _BusinessShellState extends State<BusinessShell> {
               context,
               authStore: widget.authStore,
               businessId: widget.businessId,
+              calendarController: widget.calendarController,
             );
           },
           icon: const Icon(Icons.smart_toy_outlined),
@@ -1538,7 +1521,6 @@ class _BusinessShellState extends State<BusinessShell> {
     if (label == t.openingBalance) return 'opening_balance';
     if (label == t.reports) return 'reports';
     if (label == t.warehouses) return 'warehouses';
-    if (label == t.inquiries) return 'reports';
     if (label == t.storageSpace) return 'storage';
     if (label == t.taxpayers) return 'settings';
     if (label == t.settings) return 'settings';

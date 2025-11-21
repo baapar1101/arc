@@ -806,6 +806,240 @@ abstract class AppLocalizations {
   /// **'records'**
   String get records;
 
+  /// No description provided for @installmentsReportTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Installments report'**
+  String get installmentsReportTitle;
+
+  /// No description provided for @installmentsFiltersFiscalYear.
+  ///
+  /// In en, this message translates to:
+  /// **'Fiscal year'**
+  String get installmentsFiltersFiscalYear;
+
+  /// No description provided for @installmentsFiltersStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Status'**
+  String get installmentsFiltersStatus;
+
+  /// No description provided for @installmentsFiltersDueFrom.
+  ///
+  /// In en, this message translates to:
+  /// **'Due date from'**
+  String get installmentsFiltersDueFrom;
+
+  /// No description provided for @installmentsFiltersDueTo.
+  ///
+  /// In en, this message translates to:
+  /// **'Due date to'**
+  String get installmentsFiltersDueTo;
+
+  /// No description provided for @installmentsFiltersPerson.
+  ///
+  /// In en, this message translates to:
+  /// **'Person'**
+  String get installmentsFiltersPerson;
+
+  /// No description provided for @installmentsFiltersPersonHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search and select a person'**
+  String get installmentsFiltersPersonHint;
+
+  /// No description provided for @installmentsFiltersInvoice.
+  ///
+  /// In en, this message translates to:
+  /// **'Invoice'**
+  String get installmentsFiltersInvoice;
+
+  /// No description provided for @installmentsFiltersInvoiceHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Selected invoice number'**
+  String get installmentsFiltersInvoiceHint;
+
+  /// No description provided for @installmentsFiltersInvoiceButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Select invoice'**
+  String get installmentsFiltersInvoiceButton;
+
+  /// No description provided for @installmentsStatusAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All statuses'**
+  String get installmentsStatusAll;
+
+  /// No description provided for @installmentsStatusPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending'**
+  String get installmentsStatusPending;
+
+  /// No description provided for @installmentsStatusPartial.
+  ///
+  /// In en, this message translates to:
+  /// **'Partially paid'**
+  String get installmentsStatusPartial;
+
+  /// No description provided for @installmentsStatusPaid.
+  ///
+  /// In en, this message translates to:
+  /// **'Paid'**
+  String get installmentsStatusPaid;
+
+  /// No description provided for @installmentsStatusOverdue.
+  ///
+  /// In en, this message translates to:
+  /// **'Overdue'**
+  String get installmentsStatusOverdue;
+
+  /// No description provided for @installmentsSummaryPrincipal.
+  ///
+  /// In en, this message translates to:
+  /// **'Principal total'**
+  String get installmentsSummaryPrincipal;
+
+  /// No description provided for @installmentsSummaryInterest.
+  ///
+  /// In en, this message translates to:
+  /// **'Interest total'**
+  String get installmentsSummaryInterest;
+
+  /// No description provided for @installmentsSummaryTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Grand total'**
+  String get installmentsSummaryTotal;
+
+  /// No description provided for @installmentsSummaryPaid.
+  ///
+  /// In en, this message translates to:
+  /// **'Paid total'**
+  String get installmentsSummaryPaid;
+
+  /// No description provided for @installmentsSummaryRemaining.
+  ///
+  /// In en, this message translates to:
+  /// **'Remaining total'**
+  String get installmentsSummaryRemaining;
+
+  /// No description provided for @installmentsSummaryLateFee.
+  ///
+  /// In en, this message translates to:
+  /// **'Late fee total'**
+  String get installmentsSummaryLateFee;
+
+  /// No description provided for @installmentsFetchError.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to load installments'**
+  String get installmentsFetchError;
+
+  /// No description provided for @installmentsExportError.
+  ///
+  /// In en, this message translates to:
+  /// **'Export failed'**
+  String get installmentsExportError;
+
+  /// No description provided for @installmentsExportWebOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'File download is only available on the web version'**
+  String get installmentsExportWebOnly;
+
+  /// No description provided for @installmentsInvoicePickerTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Select invoice'**
+  String get installmentsInvoicePickerTitle;
+
+  /// No description provided for @installmentsInvoicePickerSearchLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Search invoice'**
+  String get installmentsInvoicePickerSearchLabel;
+
+  /// No description provided for @installmentsTableInvoice.
+  ///
+  /// In en, this message translates to:
+  /// **'Invoice'**
+  String get installmentsTableInvoice;
+
+  /// No description provided for @installmentsTableInstallment.
+  ///
+  /// In en, this message translates to:
+  /// **'Installment'**
+  String get installmentsTableInstallment;
+
+  /// No description provided for @installmentsTablePerson.
+  ///
+  /// In en, this message translates to:
+  /// **'Person'**
+  String get installmentsTablePerson;
+
+  /// No description provided for @installmentsTableDueDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Due date'**
+  String get installmentsTableDueDate;
+
+  /// No description provided for @installmentsTableStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Status'**
+  String get installmentsTableStatus;
+
+  /// No description provided for @installmentsTablePrincipal.
+  ///
+  /// In en, this message translates to:
+  /// **'Principal'**
+  String get installmentsTablePrincipal;
+
+  /// No description provided for @installmentsTableInterest.
+  ///
+  /// In en, this message translates to:
+  /// **'Interest'**
+  String get installmentsTableInterest;
+
+  /// No description provided for @installmentsTableTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Total'**
+  String get installmentsTableTotal;
+
+  /// No description provided for @installmentsTablePaid.
+  ///
+  /// In en, this message translates to:
+  /// **'Paid'**
+  String get installmentsTablePaid;
+
+  /// No description provided for @installmentsTableRemaining.
+  ///
+  /// In en, this message translates to:
+  /// **'Remaining'**
+  String get installmentsTableRemaining;
+
+  /// No description provided for @installmentsTableLateFee.
+  ///
+  /// In en, this message translates to:
+  /// **'Late fee'**
+  String get installmentsTableLateFee;
+
+  /// No description provided for @installmentsTableOverdueDays.
+  ///
+  /// In en, this message translates to:
+  /// **'Overdue days'**
+  String get installmentsTableOverdueDays;
+
+  /// No description provided for @installmentsRowsPerPage.
+  ///
+  /// In en, this message translates to:
+  /// **'Rows per page'**
+  String get installmentsRowsPerPage;
+
   /// No description provided for @test.
   ///
   /// In en, this message translates to:
@@ -5101,6 +5335,72 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Tax'**
   String get tax;
+
+  /// No description provided for @productStock.
+  ///
+  /// In en, this message translates to:
+  /// **'Stock'**
+  String get productStock;
+
+  /// No description provided for @productStockInWarehouses.
+  ///
+  /// In en, this message translates to:
+  /// **'Product Stock in Warehouses'**
+  String get productStockInWarehouses;
+
+  /// No description provided for @warehouseCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Warehouse Code'**
+  String get warehouseCode;
+
+  /// No description provided for @warehouseName.
+  ///
+  /// In en, this message translates to:
+  /// **'Warehouse Name'**
+  String get warehouseName;
+
+  /// No description provided for @stockQuantity.
+  ///
+  /// In en, this message translates to:
+  /// **'Quantity'**
+  String get stockQuantity;
+
+  /// No description provided for @totalStock.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Stock'**
+  String get totalStock;
+
+  /// No description provided for @noStockRecorded.
+  ///
+  /// In en, this message translates to:
+  /// **'No stock recorded'**
+  String get noStockRecorded;
+
+  /// No description provided for @inventoryNotTracked.
+  ///
+  /// In en, this message translates to:
+  /// **'This product does not track inventory'**
+  String get inventoryNotTracked;
+
+  /// No description provided for @stockReportDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Report Date'**
+  String get stockReportDate;
+
+  /// No description provided for @showZeroStock.
+  ///
+  /// In en, this message translates to:
+  /// **'Show Zero Stock'**
+  String get showZeroStock;
+
+  /// No description provided for @refreshStock.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh Stock'**
+  String get refreshStock;
 
   /// No description provided for @inventoryControl.
   ///

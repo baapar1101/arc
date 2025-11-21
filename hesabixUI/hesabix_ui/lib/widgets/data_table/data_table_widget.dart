@@ -241,6 +241,9 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
       final api = ApiClient();
       
       // Build QueryInfo payload
+      final includeInventory = widget.config.additionalParams?['include_inventory'] == true;
+      final inventoryAsOfDate = widget.config.additionalParams?['inventory_as_of_date'] as String?;
+      
       final queryInfo = QueryInfo(
         take: _limit,
         skip: (_page - 1) * _limit,
@@ -252,12 +255,19 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
         search: _searchCtrl.text.trim().isNotEmpty ? _searchCtrl.text.trim() : null,
         searchFields: widget.config.searchFields.isNotEmpty ? widget.config.searchFields : null,
         filters: _buildFilters(),
+        includeInventory: includeInventory,
+        inventoryAsOfDate: inventoryAsOfDate,
       );
 
-      // Add additional parameters
+      // Add additional parameters (excluding inventory params that are already in QueryInfo)
       final requestData = queryInfo.toJson();
       if (widget.config.additionalParams != null) {
-        requestData.addAll(widget.config.additionalParams!);
+        final additionalParamsCopy = Map<String, dynamic>.from(widget.config.additionalParams!);
+        additionalParamsCopy.remove('include_inventory');
+        additionalParamsCopy.remove('inventory_as_of_date');
+        if (additionalParamsCopy.isNotEmpty) {
+          requestData.addAll(additionalParamsCopy);
+        }
       }
 
       final res = await api.post<Map<String, dynamic>>(widget.config.endpoint, data: requestData);
@@ -1192,7 +1202,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
         ],
         
         // Export buttons
-        if (widget.config.excelEndpoint != null || widget.config.pdfEndpoint != null) ...[
+        if (widget.config.showExportButtons && (widget.config.excelEndpoint != null || widget.config.pdfEndpoint != null)) ...[
           _buildExportButtons(t, theme),
           const SizedBox(width: 8),
         ],
@@ -1513,12 +1523,13 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
         borderRadius: BorderRadius.circular(6),
         border: Border.all(color: theme.dividerColor.withValues(alpha: 0.3)),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Footer totals for current page (optional)
+          // Footer totals for current page (optional) - on separate row
           if (widget.config.footerTotals != null && widget.config.footerTotals!.isNotEmpty && _items.isNotEmpty)
-            Flexible(
-              fit: FlexFit.loose,
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
               child: SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: Row(
@@ -1537,7 +1548,11 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                         }
                       } catch (_) {}
                     }
-                    final text = sum.toStringAsFixed(2).replaceAll(RegExp(r'\\.00$'), '');
+                    // Format number with thousand separators and remove unnecessary decimals
+                    final formattedText = DataTableUtils.formatNumber(
+                      sum,
+                      decimalPlaces: 2,
+                    );
                     return Container(
                       margin: const EdgeInsetsDirectional.only(end: 8),
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -1558,7 +1573,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                           ),
                           const SizedBox(width: 6),
                           Text(
-                            text,
+                            formattedText,
                             style: theme.textTheme.bodySmall?.copyWith(
                               fontFeatures: const [FontFeature.tabularFigures()],
                               color: theme.colorScheme.onSurface,
@@ -1574,6 +1589,9 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
               ),
             ),
           
+          // Results info and pagination on second row
+          Row(
+            children: [
           // Results info
           Text(
             '${t.showing} ${((_page - 1) * _limit) + 1} ${t.to} ${(_page * _limit).clamp(0, _total)} ${t.ofText} $_total ${t.results}',
@@ -1682,6 +1700,8 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                   icon: const Icon(Icons.last_page),
                   iconSize: 20,
                   tooltip: t.lastPage,
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -2106,7 +2126,20 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
           final columnsToShow = widget.config.enableColumnSettings && _visibleColumns.isNotEmpty
               ? _visibleColumns
               : widget.config.columns;
-          final dataColumnsToShow = columnsToShow.where((c) => c is! ActionColumn).toList();
+          List<DataTableColumn> dataColumnsToShow = columnsToShow.where((c) => c is! ActionColumn).toList();
+          
+          // Reorder by pinning if settings available (same logic as headers)
+          if (widget.config.enableColumnSettings && _columnSettings != null) {
+            final visibleKeys = _columnSettings!.visibleColumns.toSet();
+            final order = _columnSettings!.columnOrder;
+            List<String> middleKeys = order.where((k) => visibleKeys.contains(k)).toList();
+            final leftKeys = _columnSettings!.pinnedLeft.where((k) => middleKeys.contains(k)).toList();
+            final rightKeys = _columnSettings!.pinnedRight.where((k) => middleKeys.contains(k)).toList();
+            middleKeys.removeWhere((k) => leftKeys.contains(k) || rightKeys.contains(k));
+            List<String> finalOrder = [...leftKeys, ...middleKeys, ...rightKeys];
+            final mapByKey = {for (final c in dataColumnsToShow) c.key: c};
+            dataColumnsToShow = finalOrder.map((k) => mapByKey[k]).whereType<DataTableColumn>().toList();
+          }
               
           cells.addAll(dataColumnsToShow.map((column) {
             return DataCell(

@@ -475,6 +475,8 @@ class QueryInfo {
   final List<SortItem>? sorts;
   final int take;
   final int skip;
+  final bool includeInventory;
+  final String? inventoryAsOfDate;
 
   const QueryInfo({
     this.search,
@@ -485,6 +487,8 @@ class QueryInfo {
     this.sorts,
     this.take = 20,
     this.skip = 0,
+    this.includeInventory = false,
+    this.inventoryAsOfDate,
   });
 
   Map<String, dynamic> toJson() {
@@ -509,6 +513,13 @@ class QueryInfo {
 
     if (filters != null && filters!.isNotEmpty) {
       json['filters'] = filters!.map((f) => f.toJson()).toList();
+    }
+
+    if (includeInventory) {
+      json['include_inventory'] = true;
+      if (inventoryAsOfDate != null && inventoryAsOfDate!.isNotEmpty) {
+        json['inventory_as_of_date'] = inventoryAsOfDate;
+      }
     }
 
     return json;

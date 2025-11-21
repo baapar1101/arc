@@ -294,6 +294,7 @@ def list_kardex_lines(db: Session, business_id: int, query: Dict[str, Any]) -> D
             "transfer": "انتقال",
             "manual": "سند دستی",
             "invoice": "فاکتور",
+            "check": "چک",
         }
         return mapping.get(doc_type, doc_type)
 

@@ -199,6 +199,7 @@ class DocumentRepository:
                 "transfer": "انتقال",
                 "manual": "سند دستی",
                 "invoice": "فاکتور",
+                "check": "چک",
             }
             return mapping.get(doc_type, doc_type)
 

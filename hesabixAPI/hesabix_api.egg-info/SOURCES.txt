@@ -224,6 +224,7 @@ app/services/document_monetization_service.py
 app/services/document_service.py
 app/services/email_service.py
 app/services/expense_income_service.py
+app/services/file_dependency_service.py
 app/services/file_storage_service.py
 app/services/invoice_service.py
 app/services/job_manager.py

@@ -46,6 +46,12 @@ import 'pages/business/settings_page.dart';
 import 'pages/business/business_info_settings_page.dart';
 import 'pages/business/reports_page.dart';
 import 'pages/business/kardex_page.dart';
+import 'pages/business/debtors_report_page.dart';
+import 'pages/business/creditors_report_page.dart';
+import 'pages/business/people_transactions_report_page.dart';
+import 'pages/business/item_movements_report_page.dart';
+import 'pages/business/sales_by_product_report_page.dart';
+import 'pages/business/inventory_kardex_report_page.dart';
 import 'pages/business/persons_page.dart';
 import 'pages/business/product_attributes_page.dart';
 import 'pages/business/products_page.dart';
@@ -90,7 +96,6 @@ import 'pages/public/public_person_share_link_page.dart';
 import 'pages/admin/ai_settings_page.dart';
 import 'pages/admin/ai_plans_admin_page.dart';
 import 'pages/admin/ai_prompts_admin_page.dart';
-import 'pages/business/ai_chat_page.dart';
 import 'pages/business/ai_subscription_page.dart';
 import 'pages/business/ai_usage_page.dart';
 
@@ -842,19 +847,6 @@ class _MyAppState extends State<MyApp> {
               },
             ),
             GoRoute(
-              path: '/business/:business_id/ai/chat',
-              name: 'business_ai_chat',
-              pageBuilder: (context, state) {
-                final businessId = int.parse(state.pathParameters['business_id']!);
-                return NoTransitionPage(
-                  child: AIChatPage(
-                    businessId: businessId,
-                    authStore: _authStore!,
-                  ),
-                );
-              },
-            ),
-            GoRoute(
               path: '/business/:business_id/ai/subscription',
               name: 'business_ai_subscription',
               pageBuilder: (context, state) {
@@ -996,6 +988,84 @@ class _MyAppState extends State<MyApp> {
                     businessId: businessId,
                     calendarController: _calendarController!,
                     initialPersonIds: initialPersonIds.toList(),
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/reports/debtors',
+              name: 'business_reports_debtors',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return NoTransitionPage(
+                  child: DebtorsReportPage(
+                    businessId: businessId,
+                    calendarController: _calendarController!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/reports/creditors',
+              name: 'business_reports_creditors',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return NoTransitionPage(
+                  child: CreditorsReportPage(
+                    businessId: businessId,
+                    calendarController: _calendarController!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/reports/people-transactions',
+              name: 'business_reports_people_transactions',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return NoTransitionPage(
+                  child: PeopleTransactionsReportPage(
+                    businessId: businessId,
+                    calendarController: _calendarController!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/reports/item-movements',
+              name: 'business_reports_item_movements',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return NoTransitionPage(
+                  child: ItemMovementsReportPage(
+                    businessId: businessId,
+                    calendarController: _calendarController!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/reports/sales-by-product',
+              name: 'business_reports_sales_by_product',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return NoTransitionPage(
+                  child: SalesByProductReportPage(
+                    businessId: businessId,
+                    calendarController: _calendarController!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/reports/inventory-kardex',
+              name: 'business_reports_inventory_kardex',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return NoTransitionPage(
+                  child: InventoryKardexReportPage(
+                    businessId: businessId,
+                    calendarController: _calendarController!,
                   ),
                 );
               },

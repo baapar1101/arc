@@ -371,6 +371,124 @@ class AppLocalizationsFa extends AppLocalizations {
   String get records => 'رکورد';
 
   @override
+  String get installmentsReportTitle => 'گزارش اقساط';
+
+  @override
+  String get installmentsFiltersFiscalYear => 'سال مالی';
+
+  @override
+  String get installmentsFiltersStatus => 'وضعیت';
+
+  @override
+  String get installmentsFiltersDueFrom => 'از تاریخ سررسید';
+
+  @override
+  String get installmentsFiltersDueTo => 'تا تاریخ سررسید';
+
+  @override
+  String get installmentsFiltersPerson => 'شخص';
+
+  @override
+  String get installmentsFiltersPersonHint => 'جستجو و انتخاب شخص';
+
+  @override
+  String get installmentsFiltersInvoice => 'فاکتور';
+
+  @override
+  String get installmentsFiltersInvoiceHint => 'شماره فاکتور انتخابی';
+
+  @override
+  String get installmentsFiltersInvoiceButton => 'انتخاب فاکتور';
+
+  @override
+  String get installmentsStatusAll => 'همه وضعیت‌ها';
+
+  @override
+  String get installmentsStatusPending => 'در انتظار';
+
+  @override
+  String get installmentsStatusPartial => 'پرداخت جزئی';
+
+  @override
+  String get installmentsStatusPaid => 'تسویه شده';
+
+  @override
+  String get installmentsStatusOverdue => 'سررسید گذشته';
+
+  @override
+  String get installmentsSummaryPrincipal => 'جمع اصل';
+
+  @override
+  String get installmentsSummaryInterest => 'جمع سود';
+
+  @override
+  String get installmentsSummaryTotal => 'جمع کل';
+
+  @override
+  String get installmentsSummaryPaid => 'جمع پرداخت';
+
+  @override
+  String get installmentsSummaryRemaining => 'جمع مانده';
+
+  @override
+  String get installmentsSummaryLateFee => 'جمع جریمه دیرکرد';
+
+  @override
+  String get installmentsFetchError => 'خطا در دریافت گزارش اقساط';
+
+  @override
+  String get installmentsExportError => 'خطا در خروجی گرفتن';
+
+  @override
+  String get installmentsExportWebOnly =>
+      'دانلود فایل فقط در نسخه وب پشتیبانی می‌شود';
+
+  @override
+  String get installmentsInvoicePickerTitle => 'انتخاب فاکتور';
+
+  @override
+  String get installmentsInvoicePickerSearchLabel => 'جستجوی فاکتور';
+
+  @override
+  String get installmentsTableInvoice => 'فاکتور';
+
+  @override
+  String get installmentsTableInstallment => 'قسط';
+
+  @override
+  String get installmentsTablePerson => 'شخص';
+
+  @override
+  String get installmentsTableDueDate => 'تاریخ سررسید';
+
+  @override
+  String get installmentsTableStatus => 'وضعیت';
+
+  @override
+  String get installmentsTablePrincipal => 'اصل';
+
+  @override
+  String get installmentsTableInterest => 'سود';
+
+  @override
+  String get installmentsTableTotal => 'کل';
+
+  @override
+  String get installmentsTablePaid => 'پرداخت';
+
+  @override
+  String get installmentsTableRemaining => 'مانده';
+
+  @override
+  String get installmentsTableLateFee => 'جریمه دیرکرد';
+
+  @override
+  String get installmentsTableOverdueDays => 'روزهای تاخیر';
+
+  @override
+  String get installmentsRowsPerPage => 'تعداد سطر در هر صفحه';
+
+  @override
   String get test => 'تست';
 
   @override
@@ -2559,6 +2677,39 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get tax => 'مالیات';
+
+  @override
+  String get productStock => 'موجودی';
+
+  @override
+  String get productStockInWarehouses => 'موجودی کالا در انبارها';
+
+  @override
+  String get warehouseCode => 'کد انبار';
+
+  @override
+  String get warehouseName => 'نام انبار';
+
+  @override
+  String get stockQuantity => 'موجودی';
+
+  @override
+  String get totalStock => 'موجودی کل';
+
+  @override
+  String get noStockRecorded => 'موجودی ثبت نشده';
+
+  @override
+  String get inventoryNotTracked => 'این کالا کنترل موجودی ندارد';
+
+  @override
+  String get stockReportDate => 'تاریخ گزارش';
+
+  @override
+  String get showZeroStock => 'نمایش موجودی صفر';
+
+  @override
+  String get refreshStock => 'به‌روزرسانی موجودی';
 
   @override
   String get inventoryControl => 'کنترل موجودی';

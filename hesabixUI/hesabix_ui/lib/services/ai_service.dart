@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:dio/dio.dart';
 import '../core/api_client.dart';
 import '../models/ai_models.dart';
@@ -130,13 +131,11 @@ class AIService {
   }
 
   Future<AIChatSession> createChatSession({
-    required String title,
     int? businessId,
   }) async {
     final res = await _api.post<Map<String, dynamic>>(
       '/api/v1/ai/chat/sessions',
       data: {
-        'title': title,
         if (businessId != null) 'business_id': businessId,
       },
     );
@@ -172,6 +171,98 @@ class AIService {
     );
     final body = res.data as Map<String, dynamic>;
     return body['data'] as Map<String, dynamic>;
+  }
+
+  /// ارسال پیام به صورت streaming
+  /// 
+  /// Returns a Stream<String> که هر chunk محتوای جدید است
+  /// onComplete callback با usage stats فراخوانی می‌شود
+  Stream<String> sendMessageStream({
+    required int sessionId,
+    required String content,
+    void Function(Map<String, dynamic>? usage, int? messageId)? onComplete,
+    void Function(String error)? onError,
+  }) async* {
+    try {
+      // Use ApiClient with streaming response type
+      final response = await _api.post<ResponseBody>(
+        '/api/v1/ai/chat/sessions/$sessionId/messages?stream=true',
+        data: {'content': content},
+        responseType: ResponseType.stream,
+        options: Options(
+          receiveTimeout: const Duration(seconds: 30), // timeout 30 ثانیه
+          sendTimeout: const Duration(seconds: 30),
+          headers: {
+            'Accept': 'text/event-stream',
+            'Cache-Control': 'no-cache',
+          },
+        ),
+      );
+
+      final responseBody = response.data;
+      if (responseBody == null) {
+        onError?.call('Empty response');
+        return;
+      }
+
+      // Transform stream to String
+      final stream = responseBody.stream
+          .cast<List<int>>()
+          .transform(utf8.decoder);
+      
+      // Parse SSE stream
+      String buffer = '';
+      await for (final chunk in stream) {
+        buffer += chunk;
+        
+        // Process complete lines
+        while (buffer.contains('\n')) {
+          final lineIndex = buffer.indexOf('\n');
+          final line = buffer.substring(0, lineIndex).trim();
+          buffer = buffer.substring(lineIndex + 1);
+          
+          if (line.isEmpty) continue;
+          
+          // Parse SSE format: "data: {json}"
+          if (line.startsWith('data: ')) {
+            final jsonStr = line.substring(6); // Remove "data: "
+            
+            try {
+              final data = jsonDecode(jsonStr) as Map<String, dynamic>;
+              
+              // Check for error
+              if (data.containsKey('error')) {
+                onError?.call(data['error'] as String);
+                return;
+              }
+              
+              // Check if done
+              final done = data['done'] as bool? ?? false;
+              
+              // Yield content chunk
+              final contentChunk = data['content'] as String? ?? '';
+              if (contentChunk.isNotEmpty) {
+                yield contentChunk;
+              }
+              
+              // If done, call onComplete and return
+              if (done) {
+                final usage = data['usage'] as Map<String, dynamic>?;
+                final messageId = data['message_id'] as int?;
+                onComplete?.call(usage, messageId);
+                return;
+              }
+            } catch (e) {
+              // Ignore JSON decode errors for incomplete chunks
+              continue;
+            }
+          }
+        }
+      }
+    } catch (e) {
+      onError?.call(e.toString());
+      rethrow;
+    }
   }
 
   Future<void> deleteChatSession(int sessionId) async {

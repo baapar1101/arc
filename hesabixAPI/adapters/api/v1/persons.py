@@ -15,9 +15,9 @@ from adapters.api.v1.schema_models.person import (
     PersonShareLinkCreateRequest,
 )
 from adapters.api.v1.schemas import QueryInfo, SuccessResponse
-from app.core.responses import success_response, format_datetime_fields
+from app.core.responses import success_response, format_datetime_fields, ApiError
 from app.core.auth_dependency import get_current_user, AuthContext
-from app.core.permissions import require_business_management_dep
+from app.core.permissions import require_business_management_dep, require_business_access
 from app.core.i18n import negotiate_locale
 from app.services.person_service import (
     create_person,
@@ -26,6 +26,9 @@ from app.services.person_service import (
     update_person,
     delete_person,
     get_person_summary,
+    get_debtors_report,
+    get_creditors_report,
+    get_people_transactions_report,
 )
 from app.services.person_share_link_service import (
     create_share_link as create_person_share_link_service,
@@ -1218,3 +1221,1097 @@ async def import_persons_excel(
     except Exception as e:
         logger.error(f"Import error: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"خطا در پردازش فایل: {str(e)}")
+
+
+@router.post("/businesses/{business_id}/reports/debtors",
+    summary="گزارش بدهکاران",
+    description="گزارش لیست بدهکاران با امکان فیلتر بر اساس سال مالی، تاریخ، حداقل بدهی و جستجو",
+)
+async def debtors_report_endpoint(
+    request: Request,
+    business_id: int,
+    body: Dict[str, Any] = Body(default={}),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """گزارش بدهکاران"""
+    # بررسی دسترسی
+    if not ctx.can_read_section("reports"):
+        raise ApiError("FORBIDDEN", "Missing business permission: reports.read", http_status=403)
+    
+    # دریافت سال مالی از header یا body
+    fiscal_year_id = None
+    fy_header = request.headers.get('X-Fiscal-Year-ID')
+    if fy_header:
+        try:
+            fiscal_year_id = int(fy_header)
+        except (ValueError, TypeError):
+            pass
+    
+    # اگر سال مالی در body مشخص شده، اولویت با body است
+    if body.get('fiscal_year_id'):
+        try:
+            fiscal_year_id = int(body['fiscal_year_id'])
+        except (ValueError, TypeError):
+            pass
+    
+    # اگر سال مالی مشخص نشده، از سال مالی جاری business استفاده می‌کنیم
+    if not fiscal_year_id:
+        fiscal_year = db.query(FiscalYear).filter(
+            and_(
+                FiscalYear.business_id == business_id,
+                FiscalYear.is_last == True
+            )
+        ).first()
+        if fiscal_year:
+            fiscal_year_id = fiscal_year.id
+    
+    # استخراج پارامترها از body
+    date_from = body.get('date_from')
+    date_to = body.get('date_to')
+    currency_id = body.get('currency_id')
+    if currency_id is not None:
+        try:
+            currency_id = int(currency_id)
+        except (ValueError, TypeError):
+            currency_id = None
+    
+    min_balance = body.get('min_balance')
+    if min_balance is not None:
+        try:
+            min_balance = float(min_balance)
+        except (ValueError, TypeError):
+            min_balance = None
+    
+    person_ids = body.get('person_ids')
+    if person_ids is not None and not isinstance(person_ids, list):
+        person_ids = None
+    
+    search = body.get('search')
+    skip = int(body.get('skip', 0))
+    take = int(body.get('take', 50))
+    
+    # دریافت گزارش
+    result = get_debtors_report(
+        db=db,
+        business_id=business_id,
+        fiscal_year_id=fiscal_year_id,
+        currency_id=currency_id,
+        date_from=date_from,
+        date_to=date_to,
+        min_balance=min_balance,
+        person_ids=person_ids,
+        search=search,
+        skip=skip,
+        take=take,
+    )
+    
+    # فرمت کردن تاریخ‌ها
+    result['items'] = [
+        format_datetime_fields(item, request) for item in result['items']
+    ]
+    
+    return success_response(
+        data=result,
+        request=request,
+        message="گزارش بدهکاران با موفقیت دریافت شد",
+    )
+
+
+@router.post("/businesses/{business_id}/reports/creditors",
+    summary="گزارش بستانکاران",
+    description="گزارش لیست بستانکاران با امکان فیلتر بر اساس سال مالی، تاریخ، حداقل بستانکاری و جستجو",
+)
+async def creditors_report_endpoint(
+    request: Request,
+    business_id: int,
+    body: Dict[str, Any] = Body(default={}),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """گزارش بستانکاران"""
+    # بررسی دسترسی
+    if not ctx.can_read_section("reports"):
+        raise ApiError("FORBIDDEN", "Missing business permission: reports.read", http_status=403)
+    
+    # دریافت سال مالی از header یا body
+    fiscal_year_id = None
+    fy_header = request.headers.get('X-Fiscal-Year-ID')
+    if fy_header:
+        try:
+            fiscal_year_id = int(fy_header)
+        except (ValueError, TypeError):
+            pass
+    
+    # اگر سال مالی در body مشخص شده، اولویت با body است
+    if body.get('fiscal_year_id'):
+        try:
+            fiscal_year_id = int(body['fiscal_year_id'])
+        except (ValueError, TypeError):
+            pass
+    
+    # اگر سال مالی مشخص نشده، از سال مالی جاری business استفاده می‌کنیم
+    if not fiscal_year_id:
+        fiscal_year = db.query(FiscalYear).filter(
+            and_(
+                FiscalYear.business_id == business_id,
+                FiscalYear.is_last == True
+            )
+        ).first()
+        if fiscal_year:
+            fiscal_year_id = fiscal_year.id
+    
+    # استخراج پارامترها از body
+    date_from = body.get('date_from')
+    date_to = body.get('date_to')
+    currency_id = body.get('currency_id')
+    if currency_id is not None:
+        try:
+            currency_id = int(currency_id)
+        except (ValueError, TypeError):
+            currency_id = None
+    
+    min_balance = body.get('min_balance')
+    if min_balance is not None:
+        try:
+            min_balance = float(min_balance)
+        except (ValueError, TypeError):
+            min_balance = None
+    
+    person_ids = body.get('person_ids')
+    if person_ids is not None and not isinstance(person_ids, list):
+        person_ids = None
+    
+    search = body.get('search')
+    skip = int(body.get('skip', 0))
+    take = int(body.get('take', 50))
+    
+    # دریافت گزارش
+    result = get_creditors_report(
+        db=db,
+        business_id=business_id,
+        fiscal_year_id=fiscal_year_id,
+        currency_id=currency_id,
+        date_from=date_from,
+        date_to=date_to,
+        min_balance=min_balance,
+        person_ids=person_ids,
+        search=search,
+        skip=skip,
+        take=take,
+    )
+    
+    # فرمت کردن تاریخ‌ها
+    result['items'] = [
+        format_datetime_fields(item, request) for item in result['items']
+    ]
+    
+    return success_response(
+        data=result,
+        request=request,
+        message="گزارش بستانکاران با موفقیت دریافت شد",
+    )
+
+
+@router.post("/businesses/{business_id}/reports/debtors/export/excel",
+    summary="خروجی Excel گزارش بدهکاران",
+    description="خروجی Excel گزارش بدهکاران با قابلیت فیلتر، انتخاب سطرها و رعایت ترتیب/نمایش ستون‌ها",
+)
+@require_business_access("business_id")
+async def export_debtors_report_excel(
+    request: Request,
+    business_id: int,
+    body: Dict[str, Any] = Body(default={}),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """خروجی Excel گزارش بدهکاران"""
+    import io
+    import json
+    import datetime
+    import re
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+    from fastapi.responses import Response
+    
+    # بررسی دسترسی
+    if not ctx.can_read_section("reports"):
+        raise ApiError("FORBIDDEN", "Missing business permission: reports.read", http_status=403)
+    
+    # دریافت سال مالی از header یا body
+    fiscal_year_id = None
+    fy_header = request.headers.get('X-Fiscal-Year-ID')
+    if fy_header:
+        try:
+            fiscal_year_id = int(fy_header)
+        except (ValueError, TypeError):
+            pass
+    
+    if body.get('fiscal_year_id'):
+        try:
+            fiscal_year_id = int(body['fiscal_year_id'])
+        except (ValueError, TypeError):
+            pass
+    
+    if not fiscal_year_id:
+        fiscal_year = db.query(FiscalYear).filter(
+            and_(
+                FiscalYear.business_id == business_id,
+                FiscalYear.is_last == True
+            )
+        ).first()
+        if fiscal_year:
+            fiscal_year_id = fiscal_year.id
+    
+    # استخراج پارامترها از body
+    date_from = body.get('date_from')
+    date_to = body.get('date_to')
+    currency_id = body.get('currency_id')
+    if currency_id is not None:
+        try:
+            currency_id = int(currency_id)
+        except (ValueError, TypeError):
+            currency_id = None
+    
+    min_balance = body.get('min_balance')
+    if min_balance is not None:
+        try:
+            min_balance = float(min_balance)
+        except (ValueError, TypeError):
+            min_balance = None
+    
+    person_ids = body.get('person_ids')
+    if person_ids is not None and not isinstance(person_ids, list):
+        person_ids = None
+    
+    search = body.get('search')
+    
+    # برای export، همه رکوردها را بدون pagination می‌گیریم
+    max_export_records = 10000
+    result = get_debtors_report(
+        db=db,
+        business_id=business_id,
+        fiscal_year_id=fiscal_year_id,
+        currency_id=currency_id,
+        date_from=date_from,
+        date_to=date_to,
+        min_balance=min_balance,
+        person_ids=person_ids,
+        search=search,
+        skip=0,
+        take=max_export_records,
+    )
+    
+    items = result.get('items', [])
+    items = [format_datetime_fields(item, request) for item in items]
+    
+    # Handle selected rows
+    selected_only = bool(body.get('selected_only', False))
+    selected_indices = body.get('selected_indices')
+    if selected_only and selected_indices is not None:
+        indices = None
+        if isinstance(selected_indices, str):
+            try:
+                indices = json.loads(selected_indices)
+            except (json.JSONDecodeError, TypeError):
+                indices = None
+        elif isinstance(selected_indices, list):
+            indices = selected_indices
+        if isinstance(indices, list):
+            items = [items[i] for i in indices if isinstance(i, int) and 0 <= i < len(items)]
+    
+    # Check if we hit the limit
+    if len(items) >= max_export_records:
+        warning_item = {
+            'code': '⚠️',
+            'display_name': 'حداکثر ۱۰,۰۰۰ رکورد قابل export است',
+            'balance': '',
+            'total_debit': '',
+            'total_credit': '',
+            'last_transaction_date': '',
+            'status': '',
+        }
+        items.append(warning_item)
+    
+    # Get locale
+    locale = negotiate_locale(request.headers.get("Accept-Language"))
+    is_fa = locale == 'fa'
+    
+    # Prepare headers based on export_columns
+    headers: List[str] = []
+    keys: List[str] = []
+    export_columns = body.get('export_columns')
+    if export_columns:
+        for col in export_columns:
+            key = col.get('key')
+            label = col.get('label', key)
+            if key:
+                keys.append(str(key))
+                headers.append(str(label))
+    else:
+        # Default columns
+        default_columns = [
+            ('code', 'کد' if is_fa else 'Code'),
+            ('display_name', 'نام' if is_fa else 'Name'),
+            ('balance', 'تراز' if is_fa else 'Balance'),
+            ('total_debit', 'بدهکار' if is_fa else 'Debit'),
+            ('total_credit', 'بستانکار' if is_fa else 'Credit'),
+            ('last_transaction_date', 'تاریخ آخرین تراکنش' if is_fa else 'Last Transaction Date'),
+            ('status', 'وضعیت' if is_fa else 'Status'),
+        ]
+        for key, label in default_columns:
+            if items and (key in items[0] or key == 'display_name'):
+                keys.append(key)
+                headers.append(label)
+    
+    # Create workbook
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "گزارش بدهکاران" if is_fa else "Debtors Report"
+    
+    # RTL handling for Persian
+    if locale == 'fa':
+        try:
+            ws.sheet_view.rightToLeft = True
+        except Exception:
+            pass
+    
+    header_font = Font(bold=True, color="FFFFFF")
+    header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+    header_alignment = Alignment(horizontal="center", vertical="center")
+    border = Border(
+        left=Side(style='thin'),
+        right=Side(style='thin'),
+        top=Side(style='thin'),
+        bottom=Side(style='thin')
+    )
+    
+    # Write header row
+    for col_idx, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col_idx, value=header)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = header_alignment
+        cell.border = border
+    
+    # Write data rows
+    for row_idx, item in enumerate(items, 2):
+        for col_idx, key in enumerate(keys, 1):
+            value = item.get(key, "")
+            
+            # Handle display_name specially
+            if key == 'display_name':
+                value = (
+                    item.get('display_name') or
+                    item.get('alias_name') or
+                    f"{item.get('first_name', '')} {item.get('last_name', '')}".strip()
+                )
+            
+            # Format numbers
+            if key in ['balance', 'total_debit', 'total_credit'] and value:
+                try:
+                    num_value = float(value) if not isinstance(value, (int, float)) else value
+                    value = num_value
+                except (ValueError, TypeError):
+                    pass
+            
+            # Format dates
+            if key == 'last_transaction_date' and value:
+                # Value is already formatted by format_datetime_fields
+                pass
+            
+            if isinstance(value, list):
+                value = ", ".join(str(v) for v in value)
+            elif isinstance(value, dict):
+                value = str(value)
+            
+            cell = ws.cell(row=row_idx, column=col_idx, value=value)
+            cell.border = border
+            
+            # RTL alignment for Persian text and numbers
+            if locale == 'fa':
+                if isinstance(value, (int, float)):
+                    cell.alignment = Alignment(horizontal="right")
+                elif isinstance(value, str) and any('\u0600' <= c <= '\u06FF' for c in value):
+                    cell.alignment = Alignment(horizontal="right")
+    
+    # Auto-width columns
+    for column in ws.columns:
+        max_length = 0
+        column_letter = column[0].column_letter
+        for cell in column:
+            try:
+                if cell.value is not None:
+                    cell_length = len(str(cell.value))
+                    if cell_length > max_length:
+                        max_length = cell_length
+            except Exception:
+                pass
+        ws.column_dimensions[column_letter].width = min(max_length + 2, 50)
+    
+    # Save to bytes
+    buffer = io.BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+    
+    # Build meaningful filename
+    biz_name = ""
+    try:
+        b = db.query(Business).filter(Business.id == business_id).first()
+        if b is not None:
+            biz_name = b.name or ""
+    except Exception:
+        biz_name = ""
+    
+    def slugify(text: str) -> str:
+        return re.sub(r"[^A-Za-z0-9_-]+", "_", text).strip("_")
+    
+    base = "debtors_report"
+    if biz_name:
+        base += f"_{slugify(biz_name)}"
+    if selected_only:
+        base += "_selected"
+    filename = f"{base}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    content = buffer.getvalue()
+    
+    return Response(
+        content=content,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": f"attachment; filename={filename}",
+            "Content-Length": str(len(content)),
+            "Access-Control-Expose-Headers": "Content-Disposition",
+        },
+    )
+
+
+@router.post("/businesses/{business_id}/reports/creditors/export/excel",
+    summary="خروجی Excel گزارش بستانکاران",
+    description="خروجی Excel گزارش بستانکاران با قابلیت فیلتر، انتخاب سطرها و رعایت ترتیب/نمایش ستون‌ها",
+)
+@require_business_access("business_id")
+async def export_creditors_report_excel(
+    request: Request,
+    business_id: int,
+    body: Dict[str, Any] = Body(default={}),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """خروجی Excel گزارش بستانکاران"""
+    import io
+    import json
+    import datetime
+    import re
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+    from fastapi.responses import Response
+    
+    # بررسی دسترسی
+    if not ctx.can_read_section("reports"):
+        raise ApiError("FORBIDDEN", "Missing business permission: reports.read", http_status=403)
+    
+    # دریافت سال مالی از header یا body
+    fiscal_year_id = None
+    fy_header = request.headers.get('X-Fiscal-Year-ID')
+    if fy_header:
+        try:
+            fiscal_year_id = int(fy_header)
+        except (ValueError, TypeError):
+            pass
+    
+    if body.get('fiscal_year_id'):
+        try:
+            fiscal_year_id = int(body['fiscal_year_id'])
+        except (ValueError, TypeError):
+            pass
+    
+    if not fiscal_year_id:
+        fiscal_year = db.query(FiscalYear).filter(
+            and_(
+                FiscalYear.business_id == business_id,
+                FiscalYear.is_last == True
+            )
+        ).first()
+        if fiscal_year:
+            fiscal_year_id = fiscal_year.id
+    
+    # استخراج پارامترها از body
+    date_from = body.get('date_from')
+    date_to = body.get('date_to')
+    currency_id = body.get('currency_id')
+    if currency_id is not None:
+        try:
+            currency_id = int(currency_id)
+        except (ValueError, TypeError):
+            currency_id = None
+    
+    min_balance = body.get('min_balance')
+    if min_balance is not None:
+        try:
+            min_balance = float(min_balance)
+        except (ValueError, TypeError):
+            min_balance = None
+    
+    person_ids = body.get('person_ids')
+    if person_ids is not None and not isinstance(person_ids, list):
+        person_ids = None
+    
+    search = body.get('search')
+    
+    # برای export، همه رکوردها را بدون pagination می‌گیریم
+    max_export_records = 10000
+    result = get_creditors_report(
+        db=db,
+        business_id=business_id,
+        fiscal_year_id=fiscal_year_id,
+        currency_id=currency_id,
+        date_from=date_from,
+        date_to=date_to,
+        min_balance=min_balance,
+        person_ids=person_ids,
+        search=search,
+        skip=0,
+        take=max_export_records,
+    )
+    
+    items = result.get('items', [])
+    items = [format_datetime_fields(item, request) for item in items]
+    
+    # Handle selected rows
+    selected_only = bool(body.get('selected_only', False))
+    selected_indices = body.get('selected_indices')
+    if selected_only and selected_indices is not None:
+        indices = None
+        if isinstance(selected_indices, str):
+            try:
+                indices = json.loads(selected_indices)
+            except (json.JSONDecodeError, TypeError):
+                indices = None
+        elif isinstance(selected_indices, list):
+            indices = selected_indices
+        if isinstance(indices, list):
+            items = [items[i] for i in indices if isinstance(i, int) and 0 <= i < len(items)]
+    
+    # Check if we hit the limit
+    if len(items) >= max_export_records:
+        warning_item = {
+            'code': '⚠️',
+            'display_name': 'حداکثر ۱۰,۰۰۰ رکورد قابل export است',
+            'balance': '',
+            'total_debit': '',
+            'total_credit': '',
+            'last_transaction_date': '',
+            'status': '',
+        }
+        items.append(warning_item)
+    
+    # Get locale
+    locale = negotiate_locale(request.headers.get("Accept-Language"))
+    is_fa = locale == 'fa'
+    
+    # Prepare headers based on export_columns
+    headers: List[str] = []
+    keys: List[str] = []
+    export_columns = body.get('export_columns')
+    if export_columns:
+        for col in export_columns:
+            key = col.get('key')
+            label = col.get('label', key)
+            if key:
+                keys.append(str(key))
+                headers.append(str(label))
+    else:
+        # Default columns
+        default_columns = [
+            ('code', 'کد' if is_fa else 'Code'),
+            ('display_name', 'نام' if is_fa else 'Name'),
+            ('balance', 'تراز' if is_fa else 'Balance'),
+            ('total_debit', 'بدهکار' if is_fa else 'Debit'),
+            ('total_credit', 'بستانکار' if is_fa else 'Credit'),
+            ('last_transaction_date', 'تاریخ آخرین تراکنش' if is_fa else 'Last Transaction Date'),
+            ('status', 'وضعیت' if is_fa else 'Status'),
+        ]
+        for key, label in default_columns:
+            if items and (key in items[0] or key == 'display_name'):
+                keys.append(key)
+                headers.append(label)
+    
+    # Create workbook
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "گزارش بستانکاران" if is_fa else "Creditors Report"
+    
+    # RTL handling for Persian
+    if locale == 'fa':
+        try:
+            ws.sheet_view.rightToLeft = True
+        except Exception:
+            pass
+    
+    header_font = Font(bold=True, color="FFFFFF")
+    header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+    header_alignment = Alignment(horizontal="center", vertical="center")
+    border = Border(
+        left=Side(style='thin'),
+        right=Side(style='thin'),
+        top=Side(style='thin'),
+        bottom=Side(style='thin')
+    )
+    
+    # Write header row
+    for col_idx, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col_idx, value=header)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = header_alignment
+        cell.border = border
+    
+    # Write data rows
+    for row_idx, item in enumerate(items, 2):
+        for col_idx, key in enumerate(keys, 1):
+            value = item.get(key, "")
+            
+            # Handle display_name specially
+            if key == 'display_name':
+                value = (
+                    item.get('display_name') or
+                    item.get('alias_name') or
+                    f"{item.get('first_name', '')} {item.get('last_name', '')}".strip()
+                )
+            
+            # Format numbers
+            if key in ['balance', 'total_debit', 'total_credit'] and value:
+                try:
+                    num_value = float(value) if not isinstance(value, (int, float)) else value
+                    value = num_value
+                except (ValueError, TypeError):
+                    pass
+            
+            # Format dates
+            if key == 'last_transaction_date' and value:
+                # Value is already formatted by format_datetime_fields
+                pass
+            
+            if isinstance(value, list):
+                value = ", ".join(str(v) for v in value)
+            elif isinstance(value, dict):
+                value = str(value)
+            
+            cell = ws.cell(row=row_idx, column=col_idx, value=value)
+            cell.border = border
+            
+            # RTL alignment for Persian text and numbers
+            if locale == 'fa':
+                if isinstance(value, (int, float)):
+                    cell.alignment = Alignment(horizontal="right")
+                elif isinstance(value, str) and any('\u0600' <= c <= '\u06FF' for c in value):
+                    cell.alignment = Alignment(horizontal="right")
+    
+    # Auto-width columns
+    for column in ws.columns:
+        max_length = 0
+        column_letter = column[0].column_letter
+        for cell in column:
+            try:
+                if cell.value is not None:
+                    cell_length = len(str(cell.value))
+                    if cell_length > max_length:
+                        max_length = cell_length
+            except Exception:
+                pass
+        ws.column_dimensions[column_letter].width = min(max_length + 2, 50)
+    
+    # Save to bytes
+    buffer = io.BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+    
+    # Build meaningful filename
+    biz_name = ""
+    try:
+        b = db.query(Business).filter(Business.id == business_id).first()
+        if b is not None:
+            biz_name = b.name or ""
+    except Exception:
+        biz_name = ""
+    
+    def slugify(text: str) -> str:
+        return re.sub(r"[^A-Za-z0-9_-]+", "_", text).strip("_")
+    
+    base = "creditors_report"
+    if biz_name:
+        base += f"_{slugify(biz_name)}"
+    if selected_only:
+        base += "_selected"
+    filename = f"{base}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    content = buffer.getvalue()
+    
+    return Response(
+        content=content,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": f"attachment; filename={filename}",
+            "Content-Length": str(len(content)),
+            "Access-Control-Expose-Headers": "Content-Disposition",
+        },
+    )
+
+
+@router.post("/businesses/{business_id}/reports/people-transactions",
+    summary="گزارش تراکنش‌های اشخاص",
+    description="گزارش ریز دریافت‌ها و پرداخت‌ها به تفکیک شخص",
+)
+@require_business_access("business_id")
+async def people_transactions_report_endpoint(
+    request: Request,
+    business_id: int,
+    body: Dict[str, Any] = Body(default={}),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """گزارش تراکنش‌های اشخاص"""
+    # بررسی دسترسی
+    if not ctx.can_read_section("reports"):
+        raise ApiError("FORBIDDEN", "Missing business permission: reports.read", http_status=403)
+    
+    # دریافت سال مالی از header یا body
+    fiscal_year_id = None
+    fy_header = request.headers.get('X-Fiscal-Year-ID')
+    if fy_header:
+        try:
+            fiscal_year_id = int(fy_header)
+        except (ValueError, TypeError):
+            pass
+    
+    if body.get('fiscal_year_id'):
+        try:
+            fiscal_year_id = int(body['fiscal_year_id'])
+        except (ValueError, TypeError):
+            pass
+    
+    if not fiscal_year_id:
+        fiscal_year = db.query(FiscalYear).filter(
+            and_(
+                FiscalYear.business_id == business_id,
+                FiscalYear.is_last == True
+            )
+        ).first()
+        if fiscal_year:
+            fiscal_year_id = fiscal_year.id
+    
+    # استخراج پارامترها از body
+    date_from = body.get('date_from')
+    date_to = body.get('date_to')
+    currency_id = body.get('currency_id')
+    if currency_id is not None:
+        try:
+            currency_id = int(currency_id)
+        except (ValueError, TypeError):
+            currency_id = None
+    
+    person_ids = body.get('person_ids')
+    if person_ids is not None and not isinstance(person_ids, list):
+        person_ids = None
+    
+    document_type = body.get('document_type')  # هر نوع سند یا None
+    # پشتیبانی از همه انواع اسناد
+    if document_type is not None and not isinstance(document_type, str):
+        document_type = None
+    
+    search = body.get('search')
+    
+    # Pagination
+    skip = body.get('skip', 0)
+    take = body.get('take', 50)
+    try:
+        skip = int(skip)
+        take = int(take)
+        if take > 500:
+            take = 500
+        if take < 1:
+            take = 50
+        if skip < 0:
+            skip = 0
+    except (ValueError, TypeError):
+        skip = 0
+        take = 50
+    
+    result = get_people_transactions_report(
+        db=db,
+        business_id=business_id,
+        fiscal_year_id=fiscal_year_id,
+        currency_id=currency_id,
+        date_from=date_from,
+        date_to=date_to,
+        person_ids=person_ids,
+        document_type=document_type,
+        search=search,
+        skip=skip,
+        take=take,
+    )
+    
+    items = result.get('items', [])
+    items = [format_datetime_fields(item, request) for item in items]
+    
+    result['items'] = items
+    
+    locale = negotiate_locale(request.headers.get("Accept-Language"))
+    return success_response(
+        data=result,
+        message="People transactions report retrieved successfully" if locale != 'fa' else "گزارش تراکنش‌های اشخاص با موفقیت دریافت شد"
+    )
+
+
+@router.post("/businesses/{business_id}/reports/people-transactions/export/excel",
+    summary="خروجی Excel گزارش تراکنش‌های اشخاص",
+    description="خروجی Excel گزارش تراکنش‌های اشخاص با قابلیت فیلتر، انتخاب سطرها و رعایت ترتیب/نمایش ستون‌ها",
+)
+@require_business_access("business_id")
+async def export_people_transactions_report_excel(
+    request: Request,
+    business_id: int,
+    body: Dict[str, Any] = Body(default={}),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """خروجی Excel گزارش تراکنش‌های اشخاص"""
+    import io
+    import json
+    import datetime
+    import re
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+    from fastapi.responses import Response
+    from app.core.i18n import negotiate_locale
+    from adapters.db.models.business import Business
+    from adapters.db.models.fiscal_year import FiscalYear
+    from sqlalchemy import and_
+
+    if not ctx.can_read_section("reports"):
+        raise ApiError("FORBIDDEN", "Missing business permission: reports.read", http_status=403)
+
+    fiscal_year_id = None
+    fy_header = request.headers.get('X-Fiscal-Year-ID')
+    if fy_header:
+        try:
+            fiscal_year_id = int(fy_header)
+        except (ValueError, TypeError):
+            pass
+
+    if body.get('fiscal_year_id'):
+        try:
+            fiscal_year_id = int(body['fiscal_year_id'])
+        except (ValueError, TypeError):
+            pass
+
+    if not fiscal_year_id:
+        fiscal_year = db.query(FiscalYear).filter(
+            and_(
+                FiscalYear.business_id == business_id,
+                FiscalYear.is_last == True
+            )
+        ).first()
+        if fiscal_year:
+            fiscal_year_id = fiscal_year.id
+
+    date_from = body.get('date_from')
+    date_to = body.get('date_to')
+    currency_id = body.get('currency_id')
+    if currency_id is not None:
+        try:
+            currency_id = int(currency_id)
+        except (ValueError, TypeError):
+            currency_id = None
+
+    person_ids = body.get('person_ids')
+    if person_ids is not None and not isinstance(person_ids, list):
+        person_ids = None
+
+    document_type = body.get('document_type')
+    # پشتیبانی از همه انواع اسناد
+    if document_type is not None and not isinstance(document_type, str):
+        document_type = None
+
+    search = body.get('search')
+
+    max_export_records = 10000
+    result = get_people_transactions_report(
+        db=db,
+        business_id=business_id,
+        fiscal_year_id=fiscal_year_id,
+        currency_id=currency_id,
+        date_from=date_from,
+        date_to=date_to,
+        person_ids=person_ids,
+        document_type=document_type,
+        search=search,
+        skip=0,
+        take=max_export_records,
+    )
+
+    items = result.get('items', [])
+    items = [format_datetime_fields(item, request) for item in items]
+
+    selected_only = bool(body.get('selected_only', False))
+    selected_indices = body.get('selected_indices')
+    if selected_only and selected_indices is not None:
+        indices = None
+        if isinstance(selected_indices, str):
+            try:
+                indices = json.loads(selected_indices)
+            except (json.JSONDecodeError, TypeError):
+                indices = None
+        elif isinstance(selected_indices, list):
+            indices = selected_indices
+        if isinstance(indices, list):
+            items = [items[i] for i in indices if isinstance(i, int) and 0 <= i < len(items)]
+
+    if len(items) >= max_export_records:
+        warning_item = {
+            'document_code': '⚠️',
+            'person_name': 'حداکثر ۱۰,۰۰۰ رکورد قابل export است',
+            'document_type_name': '',
+            'debit': '',
+            'credit': '',
+            'running_balance': '',
+            'description': '',
+        }
+        items.append(warning_item)
+
+    locale = negotiate_locale(request.headers.get("Accept-Language"))
+    is_fa = locale == 'fa'
+
+    headers: List[str] = []
+    keys: List[str] = []
+    export_columns = body.get('export_columns')
+    if export_columns:
+        for col in export_columns:
+            key = col.get('key')
+            label = col.get('label', key)
+            if key:
+                keys.append(str(key))
+                headers.append(str(label))
+    else:
+        default_columns = [
+            ('document_date', 'تاریخ سند' if is_fa else 'Date'),
+            ('document_code', 'کد سند' if is_fa else 'Document Code'),
+            ('person_name', 'نام شخص' if is_fa else 'Person Name'),
+            ('document_type_name', 'نوع سند' if is_fa else 'Document Type'),
+            ('debit', 'بدهکار' if is_fa else 'Debit'),
+            ('credit', 'بستانکار' if is_fa else 'Credit'),
+            ('running_balance', 'تراز متحرک' if is_fa else 'Running Balance'),
+            ('description', 'توضیحات' if is_fa else 'Description'),
+        ]
+        for key, label in default_columns:
+            if items and (key in items[0] or key == 'person_name'):
+                keys.append(key)
+                headers.append(label)
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "People Transactions Report" if locale != 'fa' else "گزارش تراکنش‌های اشخاص"
+
+    if locale == 'fa':
+        try:
+            ws.sheet_view.rightToLeft = True
+        except Exception:
+            pass
+
+    header_font = Font(bold=True, color="FFFFFF")
+    header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+    header_alignment = Alignment(horizontal="center", vertical="center")
+    border = Border(
+        left=Side(style='thin'),
+        right=Side(style='thin'),
+        top=Side(style='thin'),
+        bottom=Side(style='thin')
+    )
+
+    for col_idx, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col_idx, value=header)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = header_alignment
+        cell.border = border
+
+    for row_idx, item in enumerate(items, 2):
+        for col_idx, key in enumerate(keys, 1):
+            value = item.get(key, "")
+
+            if key == 'person_name':
+                value = (
+                    item.get('person_name') or
+                    item.get('display_name') or
+                    item.get('alias_name') or
+                    f"{item.get('first_name', '')} {item.get('last_name', '')}".strip()
+                )
+
+            if key in ['debit', 'credit', 'running_balance'] and value:
+                try:
+                    num_value = float(value) if not isinstance(value, (int, float)) else value
+                    value = num_value
+                except (ValueError, TypeError):
+                    pass
+
+            if key == 'document_date' and value:
+                pass
+
+            if isinstance(value, list):
+                value = ", ".join(str(v) for v in value)
+            elif isinstance(value, dict):
+                value = str(value)
+
+            cell = ws.cell(row=row_idx, column=col_idx, value=value)
+            cell.border = border
+
+            if locale == 'fa':
+                if isinstance(value, (int, float)):
+                    cell.alignment = Alignment(horizontal="right")
+                elif isinstance(value, str) and any('\u0600' <= c <= '\u06FF' for c in value):
+                    cell.alignment = Alignment(horizontal="right")
+
+    for column in ws.columns:
+        max_length = 0
+        column_letter = column[0].column_letter
+        for cell in column:
+            try:
+                if cell.value is not None:
+                    cell_length = len(str(cell.value))
+                    if cell_length > max_length:
+                        max_length = cell_length
+            except Exception:
+                pass
+        ws.column_dimensions[column_letter].width = min(max_length + 2, 50)
+
+    buffer = io.BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+
+    biz_name = ""
+    try:
+        b = db.query(Business).filter(Business.id == business_id).first()
+        if b is not None:
+            biz_name = b.name or ""
+    except Exception:
+        biz_name = ""
+
+    def slugify(text: str) -> str:
+        return re.sub(r"[^A-Za-z0-9_-]+", "_", text).strip("_")
+
+    base = "people_transactions_report"
+    if biz_name:
+        base += f"_{slugify(biz_name)}"
+    if selected_only:
+        base += "_selected"
+    filename = f"{base}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    content = buffer.getvalue()
+
+    return Response(
+        content=content,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": f"attachment; filename={filename}",
+            "Content-Length": str(len(content)),
+            "Access-Control-Expose-Headers": "Content-Disposition",
+        },
+    )
