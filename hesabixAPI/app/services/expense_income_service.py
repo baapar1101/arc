@@ -21,6 +21,7 @@ from adapters.db.models.account import Account
 from adapters.db.models.currency import Currency
 from adapters.db.models.fiscal_year import FiscalYear
 from adapters.db.models.user import User
+from adapters.db.models.check import Check, CheckType, CheckStatus
 from app.core.responses import ApiError
 from app.services.document_monetization_service import ensure_document_policy_allows_creation
 
@@ -318,8 +319,53 @@ def create_expense_income(
             if line.get("person_name"):
                 extra_info["person_name"] = line.get("person_name")
 
-        debit_amount = amount if is_income else Decimal(0)
-        credit_amount = amount if not is_income else Decimal(0)
+        # برای چک: منطق حسابداری متفاوت است
+        # در اسناد هزینه با چک دریافتی: چک از 10403 خارج می‌شود → باید بستانکار شود
+        # در اسناد هزینه با چک پرداختی: چک از 20202 خارج می‌شود → باید بدهکار شود
+        # در اسناد درآمد: اگر چک قبلاً ثبت شده، نباید دوباره حساب 10403 را بدهکار کرد
+        if transaction_type == "check" and check_id_val:
+            try:
+                check_obj_for_debit_credit = db.query(Check).filter(
+                    and_(
+                        Check.id == int(check_id_val),
+                        Check.business_id == business_id,
+                    )
+                ).first()
+                
+                if check_obj_for_debit_credit:
+                    if check_obj_for_debit_credit.type == CheckType.RECEIVED:
+                        # چک دریافتی
+                        if is_income:
+                            # در اسناد درآمد: اگر چک قبلاً ثبت شده، نباید دوباره بدهکار شود
+                            # برای حال حاضر، فقط حساب درآمد را ثبت می‌کنیم
+                            debit_amount = amount
+                            credit_amount = Decimal(0)
+                        else:
+                            # در اسناد هزینه: چک از 10403 خارج می‌شود → بستانکار می‌شود
+                            debit_amount = Decimal(0)
+                            credit_amount = amount
+                    else:
+                        # چک پرداختی
+                        if is_income:
+                            # در اسناد درآمد: چک پرداختی نمی‌تواند استفاده شود
+                            debit_amount = amount
+                            credit_amount = Decimal(0)
+                        else:
+                            # در اسناد هزینه: چک از 20202 خارج می‌شود → بدهکار می‌شود
+                            debit_amount = amount
+                            credit_amount = Decimal(0)
+                else:
+                    # اگر چک پیدا نشد، از منطق قبلی استفاده می‌کنیم
+                    debit_amount = amount if is_income else Decimal(0)
+                    credit_amount = amount if not is_income else Decimal(0)
+            except Exception:
+                # در صورت خطا، از منطق قبلی استفاده می‌کنیم
+                debit_amount = amount if is_income else Decimal(0)
+                credit_amount = amount if not is_income else Decimal(0)
+        else:
+            # برای سایر حساب‌ها: منطق عادی
+            debit_amount = amount if is_income else Decimal(0)
+            credit_amount = amount if not is_income else Decimal(0)
 
         db.add(DocumentLine(
             document_id=document.id,
@@ -347,6 +393,51 @@ def create_expense_income(
                 extra_info={"is_commission_line": True}
             ))
 
+    db.flush()
+    
+    # تغییر وضعیت چک‌های استفاده شده
+    logger.info("=== تغییر وضعیت چک‌های استفاده شده ===")
+    for line in counterparty_lines:
+        check_id = line.get("check_id")
+        if not check_id:
+            continue
+        
+        try:
+            check_obj = db.query(Check).filter(Check.id == int(check_id)).first()
+            if not check_obj:
+                logger.warning(f"چک با شناسه {check_id} یافت نشد")
+                continue
+            
+            transaction_type_line = line.get("transaction_type")
+            if transaction_type_line == "check" or transaction_type_line == "check_expense":
+                logger.info(f"تغییر وضعیت چک {check_obj.check_number} (id={check_obj.id})")
+                logger.info(f"وضعیت قبلی: {check_obj.status}, نوع چک: {check_obj.type}, نوع سند: {document_type}")
+                
+                if check_obj.type == CheckType.RECEIVED:
+                    # چک دریافتی
+                    if is_income:
+                        # در اسناد درآمد: چک دریافتی استفاده نمی‌شود (قبلاً ثبت شده)
+                        # وضعیت را تغییر نمی‌دهیم
+                        pass
+                    else:
+                        # در اسناد هزینه: چک خرج می‌شود
+                        check_obj.status = CheckStatus.CLEARED
+                        logger.info(f"وضعیت جدید: {check_obj.status}")
+                
+                elif check_obj.type == CheckType.TRANSFERRED:
+                    # چک پرداختی
+                    if not is_income:
+                        # در اسناد هزینه: چک پرداخته می‌شود
+                        check_obj.status = CheckStatus.CLEARED
+                        logger.info(f"وضعیت جدید: {check_obj.status}")
+                
+                check_obj.status_at = datetime.utcnow()
+                check_obj.last_action_document_id = document.id
+                logger.info(f"وضعیت چک {check_obj.check_number} به {check_obj.status} تغییر یافت")
+        
+        except Exception as e:
+            logger.error(f"خطا در تغییر وضعیت چک {check_id}: {e}", exc_info=True)
+    
     db.commit()
     db.refresh(document)
     return document_to_dict(db, document)
@@ -644,8 +735,30 @@ def update_expense_income(
             if account is None:
                 account = _get_fixed_account_by_code(db, "10201")
         elif transaction_type == "check":
-            # برای چک‌ها از کدهای اسناد دریافتنی/پرداختنی استفاده شود
-            account = _get_fixed_account_by_code(db, "10403" if is_income else "20202")
+            # برای چک‌ها باید نوع چک را بررسی کنیم تا حساب مناسب را انتخاب کنیم
+            check_obj = None
+            if check_id_val:
+                try:
+                    check_obj = db.query(Check).filter(
+                        and_(
+                            Check.id == int(check_id_val),
+                            Check.business_id == document.business_id,
+                        )
+                    ).first()
+                except Exception:
+                    pass
+            
+            # بر اساس نوع چک، حساب مناسب را انتخاب می‌کنیم
+            if check_obj:
+                if check_obj.type == CheckType.RECEIVED:
+                    # چک دریافتی: حساب 10403 (اسناد دریافتنی)
+                    account = _get_fixed_account_by_code(db, "10403")
+                else:
+                    # چک پرداختی: حساب 20202 (اسناد پرداختنی)
+                    account = _get_fixed_account_by_code(db, "20202")
+            else:
+                # اگر چک پیدا نشد یا check_id موجود نبود، از منطق قبلی استفاده می‌کنیم
+                account = _get_fixed_account_by_code(db, "10403" if is_income else "20202")
         elif transaction_type == "person":
             # حساب شخص بر اساس نوع (دریافتنی در درآمد / پرداختنی در هزینه)
             if person_id_val:
@@ -703,8 +816,51 @@ def update_expense_income(
             if line.get("person_name"):
                 extra_info["person_name"] = line.get("person_name")
 
-        debit_amount = amount if is_income else Decimal(0)
-        credit_amount = amount if not is_income else Decimal(0)
+        # برای چک: منطق حسابداری متفاوت است
+        # در اسناد هزینه با چک دریافتی: چک از 10403 خارج می‌شود → باید بستانکار شود
+        # در اسناد هزینه با چک پرداختی: چک از 20202 خارج می‌شود → باید بدهکار شود
+        if transaction_type == "check" and check_id_val:
+            try:
+                check_obj_for_debit_credit = db.query(Check).filter(
+                    and_(
+                        Check.id == int(check_id_val),
+                        Check.business_id == document.business_id,
+                    )
+                ).first()
+                
+                if check_obj_for_debit_credit:
+                    if check_obj_for_debit_credit.type == CheckType.RECEIVED:
+                        # چک دریافتی
+                        if is_income:
+                            # در اسناد درآمد: اگر چک قبلاً ثبت شده، نباید دوباره بدهکار شود
+                            debit_amount = amount
+                            credit_amount = Decimal(0)
+                        else:
+                            # در اسناد هزینه: چک از 10403 خارج می‌شود → بستانکار می‌شود
+                            debit_amount = Decimal(0)
+                            credit_amount = amount
+                    else:
+                        # چک پرداختی
+                        if is_income:
+                            # در اسناد درآمد: چک پرداختی نمی‌تواند استفاده شود
+                            debit_amount = amount
+                            credit_amount = Decimal(0)
+                        else:
+                            # در اسناد هزینه: چک از 20202 خارج می‌شود → بدهکار می‌شود
+                            debit_amount = amount
+                            credit_amount = Decimal(0)
+                else:
+                    # اگر چک پیدا نشد، از منطق قبلی استفاده می‌کنیم
+                    debit_amount = amount if is_income else Decimal(0)
+                    credit_amount = amount if not is_income else Decimal(0)
+            except Exception:
+                # در صورت خطا، از منطق قبلی استفاده می‌کنیم
+                debit_amount = amount if is_income else Decimal(0)
+                credit_amount = amount if not is_income else Decimal(0)
+        else:
+            # برای سایر حساب‌ها: منطق عادی
+            debit_amount = amount if is_income else Decimal(0)
+            credit_amount = amount if not is_income else Decimal(0)
 
         db.add(DocumentLine(
             document_id=document.id,
@@ -731,6 +887,50 @@ def update_expense_income(
                 description=f"کارمزد {description or ''}",
                 extra_info={"is_commission_line": True}
             ))
+    
+    db.flush()
+    
+    # تغییر وضعیت چک‌های استفاده شده (در update)
+    logger.info("[UPDATE_EXPENSE_INCOME] === تغییر وضعیت چک‌های استفاده شده ===")
+    for line in counterparty_lines:
+        check_id = line.get("check_id")
+        if not check_id:
+            continue
+        
+        try:
+            check_obj = db.query(Check).filter(Check.id == int(check_id)).first()
+            if not check_obj:
+                logger.warning(f"[UPDATE_EXPENSE_INCOME] چک با شناسه {check_id} یافت نشد")
+                continue
+            
+            transaction_type_line = line.get("transaction_type")
+            if transaction_type_line == "check" or transaction_type_line == "check_expense":
+                logger.info(f"[UPDATE_EXPENSE_INCOME] تغییر وضعیت چک {check_obj.check_number} (id={check_obj.id})")
+                logger.info(f"[UPDATE_EXPENSE_INCOME] وضعیت قبلی: {check_obj.status}, نوع چک: {check_obj.type}, نوع سند: {document.document_type}")
+                
+                if check_obj.type == CheckType.RECEIVED:
+                    # چک دریافتی
+                    if is_income:
+                        # در اسناد درآمد: چک دریافتی استفاده نمی‌شود (قبلاً ثبت شده)
+                        pass
+                    else:
+                        # در اسناد هزینه: چک خرج می‌شود
+                        check_obj.status = CheckStatus.CLEARED
+                        logger.info(f"[UPDATE_EXPENSE_INCOME] وضعیت جدید: {check_obj.status}")
+                
+                elif check_obj.type == CheckType.TRANSFERRED:
+                    # چک پرداختی
+                    if not is_income:
+                        # در اسناد هزینه: چک پرداخته می‌شود
+                        check_obj.status = CheckStatus.CLEARED
+                        logger.info(f"[UPDATE_EXPENSE_INCOME] وضعیت جدید: {check_obj.status}")
+                
+                check_obj.status_at = datetime.utcnow()
+                check_obj.last_action_document_id = document.id
+                logger.info(f"[UPDATE_EXPENSE_INCOME] وضعیت چک {check_obj.check_number} به {check_obj.status} تغییر یافت")
+        
+        except Exception as e:
+            logger.error(f"[UPDATE_EXPENSE_INCOME] خطا در تغییر وضعیت چک {check_id}: {e}", exc_info=True)
     
     db.commit()
     db.refresh(document)

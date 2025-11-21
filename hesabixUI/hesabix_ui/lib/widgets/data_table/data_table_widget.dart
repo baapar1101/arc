@@ -1589,17 +1589,17 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                       }
                     } else {
                       // برای سایر فیلدها، مجموع را محاسبه می‌کنیم
-                      for (final it in _items) {
-                        try {
-                          final v = DataTableUtils.getCellValue(it, colKey);
-                          if (v is num) {
+                    for (final it in _items) {
+                      try {
+                        final v = DataTableUtils.getCellValue(it, colKey);
+                        if (v is num) {
                             value += v.toDouble();
-                          } else if (v != null) {
-                            final parsed = double.tryParse('$v');
+                        } else if (v != null) {
+                          final parsed = double.tryParse('$v');
                             if (parsed != null) value += parsed;
-                          }
-                        } catch (_) {}
-                      }
+                        }
+                      } catch (_) {}
+                    }
                     }
                     
                     // Format number with thousand separators and remove unnecessary decimals

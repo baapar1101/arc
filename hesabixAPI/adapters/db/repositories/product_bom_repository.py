@@ -51,22 +51,28 @@ class ProductBOMRepository:
         return True
 
     # Items
-    def replace_items(self, bom_id: int, items: List[dict]) -> None:
+    def replace_items(self, bom_id: int, items: List[dict], commit: bool = False) -> None:
+        """جایگزین کردن اقلام مواد اولیه. commit=False برای استفاده در transaction"""
         self.db.query(ProductBOMItem).filter(ProductBOMItem.bom_id == bom_id).delete()
         for it in items:
             self.db.add(ProductBOMItem(bom_id=bom_id, **it))
-        self.db.commit()
+        if commit:
+            self.db.commit()
 
-    def replace_outputs(self, bom_id: int, outputs: List[dict]) -> None:
+    def replace_outputs(self, bom_id: int, outputs: List[dict], commit: bool = False) -> None:
+        """جایگزین کردن خروجی‌ها. commit=False برای استفاده در transaction"""
         self.db.query(ProductBOMOutput).filter(ProductBOMOutput.bom_id == bom_id).delete()
         for out in outputs:
             self.db.add(ProductBOMOutput(bom_id=bom_id, **out))
-        self.db.commit()
+        if commit:
+            self.db.commit()
 
-    def replace_operations(self, bom_id: int, operations: List[dict]) -> None:
+    def replace_operations(self, bom_id: int, operations: List[dict], commit: bool = False) -> None:
+        """جایگزین کردن عملیات. commit=False برای استفاده در transaction"""
         self.db.query(ProductBOMOperation).filter(ProductBOMOperation.bom_id == bom_id).delete()
         for op in operations:
             self.db.add(ProductBOMOperation(bom_id=bom_id, **op))
-        self.db.commit()
+        if commit:
+            self.db.commit()
 
 

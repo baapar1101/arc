@@ -526,6 +526,6 @@ def get_bank_accounts_turnover_report(
             'has_next': current_page < total_pages,
             'has_prev': current_page > 1,
         }
-    }
+	}
 
 

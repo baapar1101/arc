@@ -218,16 +218,12 @@ class _NotificationsSettingsPageState extends State<NotificationsSettingsPage> {
       ),
     ];
 
-    final documentationUrl = t.notificationsDocumentationUrl;
-
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildHeader(t, theme, colorScheme),
-          const SizedBox(height: 16),
-          _buildOverviewCard(t, theme, colorScheme, documentationUrl),
           const SizedBox(height: 16),
           _buildChannelsCard(t, theme, colorScheme, channelOptions),
           const SizedBox(height: 16),
@@ -271,84 +267,6 @@ class _NotificationsSettingsPageState extends State<NotificationsSettingsPage> {
           label: Text(t.save),
         ),
       ],
-    );
-  }
-
-  Widget _buildOverviewCard(AppLocalizations t, ThemeData theme, ColorScheme colorScheme, String documentationUrl) {
-    final guidanceItems = [
-      t.notificationsGuidanceItemChannels,
-      t.notificationsGuidanceItemTemplates,
-      t.notificationsGuidanceItemTesting,
-    ];
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: colorScheme.outline.withValues(alpha: 0.2)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: colorScheme.primary.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(Icons.notifications_outlined, color: colorScheme.primary),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(t.notificationsOverviewTitle, style: theme.textTheme.titleMedium),
-                      const SizedBox(height: 4),
-                      Text(
-                        t.notificationsOverviewDescription,
-                        style: theme.textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            ...guidanceItems.map(
-              (item) => Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(Icons.check_circle_outline, size: 18, color: colorScheme.primary),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        item,
-                        style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurface),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Tooltip(
-              message: documentationUrl,
-              child: TextButton.icon(
-                onPressed: () => _copyToClipboard(documentationUrl, t.copied),
-                icon: const Icon(Icons.menu_book_outlined),
-                label: Text(t.notificationsLearnMore),
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 

@@ -732,10 +732,26 @@ def create_receipt_payment(
                 extra_info["check_number"] = account_line.get("check_number")
         
         # ایجاد خط سند برای حساب
-        # در دریافت: حساب بدهکار (debit) - دارایی افزایش می‌یابد
-        # در پرداخت: حساب بستانکار (credit) - دارایی کاهش می‌یابد
-        debit_amount = amount if is_receipt else Decimal(0)
-        credit_amount = amount if not is_receipt else Decimal(0)
+        # برای چک: منطق حسابداری متفاوت است
+        # در دریافت با چک دریافتی: چک از 10403 خارج می‌شود → باید بستانکار شود
+        # در پرداخت با چک پرداختی: چک از 20202 خارج می‌شود → باید بدهکار شود
+        if normalized_transaction_type == "check":
+            # برای چک دریافتی در سند دریافت: حساب 10403 باید بستانکار شود (چک خارج شد)
+            # برای چک پرداختی در سند پرداخت: حساب 20202 باید بدهکار شود (چک پرداخت شد)
+            if is_receipt:
+                # دریافت با چک دریافتی: حساب 10403 بستانکار می‌شود
+                debit_amount = Decimal(0)
+                credit_amount = amount
+            else:
+                # پرداخت با چک پرداختی: حساب 20202 بدهکار می‌شود
+                debit_amount = amount
+                credit_amount = Decimal(0)
+        else:
+            # برای سایر حساب‌ها (بانک، صندوق، ...): منطق عادی
+            # در دریافت: حساب بدهکار (debit) - دارایی افزایش می‌یابد
+            # در پرداخت: حساب بستانکار (credit) - دارایی کاهش می‌یابد
+            debit_amount = amount if is_receipt else Decimal(0)
+            credit_amount = amount if not is_receipt else Decimal(0)
         logger.info(f"مقادیر بدهکار/بستانکار برای حساب: debit={debit_amount}, credit={credit_amount}")
         
         # تنظیم bank_account_id بر اساس bank_id ارسالی
@@ -779,6 +795,113 @@ def create_receipt_payment(
         )
         logger.info(f"خط سند حساب ایجاد شد: {line}")
         db.add(line)
+        
+        # برای چک: ایجاد خط اضافی برای بانک/صندوق (اگر چک به بانک/صندوق سپرده شد)
+        if normalized_transaction_type == "check" and is_receipt:
+            # چک دریافتی در سند دریافت: چک از 10403 خارج می‌شود و وجه به بانک/صندوق سپرده می‌شود
+            # ایجاد خط اضافی برای بانک/صندوق (بدهکار)
+            # بررسی اینکه چک به چه حسابی سپرده شد
+            target_account_type = account_line.get("target_account_type")  # bank, cash_register, petty_cash
+            target_bank_id = account_line.get("bank_id")
+            target_cash_register_id = account_line.get("cash_register_id")
+            target_petty_cash_id = account_line.get("petty_cash_id")
+            
+            # تعیین حساب مقصد
+            target_account = None
+            target_account_code = None
+            target_bank_account_id = None
+            
+            if target_account_type == "bank" or target_bank_id:
+                target_account_code = "10203"  # بانک
+                target_account = _get_fixed_account_by_code(db, target_account_code)
+                if target_bank_id:
+                    target_bank_account_id = int(target_bank_id)
+            elif target_account_type == "cash_register" or target_cash_register_id:
+                target_account_code = "10202"  # صندوق
+                target_account = _get_fixed_account_by_code(db, target_account_code)
+            elif target_account_type == "petty_cash" or target_petty_cash_id:
+                target_account_code = "10201"  # تنخواه گردان
+                target_account = _get_fixed_account_by_code(db, target_account_code)
+            else:
+                # پیش‌فرض: بانک (اگر مشخص نشده باشد)
+                target_account_code = "10203"  # بانک
+                target_account = _get_fixed_account_by_code(db, target_account_code)
+            
+            if target_account:
+                # ایجاد خط برای بانک/صندوق (بدهکار)
+                target_line_extra_info = {
+                    "transaction_type": "bank" if target_account_code == "10203" else ("cash_register" if target_account_code == "10202" else "petty_cash"),
+                    "check_id": resolved_check_id,
+                    "is_check_target_account": True,
+                }
+                if target_bank_id:
+                    target_line_extra_info["bank_id"] = target_bank_id
+                
+                target_line = DocumentLine(
+                    document_id=document.id,
+                    account_id=target_account.id,
+                    bank_account_id=target_bank_account_id,
+                    check_id=resolved_check_id,
+                    debit=amount,  # بانک/صندوق بدهکار می‌شود (وجه دریافت شد)
+                    credit=Decimal(0),
+                    description=description or f"سپرده چک به {target_account.name}",
+                    extra_info=target_line_extra_info,
+                )
+                logger.info(f"خط اضافی برای حساب مقصد چک ایجاد شد: {target_line}")
+                db.add(target_line)
+        
+        elif normalized_transaction_type == "check" and not is_receipt:
+            # چک پرداختی در سند پرداخت: چک از 20202 خارج می‌شود و وجه از بانک/صندوق پرداخت می‌شود
+            # ایجاد خط اضافی برای بانک/صندوق (بستانکار)
+            # بررسی اینکه چک از چه حسابی پرداخت شد
+            source_account_type = account_line.get("source_account_type")  # bank, cash_register, petty_cash
+            source_bank_id = account_line.get("bank_id")
+            source_cash_register_id = account_line.get("cash_register_id")
+            source_petty_cash_id = account_line.get("petty_cash_id")
+            
+            # تعیین حساب مبدا
+            source_account = None
+            source_account_code = None
+            source_bank_account_id = None
+            
+            if source_account_type == "bank" or source_bank_id:
+                source_account_code = "10203"  # بانک
+                source_account = _get_fixed_account_by_code(db, source_account_code)
+                if source_bank_id:
+                    source_bank_account_id = int(source_bank_id)
+            elif source_account_type == "cash_register" or source_cash_register_id:
+                source_account_code = "10202"  # صندوق
+                source_account = _get_fixed_account_by_code(db, source_account_code)
+            elif source_account_type == "petty_cash" or source_petty_cash_id:
+                source_account_code = "10201"  # تنخواه گردان
+                source_account = _get_fixed_account_by_code(db, source_account_code)
+            else:
+                # پیش‌فرض: بانک (اگر مشخص نشده باشد)
+                source_account_code = "10203"  # بانک
+                source_account = _get_fixed_account_by_code(db, source_account_code)
+            
+            if source_account:
+                # ایجاد خط برای بانک/صندوق (بستانکار)
+                source_line_extra_info = {
+                    "transaction_type": "bank" if source_account_code == "10203" else ("cash_register" if source_account_code == "10202" else "petty_cash"),
+                    "check_id": resolved_check_id,
+                    "is_check_source_account": True,
+                }
+                if source_bank_id:
+                    source_line_extra_info["bank_id"] = source_bank_id
+                
+                source_line = DocumentLine(
+                    document_id=document.id,
+                    account_id=source_account.id,
+                    bank_account_id=source_bank_account_id,
+                    check_id=resolved_check_id,
+                    debit=Decimal(0),
+                    credit=amount,  # بانک/صندوق بستانکار می‌شود (وجه پرداخت شد)
+                    description=description or f"پرداخت چک از {source_account.name}",
+                    extra_info=source_line_extra_info,
+                )
+                logger.info(f"خط اضافی برای حساب مبدا چک ایجاد شد: {source_line}")
+                db.add(source_line)
     
     # ایجاد خطوط کارمزد اگر کارمزدی وجود دارد
     if total_commission > 0:
@@ -981,6 +1104,58 @@ def create_receipt_payment(
     logger.info(f"=== ذخیره تغییرات ===")
     # flush کردن تغییرات قبل از commit برای اطمینان از ذخیره شدن
     db.flush()
+    
+    # تغییر وضعیت چک‌های استفاده شده
+    logger.info(f"=== تغییر وضعیت چک‌های استفاده شده ===")
+    for account_line in account_lines:
+        check_id = account_line.get("check_id")
+        if not check_id:
+            continue
+        
+        try:
+            check_obj = db.query(Check).filter(Check.id == int(check_id)).first()
+            if not check_obj:
+                logger.warning(f"چک با شناسه {check_id} یافت نشد")
+                continue
+            
+            normalized_transaction_type = account_line.get("transaction_type")
+            if normalized_transaction_type == "check_expense":
+                normalized_transaction_type = "check"
+            
+            if normalized_transaction_type == "check":
+                logger.info(f"تغییر وضعیت چک {check_obj.check_number} (id={check_obj.id})")
+                logger.info(f"وضعیت قبلی: {check_obj.status}, نوع چک: {check_obj.type}, نوع سند: {document_type}")
+                
+                if check_obj.type == CheckType.RECEIVED:
+                    # چک دریافتی
+                    if is_receipt:
+                        # در سند دریافت، چک استفاده می‌شود (مثلاً به بانک سپرده می‌شود)
+                        # بسته به نوع تراکنش حساب (بانک/صندوق/چک) وضعیت را تعیین می‌کنیم
+                        if account_line.get("transaction_type") in ("bank", "cash_register"):
+                            # اگر به بانک/صندوق سپرده شد، وضعیت را DEPOSITED می‌کنیم
+                            check_obj.status = CheckStatus.DEPOSITED
+                        else:
+                            # اگر در جای دیگری استفاده شد، وضعیت را CLEARED می‌کنیم
+                            check_obj.status = CheckStatus.CLEARED
+                        logger.info(f"وضعیت جدید: {check_obj.status}")
+                    # در سند پرداخت، چک دریافتی نمی‌تواند استفاده شود (validation قبلاً این را چک می‌کند)
+                
+                elif check_obj.type == CheckType.TRANSFERRED:
+                    # چک پرداختی
+                    if not is_receipt:
+                        # در سند پرداخت، چک پرداخته می‌شود
+                        check_obj.status = CheckStatus.CLEARED
+                        logger.info(f"وضعیت جدید: {check_obj.status}")
+                    # در سند دریافت، چک پرداختی نمی‌تواند استفاده شود (validation قبلاً این را چک می‌کند)
+                
+                check_obj.status_at = datetime.utcnow()
+                check_obj.last_action_document_id = document.id
+                logger.info(f"وضعیت چک {check_obj.check_number} به {check_obj.status} تغییر یافت")
+        
+        except Exception as e:
+            logger.error(f"خطا در تغییر وضعیت چک {check_id}: {e}", exc_info=True)
+            # خطا را لاگ می‌کنیم اما به فرآیند ادامه می‌دهیم
+    
     db.commit()
     db.refresh(document)
     # refresh کردن فاکتورهای اقساطی که به‌روزرسانی شدند
@@ -1520,8 +1695,27 @@ def update_receipt_payment(
             if account_line.get("check_number"):
                 extra_info["check_number"] = account_line.get("check_number")
 
-        debit_amount = amount if is_receipt else Decimal(0)
-        credit_amount = amount if not is_receipt else Decimal(0)
+        # ایجاد خط سند برای حساب
+        # برای چک: منطق حسابداری متفاوت است
+        # در دریافت با چک دریافتی: چک از 10403 خارج می‌شود → باید بستانکار شود
+        # در پرداخت با چک پرداختی: چک از 20202 خارج می‌شود → باید بدهکار شود
+        if normalized_transaction_type == "check":
+            # برای چک دریافتی در سند دریافت: حساب 10403 باید بستانکار شود (چک خارج شد)
+            # برای چک پرداختی در سند پرداخت: حساب 20202 باید بدهکار شود (چک پرداخت شد)
+            if is_receipt:
+                # دریافت با چک دریافتی: حساب 10403 بستانکار می‌شود
+                debit_amount = Decimal(0)
+                credit_amount = amount
+            else:
+                # پرداخت با چک پرداختی: حساب 20202 بدهکار می‌شود
+                debit_amount = amount
+                credit_amount = Decimal(0)
+        else:
+            # برای سایر حساب‌ها (بانک، صندوق، ...): منطق عادی
+            # در دریافت: حساب بدهکار (debit) - دارایی افزایش می‌یابد
+            # در پرداخت: حساب بستانکار (credit) - دارایی کاهش می‌یابد
+            debit_amount = amount if is_receipt else Decimal(0)
+            credit_amount = amount if not is_receipt else Decimal(0)
 
         bank_account_id = None
         if transaction_type == "bank" and account_line.get("bank_id"):
@@ -1805,6 +1999,52 @@ def update_receipt_payment(
 
     # flush کردن تغییرات قبل از commit برای اطمینان از ذخیره شدن
     db.flush()
+    
+    # تغییر وضعیت چک‌های استفاده شده (در update)
+    logger.info(f"[UPDATE_RECEIPT_PAYMENT] === تغییر وضعیت چک‌های استفاده شده ===")
+    for account_line in account_lines:
+        check_id = account_line.get("check_id")
+        if not check_id:
+            continue
+        
+        try:
+            check_obj = db.query(Check).filter(Check.id == int(check_id)).first()
+            if not check_obj:
+                logger.warning(f"[UPDATE_RECEIPT_PAYMENT] چک با شناسه {check_id} یافت نشد")
+                continue
+            
+            normalized_transaction_type = account_line.get("transaction_type")
+            if normalized_transaction_type == "check_expense":
+                normalized_transaction_type = "check"
+            
+            if normalized_transaction_type == "check":
+                logger.info(f"[UPDATE_RECEIPT_PAYMENT] تغییر وضعیت چک {check_obj.check_number} (id={check_obj.id})")
+                logger.info(f"[UPDATE_RECEIPT_PAYMENT] وضعیت قبلی: {check_obj.status}, نوع چک: {check_obj.type}, نوع سند: {document.document_type}")
+                
+                if check_obj.type == CheckType.RECEIVED:
+                    # چک دریافتی
+                    if is_receipt:
+                        # در سند دریافت، چک استفاده می‌شود
+                        if account_line.get("transaction_type") in ("bank", "cash_register"):
+                            check_obj.status = CheckStatus.DEPOSITED
+                        else:
+                            check_obj.status = CheckStatus.CLEARED
+                        logger.info(f"[UPDATE_RECEIPT_PAYMENT] وضعیت جدید: {check_obj.status}")
+                
+                elif check_obj.type == CheckType.TRANSFERRED:
+                    # چک پرداختی
+                    if not is_receipt:
+                        # در سند پرداخت، چک پرداخته می‌شود
+                        check_obj.status = CheckStatus.CLEARED
+                        logger.info(f"[UPDATE_RECEIPT_PAYMENT] وضعیت جدید: {check_obj.status}")
+                
+                check_obj.status_at = datetime.utcnow()
+                check_obj.last_action_document_id = document.id
+                logger.info(f"[UPDATE_RECEIPT_PAYMENT] وضعیت چک {check_obj.check_number} به {check_obj.status} تغییر یافت")
+        
+        except Exception as e:
+            logger.error(f"[UPDATE_RECEIPT_PAYMENT] خطا در تغییر وضعیت چک {check_id}: {e}", exc_info=True)
+    
     db.commit()
     db.refresh(document)
     # refresh کردن فاکتورهای اقساطی که به‌روزرسانی شدند

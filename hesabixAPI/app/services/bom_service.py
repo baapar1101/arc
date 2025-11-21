@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Set
 from decimal import Decimal
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
@@ -14,13 +14,162 @@ from adapters.api.v1.schema_models.product_bom import (
     ProductBOMUpdateRequest,
     BOMExplosionRequest,
     ProductionDraftRequest,
+    BomItem,
+    BomOutput,
+    BomOperation,
 )
+
+
+def _validate_product_belongs_to_business(db: Session, product_id: int, business_id: int, field_name: str = "product") -> Product:
+    """بررسی می‌کند که محصول به business تعلق دارد"""
+    if product_id <= 0:
+        raise ApiError("INVALID_PRODUCT", f"{field_name} باید انتخاب شود", http_status=400)
+    product = db.get(Product, product_id)
+    if not product or product.business_id != business_id:
+        raise ApiError("INVALID_PRODUCT", f"{field_name} انتخابی معتبر نیست یا به کسب‌وکار دیگری تعلق دارد", http_status=400)
+    return product
+
+
+def _validate_bom_items(db: Session, business_id: int, product_id: int, items: List[BomItem]) -> None:
+    """اعتبارسنجی اقلام مواد اولیه BOM"""
+    if not items:
+        return
+    
+    component_ids: Set[int] = set()
+    line_nos: Set[int] = set()
+    
+    for item in items:
+        # بررسی component_product_id معتبر و تعلق به business
+        if item.component_product_id <= 0:
+            raise ApiError("INVALID_BOM_ITEM", "کالای مواد اولیه باید انتخاب شود", http_status=400)
+        
+        component_product = _validate_product_belongs_to_business(
+            db, item.component_product_id, business_id, "کالای مواد اولیه"
+        )
+        
+        # بررسی وابستگی چرخه‌ای - یک کالا نمی‌تواند برای خودش ماده اولیه باشد
+        if item.component_product_id == product_id:
+            raise ApiError("CIRCULAR_DEPENDENCY", f"کالا نمی‌تواند برای خودش به عنوان ماده اولیه استفاده شود", http_status=400)
+        
+        # بررسی qty_per مثبت
+        if item.qty_per <= 0:
+            raise ApiError("INVALID_BOM_ITEM", "مقدار برای تولید (qty_per) باید بزرگ‌تر از صفر باشد", http_status=400)
+        
+        # بررسی wastage_percent در محدوده 0-100
+        if item.wastage_percent is not None:
+            if item.wastage_percent < 0 or item.wastage_percent > 100:
+                raise ApiError("INVALID_BOM_ITEM", "درصد پرت باید بین 0 تا 100 باشد", http_status=400)
+        
+        # بررسی line_no تکراری
+        if item.line_no in line_nos:
+            raise ApiError("INVALID_BOM_ITEM", f"شماره ردیف {item.line_no} تکراری است", http_status=400)
+        line_nos.add(item.line_no)
+        
+        component_ids.add(item.component_product_id)
+
+
+def _validate_bom_outputs(db: Session, business_id: int, outputs: List[BomOutput]) -> None:
+    """اعتبارسنجی خروجی‌های BOM"""
+    if not outputs:
+        return
+    
+    line_nos: Set[int] = set()
+    
+    for output in outputs:
+        # بررسی output_product_id معتبر و تعلق به business
+        if output.output_product_id <= 0:
+            raise ApiError("INVALID_BOM_OUTPUT", "محصول خروجی باید انتخاب شود", http_status=400)
+        
+        _validate_product_belongs_to_business(
+            db, output.output_product_id, business_id, "محصول خروجی"
+        )
+        
+        # بررسی ratio مثبت
+        if output.ratio <= 0:
+            raise ApiError("INVALID_BOM_OUTPUT", "نسبت خروجی باید بزرگ‌تر از صفر باشد", http_status=400)
+        
+        # بررسی line_no تکراری
+        if output.line_no in line_nos:
+            raise ApiError("INVALID_BOM_OUTPUT", f"شماره ردیف {output.line_no} تکراری است", http_status=400)
+        line_nos.add(output.line_no)
+
+
+def _validate_bom_operations(operations: List[BomOperation]) -> None:
+    """اعتبارسنجی عملیات BOM"""
+    if not operations:
+        return
+    
+    line_nos: Set[int] = set()
+    
+    for op in operations:
+        # بررسی نام عملیات خالی نباشد
+        if not op.operation_name or not op.operation_name.strip():
+            raise ApiError("INVALID_BOM_OPERATION", "نام عملیات نمی‌تواند خالی باشد", http_status=400)
+        
+        # بررسی line_no تکراری
+        if op.line_no in line_nos:
+            raise ApiError("INVALID_BOM_OPERATION", f"شماره ردیف {op.line_no} تکراری است", http_status=400)
+        line_nos.add(op.line_no)
+
+
+def _validate_version_uniqueness(db: Session, business_id: int, product_id: int, version: str, exclude_bom_id: Optional[int] = None) -> None:
+    """بررسی یکتایی نسخه برای محصول"""
+    query = db.query(ProductBOM).filter(
+        and_(
+            ProductBOM.business_id == business_id,
+            ProductBOM.product_id == product_id,
+            ProductBOM.version == version.strip()
+        )
+    )
+    if exclude_bom_id:
+        query = query.filter(ProductBOM.id != exclude_bom_id)
+    
+    existing = query.first()
+    if existing:
+        raise ApiError("DUPLICATE_VERSION", f"نسخه '{version}' برای این کالا قبلاً استفاده شده است", http_status=400)
+
+
+def _validate_effective_dates(effective_from: Optional[str], effective_to: Optional[str]) -> None:
+    """بررسی اعتبار تاریخ‌های effective"""
+    if effective_from and effective_to:
+        try:
+            from datetime import datetime
+            from_date = datetime.fromisoformat(effective_from.replace('Z', '+00:00') if 'Z' in effective_from else effective_from)
+            to_date = datetime.fromisoformat(effective_to.replace('Z', '+00:00') if 'Z' in effective_to else effective_to)
+            if from_date.date() > to_date.date():
+                raise ApiError("INVALID_DATE_RANGE", "تاریخ شروع نمی‌تواند بعد از تاریخ پایان باشد", http_status=400)
+        except (ValueError, AttributeError):
+            pass  # اگر فرمت تاریخ اشتباه باشد، validation در schema انجام می‌شود
+
+
+def _validate_yield_wastage_percent(yield_percent: Optional[Decimal], wastage_percent: Optional[Decimal]) -> None:
+    """اعتبارسنجی درصد بازده و پرت"""
+    if yield_percent is not None:
+        if yield_percent < 0 or yield_percent > 100:
+            raise ApiError("INVALID_YIELD_PERCENT", "درصد بازده باید بین 0 تا 100 باشد", http_status=400)
+    
+    if wastage_percent is not None:
+        if wastage_percent < 0 or wastage_percent > 100:
+            raise ApiError("INVALID_WASTAGE_PERCENT", "درصد پرت باید بین 0 تا 100 باشد", http_status=400)
 
 
 def _to_bom_dict(bom: ProductBOM, db: Session) -> Dict[str, Any]:
     items = db.query(ProductBOMItem).filter(ProductBOMItem.bom_id == bom.id).order_by(ProductBOMItem.line_no).all()
     outputs = db.query(ProductBOMOutput).filter(ProductBOMOutput.bom_id == bom.id).order_by(ProductBOMOutput.line_no).all()
     operations = db.query(ProductBOMOperation).filter(ProductBOMOperation.bom_id == bom.id).order_by(ProductBOMOperation.line_no).all()
+    
+    # دریافت اطلاعات محصولات برای نمایش نام و کد
+    product_ids: Set[int] = set()
+    if items:
+        product_ids.update([it.component_product_id for it in items])
+    if outputs:
+        product_ids.update([ot.output_product_id for ot in outputs])
+    
+    products_by_id: Dict[int, Product] = {}
+    if product_ids:
+        for p in db.query(Product).filter(Product.id.in_(product_ids)).all():
+            products_by_id[p.id] = p
+    
     return {
         "id": bom.id,
         "business_id": bom.business_id,
@@ -40,6 +189,8 @@ def _to_bom_dict(bom: ProductBOM, db: Session) -> Dict[str, Any]:
             {
                 "line_no": it.line_no,
                 "component_product_id": it.component_product_id,
+                "component_product_name": getattr(products_by_id.get(it.component_product_id), "name", None) if products_by_id.get(it.component_product_id) else None,
+                "component_product_code": getattr(products_by_id.get(it.component_product_id), "code", None) if products_by_id.get(it.component_product_id) else None,
                 "qty_per": it.qty_per,
                 "uom": it.uom,
                 "wastage_percent": it.wastage_percent,
@@ -53,6 +204,8 @@ def _to_bom_dict(bom: ProductBOM, db: Session) -> Dict[str, Any]:
             {
                 "line_no": ot.line_no,
                 "output_product_id": ot.output_product_id,
+                "output_product_name": getattr(products_by_id.get(ot.output_product_id), "name", None) if products_by_id.get(ot.output_product_id) else None,
+                "output_product_code": getattr(products_by_id.get(ot.output_product_id), "code", None) if products_by_id.get(ot.output_product_id) else None,
                 "ratio": ot.ratio,
                 "uom": ot.uom,
             }
@@ -74,41 +227,76 @@ def _to_bom_dict(bom: ProductBOM, db: Session) -> Dict[str, Any]:
 
 def create_bom(db: Session, business_id: int, payload: ProductBOMCreateRequest) -> Dict[str, Any]:
     # product must belong to business
-    product = db.get(Product, payload.product_id)
-    if not product or product.business_id != business_id:
-        raise ApiError("INVALID_PRODUCT", "کالای انتخابی معتبر نیست", http_status=400)
+    product = _validate_product_belongs_to_business(db, payload.product_id, business_id, "کالا")
+    
+    # اعتبارسنجی نسخه تکراری
+    _validate_version_uniqueness(db, business_id, payload.product_id, payload.version)
+    
+    # اعتبارسنجی تاریخ‌های effective
+    _validate_effective_dates(payload.effective_from, payload.effective_to)
+    
+    # اعتبارسنجی درصد بازده و پرت
+    _validate_yield_wastage_percent(payload.yield_percent, payload.wastage_percent)
+    
+    # اعتبارسنجی اقلام مواد اولیه
+    _validate_bom_items(db, business_id, payload.product_id, payload.items)
+    
+    # اعتبارسنجی خروجی‌ها
+    _validate_bom_outputs(db, business_id, payload.outputs)
+    
+    # اعتبارسنجی عملیات
+    _validate_bom_operations(payload.operations)
 
-    repo = ProductBOMRepository(db)
-    bom = repo.create_bom(
-        business_id=business_id,
-        product_id=payload.product_id,
-        version=payload.version.strip(),
-        name=payload.name.strip(),
-        is_default=bool(payload.is_default),
-        effective_from=payload.effective_from,
-        effective_to=payload.effective_to,
-        yield_percent=payload.yield_percent,
-        wastage_percent=payload.wastage_percent,
-        status=payload.status,
-        notes=payload.notes,
-    )
+    try:
+        repo = ProductBOMRepository(db)
+        bom = repo.create_bom(
+            business_id=business_id,
+            product_id=payload.product_id,
+            version=payload.version.strip(),
+            name=payload.name.strip(),
+            is_default=bool(payload.is_default),
+            effective_from=payload.effective_from,
+            effective_to=payload.effective_to,
+            yield_percent=payload.yield_percent,
+            wastage_percent=payload.wastage_percent,
+            status=payload.status,
+            notes=payload.notes,
+        )
 
-    # Replace child rows
-    items = [it.model_dump() for it in payload.items]
-    outputs = [ot.model_dump() for ot in payload.outputs]
-    operations = [op.model_dump() for op in payload.operations]
-    repo.replace_items(bom.id, items)
-    repo.replace_outputs(bom.id, outputs)
-    repo.replace_operations(bom.id, operations)
+        # Replace child rows - همه در یک transaction
+        try:
+            items = [it.model_dump() for it in payload.items]
+            outputs = [ot.model_dump() for ot in payload.outputs]
+            operations = [op.model_dump() for op in payload.operations]
+            repo.replace_items(bom.id, items)
+            repo.replace_outputs(bom.id, outputs)
+            repo.replace_operations(bom.id, operations)
 
-    # enforce single default per product
-    if bom.is_default:
-        db.query(ProductBOM).filter(
-            and_(ProductBOM.business_id == business_id, ProductBOM.product_id == payload.product_id, ProductBOM.id != bom.id)
-        ).update({ProductBOM.is_default: False})
-        db.commit()
+            # enforce single default per product
+            if bom.is_default:
+                db.query(ProductBOM).filter(
+                    and_(ProductBOM.business_id == business_id, ProductBOM.product_id == payload.product_id, ProductBOM.id != bom.id)
+                ).update({ProductBOM.is_default: False})
+            
+            db.commit()
+        except Exception as e:
+            db.rollback()
+            # حذف BOM ایجاد شده در صورت خطا در child rows
+            try:
+                db.delete(bom)
+                db.commit()
+            except Exception:
+                db.rollback()
+            if isinstance(e, ApiError):
+                raise
+            raise ApiError("BOM_CREATE_FAILED", f"خطا در ایجاد اقلام فرمول تولید: {str(e)}", http_status=500)
 
-    return {"message": "BOM_CREATED", "data": _to_bom_dict(bom, db)}
+        return {"message": "BOM_CREATED", "data": _to_bom_dict(bom, db)}
+    except Exception as e:
+        db.rollback()
+        if isinstance(e, ApiError):
+            raise
+        raise ApiError("BOM_CREATE_FAILED", f"خطا در ایجاد فرمول تولید: {str(e)}", http_status=500)
 
 
 def get_bom(db: Session, business_id: int, bom_id: int) -> Optional[Dict[str, Any]]:
@@ -131,35 +319,105 @@ def update_bom(db: Session, business_id: int, bom_id: int, payload: ProductBOMUp
     if not bom:
         return None
 
-    updated = repo.update_bom(
-        bom_id,
-        version=payload.version.strip() if isinstance(payload.version, str) else None,
-        name=payload.name.strip() if isinstance(payload.name, str) else None,
-        is_default=payload.is_default if payload.is_default is not None else None,
-        effective_from=payload.effective_from,
-        effective_to=payload.effective_to,
-        yield_percent=payload.yield_percent,
-        wastage_percent=payload.wastage_percent,
-        status=payload.status,
-        notes=payload.notes,
-    )
-    if not updated:
-        return None
-
+    # اعتبارسنجی نسخه تکراری در صورت تغییر
+    if payload.version is not None:
+        version_to_check = payload.version.strip() if isinstance(payload.version, str) else payload.version
+        if version_to_check and version_to_check != bom.version:
+            _validate_version_uniqueness(db, business_id, bom.product_id, version_to_check, exclude_bom_id=bom_id)
+    
+    # اعتبارسنجی تاریخ‌های effective
+    effective_from = payload.effective_from if payload.effective_from is not None else bom.effective_from
+    effective_to = payload.effective_to if payload.effective_to is not None else bom.effective_to
+    if effective_from or effective_to:
+        _validate_effective_dates(
+            effective_from.isoformat() if effective_from else None,
+            effective_to.isoformat() if effective_to else None
+        )
+    
+    # اعتبارسنجی درصد بازده و پرت
+    yield_percent = payload.yield_percent if payload.yield_percent is not None else bom.yield_percent
+    wastage_percent = payload.wastage_percent if payload.wastage_percent is not None else bom.wastage_percent
+    _validate_yield_wastage_percent(yield_percent, wastage_percent)
+    
+    # اعتبارسنجی اقلام مواد اولیه در صورت تغییر
     if payload.items is not None:
-        repo.replace_items(bom_id, [it.model_dump() for it in payload.items])
+        _validate_bom_items(db, business_id, bom.product_id, payload.items)
+    
+    # اعتبارسنجی خروجی‌ها در صورت تغییر
     if payload.outputs is not None:
-        repo.replace_outputs(bom_id, [ot.model_dump() for ot in payload.outputs])
+        _validate_bom_outputs(db, business_id, payload.outputs)
+    
+    # اعتبارسنجی عملیات در صورت تغییر
     if payload.operations is not None:
-        repo.replace_operations(bom_id, [op.model_dump() for op in payload.operations])
+        _validate_bom_operations(payload.operations)
 
-    if updated.is_default:
-        db.query(ProductBOM).filter(
-            and_(ProductBOM.business_id == business_id, ProductBOM.product_id == updated.product_id, ProductBOM.id != updated.id)
-        ).update({ProductBOM.is_default: False})
-        db.commit()
+    try:
+        # ذخیره وضعیت قبلی برای rollback در صورت خطا
+        old_items = list(db.query(ProductBOMItem).filter(ProductBOMItem.bom_id == bom_id).all())
+        old_outputs = list(db.query(ProductBOMOutput).filter(ProductBOMOutput.bom_id == bom_id).all())
+        old_operations = list(db.query(ProductBOMOperation).filter(ProductBOMOperation.bom_id == bom_id).all())
+        
+        updated = repo.update_bom(
+            bom_id,
+            version=payload.version.strip() if isinstance(payload.version, str) else None,
+            name=payload.name.strip() if isinstance(payload.name, str) else None,
+            is_default=payload.is_default if payload.is_default is not None else None,
+            effective_from=payload.effective_from,
+            effective_to=payload.effective_to,
+            yield_percent=payload.yield_percent,
+            wastage_percent=payload.wastage_percent,
+            status=payload.status,
+            notes=payload.notes,
+        )
+        if not updated:
+            return None
 
-    return {"message": "BOM_UPDATED", "data": _to_bom_dict(updated, db)}
+        # Update child rows - همه در یک transaction
+        try:
+            if payload.items is not None:
+                repo.replace_items(bom_id, [it.model_dump() for it in payload.items])
+            if payload.outputs is not None:
+                repo.replace_outputs(bom_id, [ot.model_dump() for ot in payload.outputs])
+            if payload.operations is not None:
+                repo.replace_operations(bom_id, [op.model_dump() for op in payload.operations])
+
+            if updated.is_default:
+                db.query(ProductBOM).filter(
+                    and_(ProductBOM.business_id == business_id, ProductBOM.product_id == updated.product_id, ProductBOM.id != updated.id)
+                ).update({ProductBOM.is_default: False})
+            
+            db.commit()
+        except Exception as e:
+            db.rollback()
+            # بازگرداندن وضعیت قبلی
+            try:
+                # حذف همه child rows فعلی
+                db.query(ProductBOMItem).filter(ProductBOMItem.bom_id == bom_id).delete()
+                db.query(ProductBOMOutput).filter(ProductBOMOutput.bom_id == bom_id).delete()
+                db.query(ProductBOMOperation).filter(ProductBOMOperation.bom_id == bom_id).delete()
+                
+                # بازگرداندن child rows قبلی
+                for item in old_items:
+                    db.add(item)
+                for output in old_outputs:
+                    db.add(output)
+                for op in old_operations:
+                    db.add(op)
+                
+                db.commit()
+            except Exception:
+                db.rollback()
+            
+            if isinstance(e, ApiError):
+                raise
+            raise ApiError("BOM_UPDATE_FAILED", f"خطا در به‌روزرسانی اقلام فرمول تولید: {str(e)}", http_status=500)
+
+        return {"message": "BOM_UPDATED", "data": _to_bom_dict(updated, db)}
+    except Exception as e:
+        db.rollback()
+        if isinstance(e, ApiError):
+            raise
+        raise ApiError("BOM_UPDATE_FAILED", f"خطا در به‌روزرسانی فرمول تولید: {str(e)}", http_status=500)
 
 
 def delete_bom(db: Session, business_id: int, bom_id: int) -> bool:

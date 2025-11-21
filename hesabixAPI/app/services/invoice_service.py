@@ -7,7 +7,7 @@ import logging
 
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
-from sqlalchemy import and_, or_
+from sqlalchemy import and_, or_, func
 
 from adapters.db.models.document import Document
 from adapters.db.models.document_line import DocumentLine
@@ -16,7 +16,7 @@ from adapters.db.models.currency import Currency
 from adapters.db.models.bank_account import BankAccount
 from adapters.db.models.cash_register import CashRegister
 from adapters.db.models.petty_cash import PettyCash
-from adapters.db.models.check import Check
+from adapters.db.models.check import Check, CheckType
 from adapters.db.models.user import User
 from adapters.db.models.fiscal_year import FiscalYear
 from adapters.db.models.person import Person
@@ -810,6 +810,47 @@ def create_invoice(
     if not isinstance(lines_input, list) or len(lines_input) == 0:
         raise ApiError("LINES_REQUIRED", "At least one line is required", http_status=400)
 
+    # اعتبارسنجی ویژه برای فاکتور تولید
+    if invoice_type == INVOICE_PRODUCTION:
+        has_out = False
+        has_in = False
+        
+        for i, line in enumerate(lines_input, start=1):
+            extra_info = line.get("extra_info") or {}
+            movement = extra_info.get("movement")
+            
+            if movement is None or (movement != "in" and movement != "out"):
+                raise ApiError(
+                    "INVALID_PRODUCTION_LINE",
+                    f"ردیف {i} باید movement مشخص داشته باشد ('in' یا 'out'). برای فاکتور تولید، باید از فرمول تولید استفاده کنید.",
+                    http_status=400
+                )
+            
+            if movement == "out":
+                has_out = True
+            elif movement == "in":
+                has_in = True
+        
+        if not has_out:
+            raise ApiError(
+                "INVALID_PRODUCTION_INVOICE",
+                "فاکتور تولید باید حداقل یک ردیف با movement: 'out' داشته باشد (مواد اولیه). برای فاکتور تولید، باید از فرمول تولید استفاده کنید.",
+                http_status=400
+            )
+        
+        if not has_in:
+            raise ApiError(
+                "INVALID_PRODUCTION_INVOICE",
+                "فاکتور تولید باید حداقل یک ردیف با movement: 'in' داشته باشد (محصول نهایی). برای فاکتور تولید، باید از فرمول تولید استفاده کنید.",
+                http_status=400
+            )
+        
+        # بررسی وجود bom_ids در extra_info فاکتور (برای ردیابی)
+        header_extra_check = data.get("extra_info") or {}
+        bom_ids = header_extra_check.get("bom_ids")
+        if not bom_ids or not isinstance(bom_ids, list) or len(bom_ids) == 0:
+            logger.warning(f"فاکتور تولید بدون bom_ids ثبت شد (business_id={business_id}). ممکن است از فرمول تولید استفاده نشده باشد.")
+
     # Basic person requirement for AR/AP invoices
     person_id = _person_id_from_header(data)
     if invoice_type in {INVOICE_SALES, INVOICE_SALES_RETURN, INVOICE_PURCHASE, INVOICE_PURCHASE_RETURN} and not person_id:
@@ -1327,6 +1368,22 @@ def create_invoice(
                                     raise ApiError("PAYMENT_ACCOUNT_NOT_FOUND", "Check not found", http_status=404)
                                 if int(chk.currency_id) != invoice_currency_id:
                                     raise ApiError("PAYMENT_CURRENCY_MISMATCH", "Currency of check does not match invoice currency", http_status=400)
+                                
+                                # بررسی تطابق نوع چک با نوع فاکتور
+                                # چک دریافتی فقط در فاکتور فروش/برگشت از فروش استفاده می‌شود
+                                # چک پرداختی فقط در فاکتور خرید/برگشت از خرید استفاده می‌شود
+                                is_receipt_invoice = invoice_type in {INVOICE_SALES, INVOICE_PURCHASE_RETURN}
+                                expected_check_type = CheckType.RECEIVED if is_receipt_invoice else CheckType.TRANSFERRED
+                                
+                                if chk.type != expected_check_type:
+                                    check_type_name = "دریافتی" if chk.type == CheckType.RECEIVED else "پرداختی"
+                                    expected_type_name = "دریافتی" if expected_check_type == CheckType.RECEIVED else "پرداختی"
+                                    invoice_type_name = "فروش/برگشت از فروش" if is_receipt_invoice else "خرید/برگشت از خرید"
+                                    raise ApiError(
+                                        "CHECK_TYPE_MISMATCH_WITH_INVOICE",
+                                        f"نوع چک با نوع فاکتور هم‌خوانی ندارد. چک {check_type_name} نمی‌تواند در فاکتور {invoice_type_name} استفاده شود. باید چک {expected_type_name} استفاده شود.",
+                                        http_status=400
+                                    )
 
                     # Build account line entry including ids/names for linking
                     # استفاده از 'type' یا 'transaction_type' (فرانت‌اند 'type' می‌فرستد)
@@ -1844,6 +1901,22 @@ def update_invoice(
                                     raise ApiError("PAYMENT_ACCOUNT_NOT_FOUND", "Check not found", http_status=404)
                                 if int(chk.currency_id) != invoice_currency_id:
                                     raise ApiError("PAYMENT_CURRENCY_MISMATCH", "Currency of check does not match invoice currency", http_status=400)
+                                
+                                # بررسی تطابق نوع چک با نوع فاکتور (در update)
+                                # چک دریافتی فقط در فاکتور فروش/برگشت از فروش استفاده می‌شود
+                                # چک پرداختی فقط در فاکتور خرید/برگشت از خرید استفاده می‌شود
+                                is_receipt_invoice = inv_type in {INVOICE_SALES, INVOICE_PURCHASE_RETURN}
+                                expected_check_type = CheckType.RECEIVED if is_receipt_invoice else CheckType.TRANSFERRED
+                                
+                                if chk.type != expected_check_type:
+                                    check_type_name = "دریافتی" if chk.type == CheckType.RECEIVED else "پرداختی"
+                                    expected_type_name = "دریافتی" if expected_check_type == CheckType.RECEIVED else "پرداختی"
+                                    invoice_type_name = "فروش/برگشت از فروش" if is_receipt_invoice else "خرید/برگشت از خرید"
+                                    raise ApiError(
+                                        "CHECK_TYPE_MISMATCH_WITH_INVOICE",
+                                        f"نوع چک با نوع فاکتور هم‌خوانی ندارد. چک {check_type_name} نمی‌تواند در فاکتور {invoice_type_name} استفاده شود. باید چک {expected_type_name} استفاده شود.",
+                                        http_status=400
+                                    )
                     
                     transaction_type_value = p.get("transaction_type") or p.get("type")
                     account_line: Dict[str, Any] = {
@@ -2699,6 +2772,175 @@ def get_daily_sales_report(
     }
 
 
+def get_daily_purchases_report(
+    db: Session,
+    business_id: int,
+    fiscal_year_id: Optional[int] = None,
+    currency_id: Optional[int] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    skip: int = 0,
+    take: int = 50,
+) -> Dict[str, Any]:
+    """
+    گزارش خرید روزانه
+    
+    Args:
+        db: نشست پایگاه داده
+        business_id: شناسه کسب‌وکار
+        fiscal_year_id: شناسه سال مالی (اختیاری)
+        currency_id: شناسه ارز (اختیاری)
+        date_from: از تاریخ (اختیاری، فرمت YYYY-MM-DD)
+        date_to: تا تاریخ (اختیاری، فرمت YYYY-MM-DD)
+        skip: تعداد رکوردهای رد شده برای pagination
+        take: تعداد رکوردهای برگشتی
+    
+    Returns:
+        dict: {
+            'items': لیست روزها با آمار خرید,
+            'summary': خلاصه آمار,
+            'pagination': اطلاعات pagination
+        }
+    """
+    from collections import defaultdict
+    
+    # تبدیل تاریخ‌ها
+    date_from_obj = None
+    date_to_obj = None
+    
+    if date_from:
+        try:
+            date_from_obj = _parse_iso_date(date_from)
+        except Exception:
+            pass
+    
+    if date_to:
+        try:
+            date_to_obj = _parse_iso_date(date_to)
+        except Exception:
+            pass
+    
+    # اگر تاریخ‌ها مشخص نشده‌اند، از سال مالی استفاده کن
+    if date_from_obj is None or date_to_obj is None:
+        try:
+            if fiscal_year_id:
+                fiscal_year = db.query(FiscalYear).filter(FiscalYear.id == fiscal_year_id).first()
+            else:
+                fiscal_year = db.query(FiscalYear).filter(
+                    and_(
+                        FiscalYear.business_id == business_id,
+                        FiscalYear.is_last == True
+                    )
+                ).first()
+            
+            if fiscal_year:
+                if date_from_obj is None:
+                    date_from_obj = fiscal_year.start_date
+                if date_to_obj is None:
+                    date_to_obj = fiscal_year.end_date if fiscal_year.end_date else date.today()
+        except Exception:
+            pass
+    
+    # اگر هنوز تاریخ مشخص نشده
+    if date_to_obj is None:
+        date_to_obj = date.today()
+    if date_from_obj is None:
+        date_from_obj = date.today()
+    
+    # Query فاکتورهای خرید
+    purchases_query = db.query(
+        Document.document_date,
+        Document.extra_info,
+        Document.currency_id,
+    ).filter(
+        and_(
+            Document.business_id == business_id,
+            Document.document_type == INVOICE_PURCHASE,
+            Document.is_proforma == False,
+            Document.document_date >= date_from_obj,
+            Document.document_date <= date_to_obj,
+        )
+    )
+    
+    if currency_id:
+        purchases_query = purchases_query.filter(Document.currency_id == currency_id)
+    
+    if fiscal_year_id:
+        purchases_query = purchases_query.filter(Document.fiscal_year_id == fiscal_year_id)
+    
+    purchases_documents = purchases_query.order_by(Document.document_date.asc()).all()
+    
+    # گروه‌بندی بر اساس روز
+    daily_stats: Dict[str, Dict[str, Any]] = defaultdict(lambda: {
+        'date': None,
+        'invoice_count': 0,
+        'total_gross': Decimal(0),
+        'total_discount': Decimal(0),
+        'total_tax': Decimal(0),
+        'total_net': Decimal(0),
+    })
+    
+    for doc in purchases_documents:
+        doc_date = doc.document_date
+        if not doc_date:
+            continue
+        
+        date_key = doc_date.isoformat()
+        extra_info = doc.extra_info or {}
+        totals = extra_info.get('totals') or {}
+        
+        daily_stats[date_key]['date'] = doc_date.isoformat()
+        daily_stats[date_key]['invoice_count'] += 1
+        daily_stats[date_key]['total_gross'] += Decimal(str(totals.get('gross', 0) or 0))
+        daily_stats[date_key]['total_discount'] += Decimal(str(totals.get('discount', 0) or 0))
+        daily_stats[date_key]['total_tax'] += Decimal(str(totals.get('tax', 0) or 0))
+        daily_stats[date_key]['total_net'] += Decimal(str(totals.get('net', 0) or 0))
+    
+    # تبدیل به لیست و مرتب‌سازی (ترتیب نزولی)
+    items = []
+    for date_key in sorted(daily_stats.keys(), reverse=True):
+        stats = daily_stats[date_key]
+        items.append({
+            'date': stats['date'],
+            'invoice_count': stats['invoice_count'],
+            'total_gross': float(stats['total_gross']),
+            'total_discount': float(stats['total_discount']),
+            'total_tax': float(stats['total_tax']),
+            'total_net': float(stats['total_net']),
+        })
+    
+    total = len(items)
+    current_page = (skip // take) + 1
+    total_pages = (total + take - 1) // take if take > 0 else 1
+    paginated_items = items[skip:skip + take]
+    
+    total_invoice_count = sum(item['invoice_count'] for item in items)
+    total_gross_sum = sum(item['total_gross'] for item in items)
+    total_discount_sum = sum(item['total_discount'] for item in items)
+    total_tax_sum = sum(item['total_tax'] for item in items)
+    total_net_sum = sum(item['total_net'] for item in items)
+    
+    return {
+        'items': paginated_items,
+        'summary': {
+            'total_count': total,
+            'total_invoice_count': total_invoice_count,
+            'total_gross': float(total_gross_sum),
+            'total_discount': float(total_discount_sum),
+            'total_tax': float(total_tax_sum),
+            'total_net': float(total_net_sum),
+        },
+        'pagination': {
+            'total': total,
+            'page': current_page,
+            'per_page': take,
+            'total_pages': total_pages,
+            'has_next': current_page < total_pages,
+            'has_prev': current_page > 1,
+        }
+    }
+
+
 def get_monthly_sales_report(
     db: Session,
     business_id: int,
@@ -2955,19 +3197,20 @@ def get_top_customers_report(
         except Exception:
             pass
     
-    # اگر هنوز تاریخ مشخص نشده
+    # اگر هنوز تاریخ مشخص نشده، از یک بازه زمانی معقول استفاده کن
+    # مثلاً از ابتدای سال جاری تا امروز
     if date_to_obj is None:
         date_to_obj = date.today()
     if date_from_obj is None:
-        date_from_obj = date.today()
+        # اگر سال مالی پیدا نشد، از ابتدای سال جاری استفاده کن
+        try:
+            current_year = date.today().year
+            date_from_obj = date(current_year, 1, 1)
+        except Exception:
+            date_from_obj = date.today()
     
     # Query فاکتورهای فروش
-    sales_query = db.query(
-        Document.id,
-        Document.document_date,
-        Document.extra_info,
-        Document.currency_id,
-    ).filter(
+    sales_query = db.query(Document).filter(
         and_(
             Document.business_id == business_id,
             Document.document_type == INVOICE_SALES,
@@ -2985,6 +3228,29 @@ def get_top_customers_report(
     
     sales_documents = sales_query.order_by(Document.document_date.asc()).all()
     
+    # Debug: لاگ تعداد فاکتورهای پیدا شده و بازه زمانی
+    logger.debug(f"Top customers report: Found {len(sales_documents)} sales invoices for business {business_id}, date_range: {date_from_obj} to {date_to_obj}")
+    
+    # استخراج person_id از DocumentLine ها به صورت batch برای بهبود کارایی
+    doc_ids = [doc.id for doc in sales_documents]
+    person_id_map = {}
+    if doc_ids:
+        # دریافت person_id از DocumentLine برای تمام فاکتورها در یک query
+        doc_lines_with_person = db.query(
+            DocumentLine.document_id,
+            DocumentLine.person_id
+        ).filter(
+            and_(
+                DocumentLine.document_id.in_(doc_ids),
+                DocumentLine.person_id.isnot(None)
+            )
+        ).all()
+        
+        # ساخت map از document_id به person_id (اولین person_id پیدا شده)
+        for line in doc_lines_with_person:
+            if line.document_id not in person_id_map:
+                person_id_map[line.document_id] = line.person_id
+    
     # گروه‌بندی بر اساس person_id
     customer_stats: Dict[int, Dict[str, Any]] = defaultdict(lambda: {
         'person_id': None,
@@ -2995,17 +3261,26 @@ def get_top_customers_report(
     
     # دریافت اطلاعات شخص‌ها از پایگاه داده
     person_ids_set = set()
+    invoices_without_person = 0
     
     for doc in sales_documents:
         extra_info = doc.extra_info or {}
+        
+        # استخراج person_id از extra_info
         person_id = extra_info.get('person_id')
         
+        # اگر person_id در extra_info نبود، از person_id_map استفاده کن (از DocumentLine)
         if person_id is None:
+            person_id = person_id_map.get(doc.id)
+        
+        if person_id is None:
+            invoices_without_person += 1
             continue
         
         try:
             person_id_int = int(person_id)
         except (ValueError, TypeError):
+            invoices_without_person += 1
             continue
         
         person_ids_set.add(person_id_int)
@@ -3024,6 +3299,10 @@ def get_top_customers_report(
             current_last_date = customer_stats[person_id_int]['last_sale_date']
             if current_last_date is None or doc_date > current_last_date:
                 customer_stats[person_id_int]['last_sale_date'] = doc_date
+    
+    # Debug: لاگ تعداد فاکتورهای بدون person_id
+    if invoices_without_person > 0:
+        logger.debug(f"Top customers report: {invoices_without_person} invoices without person_id")
     
     # دریافت اطلاعات شخص‌ها از پایگاه داده
     persons_map = {}
@@ -3108,4 +3387,790 @@ def get_top_customers_report(
         }
     }
 
+
+def get_top_suppliers_report(
+    db: Session,
+    business_id: int,
+    fiscal_year_id: Optional[int] = None,
+    currency_id: Optional[int] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    limit: Optional[int] = None,
+    skip: int = 0,
+    take: int = 50,
+) -> Dict[str, Any]:
+    """
+    گزارش برترین تامین‌کنندگان بر اساس مبلغ خرید
+    
+    Args:
+        db: نشست پایگاه داده
+        business_id: شناسه کسب‌وکار
+        fiscal_year_id: شناسه سال مالی (اختیاری)
+        currency_id: شناسه ارز (اختیاری)
+        date_from: از تاریخ (اختیاری، فرمت YYYY-MM-DD)
+        date_to: تا تاریخ (اختیاری، فرمت YYYY-MM-DD)
+        limit: تعداد تامین‌کنندگان برتر (اختیاری، برای pagination)
+        skip: تعداد رکوردهای رد شده برای pagination
+        take: تعداد رکوردهای برگشتی
+    
+    Returns:
+        dict: {
+            'items': لیست تامین‌کنندگان برتر,
+            'summary': خلاصه آمار,
+            'pagination': اطلاعات pagination
+        }
+    """
+    from collections import defaultdict
+    
+    # تبدیل تاریخ‌ها
+    date_from_obj = None
+    date_to_obj = None
+    
+    if date_from:
+        try:
+            date_from_obj = _parse_iso_date(date_from)
+        except Exception:
+            pass
+    
+    if date_to:
+        try:
+            date_to_obj = _parse_iso_date(date_to)
+        except Exception:
+            pass
+    
+    # اگر تاریخ‌ها مشخص نشده‌اند، از سال مالی استفاده کن
+    if date_from_obj is None or date_to_obj is None:
+        try:
+            if fiscal_year_id:
+                fiscal_year = db.query(FiscalYear).filter(FiscalYear.id == fiscal_year_id).first()
+            else:
+                fiscal_year = db.query(FiscalYear).filter(
+                    and_(
+                        FiscalYear.business_id == business_id,
+                        FiscalYear.is_last == True
+                    )
+                ).first()
+            
+            if fiscal_year:
+                if date_from_obj is None:
+                    date_from_obj = fiscal_year.start_date
+                if date_to_obj is None:
+                    date_to_obj = fiscal_year.end_date if fiscal_year.end_date else date.today()
+        except Exception:
+            pass
+    
+    # اگر هنوز تاریخ مشخص نشده، از یک بازه زمانی معقول استفاده کن
+    # مثلاً از ابتدای سال جاری تا امروز
+    if date_to_obj is None:
+        date_to_obj = date.today()
+    if date_from_obj is None:
+        # اگر سال مالی پیدا نشد، از ابتدای سال جاری استفاده کن
+        try:
+            current_year = date.today().year
+            date_from_obj = date(current_year, 1, 1)
+        except Exception:
+            date_from_obj = date.today()
+    
+    # Query فاکتورهای خرید
+    purchases_query = db.query(Document).filter(
+        and_(
+            Document.business_id == business_id,
+            Document.document_type == INVOICE_PURCHASE,
+            Document.is_proforma == False,
+            Document.document_date >= date_from_obj,
+            Document.document_date <= date_to_obj,
+        )
+    )
+    
+    if currency_id:
+        purchases_query = purchases_query.filter(Document.currency_id == currency_id)
+    
+    if fiscal_year_id:
+        purchases_query = purchases_query.filter(Document.fiscal_year_id == fiscal_year_id)
+    
+    purchases_documents = purchases_query.order_by(Document.document_date.asc()).all()
+    
+    # Debug: لاگ تعداد فاکتورهای پیدا شده
+    logger.debug(f"Top suppliers report: Found {len(purchases_documents)} purchase invoices for business {business_id}")
+    
+    # استخراج person_id از DocumentLine ها به صورت batch برای بهبود کارایی
+    doc_ids = [doc.id for doc in purchases_documents]
+    person_id_map = {}
+    if doc_ids:
+        # دریافت person_id از DocumentLine برای تمام فاکتورها در یک query
+        doc_lines_with_person = db.query(
+            DocumentLine.document_id,
+            DocumentLine.person_id
+        ).filter(
+            and_(
+                DocumentLine.document_id.in_(doc_ids),
+                DocumentLine.person_id.isnot(None)
+            )
+        ).all()
+        
+        # ساخت map از document_id به person_id (اولین person_id پیدا شده)
+        for line in doc_lines_with_person:
+            if line.document_id not in person_id_map:
+                person_id_map[line.document_id] = line.person_id
+    
+    # گروه‌بندی بر اساس person_id
+    supplier_stats: Dict[int, Dict[str, Any]] = defaultdict(lambda: {
+        'person_id': None,
+        'invoice_count': 0,
+        'total_purchases': Decimal(0),
+        'last_purchase_date': None,
+    })
+    
+    # دریافت اطلاعات شخص‌ها از پایگاه داده
+    person_ids_set = set()
+    invoices_without_person = 0
+    
+    for doc in purchases_documents:
+        extra_info = doc.extra_info or {}
+        
+        # استخراج person_id از extra_info
+        person_id = extra_info.get('person_id')
+        
+        # اگر person_id در extra_info نبود، از person_id_map استفاده کن (از DocumentLine)
+        if person_id is None:
+            person_id = person_id_map.get(doc.id)
+        
+        if person_id is None:
+            invoices_without_person += 1
+            continue
+        
+        try:
+            person_id_int = int(person_id)
+        except (ValueError, TypeError):
+            invoices_without_person += 1
+            continue
+        
+        person_ids_set.add(person_id_int)
+        
+        # محاسبه مبلغ خرید از extra_info.totals.net
+        totals = extra_info.get('totals') or {}
+        net_amount = Decimal(str(totals.get('net', 0) or 0))
+        
+        supplier_stats[person_id_int]['person_id'] = person_id_int
+        supplier_stats[person_id_int]['invoice_count'] += 1
+        supplier_stats[person_id_int]['total_purchases'] += net_amount
+        
+        # به‌روزرسانی آخرین تاریخ خرید
+        doc_date = doc.document_date
+        if doc_date:
+            current_last_date = supplier_stats[person_id_int]['last_purchase_date']
+            if current_last_date is None or doc_date > current_last_date:
+                supplier_stats[person_id_int]['last_purchase_date'] = doc_date
+    
+    # Debug: لاگ تعداد فاکتورهای بدون person_id و تعداد تامین‌کنندگان پیدا شده
+    if invoices_without_person > 0:
+        logger.debug(f"Top suppliers report: {invoices_without_person} invoices without person_id out of {len(purchases_documents)} total")
+    logger.debug(f"Top suppliers report: Found {len(person_ids_set)} unique suppliers")
+    
+    # دریافت اطلاعات شخص‌ها از پایگاه داده
+    persons_map = {}
+    if person_ids_set:
+        persons = db.query(Person).filter(
+            and_(
+                Person.business_id == business_id,
+                Person.id.in_(list(person_ids_set))
+            )
+        ).all()
+        
+        for person in persons:
+            # ساخت نام نمایشی
+            display_name = person.alias_name or ''
+            if person.company_name:
+                display_name = person.company_name
+            elif person.first_name or person.last_name:
+                parts = []
+                if person.first_name:
+                    parts.append(person.first_name)
+                if person.last_name:
+                    parts.append(person.last_name)
+                display_name = ' '.join(parts) if parts else person.alias_name or ''
+            
+            persons_map[person.id] = {
+                'id': person.id,
+                'code': person.code,
+                'alias_name': person.alias_name,
+                'first_name': person.first_name,
+                'last_name': person.last_name,
+                'company_name': person.company_name,
+                'display_name': display_name,
+            }
+    
+    # تبدیل به لیست و مرتب‌سازی بر اساس مبلغ خرید (ترتیب نزولی)
+    items = []
+    for person_id, stats in supplier_stats.items():
+        person_info = persons_map.get(person_id, {})
+        
+        items.append({
+            'person_id': person_id,
+            'person_code': person_info.get('code'),
+            'person_name': person_info.get('display_name', person_info.get('alias_name', '')),
+            'invoice_count': stats['invoice_count'],
+            'total_purchases': float(stats['total_purchases']),
+            'last_purchase_date': stats['last_purchase_date'].isoformat() if stats['last_purchase_date'] else None,
+        })
+    
+    # مرتب‌سازی بر اساس مبلغ خرید (ترتیب نزولی)
+    items.sort(key=lambda x: x['total_purchases'], reverse=True)
+    
+    # اعمال limit اگر مشخص شده باشد
+    if limit is not None and limit > 0:
+        items = items[:limit]
+    
+    # Pagination
+    total = len(items)
+    current_page = (skip // take) + 1
+    total_pages = (total + take - 1) // take if take > 0 else 1
+    paginated_items = items[skip:skip + take]
+    
+    # محاسبه خلاصه
+    total_suppliers = len(supplier_stats)
+    total_invoice_count = sum(item['invoice_count'] for item in items)
+    total_purchases_sum = sum(item['total_purchases'] for item in items)
+    
+    return {
+        'items': paginated_items,
+        'summary': {
+            'total_count': total,
+            'total_suppliers': total_suppliers,
+            'total_invoice_count': total_invoice_count,
+            'total_purchases': float(total_purchases_sum),
+        },
+        'pagination': {
+            'total': total,
+            'page': current_page,
+            'per_page': take,
+            'total_pages': total_pages,
+            'has_next': current_page < total_pages,
+            'has_prev': current_page > 1,
+        }
+    }
+
+
+def get_materials_consumption_report(
+    db: Session,
+    business_id: int,
+    fiscal_year_id: Optional[int] = None,
+    currency_id: Optional[int] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    product_id: Optional[int] = None,
+    warehouse_id: Optional[int] = None,
+    skip: int = 0,
+    take: int = 50,
+) -> Dict[str, Any]:
+    """
+    گزارش مصرف مواد از فاکتورهای تولید
+    
+    این گزارش خطوط فاکتورهای تولید (invoice_production) که movement: "out" دارند را نمایش می‌دهد.
+    این خطوط نشان‌دهنده مواد اولیه مصرف شده در فرآیند تولید هستند.
+    
+    Args:
+        db: نشست پایگاه داده
+        business_id: شناسه کسب‌وکار
+        fiscal_year_id: شناسه سال مالی (اختیاری)
+        currency_id: شناسه ارز (اختیاری)
+        date_from: از تاریخ (اختیاری، فرمت YYYY-MM-DD)
+        date_to: تا تاریخ (اختیاری، فرمت YYYY-MM-DD)
+        product_id: شناسه محصول (اختیاری)
+        warehouse_id: شناسه انبار (اختیاری)
+        skip: تعداد رکوردهای رد شده برای pagination
+        take: تعداد رکوردهای برگشتی
+    
+    Returns:
+        dict: {
+            'items': لیست خطوط مصرف مواد,
+            'summary': خلاصه آمار,
+            'pagination': اطلاعات pagination
+        }
+    """
+    # تبدیل تاریخ‌ها
+    date_from_obj = None
+    date_to_obj = None
+    
+    if date_from:
+        try:
+            date_from_obj = _parse_iso_date(date_from)
+        except Exception:
+            pass
+    
+    if date_to:
+        try:
+            date_to_obj = _parse_iso_date(date_to)
+        except Exception:
+            pass
+    
+    # اگر تاریخ‌ها مشخص نشده‌اند، از سال مالی استفاده کن
+    if date_from_obj is None or date_to_obj is None:
+        try:
+            if fiscal_year_id:
+                fiscal_year = db.query(FiscalYear).filter(FiscalYear.id == fiscal_year_id).first()
+            else:
+                fiscal_year = db.query(FiscalYear).filter(
+                    and_(
+                        FiscalYear.business_id == business_id,
+                        FiscalYear.is_last == True
+                    )
+                ).first()
+            
+            if fiscal_year:
+                if date_from_obj is None:
+                    date_from_obj = fiscal_year.start_date
+                if date_to_obj is None:
+                    date_to_obj = fiscal_year.end_date if fiscal_year.end_date else date.today()
+        except Exception:
+            pass
+    
+    # اگر هنوز تاریخ مشخص نشده، از یک بازه زمانی معقول استفاده کن
+    if date_to_obj is None:
+        date_to_obj = date.today()
+    if date_from_obj is None:
+        try:
+            current_year = date.today().year
+            date_from_obj = date(current_year, 1, 1)
+        except Exception:
+            date_from_obj = date.today()
+    
+    # Query فاکتورهای تولید
+    production_query = db.query(Document).filter(
+        and_(
+            Document.business_id == business_id,
+            Document.document_type == INVOICE_PRODUCTION,
+            Document.is_proforma == False,
+            Document.document_date >= date_from_obj,
+            Document.document_date <= date_to_obj,
+        )
+    )
+    
+    if currency_id:
+        production_query = production_query.filter(Document.currency_id == currency_id)
+    
+    if fiscal_year_id:
+        production_query = production_query.filter(Document.fiscal_year_id == fiscal_year_id)
+    
+    production_documents = production_query.order_by(Document.document_date.asc()).all()
+    
+    doc_ids = [doc.id for doc in production_documents]
+    
+    if not doc_ids:
+        return {
+            'items': [],
+            'summary': {
+                'total_count': 0,
+                'total_quantity': 0.0,
+                'total_amount': 0.0,
+            },
+            'pagination': {
+                'total': 0,
+                'page': 1,
+                'per_page': take,
+                'total_pages': 1,
+                'has_next': False,
+                'has_prev': False,
+            }
+        }
+    
+    # Query خطوط فاکتورها که movement: "out" دارند (مواد مصرف شده)
+    lines_query = db.query(
+        InvoiceItemLine,
+        Document,
+    ).join(
+        Document, Document.id == InvoiceItemLine.document_id
+    ).filter(
+        and_(
+            InvoiceItemLine.document_id.in_(doc_ids),
+            InvoiceItemLine.product_id.isnot(None),
+        )
+    )
+    
+    if product_id:
+        lines_query = lines_query.filter(InvoiceItemLine.product_id == product_id)
+    
+    lines_with_docs = lines_query.all()
+    
+    # فیلتر کردن خطوطی که movement: "out" دارند
+    items = []
+    product_ids_set = set()
+    warehouse_ids_set = set()
+    
+    for line, doc in lines_with_docs:
+        line_info = line.extra_info or {}
+        movement = line_info.get('movement')
+        
+        # فقط خطوطی که movement: "out" دارند (مواد مصرف شده)
+        if movement != 'out':
+            continue
+        
+        # فیلتر انبار
+        line_warehouse_id = line_info.get('warehouse_id')
+        if warehouse_id and line_warehouse_id != warehouse_id:
+            continue
+        
+        product_ids_set.add(line.product_id)
+        if line_warehouse_id:
+            warehouse_ids_set.add(line_warehouse_id)
+        
+        # محاسبه مبلغ
+        unit_price = Decimal(str(line_info.get('unit_price', 0) or 0))
+        quantity = Decimal(str(line.quantity or 0))
+        amount = unit_price * quantity
+        
+        items.append({
+            'document_id': doc.id,
+            'document_code': doc.code,
+            'document_date': doc.document_date.isoformat() if doc.document_date else None,
+            'product_id': line.product_id,
+            'warehouse_id': line_warehouse_id,
+            'quantity': float(quantity),
+            'unit_price': float(unit_price),
+            'amount': float(amount),
+            'description': line.description,
+        })
+    
+    # دریافت اطلاعات محصولات
+    products_map = {}
+    if product_ids_set:
+        products = db.query(Product).filter(
+            and_(
+                Product.business_id == business_id,
+                Product.id.in_(list(product_ids_set))
+            )
+        ).all()
+        
+        for product in products:
+            products_map[product.id] = {
+                'id': product.id,
+                'code': product.code,
+                'name': product.name,
+                'unit': product.unit,
+            }
+    
+    # دریافت اطلاعات انبارها
+    warehouses_map = {}
+    if warehouse_ids_set:
+        from adapters.db.models.warehouse import Warehouse
+        warehouses = db.query(Warehouse).filter(
+            and_(
+                Warehouse.business_id == business_id,
+                Warehouse.id.in_(list(warehouse_ids_set))
+            )
+        ).all()
+        
+        for warehouse in warehouses:
+            warehouses_map[warehouse.id] = {
+                'id': warehouse.id,
+                'code': warehouse.code,
+                'name': warehouse.name,
+            }
+    
+    # اضافه کردن اطلاعات محصول و انبار به آیتم‌ها
+    for item in items:
+        product_info = products_map.get(item['product_id'], {})
+        item['product_code'] = product_info.get('code')
+        item['product_name'] = product_info.get('name')
+        item['product_unit'] = product_info.get('unit')
+        
+        if item.get('warehouse_id'):
+            warehouse_info = warehouses_map.get(item['warehouse_id'], {})
+            item['warehouse_code'] = warehouse_info.get('code')
+            item['warehouse_name'] = warehouse_info.get('name')
+        else:
+            item['warehouse_code'] = None
+            item['warehouse_name'] = None
+    
+    # مرتب‌سازی بر اساس تاریخ سند
+    items.sort(key=lambda x: (x['document_date'] or '', x['document_code'] or ''))
+    
+    # Pagination
+    total = len(items)
+    current_page = (skip // take) + 1
+    total_pages = (total + take - 1) // take if take > 0 else 1
+    paginated_items = items[skip:skip + take]
+    
+    # محاسبه خلاصه
+    total_quantity_sum = sum(item['quantity'] for item in items)
+    total_amount_sum = sum(item['amount'] for item in items)
+    
+    return {
+        'items': paginated_items,
+        'summary': {
+            'total_count': total,
+            'total_quantity': float(total_quantity_sum),
+            'total_amount': float(total_amount_sum),
+        },
+        'pagination': {
+            'total': total,
+            'page': current_page,
+            'per_page': take,
+            'total_pages': total_pages,
+            'has_next': current_page < total_pages,
+            'has_prev': current_page > 1,
+        }
+    }
+
+
+def get_production_report(
+    db: Session,
+    business_id: int,
+    fiscal_year_id: Optional[int] = None,
+    currency_id: Optional[int] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    product_id: Optional[int] = None,
+    warehouse_id: Optional[int] = None,
+    skip: int = 0,
+    take: int = 50,
+) -> Dict[str, Any]:
+    """
+    گزارش تولید (کالاهای ساخته شده) از فاکتورهای تولید
+    
+    این گزارش خطوط فاکتورهای تولید (invoice_production) که movement: "in" دارند را نمایش می‌دهد.
+    این خطوط نشان‌دهنده کالاهای ساخته شده در فرآیند تولید هستند.
+    
+    Args:
+        db: نشست پایگاه داده
+        business_id: شناسه کسب‌وکار
+        fiscal_year_id: شناسه سال مالی (اختیاری)
+        currency_id: شناسه ارز (اختیاری)
+        date_from: از تاریخ (اختیاری، فرمت YYYY-MM-DD)
+        date_to: تا تاریخ (اختیاری، فرمت YYYY-MM-DD)
+        product_id: شناسه محصول (اختیاری)
+        warehouse_id: شناسه انبار (اختیاری)
+        skip: تعداد رکوردهای رد شده برای pagination
+        take: تعداد رکوردهای برگشتی
+    
+    Returns:
+        dict: {
+            'items': لیست خطوط تولید,
+            'summary': خلاصه آمار,
+            'pagination': اطلاعات pagination
+        }
+    """
+    # تبدیل تاریخ‌ها
+    date_from_obj = None
+    date_to_obj = None
+    
+    if date_from:
+        try:
+            date_from_obj = _parse_iso_date(date_from)
+        except Exception:
+            pass
+    
+    if date_to:
+        try:
+            date_to_obj = _parse_iso_date(date_to)
+        except Exception:
+            pass
+    
+    # اگر تاریخ‌ها مشخص نشده‌اند، از سال مالی استفاده کن
+    if date_from_obj is None or date_to_obj is None:
+        try:
+            if fiscal_year_id:
+                fiscal_year = db.query(FiscalYear).filter(FiscalYear.id == fiscal_year_id).first()
+            else:
+                fiscal_year = db.query(FiscalYear).filter(
+                    and_(
+                        FiscalYear.business_id == business_id,
+                        FiscalYear.is_last == True
+                    )
+                ).first()
+            
+            if fiscal_year:
+                if date_from_obj is None:
+                    date_from_obj = fiscal_year.start_date
+                if date_to_obj is None:
+                    date_to_obj = fiscal_year.end_date if fiscal_year.end_date else date.today()
+        except Exception:
+            pass
+    
+    # اگر هنوز تاریخ مشخص نشده، از یک بازه زمانی معقول استفاده کن
+    if date_to_obj is None:
+        date_to_obj = date.today()
+    if date_from_obj is None:
+        try:
+            current_year = date.today().year
+            date_from_obj = date(current_year, 1, 1)
+        except Exception:
+            date_from_obj = date.today()
+    
+    # Query فاکتورهای تولید
+    production_query = db.query(Document).filter(
+        and_(
+            Document.business_id == business_id,
+            Document.document_type == INVOICE_PRODUCTION,
+            Document.is_proforma == False,
+            Document.document_date >= date_from_obj,
+            Document.document_date <= date_to_obj,
+        )
+    )
+    
+    if currency_id:
+        production_query = production_query.filter(Document.currency_id == currency_id)
+    
+    if fiscal_year_id:
+        production_query = production_query.filter(Document.fiscal_year_id == fiscal_year_id)
+    
+    production_documents = production_query.order_by(Document.document_date.asc()).all()
+    
+    doc_ids = [doc.id for doc in production_documents]
+    
+    if not doc_ids:
+        return {
+            'items': [],
+            'summary': {
+                'total_count': 0,
+                'total_quantity': 0.0,
+                'total_amount': 0.0,
+            },
+            'pagination': {
+                'total': 0,
+                'page': 1,
+                'per_page': take,
+                'total_pages': 1,
+                'has_next': False,
+                'has_prev': False,
+            }
+        }
+    
+    # Query خطوط فاکتورها که movement: "in" دارند (کالاهای تولید شده)
+    lines_query = db.query(
+        InvoiceItemLine,
+        Document,
+    ).join(
+        Document, Document.id == InvoiceItemLine.document_id
+    ).filter(
+        and_(
+            InvoiceItemLine.document_id.in_(doc_ids),
+            InvoiceItemLine.product_id.isnot(None),
+        )
+    )
+    
+    if product_id:
+        lines_query = lines_query.filter(InvoiceItemLine.product_id == product_id)
+    
+    lines_with_docs = lines_query.all()
+    
+    # فیلتر کردن خطوطی که movement: "in" دارند
+    items = []
+    product_ids_set = set()
+    warehouse_ids_set = set()
+    
+    for line, doc in lines_with_docs:
+        line_info = line.extra_info or {}
+        movement = line_info.get('movement')
+        
+        # فقط خطوطی که movement: "in" دارند (کالاهای تولید شده)
+        if movement != 'in':
+            continue
+        
+        # فیلتر انبار
+        line_warehouse_id = line_info.get('warehouse_id')
+        if warehouse_id and line_warehouse_id != warehouse_id:
+            continue
+        
+        product_ids_set.add(line.product_id)
+        if line_warehouse_id:
+            warehouse_ids_set.add(line_warehouse_id)
+        
+        # محاسبه مبلغ
+        unit_price = Decimal(str(line_info.get('unit_price', 0) or 0))
+        quantity = Decimal(str(line.quantity or 0))
+        amount = unit_price * quantity
+        
+        items.append({
+            'document_id': doc.id,
+            'document_code': doc.code,
+            'document_date': doc.document_date.isoformat() if doc.document_date else None,
+            'product_id': line.product_id,
+            'warehouse_id': line_warehouse_id,
+            'quantity': float(quantity),
+            'unit_price': float(unit_price),
+            'amount': float(amount),
+            'description': line.description,
+        })
+    
+    # دریافت اطلاعات محصولات
+    products_map = {}
+    if product_ids_set:
+        products = db.query(Product).filter(
+            and_(
+                Product.business_id == business_id,
+                Product.id.in_(list(product_ids_set))
+            )
+        ).all()
+        
+        for product in products:
+            products_map[product.id] = {
+                'id': product.id,
+                'code': product.code,
+                'name': product.name,
+                'unit': product.unit,
+            }
+    
+    # دریافت اطلاعات انبارها
+    warehouses_map = {}
+    if warehouse_ids_set:
+        from adapters.db.models.warehouse import Warehouse
+        warehouses = db.query(Warehouse).filter(
+            and_(
+                Warehouse.business_id == business_id,
+                Warehouse.id.in_(list(warehouse_ids_set))
+            )
+        ).all()
+        
+        for warehouse in warehouses:
+            warehouses_map[warehouse.id] = {
+                'id': warehouse.id,
+                'code': warehouse.code,
+                'name': warehouse.name,
+            }
+    
+    # اضافه کردن اطلاعات محصول و انبار به آیتم‌ها
+    for item in items:
+        product_info = products_map.get(item['product_id'], {})
+        item['product_code'] = product_info.get('code')
+        item['product_name'] = product_info.get('name')
+        item['product_unit'] = product_info.get('unit')
+        
+        if item.get('warehouse_id'):
+            warehouse_info = warehouses_map.get(item['warehouse_id'], {})
+            item['warehouse_code'] = warehouse_info.get('code')
+            item['warehouse_name'] = warehouse_info.get('name')
+        else:
+            item['warehouse_code'] = None
+            item['warehouse_name'] = None
+    
+    # مرتب‌سازی بر اساس تاریخ سند
+    items.sort(key=lambda x: (x['document_date'] or '', x['document_code'] or ''))
+    
+    # Pagination
+    total = len(items)
+    current_page = (skip // take) + 1
+    total_pages = (total + take - 1) // take if take > 0 else 1
+    paginated_items = items[skip:skip + take]
+    
+    # محاسبه خلاصه
+    total_quantity_sum = sum(item['quantity'] for item in items)
+    total_amount_sum = sum(item['amount'] for item in items)
+    
+    return {
+        'items': paginated_items,
+        'summary': {
+            'total_count': total,
+            'total_quantity': float(total_quantity_sum),
+            'total_amount': float(total_amount_sum),
+        },
+        'pagination': {
+            'total': total,
+            'page': current_page,
+            'per_page': take,
+            'total_pages': total_pages,
+            'has_next': current_page < total_pages,
+            'has_prev': current_page > 1,
+        }
+    }
 

@@ -956,9 +956,10 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
                                 helperText: '${t.example}: ${t.phoneExample}',
                               ),
                               keyboardType: TextInputType.phone,
+                              inputFormatters: const [EnglishDigitsFormatter()],
                               onChanged: (value) {
                                 setState(() {
-                                  _businessData.phone = value;
+                                  _businessData.phone = toEnglishDigits(value);
                                 });
                               },
                             ),
@@ -988,9 +989,10 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
                                 helperText: '${t.example}: ${t.mobileExample}',
                               ),
                               keyboardType: TextInputType.phone,
+                              inputFormatters: const [EnglishDigitsFormatter()],
                               onChanged: (value) {
                                 setState(() {
-                                  _businessData.mobile = value;
+                                  _businessData.mobile = toEnglishDigits(value);
                                 });
                               },
                             ),
@@ -1023,9 +1025,10 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
                               helperText: '${t.example}: ${t.phoneExample}',
                             ),
                             keyboardType: TextInputType.phone,
+                            inputFormatters: const [EnglishDigitsFormatter()],
                             onChanged: (value) {
                               setState(() {
-                                _businessData.phone = value;
+                                _businessData.phone = toEnglishDigits(value);
                               });
                             },
                           ),
@@ -1053,9 +1056,10 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
                               helperText: '${t.example}: ${t.mobileExample}',
                             ),
                             keyboardType: TextInputType.phone,
+                            inputFormatters: const [EnglishDigitsFormatter()],
                             onChanged: (value) {
                               setState(() {
-                                _businessData.mobile = value;
+                                _businessData.mobile = toEnglishDigits(value);
                               });
                             },
                           ),

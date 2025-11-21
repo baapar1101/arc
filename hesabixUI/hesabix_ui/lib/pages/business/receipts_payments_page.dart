@@ -68,6 +68,7 @@ class _ReceiptsPaymentsPageState extends State<ReceiptsPaymentsPage> {
                           isReceipt: _tabIndex == 0,
                           businessInfo: widget.authStore.currentBusiness,
                           apiClient: widget.apiClient,
+                          authStore: widget.authStore,
                         ),
                       );
                       if (draft != null) {
@@ -110,6 +111,7 @@ class _ReceiptsPaymentsPageState extends State<ReceiptsPaymentsPage> {
                         isReceipt: d.isReceipt,
                         initial: d,
                         apiClient: widget.apiClient,
+                        authStore: widget.authStore,
                       ),
                     );
                     if (updated != null) {
@@ -200,6 +202,7 @@ class _BulkSettlementDialog extends StatefulWidget {
   final BusinessWithPermission? businessInfo;
   final _BulkSettlementDraft? initial;
   final ApiClient apiClient;
+  final AuthStore? authStore;
   const _BulkSettlementDialog({
     required this.businessId,
     required this.calendarController,
@@ -207,6 +210,7 @@ class _BulkSettlementDialog extends StatefulWidget {
     this.businessInfo,
     this.initial,
     required this.apiClient,
+    this.authStore,
   });
 
   @override
@@ -345,6 +349,7 @@ class _BulkSettlementDialogState extends State<_BulkSettlementDialog> {
                           calendarController: widget.calendarController,
                           invoiceType: InvoiceType.sales,
                           checkPickerMode: _isReceipt ? CheckPickerMode.receipt : CheckPickerMode.payment,
+                          authStore: widget.authStore,
                         ),
                       ),
                     ),

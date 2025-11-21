@@ -91,6 +91,8 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
   List<InvoiceTransaction> _transactions = [];
   // ردیف‌های فاکتور برای ساخت payload
   List<InvoiceLineItem> _lineItems = <InvoiceLineItem>[];
+  // لیست شناسه فرمول‌های تولید استفاده شده در این فاکتور
+  Set<int> _bomIds = <int>{};
   
   // فروش اقساطی (MVP)
   bool _useInstallments = false;
@@ -883,6 +885,10 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                           onTypeChanged: (type) {
                                   setState(() {
                                     _selectedInvoiceType = type;
+                                    // پاک کردن bom_ids در صورت تغییر نوع فاکتور
+                                    if (type != InvoiceType.production) {
+                                      _bomIds.clear();
+                                    }
                                     // پاک کردن انتخاب‌های قبلی هنگام تغییر نوع فاکتور
                                     if (type == InvoiceType.purchase || type == InvoiceType.purchaseReturn) {
                                       _selectedCustomer = null;
@@ -1176,6 +1182,10 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                                 onTypeChanged: (type) {
                                   setState(() {
                                     _selectedInvoiceType = type;
+                                    // پاک کردن bom_ids در صورت تغییر نوع فاکتور
+                                    if (type != InvoiceType.production) {
+                                      _bomIds.clear();
+                                    }
                                     // پاک کردن انتخاب‌های قبلی هنگام تغییر نوع فاکتور
                                     if (type == InvoiceType.purchase || type == InvoiceType.purchaseReturn) {
                                       _selectedCustomer = null;
@@ -1534,6 +1544,43 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
     if (_lineItems.isEmpty) {
       return 'حداقل یک ردیف کالا/خدمت وارد کنید';
     }
+    
+    // اعتبارسنجی ویژه برای فاکتور تولید
+    if (_selectedInvoiceType == InvoiceType.production) {
+      // بررسی اینکه حداقل یک فرمول منفجر شده باشد
+      if (_bomIds.isEmpty) {
+        return 'برای فاکتور تولید، باید حداقل یک فرمول تولید را منفجر کنید';
+      }
+      
+      // بررسی وجود movement در تمام ردیف‌ها
+      int hasOutCount = 0;
+      int hasInCount = 0;
+      for (int i = 0; i < _lineItems.length; i++) {
+        final r = _lineItems[i];
+        final movement = r.extraInfo?['movement']?.toString();
+        
+        if (movement == null || (movement != 'in' && movement != 'out')) {
+          return 'ردیف ${i + 1} باید movement مشخص داشته باشد (in یا out)';
+        }
+        
+        if (movement == 'out') {
+          hasOutCount++;
+        } else if (movement == 'in') {
+          hasInCount++;
+        }
+      }
+      
+      // بررسی وجود حداقل یک ردیف با movement: "out" (مواد اولیه)
+      if (hasOutCount == 0) {
+        return 'فاکتور تولید باید حداقل یک ردیف با movement: "out" داشته باشد (مواد اولیه)';
+      }
+      
+      // بررسی وجود حداقل یک ردیف با movement: "in" (محصول نهایی)
+      if (hasInCount == 0) {
+        return 'فاکتور تولید باید حداقل یک ردیف با movement: "in" داشته باشد (محصول نهایی)';
+      }
+    }
+    
     // اعتبارسنجی ردیف‌ها
     for (int i = 0; i < _lineItems.length; i++) {
       final r = _lineItems[i];
@@ -1557,9 +1604,11 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
         final isOut = _selectedInvoiceType == InvoiceType.sales ||
                       _selectedInvoiceType == InvoiceType.purchaseReturn ||
                       _selectedInvoiceType == InvoiceType.directConsumption ||
-                      _selectedInvoiceType == InvoiceType.waste;
+                      _selectedInvoiceType == InvoiceType.waste ||
+                      (_selectedInvoiceType == InvoiceType.production && (r.extraInfo?['movement']?.toString() == 'out'));
         final isIn = _selectedInvoiceType == InvoiceType.purchase ||
-                     _selectedInvoiceType == InvoiceType.salesReturn;
+                     _selectedInvoiceType == InvoiceType.salesReturn ||
+                     (_selectedInvoiceType == InvoiceType.production && (r.extraInfo?['movement']?.toString() == 'in'));
         if ((isOut || isIn) && r.warehouseId == null) {
           return 'انبار ردیف ${i + 1} الزامی است';
         }
@@ -1688,6 +1737,11 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
       extraInfo['installment_plan'] = plan;
     }
     
+    // افزودن bom_ids برای فاکتور تولید
+    if (_selectedInvoiceType == InvoiceType.production && _bomIds.isNotEmpty) {
+      extraInfo['bom_ids'] = _bomIds.toList();
+    }
+    
     // ساخت payload
     final payload = <String, dynamic>{
       'invoice_type': _convertInvoiceTypeToApi(_selectedInvoiceType!),
@@ -1708,41 +1762,60 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
   }
 
   Map<String, dynamic> _serializeLineItem(InvoiceLineItem e) {
-    // تعیین movement بر اساس نوع فاکتور
+    // تعیین movement بر اساس نوع فاکتور یا از extra_info
     String? movement;
-    if (_selectedInvoiceType == InvoiceType.sales || 
-        _selectedInvoiceType == InvoiceType.purchaseReturn ||
-        _selectedInvoiceType == InvoiceType.directConsumption ||
-        _selectedInvoiceType == InvoiceType.waste) {
-      movement = 'out';
-    } else if (_selectedInvoiceType == InvoiceType.purchase || 
-               _selectedInvoiceType == InvoiceType.salesReturn) {
-      movement = 'in';
+    
+    // اول از extra_info استفاده می‌کنیم (اگر از BOM آمده باشد)
+    if (e.extraInfo != null && e.extraInfo!['movement'] != null) {
+      movement = e.extraInfo!['movement'].toString();
+    } else {
+      // در غیر این صورت از نوع فاکتور تعیین می‌کنیم
+      if (_selectedInvoiceType == InvoiceType.sales || 
+          _selectedInvoiceType == InvoiceType.purchaseReturn ||
+          _selectedInvoiceType == InvoiceType.directConsumption ||
+          _selectedInvoiceType == InvoiceType.waste) {
+        movement = 'out';
+      } else if (_selectedInvoiceType == InvoiceType.purchase || 
+                 _selectedInvoiceType == InvoiceType.salesReturn) {
+        movement = 'in';
+      }
     }
-    // برای production، movement باید در UI تعیین شود (می‌تواند out یا in باشد)
+    // برای production، movement باید در extra_info تعیین شده باشد
     
     // محاسبه مقادیر
     final lineDiscount = e.discountAmount;
     final taxAmount = e.taxAmount;
     final lineTotal = e.total;
     
+    // ساختن extra_info با ترکیب اطلاعات موجود و extra_info از InvoiceLineItem
+    final extraInfo = <String, dynamic>{
+      'unit_price': e.unitPrice,
+      'line_discount': lineDiscount,
+      'tax_amount': taxAmount,
+      'line_total': lineTotal,
+      // اطلاعات اضافی برای ردیابی
+      'unit': e.selectedUnit ?? e.mainUnit,
+      'unit_price_source': e.unitPriceSource,
+      'discount_type': e.discountType,
+      'discount_value': e.discountValue,
+      'tax_rate': e.taxRate,
+    };
+    
+    // اضافه کردن movement اگر وجود دارد
+    if (movement != null) {
+      extraInfo['movement'] = movement;
+    }
+    
+    // اضافه کردن اطلاعات از extra_info InvoiceLineItem (مانند bom_id)
+    if (e.extraInfo != null) {
+      extraInfo.addAll(e.extraInfo!);
+    }
+    
     return <String, dynamic>{
       'product_id': e.productId,
       'quantity': e.quantity,
       if ((e.description ?? '').isNotEmpty) 'description': e.description,
-      'extra_info': {
-        'unit_price': e.unitPrice,
-        'line_discount': lineDiscount,
-        'tax_amount': taxAmount,
-        'line_total': lineTotal,
-        if (movement != null) 'movement': movement,
-        // اطلاعات اضافی برای ردیابی
-        'unit': e.selectedUnit ?? e.mainUnit,
-        'unit_price_source': e.unitPriceSource,
-        'discount_type': e.discountType,
-        'discount_value': e.discountValue,
-        'tax_rate': e.taxRate,
-      },
+      'extra_info': extraInfo,
     };
   }
 
@@ -1768,10 +1841,12 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
               if (_selectedInvoiceType == InvoiceType.production) ...[
                 BomExplosionWidget(
                   businessId: widget.businessId,
-                  onExploded: (newItems) {
+                  onExploded: (newItems, bomId) {
                     setState(() {
                       // افزودن ردیف‌های جدید به لیست موجود
                       _lineItems = [..._lineItems, ...newItems];
+                      // افزودن bom_id به لیست
+                      _bomIds.add(bomId);
                       // محاسبه مجدد جمع‌ها
                       _sumSubtotal = _lineItems.fold<num>(0, (acc, e) => acc + e.subtotal);
                       _sumDiscount = _lineItems.fold<num>(0, (acc, e) => acc + e.discountAmount);
@@ -1780,6 +1855,38 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                     });
                   },
                 ),
+                // نمایش هشدار در صورت عدم وجود انفجار فرمول
+                if (_bomIds.isEmpty && _lineItems.isEmpty)
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 16),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.errorContainer,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: Theme.of(context).colorScheme.error,
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.warning_amber_rounded,
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            'برای فاکتور تولید، باید حداقل یک فرمول تولید را منفجر کنید',
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.onErrorContainer,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 const SizedBox(height: 16),
               ],
               InvoiceLineItemsTable(
@@ -1832,6 +1939,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
             calendarController: widget.calendarController,
             invoiceType: _selectedInvoiceType ?? InvoiceType.sales,
             selectedCurrencyId: _selectedCurrencyId,
+            authStore: widget.authStore,
             onChanged: (transactions) {
               setState(() {
                 _transactions = transactions;

@@ -6,6 +6,9 @@ import '../../models/person_model.dart';
 import '../../services/person_service.dart';
 import '../../services/credit_api_service.dart';
 import '../../utils/number_normalizer.dart';
+import '../../services/business_dashboard_service.dart';
+import '../../models/business_dashboard_models.dart';
+import '../../core/api_client.dart';
 
 class PersonFormDialog extends StatefulWidget {
   final int businessId;
@@ -26,6 +29,7 @@ class PersonFormDialog extends StatefulWidget {
 class _PersonFormDialogState extends State<PersonFormDialog> {
   final _formKey = GlobalKey<FormState>();
   final _personService = PersonService();
+  final _businessDashboardService = BusinessDashboardService(ApiClient());
   bool _isLoading = false;
 
   // Code (unique) controls
@@ -76,11 +80,13 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
   // Credit override UI state
   final _creditLimitController = TextEditingController();
   String _creditCheckMode = 'inherit'; // inherit | enabled | disabled
+  String? _creditCurrencyLabel;
 
   @override
   void initState() {
     super.initState();
     _initializeForm();
+    _loadBusinessCurrencyLabel();
   }
 
   void _initializeForm() {
@@ -153,6 +159,33 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
         } catch (_) {}
       });
     }
+  }
+
+  Future<void> _loadBusinessCurrencyLabel() async {
+    try {
+      final business = await _businessDashboardService.getBusinessWithPermissions(widget.businessId);
+      if (!mounted) return;
+      final currency = business.defaultCurrency ?? (business.currencies.isNotEmpty ? business.currencies.first : null);
+      if (currency == null) return;
+      setState(() {
+        _creditCurrencyLabel = _formatCurrencyLabel(currency);
+      });
+    } catch (_) {
+      // Silent fail - fallback to localization default
+    }
+  }
+
+  String _formatCurrencyLabel(CurrencyLite currency) {
+    final symbol = currency.symbol.trim();
+    if (symbol.isNotEmpty) return symbol;
+    final title = currency.title.trim();
+    final code = currency.code.trim();
+    if (title.isNotEmpty && code.isNotEmpty) {
+      return '$title ($code)';
+    }
+    if (title.isNotEmpty) return title;
+    if (code.isNotEmpty) return code;
+    return '';
   }
 
   @override
@@ -661,28 +694,31 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
   }
 
   Widget _buildCreditOverrideSection() {
+    final t = AppLocalizations.of(context);
+    final currencyLabel = _creditCurrencyLabel?.isNotEmpty == true ? _creditCurrencyLabel! : t.currencyToman;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(AppLocalizations.of(context).creditPersonPolicyTitle, style: const TextStyle(fontWeight: FontWeight.bold)),
+        Text(t.creditPersonPolicyTitle, style: const TextStyle(fontWeight: FontWeight.bold)),
         const SizedBox(height: 8),
         DropdownButtonFormField<String>(
           initialValue: _creditCheckMode,
           items: [
-            DropdownMenuItem(value: 'inherit', child: Text(AppLocalizations.of(context).creditCheckModeInherit)),
-            DropdownMenuItem(value: 'enabled', child: Text(AppLocalizations.of(context).creditCheckModeEnabled)),
-            DropdownMenuItem(value: 'disabled', child: Text(AppLocalizations.of(context).creditCheckModeDisabled)),
+            DropdownMenuItem(value: 'inherit', child: Text(t.creditCheckModeInherit)),
+            DropdownMenuItem(value: 'enabled', child: Text(t.creditCheckModeEnabled)),
+            DropdownMenuItem(value: 'disabled', child: Text(t.creditCheckModeDisabled)),
           ],
           onChanged: (v) => setState(() => _creditCheckMode = v ?? 'inherit'),
-          decoration: InputDecoration(labelText: AppLocalizations.of(context).creditCheckModeLabel),
+          decoration: InputDecoration(labelText: t.creditCheckModeLabel),
         ),
         const SizedBox(height: 12),
         TextFormField(
           controller: _creditLimitController,
           decoration: InputDecoration(
-            labelText: AppLocalizations.of(context).creditLimitLabel,
-            hintText: AppLocalizations.of(context).creditLimitHint,
+            labelText: '${t.creditLimitLabel} ($currencyLabel)',
+            hintText: t.creditLimitHint,
             border: const OutlineInputBorder(),
+            suffixText: currencyLabel,
           ),
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
           inputFormatters: [
@@ -690,7 +726,7 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
           ],
         ),
         const SizedBox(height: 8),
-        Text(AppLocalizations.of(context).creditTipText),
+        Text(t.creditTipText),
       ],
     );
   }

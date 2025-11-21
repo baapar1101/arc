@@ -352,11 +352,11 @@ class AIService:
             response = await loop.run_in_executor(
                 _executor,
                 lambda: provider.chat_completion(
-                    messages=full_messages,
-                    model=self.config.model_name,
-                    max_tokens=max_tokens_override or self.config.max_tokens,
-                    temperature=float(self.config.temperature),
-                    tools=tools if tools else None
+                messages=full_messages,
+                model=self.config.model_name,
+                max_tokens=max_tokens_override or self.config.max_tokens,
+                temperature=float(self.config.temperature),
+                tools=tools if tools else None
                 )
             )
         except ApiError:
@@ -424,11 +424,11 @@ class AIService:
                 response = await loop.run_in_executor(
                     _executor,
                     lambda: provider.chat_completion(
-                        messages=full_messages,
-                        model=self.config.model_name,
-                        max_tokens=max_tokens_override or self.config.max_tokens,
-                        temperature=float(self.config.temperature),
-                        tools=None  # دیگر نیازی به tools نیست
+                    messages=full_messages,
+                    model=self.config.model_name,
+                    max_tokens=max_tokens_override or self.config.max_tokens,
+                    temperature=float(self.config.temperature),
+                    tools=None  # دیگر نیازی به tools نیست
                     )
                 )
             except ApiError:
@@ -590,11 +590,11 @@ class AIService:
                     response = await loop.run_in_executor(
                         _executor,
                         lambda: provider.chat_completion(
-                            messages=full_messages,
-                            model=self.config.model_name,
-                            max_tokens=max_tokens_override or self.config.max_tokens,
-                            temperature=float(self.config.temperature),
-                            tools=None  # دیگر نیازی به tools نیست
+                        messages=full_messages,
+                        model=self.config.model_name,
+                        max_tokens=max_tokens_override or self.config.max_tokens,
+                        temperature=float(self.config.temperature),
+                        tools=None  # دیگر نیازی به tools نیست
                         )
                     )
                     
@@ -678,7 +678,7 @@ class AIService:
                 results[function_name] = {"error": str(e)}
         
         return results
-    
+
     async def handle_function_calls_async(
         self,
         function_calls: List[Dict[str, Any]],

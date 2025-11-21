@@ -201,8 +201,8 @@ def _create_ai_invoice_document(
 ) -> int:
     """ایجاد سند حسابداری برای صورتحساب AI"""
     currency_id = _resolve_wallet_currency_id(db)
-    wallet_acc = _get_fixed_account_by_code(db, "10204")  # حساب کیف پول
-    ai_expense_acc = _get_fixed_account_by_code(db, "70903")  # هزینه AI
+    wallet_acc = _get_fixed_account_by_code(db, "10205")  # حساب کیف پول
+    ai_expense_acc = _get_fixed_account_by_code(db, "70508")  # هزینه هوش مصنوعی
     
     lines = [
         {
@@ -243,12 +243,12 @@ def _create_ai_usage_document(
 ) -> int:
     """
     ایجاد سند حسابداری برای هزینه استفاده از AI
-    Dr: هزینه AI (حساب هزینه - 70903)
-    Cr: کیف پول (حساب کیف پول - 10204)
+    Dr: هزینه هوش مصنوعی (حساب هزینه - 70508)
+    Cr: کیف پول (حساب کیف پول - 10205)
     """
     currency_id = _resolve_wallet_currency_id(db)
-    wallet_acc = _get_fixed_account_by_code(db, "10204")  # حساب کیف پول
-    ai_expense_acc = _get_fixed_account_by_code(db, "70903")  # هزینه AI
+    wallet_acc = _get_fixed_account_by_code(db, "10205")  # حساب کیف پول
+    ai_expense_acc = _get_fixed_account_by_code(db, "70508")  # هزینه هوش مصنوعی
     
     lines = [
         {

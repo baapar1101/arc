@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/core/auth_store.dart';
+import 'package:hesabix_ui/services/account_service.dart';
 
 class AccountNode {
 	final String id;
@@ -61,11 +63,26 @@ class _AccountsPageState extends State<AccountsPage> {
 	String? _error;
 	List<AccountNode> _roots = const [];
 	final Set<String> _expandedIds = <String>{};
+	
+	// Search state
+	final TextEditingController _searchController = TextEditingController();
+	Timer? _searchDebounce;
+	String? _searchQuery;
+	bool _isSearchMode = false;
+	List<AccountNode> _searchResults = const [];
+	bool _searchLoading = false;
 
 	@override
 	void initState() {
 		super.initState();
 		_fetch();
+	}
+	
+	@override
+	void dispose() {
+		_searchController.dispose();
+		_searchDebounce?.cancel();
+		super.dispose();
 	}
 
 	Future<void> _fetch() async {
@@ -83,6 +100,65 @@ class _AccountsPageState extends State<AccountsPage> {
 		} finally {
 			setState(() { _loading = false; });
 		}
+	}
+	
+	void _debounceSearch(String query) {
+		_searchDebounce?.cancel();
+		_searchDebounce = Timer(const Duration(milliseconds: 500), () {
+			if (query.trim().isEmpty) {
+				setState(() {
+					_searchQuery = null;
+					_isSearchMode = false;
+					_searchResults = const [];
+				});
+				_fetch();
+			} else {
+				_performSearch(query.trim());
+			}
+		});
+	}
+	
+	Future<void> _performSearch(String query) async {
+		setState(() {
+			_searchLoading = true;
+			_searchQuery = query;
+			_isSearchMode = true;
+			_error = null;
+		});
+		
+		try {
+			final service = AccountService();
+			final result = await service.searchAccounts(
+				businessId: widget.businessId,
+				searchQuery: query,
+				limit: 100,
+			);
+			
+			final items = (result['items'] as List?) ?? const [];
+			final parsed = items
+				.map((n) => AccountNode.fromJson(Map<String, dynamic>.from(n as Map)))
+				.toList();
+			
+			setState(() {
+				_searchResults = parsed;
+				_searchLoading = false;
+			});
+		} catch (e) {
+			setState(() {
+				_error = e.toString();
+				_searchLoading = false;
+			});
+		}
+	}
+	
+	void _clearSearch() {
+		_searchController.clear();
+		setState(() {
+			_searchQuery = null;
+			_isSearchMode = false;
+			_searchResults = const [];
+		});
+		_fetch();
 	}
 
 	List<Map<String, String>> _flattenNodes() {
@@ -370,7 +446,11 @@ class _AccountsPageState extends State<AccountsPage> {
 			},
 		);
 		if (result == true) {
-			await _fetch();
+			if (_isSearchMode && _searchQuery != null) {
+				await _performSearch(_searchQuery!);
+			} else {
+				await _fetch();
+			}
 		}
 	}
 
@@ -395,7 +475,11 @@ class _AccountsPageState extends State<AccountsPage> {
 			try {
 				final api = ApiClient();
 				await api.delete('/api/v1/accounts/account/$id');
-				await _fetch();
+				if (_isSearchMode && _searchQuery != null) {
+					await _performSearch(_searchQuery!);
+				} else {
+					await _fetch();
+				}
 			} catch (e) {
 				if (!ctx.mounted) return;
 				ScaffoldMessenger.of(ctx).showSnackBar(
@@ -462,106 +546,230 @@ class _AccountsPageState extends State<AccountsPage> {
 	@override
 	Widget build(BuildContext context) {
 		final t = AppLocalizations.of(context);
-		if (_loading) return const Center(child: CircularProgressIndicator());
-		if (_error != null) return Center(child: Text(_error!));
-		final visible = _buildVisibleNodes();
+		if (_loading && !_isSearchMode) return const Center(child: CircularProgressIndicator());
+		if (_error != null && !_isSearchMode) return Center(child: Text(_error!));
+		
 		return Scaffold(
-			appBar: AppBar(title: Text(t.chartOfAccounts)),
-			body: Column(
-				children: [
-					Container(
-						padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-						color: Theme.of(context).colorScheme.surfaceContainerHighest,
-										child: Row(
-							children: [
-								const SizedBox(width: 28), // expander space
-								Expanded(flex: 2, child: Text(t.code, style: const TextStyle(fontWeight: FontWeight.w600))),
-								Expanded(flex: 5, child: Text(t.title, style: const TextStyle(fontWeight: FontWeight.w600))),
-								Expanded(flex: 3, child: Text(t.type, style: const TextStyle(fontWeight: FontWeight.w600))),
-							],
-						),
-					),
-					Expanded(
-						child: RefreshIndicator(
-							onRefresh: _fetch,
-							child: ListView.builder(
-								itemCount: visible.length,
-								itemBuilder: (context, index) {
-									final item = visible[index];
-									final node = item.node;
-									final level = item.level;
-									final isExpanded = _expandedIds.contains(node.id);
-									final canExpand = node.hasChildren;
-									return InkWell(
-										onTap: canExpand ? () => _toggleExpand(node) : null,
-										child: Container(
-											padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-											child: Row(
-												children: [
-													SizedBox(width: 12.0 * level),
-													SizedBox(
-														width: 28,
-														child: canExpand
-															? IconButton(
-																padding: EdgeInsets.zero,
-																iconSize: 20,
-																visualDensity: VisualDensity.compact,
-												icon: Icon(isExpanded ? Icons.expand_more : Icons.chevron_right),
-																onPressed: () => _toggleExpand(node),
-															)
-														: const SizedBox.shrink(),
-													),
-										if (node.businessId == null) const SizedBox(width: 20, child: Icon(Icons.lock_outline, size: 16)),
-										Expanded(flex: 2, child: Text(node.code, style: const TextStyle(fontFeatures: []))),
-													Expanded(flex: 5, child: Text(node.name)),
-												Expanded(flex: 3, child: Text(_localizedAccountType(t, node.accountType))),
-												SizedBox(
-													width: 40,
-													child: PopupMenuButton<String>(
-														padding: EdgeInsets.zero,
-									onSelected: (v) {
-										if (v == 'add_child') _openCreateDialog(parent: node);
-										if (v == 'edit') _openEditDialog(node);
-										if (v == 'delete') _confirmDelete(node);
-									},
-								itemBuilder: (context) {
-									final bool isOwned = node.businessId != null && node.businessId == widget.businessId;
-									final bool canEdit = isOwned;
-									final bool canDelete = isOwned && !node.hasChildren;
-									final bool canAddChild = widget.authStore.canWriteSection('accounting') && ((node.businessId == null && node.hasChildren) || isOwned);
-									final List<PopupMenuEntry<String>> items = <PopupMenuEntry<String>>[];
-									if (canAddChild) {
-										items.add(const PopupMenuItem<String>(value: 'add_child', child: Text('افزودن ریز حساب')));
-									}
-									if (canEdit) {
-										items.add(const PopupMenuItem<String>(value: 'edit', child: Text('ویرایش')));
-									}
-									if (canDelete) {
-										items.add(const PopupMenuItem<String>(value: 'delete', child: Text('حذف')));
-									}
-									if (items.isEmpty) {
-										return [const PopupMenuItem<String>(value: 'noop', enabled: false, child: Text('غیرقابل ویرایش'))];
-									}
-									return items;
-								},
-													),
-												),
-												],
-											),
-										),
-									);
-								},
+			appBar: AppBar(
+				title: Text(t.chartOfAccounts),
+				bottom: PreferredSize(
+					preferredSize: const Size.fromHeight(60),
+					child: Padding(
+						padding: const EdgeInsets.all(8.0),
+						child: TextField(
+							controller: _searchController,
+							decoration: InputDecoration(
+								hintText: 'جستجو در کد و نام حساب...',
+								prefixIcon: const Icon(Icons.search),
+								suffixIcon: _searchQuery != null && _searchQuery!.isNotEmpty
+									? IconButton(
+										icon: const Icon(Icons.clear),
+										onPressed: _clearSearch,
+									)
+									: null,
+								border: OutlineInputBorder(
+									borderRadius: BorderRadius.circular(8),
+								),
+								filled: true,
+								fillColor: Theme.of(context).colorScheme.surface,
 							),
+							onChanged: _debounceSearch,
 						),
 					),
-				],
+				),
 			),
+			body: _isSearchMode ? _buildSearchResults(t) : _buildTreeView(t),
 			floatingActionButton: widget.authStore.canWriteSection('accounting')
 				? FloatingActionButton(
 					onPressed: _openCreateDialog,
 					child: const Icon(Icons.add),
 				)
 				: null,
+		);
+	}
+	
+	Widget _buildTreeView(AppLocalizations t) {
+		if (_loading) return const Center(child: CircularProgressIndicator());
+		if (_error != null) return Center(child: Text(_error!));
+		
+		final visible = _buildVisibleNodes();
+		return Column(
+			children: [
+				Container(
+					padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+					color: Theme.of(context).colorScheme.surfaceContainerHighest,
+					child: Row(
+						children: [
+							const SizedBox(width: 28), // expander space
+							Expanded(flex: 2, child: Text(t.code, style: const TextStyle(fontWeight: FontWeight.w600))),
+							Expanded(flex: 5, child: Text(t.title, style: const TextStyle(fontWeight: FontWeight.w600))),
+							Expanded(flex: 3, child: Text(t.type, style: const TextStyle(fontWeight: FontWeight.w600))),
+						],
+					),
+				),
+				Expanded(
+					child: RefreshIndicator(
+						onRefresh: _fetch,
+						child: ListView.builder(
+							itemCount: visible.length,
+							itemBuilder: (context, index) {
+								final item = visible[index];
+								final node = item.node;
+								final level = item.level;
+								final isExpanded = _expandedIds.contains(node.id);
+								final canExpand = node.hasChildren;
+								return InkWell(
+									onTap: canExpand ? () => _toggleExpand(node) : null,
+									child: Container(
+										padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+										child: Row(
+											children: [
+												SizedBox(width: 12.0 * level),
+												SizedBox(
+													width: 28,
+													child: canExpand
+														? IconButton(
+															padding: EdgeInsets.zero,
+															iconSize: 20,
+															visualDensity: VisualDensity.compact,
+															icon: Icon(isExpanded ? Icons.expand_more : Icons.chevron_right),
+															onPressed: () => _toggleExpand(node),
+														)
+														: const SizedBox.shrink(),
+												),
+												if (node.businessId == null) const SizedBox(width: 20, child: Icon(Icons.lock_outline, size: 16)),
+												Expanded(flex: 2, child: Text(node.code, style: const TextStyle(fontFeatures: []))),
+												Expanded(flex: 5, child: Text(node.name)),
+												Expanded(flex: 3, child: Text(_localizedAccountType(t, node.accountType))),
+												SizedBox(
+													width: 40,
+													child: PopupMenuButton<String>(
+														padding: EdgeInsets.zero,
+														onSelected: (v) {
+															if (v == 'add_child') _openCreateDialog(parent: node);
+															if (v == 'edit') _openEditDialog(node);
+															if (v == 'delete') _confirmDelete(node);
+														},
+														itemBuilder: (context) {
+															final bool isOwned = node.businessId != null && node.businessId == widget.businessId;
+															final bool canEdit = isOwned;
+															final bool canDelete = isOwned && !node.hasChildren;
+															final bool canAddChild = widget.authStore.canWriteSection('accounting') && ((node.businessId == null && node.hasChildren) || isOwned);
+															final List<PopupMenuEntry<String>> items = <PopupMenuEntry<String>>[];
+															if (canAddChild) {
+																items.add(const PopupMenuItem<String>(value: 'add_child', child: Text('افزودن ریز حساب')));
+															}
+															if (canEdit) {
+																items.add(const PopupMenuItem<String>(value: 'edit', child: Text('ویرایش')));
+															}
+															if (canDelete) {
+																items.add(const PopupMenuItem<String>(value: 'delete', child: Text('حذف')));
+															}
+															if (items.isEmpty) {
+																return [const PopupMenuItem<String>(value: 'noop', enabled: false, child: Text('غیرقابل ویرایش'))];
+															}
+															return items;
+														},
+													),
+												),
+											],
+										),
+									),
+								);
+							},
+						),
+					),
+				),
+			],
+		);
+	}
+	
+	Widget _buildSearchResults(AppLocalizations t) {
+		if (_searchLoading) {
+			return const Center(child: CircularProgressIndicator());
+		}
+		
+		if (_error != null) {
+			return Center(child: Text(_error!));
+		}
+		
+		if (_searchResults.isEmpty) {
+			return Center(
+				child: Column(
+					mainAxisAlignment: MainAxisAlignment.center,
+					children: [
+						Icon(Icons.search_off, size: 64, color: Colors.grey[400]),
+						const SizedBox(height: 16),
+						Text(
+							'نتیجه‌ای یافت نشد',
+							style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+						),
+					],
+				),
+			);
+		}
+		
+		return Column(
+			children: [
+				Container(
+					padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+					color: Theme.of(context).colorScheme.surfaceContainerHighest,
+					child: Row(
+						children: [
+							Expanded(flex: 2, child: Text(t.code, style: const TextStyle(fontWeight: FontWeight.w600))),
+							Expanded(flex: 5, child: Text(t.title, style: const TextStyle(fontWeight: FontWeight.w600))),
+							Expanded(flex: 3, child: Text(t.type, style: const TextStyle(fontWeight: FontWeight.w600))),
+						],
+					),
+				),
+				Expanded(
+					child: ListView.builder(
+						itemCount: _searchResults.length,
+						itemBuilder: (context, index) {
+							final node = _searchResults[index];
+							return InkWell(
+								child: Container(
+									padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+									child: Row(
+										children: [
+											if (node.businessId == null) const SizedBox(width: 20, child: Icon(Icons.lock_outline, size: 16)),
+											Expanded(flex: 2, child: Text(node.code, style: const TextStyle(fontFeatures: []))),
+											Expanded(flex: 5, child: Text(node.name)),
+											Expanded(flex: 3, child: Text(_localizedAccountType(t, node.accountType))),
+											SizedBox(
+												width: 40,
+												child: PopupMenuButton<String>(
+													padding: EdgeInsets.zero,
+													onSelected: (v) {
+														if (v == 'edit') _openEditDialog(node);
+														if (v == 'delete') _confirmDelete(node);
+													},
+													itemBuilder: (context) {
+														final bool isOwned = node.businessId != null && node.businessId == widget.businessId;
+														final bool canEdit = isOwned;
+														final bool canDelete = isOwned && !node.hasChildren;
+														final List<PopupMenuEntry<String>> items = <PopupMenuEntry<String>>[];
+														if (canEdit) {
+															items.add(const PopupMenuItem<String>(value: 'edit', child: Text('ویرایش')));
+														}
+														if (canDelete) {
+															items.add(const PopupMenuItem<String>(value: 'delete', child: Text('حذف')));
+														}
+														if (items.isEmpty) {
+															return [const PopupMenuItem<String>(value: 'noop', enabled: false, child: Text('غیرقابل ویرایش'))];
+														}
+														return items;
+													},
+												),
+											),
+										],
+									),
+								),
+							);
+						},
+					),
+				),
+			],
 		);
 	}
 }

@@ -7466,6 +7466,18 @@ abstract class AppLocalizations {
   /// **'Cumulative profit and loss'**
   String get reportsPnlCumulativeTitle;
 
+  /// No description provided for @reportsAccountsReviewTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Accounts review report'**
+  String get reportsAccountsReviewTitle;
+
+  /// No description provided for @reportsAccountsReviewSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Account tree structure with balances and transaction details'**
+  String get reportsAccountsReviewSubtitle;
+
   /// No description provided for @reportsPnlCumulativeSubtitle.
   ///
   /// In en, this message translates to:
@@ -7495,48 +7507,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Enable delivery channels, send test messages, and manage service credentials.'**
   String get notificationsSettingsSubtitle;
-
-  /// No description provided for @notificationsOverviewTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Ensure messages reach your team'**
-  String get notificationsOverviewTitle;
-
-  /// No description provided for @notificationsOverviewDescription.
-  ///
-  /// In en, this message translates to:
-  /// **'Decide which channels deliver operational alerts so administrators know how messages are sent.'**
-  String get notificationsOverviewDescription;
-
-  /// No description provided for @notificationsGuidanceItemChannels.
-  ///
-  /// In en, this message translates to:
-  /// **'Enable or disable channels based on availability and team requirements.'**
-  String get notificationsGuidanceItemChannels;
-
-  /// No description provided for @notificationsGuidanceItemTemplates.
-  ///
-  /// In en, this message translates to:
-  /// **'Publish an active template for each channel and language.'**
-  String get notificationsGuidanceItemTemplates;
-
-  /// No description provided for @notificationsGuidanceItemTesting.
-  ///
-  /// In en, this message translates to:
-  /// **'After changes, verify delivery paths with the test buttons.'**
-  String get notificationsGuidanceItemTesting;
-
-  /// No description provided for @notificationsLearnMore.
-  ///
-  /// In en, this message translates to:
-  /// **'Read the guide'**
-  String get notificationsLearnMore;
-
-  /// No description provided for @notificationsDocumentationUrl.
-  ///
-  /// In en, this message translates to:
-  /// **'https://docs.hesabix.com/notifications'**
-  String get notificationsDocumentationUrl;
 
   /// No description provided for @notificationsChannelsSectionTitle.
   ///
@@ -8669,7 +8639,7 @@ abstract class AppLocalizations {
   /// No description provided for @creditLimitLabel.
   ///
   /// In en, this message translates to:
-  /// **'Custom credit limit (toman)'**
+  /// **'Custom credit limit'**
   String get creditLimitLabel;
 
   /// No description provided for @creditLimitHint.

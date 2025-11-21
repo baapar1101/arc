@@ -250,8 +250,6 @@ class _UserNotificationsPageState extends State<UserNotificationsPage> {
         children: [
           _buildHeader(t, theme, colorScheme),
           const SizedBox(height: 16),
-          _buildOverviewCard(t, theme, colorScheme),
-          const SizedBox(height: 16),
           _buildChannelsCard(t, theme, colorScheme, channelOptions),
           const SizedBox(height: 24),
         ],
@@ -288,56 +286,6 @@ class _UserNotificationsPageState extends State<UserNotificationsPage> {
           label: Text(t.save),
         ),
       ],
-    );
-  }
-
-  Widget _buildOverviewCard(AppLocalizations t, ThemeData theme, ColorScheme colorScheme) {
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: colorScheme.outline.withValues(alpha: 0.2)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: colorScheme.primary.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(Icons.notifications_outlined, color: colorScheme.primary),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(t.notificationsOverviewTitle, style: theme.textTheme.titleMedium),
-                      const SizedBox(height: 4),
-                      Text(
-                        t.notificationsOverviewDescription,
-                        style: theme.textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'با اتصال به ربات تلگرام، می‌توانید ناتیفیکیشن‌های مهم مانند چک‌های با سررسید امروز، فاکتورهای جدید و سایر رویدادهای مهم را از طریق تلگرام دریافت کنید.',
-              style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
-            ),
-          ],
-        ),
-      ),
     );
   }
 

@@ -613,6 +613,27 @@ def post_warehouse_document(db: Session, wh_id: int) -> Dict[str, Any]:
 
 def warehouse_document_to_dict(db: Session, wh: WarehouseDocument) -> Dict[str, Any]:
 	lines = db.query(WarehouseDocumentLine).filter(WarehouseDocumentLine.warehouse_document_id == wh.id).all()
+	doc_type_movement_map = {
+		"receipt": "in",
+		"production_in": "in",
+		"issue": "out",
+		"production_out": "out",
+		"transfer": "out",
+	}
+	movement_filter = doc_type_movement_map.get(wh.doc_type)
+	total_quantity = Decimal(0)
+	for ln in lines:
+		if movement_filter and (ln.movement or "").lower() != movement_filter:
+			continue
+		try:
+			qty = Decimal(str(ln.quantity or 0))
+		except Exception:
+			qty = Decimal(0)
+		if qty <= 0:
+			continue
+		total_quantity += qty
+	if total_quantity < 0:
+		total_quantity = Decimal(0)
 	return {
 		"id": wh.id,
 		"code": wh.code,
@@ -626,6 +647,7 @@ def warehouse_document_to_dict(db: Session, wh: WarehouseDocument) -> Dict[str, 
 		"source_type": wh.source_type,
 		"source_document_id": wh.source_document_id,
 		"extra_info": wh.extra_info,
+		"total_quantity": float(total_quantity),
 		"lines": [
 			{
 				"id": ln.id,

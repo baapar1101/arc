@@ -10,7 +10,7 @@ import '../../utils/number_normalizer.dart';
 /// ویجت انفجار فرمول تولید برای فاکتور تولید
 class BomExplosionWidget extends StatefulWidget {
   final int businessId;
-  final Function(List<InvoiceLineItem>) onExploded;
+  final Function(List<InvoiceLineItem>, int bomId) onExploded;
 
   const BomExplosionWidget({
     super.key,
@@ -103,12 +103,17 @@ class _BomExplosionWidgetState extends State<BomExplosionWidget> {
 
     try {
       final bomId = _selectedBom?.id;
-      final productId = _selectedProduct!['id'] as int;
+      if (bomId == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('لطفاً یک فرمول تولید را انتخاب کنید')),
+        );
+        return;
+      }
 
       // انفجار فرمول
       final explosionResult = await _bomService.explode(
         businessId: widget.businessId,
-        productId: bomId == null ? productId : null,
+        productId: null, // از bom_id استفاده می‌کنیم
         bomId: bomId,
         quantity: quantity,
       );
@@ -159,6 +164,10 @@ class _BomExplosionWidgetState extends State<BomExplosionWidget> {
               taxRate: _toNum(productData['sales_tax_rate'], fallback: 0),
               trackInventory: productData['track_inventory'] == true,
               warehouseId: item.suggestedWarehouseId,
+              extraInfo: {
+                'movement': 'out',
+                'bom_id': bomId,
+              },
             ),
           );
         } catch (e) {
@@ -173,6 +182,10 @@ class _BomExplosionWidgetState extends State<BomExplosionWidget> {
               unitPriceSource: 'base',
               unitPrice: 0,
               warehouseId: item.suggestedWarehouseId,
+              extraInfo: {
+                'movement': 'out',
+                'bom_id': bomId,
+              },
             ),
           );
         }
@@ -219,6 +232,10 @@ class _BomExplosionWidgetState extends State<BomExplosionWidget> {
               basePurchasePriceMainUnit: _toNum(productData['base_purchase_price']),
               taxRate: _toNum(productData['sales_tax_rate'], fallback: 0),
               trackInventory: productData['track_inventory'] == true,
+              extraInfo: {
+                'movement': 'in',
+                'bom_id': bomId,
+              },
             ),
           );
         } catch (e) {
@@ -232,6 +249,10 @@ class _BomExplosionWidgetState extends State<BomExplosionWidget> {
               description: 'خروجی تولید',
               unitPriceSource: 'base',
               unitPrice: 0,
+              extraInfo: {
+                'movement': 'in',
+                'bom_id': bomId,
+              },
             ),
           );
         }
@@ -239,8 +260,8 @@ class _BomExplosionWidgetState extends State<BomExplosionWidget> {
 
       if (!mounted) return;
 
-      // افزودن ردیف‌ها به فاکتور
-      widget.onExploded(lineItems);
+      // افزودن ردیف‌ها به فاکتور (bomId همیشه وجود دارد چون در ابتدای تابع بررسی شده)
+      widget.onExploded(lineItems, bomId);
 
       // نمایش پیام موفقیت
       ScaffoldMessenger.of(context).showSnackBar(

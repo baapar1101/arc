@@ -217,6 +217,13 @@ async def send_message(
     # ارسال به AI به صورت async
     ai_service = AIService(db, ctx, session.business_id)
     response = await ai_service.chat_completion(messages, use_function_calling=True, session_business_id=session.business_id)
+    response_content_preview = (response.get("message", {}).get("content") or "")[:500]
+    logger.info(
+        "[AI Response][session=%s][stream=%s] preview=%s",
+        session_id,
+        False,
+        response_content_preview
+    )
     
     # بررسی سهمیه و شارژ
     usage = response.get("usage", {})
@@ -299,6 +306,11 @@ async def _stream_message_response(
             
             if content_chunk:
                 accumulated_content += content_chunk
+                logger.info(
+                    "[AI Stream][session=%s] chunk=%s",
+                    session_id,
+                    content_chunk[:200]
+                )
             
             # ذخیره usage از chunk آخر
             if chunk.get("usage"):
@@ -312,6 +324,13 @@ async def _stream_message_response(
                 # در chunk نهایی، accumulated_content باید کامل باشد
                 # اما برای اطمینان، از content_chunk هم استفاده نمی‌کنیم چون خالی است
                 break
+        
+        logger.info(
+            "[AI Stream][session=%s] final_response_length=%s preview=%s",
+            session_id,
+            len(accumulated_content),
+            (accumulated_content or "")[:500]
+        )
         
         # بعد از تمام شدن streaming:
         # 1. ذخیره پیام در دیتابیس

@@ -155,7 +155,7 @@ class AIFunctionRegistry:
             required_permissions=["invoices.read"],
             category="invoices"
         ))
-        
+    
         # اضافه کردن get_invoice_details
         def get_invoice_details_wrapper(db, business_id, user_id, invoice_id, **kwargs):
             """Wrapper برای دریافت جزئیات فاکتور"""

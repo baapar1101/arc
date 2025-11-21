@@ -3791,6 +3791,13 @@ class AppLocalizationsFa extends AppLocalizations {
   String get reportsPnlCumulativeTitle => 'سود و زیان تجمیعی';
 
   @override
+  String get reportsAccountsReviewTitle => 'گزارش مرور حساب‌ها';
+
+  @override
+  String get reportsAccountsReviewSubtitle =>
+      'ساختار درختی حساب‌ها با مانده‌ها و جزئیات تراکنش‌ها';
+
+  @override
   String get reportsPnlCumulativeSubtitle => 'مقایسه دوره‌ای و تجمیعی';
 
   @override
@@ -3806,32 +3813,6 @@ class AppLocalizationsFa extends AppLocalizations {
   @override
   String get notificationsSettingsSubtitle =>
       'کانال‌های ارسال را فعال کنید، پیام تست بفرستید و اطلاعات اتصال سرویس‌ها را مدیریت کنید.';
-
-  @override
-  String get notificationsOverviewTitle => 'اطمینان از رسیدن پیام‌ها به تیم';
-
-  @override
-  String get notificationsOverviewDescription =>
-      'مشخص کنید هشدارهای عملیاتی از چه مسیرهایی ارسال شوند و مدیر سیستم بداند سازوکار ارسال چیست.';
-
-  @override
-  String get notificationsGuidanceItemChannels =>
-      'کانال‌ها را بر اساس دسترس‌پذیری و الزامات هر واحد فعال یا غیرفعال کنید.';
-
-  @override
-  String get notificationsGuidanceItemTemplates =>
-      'برای هر کانال و هر زبان، قالب فعال منتشر شده داشته باشید.';
-
-  @override
-  String get notificationsGuidanceItemTesting =>
-      'بعد از تغییرات، با دکمه‌های تست مسیر ارسال را بررسی کنید.';
-
-  @override
-  String get notificationsLearnMore => 'مطالعهٔ راهنما';
-
-  @override
-  String get notificationsDocumentationUrl =>
-      'https://docs.hesabix.com/notifications';
 
   @override
   String get notificationsChannelsSectionTitle => 'کانال‌های ارسال';
@@ -4452,7 +4433,7 @@ class AppLocalizationsFa extends AppLocalizations {
   String get creditCheckModeDisabled => 'بررسی اعتبار غیرفعال';
 
   @override
-  String get creditLimitLabel => 'سقف اعتبار اختصاصی (تومان)';
+  String get creditLimitLabel => 'سقف اعتبار اختصاصی';
 
   @override
   String get creditLimitHint => 'خالی: استفاده از سقف پیش‌فرض کسب‌وکار';

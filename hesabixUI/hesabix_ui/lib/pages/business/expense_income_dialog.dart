@@ -115,6 +115,7 @@ class _ExpenseIncomeDialogState extends State<ExpenseIncomeDialog> {
                           businessId: widget.businessId,
                           calendarController: widget.calendarController,
                           invoiceType: _docType == 'income' ? InvoiceType.sales : InvoiceType.purchase,
+                          authStore: widget.authStore,
                         ),
                       ),
                     ),

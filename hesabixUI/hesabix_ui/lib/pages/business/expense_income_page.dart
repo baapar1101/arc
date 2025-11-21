@@ -141,6 +141,7 @@ class _ExpenseIncomePageState extends State<ExpenseIncomePage> {
                         calendarController: widget.calendarController,
                         invoiceType: _docType == 'income' ? InvoiceType.sales : InvoiceType.purchase,
                         selectedCurrencyId: _currencyId,
+                        authStore: widget.authStore,
                       ),
                     ),
                   ),

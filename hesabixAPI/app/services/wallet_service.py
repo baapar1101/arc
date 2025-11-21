@@ -674,13 +674,13 @@ def _create_simple_document(
 
 def _post_topup_document(db: Session, business_id: int, user_id: int, amount: Decimal, fee_amount: Decimal | None = None, doc_date: date | None = None) -> int:
 	currency_id = _resolve_wallet_currency_id(db)
-	wallet_acc = _get_fixed_account_by_code(db, "10204")
+	wallet_acc = _get_fixed_account_by_code(db, "10205")  # حساب کیف پول
 	bank_acc = _get_fixed_account_by_code(db, "10203")
 	fee_amt = Decimal(str(fee_amount or 0))
 	net = amount - fee_amt if amount >= fee_amt else Decimal("0")
 	lines = [
 		# Receipt pattern with commission (per existing commission logic):
-		# Dr 10204 (wallet) = net, Dr 70902 (fee expense) = fee, Cr 10203 (bank) = gross
+		# Dr 10205 (wallet) = net, Dr 70902 (fee expense) = fee, Cr 10203 (bank) = gross
 		{"account_id": wallet_acc.id, "debit": net, "credit": 0, "description": "افزایش اعتبار (خالص)"},
 	]
 	if fee_amt > 0:
@@ -702,7 +702,7 @@ def _post_topup_document(db: Session, business_id: int, user_id: int, amount: De
 
 def _post_payout_document(db: Session, business_id: int, user_id: int, net_amount: Decimal, fee_amount: Decimal | None = None, doc_date: date | None = None) -> int:
 	currency_id = _resolve_wallet_currency_id(db)
-	wallet_acc = _get_fixed_account_by_code(db, "10204")
+	wallet_acc = _get_fixed_account_by_code(db, "10205")  # حساب کیف پول
 	bank_acc = _get_fixed_account_by_code(db, "10203")
 	fee_amt = Decimal(str(fee_amount or 0))
 	# Per existing commission logic for Payment: Dr bank = fee, Cr 70902 = fee
@@ -730,11 +730,11 @@ def _post_payout_document(db: Session, business_id: int, user_id: int, net_amoun
 def _post_gift_credit_document(db: Session, business_id: int, user_id: int, amount: Decimal, description: str | None = None, doc_date: date | None = None) -> int:
 	"""
 	ایجاد سند حسابداری برای اعتبارات هدیه
-	Dr 10204 (wallet) = amount
+	Dr 10205 (wallet) = amount
 	Cr 60205 (gift credit income) = amount
 	"""
 	currency_id = _resolve_wallet_currency_id(db)
-	wallet_acc = _get_fixed_account_by_code(db, "10204")
+	wallet_acc = _get_fixed_account_by_code(db, "10205")  # حساب کیف پول
 	gift_income_acc = _get_fixed_account_by_code(db, "60205")
 	
 	lines = [

@@ -60,13 +60,16 @@ class AccountService {
     required int businessId,
     String? searchQuery,
     int limit = 50,
+    int skip = 0,
+    String? sortBy,
+    bool sortDesc = false,
   }) async {
     try {
       final requestData = <String, dynamic>{
         'take': limit,
-        'skip': 0,
-        'sort_by': 'name',
-        'sort_desc': false,
+        'skip': skip,
+        'sort_by': sortBy ?? 'code',
+        'sort_desc': sortDesc,
       };
 
       if (searchQuery != null && searchQuery.isNotEmpty) {
@@ -79,10 +82,14 @@ class AccountService {
       );
       
       final responseData = res.data?['data'] as Map<String, dynamic>?;
-      return responseData ?? <String, dynamic>{'items': <dynamic>[]};
+      return responseData ?? <String, dynamic>{
+        'items': <dynamic>[],
+        'total': 0,
+        'skip': skip,
+        'take': limit,
+      };
     } catch (e) {
-      // Error handled silently, returning empty result
-      return <String, dynamic>{'items': <dynamic>[]};
+      rethrow;
     }
   }
 }

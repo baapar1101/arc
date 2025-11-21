@@ -45,6 +45,8 @@ class _AIChatDialogState extends State<AIChatDialog> {
   List<AIChatSession> _sessions = [];
   AIChatSession? _currentSession;
   List<AIChatMessage> _messages = [];
+  String? _streamingContent;
+  DateTime? _streamingTimestamp;
   final TextEditingController _messageCtrl = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   bool _sessionsLoading = true;
@@ -166,72 +168,77 @@ class _AIChatDialogState extends State<AIChatDialog> {
     );
 
     setState(() {
-      _messages.add(userMessage);
+      _messages = List<AIChatMessage>.from(_messages)..add(userMessage);
       _sending = true;
-    });
-    _scrollToBottom();
-
-    // ایجاد پیام assistant با محتوای خالی برای streaming
-    final assistantMessageIndex = _messages.length;
-    final assistantMessage = AIChatMessage(
-      sessionId: _currentSession!.id!,
-      role: MessageRole.assistant,
-      content: '', // به تدریج پر می‌شود
-      createdAt: DateTime.now(),
-    );
-
-    setState(() {
-      _messages.add(assistantMessage);
     });
     _scrollToBottom();
 
     try {
       String accumulatedContent = '';
+      Map<String, dynamic>? finalUsage;
+      setState(() {
+        _streamingContent = '';
+        _streamingTimestamp = DateTime.now();
+      });
       
       await for (final chunk in _aiService.sendMessageStream(
         sessionId: _currentSession!.id!,
         content: content,
         onComplete: (usage, messageId) {
-          // به‌روزرسانی usage stats و message ID
-          setState(() {
-            _messages[assistantMessageIndex] = AIChatMessage(
-              sessionId: _currentSession!.id!,
-              role: MessageRole.assistant,
-              content: accumulatedContent,
-              tokensUsed: usage?['total_tokens'] as int? ?? 0,
-              createdAt: _messages[assistantMessageIndex].createdAt,
-            );
-            _sending = false;
-          });
-          _scrollToBottom();
+          finalUsage = usage;
         },
         onError: (error) {
           setState(() {
             _sending = false;
-            _messages.removeAt(assistantMessageIndex);
+            _streamingContent = null;
           });
           _showError('ارسال پیام ناموفق بود: $error');
         },
       )) {
+        final receivedAt = DateTime.now();
+        debugPrint(
+          '[AIChatDialog] Chunk received @${receivedAt.toIso8601String()} '
+          'len=${chunk.length} content="$chunk"',
+        );
         accumulatedContent += chunk;
         
         // به‌روزرسانی UI به صورت real-time
         setState(() {
-          _messages[assistantMessageIndex] = AIChatMessage(
-            sessionId: _currentSession!.id!,
-            role: MessageRole.assistant,
-            content: accumulatedContent,
-            createdAt: _messages[assistantMessageIndex].createdAt,
+          debugPrint(
+            '[AIChatDialog] UI setState for chunk @${DateTime.now().toIso8601String()} '
+            'accumulatedLen=${accumulatedContent.length}',
           );
+          _streamingContent = accumulatedContent;
         });
         _scrollToBottom();
+        await Future<void>.delayed(Duration.zero);
       }
-    } catch (e) {
+
+      setState(() {
+        if (accumulatedContent.isNotEmpty) {
+          _messages = List<AIChatMessage>.from(_messages)
+            ..add(
+              AIChatMessage(
+                sessionId: _currentSession!.id!,
+                role: MessageRole.assistant,
+                content: accumulatedContent,
+                tokensUsed: finalUsage?['total_tokens'] as int? ?? 0,
+                createdAt: _streamingTimestamp,
+              ),
+            );
+        }
+        _streamingContent = null;
+        _streamingTimestamp = null;
+        _sending = false;
+      });
+      _scrollToBottom();
+    } catch (e, stack) {
+      debugPrint('[AIChatDialog] Streaming error: $e');
+      debugPrintStack(stackTrace: stack);
       setState(() {
         _sending = false;
-        if (_messages.length > assistantMessageIndex) {
-          _messages.removeAt(assistantMessageIndex);
-        }
+        _streamingContent = null;
+        _streamingTimestamp = null;
       });
       _showError('ارسال پیام ناموفق بود: $e');
     }
@@ -347,56 +354,60 @@ class _AIChatDialogState extends State<AIChatDialog> {
                                 ),
                               ),
                               Expanded(
-                                child: _messages.isEmpty
-                                    ? const Center(
-                                        child: Text('پیامی وجود ندارد. گفت‌وگو را آغاز کنید.'),
-                                      )
-                                    : ListView.builder(
-                                        controller: _scrollController,
-                                        padding: const EdgeInsets.all(16),
-                                        itemCount: _messages.length,
-                                        itemBuilder: (context, index) {
-                                          final msg = _messages[index];
-                                          final bool isUser =
-                                              msg.role == MessageRole.user;
-                                          return Align(
-                                            alignment: isUser
-                                                ? AlignmentDirectional.centerEnd
-                                                : AlignmentDirectional.centerStart,
-                                            child: Container(
-                                              margin: const EdgeInsets.symmetric(
-                                                vertical: 6,
-                                              ),
-                                              padding: const EdgeInsets.all(12),
-                                              constraints: BoxConstraints(
-                                                maxWidth: dialogWidth * 0.55,
-                                              ),
-                                              decoration: BoxDecoration(
-                                                color: isUser
-                                                    ? theme.colorScheme.primary
-                                                        .withOpacity(0.1)
-                                                    : theme.colorScheme.surfaceVariant,
-                                                borderRadius: BorderRadius.circular(16),
-                                              ),
-                                              child: Column(
-                                                crossAxisAlignment:
-                                                    CrossAxisAlignment.start,
-                                                children: [
-                                                  Text(
-                                                    isUser ? 'شما' : 'AI',
-                                                    style: theme.textTheme.labelSmall
-                                                        ?.copyWith(
-                                                      fontWeight: FontWeight.bold,
+                                child: Column(
+                                  children: [
+                                    Expanded(
+                                      child: _messages.isEmpty
+                                          ? const Center(
+                                              child: Text('پیامی وجود ندارد. گفت‌وگو را آغاز کنید.'),
+                                            )
+                                          : ListView.builder(
+                                              controller: _scrollController,
+                                              padding: const EdgeInsets.all(16),
+                                              itemCount: _messages.length,
+                                              itemBuilder: (context, index) {
+                                                final msg = _messages[index];
+                                                final bool isUser = msg.role == MessageRole.user;
+                                                return Align(
+                                                  alignment: isUser
+                                                      ? AlignmentDirectional.centerEnd
+                                                      : AlignmentDirectional.centerStart,
+                                                  child: Container(
+                                                    margin: const EdgeInsets.symmetric(
+                                                      vertical: 6,
+                                                    ),
+                                                    padding: const EdgeInsets.all(12),
+                                                    constraints: BoxConstraints(
+                                                      maxWidth: dialogWidth * 0.55,
+                                                    ),
+                                                    decoration: BoxDecoration(
+                                                      color: isUser
+                                                          ? theme.colorScheme.primary.withOpacity(0.1)
+                                                          : theme.colorScheme.surfaceVariant,
+                                                      borderRadius: BorderRadius.circular(16),
+                                                    ),
+                                                    child: Column(
+                                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                                      children: [
+                                                        Text(
+                                                          isUser ? 'شما' : 'AI',
+                                                          style: theme.textTheme.labelSmall?.copyWith(
+                                                            fontWeight: FontWeight.bold,
+                                                          ),
+                                                        ),
+                                                        const SizedBox(height: 4),
+                                                        Text(msg.content),
+                                                      ],
                                                     ),
                                                   ),
-                                                  const SizedBox(height: 4),
-                                                  Text(msg.content),
-                                                ],
-                                              ),
+                                                );
+                                              },
                                             ),
-                                          );
-                                        },
-                                      ),
+                                    ),
+                                    if (_streamingContent != null)
+                                      _buildStreamingPreview(theme, dialogWidth),
+                                  ],
+                                ),
                               ),
                               Container(
                                 padding: const EdgeInsets.all(16),
@@ -446,6 +457,49 @@ class _AIChatDialogState extends State<AIChatDialog> {
                 ],
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStreamingPreview(ThemeData theme, double dialogWidth) {
+    final content = _streamingContent ?? '';
+    return Align(
+      alignment: AlignmentDirectional.centerStart,
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+        padding: const EdgeInsets.all(12),
+        constraints: BoxConstraints(
+          maxWidth: dialogWidth * 0.55,
+        ),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceVariant,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: theme.colorScheme.primary.withOpacity(0.3)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Text(
+                  'AI (در حال نوشتن...)',
+                  style: theme.textTheme.labelSmall?.copyWith(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(width: 8),
+                SizedBox(
+                  width: 12,
+                  height: 12,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: theme.colorScheme.primary,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(content),
           ],
         ),
       ),

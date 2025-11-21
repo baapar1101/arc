@@ -632,6 +632,7 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
             calendarController: widget.calendarController,
             invoiceType: _selectedInvoiceType ?? InvoiceType.sales,
             selectedCurrencyId: _selectedCurrencyId,
+            authStore: widget.authStore,
           ),
         ),
       ),

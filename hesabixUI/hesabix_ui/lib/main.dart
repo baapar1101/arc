@@ -57,6 +57,15 @@ import 'pages/business/cash_petty_turnover_report_page.dart';
 import 'pages/business/daily_sales_report_page.dart';
 import 'pages/business/monthly_sales_report_page.dart';
 import 'pages/business/top_customers_report_page.dart';
+import 'pages/business/daily_purchases_report_page.dart';
+import 'pages/business/top_suppliers_report_page.dart';
+import 'pages/business/materials_consumption_report_page.dart';
+import 'pages/business/production_report_page.dart';
+import 'pages/business/trial_balance_report_page.dart';
+import 'pages/business/general_ledger_report_page.dart';
+import 'pages/business/pnl_period_report_page.dart';
+import 'pages/business/pnl_cumulative_report_page.dart';
+import 'pages/business/account_review_report_page.dart';
 import 'pages/business/persons_page.dart';
 import 'pages/business/product_attributes_page.dart';
 import 'pages/business/products_page.dart';
@@ -1115,6 +1124,19 @@ class _MyAppState extends State<MyApp> {
               },
             ),
             GoRoute(
+              path: '/business/:business_id/reports/daily-purchases',
+              name: 'business_reports_daily_purchases',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return NoTransitionPage(
+                  child: DailyPurchasesReportPage(
+                    businessId: businessId,
+                    calendarController: _calendarController!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
               path: '/business/:business_id/reports/monthly-sales',
               name: 'business_reports_monthly_sales',
               pageBuilder: (context, state) {
@@ -1134,6 +1156,110 @@ class _MyAppState extends State<MyApp> {
                 final businessId = int.parse(state.pathParameters['business_id']!);
                 return NoTransitionPage(
                   child: TopCustomersReportPage(
+                    businessId: businessId,
+                    calendarController: _calendarController!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/reports/top-suppliers',
+              name: 'business_reports_top_suppliers',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return NoTransitionPage(
+                  child: TopSuppliersReportPage(
+                    businessId: businessId,
+                    calendarController: _calendarController!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/reports/materials-consumption',
+              name: 'business_reports_materials_consumption',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return NoTransitionPage(
+                  child: MaterialsConsumptionReportPage(
+                    businessId: businessId,
+                    calendarController: _calendarController!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/reports/production',
+              name: 'business_reports_production',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return NoTransitionPage(
+                  child: ProductionReportPage(
+                    businessId: businessId,
+                    calendarController: _calendarController!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/reports/trial-balance',
+              name: 'business_reports_trial_balance',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return NoTransitionPage(
+                  child: TrialBalanceReportPage(
+                    businessId: businessId,
+                    calendarController: _calendarController!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/reports/general-ledger',
+              name: 'business_reports_general_ledger',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return NoTransitionPage(
+                  child: GeneralLedgerReportPage(
+                    businessId: businessId,
+                    calendarController: _calendarController!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/reports/pnl-period',
+              name: 'business_reports_pnl_period',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return NoTransitionPage(
+                  child: PnlPeriodReportPage(
+                    businessId: businessId,
+                    calendarController: _calendarController!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/reports/pnl-cumulative',
+              name: 'business_reports_pnl_cumulative',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return NoTransitionPage(
+                  child: PnlCumulativeReportPage(
+                    businessId: businessId,
+                    calendarController: _calendarController!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/reports/accounts-review',
+              name: 'business_reports_accounts_review',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return NoTransitionPage(
+                  child: AccountReviewReportPage(
                     businessId: businessId,
                     calendarController: _calendarController!,
                   ),

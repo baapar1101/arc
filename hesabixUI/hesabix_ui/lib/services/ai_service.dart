@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import '../core/api_client.dart';
 import '../models/ai_models.dart';
 
@@ -185,6 +186,7 @@ class AIService {
   }) async* {
     try {
       // Use ApiClient with streaming response type
+      debugPrint('[AIService] Starting streaming request for session $sessionId');
       final response = await _api.post<ResponseBody>(
         '/api/v1/ai/chat/sessions/$sessionId/messages?stream=true',
         data: {'content': content},
@@ -201,65 +203,104 @@ class AIService {
 
       final responseBody = response.data;
       if (responseBody == null) {
+        debugPrint('[AIService] Empty streaming response body');
         onError?.call('Empty response');
         return;
       }
 
-      // Transform stream to String
-      final stream = responseBody.stream
+      // Transform stream to UTF-8 decoded lines
+      final lineStream = responseBody.stream
           .cast<List<int>>()
-          .transform(utf8.decoder);
-      
-      // Parse SSE stream
-      String buffer = '';
-      await for (final chunk in stream) {
-        buffer += chunk;
-        
-        // Process complete lines
-        while (buffer.contains('\n')) {
-          final lineIndex = buffer.indexOf('\n');
-          final line = buffer.substring(0, lineIndex).trim();
-          buffer = buffer.substring(lineIndex + 1);
-          
-          if (line.isEmpty) continue;
-          
-          // Parse SSE format: "data: {json}"
-          if (line.startsWith('data: ')) {
-            final jsonStr = line.substring(6); // Remove "data: "
-            
-            try {
-              final data = jsonDecode(jsonStr) as Map<String, dynamic>;
-              
-              // Check for error
+          .transform(utf8.decoder)
+          .transform(const LineSplitter());
+
+      final List<String> eventBuffer = [];
+
+      await for (final rawLine in lineStream) {
+        debugPrint('[AIService] SSE raw line: $rawLine');
+        final line = rawLine.trimRight();
+
+        // Empty line → event separator
+        if (line.isEmpty) {
+          if (eventBuffer.isEmpty) {
+            continue;
+          }
+
+          final payload = eventBuffer.join('\n');
+          eventBuffer.clear();
+
+          Map<String, dynamic> data;
+          try {
+            data = jsonDecode(payload) as Map<String, dynamic>;
+            debugPrint('[AIService] SSE event payload: $data');
+          } catch (_) {
+            debugPrint('[AIService] Failed to decode SSE payload: $payload');
+            continue;
+          }
+
               if (data.containsKey('error')) {
-                onError?.call(data['error'] as String);
+            final errorMessage = data['error'] as String? ?? 'خطای نامشخص در استریم';
+            debugPrint('[AIService] SSE error event: $errorMessage');
+            onError?.call(errorMessage);
                 return;
               }
               
-              // Check if done
               final done = data['done'] as bool? ?? false;
+          final contentChunk = data['content'] as String? ?? '';
               
-              // Yield content chunk
-              final contentChunk = data['content'] as String? ?? '';
               if (contentChunk.isNotEmpty) {
                 yield contentChunk;
               }
               
-              // If done, call onComplete and return
               if (done) {
                 final usage = data['usage'] as Map<String, dynamic>?;
                 final messageId = data['message_id'] as int?;
                 onComplete?.call(usage, messageId);
                 return;
               }
-            } catch (e) {
-              // Ignore JSON decode errors for incomplete chunks
               continue;
             }
+
+        if (line.startsWith('data:')) {
+          // Support both "data: " and "data:"
+          final value = line.length > 5 && line[5] == ' '
+              ? line.substring(6)
+              : line.substring(5);
+          eventBuffer.add(value);
           }
         }
+
+      // Flush remaining buffer if stream ended without trailing newline
+      if (eventBuffer.isNotEmpty) {
+        final payload = eventBuffer.join('\n');
+        Map<String, dynamic> data;
+        try {
+          data = jsonDecode(payload) as Map<String, dynamic>;
+          debugPrint('[AIService] SSE final payload: $data');
+        } catch (_) {
+          debugPrint('[AIService] Failed to decode final SSE payload: $payload');
+          return;
+        }
+
+        if (data.containsKey('error')) {
+          final errorMessage = data['error'] as String? ?? 'خطای نامشخص در استریم';
+          debugPrint('[AIService] SSE final error event: $errorMessage');
+          onError?.call(errorMessage);
+          return;
+        }
+
+        final contentChunk = data['content'] as String? ?? '';
+        if (contentChunk.isNotEmpty) {
+          yield contentChunk;
+        }
+
+        final usage = data['usage'] as Map<String, dynamic>?;
+        final messageId = data['message_id'] as int?;
+        onComplete?.call(usage, messageId);
       }
-    } catch (e) {
+    } catch (e, stack) {
+      debugPrint('[AIService] Streaming error: $e');
+      debugPrintStack(stackTrace: stack);
       onError?.call(e.toString());
       rethrow;
     }

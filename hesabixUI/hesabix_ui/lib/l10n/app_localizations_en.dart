@@ -3814,6 +3814,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get reportsPnlCumulativeTitle => 'Cumulative profit and loss';
 
   @override
+  String get reportsAccountsReviewTitle => 'Accounts review report';
+
+  @override
+  String get reportsAccountsReviewSubtitle =>
+      'Account tree structure with balances and transaction details';
+
+  @override
   String get reportsPnlCumulativeSubtitle =>
       'Periodical comparison and cumulative view';
 
@@ -3829,32 +3836,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get notificationsSettingsSubtitle =>
       'Enable delivery channels, send test messages, and manage service credentials.';
-
-  @override
-  String get notificationsOverviewTitle => 'Ensure messages reach your team';
-
-  @override
-  String get notificationsOverviewDescription =>
-      'Decide which channels deliver operational alerts so administrators know how messages are sent.';
-
-  @override
-  String get notificationsGuidanceItemChannels =>
-      'Enable or disable channels based on availability and team requirements.';
-
-  @override
-  String get notificationsGuidanceItemTemplates =>
-      'Publish an active template for each channel and language.';
-
-  @override
-  String get notificationsGuidanceItemTesting =>
-      'After changes, verify delivery paths with the test buttons.';
-
-  @override
-  String get notificationsLearnMore => 'Read the guide';
-
-  @override
-  String get notificationsDocumentationUrl =>
-      'https://docs.hesabix.com/notifications';
 
   @override
   String get notificationsChannelsSectionTitle => 'Delivery channels';
@@ -4479,7 +4460,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get creditCheckModeDisabled => 'Credit check disabled';
 
   @override
-  String get creditLimitLabel => 'Custom credit limit (toman)';
+  String get creditLimitLabel => 'Custom credit limit';
 
   @override
   String get creditLimitHint => 'Leave empty to use business default';

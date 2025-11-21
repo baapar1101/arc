@@ -34,6 +34,9 @@ class InvoiceLineItem {
   // presentation
   String? description;
 
+  // extra info for API payload
+  final Map<String, dynamic>? extraInfo;
+
   InvoiceLineItem({
     this.productId,
     this.productCode,
@@ -54,6 +57,7 @@ class InvoiceLineItem {
     this.minOrderQty,
     this.trackInventory = false,
     this.warehouseId,
+    this.extraInfo,
   });
 
   InvoiceLineItem copyWith({
@@ -76,6 +80,7 @@ class InvoiceLineItem {
     int? minOrderQty,
     bool? trackInventory,
     int? warehouseId,
+    Map<String, dynamic>? extraInfo,
   }) {
     return InvoiceLineItem(
       productId: productId ?? this.productId,
@@ -97,6 +102,7 @@ class InvoiceLineItem {
       minOrderQty: minOrderQty ?? this.minOrderQty,
       trackInventory: trackInventory ?? this.trackInventory,
       warehouseId: warehouseId ?? this.warehouseId,
+      extraInfo: extraInfo ?? this.extraInfo,
     );
   }
 
