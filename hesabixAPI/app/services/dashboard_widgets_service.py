@@ -126,14 +126,77 @@ DEFAULT_WIDGET_DEFINITIONS: List[Dict[str, Any]] = [
 ]
 
 
-def get_widget_definitions(db: Session, business_id: int, user_id: int) -> Dict[str, Any]:
+def _check_widget_permissions(
+    permissions_required: List[str],
+    ctx: Any  # AuthContext
+) -> bool:
+    """
+    بررسی اینکه آیا کاربر دسترسی به تمام permission های مورد نیاز ویجت را دارد یا نه.
+    
+    Args:
+        permissions_required: لیست permission های مورد نیاز (مثل ["invoices.view"])
+        ctx: AuthContext برای بررسی دسترسی‌ها
+    
+    Returns:
+        True اگر کاربر دسترسی دارد، False در غیر این صورت
+    """
+    if not permissions_required:
+        # اگر ویجت permission خاصی نیاز ندارد، نمایش داده می‌شود
+        return True
+    
+    # اگر superadmin یا مالک کسب و کار است، دسترسی کامل دارد
+    if ctx.is_superadmin() or ctx.is_business_owner():
+        return True
+    
+    # بررسی هر permission
+    for perm_str in permissions_required:
+        # Parse permission string (مثل "invoices.view" -> section="invoices", action="view")
+        if "." not in perm_str:
+            # اگر فرمت صحیح نیست، از آن عبور می‌کنیم (برای سازگاری)
+            continue
+        
+        section, action = perm_str.split(".", 1)
+        
+        # بررسی دسترسی
+        if not ctx.has_business_permission(section, action):
+            return False
+    
+    return True
+
+
+def get_widget_definitions(
+    db: Session, 
+    business_id: int, 
+    user_id: int,
+    ctx: Any = None  # AuthContext (اختیاری برای سازگاری با کدهای قدیمی)
+) -> Dict[str, Any]:
     """
     Returns available widgets for current user/business along with responsive columns map.
-    NOTE: Permission filtering can be added by checking user's business permissions.
+    Widgets are filtered based on user's business permissions.
+    
+    Args:
+        db: Database session
+        business_id: Business ID
+        user_id: User ID
+        ctx: AuthContext for permission checking (optional)
     """
+    # اگر ctx ارائه نشده، همه ویجت‌ها را برمی‌گردانیم (برای سازگاری)
+    if ctx is None:
+        return {
+            "columns": COLUMNS_BY_BREAKPOINT,
+            "items": DEFAULT_WIDGET_DEFINITIONS,
+        }
+    
+    # فیلتر ویجت‌ها بر اساس دسترسی
+    filtered_widgets = []
+    for widget_def in DEFAULT_WIDGET_DEFINITIONS:
+        permissions_required = widget_def.get("permissions_required", [])
+        if _check_widget_permissions(permissions_required, ctx):
+            filtered_widgets.append(widget_def)
+    
     return {
         "columns": COLUMNS_BY_BREAKPOINT,
-        "items": DEFAULT_WIDGET_DEFINITIONS,
+        "items": filtered_widgets,
     }
 
 

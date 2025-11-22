@@ -3,6 +3,7 @@ import '../../../services/bom_service.dart';
 import '../../../models/bom_models.dart';
 import '../../product/bom_editor_dialog.dart';
 import '../production_settings_dialog.dart';
+import '../../../../utils/snackbar_helper.dart';
 
 class ProductBomSection extends StatefulWidget {
   final int businessId;
@@ -351,7 +352,7 @@ class _ProductBomSectionState extends State<ProductBomSection> {
       });
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطا: $e')));
+      SnackBarHelper.showError(context, message: 'خطا: $e');
     }
   }
 
@@ -404,7 +405,7 @@ class _ProductBomSectionState extends State<ProductBomSection> {
       });
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطا: $e')));
+      SnackBarHelper.showError(context, message: 'خطا: $e');
     }
   }
 }

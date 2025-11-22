@@ -11,6 +11,7 @@ import 'package:hesabix_ui/core/api_client.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:dio/dio.dart';
 import 'package:go_router/go_router.dart';
+import '../../utils/snackbar_helper.dart';
 
 class CheckDetailsDialog extends StatefulWidget {
   final int checkId;

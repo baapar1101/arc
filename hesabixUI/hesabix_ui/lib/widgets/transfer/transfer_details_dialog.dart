@@ -4,6 +4,7 @@ import '../../core/date_utils.dart';
 import '../../core/calendar_controller.dart';
 import '../../core/api_client.dart';
 import 'package:hesabix_ui/utils/web/web_utils.dart' as web_utils;
+import '../../utils/snackbar_helper.dart';
 
 class TransferDetailsDialog extends StatefulWidget {
   final Map<String, dynamic> document;

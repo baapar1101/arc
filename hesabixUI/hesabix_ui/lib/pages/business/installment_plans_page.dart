@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:hesabix_ui/models/credit_models.dart';
 import 'package:hesabix_ui/services/credit_api_service.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
+import '../../utils/snackbar_helper.dart';
 
 class InstallmentPlansPage extends StatefulWidget {
   final int businessId;
@@ -80,7 +81,7 @@ class _InstallmentPlansPageState extends State<InstallmentPlansPage> {
     if (ok != true) return;
     await CreditApiService.deleteInstallmentPlan(widget.businessId, plan.id);
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(AppLocalizations.of(context).deletedSuccessfully)));
+    SnackBarHelper.showSuccess(context, message: 'طرح اقساط با موفقیت حذف شد');
     _load();
   }
 
@@ -403,10 +404,10 @@ class _InstallmentPlanDialogState extends State<InstallmentPlanDialog> {
       }
       if (!mounted) return;
       Navigator.pop(context, true);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(AppLocalizations.of(context).saved)));
+      SnackBarHelper.showSuccess(context, message: 'طرح اقساط با موفقیت ذخیره شد');
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطا: $e')));
+      SnackBarHelper.showError(context, message: 'خطا: $e');
     } finally {
       if (mounted) setState(() => _saving = false);
     }

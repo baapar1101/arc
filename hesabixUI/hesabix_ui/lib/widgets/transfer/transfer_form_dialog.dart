@@ -10,6 +10,7 @@ import '../../core/api_client.dart';
 import '../../services/transfer_service.dart';
 import '../../widgets/banking/currency_picker_widget.dart';
 import '../../utils/number_normalizer.dart';
+import '../../utils/snackbar_helper.dart';
 
 class TransferFormDialog extends StatefulWidget {
   final int businessId;

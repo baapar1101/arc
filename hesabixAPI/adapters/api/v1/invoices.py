@@ -13,7 +13,7 @@ import logging
 
 from adapters.db.session import get_db
 from app.core.auth_dependency import get_current_user, AuthContext
-from app.core.permissions import require_business_access, require_business_management_dep
+from app.core.permissions import require_business_access, require_business_management_dep, require_business_permission_dep
 from app.core.responses import success_response, format_datetime_fields
 from adapters.api.v1.schemas import QueryInfo
 from adapters.db.models.document import Document
@@ -173,7 +173,7 @@ def delete_invoice_endpoint(
     invoice_id: int,
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
-    _: None = Depends(require_business_management_dep),
+    _: None = Depends(require_business_permission_dep("invoices", "delete")),
 ) -> Dict[str, Any]:
     """حذف یک فاکتور"""
     # بررسی مالکیت
@@ -1214,6 +1214,10 @@ async def search_invoices_endpoint(
         item['document_type_name'] = _type_name(item.get('document_type'))
         if total_amount is not None:
             item['total_amount'] = total_amount
+        
+        # افزودن counterparty
+        _add_counterparty_to_invoice_item(db, item)
+        
         data_items.append(format_datetime_fields(item, request))
 
     # Build pagination info
@@ -1241,6 +1245,35 @@ async def search_invoices_endpoint(
         request=request,
         message="INVOICE_LIST",
     )
+
+def _add_counterparty_to_invoice_item(db: Session, item: Dict[str, Any]) -> None:
+    """افزودن فیلد counterparty به آیتم فاکتور بر اساس person_id در extra_info"""
+    try:
+        inv_type = str(item.get("document_type") or "")
+        extra_info = item.get("extra_info") or {}
+        person_id = extra_info.get("person_id")
+        person_name = None
+        if person_id is not None:
+            try:
+                p = db.query(Person).filter(Person.id == int(person_id)).first()
+                if p is not None:
+                    # استفاده از display_name یا alias_name یا name
+                    person_name = getattr(p, "display_name", None) or getattr(p, "alias_name", None)
+                    if not person_name and (p.first_name or p.last_name):
+                        name_parts = []
+                        if p.first_name:
+                            name_parts.append(p.first_name)
+                        if p.last_name:
+                            name_parts.append(p.last_name)
+                        person_name = " ".join(name_parts) if name_parts else None
+                    if not person_name and p.company_name:
+                        person_name = p.company_name
+            except Exception:
+                person_name = None
+        item["counterparty"] = person_name or ""
+    except Exception:
+        item["counterparty"] = ""
+
 
 @router.post("/business/{business_id}/tax-workspace/search")
 @require_business_access("business_id")
@@ -1449,6 +1482,10 @@ async def search_tax_workspace_endpoint(
         item["document_type_name"] = _type_name(item.get("document_type"))
         if total_amount is not None:
             item["total_amount"] = total_amount
+        
+        # افزودن counterparty
+        _add_counterparty_to_invoice_item(db, item)
+        
         data_items.append(format_datetime_fields(item, request))
 
     page = (skip // take) + 1 if take > 0 else 1
@@ -1908,6 +1945,10 @@ async def remove_invoices_from_tax_workspace_batch(
         item["document_type_name"] = _type_name(item.get("document_type"))
         if total_amount is not None:
             item["total_amount"] = total_amount
+        
+        # افزودن counterparty
+        _add_counterparty_to_invoice_item(db, item)
+        
         data_items.append(format_datetime_fields(item, request))
 
     page = (skip // take) + 1 if take > 0 else 1

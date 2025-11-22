@@ -6,6 +6,7 @@ import 'package:hesabix_ui/utils/number_formatters.dart';
 import 'package:hesabix_ui/utils/number_normalizer.dart';
 import 'package:hesabix_ui/widgets/document/detail_selector_widget.dart';
 import 'package:hesabix_ui/widgets/invoice/account_tree_combobox_widget.dart';
+import '../../utils/snackbar_helper.dart';
 
 /// مدل داخلی برای نگهداری اطلاعات یک سطر سند در حین ویرایش
 class DocumentLineEdit {

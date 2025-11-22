@@ -5,6 +5,7 @@ import '../../services/bank_account_service.dart';
 import '../../core/api_client.dart';
 import '../../services/currency_service.dart';
 import '../../widgets/banking/bank_account_form_dialog.dart';
+import '../../utils/snackbar_helper.dart';
 
 class BankAccountOption {
   final String id;
@@ -181,7 +182,7 @@ class _BankAccountComboboxWidgetState extends State<BankAccountComboboxWidget> {
         }
       });
       _setModalState?.call(() {});
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطا در دریافت لیست بانک‌ها: $e')));
+      SnackBarHelper.showError(context, message: 'خطا در دریافت لیست بانک‌ها: $e');
     }
   }
 

@@ -12,6 +12,7 @@ import '../../utils/number_formatters.dart' show formatWithThousands;
 import '../../widgets/date_input_field.dart';
 import '../../widgets/transfer/transfer_form_dialog.dart';
 import '../../widgets/transfer/transfer_details_dialog.dart';
+import '../../utils/snackbar_helper.dart';
 
 class TransfersPage extends StatefulWidget {
   final int businessId;
@@ -363,7 +364,7 @@ class _TransfersPageState extends State<TransfersPage> {
         _refreshData();
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطا: $e'), backgroundColor: Colors.red));
+          SnackBarHelper.showError(context, message: 'خطا: $e');
         }
       }
     }

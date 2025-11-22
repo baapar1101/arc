@@ -5,6 +5,7 @@ import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/core/date_utils.dart' show HesabixDateUtils;
 import 'package:hesabix_ui/models/ai_models.dart';
 import 'package:hesabix_ui/services/ai_service.dart';
+import 'package:hesabix_ui/utils/snackbar_helper.dart';
 
 /// دیالوگی برای دسترسی سریع به چت هوش مصنوعی از هر صفحه
 class AIChatDialog extends StatefulWidget {
@@ -258,12 +259,12 @@ class _AIChatDialogState extends State<AIChatDialog> {
 
   void _showError(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    SnackBarHelper.showError(context, message: message);
   }
 
   void _showSnackbar(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    SnackBarHelper.show(context, message: message);
   }
 
   @override

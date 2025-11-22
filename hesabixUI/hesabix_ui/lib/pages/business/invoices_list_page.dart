@@ -12,6 +12,7 @@ import 'package:hesabix_ui/core/date_utils.dart' show HesabixDateUtils;
 import 'package:hesabix_ui/utils/number_formatters.dart' show formatWithThousands;
 import 'package:hesabix_ui/widgets/document/document_details_dialog.dart';
 import 'package:hesabix_ui/services/invoice_service.dart';
+import '../../utils/snackbar_helper.dart';
 
 /// صفحه لیست فاکتورها با ویجت جدول عمومی
 class InvoicesListPage extends StatefulWidget {
@@ -482,12 +483,7 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
         navigator.pop();
       }
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(t.deleteInvoiceErrorWithMessage(e.toString())),
-          backgroundColor: Colors.red,
-        ),
-      );
+      SnackBarHelper.showError(context, message: t.deleteInvoiceErrorWithMessage(e.toString()));
     }
   }
 
@@ -563,12 +559,7 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
         navigator.pop();
       }
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(t.taxAddToWorkspaceErrorWithMessage(e.toString())),
-          backgroundColor: Colors.red,
-        ),
-      );
+      SnackBarHelper.showError(context, message: t.taxAddToWorkspaceErrorWithMessage(e.toString()));
     }
   }
 
@@ -632,12 +623,7 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
         navigator.pop();
       }
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(t.taxRemoveFromWorkspaceErrorWithMessage(e.toString())),
-          backgroundColor: Colors.red,
-        ),
-      );
+      SnackBarHelper.showError(context, message: t.taxRemoveFromWorkspaceErrorWithMessage(e.toString()));
     }
   }
 }

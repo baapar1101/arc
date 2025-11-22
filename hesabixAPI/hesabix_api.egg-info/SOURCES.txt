@@ -37,6 +37,7 @@ adapters/api/v1/ping_pong.py
 adapters/api/v1/price_lists.py
 adapters/api/v1/product_attributes.py
 adapters/api/v1/products.py
+adapters/api/v1/profile_dashboard.py
 adapters/api/v1/public_share_links.py
 adapters/api/v1/receipts_payments.py
 adapters/api/v1/report_templates.py
@@ -202,6 +203,7 @@ app/core/responses.py
 app/core/security.py
 app/core/settings.py
 app/core/smart_normalizer.py
+app/services/account_review_service.py
 app/services/account_service.py
 app/services/ai_background_jobs.py
 app/services/ai_plan_service.py
@@ -226,6 +228,7 @@ app/services/email_service.py
 app/services/expense_income_service.py
 app/services/file_dependency_service.py
 app/services/file_storage_service.py
+app/services/general_ledger_service.py
 app/services/invoice_service.py
 app/services/job_manager.py
 app/services/kardex_service.py
@@ -237,9 +240,11 @@ app/services/payment_service.py
 app/services/person_service.py
 app/services/person_share_link_service.py
 app/services/petty_cash_service.py
+app/services/pnl_service.py
 app/services/price_list_service.py
 app/services/product_attribute_service.py
 app/services/product_service.py
+app/services/profile_dashboard_widgets_service.py
 app/services/query_service.py
 app/services/realtime.py
 app/services/receipt_payment_service.py
@@ -253,6 +258,7 @@ app/services/storage_subscription_service.py
 app/services/system_settings_service.py
 app/services/template_builder_compiler.py
 app/services/transfer_service.py
+app/services/trial_balance_service.py
 app/services/wallet_service.py
 app/services/warehouse_service.py
 app/services/ai/__init__.py
@@ -299,6 +305,7 @@ migrations/versions/20250119_000001_add_check_reconciliations_tables.py
 migrations/versions/20250120_000001_add_persons_tables.py
 migrations/versions/20250120_000001_add_warehouse_contact_fields.py
 migrations/versions/20250120_000002_add_join_permission.py
+migrations/versions/20250121_000001_add_ai_expense_account.py
 migrations/versions/20250126_000001_add_gift_credit_account.py
 migrations/versions/20250915_000001_init_auth_tables.py
 migrations/versions/20250916_000002_add_referral_fields.py

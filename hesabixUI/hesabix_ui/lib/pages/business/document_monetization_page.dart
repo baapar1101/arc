@@ -9,6 +9,7 @@ import '../../services/errors/api_error.dart';
 import '../../utils/number_formatters.dart';
 import '../../widgets/data_table/data_table_widget.dart';
 import '../../widgets/data_table/data_table_config.dart';
+import '../../utils/snackbar_helper.dart';
 
 class DocumentMonetizationBusinessPage extends StatefulWidget {
   final int businessId;
@@ -84,7 +85,7 @@ class _DocumentMonetizationBusinessPageState extends State<DocumentMonetizationB
     try {
       await _service.payBusinessCharge(widget.businessId, chargeId);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.paymentSuccess)));
+      SnackBarHelper.show(context, message: t.paymentSuccess);
       // فقط جدول charges را refresh کنیم، نه کل صفحه
       final state = _chargesTableKey.currentState;
       if (state != null) {
@@ -103,7 +104,7 @@ class _DocumentMonetizationBusinessPageState extends State<DocumentMonetizationB
     try {
       await _service.finalizeVolume(widget.businessId);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.volumeFinalized)));
+      SnackBarHelper.show(context, message: t.volumeFinalized);
       _load();
     } catch (e) {
       _showErrorFromException(e, fallback: t.volumeFinalizeError);
@@ -355,7 +356,7 @@ class _DocumentMonetizationBusinessPageState extends State<DocumentMonetizationB
         autoRenew: dialogAutoRenew,
       );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.packageActivatedSuccess)));
+      SnackBarHelper.show(context, message: t.packageActivatedSuccess);
       await _load();
     } catch (e) {
       _showErrorFromException(e, fallback: t.packageActivationError);
@@ -433,7 +434,7 @@ class _DocumentMonetizationBusinessPageState extends State<DocumentMonetizationB
       }
     }
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    SnackBarHelper.show(context, message: message);
   }
 
   Widget _buildPoliciesCard(ThemeData theme, AppLocalizations t) {

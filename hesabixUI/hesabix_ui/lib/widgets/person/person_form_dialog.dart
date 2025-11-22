@@ -9,6 +9,7 @@ import '../../utils/number_normalizer.dart';
 import '../../services/business_dashboard_service.dart';
 import '../../models/business_dashboard_models.dart';
 import '../../core/api_client.dart';
+import '../../utils/snackbar_helper.dart';
 
 class PersonFormDialog extends StatefulWidget {
   final int businessId;
@@ -368,23 +369,16 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
       if (mounted) {
         Navigator.of(context).pop();
         widget.onSuccess?.call();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(widget.person == null 
-              ? AppLocalizations.of(context).personCreatedSuccessfully
-              : AppLocalizations.of(context).personUpdatedSuccessfully),
-            backgroundColor: Colors.green,
-          ),
+        SnackBarHelper.showSuccess(
+          context,
+          message: widget.person == null 
+            ? AppLocalizations.of(context).personCreatedSuccessfully
+            : AppLocalizations.of(context).personUpdatedSuccessfully,
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('خطا: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        SnackBarHelper.showError(context, message: 'خطا: $e');
       }
     } finally {
       if (mounted) {

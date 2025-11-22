@@ -26,6 +26,7 @@ import 'package:hesabix_ui/utils/number_normalizer.dart';
 // removed duplicate import
 import 'package:hesabix_ui/models/business_dashboard_models.dart';
 import 'package:hesabix_ui/utils/web/web_utils.dart' as web_utils;
+import '../../utils/snackbar_helper.dart';
 
 /// صفحه لیست اسناد دریافت و پرداخت با ویجت جدول
 class ReceiptsPaymentsListPage extends StatefulWidget {
@@ -1375,7 +1376,7 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog> {
       } else {
         message = e.toString();
       }
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+      SnackBarHelper.show(context, message: message);
     }
   }
 

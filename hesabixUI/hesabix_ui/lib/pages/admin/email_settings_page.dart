@@ -4,6 +4,7 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/models/email_models.dart';
 import 'package:hesabix_ui/services/email_service.dart';
 import 'package:hesabix_ui/utils/number_normalizer.dart';
+import '../../utils/snackbar_helper.dart';
 
 class EmailSettingsPage extends StatefulWidget {
   const EmailSettingsPage({super.key});

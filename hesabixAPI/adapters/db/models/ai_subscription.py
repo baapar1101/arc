@@ -36,10 +36,12 @@ class UserAISubscription(Base):
     # دوره زمانی
     period_start: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     period_end: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)  # برای subscription
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)  # تاریخ انقضای اشتراک
     
     # تنظیمات
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     auto_renew: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)  # برای subscription
+    last_reset_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)  # آخرین زمان reset سهمیه
     
     # حداقل موجودی کیف پول (برای pay_as_go)
     wallet_balance_required: Mapped[float | None] = mapped_column(Numeric(18, 2), nullable=True)

@@ -8,6 +8,7 @@ import 'package:hesabix_ui/services/expense_income_service.dart';
 import 'package:hesabix_ui/utils/number_formatters.dart' show formatWithThousands;
 import 'package:hesabix_ui/core/date_utils.dart' show HesabixDateUtils;
 import 'package:hesabix_ui/utils/web/web_utils.dart' as web_utils;
+import '../../utils/snackbar_helper.dart';
 
 /// دیالوگ مشاهده جزئیات سند هزینه/درآمد
 class ExpenseIncomeDetailsDialog extends StatefulWidget {

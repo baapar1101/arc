@@ -6,6 +6,7 @@ import '../../models/cash_register.dart';
 import '../../services/cash_register_service.dart';
 import '../../utils/number_normalizer.dart';
 import 'currency_picker_widget.dart';
+import '../../utils/snackbar_helper.dart';
 
 class CashRegisterFormDialog extends StatefulWidget {
 	final int businessId;
@@ -111,14 +112,11 @@ class _CashRegisterFormDialogState extends State<CashRegisterFormDialog> {
 				Navigator.of(context).pop(true); // Return true to indicate success
 				widget.onSuccess?.call();
 				final t = AppLocalizations.of(context);
-				ScaffoldMessenger.of(context).showSnackBar(
-					SnackBar(
-						content: Text(widget.register == null
-							? (t.localeName == 'fa' ? 'صندوق با موفقیت ایجاد شد' : 'Cash register created successfully')
-							: (t.localeName == 'fa' ? 'صندوق با موفقیت به‌روزرسانی شد' : 'Cash register updated successfully')
-						),
-						backgroundColor: Colors.green,
-					),
+				SnackBarHelper.showSuccess(
+					context,
+					message: widget.register == null
+						? (t.localeName == 'fa' ? 'صندوق با موفقیت ایجاد شد' : 'Cash register created successfully')
+						: (t.localeName == 'fa' ? 'صندوق با موفقیت به‌روزرسانی شد' : 'Cash register updated successfully'),
 				);
 			}
 		} catch (e) {

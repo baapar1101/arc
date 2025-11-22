@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/models/business_models.dart';
 import 'package:hesabix_ui/services/business_api_service.dart';
 import 'package:hesabix_ui/core/api_client.dart';
+import '../../utils/snackbar_helper.dart';
 
 class BusinessInfoSettingsPage extends StatefulWidget {
   final int businessId;
@@ -201,7 +202,7 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
         _error = e.toString();
       });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_error!)));
+        SnackBarHelper.showError(context, message: _error!);
       }
     } finally {
       if (mounted) {
@@ -269,7 +270,7 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطا در آپلود لوگو: $e')));
+        SnackBarHelper.showError(context, message: 'خطا در آپلود لوگو: $e');
       }
     } finally {
       if (mounted) {
@@ -301,7 +302,7 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطا در آپلود مهر/امضا: $e')));
+        SnackBarHelper.showError(context, message: 'خطا در آپلود مهر/امضا: $e');
       }
     } finally {
       if (mounted) {

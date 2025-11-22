@@ -3,9 +3,10 @@ from fastapi import APIRouter, Depends, Request, Body
 from sqlalchemy.orm import Session
 
 from adapters.db.session import get_db
+from adapters.db.models.check import Check
 from app.core.auth_dependency import get_current_user, AuthContext
 from app.core.responses import success_response, format_datetime_fields, ApiError
-from app.core.permissions import require_business_management_dep, require_business_access
+from app.core.permissions import require_business_management_dep, require_business_access, require_business_permission_dep, require_business_permission_by_entity_dep
 from adapters.api.v1.schemas import QueryInfo
 from adapters.api.v1.schema_models.check import (
     CheckCreateRequest,
@@ -101,7 +102,7 @@ async def create_check_endpoint(
     body: CheckCreateRequest = Body(...),
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
-    _: None = Depends(require_business_management_dep),
+    _: None = Depends(require_business_permission_dep("checks", "add")),
 ):
     payload: Dict[str, Any] = body.model_dump(exclude_unset=True)
     # ثبت سند حسابداری الزامی است - بررسی دسترسی نوشتن حسابداری
@@ -352,7 +353,7 @@ async def update_check_endpoint(
     body: CheckUpdateRequest = Body(...),
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
-    _: None = Depends(require_business_management_dep),
+    _: None = Depends(require_business_permission_by_entity_dep("checks", "edit", Check, "check_id")),
 ):
     # بررسی دسترسی قبل از update
     before = get_check_by_id(db, check_id)
@@ -382,7 +383,7 @@ async def delete_check_endpoint(
     check_id: int,
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
-    _: None = Depends(require_business_management_dep),
+    _: None = Depends(require_business_permission_by_entity_dep("checks", "delete", Check, "check_id")),
 ):
     result = get_check_by_id(db, check_id)
     if result:

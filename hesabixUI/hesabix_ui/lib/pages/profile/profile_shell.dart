@@ -13,6 +13,7 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../services/notifications_ws_client.dart';
 import '../../core/api_client.dart';
 import '../../services/announcements_service.dart';
+import '../../utils/snackbar_helper.dart';
 
 class ProfileShell extends StatefulWidget {
   final Widget child;
@@ -275,7 +276,7 @@ class _ProfileShellState extends State<ProfileShell> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطا: $e')));
+        SnackBarHelper.showError(context, message: 'خطا: $e');
       }
     } finally {
       if (mounted) {

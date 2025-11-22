@@ -14,6 +14,7 @@ import '../../services/check_service.dart';
 import '../../widgets/invoice/bank_account_combobox_widget.dart';
 import 'check_form_page.dart';
 import 'check_details_dialog.dart';
+import '../../utils/snackbar_helper.dart';
 
 class ChecksPage extends StatefulWidget {
   final int businessId;
@@ -391,7 +392,7 @@ class _ChecksPageState extends State<ChecksPage> {
                   } catch (e) {
                     if (!context.mounted) return;
                     Navigator.pop(ctx);
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطا: $e')));
+                    SnackBarHelper.showError(context, message: 'خطا: $e');
                   }
                 },
                 child: const Text('ثبت'),
@@ -438,7 +439,7 @@ class _ChecksPageState extends State<ChecksPage> {
               } catch (e) {
                 if (!context.mounted) return;
                 Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطا: $e')));
+                SnackBarHelper.showError(context, message: 'خطا: $e');
               }
             },
             child: const Text('ثبت'),
@@ -483,7 +484,7 @@ class _ChecksPageState extends State<ChecksPage> {
               } catch (e) {
                 if (!context.mounted) return;
                 Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطا: $e')));
+                SnackBarHelper.showError(context, message: 'خطا: $e');
               }
             },
             child: const Text('ثبت'),
@@ -512,7 +513,7 @@ class _ChecksPageState extends State<ChecksPage> {
       _refresh();
     } catch (e) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطا: $e')));
+      SnackBarHelper.showError(context, message: 'خطا: $e');
     }
   }
 
@@ -535,7 +536,7 @@ class _ChecksPageState extends State<ChecksPage> {
       _refresh();
     } catch (e) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطا: $e')));
+      SnackBarHelper.showError(context, message: 'خطا: $e');
     }
   }
 
@@ -558,7 +559,7 @@ class _ChecksPageState extends State<ChecksPage> {
       _refresh();
     } catch (e) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطا: $e')));
+      SnackBarHelper.showError(context, message: 'خطا: $e');
     }
   }
 

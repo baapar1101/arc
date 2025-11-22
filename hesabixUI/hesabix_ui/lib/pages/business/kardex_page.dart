@@ -28,6 +28,7 @@ import 'package:hesabix_ui/widgets/document/document_details_dialog.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../utils/snackbar_helper.dart';
 
 class KardexPage extends StatefulWidget {
   final int businessId;
@@ -233,10 +234,10 @@ class _KardexPageState extends State<KardexPage> {
         _selectedPresetName = name;
       });
       final t = AppLocalizations.of(context);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.presetSaved)));
+      SnackBarHelper.show(context, message: t.presetSaved);
     } catch (e) {
       final t = AppLocalizations.of(context);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.presetSaveError('$e'))));
+      SnackBarHelper.showError(context, message: t.presetSaveError('$e'));
     }
   }
 
@@ -255,7 +256,7 @@ class _KardexPageState extends State<KardexPage> {
       });
     } catch (e) {
       final t = AppLocalizations.of(context);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.presetDeleteError('$e'))));
+      SnackBarHelper.showError(context, message: t.presetDeleteError('$e'));
     }
   }
 

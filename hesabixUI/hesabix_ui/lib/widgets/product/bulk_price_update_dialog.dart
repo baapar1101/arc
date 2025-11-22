@@ -11,6 +11,7 @@ import '../../services/price_list_service.dart';
 import '../../utils/number_formatters.dart';
 import '../../utils/number_normalizer.dart';
 import '../../widgets/category/category_picker_field.dart';
+import '../../utils/snackbar_helper.dart';
 
 class BulkPriceUpdateDialog extends StatefulWidget {
   final int businessId;
@@ -236,8 +237,7 @@ class _BulkPriceUpdateDialogState extends State<BulkPriceUpdateDialog> {
       if (mounted) {
         Navigator.of(context).pop(true);
         widget.onSuccess?.call();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(result['message'] ?? AppLocalizations.of(context).applyChanges)),
+        SnackBarHelper.show(context, message: result['message'] ?? AppLocalizations.of(context),
         );
       }
     } catch (e) {

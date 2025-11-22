@@ -5,6 +5,7 @@ import '../../models/warehouse_model.dart';
 import '../../widgets/data_table/data_table_widget.dart';
 import '../../widgets/data_table/data_table_config.dart';
 import '../../widgets/warehouse/warehouse_form_dialog.dart';
+import '../../utils/snackbar_helper.dart';
 
 class WarehousesPage extends StatefulWidget {
   final int businessId;
@@ -167,7 +168,7 @@ class _WarehousesPageState extends State<WarehousesPage> {
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطا: $e')));
+      SnackBarHelper.showError(context, message: 'خطا: $e');
     }
   }
 }

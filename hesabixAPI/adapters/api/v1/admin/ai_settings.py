@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import Dict, Any
 from fastapi import APIRouter, Depends, Request, Body
 from sqlalchemy.orm import Session
@@ -10,6 +11,8 @@ from app.core.responses import success_response, ApiError
 from adapters.db.repositories.ai_config_repository import AIConfigRepository
 from adapters.db.models.ai_config import AIConfig, AIProvider
 from pydantic import BaseModel
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/admin/ai", tags=["admin-ai"])
 
@@ -31,7 +34,7 @@ async def get_ai_config(
     ctx: AuthContext = Depends(get_current_user),
 ) -> Dict[str, Any]:
     """دریافت تنظیمات AI (فقط مدیر سیستم)"""
-    if not ctx.is_superadmin():
+    if not ctx.has_any_permission("system_settings", "superadmin"):
         raise ApiError("FORBIDDEN", "فقط مدیر سیستم می‌تواند تنظیمات AI را مشاهده کند", http_status=403)
     
     repo = AIConfigRepository(db)
@@ -68,7 +71,7 @@ async def update_ai_config(
     ctx: AuthContext = Depends(get_current_user),
 ) -> Dict[str, Any]:
     """به‌روزرسانی تنظیمات AI (فقط مدیر سیستم)"""
-    if not ctx.is_superadmin():
+    if not ctx.has_any_permission("system_settings", "superadmin"):
         raise ApiError("FORBIDDEN", "فقط مدیر سیستم می‌تواند تنظیمات AI را تغییر دهد", http_status=403)
     
     repo = AIConfigRepository(db)
@@ -122,7 +125,7 @@ async def test_ai_connection(
     ctx: AuthContext = Depends(get_current_user),
 ) -> Dict[str, Any]:
     """تست اتصال به AI Provider (فقط مدیر سیستم)"""
-    if not ctx.is_superadmin():
+    if not ctx.has_any_permission("system_settings", "superadmin"):
         raise ApiError("FORBIDDEN", "فقط مدیر سیستم می‌تواند اتصال را تست کند", http_status=403)
     
     repo = AIConfigRepository(db)

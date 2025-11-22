@@ -100,6 +100,7 @@ import 'core/keyboard_shortcut_listener.dart';
 import 'core/route_registry.dart';
 import 'widgets/simple_splash_screen.dart';
 import 'widgets/url_tracker.dart';
+import 'utils/route_prefetcher.dart';
 import 'pages/business/opening_balance_page.dart';
 import 'pages/business/report_templates_page.dart';
 import 'pages/business/storage_files_page.dart';
@@ -225,6 +226,11 @@ class _MyAppState extends State<MyApp> {
         _isLoading = false;
       });
     }
+    
+    // در Flutter Web، تمام صفحات به صورت eager load می‌شوند
+    // (همه import شده‌اند) بنابراین کد تمام صفحات در bundle اولیه موجود است
+    // این باعث می‌شود که تأخیر در جابجایی بین صفحات از بین برود
+    RoutePrefetcher.initialize();
   }
 
   /// Preload تمام صفحات برای جلوگیری از تاخیر در navigation

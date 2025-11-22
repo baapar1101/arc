@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
+import '../../utils/snackbar_helper.dart';
 
 class SystemLogsPage extends StatefulWidget {
   const SystemLogsPage({super.key});

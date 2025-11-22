@@ -3,9 +3,10 @@ from fastapi import APIRouter, Depends, Request, Body
 from sqlalchemy.orm import Session
 
 from adapters.db.session import get_db
+from adapters.db.models.cash_register import CashRegister
 from app.core.auth_dependency import get_current_user, AuthContext
 from app.core.responses import success_response, format_datetime_fields, ApiError
-from app.core.permissions import require_business_management_dep, require_business_access
+from app.core.permissions import require_business_management_dep, require_business_access, require_business_permission_dep, require_business_permission_by_entity_dep
 from adapters.api.v1.schemas import QueryInfo
 from app.services.cash_register_service import (
     create_cash_register,
@@ -60,7 +61,7 @@ async def create_cash_register_endpoint(
     body: Dict[str, Any] = Body(...),
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
-    _: None = Depends(require_business_management_dep),
+    _: None = Depends(require_business_permission_dep("cash", "add")),
 ):
     payload: Dict[str, Any] = dict(body or {})
     created = create_cash_register(db, business_id, payload)
@@ -77,7 +78,7 @@ async def get_cash_register_endpoint(
     cash_id: int,
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
-    _: None = Depends(require_business_management_dep),
+    _: None = Depends(require_business_permission_by_entity_dep("cash", "view", CashRegister, "cash_id")),
 ):
     result = get_cash_register_by_id(db, cash_id)
     if not result:
@@ -102,7 +103,7 @@ async def update_cash_register_endpoint(
     body: Dict[str, Any] = Body(...),
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
-    _: None = Depends(require_business_management_dep),
+    _: None = Depends(require_business_permission_by_entity_dep("cash", "edit", CashRegister, "cash_id")),
 ):
     payload: Dict[str, Any] = dict(body or {})
     result = update_cash_register(db, cash_id, payload)
@@ -127,7 +128,7 @@ async def delete_cash_register_endpoint(
     cash_id: int,
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
-    _: None = Depends(require_business_management_dep),
+    _: None = Depends(require_business_permission_by_entity_dep("cash", "delete", CashRegister, "cash_id")),
 ):
     result = get_cash_register_by_id(db, cash_id)
     if result:
@@ -155,7 +156,7 @@ async def bulk_delete_cash_registers_endpoint(
     body: Dict[str, Any] = Body(...),
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
-    _: None = Depends(require_business_management_dep),
+    _: None = Depends(require_business_permission_dep("cash", "delete")),
 ):
     ids = body.get("ids")
     if not isinstance(ids, list):

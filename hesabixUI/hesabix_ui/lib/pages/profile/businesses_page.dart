@@ -5,6 +5,7 @@ import '../../services/business_dashboard_service.dart';
 import '../../core/api_client.dart';
 import '../../models/business_dashboard_models.dart';
 import '../../core/auth_store.dart';
+import '../../utils/snackbar_helper.dart';
 
 class BusinessesPage extends StatefulWidget {
   const BusinessesPage({super.key});
@@ -54,9 +55,7 @@ class _BusinessesPageState extends State<BusinessesPage> {
           _loading = false;
           _error = e.toString();
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${AppLocalizations.of(context).dataLoadingError}: $e')),
-        );
+        SnackBarHelper.showError(context, message: '${AppLocalizations.of(context).dataLoadingError}: $e');
       }
     }
   }

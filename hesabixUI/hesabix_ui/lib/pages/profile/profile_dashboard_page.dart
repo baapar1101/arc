@@ -6,6 +6,7 @@ import '../../services/profile_dashboard_service.dart';
 import '../../services/announcements_service.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
+import '../../utils/snackbar_helper.dart';
 
 class ProfileDashboardPage extends StatefulWidget {
   const ProfileDashboardPage({super.key});
@@ -23,7 +24,6 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> {
   bool _loading = true;
   String? _error;
   bool _editMode = false;
-  static const double _gridSpacingPx = 12.0;
   // Announcements state
   final Set<int> _annBusyIds = <int>{};
   bool _annOnlyUnread = false;
@@ -41,6 +41,83 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> {
     if (width < 1240) return 'md';
     if (width < 1600) return 'lg';
     return 'xl';
+  }
+
+  // Helper methods for responsive values
+  double _getPadding(BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
+    final bp = _currentBreakpoint(width);
+    switch (bp) {
+      case 'xs':
+        return 8.0; // موبایل
+      case 'sm':
+        return 12.0; // تبلت کوچک
+      case 'md':
+        return 16.0; // تبلت بزرگ
+      case 'lg':
+        return 20.0; // دسکتاپ کوچک
+      case 'xl':
+        return 24.0; // دسکتاپ بزرگ
+      default:
+        return 16.0;
+    }
+  }
+
+  double _getGridSpacing(BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
+    final bp = _currentBreakpoint(width);
+    switch (bp) {
+      case 'xs':
+        return 8.0;
+      case 'sm':
+        return 10.0;
+      case 'md':
+        return 12.0;
+      case 'lg':
+        return 14.0;
+      case 'xl':
+        return 16.0;
+      default:
+        return 12.0;
+    }
+  }
+
+  double _getMinTileUnit(BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
+    final bp = _currentBreakpoint(width);
+    switch (bp) {
+      case 'xs':
+        return 140.0; // موبایل
+      case 'sm':
+        return 160.0; // تبلت کوچک
+      case 'md':
+        return 180.0; // تبلت بزرگ
+      case 'lg':
+        return 200.0; // دسکتاپ کوچک
+      case 'xl':
+        return 220.0; // دسکتاپ بزرگ
+      default:
+        return 180.0;
+    }
+  }
+
+  TextStyle? _getHeaderTextStyle(BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
+    final bp = _currentBreakpoint(width);
+    final theme = Theme.of(context);
+    switch (bp) {
+      case 'xs':
+        return theme.textTheme.titleLarge; // موبایل
+      case 'sm':
+        return theme.textTheme.headlineSmall; // تبلت کوچک
+      default:
+        return theme.textTheme.headlineMedium; // تبلت بزرگ و دسکتاپ
+    }
+  }
+
+  bool _isMobile(BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
+    return _currentBreakpoint(width) == 'xs';
   }
 
   Future<void> _loadAll() async {
@@ -141,24 +218,26 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> {
     final items = List<DashboardLayoutItem>.from(layout.items)..sort((a, b) => a.order.compareTo(b.order));
     final visible = items.where((e) => !e.hidden).toList();
     final crossAxisCount = layout.columns;
+    final padding = _getPadding(context);
 
     return Padding(
-      padding: const EdgeInsets.all(16.0),
+      padding: EdgeInsets.all(padding),
       child: Column(
         children: [
           _buildHeaderRow(),
-          const SizedBox(height: 16),
+          SizedBox(height: _isMobile(context) ? 12 : 16),
           Expanded(
             child: LayoutBuilder(
               builder: (context, constraints) {
                 final totalWidth = constraints.maxWidth;
-                double unit = (totalWidth - (crossAxisCount - 1) * _gridSpacingPx) / crossAxisCount;
-                const double minTileUnit = 180;
+                final spacing = _getGridSpacing(context);
+                final minTileUnit = _getMinTileUnit(context);
+                double unit = (totalWidth - (crossAxisCount - 1) * spacing) / crossAxisCount;
                 if (unit <= 0) unit = minTileUnit;
                 if (unit < minTileUnit) unit = minTileUnit;
                 final children = <Widget>[];
                 for (final it in visible) {
-                  final w = (unit * it.colSpan) + _gridSpacingPx * (it.colSpan - 1);
+                  final w = (unit * it.colSpan) + spacing * (it.colSpan - 1);
                   final cw = w > totalWidth ? totalWidth : (w < unit ? unit : w);
                   children.add(AnimatedContainer(
                     duration: const Duration(milliseconds: 180),
@@ -170,8 +249,8 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> {
                 }
                 return SingleChildScrollView(
                   child: Wrap(
-                    spacing: _gridSpacingPx,
-                    runSpacing: _gridSpacingPx,
+                    spacing: spacing,
+                    runSpacing: spacing,
                     children: children,
                   ),
                 );
@@ -184,21 +263,48 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> {
   }
 
   Widget _buildHeaderRow() {
-    return Row(
-      children: [
-        Expanded(
-          child: Text(
-            'داشبورد پروفایل',
-            style: Theme.of(context).textTheme.headlineMedium,
-          ),
-        ),
-        IconButton(
-          tooltip: _editMode ? 'خروج از ویرایش' : 'ویرایش چیدمان',
-          onPressed: () => setState(() => _editMode = !_editMode),
-          icon: Icon(_editMode ? Icons.check : Icons.edit),
-        ),
-      ],
+    final isMobile = _isMobile(context);
+    final headerStyle = _getHeaderTextStyle(context);
+    
+    final editToggleButton = IconButton(
+      tooltip: _editMode ? 'خروج از ویرایش' : 'ویرایش چیدمان',
+      onPressed: () => setState(() => _editMode = !_editMode),
+      icon: Icon(_editMode ? Icons.check : Icons.edit),
+      iconSize: isMobile ? 20 : 24,
     );
+
+    if (isMobile) {
+      // موبایل: Column layout
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'داشبورد پروفایل',
+                  style: headerStyle,
+                ),
+              ),
+              editToggleButton,
+            ],
+          ),
+        ],
+      );
+    } else {
+      // دسکتاپ/تبلت: Row layout
+      return Row(
+        children: [
+          Expanded(
+            child: Text(
+              'داشبورد پروفایل',
+              style: headerStyle,
+            ),
+          ),
+          editToggleButton,
+        ],
+      );
+    }
   }
 
   Widget _buildGridTile(DashboardLayoutItem item, int totalColumns) {
@@ -518,7 +624,7 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> {
                               ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('به‌عنوان خوانده‌شده علامت خورد')));
                             } catch (e) {
                               if (!context.mounted) return;
-                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطا: $e')));
+                              SnackBarHelper.showError(context, message: 'خطا: $e');
                             } finally {
                               if (mounted && annId != null) setState(() => _annBusyIds.remove(annId));
                             }
@@ -539,7 +645,7 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> {
                               ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('اعلان پنهان شد')));
                             } catch (e) {
                               if (!context.mounted) return;
-                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطا: $e')));
+                              SnackBarHelper.showError(context, message: 'خطا: $e');
                             } finally {
                               if (mounted && annId != null) setState(() => _annBusyIds.remove(annId));
                             }

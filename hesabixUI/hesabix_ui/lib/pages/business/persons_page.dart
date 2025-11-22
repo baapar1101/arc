@@ -12,6 +12,7 @@ import '../../models/person_model.dart';
 import '../../services/person_service.dart';
 import '../../core/auth_store.dart';
 import 'person_details_dialog.dart';
+import '../../utils/snackbar_helper.dart';
 
 class PersonsPage extends StatefulWidget {
   final int businessId;
@@ -426,7 +427,7 @@ class _PersonsPageState extends State<PersonsPage> {
                   final selectedIndices = (state?.getSelectedRowIndices() as List<int>?) ?? const <int>[];
                   final items = (state?.getSelectedItems() as List<dynamic>?) ?? const <dynamic>[];
                   if (selectedIndices.isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.noRowsSelectedError)));
+                    SnackBarHelper.showError(context, message: t.noRowsSelectedError);
                     return;
                   }
                   final ids = <int>[];
@@ -464,12 +465,12 @@ class _PersonsPageState extends State<PersonsPage> {
                   try { ( _personsTableKey.currentState as dynamic)?.refresh(); } catch (_) {}
                   if (mounted) {
                     // Reuse generic success text available in l10n
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.productsDeletedSuccessfully)));
+                    SnackBarHelper.show(context, message: t.productsDeletedSuccessfully);
                   }
                 } catch (e) {
                   if (mounted) {
                     final t = AppLocalizations.of(context);
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${t.error}: $e')));
+                    SnackBarHelper.showError(context, message: '${t.error}: $e');
                   }
                 }
               },

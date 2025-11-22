@@ -6,6 +6,7 @@ import '../../models/bom_models.dart';
 import '../../models/invoice_line_item.dart';
 import '../../widgets/invoice/product_combobox_widget.dart';
 import '../../utils/number_normalizer.dart';
+import '../../utils/snackbar_helper.dart';
 
 /// ویجت انفجار فرمول تولید برای فاکتور تولید
 class BomExplosionWidget extends StatefulWidget {

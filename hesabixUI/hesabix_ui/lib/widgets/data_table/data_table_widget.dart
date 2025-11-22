@@ -18,6 +18,7 @@ import 'data_table_search_dialog.dart';
 import 'column_settings_dialog.dart';
 import 'helpers/data_table_utils.dart';
 import 'helpers/column_settings_service.dart';
+import '../../utils/snackbar_helper.dart';
 
 /// Main reusable data table widget
 class DataTableWidget<T> extends StatefulWidget {
@@ -2280,7 +2281,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
       final wrapped = GestureDetector(
         onLongPress: () {
           Clipboard.setData(ClipboardData(text: text));
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.copied)));
+          SnackBarHelper.show(context, message: t.copied);
         },
         child: Align(alignment: _alignmentFor(align), child: textWidget),
       );
@@ -2304,7 +2305,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
       final wrapped = GestureDetector(
         onLongPress: () {
           Clipboard.setData(ClipboardData(text: text));
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.copied)));
+          SnackBarHelper.show(context, message: t.copied);
         },
         child: Align(alignment: _alignmentFor(align), child: textWidget),
       );
@@ -2325,7 +2326,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
       final wrapped = GestureDetector(
         onLongPress: () {
           Clipboard.setData(ClipboardData(text: text));
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.copied)));
+          SnackBarHelper.show(context, message: t.copied);
         },
         child: Align(alignment: _alignmentFor(align), child: textWidget),
       );
@@ -2353,7 +2354,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     final wrapped = GestureDetector(
       onLongPress: () {
         Clipboard.setData(ClipboardData(text: formattedValue));
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.copied)));
+        SnackBarHelper.show(context, message: t.copied);
       },
       child: Align(alignment: _alignmentFor(align), child: textWidget),
     );

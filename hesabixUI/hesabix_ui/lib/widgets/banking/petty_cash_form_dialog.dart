@@ -3,6 +3,7 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../models/petty_cash.dart';
 import '../../services/petty_cash_service.dart';
 import 'currency_picker_widget.dart';
+import '../../utils/snackbar_helper.dart';
 
 class PettyCashFormDialog extends StatefulWidget {
 	final int businessId;
@@ -96,14 +97,11 @@ class _PettyCashFormDialogState extends State<PettyCashFormDialog> {
 				Navigator.of(context).pop(true); // Return true to indicate success
 				widget.onSuccess?.call();
 				final t = AppLocalizations.of(context);
-				ScaffoldMessenger.of(context).showSnackBar(
-					SnackBar(
-						content: Text(widget.pettyCash == null
-							? (t.localeName == 'fa' ? 'تنخواه گردان با موفقیت ایجاد شد' : 'Petty cash created successfully')
-							: (t.localeName == 'fa' ? 'تنخواه گردان با موفقیت به‌روزرسانی شد' : 'Petty cash updated successfully')
-						),
-						backgroundColor: Colors.green,
-					),
+				SnackBarHelper.showSuccess(
+					context,
+					message: widget.pettyCash == null
+						? (t.localeName == 'fa' ? 'تنخواه گردان با موفقیت ایجاد شد' : 'Petty cash created successfully')
+						: (t.localeName == 'fa' ? 'تنخواه گردان با موفقیت به‌روزرسانی شد' : 'Petty cash updated successfully'),
 				);
 			}
 		} catch (e) {

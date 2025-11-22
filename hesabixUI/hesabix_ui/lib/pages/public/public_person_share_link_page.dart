@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../models/public_person_share_payload.dart';
 import '../../models/public_invoice_details.dart';
 import '../../services/public_person_share_service.dart';
+import '../../utils/snackbar_helper.dart';
 
 class PublicPersonShareLinkPage extends StatefulWidget {
   final String code;

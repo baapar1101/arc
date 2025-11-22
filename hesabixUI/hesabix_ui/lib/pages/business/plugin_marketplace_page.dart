@@ -3,6 +3,7 @@ import '../../core/auth_store.dart';
 import '../../core/api_client.dart';
 import '../../services/marketplace_service.dart';
 import '../../services/wallet_service.dart';
+import '../../utils/snackbar_helper.dart';
 
 class PluginMarketplacePage extends StatefulWidget {
   final int businessId;
@@ -103,7 +104,7 @@ class _PluginMarketplacePageState extends State<PluginMarketplacePage> {
 
   void _showSnack(String msg) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    SnackBarHelper.show(context, message: msg);
   }
 
   @override

@@ -6,6 +6,8 @@ import '../../core/auth_store.dart';
 import '../../core/calendar_controller.dart';
 import '../../services/business_user_service.dart';
 import '../../models/business_user_model.dart';
+import '../../utils/number_normalizer.dart';
+import '../../utils/snackbar_helper.dart';
 
 class UsersPermissionsPage extends StatefulWidget {
   final String businessId;
@@ -75,14 +77,20 @@ class _UsersPermissionsPageState extends State<UsersPermissionsPage> {
       return;
     }
 
+    // Normalize phone number if it's a phone number (not email)
+    String emailOrPhone = _emailOrPhoneController.text.trim();
+    if (_isPhoneNumber(emailOrPhone)) {
+      emailOrPhone = normalizeIranianMobileToE164(emailOrPhone);
+    }
+
     // Check if trying to add business owner
-    if (_isTryingToAddOwner(_emailOrPhoneController.text.trim())) {
+    if (_isTryingToAddOwner(emailOrPhone)) {
       _showOwnerWarning();
       return;
     }
 
     // Check if user already exists
-    if (_isUserAlreadyAdded(_emailOrPhoneController.text.trim())) {
+    if (_isUserAlreadyAdded(emailOrPhone)) {
       _showAlreadyAddedWarning();
       return;
     }
@@ -92,7 +100,7 @@ class _UsersPermissionsPageState extends State<UsersPermissionsPage> {
     try {
       final request = AddUserRequest(
         businessId: int.parse(widget.businessId),
-        emailOrPhone: _emailOrPhoneController.text.trim(),
+        emailOrPhone: emailOrPhone,
       );
 
       final response = await _userService.addUser(request);
@@ -108,6 +116,20 @@ class _UsersPermissionsPageState extends State<UsersPermissionsPage> {
       if (!ctx.mounted) return;
       _showErrorSnackBar('${AppLocalizations.of(ctx).userAddFailed}: $e');
     }
+  }
+
+  /// بررسی می‌کند که آیا ورودی یک شماره تلفن است یا ایمیل
+  bool _isPhoneNumber(String input) {
+    // اگر شامل @ باشد، ایمیل است
+    if (input.contains('@')) {
+      return false;
+    }
+    
+    // حذف کاراکترهای غیرعددی (به جز +)
+    String cleaned = input.replaceAll(RegExp(r'[^\d+]'), '');
+    
+    // اگر فقط اعداد (و احتمالاً +) دارد و طول آن مناسب است، شماره تلفن است
+    return cleaned.length >= 10 && RegExp(r'^[\d+]+$').hasMatch(cleaned);
   }
 
 
