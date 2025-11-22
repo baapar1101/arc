@@ -342,23 +342,6 @@ class ReportsPage extends StatelessWidget {
       ),
     );
   }
-
-  void _showComingSoonDialog(BuildContext context, String title) {
-    final t = AppLocalizations.of(context);
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(title),
-        content: Text(t.reportsComingSoonMessage),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(t.close),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 

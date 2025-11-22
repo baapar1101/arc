@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:go_router/go_router.dart';
 import '../../services/warehouse_service.dart';
 import '../../services/invoice_service.dart';
 import '../../core/api_client.dart';
@@ -341,7 +342,12 @@ class _WarehouseDocsPageState extends State<WarehouseDocsPage> {
           endpoint: '/api/v1/warehouse-docs/business/${widget.businessId}/search',
           title: t.warehouseDocuments,
           showBackButton: true,
-          onBack: () => Navigator.of(context).maybePop(),
+          onBack: () {
+            if (!mounted) return;
+            if (context.canPop()) {
+              context.pop();
+            }
+          },
           showTableIcon: false,
           showSearch: true,
           showPagination: true,

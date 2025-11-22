@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/services/ai_service.dart';
 import 'package:hesabix_ui/models/ai_models.dart';
@@ -159,7 +160,10 @@ class _AISubscriptionPageState extends State<AISubscriptionPage> {
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new),
           onPressed: () {
-            Navigator.of(context).maybePop();
+            if (!mounted) return;
+            if (context.canPop()) {
+              context.pop();
+            }
           },
         ),
         actions: [

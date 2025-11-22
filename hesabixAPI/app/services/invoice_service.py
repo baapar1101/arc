@@ -485,6 +485,33 @@ def _extract_cogs_total(lines: List[Dict[str, Any]]) -> Decimal:
     return total
 
 
+def _extract_cogs_total_for_invoice(lines: List[Dict[str, Any]]) -> Decimal:
+    """
+    محاسبه COGS برای فاکتورها (بدون بررسی inventory_posted).
+    برای مصرف مستقیم، ضایعات و تولید استفاده می‌شود.
+    """
+    total = Decimal(0)
+    for line in lines:
+        info = line.get("extra_info") or {}
+        qty = Decimal(str(line.get("quantity", 0) or 0))
+        if qty <= 0:
+            continue
+        
+        # اولویت: cogs_amount > cost_price > unit_price
+        if info.get("cogs_amount") is not None:
+            total += Decimal(str(info.get("cogs_amount")))
+            continue
+        cost_price = info.get("cost_price")
+        if cost_price is not None:
+            total += (qty * Decimal(str(cost_price)))
+            continue
+        # fallback: use unit_price as cost if nothing provided
+        unit_price = info.get("unit_price")
+        if unit_price is not None:
+            total += (qty * Decimal(str(unit_price)))
+    return total
+
+
 def _resolve_accounts_for_invoice(db: Session, data: Dict[str, Any]) -> Dict[str, Account]:
     # امکان override از extra_info.account_codes
     overrides = ((data.get("extra_info") or {}).get("account_codes") or {})
@@ -1265,8 +1292,122 @@ def create_invoice(
 
         # Direct consumption / Waste / Production
         elif invoice_type in (INVOICE_DIRECT_CONSUMPTION, INVOICE_WASTE, INVOICE_PRODUCTION):
-            # برای این انواع، ثبت‌های موجودی و بهای تمام‌شده فقط در پست حواله انبار انجام می‌شود
-            pass
+            # برای این انواع، ثبت‌های موجودی و بهای تمام‌شده در فاکتور انجام می‌شود
+            # (نه فقط در پست حواله)
+            
+            if invoice_type == INVOICE_DIRECT_CONSUMPTION:
+                # محاسبه COGS برای مصرف مستقیم
+                total_cogs = _extract_cogs_total_for_invoice(lines_input)
+                
+                if total_cogs > 0:
+                    # بدهکار: هزینه مصرف مستقیم
+                    db.add(DocumentLine(
+                        document_id=document.id,
+                        account_id=accounts["direct_consumption"].id,
+                        debit=total_cogs,
+                        credit=Decimal(0),
+                        description="هزینه مصرف مستقیم کالا",
+                    ))
+                    
+                    # بستانکار: موجودی کالا
+                    db.add(DocumentLine(
+                        document_id=document.id,
+                        account_id=accounts["inventory"].id,
+                        debit=Decimal(0),
+                        credit=total_cogs,
+                        description="خروج کالا از موجودی (مصرف مستقیم)",
+                    ))
+            
+            elif invoice_type == INVOICE_WASTE:
+                # محاسبه COGS برای ضایعات
+                total_cogs = _extract_cogs_total_for_invoice(lines_input)
+                
+                if total_cogs > 0:
+                    # بدهکار: هزینه ضایعات
+                    db.add(DocumentLine(
+                        document_id=document.id,
+                        account_id=accounts["waste_expense"].id,
+                        debit=total_cogs,
+                        credit=Decimal(0),
+                        description="هزینه کسری و ضایعات کالا",
+                    ))
+                    
+                    # بستانکار: موجودی کالا
+                    db.add(DocumentLine(
+                        document_id=document.id,
+                        account_id=accounts["inventory"].id,
+                        debit=Decimal(0),
+                        credit=total_cogs,
+                        description="خروج کالا از موجودی (ضایعات)",
+                    ))
+            
+            elif invoice_type == INVOICE_PRODUCTION:
+                # جداسازی خطوط ورودی و خروجی
+                out_lines = [ln for ln in lines_input if (ln.get("extra_info") or {}).get("movement") == "out"]
+                in_lines = [ln for ln in lines_input if (ln.get("extra_info") or {}).get("movement") == "in"]
+                
+                # محاسبه COGS برای مواد اولیه (خروج)
+                total_materials_cost = _extract_cogs_total_for_invoice(out_lines)
+                
+                # محاسبه هزینه محصول نهایی (ورود)
+                # برای محصول نهایی، از cost_price استفاده می‌کنیم
+                total_finished_cost = Decimal(0)
+                for line in in_lines:
+                    extra_info = line.get("extra_info") or {}
+                    qty = Decimal(str(line.get("quantity", 0) or 0))
+                    if qty <= 0:
+                        continue
+                    
+                    # اولویت: cost_price > unit_price > مجموع هزینه مواد اولیه
+                    if extra_info.get("cost_price") is not None:
+                        cost_line = qty * Decimal(str(extra_info.get("cost_price")))
+                    elif extra_info.get("unit_price") is not None:
+                        cost_line = qty * Decimal(str(extra_info.get("unit_price")))
+                    else:
+                        # fallback: استفاده از مجموع هزینه مواد اولیه (اگر فقط یک خط ورودی باشد)
+                        cost_line = total_materials_cost if len(in_lines) == 1 else Decimal(0)
+                    
+                    total_finished_cost += cost_line
+                
+                # ثبت حسابداری برای مواد اولیه (خروج)
+                if total_materials_cost > 0:
+                    # بدهکار: WIP
+                    db.add(DocumentLine(
+                        document_id=document.id,
+                        account_id=accounts["wip"].id,
+                        debit=total_materials_cost,
+                        credit=Decimal(0),
+                        description="انتقال مواد اولیه به WIP",
+                    ))
+                    
+                    # بستانکار: موجودی کالا
+                    db.add(DocumentLine(
+                        document_id=document.id,
+                        account_id=accounts["inventory"].id,
+                        debit=Decimal(0),
+                        credit=total_materials_cost,
+                        description="خروج مواد اولیه از موجودی",
+                    ))
+                
+                # ثبت حسابداری برای محصول نهایی (ورود)
+                if total_finished_cost > 0:
+                    # بدهکار: موجودی کالا
+                    db.add(DocumentLine(
+                        document_id=document.id,
+                        account_id=accounts["inventory"].id,
+                        debit=total_finished_cost,
+                        credit=Decimal(0),
+                        description="ورود محصول نهایی به موجودی",
+                    ))
+                    
+                    # بستانکار: WIP
+                    db.add(DocumentLine(
+                        document_id=document.id,
+                        account_id=accounts["wip"].id,
+                        debit=Decimal(0),
+                        credit=total_finished_cost,
+                        description="انتقال محصول نهایی از WIP",
+                    ))
 
         # --- پورسانت فروشنده/بازاریاب (تکمیلی پس از ثبت خطوط انواع فاکتور) ---
         if invoice_type in (INVOICE_SALES, INVOICE_SALES_RETURN):
@@ -1782,14 +1923,115 @@ def update_invoice(
                     description=document.description,
                 ))
         elif inv_type == INVOICE_DIRECT_CONSUMPTION:
-            # Expense/Inventory in warehouse posting
-            pass
+            # محاسبه COGS برای مصرف مستقیم
+            total_cogs = _extract_cogs_total_for_invoice(lines_input)
+            
+            if total_cogs > 0:
+                # بدهکار: هزینه مصرف مستقیم
+                db.add(DocumentLine(
+                    document_id=document.id,
+                    account_id=accounts["direct_consumption"].id,
+                    debit=total_cogs,
+                    credit=Decimal(0),
+                    description="هزینه مصرف مستقیم کالا",
+                ))
+                
+                # بستانکار: موجودی کالا
+                db.add(DocumentLine(
+                    document_id=document.id,
+                    account_id=accounts["inventory"].id,
+                    debit=Decimal(0),
+                    credit=total_cogs,
+                    description="خروج کالا از موجودی (مصرف مستقیم)",
+                ))
         elif inv_type == INVOICE_WASTE:
-            # Expense/Inventory in warehouse posting
-            pass
+            # محاسبه COGS برای ضایعات
+            total_cogs = _extract_cogs_total_for_invoice(lines_input)
+            
+            if total_cogs > 0:
+                # بدهکار: هزینه ضایعات
+                db.add(DocumentLine(
+                    document_id=document.id,
+                    account_id=accounts["waste_expense"].id,
+                    debit=total_cogs,
+                    credit=Decimal(0),
+                    description="هزینه کسری و ضایعات کالا",
+                ))
+                
+                # بستانکار: موجودی کالا
+                db.add(DocumentLine(
+                    document_id=document.id,
+                    account_id=accounts["inventory"].id,
+                    debit=Decimal(0),
+                    credit=total_cogs,
+                    description="خروج کالا از موجودی (ضایعات)",
+                ))
         elif inv_type == INVOICE_PRODUCTION:
-            # WIP/Inventory in warehouse posting
-            pass
+            # جداسازی خطوط ورودی و خروجی
+            out_lines = [ln for ln in lines_input if (ln.get("extra_info") or {}).get("movement") == "out"]
+            in_lines = [ln for ln in lines_input if (ln.get("extra_info") or {}).get("movement") == "in"]
+            
+            # محاسبه COGS برای مواد اولیه (خروج)
+            total_materials_cost = _extract_cogs_total_for_invoice(out_lines)
+            
+            # محاسبه هزینه محصول نهایی (ورود)
+            total_finished_cost = Decimal(0)
+            for line in in_lines:
+                extra_info = line.get("extra_info") or {}
+                qty = Decimal(str(line.get("quantity", 0) or 0))
+                if qty <= 0:
+                    continue
+                
+                # اولویت: cost_price > unit_price > مجموع هزینه مواد اولیه
+                if extra_info.get("cost_price") is not None:
+                    cost_line = qty * Decimal(str(extra_info.get("cost_price")))
+                elif extra_info.get("unit_price") is not None:
+                    cost_line = qty * Decimal(str(extra_info.get("unit_price")))
+                else:
+                    # fallback: استفاده از مجموع هزینه مواد اولیه (اگر فقط یک خط ورودی باشد)
+                    cost_line = total_materials_cost if len(in_lines) == 1 else Decimal(0)
+                
+                total_finished_cost += cost_line
+            
+            # ثبت حسابداری برای مواد اولیه (خروج)
+            if total_materials_cost > 0:
+                # بدهکار: WIP
+                db.add(DocumentLine(
+                    document_id=document.id,
+                    account_id=accounts["wip"].id,
+                    debit=total_materials_cost,
+                    credit=Decimal(0),
+                    description="انتقال مواد اولیه به WIP",
+                ))
+                
+                # بستانکار: موجودی کالا
+                db.add(DocumentLine(
+                    document_id=document.id,
+                    account_id=accounts["inventory"].id,
+                    debit=Decimal(0),
+                    credit=total_materials_cost,
+                    description="خروج مواد اولیه از موجودی",
+                ))
+            
+            # ثبت حسابداری برای محصول نهایی (ورود)
+            if total_finished_cost > 0:
+                # بدهکار: موجودی کالا
+                db.add(DocumentLine(
+                    document_id=document.id,
+                    account_id=accounts["inventory"].id,
+                    debit=total_finished_cost,
+                    credit=Decimal(0),
+                    description="ورود محصول نهایی به موجودی",
+                ))
+                
+                # بستانکار: WIP
+                db.add(DocumentLine(
+                    document_id=document.id,
+                    account_id=accounts["wip"].id,
+                    debit=Decimal(0),
+                    credit=total_finished_cost,
+                    description="انتقال محصول نهایی از WIP",
+                ))
 
         # --- پورسانت فروشنده/بازاریاب (به‌صورت تکمیلی) ---
         if inv_type in (INVOICE_SALES, INVOICE_SALES_RETURN):

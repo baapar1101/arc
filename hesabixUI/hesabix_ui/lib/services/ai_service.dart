@@ -4,6 +4,9 @@ import 'package:flutter/foundation.dart';
 import '../core/api_client.dart';
 import '../models/ai_models.dart';
 
+// Enable debug prints
+bool get debugPrintEnabled => kDebugMode;
+
 class AIService {
   final ApiClient _api;
   AIService(this._api);
@@ -434,7 +437,26 @@ class AIService {
       query: query,
     );
     final body = res.data as Map<String, dynamic>;
-    return AIUsageStats.fromJson(body['data'] as Map<String, dynamic>);
+    debugPrint('[AIService] getUsageStats - Response body: $body');
+    
+    final data = body['data'];
+    debugPrint('[AIService] getUsageStats - data field: $data (type: ${data.runtimeType})');
+    
+    if (data == null || data is! Map<String, dynamic>) {
+      debugPrint('[AIService] getUsageStats - Invalid data format!');
+      throw Exception('Invalid response format: data field is missing or invalid. Got: ${data.runtimeType}');
+    }
+    
+    debugPrint('[AIService] getUsageStats - Parsing AIUsageStats from: $data');
+    try {
+      final stats = AIUsageStats.fromJson(data);
+      debugPrint('[AIService] getUsageStats - Successfully parsed AIUsageStats');
+      return stats;
+    } catch (e, stackTrace) {
+      debugPrint('[AIService] getUsageStats - Error parsing AIUsageStats: $e');
+      debugPrint('[AIService] getUsageStats - StackTrace: $stackTrace');
+      rethrow;
+    }
   }
 
   Future<List<AIUsageLog>> getUsageLogs({
@@ -456,8 +478,16 @@ class AIService {
       query: query,
     );
     final body = res.data as Map<String, dynamic>;
-    final data = body['data'] as List;
-    return data.map((e) => AIUsageLog.fromJson(e as Map<String, dynamic>)).toList();
+    final data = body['data'];
+    if (data == null || data is! List) {
+      return [];
+    }
+    return data.map((e) {
+      if (e is Map<String, dynamic>) {
+        return AIUsageLog.fromJson(e);
+      }
+      throw Exception('Invalid log entry format: $e');
+    }).toList();
   }
 
   Future<List<Map<String, dynamic>>> getInvoices({

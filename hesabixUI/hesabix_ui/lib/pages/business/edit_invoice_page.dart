@@ -697,7 +697,13 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
       );
       // بازگشت به لیست فاکتورها بعد از ذخیره موفق
       if (mounted) {
-        context.pop(true); // true به معنای موفقیت‌آمیز بودن ویرایش
+        // هدایت به لیست فاکتورها بعد از ویرایش موفق
+        context.goNamed(
+          'business_invoice',
+          pathParameters: {
+            'business_id': widget.businessId.toString(),
+          },
+        );
       }
     } catch (e) {
       if (!mounted) return;

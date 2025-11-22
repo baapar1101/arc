@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 /// مدل‌های مربوط به سیستم AI
 
 class AIConfig {
@@ -368,16 +370,94 @@ class AIUsageStats {
   });
 
   factory AIUsageStats.fromJson(Map<String, dynamic> json) {
-    return AIUsageStats(
-      period: Map<String, dynamic>.from(json['period'] as Map),
-      total: Map<String, dynamic>.from(json['total'] as Map),
-      daily: (json['daily'] as List)
-          .map((e) => Map<String, dynamic>.from(e as Map))
-          .toList(),
-      byModel: (json['by_model'] as List)
-          .map((e) => Map<String, dynamic>.from(e as Map))
-          .toList(),
-    );
+    // ignore: avoid_print
+    if (kDebugMode) {
+      print('[AIUsageStats] fromJson - Input JSON: $json');
+    }
+    
+    try {
+      final period = json['period'] != null 
+          ? Map<String, dynamic>.from(json['period'] as Map)
+          : <String, dynamic>{};
+      
+      if (kDebugMode) {
+        print('[AIUsageStats] fromJson - period: $period');
+      }
+      
+      final total = json['total'] != null
+          ? Map<String, dynamic>.from(json['total'] as Map)
+          : <String, dynamic>{
+              'total_tokens': 0,
+              'input_tokens': 0,
+              'output_tokens': 0,
+              'total_cost': 0.0,
+              'total_requests': 0,
+            };
+      
+      if (kDebugMode) {
+        print('[AIUsageStats] fromJson - total: $total');
+      }
+      
+      final dailyRaw = json['daily'];
+      final daily = dailyRaw != null && dailyRaw is List
+          ? dailyRaw
+              .map((e) {
+                try {
+                  return e is Map<String, dynamic> ? Map<String, dynamic>.from(e) : <String, dynamic>{};
+                } catch (err) {
+                  if (kDebugMode) {
+                    print('[AIUsageStats] fromJson - Error parsing daily entry: $e, error: $err');
+                  }
+                  return <String, dynamic>{};
+                }
+              })
+              .toList()
+          : <Map<String, dynamic>>[];
+      
+      if (kDebugMode) {
+        print('[AIUsageStats] fromJson - daily: $daily (length: ${daily.length})');
+      }
+      
+      final byModelRaw = json['by_model'];
+      final byModel = byModelRaw != null && byModelRaw is List
+          ? byModelRaw
+              .map((e) {
+                try {
+                  return e is Map<String, dynamic> ? Map<String, dynamic>.from(e) : <String, dynamic>{};
+                } catch (err) {
+                  if (kDebugMode) {
+                    print('[AIUsageStats] fromJson - Error parsing byModel entry: $e, error: $err');
+                  }
+                  return <String, dynamic>{};
+                }
+              })
+              .toList()
+          : <Map<String, dynamic>>[];
+      
+      if (kDebugMode) {
+        print('[AIUsageStats] fromJson - byModel: $byModel (length: ${byModel.length})');
+      }
+      
+      final result = AIUsageStats(
+        period: period,
+        total: total,
+        daily: daily,
+        byModel: byModel,
+      );
+      
+      if (kDebugMode) {
+        print('[AIUsageStats] fromJson - Successfully created AIUsageStats');
+      }
+      
+      return result;
+    } catch (e, stackTrace) {
+      // ignore: avoid_print
+      if (kDebugMode) {
+        print('[AIUsageStats] fromJson - Error: $e');
+        print('[AIUsageStats] fromJson - StackTrace: $stackTrace');
+      }
+      rethrow;
+    }
   }
 }
 

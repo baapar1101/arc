@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:data_table_2/data_table_2.dart';
 import 'package:dio/dio.dart';
+import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
@@ -1153,8 +1154,9 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
             message: MaterialLocalizations.of(context).backButtonTooltip,
             child: IconButton(
               onPressed: widget.config.onBack ?? () {
-                if (Navigator.of(context).canPop()) {
-                  Navigator.of(context).pop();
+                if (!mounted) return;
+                if (context.canPop()) {
+                  context.pop();
                 }
               },
               icon: const Icon(Icons.arrow_back),

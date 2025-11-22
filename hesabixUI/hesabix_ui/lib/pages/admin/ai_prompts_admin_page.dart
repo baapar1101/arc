@@ -155,8 +155,8 @@ class _AIPromptsAdminPageState extends State<AIPromptsAdminPage> {
                                 'content': contentController.text.trim(),
                                 'is_default': true,
                               };
-                              if (isEdit) {
-                                await _aiService.updateDefaultPrompt(prompt!.id!, data);
+                              if (isEdit && prompt.id != null) {
+                                await _aiService.updateDefaultPrompt(prompt.id!, data);
                               } else {
                                 await _aiService.createDefaultPrompt(data);
                               }

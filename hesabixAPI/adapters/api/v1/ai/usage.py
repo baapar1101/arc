@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Dict, Any, Optional
 from fastapi import APIRouter, Depends, Request, Query, Path
 from sqlalchemy.orm import Session
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 
 from adapters.db.session import get_db
 from app.core.auth_dependency import get_current_user, AuthContext
@@ -71,33 +71,46 @@ async def get_usage_stats(
         end_date=end
     )
     
+    # تبدیل تاریخ‌ها به فرمت ISO string
+    def format_date(d):
+        """تبدیل تاریخ به ISO string"""
+        if d is None:
+            return None
+        if isinstance(d, datetime):
+            return d.isoformat()
+        if isinstance(d, date):
+            return d.isoformat()
+        if isinstance(d, str):
+            return d
+        return str(d)
+    
     return success_response({
         "period": {
-            "start_date": start.isoformat(),
-            "end_date": end.isoformat()
+            "start_date": start.isoformat() if start else None,
+            "end_date": end.isoformat() if end else None
         },
         "total": {
-            "total_tokens": total_usage.get("total_tokens", 0),
-            "input_tokens": total_usage.get("input_tokens", 0),
-            "output_tokens": total_usage.get("output_tokens", 0),
-            "total_cost": float(total_usage.get("total_cost", 0)),
-            "total_requests": total_usage.get("total_requests", 0)
+            "total_tokens": int(total_usage.get("total_tokens", 0) or 0),
+            "input_tokens": int(total_usage.get("input_tokens", 0) or 0),
+            "output_tokens": int(total_usage.get("output_tokens", 0) or 0),
+            "total_cost": float(total_usage.get("total_cost", 0) or 0),
+            "total_requests": int(total_usage.get("total_requests", 0) or 0)
         },
         "daily": [
             {
-                "date": day["date"].isoformat() if isinstance(day["date"], datetime) else day["date"],
-                "tokens": day["tokens"],
-                "cost": float(day["cost"]),
-                "requests": day["requests"]
+                "date": format_date(day.get("date")),
+                "tokens": int(day.get("tokens", 0) or 0),
+                "cost": float(day.get("cost", 0) or 0),
+                "requests": int(day.get("requests", 0) or 0)
             }
             for day in daily_usage
         ],
         "by_model": [
             {
-                "model": model["model"],
-                "tokens": model["tokens"],
-                "cost": float(model["cost"]),
-                "requests": model["requests"]
+                "model": str(model.get("model", "")),
+                "tokens": int(model.get("tokens", 0) or 0),
+                "cost": float(model.get("cost", 0) or 0),
+                "requests": int(model.get("requests", 0) or 0)
             }
             for model in model_stats
         ]

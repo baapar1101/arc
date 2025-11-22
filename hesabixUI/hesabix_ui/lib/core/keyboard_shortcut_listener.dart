@@ -152,7 +152,7 @@ class _KeyboardShortcutListenerState extends State<KeyboardShortcutListener> {
           _keySequence.add(logicalKey);
         }
       }
-    } catch (e, stackTrace) {
+    } catch (e) {
     }
   }
 
@@ -180,7 +180,7 @@ class _KeyboardShortcutListenerState extends State<KeyboardShortcutListener> {
         
         // تلاش برای باز کردن دیالوگ
         _showDialogWithContext(contextToUse);
-      } catch (e, stackTrace) {
+      } catch (e) {
       }
     });
   }
@@ -209,7 +209,7 @@ class _KeyboardShortcutListenerState extends State<KeyboardShortcutListener> {
       }
       
       _showDialogDirectly(contextToUse);
-    } catch (e, stackTrace) {
+    } catch (e) {
     }
   }
 
@@ -248,9 +248,9 @@ class _KeyboardShortcutListenerState extends State<KeyboardShortcutListener> {
           return const PingPongDialog();
         },
       ).then((_) {
-      }).catchError((e, stackTrace) {
+      }).catchError((e) {
       });
-    } catch (e, stackTrace) {
+    } catch (e) {
       
       // آخرین تلاش: استفاده از showGeneralDialog
       try {

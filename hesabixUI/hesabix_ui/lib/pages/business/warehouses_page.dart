@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../../services/warehouse_service.dart';
 import '../../models/warehouse_model.dart';
 import '../../widgets/data_table/data_table_widget.dart';
@@ -34,7 +35,12 @@ class _WarehousesPageState extends State<WarehousesPage> {
           endpoint: '/api/v1/warehouses/business/${widget.businessId}/query',
           title: 'فهرست انبارها',
           showBackButton: true,
-          onBack: () => Navigator.of(context).maybePop(),
+          onBack: () {
+            if (!mounted) return;
+            if (context.canPop()) {
+              context.pop();
+            }
+          },
           showTableIcon: false,
           showSearch: true,
           showPagination: true,

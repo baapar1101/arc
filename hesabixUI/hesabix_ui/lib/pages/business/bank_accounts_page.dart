@@ -95,7 +95,12 @@ class _BankAccountsPageState extends State<BankAccountsPage> {
       reportSubtype: 'list',
       getExportParams: () => {'business_id': widget.businessId},
       showBackButton: true,
-      onBack: () => Navigator.of(context).maybePop(),
+      onBack: () {
+        if (!mounted) return;
+        if (context.canPop()) {
+          context.pop();
+        }
+      },
       showTableIcon: false,
       showRowNumbers: true,
       enableRowSelection: true,

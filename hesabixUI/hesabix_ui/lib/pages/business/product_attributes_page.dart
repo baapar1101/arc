@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../widgets/data_table/data_table_widget.dart';
 import '../../widgets/data_table/data_table_config.dart';
@@ -128,7 +129,12 @@ class _ProductAttributesPageState extends State<ProductAttributesPage> {
       endpoint: '/api/v1/product-attributes/business/${widget.businessId}/search',
       title: t.productAttributes,
       showBackButton: true,
-      onBack: () => Navigator.of(context).maybePop(),
+      onBack: () {
+        if (!mounted) return;
+        if (context.canPop()) {
+          context.pop();
+        }
+      },
       showTableIcon: false,
       columns: [
         TextColumn('title', t.title, width: ColumnWidth.large, formatter: (e) => e.title),

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/services/backup_service.dart';
 import 'package:file_saver/file_saver.dart';
@@ -156,6 +157,16 @@ class _BusinessBackupPageState extends State<BusinessBackupPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(t.dataBackup),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/business/${widget.businessId}/dashboard');
+            }
+          },
+        ),
       ),
       body: _buildBody(t),
       bottomNavigationBar: SafeArea(

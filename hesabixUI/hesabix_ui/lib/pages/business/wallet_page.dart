@@ -8,11 +8,7 @@ import '../../widgets/invoice/bank_account_combobox_widget.dart';
 import 'package:hesabix_ui/utils/number_formatters.dart' show formatWithThousands;
 import 'package:go_router/go_router.dart';
 import '../../core/api_client.dart';
-import 'package:url_launcher/url_launcher.dart';
-import 'package:url_launcher/link.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
-import 'package:dio/dio.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_widget.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
 import '../../core/calendar_controller.dart';
@@ -225,102 +221,6 @@ class _WalletPageState extends State<WalletPage> {
       onError: (error) {
         // خطا در ویجت مدیریت می‌شود
       },
-    );
-  }
-
-  Future<void> _openPaymentUrlWithFallback(String url) async {
-    // وب: تلاش برای باز کردن مستقیم؛ در صورت عدم موفقیت، دیالوگ جایگزین
-    if (kIsWeb) {
-      try {
-        final launched = await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
-        if (!launched) {
-          await _showOpenLinkDialog(url);
-        }
-      } catch (_) {
-        await _showOpenLinkDialog(url);
-      }
-      return;
-    }
-    // دسکتاپ/موبایل: باز کردن در مرورگر پیش‌فرض باFallback
-    try {
-      final launched = await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
-      if (!launched) {
-        await _showOpenLinkDialog(url);
-      }
-    } catch (_) {
-      await _showOpenLinkDialog(url);
-    }
-  }
-
-  void _showLoadingDialog(String message) {
-    showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => WillPopScope(
-        onWillPop: () async => false,
-        child: AlertDialog(
-          content: Row(
-            children: [
-              const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2)),
-              const SizedBox(width: 12),
-              Expanded(child: Text(message)),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Future<void> _showOpenLinkDialog(String url) async {
-    if (!mounted) return;
-    await showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(AppLocalizations.of(context).walletOpenGatewayDialogTitle),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(AppLocalizations.of(context).walletOpenGatewayDialogInstructions),
-            const SizedBox(height: 8),
-            SelectableText(url),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () async {
-              await Clipboard.setData(ClipboardData(text: url));
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(AppLocalizations.of(context).copied)));
-              }
-            },
-            child: Text(AppLocalizations.of(context).copyLink),
-          ),
-          if (kIsWeb)
-            Link(
-              uri: Uri.parse(url),
-              target: LinkTarget.blank,
-              builder: (context, followLink) => FilledButton(
-                onPressed: () {
-                  followLink?.call();
-                  Navigator.of(ctx).pop();
-                },
-                child: Text(AppLocalizations.of(context).open),
-              ),
-            )
-          else
-            FilledButton(
-              onPressed: () async {
-                try {
-                  await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
-                } finally {
-                  if (ctx.mounted) Navigator.of(ctx).pop();
-                }
-              },
-              child: Text(AppLocalizations.of(context).open),
-            ),
-        ],
-      ),
     );
   }
 

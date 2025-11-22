@@ -1521,9 +1521,14 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
           duration: const Duration(seconds: 2),
         ),
       );
-      // بازگشت به لیست فاکتورها بعد از ثبت موفق
+      // هدایت به لیست فاکتورها بعد از ثبت موفق
       if (mounted) {
-        context.pop(true); // true به معنای موفقیت‌آمیز بودن ثبت
+        context.goNamed(
+          'business_invoice',
+          pathParameters: {
+            'business_id': widget.businessId.toString(),
+          },
+        );
       }
     } catch (e) {
       _showError(t.saveInvoiceErrorWithMessage(e.toString()));

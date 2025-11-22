@@ -94,6 +94,16 @@ class AIUsageLogRepository(BaseRepository[AIUsageLog]):
             func.count(self.model_class.id).label('total_requests')
         ).first()
         
+        # Handle case when no records exist
+        if stats is None:
+            return {
+                "input_tokens": 0,
+                "output_tokens": 0,
+                "total_tokens": 0,
+                "total_cost": 0.0,
+                "total_requests": 0
+            }
+        
         total_tokens = int((stats.input_tokens or 0) + (stats.output_tokens or 0))
         
         return {

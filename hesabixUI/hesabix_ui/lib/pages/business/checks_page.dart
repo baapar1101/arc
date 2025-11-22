@@ -67,7 +67,12 @@ class _ChecksPageState extends State<ChecksPage> {
       getExportParams: () => {'business_id': widget.businessId, if (_selectedPerson != null) 'person_id': _selectedPerson!.id},
       additionalParams: { if (_selectedPerson != null) 'person_id': _selectedPerson!.id },
       showBackButton: true,
-      onBack: () => Navigator.of(context).maybePop(),
+      onBack: () {
+        if (!mounted) return;
+        if (context.canPop()) {
+          context.pop();
+        }
+      },
       showTableIcon: false,
       showRowNumbers: true,
       enableRowSelection: true,

@@ -67,7 +67,6 @@ class _AIPlansAdminPageState extends State<AIPlansAdminPage> {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) {
-          final theme = Theme.of(context);
           return Dialog(
             child: Container(
               width: MediaQuery.of(context).size.width * 0.9,
@@ -238,8 +237,6 @@ class _AIPlansAdminPageState extends State<AIPlansAdminPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     if (_loading) {
       return Scaffold(
         appBar: AppBar(title: const Text('پلن‌های AI')),

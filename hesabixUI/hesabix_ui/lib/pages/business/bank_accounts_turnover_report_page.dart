@@ -38,9 +38,6 @@ class _BankAccountsTurnoverReportPageState extends State<BankAccountsTurnoverRep
   List<Map<String, dynamic>> _fiscalYears = [];
   List<Map<String, dynamic>> _currencies = [];
   List<Map<String, dynamic>> _bankAccounts = [];
-  
-  // Summary from API response
-  Map<String, dynamic>? _summary;
 
   @override
   void initState() {

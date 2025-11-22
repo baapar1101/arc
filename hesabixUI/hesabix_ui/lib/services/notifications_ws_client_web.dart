@@ -16,6 +16,13 @@ class WebNotificationsWsClient implements NotificationsWsClient {
           : apiBase.replaceFirst('http://', 'ws://');
       final url = '$wsBase/ws/notifications?api_key=$apiKey';
       _ws = web.WebSocket(url);
+      
+      // Handle connection errors silently
+      _ws!.onError.listen((web.Event _) {
+        // Connection failed, silently ignore
+        _ws = null;
+      });
+      
       _ws!.onMessage.listen((web.MessageEvent e) {
         try {
           final data = e.data;
@@ -24,9 +31,17 @@ class WebNotificationsWsClient implements NotificationsWsClient {
             final Map<String, dynamic> msg = jsonDecode(jsonStr) as Map<String, dynamic>;
             onMessage?.call(msg);
           }
-        } catch (_) {}
+        } catch (_) {
+          // Ignore message parsing errors
+        }
+      });
+      
+      // Handle close events
+      _ws!.onClose.listen((web.CloseEvent _) {
+        _ws = null;
       });
     } catch (_) {
+      // Silently ignore connection errors - WebSocket is optional
       _ws = null;
     }
   }

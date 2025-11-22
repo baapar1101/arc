@@ -5,6 +5,7 @@ import '../../utils/date_formatters.dart';
 import '../../services/profile_dashboard_service.dart';
 import '../../services/announcements_service.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hesabix_ui/l10n/app_localizations.dart';
 
 class ProfileDashboardPage extends StatefulWidget {
   const ProfileDashboardPage({super.key});
@@ -202,9 +203,10 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> {
 
   Widget _buildGridTile(DashboardLayoutItem item, int totalColumns) {
     final data = _data[item.key];
+    final l10n = AppLocalizations.of(context);
     if (data == null) {
       return _buildCard(
-        title: _titleForKey(item.key),
+        title: _titleForKey(item.key, l10n),
         child: const Center(child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2))),
       );
     }
@@ -242,7 +244,7 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> {
             onPressed: _reloadDataOnly,
           );
     final card = _buildCard(
-      title: _titleForKey(item.key),
+      title: _titleForKey(item.key, l10n),
       trailing: trailing,
       child: builder(context, data, item, onRefresh: _reloadDataOnly),
     );
@@ -327,12 +329,14 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> {
     } catch (_) {}
   }
 
-  String _titleForKey(String key) {
+  String _titleForKey(String key, AppLocalizations l10n) {
     switch (key) {
       case 'profile_recent_businesses':
         return 'کسب‌وکارهای شما';
       case 'profile_announcements':
         return 'اعلان‌ها';
+      case 'profile_support_tickets':
+        return l10n.supportTickets;
       default:
         return key;
     }

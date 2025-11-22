@@ -965,7 +965,12 @@ class _ProductsPageState extends State<ProductsPage> {
           reportModuleKey: 'products',
           reportSubtype: 'list',
           showBackButton: true,
-          onBack: () => Navigator.of(context).maybePop(),
+          onBack: () {
+            if (!mounted) return;
+            if (context.canPop()) {
+              context.pop();
+            }
+          },
           showTableIcon: false,
           showRowNumbers: true,
           enableRowSelection: true,

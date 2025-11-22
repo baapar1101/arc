@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/services/ai_service.dart';
 import 'package:hesabix_ui/models/ai_models.dart';
@@ -24,7 +25,6 @@ class _AIUsagePageState extends State<AIUsagePage> {
   bool _loading = true;
   String? _error;
   AIUsageStats? _stats;
-  List<AIUsageLog> _logs = [];
   int _selectedTab = 0;
 
   @override
@@ -36,24 +36,38 @@ class _AIUsagePageState extends State<AIUsagePage> {
   }
 
   Future<void> _load() async {
+    debugPrint('[AIUsagePage] شروع بارگذاری داده‌ها...');
+    debugPrint('[AIUsagePage] businessId: ${widget.businessId}');
+    
     setState(() {
       _loading = true;
       _error = null;
     });
+    
     try {
+      debugPrint('[AIUsagePage] در حال دریافت آمار...');
       final stats = await _aiService.getUsageStats(
         businessId: widget.businessId,
       );
-      final logs = await _aiService.getUsageLogs(
-        businessId: widget.businessId,
-        limit: 50,
-      );
+      debugPrint('[AIUsagePage] آمار دریافت شد');
+      debugPrint('[AIUsagePage] total: ${stats.total}');
+      debugPrint('[AIUsagePage] daily length: ${stats.daily.length}');
+      debugPrint('[AIUsagePage] byModel length: ${stats.byModel.length}');
+      
+      if (!mounted) return;
+      
       setState(() {
         _stats = stats;
-        _logs = logs;
         _loading = false;
       });
-    } catch (e) {
+      
+      debugPrint('[AIUsagePage] بارگذاری با موفقیت انجام شد');
+    } catch (e, stackTrace) {
+      debugPrint('[AIUsagePage] خطا در بارگذاری: $e');
+      debugPrint('[AIUsagePage] StackTrace: $stackTrace');
+      
+      if (!mounted) return;
+      
       setState(() {
         _error = '$e';
         _loading = false;
@@ -68,7 +82,19 @@ class _AIUsagePageState extends State<AIUsagePage> {
 
     if (_loading) {
       return Scaffold(
-        appBar: AppBar(title: const Text('آمار استفاده از AI')),
+        appBar: AppBar(
+          title: const Text('آمار استفاده از AI'),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () {
+              if (context.canPop()) {
+                context.pop();
+              } else if (widget.businessId != null) {
+                context.go('/business/${widget.businessId}/dashboard');
+              }
+            },
+          ),
+        ),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
@@ -76,6 +102,16 @@ class _AIUsagePageState extends State<AIUsagePage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('آمار استفاده از AI'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else if (widget.businessId != null) {
+              context.go('/business/${widget.businessId}/dashboard');
+            }
+          },
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -117,11 +153,29 @@ class _AIUsagePageState extends State<AIUsagePage> {
   }
 
   Widget _buildStatsTab(ThemeData theme, NumberFormat numberFormat) {
-    if (_stats == null) {
+    final stats = _stats;
+    debugPrint('[AIUsagePage] _buildStatsTab - stats: ${stats != null}');
+    
+    if (stats == null) {
+      debugPrint('[AIUsagePage] _buildStatsTab - stats is null, نمایش پیام خالی');
       return const Center(child: Text('داده‌ای وجود ندارد'));
     }
 
-    return SingleChildScrollView(
+    try {
+      debugPrint('[AIUsagePage] _buildStatsTab - استخراج مقادیر از stats.total');
+      debugPrint('[AIUsagePage] stats.total: ${stats.total}');
+      
+      final totalTokens = (stats.total['total_tokens'] as num?)?.toInt() ?? 0;
+      final totalCost = (stats.total['total_cost'] as num?)?.toDouble() ?? 0.0;
+      final totalRequests = (stats.total['total_requests'] as num?)?.toInt() ?? 0;
+      final inputTokens = (stats.total['input_tokens'] as num?)?.toInt() ?? 0;
+      
+      debugPrint('[AIUsagePage] totalTokens: $totalTokens, totalCost: $totalCost, totalRequests: $totalRequests, inputTokens: $inputTokens');
+      
+      debugPrint('[AIUsagePage] ساخت SingleChildScrollView...');
+      debugPrint('[AIUsagePage] theme.textTheme.titleLarge: ${theme.textTheme.titleLarge}');
+      
+      return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -132,7 +186,7 @@ class _AIUsagePageState extends State<AIUsagePage> {
               Expanded(
                 child: _StatCard(
                   label: 'کل توکن',
-                  value: numberFormat.format(_stats!.total['total_tokens'] ?? 0),
+                  value: numberFormat.format(totalTokens),
                   icon: Icons.token_outlined,
                   color: Colors.blue,
                 ),
@@ -141,7 +195,7 @@ class _AIUsagePageState extends State<AIUsagePage> {
               Expanded(
                 child: _StatCard(
                   label: 'کل هزینه',
-                  value: '${numberFormat.format(_stats!.total['total_cost'] ?? 0)} تومان',
+                  value: '${numberFormat.format(totalCost)} تومان',
                   icon: Icons.attach_money,
                   color: Colors.green,
                 ),
@@ -154,7 +208,7 @@ class _AIUsagePageState extends State<AIUsagePage> {
               Expanded(
                 child: _StatCard(
                   label: 'کل درخواست‌ها',
-                  value: numberFormat.format(_stats!.total['total_requests'] ?? 0),
+                  value: numberFormat.format(totalRequests),
                   icon: Icons.request_quote_outlined,
                   color: Colors.orange,
                 ),
@@ -163,7 +217,7 @@ class _AIUsagePageState extends State<AIUsagePage> {
               Expanded(
                 child: _StatCard(
                   label: 'توکن ورودی',
-                  value: numberFormat.format(_stats!.total['input_tokens'] ?? 0),
+                  value: numberFormat.format(inputTokens),
                   icon: Icons.input_outlined,
                   color: Colors.purple,
                 ),
@@ -171,62 +225,139 @@ class _AIUsagePageState extends State<AIUsagePage> {
             ],
           ),
           const SizedBox(height: 24),
-          // Daily Stats
+          // Daily Stats Table
           Card(
             child: Padding(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.all(16),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Text(
                     'آمار روزانه',
-                    style: theme.textTheme.titleLarge,
+                    style: theme.textTheme.titleLarge ?? theme.textTheme.titleMedium,
                   ),
                   const SizedBox(height: 16),
-                  if (_stats!.daily.isEmpty)
-                    const Center(child: Text('داده‌ای وجود ندارد'))
+                  if (stats.daily.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.all(32.0),
+                      child: Center(child: Text('داده‌ای وجود ندارد')),
+                    )
                   else
-                    ..._stats!.daily.map((day) {
-                      final date = DateTime.parse(day['date'] as String);
-                      return ListTile(
-                        leading: const Icon(Icons.calendar_today),
-                        title: Text(DateFormat('yyyy/MM/dd', 'fa').format(date)),
-                        subtitle: Text(
-                          '${numberFormat.format(day['tokens'])} توکن • ${numberFormat.format(day['cost'])} تومان',
-                        ),
-                        trailing: Text('${day['requests']} درخواست'),
-                      );
-                    }),
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: DataTable(
+                        columns: const [
+                          DataColumn(label: Text('تاریخ')),
+                          DataColumn(label: Text('توکن'), numeric: true),
+                          DataColumn(label: Text('هزینه'), numeric: true),
+                          DataColumn(label: Text('درخواست'), numeric: true),
+                        ],
+                        rows: stats.daily.map((day) {
+                          try {
+                            final dateStr = day['date'];
+                            DateTime date;
+                            String dateFormatted = '';
+                            if (dateStr is String) {
+                              try {
+                                date = DateTime.parse(dateStr);
+                                dateFormatted = DateFormat('yyyy/MM/dd', 'fa').format(date);
+                              } catch (e) {
+                                dateFormatted = dateStr.toString();
+                              }
+                            } else if (dateStr is DateTime) {
+                              date = dateStr;
+                              dateFormatted = DateFormat('yyyy/MM/dd', 'fa').format(date);
+                            } else {
+                              dateFormatted = dateStr?.toString() ?? '';
+                            }
+                            
+                            final tokens = (day['tokens'] as num?)?.toInt() ?? 0;
+                            final cost = (day['cost'] as num?)?.toDouble() ?? 0.0;
+                            final requests = (day['requests'] as num?)?.toInt() ?? 0;
+                            
+                            return DataRow(
+                              cells: [
+                                DataCell(Text(dateFormatted)),
+                                DataCell(Text(numberFormat.format(tokens))),
+                                DataCell(Text('${numberFormat.format(cost)} تومان')),
+                                DataCell(Text(numberFormat.format(requests))),
+                              ],
+                            );
+                          } catch (e) {
+                            debugPrint('[AIUsagePage] خطا در پردازش daily entry: $e');
+                            return DataRow(
+                              cells: [
+                                const DataCell(Text('خطا')),
+                                const DataCell(Text('-')),
+                                const DataCell(Text('-')),
+                                const DataCell(Text('-')),
+                              ],
+                            );
+                          }
+                        }).toList(),
+                      ),
+                    ),
                 ],
               ),
             ),
           ),
           const SizedBox(height: 24),
-          // By Model
+          // By Model Table
           Card(
             child: Padding(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.all(16),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Text(
                     'بر اساس مدل',
-                    style: theme.textTheme.titleLarge,
+                    style: theme.textTheme.titleLarge ?? theme.textTheme.titleMedium,
                   ),
                   const SizedBox(height: 16),
-                  if (_stats!.byModel.isEmpty)
-                    const Center(child: Text('داده‌ای وجود ندارد'))
+                  if (stats.byModel.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.all(32.0),
+                      child: Center(child: Text('داده‌ای وجود ندارد')),
+                    )
                   else
-                    ..._stats!.byModel.map((model) {
-                      return ListTile(
-                        leading: const Icon(Icons.smart_toy),
-                        title: Text(model['model'] as String),
-                        subtitle: Text(
-                          '${numberFormat.format(model['tokens'])} توکن • ${numberFormat.format(model['cost'])} تومان',
-                        ),
-                        trailing: Text('${model['requests']} درخواست'),
-                      );
-                    }),
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: DataTable(
+                        columns: const [
+                          DataColumn(label: Text('مدل')),
+                          DataColumn(label: Text('توکن'), numeric: true),
+                          DataColumn(label: Text('هزینه'), numeric: true),
+                          DataColumn(label: Text('درخواست'), numeric: true),
+                        ],
+                        rows: stats.byModel.map((model) {
+                          try {
+                            final modelName = model['model'] as String? ?? 'نامشخص';
+                            final tokens = (model['tokens'] as num?)?.toInt() ?? 0;
+                            final cost = (model['cost'] as num?)?.toDouble() ?? 0.0;
+                            final requests = (model['requests'] as num?)?.toInt() ?? 0;
+                            
+                            return DataRow(
+                              cells: [
+                                DataCell(Text(modelName)),
+                                DataCell(Text(numberFormat.format(tokens))),
+                                DataCell(Text('${numberFormat.format(cost)} تومان')),
+                                DataCell(Text(numberFormat.format(requests))),
+                              ],
+                            );
+                          } catch (e) {
+                            debugPrint('[AIUsagePage] خطا در پردازش model entry: $e');
+                            return DataRow(
+                              cells: [
+                                const DataCell(Text('خطا')),
+                                const DataCell(Text('-')),
+                                const DataCell(Text('-')),
+                                const DataCell(Text('-')),
+                              ],
+                            );
+                          }
+                        }).toList(),
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -234,48 +365,103 @@ class _AIUsagePageState extends State<AIUsagePage> {
         ],
       ),
     );
+    } catch (e, stackTrace) {
+      debugPrint('[AIUsagePage] خطا در _buildStatsTab: $e');
+      debugPrint('[AIUsagePage] StackTrace: $stackTrace');
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline, size: 48, color: Colors.red),
+            const SizedBox(height: 16),
+            Text('خطا در نمایش آمار: $e'),
+            const SizedBox(height: 8),
+            ElevatedButton(
+              onPressed: _load,
+              child: const Text('تلاش مجدد'),
+            ),
+          ],
+        ),
+      );
+    }
   }
 
   Widget _buildLogsTab(ThemeData theme, NumberFormat numberFormat) {
-    return _logs.isEmpty
-        ? const Center(child: Text('لاگی وجود ندارد'))
-        : RefreshIndicator(
-            onRefresh: _load,
-            child: ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: _logs.length,
-              itemBuilder: (context, index) {
-                final log = _logs[index];
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  child: ListTile(
-                    leading: CircleAvatar(
-                      child: Text(log.model.substring(0, 1).toUpperCase()),
-                    ),
-                    title: Text(log.model),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Provider: ${log.provider}'),
-                        Text(
-                          '${numberFormat.format(log.totalTokens)} توکن • ${numberFormat.format(log.cost)} تومان',
-                        ),
-                        if (log.createdAt != null)
-                          Text(
-                            DateFormat('yyyy/MM/dd HH:mm', 'fa').format(log.createdAt!),
-                            style: theme.textTheme.bodySmall,
-                          ),
-                      ],
-                    ),
-                    trailing: Chip(
-                      label: Text(log.paymentMethod),
-                      labelStyle: theme.textTheme.bodySmall,
-                    ),
-                  ),
-                );
-              },
+    return FutureBuilder<List<AIUsageLog>>(
+      future: _aiService.getUsageLogs(
+        businessId: widget.businessId,
+        limit: 100,
+        skip: 0,
+      ),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        
+        if (snapshot.hasError) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text('خطا: ${snapshot.error}'),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: _load,
+                  child: const Text('تلاش مجدد'),
+                ),
+              ],
             ),
           );
+        }
+        
+        final logs = snapshot.data ?? [];
+        
+        if (logs.isEmpty) {
+          return const Center(child: Text('لاگی وجود ندارد'));
+        }
+        
+        return SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: SingleChildScrollView(
+            child: DataTable(
+              columns: const [
+                DataColumn(label: Text('مدل')),
+                DataColumn(label: Text('ارائه‌دهنده')),
+                DataColumn(label: Text('توکن ورودی'), numeric: true),
+                DataColumn(label: Text('توکن خروجی'), numeric: true),
+                DataColumn(label: Text('کل توکن'), numeric: true),
+                DataColumn(label: Text('هزینه'), numeric: true),
+                DataColumn(label: Text('روش پرداخت')),
+                DataColumn(label: Text('تاریخ')),
+              ],
+              rows: logs.map((log) {
+                String dateFormatted = '';
+                if (log.createdAt != null) {
+                  try {
+                    dateFormatted = DateFormat('yyyy/MM/dd HH:mm', 'fa').format(log.createdAt as DateTime);
+                  } catch (e) {
+                    dateFormatted = log.createdAt.toString();
+                  }
+                }
+                
+                return DataRow(
+                  cells: [
+                    DataCell(Text(log.model)),
+                    DataCell(Text(log.provider)),
+                    DataCell(Text(numberFormat.format(log.inputTokens))),
+                    DataCell(Text(numberFormat.format(log.outputTokens))),
+                    DataCell(Text(numberFormat.format(log.totalTokens))),
+                    DataCell(Text('${numberFormat.format(log.cost)} تومان')),
+                    DataCell(Text(log.paymentMethod)),
+                    DataCell(Text(dateFormatted)),
+                  ],
+                );
+              }).toList(),
+            ),
+          ),
+        );
+      },
+    );
   }
 }
 
@@ -323,7 +509,10 @@ class _StatCard extends StatelessWidget {
             const SizedBox(height: 12),
             Text(
               value,
-              style: theme.textTheme.headlineSmall?.copyWith(
+              style: (theme.textTheme.headlineSmall ?? theme.textTheme.titleLarge ?? theme.textTheme.titleMedium)?.copyWith(
+                fontWeight: FontWeight.bold,
+              ) ?? TextStyle(
+                fontSize: 24,
                 fontWeight: FontWeight.bold,
               ),
             ),

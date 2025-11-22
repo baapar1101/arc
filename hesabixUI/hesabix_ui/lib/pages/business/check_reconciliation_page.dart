@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../core/auth_store.dart';
 import '../../core/calendar_controller.dart';
@@ -62,7 +63,19 @@ class _CheckReconciliationPageState extends State<CheckReconciliationPage> with 
 
     if (!widget.authStore.canReadSection('checks')) {
       return Scaffold(
-        appBar: AppBar(title: const Text('راس‌گیری چک‌ها')),
+        appBar: AppBar(
+          title: const Text('راس‌گیری چک‌ها'),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () {
+              if (context.canPop()) {
+                context.pop();
+              } else {
+                context.go('/business/${widget.businessId}/dashboard');
+              }
+            },
+          ),
+        ),
         body: const Center(child: Text('دسترسی ندارید')),
       );
     }
@@ -70,6 +83,16 @@ class _CheckReconciliationPageState extends State<CheckReconciliationPage> with 
     return Scaffold(
       appBar: AppBar(
         title: const Text('راس‌گیری چک‌ها'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/business/${widget.businessId}/dashboard');
+            }
+          },
+        ),
         bottom: TabBar(
           controller: _tabController,
           tabs: const [

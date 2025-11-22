@@ -194,6 +194,21 @@ class _BomEditorDialogState extends State<BomEditorDialog> with SingleTickerProv
                     BomItem(lineNo: newLineNo, componentProductId: -1, qtyPer: 1),
                   ];
                   _itemSelectedProducts = [..._itemSelectedProducts, null];
+                  // به‌روزرسانی line_no همه سطرها
+                  for (var i = 0; i < _items.length; i++) {
+                    if (_items[i].lineNo != i + 1) {
+                      _items[i] = BomItem(
+                        lineNo: i + 1,
+                        componentProductId: _items[i].componentProductId,
+                        qtyPer: _items[i].qtyPer,
+                        uom: _items[i].uom,
+                        wastagePercent: _items[i].wastagePercent,
+                        isOptional: _items[i].isOptional,
+                        substituteGroup: _items[i].substituteGroup,
+                        suggestedWarehouseId: _items[i].suggestedWarehouseId,
+                      );
+                    }
+                  }
                 });
               },
               icon: const Icon(Icons.add),
@@ -207,37 +222,33 @@ class _BomEditorDialogState extends State<BomEditorDialog> with SingleTickerProv
               separatorBuilder: (separatorContext, separatorIndex) => const Divider(height: 1),
               itemBuilder: (context, index) {
                 final it = _items[index];
-                // به‌روزرسانی خودکار line_no بر اساس index
                 final actualLineNo = index + 1;
-                if (it.lineNo != actualLineNo) {
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    _updateItem(index, lineNo: actualLineNo);
-                  });
-                }
-                final qtyCtrl = TextEditingController(text: it.qtyPer.toString());
-                final uomCtrl = TextEditingController(text: it.uom ?? '');
-                final wastCtrl = TextEditingController(text: it.wastagePercent?.toString() ?? '');
-                final substCtrl = TextEditingController(text: it.substituteGroup ?? '');
-                return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: Column(
-                    children: [
-                      Row(
+                return StatefulBuilder(
+                  builder: (context, setStateLocal) {
+                    final qtyCtrl = TextEditingController(text: it.qtyPer.toString());
+                    final uomCtrl = TextEditingController(text: it.uom ?? '');
+                    final wastCtrl = TextEditingController(text: it.wastagePercent?.toString() ?? '');
+                    final substCtrl = TextEditingController(text: it.substituteGroup ?? '');
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Column(
                         children: [
-                          Expanded(
-                            child: Tooltip(
-                              message: 'شماره ردیف به صورت خودکار تنظیم می‌شود',
-                              child: TextField(
-                                controller: TextEditingController(text: actualLineNo.toString()),
-                                enabled: false,
-                                decoration: const InputDecoration(
-                                  labelText: 'ردیف',
-                                  border: OutlineInputBorder(),
-                                  filled: true,
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Tooltip(
+                                  message: 'شماره ردیف به صورت خودکار تنظیم می‌شود',
+                                  child: TextField(
+                                    controller: TextEditingController(text: actualLineNo.toString()),
+                                    enabled: false,
+                                    decoration: const InputDecoration(
+                                      labelText: 'ردیف',
+                                      border: OutlineInputBorder(),
+                                      filled: true,
+                                    ),
+                                  ),
                                 ),
                               ),
-                            ),
-                          ),
                           const SizedBox(width: 8),
                           Expanded(
                             flex: 2,
@@ -282,54 +293,73 @@ class _BomEditorDialogState extends State<BomEditorDialog> with SingleTickerProv
                             (v) => _updateItem(index, wastagePercent: double.tryParse(v)),
                           ),
                           const SizedBox(width: 8),
-                          IconButton(
-                            onPressed: () => setState(() {
-                              _items.removeAt(index);
-                              _itemSelectedProducts.removeAt(index);
-                            }),
-                            icon: const Icon(Icons.delete_outline),
-                            tooltip: 'حذف سطر',
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Tooltip(
-                              message: 'گروه جایگزین: کالاهای با گروه یکسان می‌توانند جایگزین یکدیگر شوند',
-                              child: _text(substCtrl, 'گروه جایگزین', (v) => _updateItem(index, substituteGroup: v.isEmpty ? null : v)),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Tooltip(
-                              message: 'انبار پیشنهادی برای برداشت این ماده اولیه در سند تولید',
-                              child: WarehouseComboboxWidget(
-                                businessId: widget.businessId,
-                                selectedWarehouseId: it.suggestedWarehouseId,
-                                label: 'انبار پیشنهادی',
-                                hintText: 'انتخاب انبار',
-                                onChanged: (warehouseId) => _updateItem(index, suggestedWarehouseId: warehouseId),
+                              IconButton(
+                                onPressed: () {
+                                  setState(() {
+                                    _items.removeAt(index);
+                                    _itemSelectedProducts.removeAt(index);
+                                    // به‌روزرسانی line_no سطرهای باقی‌مانده
+                                    for (var i = 0; i < _items.length; i++) {
+                                      if (_items[i].lineNo != i + 1) {
+                                        _items[i] = BomItem(
+                                          lineNo: i + 1,
+                                          componentProductId: _items[i].componentProductId,
+                                          qtyPer: _items[i].qtyPer,
+                                          uom: _items[i].uom,
+                                          wastagePercent: _items[i].wastagePercent,
+                                          isOptional: _items[i].isOptional,
+                                          substituteGroup: _items[i].substituteGroup,
+                                          suggestedWarehouseId: _items[i].suggestedWarehouseId,
+                                        );
+                                      }
+                                    }
+                                  });
+                                },
+                                icon: const Icon(Icons.delete_outline),
+                                tooltip: 'حذف سطر',
                               ),
-                            ),
+                            ],
                           ),
-                          const SizedBox(width: 8),
-                          Tooltip(
-                            message: 'اگر فعال باشد، این ماده اولیه اختیاری است و می‌تواند در تولید استفاده نشود',
-                            child: CheckboxListTile(
-                              value: it.isOptional,
-                              onChanged: (v) => _updateItem(index, isOptional: v ?? false),
-                              title: const Text('اختیاری'),
-                              controlAffinity: ListTileControlAffinity.leading,
-                              contentPadding: EdgeInsets.zero,
-                              dense: true,
-                            ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Tooltip(
+                                  message: 'گروه جایگزین: کالاهای با گروه یکسان می‌توانند جایگزین یکدیگر شوند',
+                                  child: _text(substCtrl, 'گروه جایگزین', (v) => _updateItem(index, substituteGroup: v.isEmpty ? null : v)),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Tooltip(
+                                  message: 'انبار پیشنهادی برای برداشت این ماده اولیه در سند تولید',
+                                  child: WarehouseComboboxWidget(
+                                    businessId: widget.businessId,
+                                    selectedWarehouseId: it.suggestedWarehouseId,
+                                    label: 'انبار پیشنهادی',
+                                    hintText: 'انتخاب انبار',
+                                    onChanged: (warehouseId) => _updateItem(index, suggestedWarehouseId: warehouseId),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Tooltip(
+                                message: 'اگر فعال باشد، این ماده اولیه اختیاری است و می‌تواند در تولید استفاده نشود',
+                                child: CheckboxListTile(
+                                  value: it.isOptional,
+                                  onChanged: (v) => _updateItem(index, isOptional: v ?? false),
+                                  title: const Text('اختیاری'),
+                                  controlAffinity: ListTileControlAffinity.leading,
+                                  contentPadding: EdgeInsets.zero,
+                                  dense: true,
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
-                    ],
-                  ),
+                    );
+                  },
                 );
               },
             ),
@@ -355,6 +385,19 @@ class _BomEditorDialogState extends State<BomEditorDialog> with SingleTickerProv
                     BomOutput(lineNo: newLineNo, outputProductId: -1, ratio: 1),
                   ];
                   _outputSelectedProducts = [..._outputSelectedProducts, null];
+                  // به‌روزرسانی line_no همه سطرها
+                  for (var i = 0; i < _outputs.length; i++) {
+                    if (_outputs[i].lineNo != i + 1) {
+                      _outputs[i] = BomOutput(
+                        lineNo: i + 1,
+                        outputProductId: _outputs[i].outputProductId,
+                        ratio: _outputs[i].ratio,
+                        uom: _outputs[i].uom,
+                        outputProductName: _outputs[i].outputProductName,
+                        outputProductCode: _outputs[i].outputProductCode,
+                      );
+                    }
+                  }
                 });
               },
               icon: const Icon(Icons.add),
@@ -368,33 +411,29 @@ class _BomEditorDialogState extends State<BomEditorDialog> with SingleTickerProv
               separatorBuilder: (separatorContext, separatorIndex) => const Divider(height: 1),
               itemBuilder: (context, index) {
                 final ot = _outputs[index];
-                // به‌روزرسانی خودکار line_no بر اساس index
                 final actualLineNo = index + 1;
-                if (ot.lineNo != actualLineNo) {
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    _updateOutput(index, lineNo: actualLineNo);
-                  });
-                }
-                final ratioCtrl = TextEditingController(text: ot.ratio.toString());
-                final uomCtrl = TextEditingController(text: ot.uom ?? '');
-                return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Tooltip(
-                          message: 'شماره ردیف به صورت خودکار تنظیم می‌شود',
-                          child: TextField(
-                            controller: TextEditingController(text: actualLineNo.toString()),
-                            enabled: false,
-                            decoration: const InputDecoration(
-                              labelText: 'ردیف',
-                              border: OutlineInputBorder(),
-                              filled: true,
+                return StatefulBuilder(
+                  builder: (context, setStateLocal) {
+                    final ratioCtrl = TextEditingController(text: ot.ratio.toString());
+                    final uomCtrl = TextEditingController(text: ot.uom ?? '');
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Tooltip(
+                              message: 'شماره ردیف به صورت خودکار تنظیم می‌شود',
+                              child: TextField(
+                                controller: TextEditingController(text: actualLineNo.toString()),
+                                enabled: false,
+                                decoration: const InputDecoration(
+                                  labelText: 'ردیف',
+                                  border: OutlineInputBorder(),
+                                  filled: true,
+                                ),
+                              ),
                             ),
                           ),
-                        ),
-                      ),
                       const SizedBox(width: 8),
                       Expanded(
                         flex: 2,
@@ -428,9 +467,33 @@ class _BomEditorDialogState extends State<BomEditorDialog> with SingleTickerProv
                         'واحد اندازه‌گیری محصول خروجی',
                         (v) => _updateOutput(index, uom: v.isEmpty ? null : v),
                       ),
-                      IconButton(onPressed: () => setState(() { _outputs.removeAt(index); _outputSelectedProducts.removeAt(index); }), icon: const Icon(Icons.delete_outline)),
-                    ],
-                  ),
+                          IconButton(
+                            onPressed: () {
+                              setState(() {
+                                _outputs.removeAt(index);
+                                _outputSelectedProducts.removeAt(index);
+                                // به‌روزرسانی line_no سطرهای باقی‌مانده
+                                for (var i = 0; i < _outputs.length; i++) {
+                                  if (_outputs[i].lineNo != i + 1) {
+                                    _outputs[i] = BomOutput(
+                                      lineNo: i + 1,
+                                      outputProductId: _outputs[i].outputProductId,
+                                      ratio: _outputs[i].ratio,
+                                      uom: _outputs[i].uom,
+                                      outputProductName: _outputs[i].outputProductName,
+                                      outputProductCode: _outputs[i].outputProductCode,
+                                    );
+                                  }
+                                }
+                              });
+                            },
+                            icon: const Icon(Icons.delete_outline),
+                            tooltip: 'حذف سطر',
+                          ),
+                        ],
+                      ),
+                    );
+                  },
                 );
               },
             ),
@@ -455,6 +518,19 @@ class _BomEditorDialogState extends State<BomEditorDialog> with SingleTickerProv
                     ..._operations,
                     BomOperation(lineNo: newLineNo, operationName: ''),
                   ];
+                  // به‌روزرسانی line_no همه سطرها
+                  for (var i = 0; i < _operations.length; i++) {
+                    if (_operations[i].lineNo != i + 1) {
+                      _operations[i] = BomOperation(
+                        lineNo: i + 1,
+                        operationName: _operations[i].operationName,
+                        costFixed: _operations[i].costFixed,
+                        costPerUnit: _operations[i].costPerUnit,
+                        costUom: _operations[i].costUom,
+                        workCenter: _operations[i].workCenter,
+                      );
+                    }
+                  }
                 });
               },
               icon: const Icon(Icons.add),
@@ -468,36 +544,32 @@ class _BomEditorDialogState extends State<BomEditorDialog> with SingleTickerProv
               separatorBuilder: (separatorContext, separatorIndex) => const Divider(height: 1),
               itemBuilder: (context, index) {
                 final op = _operations[index];
-                // به‌روزرسانی خودکار line_no بر اساس index
                 final actualLineNo = index + 1;
-                if (op.lineNo != actualLineNo) {
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    _updateOperation(index, lineNo: actualLineNo);
-                  });
-                }
-                final nameCtrl = TextEditingController(text: op.operationName);
-                final fixedCtrl = TextEditingController(text: op.costFixed?.toString() ?? '');
-                final perCtrl = TextEditingController(text: op.costPerUnit?.toString() ?? '');
-                final uomCtrl = TextEditingController(text: op.costUom ?? '');
-                final wcCtrl = TextEditingController(text: op.workCenter ?? '');
-                return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Tooltip(
-                          message: 'شماره ردیف به صورت خودکار تنظیم می‌شود',
-                          child: TextField(
-                            controller: TextEditingController(text: actualLineNo.toString()),
-                            enabled: false,
-                            decoration: const InputDecoration(
-                              labelText: 'ردیف',
-                              border: OutlineInputBorder(),
-                              filled: true,
+                return StatefulBuilder(
+                  builder: (context, setStateLocal) {
+                    final nameCtrl = TextEditingController(text: op.operationName);
+                    final fixedCtrl = TextEditingController(text: op.costFixed?.toString() ?? '');
+                    final perCtrl = TextEditingController(text: op.costPerUnit?.toString() ?? '');
+                    final uomCtrl = TextEditingController(text: op.costUom ?? '');
+                    final wcCtrl = TextEditingController(text: op.workCenter ?? '');
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Tooltip(
+                              message: 'شماره ردیف به صورت خودکار تنظیم می‌شود',
+                              child: TextField(
+                                controller: TextEditingController(text: actualLineNo.toString()),
+                                enabled: false,
+                                decoration: const InputDecoration(
+                                  labelText: 'ردیف',
+                                  border: OutlineInputBorder(),
+                                  filled: true,
+                                ),
+                              ),
                             ),
                           ),
-                        ),
-                      ),
                       const SizedBox(width: 8),
                       Expanded(
                         flex: 2,
@@ -534,9 +606,32 @@ class _BomEditorDialogState extends State<BomEditorDialog> with SingleTickerProv
                           child: _text(wcCtrl, 'ایستگاه کاری', (v) => _updateOperation(index, workCenter: v.isEmpty ? null : v)),
                         ),
                       ),
-                      IconButton(onPressed: () => setState(() => _operations.removeAt(index)), icon: const Icon(Icons.delete_outline)),
-                    ],
-                  ),
+                          IconButton(
+                            onPressed: () {
+                              setState(() {
+                                _operations.removeAt(index);
+                                // به‌روزرسانی line_no سطرهای باقی‌مانده
+                                for (var i = 0; i < _operations.length; i++) {
+                                  if (_operations[i].lineNo != i + 1) {
+                                    _operations[i] = BomOperation(
+                                      lineNo: i + 1,
+                                      operationName: _operations[i].operationName,
+                                      costFixed: _operations[i].costFixed,
+                                      costPerUnit: _operations[i].costPerUnit,
+                                      costUom: _operations[i].costUom,
+                                      workCenter: _operations[i].workCenter,
+                                    );
+                                  }
+                                }
+                              });
+                            },
+                            icon: const Icon(Icons.delete_outline),
+                            tooltip: 'حذف سطر',
+                          ),
+                        ],
+                      ),
+                    );
+                  },
                 );
               },
             ),

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:dio/dio.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
@@ -213,6 +214,16 @@ class _BusinessRestorePageState extends State<BusinessRestorePage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(t.dataRestore),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/business/${widget.businessId}/dashboard');
+            }
+          },
+        ),
       ),
       body: _buildBody(t),
       bottomNavigationBar: SafeArea(

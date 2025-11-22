@@ -1555,30 +1555,38 @@ class _BusinessShellState extends State<BusinessShell> {
       });
     } catch (_) {}
     // Optional: connect WS (reuse existing apiKey)
+    // WebSocket connection is optional - failures should not break the UI
     final apiKey = widget.authStore.apiKey;
     if (apiKey != null && apiKey.isNotEmpty) {
-      _ws = createNotificationsWsClient();
-      _ws!.connect(
-        apiKey: apiKey,
-        onMessage: (msg) {
-          try {
-            final type = '${msg['type'] ?? ''}';
-            if (type == 'notification') {
-              final title = '${msg['title'] ?? 'پیام'}';
-              final body = '${msg['body'] ?? ''}';
-              if (!mounted) return;
-              setState(() {
-                _notifications.insert(0, <String, dynamic>{
-                  'title': title,
-                  'body': body,
-                  'level': '${msg['level'] ?? 'info'}',
+      try {
+        _ws = createNotificationsWsClient();
+        _ws?.connect(
+          apiKey: apiKey,
+          onMessage: (msg) {
+            try {
+              final type = '${msg['type'] ?? ''}';
+              if (type == 'notification') {
+                final title = '${msg['title'] ?? 'پیام'}';
+                final body = '${msg['body'] ?? ''}';
+                if (!mounted) return;
+                setState(() {
+                  _notifications.insert(0, <String, dynamic>{
+                    'title': title,
+                    'body': body,
+                    'level': '${msg['level'] ?? 'info'}',
+                  });
+                  _unreadCount = (_unreadCount + 1).clamp(0, 99);
                 });
-                _unreadCount = (_unreadCount + 1).clamp(0, 99);
-              });
+              }
+            } catch (_) {
+              // Ignore message processing errors
             }
-          } catch (_) {}
-        },
-      );
+          },
+        );
+      } catch (_) {
+        // Silently ignore WebSocket connection failures - it's optional
+        _ws = null;
+      }
     }
   }
 
