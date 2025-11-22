@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
-import 'package:flutter_simple_treeview/flutter_simple_treeview.dart';
 import '../../services/category_service.dart';
 import '../../core/api_client.dart';
 import '../../core/auth_store.dart';
@@ -20,7 +19,7 @@ class _CategoryTreeDialogState extends State<CategoryTreeDialog> {
   bool _loading = true;
   String? _error;
   List<Map<String, dynamic>> _tree = const <Map<String, dynamic>>[];
-  // TreeController دیگر استفاده نمی‌شود
+  final Set<int> _expandedNodes = <int>{};
 
   @override
   void initState() {
@@ -81,7 +80,7 @@ class _CategoryTreeDialogState extends State<CategoryTreeDialog> {
                   FilledButton.icon(
                     onPressed: () => _showEditDialog(isRoot: true),
                     icon: const Icon(Icons.add),
-                    label: Text(t.addRootCategory),
+                    label: Text(t.addCategory),
                   ),
                 const SizedBox(width: 8),
                 IconButton(
@@ -113,60 +112,96 @@ class _CategoryTreeDialogState extends State<CategoryTreeDialog> {
     }
     return RefreshIndicator(
       onRefresh: _fetch,
-      child: Padding(
-        padding: const EdgeInsets.all(8.0),
-        child: SingleChildScrollView(
-          child: TreeView(
-            nodes: _buildTreeNodes(_tree, t),
-            indent: 24.0,
-          ),
-        ),
+      child: ListView(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        children: _buildTreeNodes(_tree, t, 0),
       ),
     );
   }
 
-  List<TreeNode> _buildTreeNodes(List<Map<String, dynamic>> items, AppLocalizations t) {
-    return items.map((m) {
-      final id = m['id'] as int?;
-      final label = (m['label'] ?? m['title'] ?? m['name'] ?? '').toString();
-      final children = (m['children'] as List?)?.cast<dynamic>()
-              .map((e) => Map<String, dynamic>.from(e as Map))
-              .toList() ?? const <Map<String, dynamic>>[];
+  List<Widget> _buildTreeNodes(List<Map<String, dynamic>> items, AppLocalizations t, int level) {
+    final List<Widget> widgets = [];
+    
+    for (final item in items) {
+      final id = item['id'] as int?;
+      final label = (item['label'] ?? item['title'] ?? item['name'] ?? '').toString();
+      final children = (item['children'] as List?)?.cast<dynamic>()
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList() ?? const <Map<String, dynamic>>[];
+      final isExpanded = id != null && _expandedNodes.contains(id);
+      final hasChildren = children.isNotEmpty;
 
-      final actions = Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (_canAdd)
-            IconButton(
-              tooltip: t.addChildCategory,
-              icon: const Icon(Icons.subdirectory_arrow_right),
-              onPressed: () => _showEditDialog(parentId: id),
-            ),
-          if (_canEdit)
-            IconButton(
-              tooltip: t.renameCategory,
-              icon: const Icon(Icons.edit),
-              onPressed: () => _showEditDialog(categoryId: id, initialLabel: label),
-            ),
-          if (_canDelete)
-            IconButton(
-              tooltip: t.deleteCategory,
-              icon: const Icon(Icons.delete_outline),
-              onPressed: () => _confirmDelete(id),
-            ),
-        ],
-      );
-
-      return TreeNode(
-        content: Row(
-          children: [
-            Expanded(child: Text(label)),
-            actions,
-          ],
+      widgets.add(
+        _CategoryTreeNodeWidget(
+          id: id,
+          label: label,
+          level: level,
+          isExpanded: isExpanded,
+          hasChildren: hasChildren,
+          canAdd: _canAdd,
+          canEdit: _canEdit,
+          canDelete: _canDelete,
+          onToggleExpand: hasChildren ? () {
+            setState(() {
+              if (isExpanded) {
+                _expandedNodes.remove(id);
+              } else {
+                _expandedNodes.add(id!);
+              }
+            });
+          } : null,
+          onAddChild: _canAdd ? () => _showEditDialog(parentId: id) : null,
+          onEdit: _canEdit ? () => _showEditDialog(categoryId: id, initialLabel: label) : null,
+          onDelete: _canDelete ? () => _confirmDelete(id) : null,
+          t: t,
         ),
-        children: _buildTreeNodes(children, t),
       );
-    }).toList();
+      
+      if (isExpanded && hasChildren) {
+        widgets.addAll(_buildTreeNodes(children, t, level + 1));
+      }
+    }
+    
+    return widgets;
+  }
+
+  /// باز کردن مسیر تا یک نود خاص
+  void _expandToNode(int targetId) {
+    bool findAndExpand(List<Map<String, dynamic>> nodes, int targetId, List<int> path) {
+      for (final node in nodes) {
+        final id = node['id'] as int?;
+        if (id == null) continue;
+        
+        final currentPath = [...path, id];
+        
+        if (id == targetId) {
+          // پیدا شد - باز کردن تمام مسیر
+          setState(() {
+            for (final pathId in currentPath) {
+              _expandedNodes.add(pathId);
+            }
+          });
+          return true;
+        }
+        
+        final children = (node['children'] as List?)?.cast<dynamic>()
+            .map((e) => Map<String, dynamic>.from(e as Map))
+            .toList() ?? const <Map<String, dynamic>>[];
+        
+        if (children.isNotEmpty) {
+          if (findAndExpand(children, targetId, currentPath)) {
+            // باز کردن نود فعلی چون در مسیر است
+            setState(() {
+              _expandedNodes.add(id);
+            });
+            return true;
+          }
+        }
+      }
+      return false;
+    }
+    
+    findAndExpand(_tree, targetId, []);
   }
 
   // _buildNodeTile حذف شد؛ از TreeView استفاده می‌کنیم
@@ -197,47 +232,295 @@ class _CategoryTreeDialogState extends State<CategoryTreeDialog> {
     String? initialLabel,
   }) async {
     final t = AppLocalizations.of(context);
+    final formKey = GlobalKey<FormState>();
     final labelCtrl = TextEditingController(text: initialLabel ?? '');
-    final ok = await showDialog<bool>(
+    
+    final result = await showDialog<Map<String, dynamic>?>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(categoryId == null ? t.createCategory : t.updateCategory),
-        content: SizedBox(
-          width: 420,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(controller: labelCtrl, decoration: const InputDecoration(labelText: 'Label')),
-            ],
+      builder: (ctx) => Dialog(
+        child: Container(
+          width: 500,
+          padding: const EdgeInsets.all(24),
+          child: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Header
+                Row(
+                  children: [
+                    Icon(
+                      categoryId == null ? Icons.add_circle_outline : Icons.edit_outlined,
+                      color: Theme.of(ctx).primaryColor,
+                      size: 28,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        categoryId == null ? t.createCategory : t.updateCategory,
+                        style: Theme.of(ctx).textTheme.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.pop(ctx, null),
+                      icon: const Icon(Icons.close),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                
+                // Category Name Field
+                TextFormField(
+                  controller: labelCtrl,
+                  decoration: InputDecoration(
+                    labelText: t.categoryName,
+                    hintText: t.categoryNameHint,
+                    prefixIcon: const Icon(Icons.category_outlined),
+                    border: const OutlineInputBorder(),
+                    filled: true,
+                    fillColor: Theme.of(ctx).colorScheme.surface,
+                  ),
+                  textInputAction: TextInputAction.done,
+                  autofocus: true,
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return t.categoryNameRequired;
+                    }
+                    return null;
+                  },
+                  onFieldSubmitted: (_) {
+                    if (formKey.currentState!.validate()) {
+                      Navigator.pop(ctx, {'label': labelCtrl.text.trim()});
+                    }
+                  },
+                ),
+                const SizedBox(height: 24),
+                
+                // Actions
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx, null),
+                      child: Text(t.cancel),
+                    ),
+                    const SizedBox(width: 8),
+                    FilledButton.icon(
+                      onPressed: () {
+                        if (formKey.currentState!.validate()) {
+                          Navigator.pop(ctx, {'label': labelCtrl.text.trim()});
+                        }
+                      },
+                      icon: Icon(categoryId == null ? Icons.add : Icons.save),
+                      label: Text(categoryId == null ? t.createCategory : t.updateCategory),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t.cancel)),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(categoryId == null ? t.createCategory : t.updateCategory),
-          )
-        ],
       ),
     );
-    if (ok != true) return;
-    if (categoryId == null) {
-      await _service.create(
-        businessId: widget.businessId,
-        parentId: isRoot ? null : parentId,
-        type: 'global',
-        label: labelCtrl.text.trim(),
-      );
-    } else {
-      await _service.update(
-        businessId: widget.businessId,
-        categoryId: categoryId,
-        type: 'global',
-        label: labelCtrl.text.trim(),
-      );
+    
+    if (result == null) return;
+    
+    final label = result['label'] as String?;
+    if (label == null || label.isEmpty) return;
+    
+    int? newCategoryId;
+    try {
+      if (categoryId == null) {
+        final createResult = await _service.create(
+          businessId: widget.businessId,
+          parentId: isRoot ? null : parentId,
+          type: 'global',
+          label: label,
+        );
+        newCategoryId = createResult['id'] as int?;
+      } else {
+        await _service.update(
+          businessId: widget.businessId,
+          categoryId: categoryId,
+          type: 'global',
+          label: label,
+        );
+      }
+      await _fetch();
+      
+      // اگر آیتم جدید اضافه شده، مسیر تا آن را باز کن
+      if (newCategoryId != null) {
+        // کمی تأخیر برای اطمینان از اینکه درخت به‌روزرسانی شده
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _expandToNode(newCategoryId!);
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(t.operationFailed),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+      }
     }
-    await _fetch();
   }
 }
 
+/// ویجت نمایش یک نود دسته‌بندی در درخت
+class _CategoryTreeNodeWidget extends StatelessWidget {
+  final int? id;
+  final String label;
+  final int level;
+  final bool isExpanded;
+  final bool hasChildren;
+  final bool canAdd;
+  final bool canEdit;
+  final bool canDelete;
+  final VoidCallback? onToggleExpand;
+  final VoidCallback? onAddChild;
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
+  final AppLocalizations t;
+
+  const _CategoryTreeNodeWidget({
+    required this.id,
+    required this.label,
+    required this.level,
+    required this.isExpanded,
+    required this.hasChildren,
+    required this.canAdd,
+    required this.canEdit,
+    required this.canDelete,
+    this.onToggleExpand,
+    this.onAddChild,
+    this.onEdit,
+    this.onDelete,
+    required this.t,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final indent = level * 24.0;
+    final lineColor = theme.colorScheme.outline.withValues(alpha: 0.3);
+    
+    return Stack(
+      children: [
+        // خطوط اتصال درخت
+        if (level > 0)
+          Positioned(
+            right: indent - 12,
+            top: 0,
+            bottom: 0,
+            child: Container(
+              width: 1,
+              color: lineColor,
+            ),
+          ),
+        InkWell(
+          onTap: onToggleExpand,
+          child: Container(
+            padding: EdgeInsets.only(
+              right: indent + 12,
+              left: 12,
+              top: 8,
+              bottom: 8,
+            ),
+            decoration: BoxDecoration(
+              color: Colors.transparent,
+              border: Border(
+                right: level > 0
+                    ? BorderSide(
+                        color: lineColor,
+                        width: 1,
+                      )
+                    : BorderSide.none,
+              ),
+            ),
+            child: Row(
+              children: [
+                // آیکون باز/بسته کردن
+                SizedBox(
+                  width: 24,
+                  child: hasChildren
+                      ? IconButton(
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                          iconSize: 20,
+                          onPressed: onToggleExpand,
+                          icon: Icon(
+                            isExpanded ? Icons.expand_more : Icons.chevron_left,
+                            color: theme.colorScheme.onSurface,
+                          ),
+                        )
+                      : const SizedBox(width: 24),
+                ),
+                
+                const SizedBox(width: 8),
+                
+                // آیکون دسته‌بندی
+                Icon(
+                  hasChildren ? Icons.folder : Icons.category,
+                  size: 20,
+                  color: hasChildren
+                      ? theme.colorScheme.primary
+                      : theme.colorScheme.onSurfaceVariant,
+                ),
+                
+                const SizedBox(width: 12),
+                
+                // نام دسته‌بندی
+                Expanded(
+                  child: Text(
+                    label,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: hasChildren ? FontWeight.w600 : FontWeight.normal,
+                      color: theme.colorScheme.onSurface,
+                    ),
+                  ),
+                ),
+                
+                const SizedBox(width: 8),
+                
+                // دکمه‌های عملیات
+                if (canAdd)
+                  IconButton(
+                    tooltip: t.addChildCategory,
+                    icon: const Icon(Icons.add_circle_outline, size: 20),
+                    onPressed: onAddChild,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  ),
+                if (canEdit)
+                  IconButton(
+                    tooltip: t.renameCategory,
+                    icon: const Icon(Icons.edit_outlined, size: 20),
+                    onPressed: onEdit,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  ),
+                if (canDelete)
+                  IconButton(
+                    tooltip: t.deleteCategory,
+                    icon: const Icon(Icons.delete_outline, size: 20),
+                    onPressed: onDelete,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    color: theme.colorScheme.error,
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
 

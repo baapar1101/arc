@@ -23,7 +23,6 @@ import '../../services/invoice_service.dart';
 import '../../services/receipt_payment_service.dart';
 import '../../core/api_client.dart';
 import '../../services/person_service.dart';
-import '../../utils/snackbar_helper.dart';
 
 class EditInvoicePage extends StatefulWidget {
   final int businessId;
@@ -528,8 +527,8 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
                           businessId: widget.businessId,
                           authStore: widget.authStore,
                           isRequired: false,
-                          label: 'مشتری',
-                          hintText: _selectedCustomer?.name ?? 'انتخاب مشتری',
+                          label: 'طرف حساب',
+                          hintText: _selectedCustomer?.name ?? 'انتخاب طرف حساب',
                         ),
                       if (_selectedInvoiceType == InvoiceType.purchase || _selectedInvoiceType == InvoiceType.purchaseReturn) ...[
                         const SizedBox(height: 16),

@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from adapters.db.session import get_db
 from app.core.auth_dependency import get_current_user, AuthContext
-from app.core.permissions import require_business_access
+from app.core.permissions import require_business_access, require_business_permission_dep
 from app.core.responses import success_response, ApiError, format_datetime_fields
 from adapters.db.repositories.fiscal_year_repo import FiscalYearRepository
 
@@ -19,12 +19,9 @@ def list_fiscal_years(
     business_id: int,
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("fiscal_years", "view")),
 ) -> Dict[str, Any]:
     repo = FiscalYearRepository(db)
-
-    # اطمینان از دسترسی کاربر به کسب و کار
-    if not ctx.can_access_business(business_id):
-        raise ApiError("FORBIDDEN", f"No access to business {business_id}", http_status=403)
 
     items = repo.list_by_business(business_id)
 
@@ -49,11 +46,9 @@ def get_current_fiscal_year(
     business_id: int,
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("fiscal_years", "view")),
 ) -> Dict[str, Any]:
     repo = FiscalYearRepository(db)
-
-    if not ctx.can_access_business(business_id):
-        raise ApiError("FORBIDDEN", f"No access to business {business_id}", http_status=403)
 
     fy = repo.get_current_for_business(business_id)
     if not fy:

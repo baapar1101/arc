@@ -31,7 +31,6 @@ import '../../models/invoice_line_item.dart';
 import '../../services/invoice_service.dart';
 import '../../services/credit_api_service.dart';
 import '../../models/credit_models.dart';
-import '../../utils/snackbar_helper.dart';
 
 class NewInvoicePage extends StatefulWidget {
   final int businessId;
@@ -180,6 +179,17 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
     // تنظیم تاریخ‌های پیش‌فرض
     _invoiceDate = DateTime.now();
     _dueDate = DateTime.now();
+    // افزودن یک ردیف پیش‌فرض کالا
+    _lineItems = [
+      InvoiceLineItem(
+        quantity: 1,
+        unitPrice: 0,
+        unitPriceSource: 'manual',
+        discountType: 'amount',
+        discountValue: 0,
+        taxRate: 0,
+      ),
+    ];
     // بارگذاری پلن‌های فعال اقساط
     _loadInstallmentPlans();
   }
@@ -999,8 +1009,8 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                             businessId: widget.businessId,
                             authStore: widget.authStore,
                             isRequired: false,
-                            label: 'مشتری',
-                            hintText: 'انتخاب مشتری',
+                            label: 'طرف حساب',
+                            hintText: 'انتخاب طرف حساب',
                           ),
                         // تامین‌کننده (فقط برای خرید و برگشت از خرید)
                         if (_selectedInvoiceType == InvoiceType.purchase || 
@@ -1298,8 +1308,8 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                                           businessId: widget.businessId,
                                           authStore: widget.authStore,
                                           isRequired: false,
-                                          label: 'مشتری',
-                                          hintText: 'انتخاب مشتری',
+                                          label: 'طرف حساب',
+                                          hintText: 'انتخاب طرف حساب',
                                         )
                                       : (_selectedInvoiceType == InvoiceType.purchase || 
                                           _selectedInvoiceType == InvoiceType.purchaseReturn)
@@ -1624,9 +1634,9 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
     final isSalesOrReturn = _selectedInvoiceType == InvoiceType.sales || _selectedInvoiceType == InvoiceType.salesReturn;
     final isPurchaseOrReturn = _selectedInvoiceType == InvoiceType.purchase || _selectedInvoiceType == InvoiceType.purchaseReturn;
     
-    // اعتبارسنجی مشتری برای فروش
+    // اعتبارسنجی طرف حساب برای فروش
     if (isSalesOrReturn && _selectedCustomer == null) {
-      return 'انتخاب مشتری الزامی است';
+      return 'انتخاب طرف حساب الزامی است';
     }
     
     // اعتبارسنجی تامین‌کننده برای خرید

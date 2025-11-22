@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from adapters.db.session import get_db
 from app.core.auth_dependency import get_current_user, AuthContext
-from app.core.permissions import require_business_access
+from app.core.permissions import require_business_access, require_business_permission_dep, require_business_permission_by_entity_dep
 from app.core.responses import success_response, ApiError, format_datetime_fields
 from adapters.api.v1.schemas import QueryInfo
 from adapters.api.v1.schema_models.price_list import (
@@ -24,6 +24,7 @@ from app.services.price_list_service import (
     upsert_price_item,
     delete_price_item,
 )
+from adapters.db.models.price_list import PriceList
 
 
 router = APIRouter(prefix="/price-lists", tags=["price-lists"])
@@ -37,9 +38,8 @@ def create_price_list_endpoint(
     payload: PriceListCreateRequest,
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("price_lists", "add")),
 ) -> Dict[str, Any]:
-    if not ctx.has_business_permission("inventory", "write"):
-        raise ApiError("FORBIDDEN", "Missing business permission: inventory.write", http_status=403)
     result = create_price_list(db, business_id, payload)
     return success_response(data=format_datetime_fields(result["data"], request), request=request, message=result.get("message"))
 
@@ -52,9 +52,8 @@ def search_price_lists_endpoint(
     query: QueryInfo,
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("price_lists", "view")),
 ) -> Dict[str, Any]:
-    if not ctx.can_read_section("inventory"):
-        raise ApiError("FORBIDDEN", "Missing business permission: inventory.read", http_status=403)
     result = list_price_lists(db, business_id, {
         "take": query.take,
         "skip": query.skip,
@@ -73,9 +72,8 @@ def get_price_list_endpoint(
     price_list_id: int,
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_by_entity_dep("price_lists", "view", PriceList, "price_list_id")),
 ) -> Dict[str, Any]:
-    if not ctx.can_read_section("inventory"):
-        raise ApiError("FORBIDDEN", "Missing business permission: inventory.read", http_status=403)
     item = get_price_list(db, business_id, price_list_id)
     if not item:
         raise ApiError("NOT_FOUND", "Price list not found", http_status=404)
@@ -91,9 +89,8 @@ def update_price_list_endpoint(
     payload: PriceListUpdateRequest,
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_by_entity_dep("price_lists", "edit", PriceList, "price_list_id")),
 ) -> Dict[str, Any]:
-    if not ctx.has_business_permission("inventory", "write"):
-        raise ApiError("FORBIDDEN", "Missing business permission: inventory.write", http_status=403)
     result = update_price_list(db, business_id, price_list_id, payload)
     if not result:
         raise ApiError("NOT_FOUND", "Price list not found", http_status=404)
@@ -108,9 +105,8 @@ def delete_price_list_endpoint(
     price_list_id: int,
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_by_entity_dep("price_lists", "delete", PriceList, "price_list_id")),
 ) -> Dict[str, Any]:
-    if not ctx.has_business_permission("inventory", "delete"):
-        raise ApiError("FORBIDDEN", "Missing business permission: inventory.delete", http_status=403)
     ok = delete_price_list(db, business_id, price_list_id)
     return success_response({"deleted": ok}, request)
 
@@ -124,9 +120,8 @@ def upsert_price_item_endpoint(
     payload: PriceItemUpsertRequest,
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_by_entity_dep("price_lists", "edit", PriceList, "price_list_id")),
 ) -> Dict[str, Any]:
-    if not ctx.has_business_permission("inventory", "write"):
-        raise ApiError("FORBIDDEN", "Missing business permission: inventory.write", http_status=403)
     result = upsert_price_item(db, business_id, price_list_id, payload)
     return success_response(data=format_datetime_fields(result["data"], request), request=request, message=result.get("message"))
 
@@ -141,9 +136,8 @@ def list_price_items_endpoint(
     currency_id: int | None = None,
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_by_entity_dep("price_lists", "view", PriceList, "price_list_id")),
 ) -> Dict[str, Any]:
-    if not ctx.can_read_section("inventory"):
-        raise ApiError("FORBIDDEN", "Missing business permission: inventory.read", http_status=403)
     result = list_price_items(db, business_id, price_list_id, product_id=product_id, currency_id=currency_id)
     return success_response(data=format_datetime_fields(result, request), request=request)
 
@@ -156,9 +150,8 @@ def delete_price_item_endpoint(
     item_id: int,
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("price_lists", "delete")),
 ) -> Dict[str, Any]:
-    if not ctx.has_business_permission("inventory", "delete"):
-        raise ApiError("FORBIDDEN", "Missing business permission: inventory.delete", http_status=403)
     ok = delete_price_item(db, business_id, item_id)
     return success_response({"deleted": ok}, request)
 

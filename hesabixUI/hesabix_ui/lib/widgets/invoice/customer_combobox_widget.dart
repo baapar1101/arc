@@ -1,8 +1,33 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../models/customer_model.dart';
 import '../../services/customer_service.dart';
 import '../../core/auth_store.dart';
 import '../../core/api_client.dart';
+
+class _CustomerPickerState {
+  final List<Customer> customers;
+  final bool isLoading;
+  final bool hasSearched;
+
+  _CustomerPickerState({
+    required this.customers,
+    required this.isLoading,
+    required this.hasSearched,
+  });
+
+  _CustomerPickerState copyWith({
+    List<Customer>? customers,
+    bool? isLoading,
+    bool? hasSearched,
+  }) {
+    return _CustomerPickerState(
+      customers: customers ?? this.customers,
+      isLoading: isLoading ?? this.isLoading,
+      hasSearched: hasSearched ?? this.hasSearched,
+    );
+  }
+}
 
 class CustomerComboboxWidget extends StatefulWidget {
   final Customer? selectedCustomer;
@@ -20,8 +45,8 @@ class CustomerComboboxWidget extends StatefulWidget {
     required this.businessId,
     required this.authStore,
     this.isRequired = false,
-    this.label = 'مشتری',
-    this.hintText = 'انتخاب مشتری',
+    this.label = 'طرف حساب',
+    this.hintText = 'انتخاب طرف حساب',
   });
 
   @override
@@ -31,10 +56,19 @@ class CustomerComboboxWidget extends StatefulWidget {
 class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
   final CustomerService _customerService = CustomerService(ApiClient());
   final TextEditingController _searchController = TextEditingController();
+  Timer? _debounceTimer;
   List<Customer> _customers = [];
   bool _isLoading = false;
   bool _hasLoadedRecent = false;
   bool _isSearchMode = false;
+  bool _hasSearched = false;
+  final ValueNotifier<_CustomerPickerState> _pickerStateNotifier = ValueNotifier<_CustomerPickerState>(
+    _CustomerPickerState(
+      customers: [],
+      isLoading: false,
+      hasSearched: false,
+    ),
+  );
 
   @override
   void initState() {
@@ -45,7 +79,9 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
 
   @override
   void dispose() {
+    _debounceTimer?.cancel();
     _searchController.dispose();
+    _pickerStateNotifier.dispose();
     super.dispose();
   }
 
@@ -67,7 +103,14 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
         _isLoading = false;
         _hasLoadedRecent = true;
         _isSearchMode = false;
+        _hasSearched = false;
       });
+      // به‌روزرسانی ValueNotifier
+      _pickerStateNotifier.value = _CustomerPickerState(
+        customers: _customers,
+        isLoading: _isLoading,
+        hasSearched: _hasSearched,
+      );
     } catch (e) {
       setState(() {
         _isLoading = false;
@@ -77,8 +120,18 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
     }
   }
 
+  void _onSearchChanged(String query) {
+    print('[CustomerCombobox] _onSearchChanged called with query: "$query"');
+    _debounceTimer?.cancel();
+    _debounceTimer = Timer(const Duration(milliseconds: 500), () {
+      print('[CustomerCombobox] Debounce timer fired, calling _searchCustomers with: "${query.trim()}"');
+      _searchCustomers(query.trim());
+    });
+  }
+
   Future<void> _searchCustomers(String query) async {
-    if (query.trim().isEmpty) {
+    print('[CustomerCombobox] _searchCustomers called with query: "$query"');
+    if (query.isEmpty) {
       await _loadRecentCustomers();
       return;
     }
@@ -86,44 +139,80 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
     setState(() {
       _isLoading = true;
       _isSearchMode = true;
+      _hasSearched = true;
     });
+    // به‌روزرسانی ValueNotifier
+    _pickerStateNotifier.value = _pickerStateNotifier.value.copyWith(
+      isLoading: _isLoading,
+      hasSearched: _hasSearched,
+    );
 
     try {
+      print('[CustomerCombobox] Calling _customerService.searchCustomers...');
       final result = await _customerService.searchCustomers(
         businessId: widget.businessId,
-        searchQuery: query.trim(),
+        searchQuery: query,
         limit: 20,
       );
 
+      final customers = result['customers'] as List<Customer>;
+      print('[CustomerCombobox] Search completed - received ${customers.length} customers');
+
       setState(() {
-        _customers = result['customers'] as List<Customer>;
+        _customers = customers;
         _isLoading = false;
       });
+      // به‌روزرسانی ValueNotifier
+      _pickerStateNotifier.value = _CustomerPickerState(
+        customers: _customers,
+        isLoading: _isLoading,
+        hasSearched: _hasSearched,
+      );
+      print('[CustomerCombobox] ValueNotifier updated - customers count: ${_pickerStateNotifier.value.customers.length}');
     } catch (e) {
+      print('[CustomerCombobox] ERROR in _searchCustomers: $e');
       setState(() {
         _customers.clear();
         _isLoading = false;
       });
+      // به‌روزرسانی ValueNotifier
+      _pickerStateNotifier.value = _CustomerPickerState(
+        customers: [],
+        isLoading: _isLoading,
+        hasSearched: _hasSearched,
+      );
     }
   }
 
 
 
   void _showCustomerPicker() {
+    print('[CustomerCombobox] _showCustomerPicker called - _customers count: ${_customers.length}');
+    // مقداردهی اولیه ValueNotifier
+    _pickerStateNotifier.value = _CustomerPickerState(
+      customers: _customers,
+      isLoading: _isLoading,
+      hasSearched: _hasSearched,
+    );
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      builder: (context) => _CustomerPickerBottomSheet(
-        customers: _customers,
-        selectedCustomer: widget.selectedCustomer,
-        onCustomerSelected: (customer) {
-          widget.onCustomerChanged(customer);
-          Navigator.pop(context);
-        },
-        searchController: _searchController,
-        onSearchChanged: _searchCustomers,
-        isLoading: _isLoading,
-      ),
+      builder: (context) {
+        print('[CustomerCombobox] BottomSheet builder called - _customers count: ${_customers.length}, _isLoading: $_isLoading');
+        return _CustomerPickerBottomSheet(
+          pickerStateNotifier: _pickerStateNotifier,
+          selectedCustomer: widget.selectedCustomer,
+          onCustomerSelected: (customer) {
+            widget.onCustomerChanged(customer);
+            Navigator.pop(context);
+          },
+          searchController: _searchController,
+          onSearchChanged: (query) {
+            print('[CustomerCombobox] onSearchChanged callback called with: "$query"');
+            _onSearchChanged(query);
+          },
+        );
+      },
     );
   }
 
@@ -183,20 +272,18 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
 }
 
 class _CustomerPickerBottomSheet extends StatefulWidget {
-  final List<Customer> customers;
+  final ValueNotifier<_CustomerPickerState> pickerStateNotifier;
   final Customer? selectedCustomer;
   final Function(Customer) onCustomerSelected;
   final TextEditingController searchController;
   final Function(String) onSearchChanged;
-  final bool isLoading;
 
   const _CustomerPickerBottomSheet({
-    required this.customers,
+    required this.pickerStateNotifier,
     required this.selectedCustomer,
     required this.onCustomerSelected,
     required this.searchController,
     required this.onSearchChanged,
-    required this.isLoading,
   });
 
   @override
@@ -206,108 +293,144 @@ class _CustomerPickerBottomSheet extends StatefulWidget {
 class _CustomerPickerBottomSheetState extends State<_CustomerPickerBottomSheet> {
   @override
   Widget build(BuildContext context) {
+    print('[CustomerPickerBottomSheet] build called');
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
 
-    return Container(
-      height: MediaQuery.of(context).size.height * 0.7,
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        children: [
-          // هدر
-          Row(
+    return ValueListenableBuilder<_CustomerPickerState>(
+      valueListenable: widget.pickerStateNotifier,
+      builder: (context, pickerState, _) {
+        print('[CustomerPickerBottomSheet] ValueListenableBuilder rebuild - customers count: ${pickerState.customers.length}, isLoading: ${pickerState.isLoading}, hasSearched: ${pickerState.hasSearched}');
+        return Container(
+          height: MediaQuery.of(context).size.height * 0.7,
+          padding: const EdgeInsets.all(16),
+          child: Column(
             children: [
-              Text(
-                'انتخاب مشتری',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
+              // هدر
+              Row(
+                children: [
+                  Text(
+                    'انتخاب طرف حساب',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close),
+                  ),
+                ],
               ),
-              const Spacer(),
-              IconButton(
-                onPressed: () => Navigator.pop(context),
-                icon: const Icon(Icons.close),
+              const SizedBox(height: 16),
+              
+              // فیلد جست‌وجو
+              TextField(
+                controller: widget.searchController,
+                decoration: InputDecoration(
+                  hintText: 'جست‌وجو در طرف حساب‌ها...',
+                  prefixIcon: const Icon(Icons.search),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  suffixIcon: pickerState.isLoading
+                      ? const Padding(
+                          padding: EdgeInsets.all(12),
+                          child: SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        )
+                      : null,
+                ),
+                onChanged: (value) {
+                  print('[CustomerPickerBottomSheet] TextField onChanged called with: "$value"');
+                  print('[CustomerPickerBottomSheet] Current customers count: ${pickerState.customers.length}');
+                  print('[CustomerPickerBottomSheet] Calling onSearchChanged callback...');
+                  widget.onSearchChanged(value);
+                  print('[CustomerPickerBottomSheet] onSearchChanged callback completed');
+                },
+              ),
+              const SizedBox(height: 16),
+              
+              // لیست طرف حساب‌ها
+              Expanded(
+                child: _buildCustomersList(context, pickerState),
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          
-          // فیلد جست‌وجو
-          TextField(
-            controller: widget.searchController,
-            decoration: InputDecoration(
-              hintText: 'جست‌وجو در مشتریان...',
-              prefixIcon: const Icon(Icons.search),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-            onChanged: widget.onSearchChanged,
-          ),
-          const SizedBox(height: 16),
-          
-          // لیست مشتریان
-          Expanded(
-            child: widget.isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : widget.customers.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.person_off,
-                              size: 48,
-                              color: colorScheme.onSurface.withValues(alpha: 0.5),
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'مشتری‌ای یافت نشد',
-                              style: theme.textTheme.bodyLarge?.copyWith(
-                                color: colorScheme.onSurface.withValues(alpha: 0.7),
-                              ),
-                            ),
-                          ],
-                        ),
-                      )
-                    : ListView.builder(
-                        itemCount: widget.customers.length,
-                        itemBuilder: (context, index) {
-                          final customer = widget.customers[index];
-                          final isSelected = widget.selectedCustomer?.id == customer.id;
-                          
-                          return ListTile(
-                            leading: CircleAvatar(
-                              backgroundColor: colorScheme.primaryContainer,
-                              child: Icon(
-                                Icons.person,
-                                color: colorScheme.onPrimaryContainer,
-                              ),
-                            ),
-                            title: Text(customer.name),
-                            subtitle: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                if (customer.code != null)
-                                  Text('کد: ${customer.code}'),
-                                if (customer.phone != null)
-                                  Text('تلفن: ${customer.phone}'),
-                              ],
-                            ),
-                            trailing: isSelected
-                                ? Icon(
-                                    Icons.check_circle,
-                                    color: colorScheme.primary,
-                                  )
-                                : null,
-                            onTap: () => widget.onCustomerSelected(customer),
-                          );
-                        },
-                      ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
+  Widget _buildCustomersList(BuildContext context, _CustomerPickerState pickerState) {
+    print('[CustomerPickerBottomSheet] _buildCustomersList called - customers count: ${pickerState.customers.length}, isLoading: ${pickerState.isLoading}');
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    if (pickerState.isLoading) {
+      print('[CustomerPickerBottomSheet] Showing loading indicator');
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (pickerState.customers.isEmpty) {
+      print('[CustomerPickerBottomSheet] Showing empty state');
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.person_off,
+              size: 48,
+              color: colorScheme.onSurface.withValues(alpha: 0.5),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              pickerState.hasSearched ? 'طرف حسابی یافت نشد' : 'هیچ طرف حسابی ثبت نشده است',
+              style: theme.textTheme.bodyLarge?.copyWith(
+                color: colorScheme.onSurface.withValues(alpha: 0.7),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    print('[CustomerPickerBottomSheet] Building ListView with ${pickerState.customers.length} items');
+    return ListView.builder(
+      itemCount: pickerState.customers.length,
+      itemBuilder: (context, index) {
+        final customer = pickerState.customers[index];
+        final isSelected = widget.selectedCustomer?.id == customer.id;
+        
+        return ListTile(
+          leading: CircleAvatar(
+            backgroundColor: colorScheme.primaryContainer,
+            child: Icon(
+              Icons.person,
+              color: colorScheme.onPrimaryContainer,
+            ),
+          ),
+          title: Text(customer.name),
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (customer.code != null)
+                Text('کد: ${customer.code}'),
+              if (customer.phone != null)
+                Text('تلفن: ${customer.phone}'),
+            ],
+          ),
+          trailing: isSelected
+              ? Icon(
+                  Icons.check_circle,
+                  color: colorScheme.primary,
+                )
+              : null,
+          onTap: () => widget.onCustomerSelected(customer),
+        );
+      },
+    );
+  }
 }

@@ -804,6 +804,7 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         'view': '${t.view} ${t.products}',
         'edit': '${t.edit} ${t.products}',
         'delete': '${t.delete} ${t.products}',
+        'export': '${t.export} ${t.products}',
       },
       'price_lists': {
         'add': '${t.add} ${t.priceLists}',
@@ -867,6 +868,7 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         'edit': '${t.edit} ${t.invoices}',
         'delete': '${t.delete} ${t.invoices}',
         'draft': '${t.draft} ${t.invoices}',
+        'export': '${t.export} ${t.invoices}',
       },
       'expenses_income': {
         'add': '${t.add} ${t.expensesIncome}',
@@ -923,6 +925,13 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         'view': t.viewMarketplace,
         'buy': t.buyPlugins,
         'invoices': t.viewInvoices,
+      },
+      'reports': {
+        'view': '${t.view} ${t.reports ?? 'گزارش‌ها'}',
+        'export': '${t.export} ${t.reports ?? 'گزارش‌ها'}',
+      },
+      'fiscal_years': {
+        'view': '${t.view} ${t.fiscalYears ?? 'سال‌های مالی'}',
       },
     };
   }
@@ -1193,9 +1202,14 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         'sections': ['warehouses', 'warehouse_transfers'],
       },
       {
+        'title': 'گزارش‌ها',
+        'icon': Icons.assessment,
+        'sections': ['reports'],
+      },
+      {
         'title': 'تنظیمات',
         'icon': Icons.settings,
-        'sections': ['settings', 'storage', 'sms', 'marketplace'],
+        'sections': ['settings', 'storage', 'sms', 'marketplace', 'fiscal_years'],
       },
     ];
     
@@ -1287,6 +1301,8 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
       'storage': [(AppLocalizations.of(context).storageSpace)],
       'sms': [(AppLocalizations.of(context).smsPanel)],
       'marketplace': [(AppLocalizations.of(context).marketplace)],
+      'reports': ['گزارش', 'گزارش‌ها', 'reports'],
+      'fiscal_years': ['سال مالی', 'سال‌های مالی', 'fiscal year', 'fiscal years'],
     };
 
     final hay = ('$title $description').toLowerCase();
@@ -1328,6 +1344,8 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
       'storage': 'فضای ذخیره‌سازی',
       'sms': 'پنل پیامک',
       'marketplace': 'بازار افزونه‌ها',
+      'reports': 'گزارش‌ها',
+      'fiscal_years': 'سال‌های مالی',
     };
     
     return titles[sectionKey] ?? sectionKey;
@@ -1368,6 +1386,8 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         return t.charge;
       case 'return':
         return 'برگشت';
+      case 'export':
+        return t.export ?? 'خروجی';
       default:
         return action;
     }

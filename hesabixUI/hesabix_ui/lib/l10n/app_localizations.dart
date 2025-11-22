@@ -5594,6 +5594,24 @@ abstract class AppLocalizations {
   /// **'Name (English)'**
   String get categoryNameEn;
 
+  /// No description provided for @categoryName.
+  ///
+  /// In en, this message translates to:
+  /// **'Category Name'**
+  String get categoryName;
+
+  /// No description provided for @categoryNameRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Category name is required'**
+  String get categoryNameRequired;
+
+  /// No description provided for @categoryNameHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter category name'**
+  String get categoryNameHint;
+
   /// No description provided for @categoryType.
   ///
   /// In en, this message translates to:
@@ -7082,6 +7100,12 @@ abstract class AppLocalizations {
   /// **'Fiscal year'**
   String get fiscalYear;
 
+  /// No description provided for @fiscalYears.
+  ///
+  /// In en, this message translates to:
+  /// **'Fiscal years'**
+  String get fiscalYears;
+
   /// No description provided for @addFilterPersons.
   ///
   /// In en, this message translates to:
@@ -7447,6 +7471,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Account movements over a period'**
   String get reportsGeneralLedgerSubtitle;
+
+  /// No description provided for @reportsJournalLedgerTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Journal Ledger'**
+  String get reportsJournalLedgerTitle;
+
+  /// No description provided for @reportsJournalLedgerSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'All financial transactions in chronological order'**
+  String get reportsJournalLedgerSubtitle;
+
+  /// No description provided for @debitAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Debit Account'**
+  String get debitAccount;
+
+  /// No description provided for @creditAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Credit Account'**
+  String get creditAccount;
 
   /// No description provided for @reportsPnlPeriodTitle.
   ///

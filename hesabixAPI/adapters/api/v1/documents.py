@@ -2,7 +2,7 @@
 API endpoints برای مدیریت اسناد حسابداری (General Accounting Documents)
 """
 
-from typing import Any, Dict
+from typing import Any, Dict, List
 from fastapi import APIRouter, Depends, Request, Body, Query
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
@@ -27,6 +27,7 @@ from app.services.trial_balance_service import get_trial_balance_report
 from app.services.general_ledger_service import get_general_ledger_report
 from app.services.pnl_service import get_pnl_period_report, get_pnl_cumulative_report
 from app.services.account_review_service import get_accounts_review_report
+from app.services.journal_ledger_service import get_journal_ledger_report
 from app.core.i18n import negotiate_locale
 from app.services.pdf.template_renderer import render_template
 from adapters.api.v1.schema_models.document import (
@@ -2417,5 +2418,373 @@ async def accounts_review_report_endpoint(
         data=result,
         message="Accounts review report retrieved successfully" if locale != 'fa' else "گزارش مرور حساب‌ها با موفقیت دریافت شد",
         request=request
+    )
+
+
+@router.post(
+    "/businesses/{business_id}/reports/journal-ledger",
+    summary="گزارش دفتر روزنامه",
+    description="گزارش دفتر روزنامه - تمام تراکنش‌های مالی به ترتیب تاریخ (Journal Ledger)",
+)
+@require_business_access("business_id")
+async def journal_ledger_report_endpoint(
+    request: Request,
+    business_id: int,
+    body: Dict[str, Any] = Body(default={}),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """گزارش دفتر روزنامه - تمام تراکنش‌های مالی به ترتیب تاریخ"""
+    # بررسی دسترسی
+    if not ctx.can_read_section("reports"):
+        raise ApiError("FORBIDDEN", "Missing business permission: reports.read", http_status=403)
+    
+    # دریافت سال مالی از header یا body
+    fiscal_year_id = None
+    fy_header = request.headers.get('X-Fiscal-Year-ID')
+    if fy_header:
+        try:
+            fiscal_year_id = int(fy_header)
+        except (ValueError, TypeError):
+            pass
+    
+    if body.get('fiscal_year_id'):
+        try:
+            fiscal_year_id = int(body['fiscal_year_id'])
+        except (ValueError, TypeError):
+            pass
+    
+    # استخراج پارامترها از body
+    date_from = body.get('date_from')
+    date_to = body.get('date_to')
+    currency_id = body.get('currency_id')
+    document_type = body.get('document_type')
+    include_proforma = body.get('include_proforma', False)
+    
+    if currency_id is not None:
+        try:
+            currency_id = int(currency_id)
+        except (ValueError, TypeError):
+            currency_id = None
+    
+    # Pagination
+    skip = body.get('skip', 0)
+    take = body.get('take', 50)
+    try:
+        skip = int(skip)
+        take = int(take)
+        if take > 500:
+            take = 500
+        if take < 1:
+            take = 50
+        if skip < 0:
+            skip = 0
+    except (ValueError, TypeError):
+        skip = 0
+        take = 50
+    
+    result = get_journal_ledger_report(
+        db=db,
+        business_id=business_id,
+        fiscal_year_id=fiscal_year_id,
+        currency_id=currency_id,
+        date_from=date_from,
+        date_to=date_to,
+        document_type=document_type,
+        include_proforma=include_proforma,
+        skip=skip,
+        take=take,
+    )
+    
+    items = result.get('items', [])
+    items = [format_datetime_fields(item, request) for item in items]
+    
+    result['items'] = items
+    
+    locale = negotiate_locale(request.headers.get("Accept-Language"))
+    return success_response(
+        data=result,
+        message="Journal ledger report retrieved successfully" if locale != 'fa' else "گزارش دفتر روزنامه با موفقیت دریافت شد",
+        request=request
+    )
+
+
+@router.post(
+    "/businesses/{business_id}/reports/journal-ledger/export/excel",
+    summary="خروجی Excel گزارش دفتر روزنامه",
+    description="خروجی Excel گزارش دفتر روزنامه با قابلیت فیلتر، انتخاب سطرها و رعایت ترتیب/نمایش ستون‌ها",
+)
+@require_business_access("business_id")
+async def export_journal_ledger_report_excel(
+    request: Request,
+    business_id: int,
+    body: Dict[str, Any] = Body(default={}),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """خروجی Excel گزارش دفتر روزنامه"""
+    import io
+    import json
+    import datetime
+    import re
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+    from fastapi.responses import Response
+    from adapters.db.models.business import Business
+    
+    # بررسی دسترسی
+    if not ctx.can_read_section("reports"):
+        raise ApiError("FORBIDDEN", "Missing business permission: reports.read", http_status=403)
+    
+    # دریافت سال مالی از header یا body
+    fiscal_year_id = None
+    fy_header = request.headers.get('X-Fiscal-Year-ID')
+    if fy_header:
+        try:
+            fiscal_year_id = int(fy_header)
+        except (ValueError, TypeError):
+            pass
+    
+    if body.get('fiscal_year_id'):
+        try:
+            fiscal_year_id = int(body['fiscal_year_id'])
+        except (ValueError, TypeError):
+            pass
+    
+    # استخراج پارامترها از body
+    date_from = body.get('date_from')
+    date_to = body.get('date_to')
+    currency_id = body.get('currency_id')
+    document_type = body.get('document_type')
+    include_proforma = body.get('include_proforma', False)
+    
+    if currency_id is not None:
+        try:
+            currency_id = int(currency_id)
+        except (ValueError, TypeError):
+            currency_id = None
+    
+    # برای export، همه رکوردها را بدون pagination می‌گیریم
+    max_export_records = 10000
+    result = get_journal_ledger_report(
+        db=db,
+        business_id=business_id,
+        fiscal_year_id=fiscal_year_id,
+        currency_id=currency_id,
+        date_from=date_from,
+        date_to=date_to,
+        document_type=document_type,
+        include_proforma=include_proforma,
+        skip=0,
+        take=max_export_records,
+    )
+    
+    items = result.get('items', [])
+    items = [format_datetime_fields(item, request) for item in items]
+    
+    # Handle selected rows
+    selected_only = bool(body.get('selected_only', False))
+    selected_indices = body.get('selected_indices')
+    if selected_only and selected_indices is not None:
+        indices = None
+        if isinstance(selected_indices, str):
+            try:
+                indices = json.loads(selected_indices)
+            except (json.JSONDecodeError, TypeError):
+                indices = None
+        elif isinstance(selected_indices, list):
+            indices = selected_indices
+        if isinstance(indices, list):
+            items = [items[i] for i in indices if isinstance(i, int) and 0 <= i < len(items)]
+    
+    # Check if we hit the limit
+    if len(items) >= max_export_records:
+        warning_item = {
+            'document_date': '',
+            'document_code': '⚠️',
+            'document_type_name': 'حداکثر ۱۰,۰۰۰ رکورد قابل export است',
+            'description': '',
+            'debit_account_code': '',
+            'debit_account_name': '',
+            'debit_amount': '',
+            'credit_account_code': '',
+            'credit_account_name': '',
+            'credit_amount': '',
+            'person_name': '',
+        }
+        items.append(warning_item)
+    
+    # Get locale
+    locale = negotiate_locale(request.headers.get("Accept-Language"))
+    is_fa = locale == 'fa'
+    
+    # Prepare headers based on export_columns
+    headers: List[str] = []
+    keys: List[str] = []
+    export_columns = body.get('export_columns')
+    if export_columns:
+        for col in export_columns:
+            key = col.get('key')
+            label = col.get('label', key)
+            if key:
+                keys.append(str(key))
+                headers.append(str(label))
+    else:
+        # Default columns
+        default_columns = [
+            ('document_date', 'تاریخ سند' if is_fa else 'Document Date'),
+            ('document_type_name', 'نوع سند' if is_fa else 'Document Type'),
+            ('document_code', 'شماره سند' if is_fa else 'Document Code'),
+            ('description', 'شرح' if is_fa else 'Description'),
+            ('debit_account_code', 'کد حساب بدهکار' if is_fa else 'Debit Account Code'),
+            ('debit_account_name', 'نام حساب بدهکار' if is_fa else 'Debit Account Name'),
+            ('debit_amount', 'مبلغ بدهکار' if is_fa else 'Debit Amount'),
+            ('credit_account_code', 'کد حساب بستانکار' if is_fa else 'Credit Account Code'),
+            ('credit_account_name', 'نام حساب بستانکار' if is_fa else 'Credit Account Name'),
+            ('credit_amount', 'مبلغ بستانکار' if is_fa else 'Credit Amount'),
+            ('person_name', 'طرف حساب' if is_fa else 'Counterpart'),
+        ]
+        for key, label in default_columns:
+            keys.append(key)
+            headers.append(label)
+    
+    # Create workbook
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "دفتر روزنامه" if is_fa else "Journal Ledger"
+    
+    # RTL handling for Persian
+    if locale == 'fa':
+        try:
+            ws.sheet_view.rightToLeft = True
+        except Exception:
+            pass
+    
+    header_font = Font(bold=True, color="FFFFFF")
+    header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+    header_alignment = Alignment(horizontal="center", vertical="center")
+    border = Border(
+        left=Side(style='thin'),
+        right=Side(style='thin'),
+        top=Side(style='thin'),
+        bottom=Side(style='thin')
+    )
+    
+    # Write header row
+    for col_idx, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col_idx, value=header)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = header_alignment
+        cell.border = border
+    
+    # Write data rows
+    for row_idx, item in enumerate(items, 2):
+        for col_idx, key in enumerate(keys, 1):
+            value = item.get(key, "")
+            
+            # Format numbers
+            if key in ['debit_amount', 'credit_amount'] and value:
+                try:
+                    num_value = float(value) if not isinstance(value, (int, float)) else value
+                    value = num_value
+                except (ValueError, TypeError):
+                    pass
+            
+            # Format dates
+            if key == 'document_date' and value:
+                # Value is already formatted by format_datetime_fields
+                pass
+            
+            if isinstance(value, list):
+                value = ", ".join(str(v) for v in value)
+            elif isinstance(value, dict):
+                value = str(value)
+            
+            cell = ws.cell(row=row_idx, column=col_idx, value=value)
+            cell.border = border
+            
+            # RTL alignment for Persian text and numbers
+            if locale == 'fa':
+                if isinstance(value, (int, float)):
+                    cell.alignment = Alignment(horizontal="right")
+                elif isinstance(value, str) and any('\u0600' <= c <= '\u06FF' for c in str(value)):
+                    cell.alignment = Alignment(horizontal="right")
+    
+    # Auto-width columns
+    for column in ws.columns:
+        max_length = 0
+        column_letter = column[0].column_letter
+        for cell in column:
+            try:
+                if cell.value is not None:
+                    cell_length = len(str(cell.value))
+                    if max_length < cell_length:
+                        max_length = cell_length
+            except Exception:
+                pass
+        ws.column_dimensions[column_letter].width = min(max_length + 2, 50)
+    
+    # Add summary row at the end
+    summary_row = len(items) + 3
+    ws.cell(row=summary_row, column=1, value="جمع" if is_fa else "Total").font = Font(bold=True)
+    ws.cell(row=summary_row, column=1).border = border
+    
+    # Find debit_amount and credit_amount column indices
+    debit_col_idx = None
+    credit_col_idx = None
+    for idx, key in enumerate(keys, 1):
+        if key == 'debit_amount':
+            debit_col_idx = idx
+        elif key == 'credit_amount':
+            credit_col_idx = idx
+    
+    if debit_col_idx:
+        total_debit = result.get('summary', {}).get('total_debit', 0)
+        ws.cell(row=summary_row, column=debit_col_idx, value=float(total_debit)).font = Font(bold=True)
+        ws.cell(row=summary_row, column=debit_col_idx).border = border
+        if locale == 'fa':
+            ws.cell(row=summary_row, column=debit_col_idx).alignment = Alignment(horizontal="right")
+    
+    if credit_col_idx:
+        total_credit = result.get('summary', {}).get('total_credit', 0)
+        ws.cell(row=summary_row, column=credit_col_idx, value=float(total_credit)).font = Font(bold=True)
+        ws.cell(row=summary_row, column=credit_col_idx).border = border
+        if locale == 'fa':
+            ws.cell(row=summary_row, column=credit_col_idx).alignment = Alignment(horizontal="right")
+    
+    # Save to bytes
+    buffer = io.BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+    
+    # Build meaningful filename
+    biz_name = ""
+    try:
+        b = db.query(Business).filter(Business.id == business_id).first()
+        if b is not None:
+            biz_name = b.name or ""
+    except Exception:
+        biz_name = ""
+    
+    def slugify(text: str) -> str:
+        return re.sub(r"[^A-Za-z0-9_-]+", "_", text).strip("_")
+    
+    base = "journal_ledger_report"
+    if biz_name:
+        base += f"_{slugify(biz_name)}"
+    if selected_only:
+        base += "_selected"
+    filename = f"{base}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    content = buffer.getvalue()
+    
+    return Response(
+        content=content,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": f"attachment; filename={filename}",
+            "Content-Length": str(len(content)),
+            "Access-Control-Expose-Headers": "Content-Disposition",
+        },
     )
 

@@ -13,7 +13,7 @@ import logging
 
 from adapters.db.session import get_db
 from app.core.auth_dependency import get_current_user, AuthContext
-from app.core.permissions import require_business_access, require_business_management_dep, require_business_permission_dep
+from app.core.permissions import require_business_access, require_business_management_dep, require_business_permission_dep, require_business_permission_by_entity_dep
 from app.core.responses import success_response, format_datetime_fields
 from adapters.api.v1.schemas import QueryInfo
 from adapters.db.models.document import Document
@@ -34,6 +34,7 @@ from app.services.invoice_service import (
     get_invoice_installment_plan,
     search_installments,
     export_installments_csv,
+    export_installments_xlsx,
 )
 from app.services.pdf.template_renderer import render_template
 from app.core.calendar import CalendarConverter
@@ -60,6 +61,7 @@ def create_invoice_endpoint(
     payload: Dict[str, Any] = Body(...),
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("invoices", "add")),
 ) -> Dict[str, Any]:
     result = create_invoice(
         db=db,
@@ -78,6 +80,7 @@ def get_invoice_installments_endpoint(
     invoice_id: int,
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_by_entity_dep("invoices", "view", Document, "invoice_id")),
 ):
     data = get_invoice_installment_plan(db=db, business_id=business_id, invoice_id=invoice_id)
     return success_response(data=data, request=request, message="INSTALLMENT_PLAN_FETCHED")
@@ -91,6 +94,7 @@ def search_installments_endpoint(
     payload: Dict[str, Any] = Body(...),
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("invoices", "view")),
 ):
     """
     جستجوی اقساط با فیلترهای:
@@ -118,6 +122,7 @@ def export_installments_excel_endpoint(
     payload: Dict[str, Any] = Body(...),
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("invoices", "export")),
 ) -> Response:
     """
     خروجی XLSX از اقساط (در صورت نبودن کتابخانه، CSV بازگردانده می‌شود).
@@ -145,6 +150,7 @@ def update_invoice_endpoint(
     payload: Dict[str, Any] = Body(...),
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_by_entity_dep("invoices", "edit", Document, "invoice_id")),
 ) -> Dict[str, Any]:
     # Optional safety: ensure ownership
     doc = db.query(Document).filter(Document.id == invoice_id).first()
@@ -204,6 +210,7 @@ def get_invoice_endpoint(
     invoice_id: int,
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_by_entity_dep("invoices", "view", Document, "invoice_id")),
 ) -> Dict[str, Any]:
     doc = db.query(Document).filter(Document.id == invoice_id).first()
     if not doc or doc.business_id != business_id or doc.document_type not in SUPPORTED_INVOICE_TYPES:
@@ -225,6 +232,7 @@ async def export_single_invoice_pdf(
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
     template_id: int | None = None,
+    _: None = Depends(require_business_permission_by_entity_dep("invoices", "view", Document, "invoice_id")),
 ):
     """
     خروجی PDF تک‌سند فاکتور با پشتیبانی از قالب سفارشی:

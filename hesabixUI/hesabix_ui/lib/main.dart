@@ -63,6 +63,7 @@ import 'pages/business/materials_consumption_report_page.dart';
 import 'pages/business/production_report_page.dart';
 import 'pages/business/trial_balance_report_page.dart';
 import 'pages/business/general_ledger_report_page.dart';
+import 'pages/business/journal_ledger_report_page.dart';
 import 'pages/business/pnl_period_report_page.dart';
 import 'pages/business/pnl_cumulative_report_page.dart';
 import 'pages/business/account_review_report_page.dart';
@@ -1594,6 +1595,19 @@ class _MyAppState extends State<MyApp> {
                 final businessId = int.parse(state.pathParameters['business_id']!);
                 return NoTransitionPage(
                   child: GeneralLedgerReportPage(
+                    businessId: businessId,
+                    calendarController: _calendarController!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/reports/journal-ledger',
+              name: 'business_reports_journal_ledger',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return NoTransitionPage(
+                  child: JournalLedgerReportPage(
                     businessId: businessId,
                     calendarController: _calendarController!,
                   ),
