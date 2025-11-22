@@ -8,8 +8,9 @@ from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
 from adapters.db.session import get_db
+from adapters.db.models.document import Document
 from app.core.auth_dependency import get_current_user, AuthContext
-from app.core.permissions import require_business_access, require_business_management_dep
+from app.core.permissions import require_business_access, require_business_management_dep, require_business_permission_dep, require_business_permission_by_entity_dep
 from app.core.responses import success_response, format_datetime_fields, ApiError
 from app.services.document_service import (
     list_documents,
@@ -341,7 +342,6 @@ async def bulk_delete_documents_endpoint(
     body: Dict[str, Any] = Body(...),
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
-    _: None = Depends(require_business_management_dep),
 ):
     """
     حذف گروهی اسناد
@@ -358,6 +358,40 @@ async def bulk_delete_documents_endpoint(
             "document_ids is required",
             http_status=400
         )
+    
+    # بررسی دسترسی برای هر document
+    # اگر business_id ندارند یا دسترسی ندارند، خطا برمی‌گردانیم
+    from adapters.db.models.document import Document as DocumentModel
+    from adapters.db.repositories.business_permission_repo import BusinessPermissionRepository
+    permission_repo = BusinessPermissionRepository(db)
+    
+    for doc_id in document_ids:
+        try:
+            doc = db.get(DocumentModel, doc_id)
+            if doc:
+                business_id = doc.business_id
+                if not ctx.can_access_business(business_id):
+                    raise ApiError("FORBIDDEN", f"No access to document {doc_id}", http_status=403)
+                
+                # بررسی دسترسی جزئی برای business_id مشخص
+                if ctx.is_superadmin() or ctx.is_business_owner(business_id):
+                    continue  # SuperAdmin و مالک تمام دسترسی‌ها را دارند
+                
+                permission_obj = permission_repo.get_by_user_and_business(ctx.get_user_id(), business_id)
+                if not permission_obj or not permission_obj.business_permissions:
+                    raise ApiError("FORBIDDEN", f"Missing permission: accounting_documents.delete for document {doc_id}", http_status=403)
+                
+                permissions = ctx._normalize_permissions_value(permission_obj.business_permissions)
+                if "accounting_documents" not in permissions:
+                    raise ApiError("FORBIDDEN", f"Missing permission: accounting_documents.delete for document {doc_id}", http_status=403)
+                
+                section_perms = permissions.get("accounting_documents", {})
+                if not section_perms.get("delete", False):
+                    raise ApiError("FORBIDDEN", f"Missing permission: accounting_documents.delete for document {doc_id}", http_status=403)
+        except ApiError:
+            raise
+        except Exception:
+            continue
     
     result = delete_multiple_documents(db, document_ids)
     
@@ -617,7 +651,7 @@ async def create_manual_document_endpoint(
     body: CreateManualDocumentRequest,
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
-    _: None = Depends(require_business_management_dep),
+    _: None = Depends(require_business_permission_dep("accounting_documents", "add")),
 ):
     """
     ایجاد سند حسابداری دستی
@@ -700,7 +734,7 @@ async def update_manual_document_endpoint(
     body: UpdateManualDocumentRequest,
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
-    _: None = Depends(require_business_management_dep),
+    _: None = Depends(require_business_permission_by_entity_dep("accounting_documents", "edit", Document, "document_id")),
 ):
     """
     ویرایش سند حسابداری دستی

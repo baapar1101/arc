@@ -17,6 +17,7 @@ import '../../core/api_client.dart';
 import '../../services/receipt_payment_service.dart';
 import '../../services/invoice_service.dart';
 import '../../utils/number_normalizer.dart';
+import '../../utils/snackbar_helper.dart';
 
 class ReceiptsPaymentsPage extends StatefulWidget {
   final int businessId;

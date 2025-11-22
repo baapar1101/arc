@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:hesabix_ui/models/credit_models.dart';
 import 'package:hesabix_ui/services/credit_api_service.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
+import '../../utils/snackbar_helper.dart';
 
 class CreditSettingsPage extends StatefulWidget {
   final int businessId;
@@ -77,7 +78,7 @@ class _CreditSettingsPageState extends State<CreditSettingsPage> {
       });
       if (!mounted) return;
       final t = AppLocalizations.of(context);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.savedSuccessfully)));
+      SnackBarHelper.show(context, message: t.savedSuccessfully);
     } catch (e) {
       setState(() {
         _error = e.toString();

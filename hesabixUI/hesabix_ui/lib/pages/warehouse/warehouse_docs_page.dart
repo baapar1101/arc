@@ -14,6 +14,7 @@ import '../../models/warehouse_document_model.dart';
 import '../../core/calendar_controller.dart';
 import '../../core/date_utils.dart' show HesabixDateUtils;
 import '../../l10n/app_localizations.dart';
+import '../../utils/snackbar_helper.dart';
 
 class WarehouseDocsPage extends StatefulWidget {
   final int businessId;
@@ -279,7 +280,7 @@ class _WarehouseDocsPageState extends State<WarehouseDocsPage> {
     final selectedItems = state?.getSelectedItems() as List<dynamic>? ?? const <dynamic>[];
     if (selectedItems.isEmpty) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.noRowsSelectedError)));
+        SnackBarHelper.showError(context, message: t.noRowsSelectedError);
       }
       return;
     }
@@ -315,11 +316,11 @@ class _WarehouseDocsPageState extends State<WarehouseDocsPage> {
       final buffer = StringBuffer('$deleted حواله حذف شد');
       if (skipped > 0) buffer.write(' | $skipped مورد به دلیل وضعیت نامعتبر حذف نشد');
       if (errors > 0) buffer.write(' | $errors خطا');
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(buffer.toString())));
+      SnackBarHelper.show(context, message: buffer.toString());
       _refreshTable();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${t.operationFailed}: $e')));
+      SnackBarHelper.show(context, message: '${t.operationFailed}: $e');
     }
   }
 

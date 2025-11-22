@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from adapters.db.session import get_db
 from app.core.auth_dependency import get_current_user, AuthContext
-from app.core.permissions import require_business_management_dep
+from app.core.permissions import require_business_management_dep, require_business_permission_dep
 from app.core.responses import success_response, format_datetime_fields
 from app.services.opening_balance_service import (
     get_opening_balance,
@@ -54,15 +54,8 @@ async def upsert_opening_balance_endpoint(
     body: Dict[str, Any] = Body(...),
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
-    _: None = Depends(require_business_management_dep),
+    _: None = Depends(require_business_permission_dep("opening_balance", "edit")),
 ):
-    # Permission: edit opening_balance
-    if not ctx.has_business_permission("opening_balance", "edit"):
-        from app.core.responses import ApiError
-        raise ApiError("FORBIDDEN", "Missing business permission: opening_balance.edit", http_status=403)
-    if not ctx.can_access_business(int(business_id)):
-        from app.core.responses import ApiError
-        raise ApiError("FORBIDDEN", f"No access to business {business_id}", http_status=403)
     created = upsert_opening_balance(db, business_id, ctx.get_user_id(), body)
     return success_response(data=format_datetime_fields(created, request), request=request, message="OPENING_BALANCE_SAVED")
 
@@ -78,12 +71,8 @@ async def post_opening_balance_endpoint(
     fiscal_year_id: Optional[int] = None,
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
-    _: None = Depends(require_business_management_dep),
+    _: None = Depends(require_business_permission_dep("opening_balance", "edit")),
 ):
-    # Permission: edit opening_balance
-    if not ctx.has_business_permission("opening_balance", "edit"):
-        from app.core.responses import ApiError
-        raise ApiError("FORBIDDEN", "Missing business permission: opening_balance.edit", http_status=403)
     if not ctx.can_access_business(int(business_id)):
         from app.core.responses import ApiError
         raise ApiError("FORBIDDEN", f"No access to business {business_id}", http_status=403)

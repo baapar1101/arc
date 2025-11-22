@@ -21,6 +21,7 @@ import 'account_tree_combobox_widget.dart';
 import 'check_combobox_widget.dart';
 import '../../models/invoice_type_model.dart';
 import '../../utils/number_normalizer.dart';
+import '../../utils/snackbar_helper.dart';
 
 class InvoiceTransactionsWidget extends StatefulWidget {
   final List<InvoiceTransaction> transactions;

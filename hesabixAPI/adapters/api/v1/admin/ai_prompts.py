@@ -21,7 +21,7 @@ async def get_default_prompts(
     ctx: AuthContext = Depends(get_current_user),
 ) -> Dict[str, Any]:
     """دریافت prompt های پیش‌فرض (فقط مدیر سیستم)"""
-    if not ctx.is_superadmin():
+    if not ctx.has_any_permission("system_settings", "superadmin"):
         raise ApiError("FORBIDDEN", "فقط مدیر سیستم می‌تواند prompt های پیش‌فرض را مشاهده کند", http_status=403)
     
     repo = AIPromptRepository(db)
@@ -53,7 +53,7 @@ async def update_default_prompt_endpoint(
     ctx: AuthContext = Depends(get_current_user),
 ) -> Dict[str, Any]:
     """به‌روزرسانی prompt پیش‌فرض (فقط مدیر سیستم)"""
-    if not ctx.is_superadmin():
+    if not ctx.has_any_permission("system_settings", "superadmin"):
         raise ApiError("FORBIDDEN", "فقط مدیر سیستم می‌تواند prompt پیش‌فرض را ویرایش کند", http_status=403)
     
     try:

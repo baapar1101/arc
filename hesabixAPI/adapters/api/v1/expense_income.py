@@ -7,8 +7,9 @@ from fastapi import APIRouter, Depends, Request, Body
 from sqlalchemy.orm import Session
 
 from adapters.db.session import get_db
+from adapters.db.models.document import Document
 from app.core.auth_dependency import get_current_user, AuthContext
-from app.core.permissions import require_business_management_dep, require_business_access
+from app.core.permissions import require_business_management_dep, require_business_access, require_business_permission_dep, require_business_permission_by_entity_dep
 from app.core.responses import success_response, format_datetime_fields
 from adapters.api.v1.schemas import QueryInfo
 from app.services.expense_income_service import (
@@ -37,7 +38,7 @@ async def create_expense_income_endpoint(
     body: Dict[str, Any] = Body(...),
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
-    _: None = Depends(require_business_management_dep),
+    _: None = Depends(require_business_permission_dep("expenses_income", "add")),
 ):
     created = create_expense_income(db, business_id, ctx.get_user_id(), body)
     return success_response(
@@ -137,7 +138,7 @@ async def update_expense_income_endpoint(
     body: Dict[str, Any] = Body(...),
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
-    _: None = Depends(require_business_management_dep),
+    _: None = Depends(require_business_permission_by_entity_dep("expenses_income", "edit", Document, "document_id")),
 ):
     """ویرایش سند هزینه/درآمد"""
     updated = update_expense_income(db, document_id, ctx.get_user_id(), body)
@@ -159,7 +160,7 @@ async def delete_expense_income_endpoint(
     document_id: int,
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
-    _: None = Depends(require_business_management_dep),
+    _: None = Depends(require_business_permission_by_entity_dep("expenses_income", "delete", Document, "document_id")),
 ):
     """حذف سند هزینه/درآمد"""
     success = delete_expense_income(db, document_id)
@@ -185,13 +186,45 @@ async def delete_multiple_expense_income_endpoint(
     body: Dict[str, Any] = Body(...),
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
-    _: None = Depends(require_business_management_dep),
 ):
     """حذف گروهی اسناد"""
     document_ids = body.get("document_ids", [])
     if not document_ids:
         from app.core.responses import ApiError
         raise ApiError("INVALID_REQUEST", "document_ids is required", http_status=400)
+    
+    # بررسی دسترسی برای هر document
+    from adapters.db.models.document import Document as DocumentModel
+    from adapters.db.repositories.business_permission_repo import BusinessPermissionRepository
+    permission_repo = BusinessPermissionRepository(db)
+    
+    for doc_id in document_ids:
+        try:
+            doc = db.get(DocumentModel, doc_id)
+            if doc:
+                business_id = doc.business_id
+                if not ctx.can_access_business(business_id):
+                    raise ApiError("FORBIDDEN", f"No access to document {doc_id}", http_status=403)
+                
+                # بررسی دسترسی جزئی برای business_id مشخص
+                if ctx.is_superadmin() or ctx.is_business_owner(business_id):
+                    continue  # SuperAdmin و مالک تمام دسترسی‌ها را دارند
+                
+                permission_obj = permission_repo.get_by_user_and_business(ctx.get_user_id(), business_id)
+                if not permission_obj or not permission_obj.business_permissions:
+                    raise ApiError("FORBIDDEN", f"Missing permission: expenses_income.delete for document {doc_id}", http_status=403)
+                
+                permissions = ctx._normalize_permissions_value(permission_obj.business_permissions)
+                if "expenses_income" not in permissions:
+                    raise ApiError("FORBIDDEN", f"Missing permission: expenses_income.delete for document {doc_id}", http_status=403)
+                
+                section_perms = permissions.get("expenses_income", {})
+                if not section_perms.get("delete", False):
+                    raise ApiError("FORBIDDEN", f"Missing permission: expenses_income.delete for document {doc_id}", http_status=403)
+        except ApiError:
+            raise
+        except Exception:
+            continue
     
     success = delete_multiple_expense_income(db, document_ids)
     

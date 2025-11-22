@@ -20,6 +20,7 @@ import 'package:hesabix_ui/widgets/attached_files/attached_files_widget.dart';
 import 'package:hesabix_ui/utils/web/web_utils.dart' as web_utils;
 import 'package:hesabix_ui/widgets/warehouse/warehouse_document_details_dialog.dart';
 import 'package:intl/intl.dart';
+import 'package:hesabix_ui/utils/snackbar_helper.dart';
 
 /// دیالوگ نمایش جزئیات کامل سند حسابداری
 class DocumentDetailsDialog extends StatefulWidget {
@@ -164,12 +165,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
       }
     }
     
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(errorMessage),
-        backgroundColor: Colors.red,
-      ),
-    );
+    SnackBarHelper.showError(context, message: errorMessage);
   }
   
   Future<void> _showStorageLimitDialog(Map<String, dynamic> error) async {
@@ -301,14 +297,10 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
       final bytes = await api.downloadPdf(path, query: query.isNotEmpty ? query : null);
       await _savePdfFile(bytes, doc.code);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppLocalizations.of(context).pdfSuccess)),
-      );
+      SnackBarHelper.showSuccess(context, message: 'فایل PDF با موفقیت ذخیره شد');
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${AppLocalizations.of(context).pdfError}: $e')),
-      );
+      SnackBarHelper.showError(context, message: 'خطا در تولید PDF: $e');
     } finally {
       if (mounted) setState(() => _isGeneratingPdf = false);
     }

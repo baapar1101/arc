@@ -4,6 +4,7 @@ import '../../services/petty_cash_service.dart';
 import '../../core/api_client.dart';
 import '../../services/currency_service.dart';
 import '../../widgets/banking/petty_cash_form_dialog.dart';
+import '../../utils/snackbar_helper.dart';
 
 class PettyCashOption {
   final String id;
@@ -177,7 +178,7 @@ class _PettyCashComboboxWidgetState extends State<PettyCashComboboxWidget> {
         }
       });
       _setModalState?.call(() {});
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطا در دریافت لیست تنخواه‌گردان‌ها: $e')));
+      SnackBarHelper.showError(context, message: 'خطا در دریافت لیست تنخواه‌گردان‌ها: $e');
     }
   }
 

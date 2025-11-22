@@ -17,6 +17,7 @@ import 'package:hesabix_ui/widgets/invoice/petty_cash_combobox_widget.dart';
 import 'package:hesabix_ui/widgets/invoice/check_combobox_widget.dart';
 import 'package:hesabix_ui/utils/number_formatters.dart' show formatWithThousands;
 import 'package:hesabix_ui/utils/number_normalizer.dart';
+import 'package:hesabix_ui/utils/snackbar_helper.dart';
 
 /// دیالوگ ایجاد/ویرایش سند هزینه/درآمد
 class ExpenseIncomeFormDialog extends StatefulWidget {
@@ -377,15 +378,11 @@ class _ExpenseIncomeFormDialogState extends State<ExpenseIncomeFormDialog> {
       Navigator.pop(context, true);
       
       // نمایش پیام موفقیت
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            widget.initialDocument != null
-              ? 'سند با موفقیت ویرایش شد'
-              : (_isIncome ? 'سند درآمد با موفقیت ثبت شد' : 'سند هزینه با موفقیت ثبت شد'),
-          ),
-          backgroundColor: Colors.green,
-        ),
+      SnackBarHelper.showSuccess(
+        context,
+        message: widget.initialDocument != null
+          ? 'سند با موفقیت ویرایش شد'
+          : (_isIncome ? 'سند درآمد با موفقیت ثبت شد' : 'سند هزینه با موفقیت ثبت شد'),
       );
     } catch (e) {
       if (!mounted) return;
@@ -394,12 +391,7 @@ class _ExpenseIncomeFormDialogState extends State<ExpenseIncomeFormDialog> {
       Navigator.pop(context);
       
       // نمایش خطا
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('خطا: ${e.toString()}'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      SnackBarHelper.showError(context, message: 'خطا: ${e.toString()}');
     }
   }
 }

@@ -8,6 +8,7 @@ import '../../core/calendar_controller.dart';
 import '../../l10n/app_localizations.dart';
 import '../../utils/web/web_utils.dart' as web_utils;
 import '../../core/date_utils.dart' show HesabixDateUtils;
+import '../../utils/snackbar_helper.dart';
 
 class WarehouseDocumentDetailsDialog extends StatefulWidget {
   final int businessId;

@@ -14,6 +14,7 @@ import '../core/referral_store.dart';
 import '../theme/theme_controller.dart';
 import '../utils/number_normalizer.dart';
 import '../widgets/auth_footer.dart';
+import '../../utils/snackbar_helper.dart';
 
 class LoginPage extends StatefulWidget {
   final LocaleController localeController;
@@ -199,9 +200,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
 
   void _showSnack(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(message)));
+    SnackBarHelper.show(context, message: message);
   }
 
   Future<void> _onSubmit() async {
@@ -209,7 +208,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     final t = AppLocalizations.of(context);
     if (form == null || !form.validate()) return;
     if ((_loginCaptchaCtrl.text.trim().isEmpty) || (_loginCaptchaId == null)) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.captchaRequired)));
+      SnackBarHelper.show(context, message: t.captchaRequired);
       return;
     }
 

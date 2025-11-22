@@ -3,6 +3,7 @@ from typing import Callable, Any, get_type_hints
 import inspect
 
 from fastapi import Depends
+from sqlalchemy.orm import Session
 from app.core.auth_dependency import get_current_user, AuthContext
 from app.core.responses import ApiError
 from adapters.db.session import get_db
@@ -261,3 +262,254 @@ def require_business_access_dep(request: Request, db=Depends(get_db)) -> None:
         return
     if not ctx.can_access_business(int(business_id)):
         raise ApiError("FORBIDDEN", f"No access to business {business_id}", http_status=403)
+
+
+def require_business_permission_dep(section: str, action: str = None, business_id_param: str = "business_id"):
+    """FastAPI dependency برای بررسی دسترسی کسب و کار با business_id از path parameter.
+    
+    این dependency برای endpoint هایی استفاده می‌شود که business_id را در path دارند
+    و باید دسترسی کسب و کار را با همان business_id چک کنند.
+    
+    Args:
+        section: بخش دسترسی (مثل "people", "sales")
+        action: عملیات دسترسی (مثل "add", "write"). اگر None باشد، فقط دسترسی به کسب و کار چک می‌شود
+        business_id_param: نام پارامتر business_id در path (پیش‌فرض: "business_id")
+    
+    استفاده:
+        _: None = Depends(require_business_permission_dep("people", "add"))
+    """
+    def _dependency(
+        request: Request,
+        auth_context: AuthContext = Depends(get_current_user),
+        db: Session = Depends(get_db)
+    ) -> None:
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        # استخراج business_id از path parameters
+        business_id = None
+        try:
+            business_id = request.path_params.get(business_id_param)
+            if business_id:
+                business_id = int(business_id)
+        except (ValueError, TypeError, AttributeError) as e:
+            logger.warning(f"Could not extract business_id from path: {e}")
+            business_id = None
+        
+        if not business_id:
+            raise ApiError("BAD_REQUEST", f"business_id parameter not found in path", http_status=400)
+        
+        logger.info(f"=== require_business_permission_dep ===")
+        logger.info(f"Section: {section}, Action: {action}")
+        logger.info(f"Business ID: {business_id}")
+        logger.info(f"User ID: {auth_context.get_user_id()}")
+        
+        # بررسی دسترسی به کسب و کار
+        if not auth_context.can_access_business(business_id):
+            logger.warning(f"User {auth_context.get_user_id()} does not have access to business {business_id}")
+            raise ApiError("FORBIDDEN", f"No access to business {business_id}", http_status=403)
+        
+        # اگر action مشخص نشده، فقط دسترسی به کسب و کار کافی است
+        if action is None:
+            logger.info(f"User {auth_context.get_user_id()} has access to business {business_id}")
+            return
+        
+        # SuperAdmin تمام دسترسی‌ها را دارد
+        if auth_context.is_superadmin():
+            logger.info(f"User {auth_context.get_user_id()} is superadmin, granting permission")
+            return
+        
+        # مالک کسب و کار تمام دسترسی‌ها را دارد
+        if auth_context.is_business_owner(business_id):
+            logger.info(f"User {auth_context.get_user_id()} is business owner of {business_id}, granting permission")
+            return
+        
+        # بررسی دسترسی کسب و کار برای business_id مشخص شده
+        # برای این کار باید مستقیماً از دیتابیس permission را بخوانیم
+        # چون has_business_permission از self.business_id استفاده می‌کند
+        from adapters.db.repositories.business_permission_repo import BusinessPermissionRepository
+        repo = BusinessPermissionRepository(db)
+        permission_obj = repo.get_by_user_and_business(auth_context.get_user_id(), business_id)
+        
+        if not permission_obj or not permission_obj.business_permissions:
+            logger.warning(f"User {auth_context.get_user_id()} has no permissions for business {business_id}")
+            raise ApiError("FORBIDDEN", f"Missing business permission: {section}.{action}", http_status=403)
+        
+        # نرمال‌سازی permissions
+        permissions = auth_context._normalize_permissions_value(permission_obj.business_permissions)
+        logger.info(f"User permissions for business {business_id}: {permissions}")
+        
+        # بررسی دسترسی بخش
+        if section not in permissions:
+            logger.warning(f"User {auth_context.get_user_id()} does not have section '{section}' for business {business_id}")
+            raise ApiError("FORBIDDEN", f"Missing business permission: {section}.{action}", http_status=403)
+        
+        section_perms = permissions[section]
+        
+        # اگر بخش خالی است، فقط خواندن مجاز است
+        if not section_perms:
+            if action == "read" or action == "view":
+                logger.info(f"User {auth_context.get_user_id()} has read permission for section '{section}'")
+                return
+            else:
+                logger.warning(f"User {auth_context.get_user_id()} does not have permission '{section}.{action}' (only read)")
+                raise ApiError("FORBIDDEN", f"Missing business permission: {section}.{action}", http_status=403)
+        
+        # بررسی دسترسی خاص
+        # پشتیبانی از هم add و هم write برای سازگاری
+        # همچنین پشتیبانی از edit برای add و بالعکس
+        has_permission = (
+            section_perms.get(action, False) or
+            (action == "add" and (section_perms.get("write", False) or section_perms.get("edit", False))) or
+            (action == "write" and (section_perms.get("add", False) or section_perms.get("edit", False))) or
+            (action == "edit" and (section_perms.get("add", False) or section_perms.get("write", False)))
+        )
+        
+        if not has_permission:
+            logger.warning(f"User {auth_context.get_user_id()} does not have permission '{section}.{action}' for business {business_id}")
+            raise ApiError("FORBIDDEN", f"Missing business permission: {section}.{action}", http_status=403)
+        
+        logger.info(f"User {auth_context.get_user_id()} has permission '{section}.{action}' for business {business_id}")
+        logger.info(f"=== require_business_permission_dep END ===")
+    
+    return _dependency
+
+
+def require_business_permission_by_entity_dep(
+    section: str,
+    action: str,
+    entity_model,
+    entity_id_param: str = None,
+    business_id_field: str = "business_id"
+):
+    """FastAPI dependency برای بررسی دسترسی کسب و کار برای endpoint هایی که business_id در path ندارند.
+    
+    این dependency برای endpoint هایی استفاده می‌شود که ID دیگری در path دارند (مثل person_id, document_id)
+    و باید ابتدا business_id را از entity بگیرند و سپس permission را چک کنند.
+    
+    Args:
+        section: بخش دسترسی (مثل "people", "bank_accounts")
+        action: عملیات دسترسی (مثل "add", "write", "delete")
+        entity_model: مدل SQLAlchemy برای entity (مثل Person, Document)
+        entity_id_param: نام پارامتر entity_id در path (مثل "person_id", "document_id")
+                         اگر None باشد، از نام مدل استفاده می‌شود (مثل Person -> "person_id")
+        business_id_field: نام فیلد business_id در مدل (پیش‌فرض: "business_id")
+    
+    استفاده:
+        _: None = Depends(require_business_permission_by_entity_dep("people", "edit", Person, "person_id"))
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    # اگر entity_id_param مشخص نشده، از نام مدل استفاده می‌کنیم
+    if entity_id_param is None:
+        model_name = entity_model.__name__.lower()
+        # تبدیل نام مدل به snake_case برای پارامتر
+        if model_name.endswith('y'):
+            entity_id_param = model_name[:-1] + "_id"  # Person -> person_id
+        elif model_name.endswith('s'):
+            entity_id_param = model_name + "_id"  # Checks -> checks_id
+        else:
+            entity_id_param = model_name + "_id"
+    
+    def _dependency(
+        request: Request,
+        auth_context: AuthContext = Depends(get_current_user),
+        db: Session = Depends(get_db),
+    ) -> None:
+        # استخراج entity_id از path parameters
+        entity_id = None
+        try:
+            # از path_params بگیریم
+            entity_id = request.path_params.get(entity_id_param)
+            
+            if entity_id:
+                entity_id = int(entity_id)
+        except (ValueError, TypeError, AttributeError, KeyError) as e:
+            logger.warning(f"Could not extract {entity_id_param} from path: {e}")
+            entity_id = None
+        
+        if not entity_id:
+            raise ApiError("BAD_REQUEST", f"{entity_id_param} parameter not found in path", http_status=400)
+        
+        logger.info(f"=== require_business_permission_by_entity_dep ===")
+        logger.info(f"Section: {section}, Action: {action}")
+        logger.info(f"Entity ID: {entity_id}, Entity ID Param: {entity_id_param}")
+        logger.info(f"User ID: {auth_context.get_user_id()}")
+        
+        # دریافت entity از دیتابیس
+        entity = db.get(entity_model, entity_id)
+        if not entity:
+            logger.warning(f"Entity {entity_id} not found for model {entity_model.__name__}")
+            raise ApiError("NOT_FOUND", f"Entity not found", http_status=404)
+        
+        # استخراج business_id از entity
+        business_id = getattr(entity, business_id_field, None)
+        if not business_id:
+            logger.error(f"Entity {entity_id} does not have {business_id_field} field")
+            raise ApiError("BAD_REQUEST", f"Entity does not have business_id", http_status=400)
+        
+        logger.info(f"Business ID extracted from entity: {business_id}")
+        
+        # بررسی دسترسی به کسب و کار
+        if not auth_context.can_access_business(business_id):
+            logger.warning(f"User {auth_context.get_user_id()} does not have access to business {business_id}")
+            raise ApiError("FORBIDDEN", f"No access to business {business_id}", http_status=403)
+        
+        # SuperAdmin تمام دسترسی‌ها را دارد
+        if auth_context.is_superadmin():
+            logger.info(f"User {auth_context.get_user_id()} is superadmin, granting permission")
+            return
+        
+        # مالک کسب و کار تمام دسترسی‌ها را دارد
+        if auth_context.is_business_owner(business_id):
+            logger.info(f"User {auth_context.get_user_id()} is business owner of {business_id}, granting permission")
+            return
+        
+        # بررسی دسترسی کسب و کار برای business_id مشخص شده
+        from adapters.db.repositories.business_permission_repo import BusinessPermissionRepository
+        repo = BusinessPermissionRepository(db)
+        permission_obj = repo.get_by_user_and_business(auth_context.get_user_id(), business_id)
+        
+        if not permission_obj or not permission_obj.business_permissions:
+            logger.warning(f"User {auth_context.get_user_id()} has no permissions for business {business_id}")
+            raise ApiError("FORBIDDEN", f"Missing business permission: {section}.{action}", http_status=403)
+        
+        # نرمال‌سازی permissions
+        permissions = auth_context._normalize_permissions_value(permission_obj.business_permissions)
+        logger.info(f"User permissions for business {business_id}: {permissions}")
+        
+        # بررسی دسترسی بخش
+        if section not in permissions:
+            logger.warning(f"User {auth_context.get_user_id()} does not have section '{section}' for business {business_id}")
+            raise ApiError("FORBIDDEN", f"Missing business permission: {section}.{action}", http_status=403)
+        
+        section_perms = permissions[section]
+        
+        # اگر بخش خالی است، فقط خواندن مجاز است
+        if not section_perms:
+            if action == "read" or action == "view":
+                logger.info(f"User {auth_context.get_user_id()} has read permission for section '{section}'")
+                return
+            else:
+                logger.warning(f"User {auth_context.get_user_id()} does not have permission '{section}.{action}' (only read)")
+                raise ApiError("FORBIDDEN", f"Missing business permission: {section}.{action}", http_status=403)
+        
+        # بررسی دسترسی خاص
+        # پشتیبانی از هم add و هم write برای سازگاری
+        # همچنین پشتیبانی از edit برای add و بالعکس
+        has_permission = (
+            section_perms.get(action, False) or
+            (action == "add" and (section_perms.get("write", False) or section_perms.get("edit", False))) or
+            (action == "write" and (section_perms.get("add", False) or section_perms.get("edit", False))) or
+            (action == "edit" and (section_perms.get("add", False) or section_perms.get("write", False)))
+        )
+        
+        if not has_permission:
+            logger.warning(f"User {auth_context.get_user_id()} does not have permission '{section}.{action}' for business {business_id}")
+            raise ApiError("FORBIDDEN", f"Missing business permission: {section}.{action}", http_status=403)
+        
+        logger.info(f"User {auth_context.get_user_id()} has permission '{section}.{action}' for business {business_id}")
+        logger.info(f"=== require_business_permission_by_entity_dep END ===")
+    
+    return _dependency

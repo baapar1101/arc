@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/api_client.dart';
 import '../../services/admin_notification_templates_service.dart';
+import '../../utils/snackbar_helper.dart';
 
 class NotificationTemplatesAdminPage extends StatefulWidget {
   const NotificationTemplatesAdminPage({super.key});
@@ -140,7 +141,7 @@ class _NotificationTemplatesAdminPageState extends State<NotificationTemplatesAd
                           );
                         } catch (e) {
                           if (!context.mounted) return;
-                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطا در پیش‌نمایش: $e')));
+                          SnackBarHelper.showError(context, message: 'خطا در پیش‌نمایش: $e');
                         }
                       },
                       icon: const Icon(Icons.visibility, size: 18),
@@ -182,7 +183,7 @@ class _NotificationTemplatesAdminPageState extends State<NotificationTemplatesAd
                   Navigator.of(context).pop(true);
                 } catch (e) {
                   if (!context.mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطا: $e')));
+                  SnackBarHelper.showError(context, message: 'خطا: $e');
                 }
               },
               child: const Text('ذخیره'),
@@ -208,7 +209,7 @@ class _NotificationTemplatesAdminPageState extends State<NotificationTemplatesAd
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطا: $e')));
+        SnackBarHelper.showError(context, message: 'خطا: $e');
       }
     }
   }

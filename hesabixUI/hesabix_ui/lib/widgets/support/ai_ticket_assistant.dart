@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/services/ai_service.dart';
+import '../../utils/snackbar_helper.dart';
 
 /// Widget برای کمک AI در پاسخ به تیکت‌های پشتیبانی
 class AITicketAssistant extends StatefulWidget {

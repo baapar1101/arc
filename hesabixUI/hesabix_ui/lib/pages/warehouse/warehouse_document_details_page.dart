@@ -6,6 +6,7 @@ import '../../widgets/invoice/warehouse_combobox_widget.dart';
 import '../../widgets/document/document_details_dialog.dart';
 import '../../core/calendar_controller.dart';
 import '../../utils/web/web_utils.dart' as web_utils;
+import '../../utils/snackbar_helper.dart';
 
 class WarehouseDocumentDetailsPage extends StatefulWidget {
   final int businessId;

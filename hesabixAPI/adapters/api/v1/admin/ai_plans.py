@@ -22,7 +22,7 @@ async def create_ai_plan(
     ctx: AuthContext = Depends(get_current_user),
 ) -> Dict[str, Any]:
     """ایجاد پلن AI جدید (فقط مدیر سیستم)"""
-    if not ctx.is_superadmin():
+    if not ctx.has_any_permission("system_settings", "superadmin"):
         raise ApiError("FORBIDDEN", "فقط مدیر سیستم می‌تواند پلن ایجاد کند", http_status=403)
     
     plan = create_plan(
@@ -53,7 +53,7 @@ async def list_ai_plans(
     ctx: AuthContext = Depends(get_current_user),
 ) -> Dict[str, Any]:
     """دریافت لیست پلن‌های AI (فقط مدیر سیستم)"""
-    if not ctx.is_superadmin():
+    if not ctx.has_any_permission("system_settings", "superadmin"):
         raise ApiError("FORBIDDEN", "فقط مدیر سیستم می‌تواند پلن‌ها را مشاهده کند", http_status=403)
     
     repo = AIPlanRepository(db)
@@ -89,7 +89,7 @@ async def get_ai_plan(
     ctx: AuthContext = Depends(get_current_user),
 ) -> Dict[str, Any]:
     """دریافت جزئیات یک پلن (فقط مدیر سیستم)"""
-    if not ctx.is_superadmin():
+    if not ctx.has_any_permission("system_settings", "superadmin"):
         raise ApiError("FORBIDDEN", "فقط مدیر سیستم می‌تواند پلن را مشاهده کند", http_status=403)
     
     repo = AIPlanRepository(db)
@@ -123,7 +123,7 @@ async def update_ai_plan(
     ctx: AuthContext = Depends(get_current_user),
 ) -> Dict[str, Any]:
     """ویرایش پلن (فقط مدیر سیستم)"""
-    if not ctx.is_superadmin():
+    if not ctx.has_any_permission("system_settings", "superadmin"):
         raise ApiError("FORBIDDEN", "فقط مدیر سیستم می‌تواند پلن را ویرایش کند", http_status=403)
     
     plan = update_plan(
@@ -155,7 +155,7 @@ async def delete_ai_plan(
     ctx: AuthContext = Depends(get_current_user),
 ) -> Dict[str, Any]:
     """غیرفعال کردن پلن (فقط مدیر سیستم)"""
-    if not ctx.is_superadmin():
+    if not ctx.has_any_permission("system_settings", "superadmin"):
         raise ApiError("FORBIDDEN", "فقط مدیر سیستم می‌تواند پلن را حذف کند", http_status=403)
     
     repo = AIPlanRepository(db)

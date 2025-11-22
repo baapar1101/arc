@@ -6,6 +6,7 @@ import 'sections/product_basic_info_section.dart';
 import 'sections/product_pricing_inventory_section.dart';
 import 'sections/product_tax_section.dart';
 import 'sections/product_bom_section.dart';
+import '../../utils/snackbar_helper.dart';
 
 class ProductFormDialog extends StatefulWidget {
   final int businessId;
@@ -246,15 +247,13 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
       widget.onSuccess?.call();
       Navigator.of(context).pop(true);
     } else if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(_controller.errorMessage ?? t.error),
-          backgroundColor: Colors.red,
-          action: SnackBarAction(
-            label: t.retry,
-            textColor: Colors.white,
-            onPressed: _handleSubmit,
-          ),
+      SnackBarHelper.showError(
+        context,
+        message: _controller.errorMessage ?? t.error,
+        action: SnackBarAction(
+          label: t.retry,
+          textColor: Colors.white,
+          onPressed: _handleSubmit,
         ),
       );
     }

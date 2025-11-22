@@ -3,9 +3,10 @@ from fastapi import APIRouter, Depends, Request, Body, HTTPException
 from sqlalchemy.orm import Session
 
 from adapters.db.session import get_db
+from adapters.db.models.bank_account import BankAccount
 from app.core.auth_dependency import get_current_user, AuthContext
 from app.core.responses import success_response, format_datetime_fields, ApiError
-from app.core.permissions import require_business_management_dep, require_business_access
+from app.core.permissions import require_business_management_dep, require_business_access, require_business_permission_dep, require_business_permission_by_entity_dep
 from adapters.api.v1.schemas import QueryInfo
 from adapters.api.v1.schema_models.bank_account import (
     BankAccountCreateRequest,
@@ -63,7 +64,7 @@ async def create_bank_account_endpoint(
     body: BankAccountCreateRequest = Body(...),
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
-    _: None = Depends(require_business_management_dep),
+    _: None = Depends(require_business_permission_dep("bank_accounts", "add")),
 ):
     payload: Dict[str, Any] = body.model_dump(exclude_unset=True)
     created = create_bank_account(db, business_id, payload)
@@ -80,7 +81,7 @@ async def get_bank_account_endpoint(
     account_id: int,
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
-    _: None = Depends(require_business_management_dep),
+    _: None = Depends(require_business_permission_by_entity_dep("bank_accounts", "view", BankAccount, "account_id")),
 ):
     result = get_bank_account_by_id(db, account_id)
     if not result:
@@ -106,7 +107,7 @@ async def update_bank_account_endpoint(
     body: BankAccountUpdateRequest = Body(...),
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
-    _: None = Depends(require_business_management_dep),
+    _: None = Depends(require_business_permission_by_entity_dep("bank_accounts", "edit", BankAccount, "account_id")),
 ):
     payload: Dict[str, Any] = body.model_dump(exclude_unset=True)
     result = update_bank_account(db, account_id, payload)
@@ -132,7 +133,7 @@ async def delete_bank_account_endpoint(
     account_id: int,
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
-    _: None = Depends(require_business_management_dep),
+    _: None = Depends(require_business_permission_by_entity_dep("bank_accounts", "delete", BankAccount, "account_id")),
 ):
     # ابتدا بررسی دسترسی بر اساس business مربوط به حساب
     result = get_bank_account_by_id(db, account_id)
@@ -161,7 +162,7 @@ async def bulk_delete_bank_accounts_endpoint(
     body: Dict[str, Any] = Body(...),
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
-    _: None = Depends(require_business_management_dep),
+    _: None = Depends(require_business_permission_dep("bank_accounts", "delete")),
 ):
     ids = body.get("ids")
     if not isinstance(ids, list):

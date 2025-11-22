@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/services/ai_service.dart';
 import 'package:hesabix_ui/models/ai_models.dart';
+import '../../utils/snackbar_helper.dart';
 
 class AIPromptsAdminPage extends StatefulWidget {
   const AIPromptsAdminPage({super.key});

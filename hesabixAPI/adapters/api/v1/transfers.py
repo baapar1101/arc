@@ -9,9 +9,10 @@ from fastapi.responses import Response
 import io, datetime, re, base64
 
 from adapters.db.session import get_db
+from adapters.db.models.document import Document
 from app.core.auth_dependency import get_current_user, AuthContext
 from app.core.responses import success_response, format_datetime_fields, ApiError
-from app.core.permissions import require_business_management_dep, require_business_access
+from app.core.permissions import require_business_management_dep, require_business_access, require_business_permission_dep, require_business_permission_by_entity_dep
 from adapters.api.v1.schemas import QueryInfo
 from app.services.transfer_service import (
     create_transfer,
@@ -86,7 +87,7 @@ async def create_transfer_endpoint(
     body: Dict[str, Any] = Body(...),
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
-    _: None = Depends(require_business_management_dep),
+    _: None = Depends(require_business_permission_dep("transfers", "add")),
 ):
     created = create_transfer(db, business_id, ctx.get_user_id(), body)
     return success_response(data=format_datetime_fields(created, request), request=request, message="TRANSFER_CREATED")
@@ -381,7 +382,7 @@ async def delete_transfer_endpoint(
     document_id: int,
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
-    _: None = Depends(require_business_management_dep),
+    _: None = Depends(require_business_permission_by_entity_dep("transfers", "delete", Document, "document_id")),
 ):
     result = get_transfer(db, document_id)
     if result:
@@ -405,7 +406,7 @@ async def update_transfer_endpoint(
     body: Dict[str, Any] = Body(...),
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
-    _: None = Depends(require_business_management_dep),
+    _: None = Depends(require_business_permission_by_entity_dep("transfers", "edit", Document, "document_id")),
 ):
     result = get_transfer(db, document_id)
     if not result:

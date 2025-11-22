@@ -4,6 +4,7 @@ import '../../services/cash_register_service.dart';
 import '../../core/api_client.dart';
 import '../../services/currency_service.dart';
 import '../../widgets/banking/cash_register_form_dialog.dart';
+import '../../utils/snackbar_helper.dart';
 
 class CashRegisterOption {
   final String id;
@@ -177,7 +178,7 @@ class _CashRegisterComboboxWidgetState extends State<CashRegisterComboboxWidget>
         }
       });
       _setModalState?.call(() {});
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطا در دریافت لیست صندوق‌ها: $e')));
+      SnackBarHelper.showError(context, message: 'خطا در دریافت لیست صندوق‌ها: $e');
     }
   }
 

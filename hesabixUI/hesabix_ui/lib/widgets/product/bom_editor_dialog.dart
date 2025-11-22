@@ -6,6 +6,7 @@ import '../../services/bom_service.dart';
 import '../invoice/product_combobox_widget.dart';
 import '../invoice/warehouse_combobox_widget.dart';
 import '../../utils/number_normalizer.dart';
+import '../../utils/snackbar_helper.dart';
 
 class BomEditorDialog extends StatefulWidget {
   final int businessId;
@@ -802,19 +803,19 @@ class _BomEditorDialogState extends State<BomEditorDialog> with SingleTickerProv
       
       // بررسی component_product_id انتخاب شده
       if (item.componentProductId <= 0) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('لطفاً کالای مواد اولیه در ردیف ${i + 1} را انتخاب کنید')));
+        SnackBarHelper.show(context, message: 'لطفاً کالای مواد اولیه در ردیف ${i + 1} را انتخاب کنید');
         return false;
       }
       
       // بررسی qty_per مثبت
       if (item.qtyPer <= 0) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('مقدار برای تولید در ردیف ${i + 1} باید بزرگ‌تر از صفر باشد')));
+        SnackBarHelper.show(context, message: 'مقدار برای تولید در ردیف ${i + 1} باید بزرگ‌تر از صفر باشد');
         return false;
       }
       
       // بررسی wastage_percent در محدوده 0-100
       if (item.wastagePercent != null && (item.wastagePercent! < 0 || item.wastagePercent! > 100)) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('درصد پرت در ردیف ${i + 1} باید بین 0 تا 100 باشد')));
+        SnackBarHelper.show(context, message: 'درصد پرت در ردیف ${i + 1} باید بین 0 تا 100 باشد');
         return false;
       }
     }
@@ -832,13 +833,13 @@ class _BomEditorDialogState extends State<BomEditorDialog> with SingleTickerProv
       
       // بررسی output_product_id انتخاب شده
       if (output.outputProductId <= 0) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('لطفاً محصول خروجی در ردیف ${i + 1} را انتخاب کنید')));
+        SnackBarHelper.show(context, message: 'لطفاً محصول خروجی در ردیف ${i + 1} را انتخاب کنید');
         return false;
       }
       
       // بررسی ratio مثبت
       if (output.ratio <= 0) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('نسبت خروجی در ردیف ${i + 1} باید بزرگ‌تر از صفر باشد')));
+        SnackBarHelper.show(context, message: 'نسبت خروجی در ردیف ${i + 1} باید بزرگ‌تر از صفر باشد');
         return false;
       }
     }
@@ -850,23 +851,23 @@ class _BomEditorDialogState extends State<BomEditorDialog> with SingleTickerProv
       
       // بررسی نام عملیات خالی نباشد
       if (op.operationName.trim().isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('نام عملیات در ردیف ${i + 1} نمی‌تواند خالی باشد')));
+        SnackBarHelper.show(context, message: 'نام عملیات در ردیف ${i + 1} نمی‌تواند خالی باشد');
         return false;
       }
       
       // بررسی هزینه‌های منفی
       if (op.costFixed != null && op.costFixed! < 0) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('هزینه ثابت در ردیف ${i + 1} نمی‌تواند منفی باشد')));
+        SnackBarHelper.show(context, message: 'هزینه ثابت در ردیف ${i + 1} نمی‌تواند منفی باشد');
         return false;
       }
       if (op.costPerUnit != null && op.costPerUnit! < 0) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('هزینه واحد در ردیف ${i + 1} نمی‌تواند منفی باشد')));
+        SnackBarHelper.show(context, message: 'هزینه واحد در ردیف ${i + 1} نمی‌تواند منفی باشد');
         return false;
       }
       
       // بررسی line_no تکراری
       if (operationLineNos.contains(op.lineNo)) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('شماره ردیف ${op.lineNo} در عملیات تکراری است')));
+        SnackBarHelper.show(context, message: 'شماره ردیف ${op.lineNo} در عملیات تکراری است');
         return false;
       }
       operationLineNos.add(op.lineNo);
@@ -905,7 +906,7 @@ class _BomEditorDialogState extends State<BomEditorDialog> with SingleTickerProv
       Navigator.of(context).pop<ProductBOM>(updated);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطا در ذخیره: $e')));
+      SnackBarHelper.showError(context, message: 'خطا در ذخیره: $e');
     } finally {
       if (mounted) setState(() => _saving = false);
     }

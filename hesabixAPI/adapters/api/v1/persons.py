@@ -17,7 +17,7 @@ from adapters.api.v1.schema_models.person import (
 from adapters.api.v1.schemas import QueryInfo, SuccessResponse
 from app.core.responses import success_response, format_datetime_fields, ApiError
 from app.core.auth_dependency import get_current_user, AuthContext
-from app.core.permissions import require_business_management_dep, require_business_access
+from app.core.permissions import require_business_management_dep, require_business_access, require_business_permission_dep, require_business_permission_by_entity_dep
 from app.core.i18n import negotiate_locale
 from app.services.person_service import (
     create_person,
@@ -53,7 +53,7 @@ async def bulk_delete_persons_endpoint(
     body: Dict[str, Any] = Body(...),
     db: Session = Depends(get_db),
     auth_context: AuthContext = Depends(get_current_user),
-    _: None = Depends(require_business_management_dep),
+    _: None = Depends(require_business_permission_dep("people", "delete")),
 ):
     """حذف گروهی اشخاص برای یک کسب‌وکار مشخص
 
@@ -161,7 +161,7 @@ async def create_person_endpoint(
     person_data: PersonCreateRequest,
     db: Session = Depends(get_db),
     auth_context: AuthContext = Depends(get_current_user),
-    _: None = Depends(require_business_management_dep),
+    _: None = Depends(require_business_permission_dep("people", "add")),
 ):
     """ایجاد شخص جدید برای کسب و کار"""
     result = create_person(db, business_id, person_data)
@@ -792,7 +792,7 @@ async def get_person_endpoint(
     person_id: int,
     db: Session = Depends(get_db),
     auth_context: AuthContext = Depends(get_current_user),
-    _: None = Depends(require_business_management_dep),
+    _: None = Depends(require_business_permission_by_entity_dep("people", "view", Person, "person_id")),
 ):
     """دریافت جزئیات شخص"""
     # ابتدا باید business_id را از person دریافت کنیم
@@ -830,7 +830,7 @@ async def update_person_endpoint(
     person_data: PersonUpdateRequest,
     db: Session = Depends(get_db),
     auth_context: AuthContext = Depends(get_current_user),
-    _: None = Depends(require_business_management_dep),
+    _: None = Depends(require_business_permission_by_entity_dep("people", "edit", Person, "person_id")),
 ):
     """ویرایش شخص"""
     # ابتدا باید business_id را از person دریافت کنیم
@@ -867,7 +867,7 @@ async def delete_person_endpoint(
     person_id: int,
     db: Session = Depends(get_db),
     auth_context: AuthContext = Depends(get_current_user),
-    _: None = Depends(require_business_management_dep),
+    _: None = Depends(require_business_permission_by_entity_dep("people", "delete", Person, "person_id")),
 ):
     """حذف شخص"""
     # ابتدا باید business_id را از person دریافت کنیم
@@ -892,7 +892,7 @@ async def get_person_share_link_endpoint(
     person_id: int,
     db: Session = Depends(get_db),
     auth_context: AuthContext = Depends(get_current_user),
-    _: None = Depends(require_business_management_dep),
+    _: None = Depends(require_business_permission_by_entity_dep("people", "view", Person, "person_id")),
 ):
     person = db.query(Person).filter(Person.id == person_id).first()
     if not person:
@@ -916,7 +916,7 @@ async def create_person_share_link_endpoint(
     payload: PersonShareLinkCreateRequest,
     db: Session = Depends(get_db),
     auth_context: AuthContext = Depends(get_current_user),
-    _: None = Depends(require_business_management_dep),
+    _: None = Depends(require_business_permission_by_entity_dep("people", "edit", Person, "person_id")),
 ):
     person = db.query(Person).filter(Person.id == person_id).first()
     if not person:
@@ -949,7 +949,7 @@ async def revoke_person_share_link_endpoint(
     person_id: int,
     db: Session = Depends(get_db),
     auth_context: AuthContext = Depends(get_current_user),
-    _: None = Depends(require_business_management_dep),
+    _: None = Depends(require_business_permission_by_entity_dep("people", "edit", Person, "person_id")),
 ):
     person = db.query(Person).filter(Person.id == person_id).first()
     if not person:
@@ -984,7 +984,7 @@ async def get_persons_summary_endpoint(
     business_id: int,
     db: Session = Depends(get_db),
     auth_context: AuthContext = Depends(get_current_user),
-    _: None = Depends(require_business_management_dep),
+    _: None = Depends(require_business_permission_dep("people", "view")),
 ):
     """دریافت خلاصه اشخاص کسب و کار"""
     result = get_person_summary(db, business_id)

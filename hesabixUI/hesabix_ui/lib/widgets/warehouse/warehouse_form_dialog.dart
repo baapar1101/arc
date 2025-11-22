@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../models/warehouse_model.dart';
 import '../../services/warehouse_service.dart';
+import '../../utils/snackbar_helper.dart';
 
 class WarehouseFormDialog extends StatefulWidget {
   final int businessId;
@@ -131,12 +132,7 @@ class _WarehouseFormDialogState extends State<WarehouseFormDialog> {
             _errorMessage = 'خطا: $e';
           });
         }
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('خطا: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        SnackBarHelper.showError(context, message: 'خطا: $e');
       }
     } finally {
       if (mounted) {

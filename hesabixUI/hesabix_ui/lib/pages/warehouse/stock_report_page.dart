@@ -3,6 +3,7 @@ import '../../services/warehouse_service.dart';
 import '../../widgets/invoice/product_combobox_widget.dart';
 import '../../widgets/invoice/warehouse_combobox_widget.dart';
 import '../../utils/number_formatters.dart' show formatWithThousands;
+import '../../utils/snackbar_helper.dart';
 
 class StockReportPage extends StatefulWidget {
   final int businessId;

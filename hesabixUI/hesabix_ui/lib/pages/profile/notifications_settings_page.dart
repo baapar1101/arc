@@ -5,6 +5,7 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../core/api_client.dart';
 import '../../services/notifications_service.dart';
 import '../../services/admin_system_settings_service.dart';
+import '../../utils/snackbar_helper.dart';
 
 class NotificationsSettingsPage extends StatefulWidget {
   const NotificationsSettingsPage({super.key});
@@ -101,10 +102,10 @@ class _NotificationsSettingsPageState extends State<NotificationsSettingsPage> {
         inappEnabled: _inapp,
       );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.notificationsSaveSuccess)));
+      SnackBarHelper.show(context, message: t.notificationsSaveSuccess);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${t.notificationsSaveError}\n$e')));
+      SnackBarHelper.showError(context, message: '${t.notificationsSaveError}\n$e');
     } finally {
       if (!mounted) return;
       setState(() => _saving = false);
@@ -115,10 +116,10 @@ class _NotificationsSettingsPageState extends State<NotificationsSettingsPage> {
     try {
       await _svc.sendTest(channel);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.notificationsTestSuccess(channelLabel))));
+      SnackBarHelper.show(context, message: t.notificationsTestSuccess(channelLabel));
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${t.notificationsTestError(channelLabel)}\n$e')));
+      SnackBarHelper.showError(context, message: '${t.notificationsTestError(channelLabel)}');
     }
   }
 
@@ -127,10 +128,10 @@ class _NotificationsSettingsPageState extends State<NotificationsSettingsPage> {
     try {
       await _adminSvc.putNotificationsConfig(_collectAdvancedPayload());
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.notificationsAdvancedSaveSuccess)));
+      SnackBarHelper.show(context, message: t.notificationsAdvancedSaveSuccess);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${t.notificationsAdvancedSaveError}\n$e')));
+      SnackBarHelper.showError(context, message: '${t.notificationsAdvancedSaveError}\n$e');
     } finally {
       if (!mounted) return;
       setState(() => _adminSaving = false);
@@ -152,7 +153,7 @@ class _NotificationsSettingsPageState extends State<NotificationsSettingsPage> {
   Future<void> _copyToClipboard(String value, String confirmationMessage) async {
     await Clipboard.setData(ClipboardData(text: value));
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(confirmationMessage)));
+    SnackBarHelper.show(context, message: confirmationMessage);
   }
 
   @override

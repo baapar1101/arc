@@ -5,6 +5,7 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../models/bank_account_model.dart';
 import '../../services/bank_account_service.dart';
 import '../../utils/number_normalizer.dart';
+import '../../utils/snackbar_helper.dart';
 import 'currency_picker_widget.dart';
 
 class BankAccountFormDialog extends StatefulWidget {
@@ -95,12 +96,7 @@ class _BankAccountFormDialogState extends State<BankAccountFormDialog> {
     
     if (_currencyId == null) {
       final t = AppLocalizations.of(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(t.currency),
-          backgroundColor: Colors.red,
-        ),
-      );
+      SnackBarHelper.showError(context, message: '${t.currency} الزامی است');
       return;
     }
 
@@ -142,23 +138,16 @@ class _BankAccountFormDialogState extends State<BankAccountFormDialog> {
       if (mounted) {
         Navigator.of(context).pop(true); // Return true to indicate success
         widget.onSuccess?.call();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(widget.account == null 
-              ? 'حساب بانکی با موفقیت ایجاد شد'
-              : 'حساب بانکی با موفقیت به‌روزرسانی شد'),
-            backgroundColor: Colors.green,
-          ),
+        SnackBarHelper.showSuccess(
+          context,
+          message: widget.account == null 
+            ? 'حساب بانکی با موفقیت ایجاد شد'
+            : 'حساب بانکی با موفقیت به‌روزرسانی شد',
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('خطا: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        SnackBarHelper.showError(context, message: 'خطا: $e');
       }
     } finally {
       if (mounted) {

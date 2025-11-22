@@ -4,6 +4,7 @@ import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/services/ai_service.dart';
 import 'package:hesabix_ui/models/ai_models.dart';
 import 'package:hesabix_ui/core/auth_store.dart';
+import '../../utils/snackbar_helper.dart';
 
 class AISubscriptionPage extends StatefulWidget {
   final int? businessId;

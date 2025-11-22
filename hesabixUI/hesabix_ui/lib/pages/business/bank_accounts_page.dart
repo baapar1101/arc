@@ -10,6 +10,7 @@ import '../../models/bank_account_model.dart';
 import '../../widgets/banking/bank_account_form_dialog.dart';
 import '../../services/bank_account_service.dart';
 import '../../services/currency_service.dart';
+import '../../utils/snackbar_helper.dart';
 
 class BankAccountsPage extends StatefulWidget {
   final int businessId;
@@ -234,7 +235,7 @@ class _BankAccountsPageState extends State<BankAccountsPage> {
                   final selectedIndices = (state?.getSelectedRowIndices() as List<int>?) ?? const <int>[];
                   final items = (state?.getSelectedItems() as List<dynamic>?) ?? const <dynamic>[];
                   if (selectedIndices.isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.noRowsSelectedError)));
+                    SnackBarHelper.showError(context, message: t.noRowsSelectedError);
                     return;
                   }
                   final ids = <int>[];
@@ -271,12 +272,12 @@ class _BankAccountsPageState extends State<BankAccountsPage> {
                   );
                   try { ( _bankAccountsTableKey.currentState as dynamic)?.refresh(); } catch (_) {}
                   if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.bankAccountDeletedSuccessfully)));
+                    SnackBarHelper.show(context, message: t.bankAccountDeletedSuccessfully);
                   }
                 } catch (e) {
                   if (mounted) {
                     final t = AppLocalizations.of(context);
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${t.error}: $e')));
+                    SnackBarHelper.showError(context, message: '${t.error}: $e');
                   }
                 }
               },

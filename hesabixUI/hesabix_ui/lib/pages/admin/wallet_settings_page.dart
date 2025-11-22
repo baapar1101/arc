@@ -3,6 +3,7 @@ import 'package:hesabix_ui/services/currency_service.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../core/api_client.dart';
 import '../../services/system_settings_service.dart';
+import '../../utils/snackbar_helper.dart';
 
 class WalletSettingsPage extends StatefulWidget {
   const WalletSettingsPage({super.key});
@@ -55,12 +56,12 @@ class _WalletSettingsPageState extends State<WalletSettingsPage> {
       await _settingsService.setWalletBaseCurrencyCode(_selectedCurrencyCode ?? 'IRR');
       if (mounted) {
         final t = AppLocalizations.of(context);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.saved)));
+        SnackBarHelper.show(context, message: t.saved);
       }
     } catch (e) {
       if (mounted) {
         final t = AppLocalizations.of(context);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${t.error}: $e')));
+        SnackBarHelper.showError(context, message: '${t.error}: $e');
       }
     }
   }

@@ -7,6 +7,7 @@ import 'package:hesabix_ui/widgets/data_table/data_table_widget.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
 import 'package:hesabix_ui/widgets/date_input_field.dart';
 import 'package:hesabix_ui/core/date_utils.dart' show HesabixDateUtils;
+import '../../utils/snackbar_helper.dart';
 
 /// صفحه کارپوشه مودیان (لیست فاکتورهای موجود در کارپوشه و وضعیت ارسال به سامانه)
 class TaxWorkspacePage extends StatefulWidget {
@@ -462,12 +463,7 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
         navigator.pop();
       }
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(t.taxSendErrorWithMessage(e.toString())),
-          backgroundColor: Colors.red,
-        ),
-      );
+      SnackBarHelper.showError(context, message: t.taxSendErrorWithMessage(e.toString()));
     }
   }
 
@@ -527,12 +523,7 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
         navigator.pop();
       }
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(t.taxRemoveFromWorkspaceErrorWithMessage(e.toString())),
-          backgroundColor: Colors.red,
-        ),
-      );
+      SnackBarHelper.showError(context, message: t.taxRemoveFromWorkspaceErrorWithMessage(e.toString()));
     }
   }
 
@@ -604,12 +595,7 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
         navigator.pop();
       }
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(t.taxSendSelectedErrorWithMessage(e.toString())),
-          backgroundColor: Colors.red,
-        ),
-      );
+      SnackBarHelper.showError(context, message: t.taxSendSelectedErrorWithMessage(e.toString()));
     }
   }
 
@@ -681,12 +667,7 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
         navigator.pop();
       }
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(t.taxRemoveSelectedErrorWithMessage(e.toString())),
-          backgroundColor: Colors.red,
-        ),
-      );
+      SnackBarHelper.showError(context, message: t.taxRemoveSelectedErrorWithMessage(e.toString()));
     }
   }
 }

@@ -15,6 +15,7 @@ import '../../services/expense_income_service.dart';
 import '../../core/api_client.dart';
 import '../../utils/number_normalizer.dart';
 import '../../widgets/banking/currency_picker_widget.dart';
+import '../../utils/snackbar_helper.dart';
 
 class ExpenseIncomePage extends StatefulWidget {
   final int businessId;
@@ -211,7 +212,7 @@ class _ExpenseIncomePageState extends State<ExpenseIncomePage> {
     } catch (e) {
       if (!mounted) return;
       Navigator.pop(context); // loading
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطا: $e'), backgroundColor: Colors.red));
+      SnackBarHelper.showError(context, message: 'خطا: $e');
     }
   }
 }

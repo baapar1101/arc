@@ -20,6 +20,7 @@ import 'package:hesabix_ui/widgets/data_table/data_table_widget.dart';
 import 'package:hesabix_ui/widgets/document/document_details_dialog.dart';
 import 'package:hesabix_ui/core/date_utils.dart';
 import 'package:intl/intl.dart';
+import '../../utils/snackbar_helper.dart';
 
 class PersonDetailsDialog extends StatefulWidget {
   final int businessId;

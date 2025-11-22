@@ -16,6 +16,7 @@ import 'package:shamsi_date/shamsi_date.dart';
 import 'package:hesabix_ui/widgets/jalali_date_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../services/currency_service.dart';
+import '../../../utils/snackbar_helper.dart';
 
 typedef DashboardWidgetBuilder = Widget Function(BuildContext, dynamic, DashboardLayoutItem, {VoidCallback? onRefresh});
 
@@ -42,7 +43,6 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
   bool _editMode = false;
   Timer? _saveDebounce;
   double _columnUnitPx = 0;
-  static const double _gridSpacingPx = 12.0;
   String _salesChartType = 'bar'; // bar | line
   String _salesChartGroup = 'day'; // day | week | month
 
@@ -71,6 +71,102 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
     return 'xl';
   }
 
+  // Helper methods for responsive values
+  double _getPadding(BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
+    final bp = _currentBreakpoint(width);
+    switch (bp) {
+      case 'xs':
+        return 8.0; // موبایل
+      case 'sm':
+        return 12.0; // تبلت کوچک
+      case 'md':
+        return 16.0; // تبلت بزرگ
+      case 'lg':
+        return 20.0; // دسکتاپ کوچک
+      case 'xl':
+        return 24.0; // دسکتاپ بزرگ
+      default:
+        return 16.0;
+    }
+  }
+
+  double _getGridSpacing(BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
+    final bp = _currentBreakpoint(width);
+    switch (bp) {
+      case 'xs':
+        return 8.0;
+      case 'sm':
+        return 10.0;
+      case 'md':
+        return 12.0;
+      case 'lg':
+        return 14.0;
+      case 'xl':
+        return 16.0;
+      default:
+        return 12.0;
+    }
+  }
+
+  double _getMinTileUnit(BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
+    final bp = _currentBreakpoint(width);
+    switch (bp) {
+      case 'xs':
+        return 140.0; // موبایل
+      case 'sm':
+        return 160.0; // تبلت کوچک
+      case 'md':
+        return 180.0; // تبلت بزرگ
+      case 'lg':
+        return 200.0; // دسکتاپ کوچک
+      case 'xl':
+        return 220.0; // دسکتاپ بزرگ
+      default:
+        return 180.0;
+    }
+  }
+
+  TextStyle? _getHeaderTextStyle(BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
+    final bp = _currentBreakpoint(width);
+    final theme = Theme.of(context);
+    switch (bp) {
+      case 'xs':
+        return theme.textTheme.titleLarge; // موبایل
+      case 'sm':
+        return theme.textTheme.headlineSmall; // تبلت کوچک
+      default:
+        return theme.textTheme.headlineMedium; // تبلت بزرگ و دسکتاپ
+    }
+  }
+
+  bool _isMobile(BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
+    return _currentBreakpoint(width) == 'xs';
+  }
+
+  double _getChartHeight(BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
+    final bp = _currentBreakpoint(width);
+    switch (bp) {
+      case 'xs':
+        return 200.0; // موبایل
+      case 'sm':
+        return 220.0; // تبلت کوچک
+      case 'md':
+        return 240.0; // تبلت بزرگ
+      case 'lg':
+        return 260.0; // دسکتاپ کوچک
+      case 'xl':
+        return 280.0; // دسکتاپ بزرگ
+      default:
+        return 240.0;
+    }
+  }
+
   Future<void> _loadAll() async {
     try {
       setState(() {
@@ -97,7 +193,24 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
         // ذخیره و جایگزینی layout
         layout = await _service.putLayoutProfile(businessId: widget.businessId, breakpoint: bp, items: items);
       }
-      final keys = layout.items.where((e) => !e.hidden).map((e) => e.key).toList();
+      // فیلتر ویجت‌ها بر اساس دسترسی قبل از درخواست داده
+      final visibleItems = layout.items.where((e) => !e.hidden).toList();
+      final keys = visibleItems.where((item) {
+        // بررسی دسترسی برای هر ویجت
+        final widgetDef = defs.items.firstWhere(
+          (d) => d.key == item.key,
+          orElse: () => DashboardWidgetDefinition(
+            key: item.key,
+            title: item.key,
+            icon: 'widgets',
+            version: 1,
+            permissionsRequired: const [],
+            defaults: const {},
+          ),
+        );
+        return _hasWidgetPermission(widgetDef);
+      }).map((e) => e.key).toList();
+      
       final data = await _service.getWidgetsBatchData(
         businessId: widget.businessId,
         widgetKeys: keys,
@@ -122,8 +235,27 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
   Future<void> _reloadDataOnly() async {
     try {
       final layout = _layout;
-      if (layout == null) return;
-      final keys = layout.items.where((e) => !e.hidden).map((e) => e.key).toList();
+      final defs = _definitions;
+      if (layout == null || defs == null) return;
+      
+      // فیلتر ویجت‌ها بر اساس دسترسی قبل از درخواست داده
+      final visibleItems = layout.items.where((e) => !e.hidden).toList();
+      final keys = visibleItems.where((item) {
+        // بررسی دسترسی برای هر ویجت
+        final widgetDef = defs.items.firstWhere(
+          (d) => d.key == item.key,
+          orElse: () => DashboardWidgetDefinition(
+            key: item.key,
+            title: item.key,
+            icon: 'widgets',
+            version: 1,
+            permissionsRequired: const [],
+            defaults: const {},
+          ),
+        );
+        return _hasWidgetPermission(widgetDef);
+      }).map((e) => e.key).toList();
+      
       final data = await _service.getWidgetsBatchData(businessId: widget.businessId, widgetKeys: keys);
       if (!mounted) return;
       setState(() {
@@ -253,25 +385,25 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
     final items = List<DashboardLayoutItem>.from(layout.items)..sort((a, b) => a.order.compareTo(b.order));
     final visible = items.where((e) => !e.hidden).toList();
     final crossAxisCount = layout.columns;
+    final padding = _getPadding(context);
 
     return Padding(
-      padding: const EdgeInsets.all(16.0),
+      padding: EdgeInsets.all(padding),
       child: Column(
         children: [
           _buildHeaderRow(t),
-          const SizedBox(height: 16),
+          SizedBox(height: _isMobile(context) ? 12 : 16),
           if (!_editMode)
             Expanded(
               child: LayoutBuilder(
                 builder: (context, constraints) {
                   final totalWidth = constraints.maxWidth;
-                  double unit = (totalWidth - (crossAxisCount - 1) * _gridSpacingPx) / crossAxisCount;
-                  const double minTileUnit = 180; // حداقل عرض یک ستون برای جلوگیری از صفر/منفی
+                  final spacing = _getGridSpacing(context);
+                  final minTileUnit = _getMinTileUnit(context);
+                  double unit = (totalWidth - (crossAxisCount - 1) * spacing) / crossAxisCount;
                   if (unit <= 0) {
-                    // ignore: avoid_print
                     unit = minTileUnit;
                   } else if (unit < minTileUnit) {
-                    // ignore: avoid_print
                     unit = minTileUnit;
                   }
                   if (unit > 0 && _columnUnitPx != unit) {
@@ -279,9 +411,8 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
                   }
                   final children = <Widget>[];
                   for (final it in visible) {
-                    final w = (unit * it.colSpan) + _gridSpacingPx * (it.colSpan - 1);
+                    final w = (unit * it.colSpan) + spacing * (it.colSpan - 1);
                     final cw = w > totalWidth ? totalWidth : (w < unit ? unit : w);
-                    // ignore: avoid_print
                     children.add(AnimatedContainer(
                       duration: const Duration(milliseconds: 180),
                       curve: Curves.easeInOut,
@@ -292,8 +423,8 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
                   }
                   return SingleChildScrollView(
                     child: Wrap(
-                      spacing: _gridSpacingPx,
-                      runSpacing: _gridSpacingPx,
+                      spacing: spacing,
+                      runSpacing: spacing,
                       children: children,
                     ),
                   );
@@ -305,13 +436,12 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
               child: LayoutBuilder(
                 builder: (context, constraints) {
                   final totalWidth = constraints.maxWidth;
-                  double unit = (totalWidth - (crossAxisCount - 1) * _gridSpacingPx) / crossAxisCount;
-                  const double minTileUnit = 180;
+                  final spacing = _getGridSpacing(context);
+                  final minTileUnit = _getMinTileUnit(context);
+                  double unit = (totalWidth - (crossAxisCount - 1) * spacing) / crossAxisCount;
                   if (unit <= 0) {
-                    // ignore: avoid_print
                     unit = minTileUnit;
                   } else if (unit < minTileUnit) {
-                    // ignore: avoid_print
                     unit = minTileUnit;
                   }
                   // ذخیره آخرین اندازه واحد ستون برای رزایز اسنپی
@@ -321,9 +451,8 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
 
                   final children = <Widget>[];
                   for (final it in visible) {
-                    final w = (unit * it.colSpan) + _gridSpacingPx * (it.colSpan - 1);
+                    final w = (unit * it.colSpan) + spacing * (it.colSpan - 1);
                     final cw = w > totalWidth ? totalWidth : (w < unit ? unit : w);
-                    // ignore: avoid_print
                     children.add(AnimatedContainer(
                       duration: const Duration(milliseconds: 180),
                       curve: Curves.easeInOut,
@@ -344,15 +473,15 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
                               painter: _GridGuidesPainter(
                                 columns: crossAxisCount,
                                 unitWidth: unit,
-                                spacing: _gridSpacingPx,
+                                spacing: spacing,
                                 color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.06),
                               ),
                       child: SizedBox(height: children.isEmpty ? 0 : 1), // ارتفاع حداقلی برای render
                             ),
                           ),
                         ReorderableWrap(
-                          spacing: _gridSpacingPx,
-                          runSpacing: _gridSpacingPx,
+                          spacing: spacing,
+                          runSpacing: spacing,
                           needsLongPressDraggable: true,
                           onReorder: (oldIndex, newIndex) {
                             final list = List<DashboardLayoutItem>.from(visible);
@@ -385,7 +514,70 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
     );
   }
 
+  /// بررسی اینکه آیا کاربر دسترسی به یک ویجت دارد یا نه
+  bool _hasWidgetPermission(DashboardWidgetDefinition widgetDef) {
+    final authStore = widget.authStore;
+    if (authStore == null) {
+      // اگر authStore موجود نیست، برای سازگاری با کدهای قدیمی، true برمی‌گردانیم
+      return true;
+    }
+    
+    // اگر مالک کسب و کار است، دسترسی کامل دارد
+    if (authStore.currentBusiness?.isOwner == true) {
+      return true;
+    }
+    
+    // اگر ویجت permission خاصی نیاز ندارد، نمایش داده می‌شود
+    if (widgetDef.permissionsRequired.isEmpty) {
+      return true;
+    }
+    
+    // بررسی هر permission
+    for (final permStr in widgetDef.permissionsRequired) {
+      // Parse permission string (مثل "invoices.view" -> section="invoices", action="view")
+      if (!permStr.contains('.')) {
+        // اگر فرمت صحیح نیست، از آن عبور می‌کنیم (برای سازگاری)
+        continue;
+      }
+      
+      final parts = permStr.split('.');
+      if (parts.length < 2) {
+        continue;
+      }
+      
+      final section = parts[0];
+      final action = parts[1];
+      
+      // بررسی دسترسی
+      if (!authStore.hasBusinessPermission(section, action)) {
+        return false;
+      }
+    }
+    
+    return true;
+  }
+
   Widget _buildGridTile(DashboardLayoutItem item, int totalColumns) {
+    // بررسی دسترسی قبل از نمایش ویجت
+    if (_definitions != null) {
+      final widgetDef = _definitions!.items.firstWhere(
+        (d) => d.key == item.key,
+        orElse: () => DashboardWidgetDefinition(
+          key: item.key,
+          title: item.key,
+          icon: 'widgets',
+          version: 1,
+          permissionsRequired: const [],
+          defaults: const {},
+        ),
+      );
+      
+      if (!_hasWidgetPermission(widgetDef)) {
+        // اگر کاربر دسترسی ندارد، ویجت را نمایش نمی‌دهیم
+        return const SizedBox.shrink();
+      }
+    }
+    
     final data = _data[item.key];
     if (data == null) {
       return _buildCard(
@@ -482,70 +674,117 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
   }
 
   Widget _buildHeaderRow(AppLocalizations t) {
-    return Row(
-      children: [
-        Expanded(
-          child: Text(
-            t.businessDashboard,
-            style: Theme.of(context).textTheme.headlineMedium,
+    final isMobile = _isMobile(context);
+    final headerStyle = _getHeaderTextStyle(context);
+    
+    // Fiscal Year Widget
+    final fiscalYearWidget = FutureBuilder<List<Map<String, dynamic>>>(
+      future: _service.listFiscalYears(widget.businessId),
+      builder: (context, snapshot) {
+        final items = snapshot.data ?? const <Map<String, dynamic>>[];
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2));
+        }
+        if (items.isEmpty) {
+          return const SizedBox.shrink();
+        }
+        return Container(
+          padding: EdgeInsets.symmetric(horizontal: isMobile ? 6 : 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(8),
           ),
-        ),
-        if (_editMode) ...[
-          IconButton(
-            tooltip: 'افزودن ویجت',
-            onPressed: _showAddWidgetDialog,
-            icon: const Icon(Icons.add_box_outlined),
-          ),
-          IconButton(
-            tooltip: 'بازنشانی چیدمان',
-            onPressed: _resetLayoutToDefaults,
-            icon: const Icon(Icons.restore),
-          ),
-          if ((widget.authStore?.currentBusiness?.isOwner ?? false))
-            IconButton(
-              tooltip: 'انتشار چیدمان پیش‌فرض کسب‌وکار',
-              onPressed: _publishBusinessDefaultLayout,
-              icon: const Icon(Icons.publish),
-            ),
-        ],
-        FutureBuilder<List<Map<String, dynamic>>>(
-          future: _service.listFiscalYears(widget.businessId),
-          builder: (context, snapshot) {
-            final items = snapshot.data ?? const <Map<String, dynamic>>[];
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2));
-            }
-            if (items.isEmpty) {
-              return const SizedBox.shrink();
-            }
-            return Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(8),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.timeline, size: isMobile ? 14 : 16),
+              SizedBox(width: isMobile ? 4 : 6),
+              FiscalYearSwitcher(
+                controller: _fiscalController,
+                fiscalYears: items,
+                onChanged: _reloadDataOnly,
               ),
-              child: Row(
-                children: [
-                  const Icon(Icons.timeline, size: 16),
-                  const SizedBox(width: 6),
-                  FiscalYearSwitcher(
-                    controller: _fiscalController,
-                    fiscalYears: items,
-                    onChanged: _reloadDataOnly,
-                  ),
-                ],
-              ),
-            );
-          },
-        ),
-        const SizedBox(width: 8),
-        IconButton(
-          tooltip: _editMode ? 'خروج از ویرایش' : 'ویرایش چیدمان',
-          onPressed: () => setState(() => _editMode = !_editMode),
-          icon: Icon(_editMode ? Icons.check : Icons.edit),
-        ),
-      ],
+            ],
+          ),
+        );
+      },
     );
+
+    // Edit mode buttons
+    final editButtons = _editMode
+        ? [
+            IconButton(
+              tooltip: 'افزودن ویجت',
+              onPressed: _showAddWidgetDialog,
+              icon: const Icon(Icons.add_box_outlined),
+              iconSize: isMobile ? 20 : 24,
+            ),
+            IconButton(
+              tooltip: 'بازنشانی چیدمان',
+              onPressed: _resetLayoutToDefaults,
+              icon: const Icon(Icons.restore),
+              iconSize: isMobile ? 20 : 24,
+            ),
+            if ((widget.authStore?.currentBusiness?.isOwner ?? false))
+              IconButton(
+                tooltip: 'انتشار چیدمان پیش‌فرض کسب‌وکار',
+                onPressed: _publishBusinessDefaultLayout,
+                icon: const Icon(Icons.publish),
+                iconSize: isMobile ? 20 : 24,
+              ),
+          ]
+        : <Widget>[];
+
+    // Edit/Check button
+    final editToggleButton = IconButton(
+      tooltip: _editMode ? 'خروج از ویرایش' : 'ویرایش چیدمان',
+      onPressed: () => setState(() => _editMode = !_editMode),
+      icon: Icon(_editMode ? Icons.check : Icons.edit),
+      iconSize: isMobile ? 20 : 24,
+    );
+
+    if (isMobile) {
+      // موبایل: Column layout (سال مالی مخفی است)
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  t.businessDashboard,
+                  style: headerStyle,
+                ),
+              ),
+              editToggleButton,
+            ],
+          ),
+          if (editButtons.isNotEmpty) ...[
+            SizedBox(height: 8),
+            Row(
+              children: editButtons,
+            ),
+          ],
+        ],
+      );
+    } else {
+      // دسکتاپ/تبلت: Row layout
+      return Row(
+        children: [
+          Expanded(
+            child: Text(
+              t.businessDashboard,
+              style: headerStyle,
+            ),
+          ),
+          ...editButtons,
+          const SizedBox(width: 8),
+          fiscalYearWidget,
+          const SizedBox(width: 8),
+          editToggleButton,
+        ],
+      );
+    }
   }
 
   // ====== Widget Registry ======
@@ -759,79 +998,97 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
     }
 
     Widget _filters() {
-      return Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        children: [
-          ChoiceChip(
-            label: const Text('این هفته'),
-            selected: currentRange == 'week',
-            onSelected: (_) => _reloadWith({'range': 'week'}),
-          ),
-          ChoiceChip(
-            label: const Text('این ماه'),
-            selected: currentRange == 'month',
-            onSelected: (_) => _reloadWith({'range': 'month'}),
-          ),
-          ChoiceChip(
-            label: const Text('سال مالی'),
-            selected: currentRange == 'fiscal',
-            onSelected: (_) => _reloadWith({'range': 'fiscal'}),
-          ),
-          ActionChip(
-            label: const Text('بازه سفارشی'),
-            onPressed: () async {
-              final picked = await _pickCustomRange(context);
-              if (picked != null) {
-                _reloadWith({'range': 'custom', 'from': picked.$1, 'to': picked.$2});
-              }
-            },
-          ),
-          const SizedBox(width: 12),
-          // Chart type
-          ChoiceChip(
-            label: const Text('میله‌ای'),
-            selected: _salesChartType == 'bar',
-            onSelected: (_) => setState(() => _salesChartType = 'bar'),
-          ),
-          ChoiceChip(
-            label: const Text('خطی'),
-            selected: _salesChartType == 'line',
-            onSelected: (_) => setState(() => _salesChartType = 'line'),
-          ),
-          const SizedBox(width: 12),
-          ChoiceChip(
-            label: const Text('روزانه'),
-            selected: _salesChartGroup == 'day',
-            onSelected: (_) async {
-              setState(() => _salesChartGroup = 'day');
-              await _reloadWith({'range': currentRange});
-            },
-          ),
-          ChoiceChip(
-            label: const Text('هفتگی'),
-            selected: _salesChartGroup == 'week',
-            onSelected: (_) async {
-              setState(() => _salesChartGroup = 'week');
-              await _reloadWith({'range': currentRange});
-            },
-          ),
-          ChoiceChip(
-            label: const Text('ماهانه'),
-            selected: _salesChartGroup == 'month',
-            onSelected: (_) async {
-              setState(() => _salesChartGroup = 'month');
-              await _reloadWith({'range': currentRange});
-            },
-          ),
-        ],
+      final isMobile = _isMobile(context);
+      final spacing = isMobile ? 6.0 : 8.0;
+      final runSpacing = isMobile ? 6.0 : 8.0;
+      
+      return Padding(
+        padding: EdgeInsets.symmetric(horizontal: isMobile ? 8 : 12),
+        child: Wrap(
+          spacing: spacing,
+          runSpacing: runSpacing,
+          children: [
+            ChoiceChip(
+              label: Text('این هفته', style: TextStyle(fontSize: isMobile ? 12 : 14)),
+              selected: currentRange == 'week',
+              onSelected: (_) => _reloadWith({'range': 'week'}),
+              padding: EdgeInsets.symmetric(horizontal: isMobile ? 8 : 12),
+            ),
+            ChoiceChip(
+              label: Text('این ماه', style: TextStyle(fontSize: isMobile ? 12 : 14)),
+              selected: currentRange == 'month',
+              onSelected: (_) => _reloadWith({'range': 'month'}),
+              padding: EdgeInsets.symmetric(horizontal: isMobile ? 8 : 12),
+            ),
+            ChoiceChip(
+              label: Text('سال مالی', style: TextStyle(fontSize: isMobile ? 12 : 14)),
+              selected: currentRange == 'fiscal',
+              onSelected: (_) => _reloadWith({'range': 'fiscal'}),
+              padding: EdgeInsets.symmetric(horizontal: isMobile ? 8 : 12),
+            ),
+            ActionChip(
+              label: Text('بازه سفارشی', style: TextStyle(fontSize: isMobile ? 12 : 14)),
+              onPressed: () async {
+                final picked = await _pickCustomRange(context);
+                if (picked != null) {
+                  _reloadWith({'range': 'custom', 'from': picked.$1, 'to': picked.$2});
+                }
+              },
+              padding: EdgeInsets.symmetric(horizontal: isMobile ? 8 : 12),
+            ),
+            SizedBox(width: isMobile ? 8 : 12),
+            // Chart type
+            ChoiceChip(
+              label: Text('میله‌ای', style: TextStyle(fontSize: isMobile ? 12 : 14)),
+              selected: _salesChartType == 'bar',
+              onSelected: (_) => setState(() => _salesChartType = 'bar'),
+              padding: EdgeInsets.symmetric(horizontal: isMobile ? 8 : 12),
+            ),
+            ChoiceChip(
+              label: Text('خطی', style: TextStyle(fontSize: isMobile ? 12 : 14)),
+              selected: _salesChartType == 'line',
+              onSelected: (_) => setState(() => _salesChartType = 'line'),
+              padding: EdgeInsets.symmetric(horizontal: isMobile ? 8 : 12),
+            ),
+            SizedBox(width: isMobile ? 8 : 12),
+            ChoiceChip(
+              label: Text('روزانه', style: TextStyle(fontSize: isMobile ? 12 : 14)),
+              selected: _salesChartGroup == 'day',
+              onSelected: (_) async {
+                setState(() => _salesChartGroup = 'day');
+                await _reloadWith({'range': currentRange});
+              },
+              padding: EdgeInsets.symmetric(horizontal: isMobile ? 8 : 12),
+            ),
+            ChoiceChip(
+              label: Text('هفتگی', style: TextStyle(fontSize: isMobile ? 12 : 14)),
+              selected: _salesChartGroup == 'week',
+              onSelected: (_) async {
+                setState(() => _salesChartGroup = 'week');
+                await _reloadWith({'range': currentRange});
+              },
+              padding: EdgeInsets.symmetric(horizontal: isMobile ? 8 : 12),
+            ),
+            ChoiceChip(
+              label: Text('ماهانه', style: TextStyle(fontSize: isMobile ? 12 : 14)),
+              selected: _salesChartGroup == 'month',
+              onSelected: (_) async {
+                setState(() => _salesChartGroup = 'month');
+                await _reloadWith({'range': currentRange});
+              },
+              padding: EdgeInsets.symmetric(horizontal: isMobile ? 8 : 12),
+            ),
+          ],
+        ),
       );
     }
 
     final List<Map<String, dynamic>> grouped = items; // already grouped by server (or daily for day)
+    final isMobile = _isMobile(context);
     final bars = <BarChartGroupData>[];
     final points = <FlSpot>[];
     double maxY = 0;
+    final barWidth = isMobile ? 10.0 : 12.0;
     for (int i = 0; i < grouped.length; i++) {
       final it = grouped[i];
       final amount = (it['amount'] as num?)?.toDouble() ?? 0;
@@ -842,7 +1099,7 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
           barRods: [
             BarChartRodData(
               toY: amount,
-              width: 12,
+              width: barWidth,
               color: theme.colorScheme.primary,
               borderRadius: BorderRadius.circular(4),
             ),
@@ -888,17 +1145,20 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
       }
     }
 
+    final chartHeight = _getChartHeight(context);
+    final isMobileChart = _isMobile(context);
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+          padding: EdgeInsets.fromLTRB(isMobileChart ? 8 : 12, 8, isMobileChart ? 8 : 12, 4),
           child: _filters(),
         ),
         SizedBox(
-          height: 240,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+          height: chartHeight,
+            child: Padding(
+            padding: EdgeInsets.fromLTRB(isMobileChart ? 4 : 8, 0, isMobileChart ? 4 : 8, 8),
             child: grouped.isEmpty
                 ? Center(child: Text('داده‌ای برای نمایش نیست', style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)))
                 : (_salesChartType == 'bar'
@@ -909,9 +1169,12 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
                             leftTitles: AxisTitles(
                               sideTitles: SideTitles(
                                 showTitles: true,
-                                reservedSize: 40,
+                                reservedSize: isMobile ? 35 : 40,
                                 interval: maxY / 4,
-                                getTitlesWidget: (value, meta) => Text(formatWithThousands(value, decimalPlaces: 0), style: theme.textTheme.labelSmall),
+                                getTitlesWidget: (value, meta) => Text(
+                                  formatWithThousands(value, decimalPlaces: 0),
+                                  style: theme.textTheme.labelSmall?.copyWith(fontSize: isMobileChart ? 10 : 12),
+                                ),
                               ),
                             ),
                             bottomTitles: AxisTitles(
@@ -919,7 +1182,10 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
                                 showTitles: true,
                                 getTitlesWidget: (value, meta) => Padding(
                                   padding: const EdgeInsets.only(top: 4),
-                                  child: Text(_labelForIndex(value.toInt()), style: theme.textTheme.labelSmall),
+                                  child: Text(
+                                    _labelForIndex(value.toInt()),
+                                    style: theme.textTheme.labelSmall?.copyWith(fontSize: isMobileChart ? 10 : 12),
+                                  ),
                                 ),
                               ),
                             ),
@@ -939,9 +1205,12 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
                             leftTitles: AxisTitles(
                               sideTitles: SideTitles(
                                 showTitles: true,
-                                reservedSize: 40,
+                                reservedSize: isMobileChart ? 35 : 40,
                                 interval: maxY / 4,
-                                getTitlesWidget: (value, meta) => Text(formatWithThousands(value, decimalPlaces: 0), style: theme.textTheme.labelSmall),
+                                getTitlesWidget: (value, meta) => Text(
+                                  formatWithThousands(value, decimalPlaces: 0),
+                                  style: theme.textTheme.labelSmall?.copyWith(fontSize: isMobileChart ? 10 : 12),
+                                ),
                               ),
                             ),
                             bottomTitles: AxisTitles(
@@ -949,7 +1218,10 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
                                 showTitles: true,
                                 getTitlesWidget: (value, meta) => Padding(
                                   padding: const EdgeInsets.only(top: 4),
-                                  child: Text(_labelForIndex(value.toInt()), style: theme.textTheme.labelSmall),
+                                  child: Text(
+                                    _labelForIndex(value.toInt()),
+                                    style: theme.textTheme.labelSmall?.copyWith(fontSize: isMobileChart ? 10 : 12),
+                                  ),
                                 ),
                               ),
                             ),
@@ -961,7 +1233,7 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
                             LineChartBarData(
                               isCurved: true,
                               color: theme.colorScheme.primary,
-                              barWidth: 3,
+                              barWidth: isMobileChart ? 2 : 3,
                               dotData: FlDotData(show: false),
                               spots: points,
                             ),
@@ -1142,10 +1414,52 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
             width: 420,
             child: StatefulBuilder(
               builder: (context, setSt) {
+                // فیلتر بر اساس جستجو و دسترسی
                 final filtered = rows.where((d) {
-                  if (query.trim().isEmpty) return true;
-                  final q = query.toLowerCase();
-                  return d.title.toLowerCase().contains(q) || d.key.toLowerCase().contains(q);
+                  // فیلتر بر اساس جستجو
+                  if (query.trim().isNotEmpty) {
+                    final q = query.toLowerCase();
+                    if (!d.title.toLowerCase().contains(q) && !d.key.toLowerCase().contains(q)) {
+                      return false;
+                    }
+                  }
+                  
+                  // بررسی دسترسی
+                  final authStore = widget.authStore;
+                  if (authStore == null) {
+                    return true; // برای سازگاری با کدهای قدیمی
+                  }
+                  
+                  // اگر مالک کسب و کار است، دسترسی کامل دارد
+                  if (authStore.currentBusiness?.isOwner == true) {
+                    return true;
+                  }
+                  
+                  // اگر ویجت permission خاصی نیاز ندارد، نمایش داده می‌شود
+                  if (d.permissionsRequired.isEmpty) {
+                    return true;
+                  }
+                  
+                  // بررسی هر permission
+                  for (final permStr in d.permissionsRequired) {
+                    if (!permStr.contains('.')) {
+                      continue;
+                    }
+                    
+                    final parts = permStr.split('.');
+                    if (parts.length < 2) {
+                      continue;
+                    }
+                    
+                    final section = parts[0];
+                    final action = parts[1];
+                    
+                    if (!authStore.hasBusinessPermission(section, action)) {
+                      return false;
+                    }
+                  }
+                  
+                  return true;
                 }).toList();
                 return Column(
                   mainAxisSize: MainAxisSize.min,
@@ -1293,7 +1607,7 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('چیدمان پیش‌فرض کسب‌وکار منتشر شد')));
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطا در انتشار: $e')));
+      SnackBarHelper.showError(context, message: 'خطا در انتشار: $e');
     }
   }
 
@@ -1323,7 +1637,8 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
     final profile = _layout;
     if (profile == null || _columnUnitPx <= 0) return;
     // هر ستون موثر: unit + spacing به جز آخرین ستون
-    final colPixel = _columnUnitPx + _gridSpacingPx;
+    final spacing = _getGridSpacing(context);
+    final colPixel = _columnUnitPx + spacing;
     // برآورد تعداد ستون‌های جدید بر اساس جابجایی
     final deltaCols = (dx / colPixel).round();
     if (deltaCols == 0) return;
@@ -1386,6 +1701,39 @@ class _TopSellingProductsWidgetContentState extends State<_TopSellingProductsWid
   Map<String, dynamic> _localData = {};
   List<Map<String, dynamic>> _currencies = [];
   late CurrencyService _currencyService;
+
+  // Helper methods for responsive values
+  String _currentBreakpoint(double width) {
+    if (width < 600) return 'xs';
+    if (width < 904) return 'sm';
+    if (width < 1240) return 'md';
+    if (width < 1600) return 'lg';
+    return 'xl';
+  }
+
+  bool _isMobile(BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
+    return _currentBreakpoint(width) == 'xs';
+  }
+
+  double _getChartHeight(BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
+    final bp = _currentBreakpoint(width);
+    switch (bp) {
+      case 'xs':
+        return 220.0; // موبایل
+      case 'sm':
+        return 240.0; // تبلت کوچک
+      case 'md':
+        return 260.0; // تبلت بزرگ
+      case 'lg':
+        return 280.0; // دسکتاپ کوچک
+      case 'xl':
+        return 300.0; // دسکتاپ بزرگ
+      default:
+        return 280.0;
+    }
+  }
 
   @override
   void initState() {
@@ -1617,87 +1965,156 @@ class _TopSellingProductsWidgetContentState extends State<_TopSellingProductsWid
     }
 
     Widget _buildFilters() {
+      final isMobile = _isMobile(context);
+      final spacing = isMobile ? 6.0 : 8.0;
+      final runSpacing = isMobile ? 6.0 : 8.0;
+      final padding = isMobile ? 8.0 : 12.0;
+      
       return Padding(
-        padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+        padding: EdgeInsets.fromLTRB(padding, 8, padding, 4),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Wrap(
-              spacing: 8,
-              runSpacing: 8,
+              spacing: spacing,
+              runSpacing: runSpacing,
               children: [
                 // نوع محاسبه
                 ChoiceChip(
-                  label: const Text('مقداری'),
+                  label: Text('مقداری', style: TextStyle(fontSize: isMobile ? 12 : 14)),
                   selected: _calculationType == 'amount',
                   onSelected: (_) => _changeCalculationType('amount'),
+                  padding: EdgeInsets.symmetric(horizontal: isMobile ? 8 : 12),
                 ),
                 ChoiceChip(
-                  label: const Text('تعدادی'),
+                  label: Text('تعدادی', style: TextStyle(fontSize: isMobile ? 12 : 14)),
                   selected: _calculationType == 'quantity',
                   onSelected: (_) => _changeCalculationType('quantity'),
+                  padding: EdgeInsets.symmetric(horizontal: isMobile ? 8 : 12),
                 ),
-                const SizedBox(width: 12),
+                SizedBox(width: isMobile ? 8 : 12),
                 // نوع نمایش
                 ChoiceChip(
-                  label: const Text('میله‌ای'),
+                  label: Text('میله‌ای', style: TextStyle(fontSize: isMobile ? 12 : 14)),
                   selected: _viewType == 'bar',
                   onSelected: (_) => _changeViewType('bar'),
+                  padding: EdgeInsets.symmetric(horizontal: isMobile ? 8 : 12),
                 ),
                 ChoiceChip(
-                  label: const Text('دایره‌ای'),
+                  label: Text('دایره‌ای', style: TextStyle(fontSize: isMobile ? 12 : 14)),
                   selected: _viewType == 'pie',
                   onSelected: (_) => _changeViewType('pie'),
+                  padding: EdgeInsets.symmetric(horizontal: isMobile ? 8 : 12),
                 ),
                 ChoiceChip(
-                  label: const Text('لیست'),
+                  label: Text('لیست', style: TextStyle(fontSize: isMobile ? 12 : 14)),
                   selected: _viewType == 'list',
                   onSelected: (_) => _changeViewType('list'),
+                  padding: EdgeInsets.symmetric(horizontal: isMobile ? 8 : 12),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: isMobile ? 6 : 8),
             Wrap(
-              spacing: 16,
-              runSpacing: 8,
+              spacing: isMobile ? 8 : 16,
+              runSpacing: isMobile ? 6 : 8,
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Text('تعداد کالا: '),
-                    const SizedBox(width: 8),
-                    DropdownButton<int>(
-                      value: _limit.clamp(1, 50),
-                      items: [5, 10, 15, 20, 25, 30].map((v) => DropdownMenuItem(value: v, child: Text('$v'))).toList(),
-                      onChanged: (v) {
-                        if (v != null) _changeLimit(v);
-                      },
-                    ),
-                  ],
-                ),
-                // انتخاب ارز (فقط برای محاسبه مقداری)
-                if (_calculationType == 'amount' && _currenciesLoaded) ...[
-                  const Text('ارز: '),
-                  const SizedBox(width: 8),
-                  DropdownButton<int>(
-                    value: _currencyId,
-                    items: _currencies.map((currency) {
-                      final id = currency['id'] as int;
-                      final code = currency['code'] as String? ?? '';
-                      final title = currency['title'] as String? ?? '';
-                      final isDefault = currency['is_default'] == true;
-                      return DropdownMenuItem<int>(
-                        value: id,
-                        child: Text(isDefault ? '$code (پیش‌فرض)' : (title.isNotEmpty ? title : code)),
-                      );
-                    }).toList(),
-                    onChanged: (v) {
-                      _changeCurrency(v);
-                    },
-                    hint: const Text('انتخاب ارز'),
+                if (isMobile)
+                  // موبایل: Column layout
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text('تعداد کالا: ', style: TextStyle(fontSize: 12)),
+                          const SizedBox(width: 8),
+                          DropdownButton<int>(
+                            value: _limit.clamp(1, 50),
+                            items: [5, 10, 15, 20, 25, 30].map((v) => DropdownMenuItem(value: v, child: Text('$v'))).toList(),
+                            onChanged: (v) {
+                              if (v != null) _changeLimit(v);
+                            },
+                            style: const TextStyle(fontSize: 12),
+                            isDense: true,
+                          ),
+                        ],
+                      ),
+                      // انتخاب ارز (فقط برای محاسبه مقداری)
+                      if (_calculationType == 'amount' && _currenciesLoaded) ...[
+                        const SizedBox(height: 8),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text('ارز: ', style: TextStyle(fontSize: 12)),
+                            const SizedBox(width: 8),
+                            DropdownButton<int>(
+                              value: _currencyId,
+                              items: _currencies.map((currency) {
+                                final id = currency['id'] as int;
+                                final code = currency['code'] as String? ?? '';
+                                final title = currency['title'] as String? ?? '';
+                                final isDefault = currency['is_default'] == true;
+                                return DropdownMenuItem<int>(
+                                  value: id,
+                                  child: Text(
+                                    isDefault ? '$code (پیش‌فرض)' : (title.isNotEmpty ? title : code),
+                                    style: const TextStyle(fontSize: 12),
+                                  ),
+                                );
+                              }).toList(),
+                              onChanged: (v) {
+                                _changeCurrency(v);
+                              },
+                              hint: const Text('انتخاب ارز', style: TextStyle(fontSize: 12)),
+                              style: const TextStyle(fontSize: 12),
+                              isDense: true,
+                            ),
+                          ],
+                        ),
+                      ],
+                    ],
+                  )
+                else
+                  // دسکتاپ/تبلت: Row layout
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text('تعداد کالا: '),
+                      const SizedBox(width: 8),
+                      DropdownButton<int>(
+                        value: _limit.clamp(1, 50),
+                        items: [5, 10, 15, 20, 25, 30].map((v) => DropdownMenuItem(value: v, child: Text('$v'))).toList(),
+                        onChanged: (v) {
+                          if (v != null) _changeLimit(v);
+                        },
+                      ),
+                      // انتخاب ارز (فقط برای محاسبه مقداری)
+                      if (_calculationType == 'amount' && _currenciesLoaded) ...[
+                        const SizedBox(width: 16),
+                        const Text('ارز: '),
+                        const SizedBox(width: 8),
+                        DropdownButton<int>(
+                          value: _currencyId,
+                          items: _currencies.map((currency) {
+                            final id = currency['id'] as int;
+                            final code = currency['code'] as String? ?? '';
+                            final title = currency['title'] as String? ?? '';
+                            final isDefault = currency['is_default'] == true;
+                            return DropdownMenuItem<int>(
+                              value: id,
+                              child: Text(isDefault ? '$code (پیش‌فرض)' : (title.isNotEmpty ? title : code)),
+                            );
+                          }).toList(),
+                          onChanged: (v) {
+                            _changeCurrency(v);
+                          },
+                          hint: const Text('انتخاب ارز'),
+                        ),
+                      ],
+                    ],
                   ),
-                ],
               ],
             ),
           ],
@@ -1746,10 +2163,13 @@ class _TopSellingProductsWidgetContentState extends State<_TopSellingProductsWid
 
       if (maxY <= 0) maxY = 1;
 
+      final chartHeight = _getChartHeight(context);
+      final isMobile = _isMobile(context);
+      
       return SizedBox(
-        height: 280,
+        height: chartHeight,
         child: Padding(
-          padding: const EdgeInsets.all(8.0),
+          padding: EdgeInsets.all(isMobile ? 4.0 : 8.0),
           child: BarChart(
             BarChartData(
               gridData: FlGridData(show: true, horizontalInterval: maxY / 4),
@@ -1757,13 +2177,13 @@ class _TopSellingProductsWidgetContentState extends State<_TopSellingProductsWid
                 leftTitles: AxisTitles(
                   sideTitles: SideTitles(
                     showTitles: true,
-                    reservedSize: 50,
+                    reservedSize: isMobile ? 40 : 50,
                     interval: maxY / 4,
                     getTitlesWidget: (value, meta) => Padding(
                       padding: const EdgeInsets.only(right: 4),
                       child: Text(
                         formatWithThousands(value, decimalPlaces: _calculationType == 'quantity' ? 0 : 2),
-                        style: theme.textTheme.labelSmall,
+                        style: theme.textTheme.labelSmall?.copyWith(fontSize: isMobile ? 10 : 12),
                       ),
                     ),
                   ),
@@ -1777,10 +2197,10 @@ class _TopSellingProductsWidgetContentState extends State<_TopSellingProductsWid
                       return Padding(
                         padding: const EdgeInsets.only(top: 4),
                         child: SizedBox(
-                          width: 60,
+                          width: isMobile ? 50 : 60,
                           child: Text(
                             labels[idx],
-                            style: theme.textTheme.labelSmall,
+                            style: theme.textTheme.labelSmall?.copyWith(fontSize: isMobile ? 10 : 12),
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             textAlign: TextAlign.center,
@@ -1788,7 +2208,7 @@ class _TopSellingProductsWidgetContentState extends State<_TopSellingProductsWid
                         ),
                       );
                     },
-                    reservedSize: 80,
+                    reservedSize: isMobile ? 60 : 80,
                   ),
                 ),
                 rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
@@ -1869,62 +2289,131 @@ class _TopSellingProductsWidgetContentState extends State<_TopSellingProductsWid
         );
       }
 
-      return SizedBox(
-        height: 280,
-        child: Row(
-          children: [
-            Expanded(
-              child: PieChart(
-                PieChartData(
-                  sections: sections,
-                  centerSpaceRadius: 40,
+      final chartHeight = _getChartHeight(context);
+      final isMobile = _isMobile(context);
+      
+      if (isMobile) {
+        // موبایل: Column layout (پای چارت بالا، لیست پایین)
+        return SizedBox(
+          height: chartHeight,
+          child: Column(
+            children: [
+              Expanded(
+                flex: 2,
+                child: PieChart(
+                  PieChartData(
+                    sections: sections,
+                    centerSpaceRadius: 30,
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: ListView.builder(
-                shrinkWrap: true,
-                itemCount: chartData.length,
-                itemBuilder: (context, index) {
-                  final data = chartData[index];
-                  final value = data['value'] as double;
-                  final label = data['label'] as String;
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 4.0),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 16,
-                          height: 16,
-                          decoration: BoxDecoration(
-                            color: colors[index % colors.length],
-                            shape: BoxShape.circle,
+              const SizedBox(height: 8),
+              Expanded(
+                flex: 3,
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: chartData.length,
+                  itemBuilder: (context, index) {
+                    final data = chartData[index];
+                    final value = data['value'] as double;
+                    final label = data['label'] as String;
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 2.0),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 12,
+                            height: 12,
+                            decoration: BoxDecoration(
+                              color: colors[index % colors.length],
+                              shape: BoxShape.circle,
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            label,
-                            style: theme.textTheme.bodySmall,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              label,
+                              style: theme.textTheme.bodySmall?.copyWith(fontSize: 11),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          formatWithThousands(value, decimalPlaces: _calculationType == 'quantity' ? 0 : 2),
-                          style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
-                        ),
-                      ],
-                    ),
-                  );
-                },
+                          const SizedBox(width: 6),
+                          Text(
+                            formatWithThousands(value, decimalPlaces: _calculationType == 'quantity' ? 0 : 2),
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
               ),
-            ),
-          ],
-        ),
-      );
+            ],
+          ),
+        );
+      } else {
+        // دسکتاپ/تبلت: Row layout
+        return SizedBox(
+          height: chartHeight,
+          child: Row(
+            children: [
+              Expanded(
+                child: PieChart(
+                  PieChartData(
+                    sections: sections,
+                    centerSpaceRadius: 40,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: chartData.length,
+                  itemBuilder: (context, index) {
+                    final data = chartData[index];
+                    final value = data['value'] as double;
+                    final label = data['label'] as String;
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4.0),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 16,
+                            height: 16,
+                            decoration: BoxDecoration(
+                              color: colors[index % colors.length],
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              label,
+                              style: theme.textTheme.bodySmall,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            formatWithThousands(value, decimalPlaces: _calculationType == 'quantity' ? 0 : 2),
+                            style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      }
     }
 
     Widget _buildList() {

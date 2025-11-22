@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/services/ai_service.dart';
 import 'package:hesabix_ui/models/ai_models.dart';
+import '../../utils/snackbar_helper.dart';
 
 class AIPlansAdminPage extends StatefulWidget {
   const AIPlansAdminPage({super.key});

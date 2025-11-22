@@ -36,7 +36,8 @@ class BusinessUserService {
         '/api/v1/business/${request.businessId}/users/${request.userId}/permissions',
         data: request.toJson(),
       );
-      return UpdatePermissionsResponse.fromJson(response.data['data']);
+      // API returns {success, message} directly, not wrapped in 'data'
+      return UpdatePermissionsResponse.fromJson(response.data);
     } catch (e) {
       throw Exception('Failed to update permissions: $e');
     }

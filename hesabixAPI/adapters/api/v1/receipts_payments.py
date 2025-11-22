@@ -12,9 +12,10 @@ import datetime
 import re
 
 from adapters.db.session import get_db
+from adapters.db.models.document import Document
 from app.core.auth_dependency import get_current_user, AuthContext
 from app.core.responses import success_response, format_datetime_fields, ApiError
-from app.core.permissions import require_business_management_dep, require_business_access
+from app.core.permissions import require_business_management_dep, require_business_access, require_business_permission_dep, require_business_permission_by_entity_dep
 from adapters.api.v1.schemas import QueryInfo
 from app.services.receipt_payment_service import (
     create_receipt_payment,
@@ -105,7 +106,7 @@ async def create_receipt_payment_endpoint(
     body: Dict[str, Any] = Body(...),
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
-    _: None = Depends(require_business_management_dep),
+    _: None = Depends(require_business_permission_dep("people_transactions", "add")),
 ):
     """
     ایجاد سند دریافت یا پرداخت
@@ -198,7 +199,7 @@ async def delete_receipt_payment_endpoint(
     document_id: int,
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
-    _: None = Depends(require_business_management_dep),
+    _: None = Depends(require_business_permission_by_entity_dep("people_transactions", "delete", Document, "document_id")),
 ):
     """حذف سند"""
     # دریافت سند برای بررسی دسترسی
@@ -236,7 +237,7 @@ async def update_receipt_payment_endpoint(
     body: Dict[str, Any] = Body(...),
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
-    _: None = Depends(require_business_management_dep),
+    _: None = Depends(require_business_permission_by_entity_dep("people_transactions", "edit", Document, "document_id")),
 ):
     """ویرایش سند"""
     # دریافت سند برای بررسی دسترسی

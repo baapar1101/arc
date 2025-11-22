@@ -7,6 +7,7 @@ import '../../core/api_client.dart';
 import '../../services/system_settings_service.dart';
 import '../../services/document_monetization_service.dart';
 import '../../services/business_api_service.dart';
+import '../../utils/snackbar_helper.dart';
 
 class DocumentMonetizationAdminPage extends StatefulWidget {
   const DocumentMonetizationAdminPage({super.key});
@@ -236,7 +237,7 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
                   _loadInitial();
                 } catch (e) {
                   if (!context.mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+                  SnackBarHelper.show(context, message: '$e');
                 }
               },
               child: const Text('ذخیره'),
@@ -357,7 +358,7 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
                   _loadPolicies();
                 } catch (e) {
                   if (!context.mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+                  SnackBarHelper.show(context, message: '$e');
                 }
               },
               child: const Text('ذخیره'),
@@ -1519,7 +1520,7 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
   }
 
   void _showSnack(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    SnackBarHelper.show(context, message: message);
   }
 
   Widget _buildPlansCard(ThemeData theme) {

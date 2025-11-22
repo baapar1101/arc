@@ -10,6 +10,7 @@ import 'package:hesabix_ui/services/business_api_service.dart';
 import 'package:hesabix_ui/utils/number_normalizer.dart';
 import '../../core/api_client.dart';
 import '../../services/document_monetization_service.dart';
+import '../../utils/snackbar_helper.dart';
 
 class BusinessesListPage extends StatefulWidget {
   const BusinessesListPage({super.key});
@@ -1180,6 +1181,6 @@ class _BusinessPoliciesTabState extends State<_BusinessPoliciesTab> {
 
   void _showSnack(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    SnackBarHelper.show(context, message: message);
   }
 }

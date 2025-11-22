@@ -3,9 +3,10 @@ from fastapi import APIRouter, Depends, Request, Body
 from sqlalchemy.orm import Session
 
 from adapters.db.session import get_db
+from adapters.db.models.petty_cash import PettyCash
 from app.core.auth_dependency import get_current_user, AuthContext
 from app.core.responses import success_response, format_datetime_fields, ApiError
-from app.core.permissions import require_business_management_dep, require_business_access
+from app.core.permissions import require_business_management_dep, require_business_access, require_business_permission_dep, require_business_permission_by_entity_dep
 from adapters.api.v1.schemas import QueryInfo
 from app.services.petty_cash_service import (
     create_petty_cash,
@@ -59,7 +60,7 @@ async def create_petty_cash_endpoint(
     body: Dict[str, Any] = Body(...),
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
-    _: None = Depends(require_business_management_dep),
+    _: None = Depends(require_business_permission_dep("petty_cash", "add")),
 ):
     payload: Dict[str, Any] = dict(body or {})
     created = create_petty_cash(db, business_id, payload)
@@ -76,7 +77,7 @@ async def get_petty_cash_endpoint(
     petty_cash_id: int,
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
-    _: None = Depends(require_business_management_dep),
+    _: None = Depends(require_business_permission_by_entity_dep("petty_cash", "view", PettyCash, "petty_cash_id")),
 ):
     result = get_petty_cash_by_id(db, petty_cash_id)
     if not result:
@@ -101,7 +102,7 @@ async def update_petty_cash_endpoint(
     body: Dict[str, Any] = Body(...),
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
-    _: None = Depends(require_business_management_dep),
+    _: None = Depends(require_business_permission_by_entity_dep("petty_cash", "edit", PettyCash, "petty_cash_id")),
 ):
     payload: Dict[str, Any] = dict(body or {})
     result = update_petty_cash(db, petty_cash_id, payload)
@@ -126,7 +127,7 @@ async def delete_petty_cash_endpoint(
     petty_cash_id: int,
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
-    _: None = Depends(require_business_management_dep),
+    _: None = Depends(require_business_permission_by_entity_dep("petty_cash", "delete", PettyCash, "petty_cash_id")),
 ):
     result = get_petty_cash_by_id(db, petty_cash_id)
     if result:
@@ -154,7 +155,7 @@ async def bulk_delete_petty_cash_endpoint(
     body: Dict[str, Any] = Body(...),
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
-    _: None = Depends(require_business_management_dep),
+    _: None = Depends(require_business_permission_dep("petty_cash", "delete")),
 ):
     ids = body.get("ids")
     if not isinstance(ids, list):

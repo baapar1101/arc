@@ -6,6 +6,7 @@ import '../../core/api_client.dart';
 import '../../services/notifications_service.dart';
 import '../../services/telegram_integration_service.dart';
 import 'package:intl/intl.dart';
+import '../../utils/snackbar_helper.dart';
 
 class UserNotificationsPage extends StatefulWidget {
   const UserNotificationsPage({super.key});
@@ -167,10 +168,10 @@ class _UserNotificationsPageState extends State<UserNotificationsPage> {
         inappEnabled: _inapp,
       );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.notificationsSaveSuccess)));
+      SnackBarHelper.show(context, message: t.notificationsSaveSuccess);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${t.notificationsSaveError}\n$e')));
+      SnackBarHelper.showError(context, message: '${t.notificationsSaveError}\n$e');
     } finally {
       if (!mounted) return;
       setState(() => _saving = false);
@@ -181,7 +182,7 @@ class _UserNotificationsPageState extends State<UserNotificationsPage> {
   Future<void> _copyToClipboard(String value, String confirmationMessage) async {
     await Clipboard.setData(ClipboardData(text: value));
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(confirmationMessage)));
+    SnackBarHelper.show(context, message: confirmationMessage);
   }
 
   @override

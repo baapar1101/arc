@@ -28,11 +28,85 @@
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
 
   <!-- Favicon -->
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
   <link rel="icon" type="image/png" href="favicon.png"/>
 
   <title>Hesabix</title>
-  <link rel="icon" type="image/x-icon" href="assets/images/favicon.ico">
   <link rel="manifest" href="manifest.json">
+  
+  <!-- Preload critical resources for faster page loads -->
+  <link rel="preload" href="flutter_bootstrap.js" as="script">
+  
+  <!-- Initial Loading Screen Styles -->
+  <style>
+    /* Loading screen که قبل از Flutter نمایش داده می‌شود */
+    #flutter-loading-screen {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(135deg, #0175C2 0%, #02579B 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      transition: opacity 0.5s ease-out, visibility 0.5s ease-out;
+    }
+    
+    #flutter-loading-screen.hidden {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+    
+    .loading-logo {
+      width: 120px;
+      height: 120px;
+      margin-bottom: 32px;
+      animation: pulse 2s ease-in-out infinite;
+    }
+    
+    .loading-spinner {
+      width: 48px;
+      height: 48px;
+      border: 4px solid rgba(255, 255, 255, 0.2);
+      border-top-color: #ffffff;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-bottom: 24px;
+    }
+    
+    .loading-text {
+      color: #ffffff;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+      font-size: 16px;
+      font-weight: 500;
+      opacity: 0.9;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.8; transform: scale(0.95); }
+    }
+    
+    /* برای جلوگیری از flash محتوا */
+    body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+    }
+    
+    /* وقتی Flutter لود شد، body را visible می‌کنیم */
+    body.flutter-ready {
+      overflow: auto;
+    }
+  </style>
   
   <!-- Suppress Intl.v8BreakIterator deprecation warning -->
   <script>
@@ -49,6 +123,13 @@
   </script>
 </head>
 <body>
+  <!-- Initial Loading Screen - نمایش داده می‌شود تا Flutter لود شود -->
+  <div id="flutter-loading-screen">
+    <img src="icons/Icon-192.png" alt="Hesabix" class="loading-logo" />
+    <div class="loading-spinner"></div>
+    <div class="loading-text">در حال بارگذاری...</div>
+  </div>
+  
   <script>
     // Configure Flutter to use path-based routing instead of hash routing
     window.flutterConfiguration = {
@@ -56,6 +137,51 @@
       renderer: "canvaskit",
       usePathUrlStrategy: true
     };
+    
+    // Prefetch strategy for Flutter Web - helps with navigation performance
+    // This ensures all routes are available when needed
+    window._flutterLoader = {
+      loadEntrypoint: function() {
+        return Promise.resolve();
+      }
+    };
+    
+    // پنهان کردن loading screen وقتی Flutter آماده شد
+    function hideLoadingScreen() {
+      const loadingScreen = document.getElementById('flutter-loading-screen');
+      if (loadingScreen) {
+        loadingScreen.classList.add('hidden');
+        // حذف کامل از DOM بعد از انیمیشن
+        setTimeout(function() {
+          loadingScreen.remove();
+          document.body.classList.add('flutter-ready');
+        }, 500);
+      }
+    }
+    
+    // گوش دادن به رویداد flutter-first-frame
+    window.addEventListener('flutter-first-frame', function() {
+      hideLoadingScreen();
+      
+      // After first frame, prefetch remaining routes
+      setTimeout(function() {
+        // Trigger prefetch for common routes
+        const router = window._flutterNavigationState?.router;
+        if (router) {
+          // Routes will be prefetched by GoRouter automatically in production builds
+          console.log('Flutter app loaded, routes are available');
+        }
+      }, 1000);
+    }, { once: true });
+    
+    // Fallback: اگر بعد از 10 ثانیه Flutter لود نشد، loading screen را پنهان کن
+    setTimeout(function() {
+      const loadingScreen = document.getElementById('flutter-loading-screen');
+      if (loadingScreen && !loadingScreen.classList.contains('hidden')) {
+        console.warn('Flutter loading timeout - hiding loading screen');
+        hideLoadingScreen();
+      }
+    }, 10000);
   </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>

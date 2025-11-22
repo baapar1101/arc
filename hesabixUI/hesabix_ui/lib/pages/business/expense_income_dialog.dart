@@ -11,6 +11,7 @@ import '../../models/account_model.dart';
 import '../../models/expense_income_document.dart' as expense;
 import '../../services/expense_income_service.dart';
 import '../../utils/number_normalizer.dart';
+import '../../utils/snackbar_helper.dart';
 
 class ExpenseIncomeDialog extends StatefulWidget {
   final int businessId;
@@ -186,7 +187,7 @@ class _ExpenseIncomeDialogState extends State<ExpenseIncomeDialog> {
     } catch (e) {
       if (!mounted) return;
       Navigator.pop(context); // loading
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطا: $e'), backgroundColor: Colors.red));
+      SnackBarHelper.showError(context, message: 'خطا: $e');
     }
   }
 

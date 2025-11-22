@@ -10,6 +10,7 @@ import '../../models/cash_register.dart';
 import '../../services/cash_register_service.dart';
 import '../../services/currency_service.dart';
 import '../../widgets/banking/cash_register_form_dialog.dart';
+import '../../utils/snackbar_helper.dart';
 
 class CashRegistersPage extends StatefulWidget {
 	final int businessId;
@@ -264,11 +265,11 @@ class _CashRegistersPageState extends State<CashRegistersPage> {
 			await _service.delete(row.id!);
 			try { (_tableKey.currentState as dynamic)?.refresh(); } catch (_) {}
 			if (mounted) {
-				ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.deletedSuccessfully)));
+				SnackBarHelper.show(context, message: t.deletedSuccessfully);
 			}
 		} catch (e) {
 			if (mounted) {
-				ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${t.error}: $e')));
+				SnackBarHelper.showError(context, message: '${t.error}: $e');
 			}
 		}
 	}
@@ -280,7 +281,7 @@ class _CashRegistersPageState extends State<CashRegistersPage> {
 			final selectedIndices = (state?.getSelectedRowIndices() as List<int>?) ?? const <int>[];
 			final items = (state?.getSelectedItems() as List<dynamic>?) ?? const <dynamic>[];
 			if (selectedIndices.isEmpty) {
-				ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.noRowsSelectedError)));
+				SnackBarHelper.showError(context, message: t.noRowsSelectedError);
 				return;
 			}
 			final ids = <int>[];
@@ -315,11 +316,11 @@ class _CashRegistersPageState extends State<CashRegistersPage> {
 			);
 			try { (_tableKey.currentState as dynamic)?.refresh(); } catch (_) {}
 			if (mounted) {
-				ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.deletedSuccessfully)));
+				SnackBarHelper.show(context, message: t.deletedSuccessfully);
 			}
 		} catch (e) {
 			if (mounted) {
-				ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${t.error}: $e')));
+				SnackBarHelper.showError(context, message: '${t.error}: $e');
 			}
 		}
 	}

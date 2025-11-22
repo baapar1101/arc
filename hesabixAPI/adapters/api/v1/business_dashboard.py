@@ -389,7 +389,24 @@ def list_dashboard_widget_definitions(
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> dict:
-    data = get_widget_definitions(db=db, business_id=business_id, user_id=ctx.get_user_id())
+    # ایجاد AuthContext با business_id صحیح برای بررسی دسترسی‌ها
+    # ctx ممکن است business_id نداشته باشد، پس باید آن را تنظیم کنیم
+    if ctx.business_id != business_id:
+        # ایجاد یک AuthContext جدید با business_id صحیح
+        from app.core.auth_dependency import AuthContext
+        ctx_with_business = AuthContext(
+            user=ctx.user,
+            api_key_id=ctx.api_key_id,
+            language=ctx.language,
+            calendar_type=ctx.calendar_type,
+            timezone=ctx.timezone,
+            business_id=business_id,
+            fiscal_year_id=ctx.fiscal_year_id,
+            db=db
+        )
+        ctx = ctx_with_business
+    
+    data = get_widget_definitions(db=db, business_id=business_id, user_id=ctx.get_user_id(), ctx=ctx)
     return success_response(data, request)
 
 

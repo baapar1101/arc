@@ -63,6 +63,52 @@ String toEnglishDigits(String input) {
   return buffer.toString();
 }
 
+/// تبدیل شماره موبایل ایرانی به فرمت بین‌المللی (E164)
+/// فرمت‌های ورودی پشتیبانی شده:
+/// - 09183282405 -> +989183282405
+/// - 009183282405 -> +989183282405
+/// - 989183282405 -> +989183282405
+/// - +989183282405 -> +989183282405 (بدون تغییر)
+String normalizeIranianMobileToE164(String input) {
+  if (input.isEmpty) {
+    return input;
+  }
+
+  // تبدیل ارقام فارسی به انگلیسی
+  String cleaned = toEnglishDigits(input.trim());
+  
+  // حذف فاصله‌ها و کاراکترهای غیرعددی (به جز +)
+  cleaned = cleaned.replaceAll(RegExp(r'[\s\-\(\)]'), '');
+  
+  // اگر از قبل فرمت E164 دارد، برگردان
+  if (cleaned.startsWith('+989')) {
+    return cleaned;
+  }
+  
+  // حذف + اگر در ابتدا باشد (برای پردازش)
+  if (cleaned.startsWith('+')) {
+    cleaned = cleaned.substring(1);
+  }
+  
+  // تبدیل فرمت‌های مختلف به +989...
+  if (cleaned.startsWith('00989')) {
+    // فرمت 00989...
+    return '+989${cleaned.substring(5)}';
+  } else if (cleaned.startsWith('989') && cleaned.length >= 12) {
+    // فرمت 989... (بدون صفر)
+    return '+$cleaned';
+  } else if (cleaned.startsWith('09') && cleaned.length == 11) {
+    // فرمت 091... (فرمت رایج ایرانی)
+    return '+989${cleaned.substring(2)}';
+  } else if (cleaned.startsWith('9') && cleaned.length == 10) {
+    // فرمت 9... (بدون صفر و کد کشور)
+    return '+989$cleaned';
+  }
+  
+  // اگر فرمت شناخته شده نیست، همان را برگردان
+  return input;
+}
+
 /// تبدیل بازگشتی ساختارهای Map/List برای ارسال به بک‌اند
 dynamic normalizeDynamic(dynamic value) {
   if (value is String) {

@@ -11,6 +11,7 @@ import '../../../utils/product_form_validator.dart';
 import '../../../controllers/product_form_controller.dart';
 import '../../../config/app_config.dart';
 import '../../../core/auth_store.dart';
+import '../../../../utils/snackbar_helper.dart';
 
 class ProductBasicInfoSection extends StatefulWidget {
   final int businessId;

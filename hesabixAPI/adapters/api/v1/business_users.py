@@ -2,6 +2,7 @@
 
 from fastapi import APIRouter, Depends, Request, HTTPException
 from sqlalchemy.orm import Session
+import re
 
 from adapters.db.session import get_db
 from adapters.api.v1.schemas import (
@@ -16,6 +17,40 @@ from adapters.db.models.user import User
 from adapters.db.models.business import Business
 
 router = APIRouter(prefix="/business", tags=["business-users"])
+
+
+def _normalize_phone_for_search(phone: str) -> str | None:
+    """نرمالایز کردن شماره تلفن برای جستجو - تبدیل فرمت‌های مختلف به فرمت E164"""
+    if not phone:
+        return None
+    
+    # حذف فاصله‌ها و کاراکترهای غیرعددی (به جز +)
+    cleaned = re.sub(r'[^\d+]', '', phone.strip())
+    
+    # اگر از قبل فرمت E164 دارد (+989...)
+    if cleaned.startswith('+989'):
+        return cleaned
+    
+    # حذف + اگر در ابتدا باشد (برای پردازش)
+    if cleaned.startswith('+'):
+        cleaned = cleaned[1:]
+    
+    # تبدیل فرمت‌های مختلف به +989...
+    if cleaned.startswith('00989') and len(cleaned) >= 13:
+        # فرمت 00989...
+        return f'+989{cleaned[5:]}'
+    elif cleaned.startswith('989') and len(cleaned) >= 12:
+        # فرمت 989... (بدون صفر)
+        return f'+{cleaned}'
+    elif cleaned.startswith('09') and len(cleaned) == 11:
+        # فرمت 091... (فرمت رایج ایرانی)
+        return f'+989{cleaned[2:]}'
+    elif cleaned.startswith('9') and len(cleaned) == 10:
+        # فرمت 9... (بدون صفر و کد کشور)
+        return f'+989{cleaned}'
+    
+    # اگر فرمت شناخته شده نیست، همان را برگردان
+    return phone
 
 
 @router.get("/{business_id}/users/{user_id}", 
@@ -367,10 +402,28 @@ def add_user(
     
     # Find user by email or phone
     logger.info(f"Searching for user with email/phone: {add_request.email_or_phone}")
-    user = db.query(User).filter(
-        (User.email == add_request.email_or_phone) | 
-        (User.mobile == add_request.email_or_phone)
-    ).first()
+    
+    # Check if input is a phone number (not email)
+    is_phone = '@' not in add_request.email_or_phone
+    
+    # Normalize phone number if it's a phone number
+    search_queries = [add_request.email_or_phone]
+    if is_phone:
+        normalized_phone = _normalize_phone_for_search(add_request.email_or_phone)
+        if normalized_phone and normalized_phone != add_request.email_or_phone:
+            search_queries.append(normalized_phone)
+            logger.info(f"Normalized phone: {normalized_phone}")
+    
+    # Search for user with original or normalized phone/email
+    user = None
+    for query in search_queries:
+        user = db.query(User).filter(
+            (User.email == query) | 
+            (User.mobile == query)
+        ).first()
+        if user:
+            logger.info(f"Found user with query: {query}")
+            break
     
     if not user:
         logger.warning(f"User not found with email/phone: {add_request.email_or_phone}")

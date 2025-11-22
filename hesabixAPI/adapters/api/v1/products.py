@@ -32,7 +32,7 @@ from app.services.bulk_price_update_service import (
 )
 from adapters.db.models.business import Business
 from app.core.i18n import negotiate_locale
-from fastapi import UploadFile, File, Form
+from fastapi import UploadFile, File, Form, HTTPException
 import os
 
 
@@ -49,8 +49,8 @@ async def create_product_endpoint(
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
-    if not ctx.has_business_permission("inventory", "write"):
-        raise ApiError("FORBIDDEN", "Missing business permission: inventory.write", http_status=403)
+    if not ctx.has_business_permission("products", "add"):
+        raise ApiError("FORBIDDEN", "Missing business permission: products.add", http_status=403)
     
     # بررسی اینکه آیا multipart/form-data است یا JSON
     content_type = request.headers.get("content-type", "")
@@ -88,6 +88,23 @@ async def create_product_endpoint(
                         check_storage_limit=True,
                     )
                     image_file_id = upload_result.get("file_id")
+                except HTTPException as e:
+                    # اگر خطای محدودیت ذخیره‌سازی باشد، جزئیات را برمی‌گردانیم
+                    if e.status_code == 400 and isinstance(e.detail, dict) and e.detail.get("error") == "STORAGE_LIMIT_EXCEEDED":
+                        error_detail = {
+                            "success": False,
+                            "error": {
+                                "code": "STORAGE_LIMIT_EXCEEDED",
+                                "message": e.detail.get("message", "حجم فایل از محدودیت ذخیره‌سازی تجاوز می‌کند"),
+                                "total_limit_gb": e.detail.get("total_limit_gb"),
+                                "current_usage_gb": e.detail.get("current_usage_gb"),
+                                "available_gb": e.detail.get("available_gb"),
+                                "required_gb": e.detail.get("required_gb"),
+                                "over_usage_gb": e.detail.get("over_usage_gb"),
+                            }
+                        }
+                        raise HTTPException(status_code=400, detail=error_detail)
+                    raise ApiError("FILE_UPLOAD_ERROR", f"خطا در آپلود فایل: {str(e.detail)}", http_status=400)
                 except Exception as e:
                     raise ApiError("FILE_UPLOAD_ERROR", f"خطا در آپلود فایل: {str(e)}", http_status=400)
         
@@ -112,7 +129,15 @@ async def create_product_endpoint(
         except Exception as e:
             raise ApiError("INVALID_PAYLOAD", f"خطا در پردازش داده‌ها: {str(e)}", http_status=400)
     else:
-        # اگر JSON است، فایل را از پارامتر file می‌خوانیم
+        # اگر JSON است، payload را از body می‌خوانیم
+        if not payload:
+            try:
+                body_data = await request.json()
+                payload = ProductCreateRequest(**body_data)
+            except Exception as e:
+                raise ApiError("INVALID_PAYLOAD", f"خطا در پردازش داده‌های JSON: {str(e)}", http_status=400)
+        
+        # اگر فایل هم ارسال شده، آن را پردازش می‌کنیم
         if file and file.filename:
             # بررسی فرمت فایل
             allowed_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'}
@@ -136,6 +161,23 @@ async def create_product_endpoint(
                     check_storage_limit=True,
                 )
                 image_file_id = upload_result.get("file_id")
+            except HTTPException as e:
+                # اگر خطای محدودیت ذخیره‌سازی باشد، جزئیات را برمی‌گردانیم
+                if e.status_code == 400 and isinstance(e.detail, dict) and e.detail.get("error") == "STORAGE_LIMIT_EXCEEDED":
+                    error_detail = {
+                        "success": False,
+                        "error": {
+                            "code": "STORAGE_LIMIT_EXCEEDED",
+                            "message": e.detail.get("message", "حجم فایل از محدودیت ذخیره‌سازی تجاوز می‌کند"),
+                            "total_limit_gb": e.detail.get("total_limit_gb"),
+                            "current_usage_gb": e.detail.get("current_usage_gb"),
+                            "available_gb": e.detail.get("available_gb"),
+                            "required_gb": e.detail.get("required_gb"),
+                            "over_usage_gb": e.detail.get("over_usage_gb"),
+                        }
+                    }
+                    raise HTTPException(status_code=400, detail=error_detail)
+                raise ApiError("FILE_UPLOAD_ERROR", f"خطا در آپلود فایل: {str(e.detail)}", http_status=400)
             except Exception as e:
                 raise ApiError("FILE_UPLOAD_ERROR", f"خطا در آپلود فایل: {str(e)}", http_status=400)
     
@@ -168,8 +210,8 @@ def search_products_endpoint(
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
-    if not ctx.can_read_section("inventory"):
-        raise ApiError("FORBIDDEN", "Missing business permission: inventory.read", http_status=403)
+    if not ctx.can_read_section("products"):
+        raise ApiError("FORBIDDEN", "Missing business permission: products.view", http_status=403)
     result = list_products(db, business_id, {
         "take": query_info.take,
         "skip": query_info.skip,
@@ -192,8 +234,8 @@ def get_product_endpoint(
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
-    if not ctx.can_read_section("inventory"):
-        raise ApiError("FORBIDDEN", "Missing business permission: inventory.read", http_status=403)
+    if not ctx.can_read_section("products"):
+        raise ApiError("FORBIDDEN", "Missing business permission: products.view", http_status=403)
     item = get_product(db, product_id, business_id)
     if not item:
         raise ApiError("NOT_FOUND", "Product not found", http_status=404)
@@ -210,8 +252,8 @@ async def update_product_endpoint(
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
-    if not ctx.has_business_permission("inventory", "write"):
-        raise ApiError("FORBIDDEN", "Missing business permission: inventory.write", http_status=403)
+    if not ctx.has_business_permission("products", "edit"):
+        raise ApiError("FORBIDDEN", "Missing business permission: products.edit", http_status=403)
     
     # بررسی وجود محصول
     from adapters.db.models.product import Product
@@ -257,6 +299,23 @@ async def update_product_endpoint(
                         check_storage_limit=True,
                     )
                     image_file_id = upload_result.get("file_id")
+                except HTTPException as e:
+                    # اگر خطای محدودیت ذخیره‌سازی باشد، جزئیات را برمی‌گردانیم
+                    if e.status_code == 400 and isinstance(e.detail, dict) and e.detail.get("error") == "STORAGE_LIMIT_EXCEEDED":
+                        error_detail = {
+                            "success": False,
+                            "error": {
+                                "code": "STORAGE_LIMIT_EXCEEDED",
+                                "message": e.detail.get("message", "حجم فایل از محدودیت ذخیره‌سازی تجاوز می‌کند"),
+                                "total_limit_gb": e.detail.get("total_limit_gb"),
+                                "current_usage_gb": e.detail.get("current_usage_gb"),
+                                "available_gb": e.detail.get("available_gb"),
+                                "required_gb": e.detail.get("required_gb"),
+                                "over_usage_gb": e.detail.get("over_usage_gb"),
+                            }
+                        }
+                        raise HTTPException(status_code=400, detail=error_detail)
+                    raise ApiError("FILE_UPLOAD_ERROR", f"خطا در آپلود فایل: {str(e.detail)}", http_status=400)
                 except Exception as e:
                     raise ApiError("FILE_UPLOAD_ERROR", f"خطا در آپلود فایل: {str(e)}", http_status=400)
         
@@ -321,6 +380,23 @@ async def update_product_endpoint(
                     check_storage_limit=True,
                 )
                 image_file_id = upload_result.get("file_id")
+            except HTTPException as e:
+                # اگر خطای محدودیت ذخیره‌سازی باشد، جزئیات را برمی‌گردانیم
+                if e.status_code == 400 and isinstance(e.detail, dict) and e.detail.get("error") == "STORAGE_LIMIT_EXCEEDED":
+                    error_detail = {
+                        "success": False,
+                        "error": {
+                            "code": "STORAGE_LIMIT_EXCEEDED",
+                            "message": e.detail.get("message", "حجم فایل از محدودیت ذخیره‌سازی تجاوز می‌کند"),
+                            "total_limit_gb": e.detail.get("total_limit_gb"),
+                            "current_usage_gb": e.detail.get("current_usage_gb"),
+                            "available_gb": e.detail.get("available_gb"),
+                            "required_gb": e.detail.get("required_gb"),
+                            "over_usage_gb": e.detail.get("over_usage_gb"),
+                        }
+                    }
+                    raise HTTPException(status_code=400, detail=error_detail)
+                raise ApiError("FILE_UPLOAD_ERROR", f"خطا در آپلود فایل: {str(e.detail)}", http_status=400)
             except Exception as e:
                 raise ApiError("FILE_UPLOAD_ERROR", f"خطا در آپلود فایل: {str(e)}", http_status=400)
     
@@ -357,8 +433,8 @@ def delete_product_endpoint(
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
-    if not ctx.has_business_permission("inventory", "delete"):
-        raise ApiError("FORBIDDEN", "Missing business permission: inventory.delete", http_status=403)
+    if not ctx.has_business_permission("products", "delete"):
+        raise ApiError("FORBIDDEN", "Missing business permission: products.delete", http_status=403)
     ok = delete_product(db, product_id, business_id)
     return success_response({"deleted": ok}, request)
 
@@ -375,8 +451,8 @@ def bulk_delete_products_endpoint(
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
-    if not ctx.has_business_permission("inventory", "delete"):
-        raise ApiError("FORBIDDEN", "Missing business permission: inventory.delete", http_status=403)
+    if not ctx.has_business_permission("products", "delete"):
+        raise ApiError("FORBIDDEN", "Missing business permission: products.delete", http_status=403)
 
     from sqlalchemy import and_ as _and
     from adapters.db.models.product import Product
@@ -440,8 +516,8 @@ async def export_products_excel(
     from openpyxl import Workbook
     from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 
-    if not ctx.can_read_section("inventory"):
-        raise ApiError("FORBIDDEN", "Missing business permission: inventory.read", http_status=403)
+    if not ctx.can_read_section("products"):
+        raise ApiError("FORBIDDEN", "Missing business permission: products.view", http_status=403)
 
     query_dict = {
         "take": int(body.get("take", 1000)),
@@ -591,8 +667,8 @@ async def download_products_import_template(
     from openpyxl import Workbook
     from openpyxl.styles import Font, Alignment
 
-    if not ctx.has_business_permission("inventory", "write"):
-        raise ApiError("FORBIDDEN", "Missing business permission: inventory.write", http_status=403)
+    if not ctx.has_business_permission("products", "edit"):
+        raise ApiError("FORBIDDEN", "Missing business permission: products.edit", http_status=403)
 
     wb = Workbook()
     ws = wb.active
@@ -673,8 +749,8 @@ async def import_products_excel(
     from typing import Optional
     from openpyxl import load_workbook
 
-    if not ctx.has_business_permission("inventory", "write"):
-        raise ApiError("FORBIDDEN", "Missing business permission: inventory.write", http_status=403)
+    if not ctx.has_business_permission("products", "edit"):
+        raise ApiError("FORBIDDEN", "Missing business permission: products.edit", http_status=403)
 
     logger = logging.getLogger(__name__)
 
@@ -872,8 +948,8 @@ async def export_products_pdf(
     from weasyprint import HTML, CSS
     from weasyprint.text.fonts import FontConfiguration
 
-    if not ctx.can_read_section("inventory"):
-        raise ApiError("FORBIDDEN", "Missing business permission: inventory.read", http_status=403)
+    if not ctx.can_read_section("products"):
+        raise ApiError("FORBIDDEN", "Missing business permission: products.view", http_status=403)
 
     query_dict = {
         "take": int(body.get("take", 100)),
@@ -1138,8 +1214,8 @@ def preview_bulk_price_update_endpoint(
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
-    if not ctx.has_business_permission("inventory", "write"):
-        raise ApiError("FORBIDDEN", "Missing business permission: inventory.write", http_status=403)
+    if not ctx.has_business_permission("products", "edit"):
+        raise ApiError("FORBIDDEN", "Missing business permission: products.edit", http_status=403)
     
     result = preview_bulk_price_update(db, business_id, payload)
     return success_response(data=result.dict(), request=request)
@@ -1157,8 +1233,8 @@ def apply_bulk_price_update_endpoint(
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
-    if not ctx.has_business_permission("inventory", "write"):
-        raise ApiError("FORBIDDEN", "Missing business permission: inventory.write", http_status=403)
+    if not ctx.has_business_permission("products", "edit"):
+        raise ApiError("FORBIDDEN", "Missing business permission: products.edit", http_status=403)
     
     result = apply_bulk_price_update(db, business_id, payload)
     return success_response(data=result, request=request)

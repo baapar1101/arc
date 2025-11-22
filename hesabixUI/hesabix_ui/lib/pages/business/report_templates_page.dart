@@ -8,6 +8,7 @@ import '../../core/auth_store.dart';
 import '../../l10n/app_localizations.dart';
 import '../../services/report_template_service.dart';
 import '../../utils/number_normalizer.dart';
+import '../../utils/snackbar_helper.dart';
 
 class ReportTemplatesPage extends StatefulWidget {
   final int businessId;
@@ -198,7 +199,7 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                           );
                         } catch (e) {
                           if (!mounted) return;
-                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.previewError(e.toString()))));
+                          SnackBarHelper.showError(context, message: t.previewError(e.toString()));
                         }
                       },
                       icon: const Icon(Icons.visibility),
@@ -242,7 +243,7 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                     await _fetch();
                   } catch (e) {
                     if (!mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${t.error}: $e')));
+                    SnackBarHelper.showError(context, message: '${t.error}: $e');
                   }
                 },
                 child: Text(existingTemplateId == null ? t.createTemplateBuilder : t.saveChanges),
@@ -1336,10 +1337,10 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
       );
       if (!mounted) return;
       final len = res['content_length'] ?? 0;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('پیش‌نمایش موفق (طول PDF: $len بایت)')));
+      SnackBarHelper.show(context, message: 'پیش‌نمایش موفق (طول PDF: $len بایت)');
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطا در پیش‌نمایش: $e')));
+      SnackBarHelper.showError(context, message: 'خطا در پیش‌نمایش: $e');
     }
   }
 
@@ -1754,7 +1755,7 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                 );
               } catch (e) {
                 if (!context.mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطا در خروجی: $e')));
+                SnackBarHelper.showError(context, message: 'خطا در خروجی: $e');
               }
             },
             icon: const Icon(Icons.file_download),
