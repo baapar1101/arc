@@ -14,9 +14,84 @@ from adapters.db.models.product_attribute_link import ProductAttributeLink
 from adapters.db.repositories.product_repository import ProductRepository
 from adapters.api.v1.schema_models.product import ProductCreateRequest, ProductUpdateRequest
 from adapters.db.models.category import BusinessCategory
+from sqlalchemy.exc import IntegrityError
 
 
-def _generate_auto_code(db: Session, business_id: int) -> str:
+def _generate_auto_code_by_category(
+    db: Session, 
+    business_id: int, 
+    category_id: int | None
+) -> str | None:
+    """
+    تولید کد خودکار بر اساس دسته‌بندی (با Row Locking برای جلوگیری از Race Condition)
+    
+    Args:
+        db: Session دیتابیس
+        business_id: شناسه کسب‌وکار
+        category_id: شناسه دسته‌بندی
+    
+    Returns:
+        کد پیشنهادی یا None اگر نتوان کد تولید کرد
+    """
+    if category_id is None:
+        return None
+    
+    # استفاده از Row Locking برای جلوگیری از Race Condition
+    # قفل کردن ردیف‌های مربوط به این دسته‌بندی
+    products = db.query(Product).filter(
+        and_(
+            Product.business_id == business_id,
+            Product.category_id == category_id,
+            Product.code.isnot(None)
+        )
+    ).with_for_update().order_by(Product.id.desc()).limit(100).all()
+    
+    if not products:
+        # هیچ کالایی در این دسته وجود ندارد
+        return None
+    
+    # استخراج آخرین کد عددی
+    max_code = None
+    for product in products:
+        code_str = product.code.strip()
+        if code_str.isdigit():
+            try:
+                code_num = int(code_str)
+                if max_code is None or code_num > max_code:
+                    max_code = code_num
+            except ValueError:
+                continue
+    
+    if max_code is None:
+        # هیچ کد عددی در این دسته وجود ندارد
+        return None
+    
+    # تولید کد بعدی
+    return str(max_code + 1)
+
+
+def _generate_auto_code(db: Session, business_id: int, category_id: int | None = None) -> str:
+    """
+    تولید کد خودکار (با پشتیبانی از دسته‌بندی)
+    
+    اول سعی می‌کند بر اساس دسته‌بندی کد تولید کند،
+    اگر موفق نشد از منطق قبلی استفاده می‌کند.
+    
+    Args:
+        db: Session دیتابیس
+        business_id: شناسه کسب‌وکار
+        category_id: شناسه دسته‌بندی (اختیاری)
+    
+    Returns:
+        کد خودکار تولید شده
+    """
+    # اگر category_id مشخص است، سعی کن بر اساس دسته کد تولید کنی
+    if category_id is not None:
+        category_code = _generate_auto_code_by_category(db, business_id, category_id)
+        if category_code:
+            return category_code
+    
+    # منطق قبلی (تولید کد بدون توجه به دسته‌بندی)
     codes = [
         r[0] for r in db.execute(
             select(Product.code).where(Product.business_id == business_id)
@@ -70,12 +145,23 @@ def _validate_unit_string(unit: Optional[str]) -> Optional[str]:
 
 
 
-def _upsert_attributes(db: Session, product_id: int, business_id: int, attribute_ids: Optional[List[int]]) -> None:
+def _upsert_attributes(db: Session, product_id: int, business_id: int, attribute_ids: Optional[List[int]], auto_commit: bool = True) -> None:
+    """
+    ایجاد یا به‌روزرسانی ویژگی‌های کالا
+    
+    Args:
+        db: Session دیتابیس
+        product_id: شناسه کالا
+        business_id: شناسه کسب‌وکار
+        attribute_ids: لیست شناسه‌های ویژگی‌ها
+        auto_commit: اگر True باشد، خودش commit می‌کند (برای سازگاری با کد قدیمی)
+    """
     if attribute_ids is None:
         return
     db.query(ProductAttributeLink).filter(ProductAttributeLink.product_id == product_id).delete()
     if not attribute_ids:
-        db.commit()
+        if auto_commit:
+            db.commit()
         return
     valid_ids = [
         a.id for a in db.query(ProductAttribute.id, ProductAttribute.business_id)
@@ -84,10 +170,14 @@ def _upsert_attributes(db: Session, product_id: int, business_id: int, attribute
     ]
     for aid in valid_ids:
         db.add(ProductAttributeLink(product_id=product_id, attribute_id=aid))
-    db.commit()
+    if auto_commit:
+        db.commit()
 
 
 def create_product(db: Session, business_id: int, payload: ProductCreateRequest) -> Dict[str, Any]:
+    """
+    ایجاد کالا/خدمت جدید (با Retry Logic برای مدیریت Race Condition)
+    """
     repo = ProductRepository(db)
     _validate_tax(payload)
     _validate_item_type_inventory(payload)
@@ -96,53 +186,110 @@ def create_product(db: Session, business_id: int, payload: ProductCreateRequest)
     secondary_unit = _validate_unit_string(payload.secondary_unit)
     _validate_units(main_unit, secondary_unit, payload.unit_conversion_factor)
 
-    code = payload.code.strip() if isinstance(payload.code, str) and payload.code.strip() else None
-    if code:
-        dup = db.query(Product).filter(and_(Product.business_id == business_id, Product.code == code)).first()
-        if dup:
-            raise ApiError("DUPLICATE_PRODUCT_CODE", "کد کالا/خدمت تکراری است", http_status=400)
-    else:
-        code = _generate_auto_code(db, business_id)
+    # Retry Logic برای مدیریت Race Condition در تولید کد خودکار
+    max_retries = 2  # حداکثر 2 بار تلاش (با توجه به Row Locking، معمولاً یک بار کافی است)
+    retry_count = 0
+    
+    while retry_count < max_retries:
+        try:
+            # پردازش کد: اگر خالی، None یا برابر نام کالا باشد، کد خودکار تولید می‌شود
+            code = None
+            manual_code = False  # آیا کد دستی وارد شده است؟
+            
+            if payload.code:
+                code_str = payload.code.strip() if isinstance(payload.code, str) else str(payload.code).strip()
+                # اگر کد خالی نباشد و برابر نام کالا نباشد، استفاده کن
+                if code_str and code_str != payload.name.strip():
+                    code = code_str
+                    manual_code = True
+                    dup = db.query(Product).filter(and_(Product.business_id == business_id, Product.code == code)).first()
+                    if dup:
+                        raise ApiError("DUPLICATE_PRODUCT_CODE", "کد کالا/خدمت تکراری است", http_status=400)
+            
+            # اگر کد خالی است یا برابر نام کالا است، کد خودکار تولید کن
+            if not code:
+                # استفاده از category_id برای تولید کد خودکار بر اساس دسته‌بندی
+                code = _generate_auto_code(db, business_id, payload.category_id)
 
-    obj = repo.create(
-        business_id=business_id,
-        item_type=payload.item_type,
-        code=code,
-        name=payload.name.strip(),
-        description=payload.description,
-        category_id=payload.category_id,
-        main_unit=main_unit,
-        secondary_unit=secondary_unit,
-        unit_conversion_factor=payload.unit_conversion_factor,
-        base_sales_price=payload.base_sales_price,
-        base_sales_note=payload.base_sales_note,
-        base_purchase_price=payload.base_purchase_price,
-        base_purchase_note=payload.base_purchase_note,
-        track_inventory=payload.track_inventory,
-        reorder_point=payload.reorder_point,
-        min_order_qty=payload.min_order_qty,
-        lead_time_days=payload.lead_time_days,
-        is_sales_taxable=payload.is_sales_taxable,
-        is_purchase_taxable=payload.is_purchase_taxable,
-        sales_tax_rate=payload.sales_tax_rate,
-        purchase_tax_rate=payload.purchase_tax_rate,
-        tax_type_id=payload.tax_type_id,
-        tax_code=payload.tax_code,
-        tax_unit_id=payload.tax_unit_id,
-        image_file_id=payload.image_file_id,
-        default_warehouse_id=payload.default_warehouse_id,
-    )
+            # ایجاد Product مستقیماً (بدون استفاده از repo.create که commit می‌کند)
+            # تا همه چیز در یک transaction باشد و بتوانیم در صورت خطا rollback کنیم
+            obj = Product(
+                business_id=business_id,
+                item_type=payload.item_type,
+                code=code,
+                name=payload.name.strip(),
+                description=payload.description,
+                category_id=payload.category_id,
+                main_unit=main_unit,
+                secondary_unit=secondary_unit,
+                unit_conversion_factor=payload.unit_conversion_factor,
+                base_sales_price=payload.base_sales_price,
+                base_sales_note=payload.base_sales_note,
+                base_purchase_price=payload.base_purchase_price,
+                base_purchase_note=payload.base_purchase_note,
+                track_inventory=payload.track_inventory,
+                reorder_point=payload.reorder_point,
+                min_order_qty=payload.min_order_qty,
+                lead_time_days=payload.lead_time_days,
+                is_sales_taxable=payload.is_sales_taxable,
+                is_purchase_taxable=payload.is_purchase_taxable,
+                sales_tax_rate=payload.sales_tax_rate,
+                purchase_tax_rate=payload.purchase_tax_rate,
+                tax_type_id=payload.tax_type_id,
+                tax_code=payload.tax_code,
+                tax_unit_id=payload.tax_unit_id,
+                image_file_id=payload.image_file_id,
+                default_warehouse_id=payload.default_warehouse_id,
+            )
+            db.add(obj)
+            db.flush()  # Flush برای دریافت id، اما commit نمی‌کند
 
-    _upsert_attributes(db, obj.id, business_id, payload.attribute_ids)
+            # _upsert_attributes را بدون commit صدا می‌زنیم تا همه چیز در یک transaction باشد
+            _upsert_attributes(db, obj.id, business_id, payload.attribute_ids, auto_commit=False)
+            
+            # Commit همه چیز (product و attributes)
+            db.commit()
+            db.refresh(obj)  # Refresh برای دریافت اطلاعات کامل
 
-    data = _to_dict(obj)
-    # enrich titles from payload if provided
-    if getattr(payload, 'main_unit_title', None):
-        data["main_unit_title"] = str(getattr(payload, 'main_unit_title'))
-    if getattr(payload, 'secondary_unit_title', None):
-        data["secondary_unit_title"] = str(getattr(payload, 'secondary_unit_title'))
+            data = _to_dict(obj)
+            # enrich titles from payload if provided
+            if getattr(payload, 'main_unit_title', None):
+                data["main_unit_title"] = str(getattr(payload, 'main_unit_title'))
+            if getattr(payload, 'secondary_unit_title', None):
+                data["secondary_unit_title"] = str(getattr(payload, 'secondary_unit_title'))
 
-    return {"message": "PRODUCT_CREATED", "data": data}
+            return {"message": "PRODUCT_CREATED", "data": data}
+            
+        except IntegrityError as e:
+            # خطای تکراری بودن کد (UniqueConstraint violation)
+            db.rollback()
+            retry_count += 1
+            
+            # اگر کد دستی بود و تکراری است، بلافاصله خطا بده
+            if manual_code:
+                raise ApiError("DUPLICATE_PRODUCT_CODE", "کد کالا/خدمت تکراری است", http_status=400)
+            
+            # اگر کد خودکار بود و تکراری شد، دوباره تلاش کن
+            if retry_count >= max_retries:
+                # اگر بعد از چند بار تلاش باز هم خطا داد، خطا را برمی‌گردانیم
+                raise ApiError(
+                    "DUPLICATE_PRODUCT_CODE", 
+                    "کد کالا/خدمت تکراری است. لطفاً دوباره تلاش کنید.", 
+                    http_status=400
+                )
+            
+            # Retry: کد خودکار دوباره تولید می‌شود
+            continue
+            
+        except ApiError:
+            # خطاهای دیگر (مثل DUPLICATE_PRODUCT_CODE از بررسی دستی) را propagate کن
+            db.rollback()
+            raise
+            
+        except Exception as e:
+            # سایر خطاها
+            db.rollback()
+            raise
 
 
 def list_products(db: Session, business_id: int, query: Dict[str, Any]) -> Dict[str, Any]:
@@ -177,10 +324,17 @@ def update_product(db: Session, product_id: int, business_id: int, payload: Prod
     if not obj or obj.business_id != business_id:
         return None
 
-    if payload.code is not None and payload.code.strip() and payload.code.strip() != obj.code:
-        dup = db.query(Product).filter(and_(Product.business_id == business_id, Product.code == payload.code.strip(), Product.id != product_id)).first()
-        if dup:
-            raise ApiError("DUPLICATE_PRODUCT_CODE", "کد کالا/خدمت تکراری است", http_status=400)
+    # Process code: اگر code خالی یا None باشد، باید None بماند تا کد خودکار تولید نشود
+    # اما در update، اگر code موجود است و خالی نیست، باید بررسی تکراری شود
+    code_value = None
+    if payload.code is not None:
+        code_str = payload.code.strip() if isinstance(payload.code, str) else str(payload.code).strip()
+        if code_str:  # فقط اگر کد خالی نباشد
+            code_value = code_str
+            if code_value != obj.code:  # اگر کد تغییر کرده
+                dup = db.query(Product).filter(and_(Product.business_id == business_id, Product.code == code_value, Product.id != product_id)).first()
+                if dup:
+                    raise ApiError("DUPLICATE_PRODUCT_CODE", "کد کالا/خدمت تکراری است", http_status=400)
 
     _validate_tax(payload)
     # از فیلدهای explicitly-set برای تشخیص پاک‌سازی (None) استفاده کن
@@ -198,10 +352,14 @@ def update_product(db: Session, product_id: int, business_id: int, payload: Prod
     factor_val = payload.unit_conversion_factor if 'unit_conversion_factor' in fields_set else obj.unit_conversion_factor
     _validate_units(main_unit_val, secondary_unit_val, factor_val)
 
+    # فقط اگر code در fields_set است و مقدار دارد، آن را به‌روزرسانی کن
+    # اگر code در fields_set نیست یا None است، مقدار قبلی را نگه می‌داریم
+    code_to_update = code_value if 'code' in fields_set else None
+
     updated = repo.update(
         product_id,
         item_type=payload.item_type if payload.item_type is not None else None,
-        code=payload.code.strip() if isinstance(payload.code, str) else None,
+        code=code_to_update,
         name=payload.name.strip() if isinstance(payload.name, str) else None,
         description=payload.description,
         category_id=payload.category_id,

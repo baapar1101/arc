@@ -97,6 +97,7 @@ import 'theme/app_theme.dart';
 import 'core/auth_store.dart';
 import 'core/permission_guard.dart';
 import 'core/keyboard_shortcut_listener.dart';
+import 'core/route_registry.dart';
 import 'widgets/simple_splash_screen.dart';
 import 'widgets/url_tracker.dart';
 import 'pages/business/opening_balance_page.dart';
@@ -186,6 +187,14 @@ class _MyAppState extends State<MyApp> {
     ApiClient.bindCalendarController(_calendarController!);
     ApiClient.bindAuthStore(_authStore!);
     
+    // Preload تمام صفحات برای جلوگیری از تاخیر در navigation
+    // این کار باعث می‌شود کد تمام صفحات در bundle اصلی قرار گیرد
+    // استفاده از Route Registry برای preload خودکار صفحات
+    _preloadPages(authStore, localeController, calendarController, themeController);
+    
+    // همچنین صفحات از Route Registry را preload کن
+    RouteRegistry().preloadAll();
+    
     // اطمینان از حداقل 1 ثانیه نمایش splash screen
     final elapsed = DateTime.now().difference(_loadStartTime!);
     const minimumDuration = Duration(seconds: 1);
@@ -205,6 +214,8 @@ class _MyAppState extends State<MyApp> {
           await _authStore!.saveLastUrl(currentUrl);
         }
       } catch (e) {
+        // صرفاً لاگ برای خطای غیر بحرانی ذخیره آدرس - ignore error
+        debugPrint('Error saving URL: $e');
       }
     }
     
@@ -213,6 +224,342 @@ class _MyAppState extends State<MyApp> {
       setState(() {
         _isLoading = false;
       });
+    }
+  }
+
+  /// Preload تمام صفحات برای جلوگیری از تاخیر در navigation
+  /// این کار باعث می‌شود کد تمام صفحات در bundle اصلی قرار گیرد
+  void _preloadPages(
+    AuthStore authStore,
+    LocaleController localeController,
+    CalendarController calendarController,
+    ThemeController themeController,
+  ) {
+    try {
+      // Preload Shell ها
+      ProfileShell(
+        authStore: authStore,
+        localeController: localeController,
+        calendarController: calendarController,
+        themeController: themeController,
+        child: const SizedBox(),
+      );
+      BusinessShell(
+        businessId: 0,
+        authStore: authStore,
+        localeController: localeController,
+        calendarController: calendarController,
+        themeController: themeController,
+        child: const SizedBox(),
+      );
+      
+      // Preload صفحات Public
+      PublicPersonShareLinkPage(code: 'preload');
+      
+      // Preload صفحات Login و Wallet
+      LoginPage(
+        localeController: localeController,
+        calendarController: calendarController,
+        themeController: themeController,
+        authStore: authStore,
+      );
+      WalletPaymentResultPage(authStore: authStore);
+      
+      // Preload صفحات Profile
+      const ProfileDashboardPage();
+      const AnnouncementsPage();
+      NewBusinessPage(calendarController: calendarController);
+      const BusinessesPage();
+      SupportPage(calendarController: calendarController);
+      MarketingPage(calendarController: calendarController);
+      const UserSignaturePage();
+      const ChangePasswordPage();
+      const UserNotificationsPage();
+      OperatorTicketsPage(calendarController: calendarController);
+      const SystemSettingsPage();
+      const WalletSettingsPage();
+      const PaymentGatewaysPage();
+      const AdminStorageManagementPage();
+      const SystemConfigurationPage();
+      const ShareLinkSettingsPage();
+      const UserManagementPage();
+      const SystemLogsPage();
+      const EmailSettingsPage();
+      const AISettingsPage();
+      const AIPlansAdminPage();
+      const AIPromptsAdminPage();
+      const AnnouncementsAdminPage();
+      const NotificationsSettingsPage();
+      const NotificationTemplatesAdminPage();
+      const StoragePlansAdminPage();
+      const DocumentMonetizationAdminPage();
+      const BusinessesListPage();
+      
+      // Preload صفحات Business (با dummy businessId)
+      const dummyBusinessId = 0;
+      BusinessDashboardPage(
+        businessId: dummyBusinessId,
+        authStore: authStore,
+        calendarController: calendarController,
+      );
+      UsersPermissionsPage(
+        businessId: dummyBusinessId.toString(),
+        authStore: authStore,
+        calendarController: calendarController,
+      );
+      OpeningBalancePage(
+        businessId: dummyBusinessId,
+        authStore: authStore,
+      );
+      AccountsPage(
+        businessId: dummyBusinessId,
+        authStore: authStore,
+      );
+      BankAccountsPage(
+        businessId: dummyBusinessId,
+        authStore: authStore,
+      );
+      PettyCashPage(
+        businessId: dummyBusinessId,
+        authStore: authStore,
+      );
+      CashRegistersPage(
+        businessId: dummyBusinessId,
+        authStore: authStore,
+      );
+      WalletPage(
+        businessId: dummyBusinessId,
+        authStore: authStore,
+      );
+      AISubscriptionPage(
+        businessId: dummyBusinessId,
+        authStore: authStore,
+      );
+      AIUsagePage(
+        businessId: dummyBusinessId,
+        authStore: authStore,
+      );
+      InvoicesListPage(
+        businessId: dummyBusinessId,
+        calendarController: calendarController,
+        authStore: authStore,
+        apiClient: ApiClient(),
+      );
+      TaxWorkspacePage(
+        businessId: dummyBusinessId,
+        calendarController: calendarController,
+        authStore: authStore,
+        apiClient: ApiClient(),
+      );
+      NewInvoicePage(
+        businessId: dummyBusinessId,
+        authStore: authStore,
+        calendarController: calendarController,
+      );
+      EditInvoicePage(
+        businessId: dummyBusinessId,
+        invoiceId: 0,
+        authStore: authStore,
+        calendarController: calendarController,
+      );
+      ReportsPage(
+        businessId: dummyBusinessId,
+        authStore: authStore,
+      );
+      KardexPage(
+        businessId: dummyBusinessId,
+        calendarController: calendarController,
+        initialPersonIds: [],
+      );
+      DebtorsReportPage(
+        businessId: dummyBusinessId,
+        calendarController: calendarController,
+      );
+      CreditorsReportPage(
+        businessId: dummyBusinessId,
+        calendarController: calendarController,
+      );
+      PeopleTransactionsReportPage(
+        businessId: dummyBusinessId,
+        calendarController: calendarController,
+      );
+      ItemMovementsReportPage(
+        businessId: dummyBusinessId,
+        calendarController: calendarController,
+      );
+      SalesByProductReportPage(
+        businessId: dummyBusinessId,
+        calendarController: calendarController,
+      );
+      InventoryKardexReportPage(
+        businessId: dummyBusinessId,
+        calendarController: calendarController,
+      );
+      BankAccountsTurnoverReportPage(
+        businessId: dummyBusinessId,
+        calendarController: calendarController,
+      );
+      CashPettyTurnoverReportPage(
+        businessId: dummyBusinessId,
+        calendarController: calendarController,
+      );
+      DailySalesReportPage(
+        businessId: dummyBusinessId,
+        calendarController: calendarController,
+      );
+      DailyPurchasesReportPage(
+        businessId: dummyBusinessId,
+        calendarController: calendarController,
+      );
+      MonthlySalesReportPage(
+        businessId: dummyBusinessId,
+        calendarController: calendarController,
+      );
+      TopCustomersReportPage(
+        businessId: dummyBusinessId,
+        calendarController: calendarController,
+      );
+      TopSuppliersReportPage(
+        businessId: dummyBusinessId,
+        calendarController: calendarController,
+      );
+      MaterialsConsumptionReportPage(
+        businessId: dummyBusinessId,
+        calendarController: calendarController,
+      );
+      ProductionReportPage(
+        businessId: dummyBusinessId,
+        calendarController: calendarController,
+      );
+      TrialBalanceReportPage(
+        businessId: dummyBusinessId,
+        calendarController: calendarController,
+      );
+      GeneralLedgerReportPage(
+        businessId: dummyBusinessId,
+        calendarController: calendarController,
+      );
+      PnlPeriodReportPage(
+        businessId: dummyBusinessId,
+        calendarController: calendarController,
+      );
+      PnlCumulativeReportPage(
+        businessId: dummyBusinessId,
+        calendarController: calendarController,
+      );
+      AccountReviewReportPage(
+        businessId: dummyBusinessId,
+        calendarController: calendarController,
+      );
+      SettingsPage(
+        businessId: dummyBusinessId,
+        localeController: localeController,
+        calendarController: calendarController,
+        themeController: themeController,
+      );
+      BusinessBackupPage(businessId: dummyBusinessId);
+      BusinessRestorePage(businessId: dummyBusinessId);
+      BusinessInfoSettingsPage(businessId: dummyBusinessId);
+      CreditSettingsPage(businessId: dummyBusinessId);
+      BusinessPrintSettingsPage(businessId: dummyBusinessId);
+      InstallmentPlansPage(businessId: dummyBusinessId);
+      DocumentMonetizationBusinessPage(businessId: dummyBusinessId);
+      ProductAttributesPage(
+        businessId: dummyBusinessId,
+        authStore: authStore,
+      );
+      ProductsPage(
+        businessId: dummyBusinessId,
+        authStore: authStore,
+      );
+      PriceListsPage(
+        businessId: dummyBusinessId,
+        authStore: authStore,
+      );
+      PriceListItemsPage(
+        businessId: dummyBusinessId,
+        priceListId: 0,
+        authStore: authStore,
+      );
+      PersonsPage(
+        businessId: dummyBusinessId,
+        authStore: authStore,
+      );
+      ReceiptsPaymentsListPage(
+        businessId: dummyBusinessId,
+        calendarController: calendarController,
+        authStore: authStore,
+        apiClient: ApiClient(),
+      );
+      InstallmentsReportPage(
+        businessId: dummyBusinessId,
+        calendarController: calendarController,
+        apiClient: ApiClient(),
+      );
+      ExpenseIncomeListPage(
+        businessId: dummyBusinessId,
+        calendarController: calendarController,
+        authStore: authStore,
+        apiClient: ApiClient(),
+      );
+      TransfersPage(
+        businessId: dummyBusinessId,
+        calendarController: calendarController,
+        authStore: authStore,
+        apiClient: ApiClient(),
+      );
+      WarehousesPage(
+        businessId: dummyBusinessId,
+      );
+      WarehouseDocsPage(
+        businessId: dummyBusinessId,
+      );
+      DocumentsPage(
+        businessId: dummyBusinessId,
+        calendarController: calendarController,
+        authStore: authStore,
+        apiClient: ApiClient(),
+      );
+      StorageFilesPage(
+        businessId: dummyBusinessId,
+      );
+      StorageFileManagerPage(
+        businessId: dummyBusinessId,
+      );
+      ReportTemplatesPage(
+        businessId: dummyBusinessId,
+        authStore: authStore,
+      );
+      PluginMarketplacePage(
+        businessId: dummyBusinessId,
+        authStore: authStore,
+      );
+      MarketplaceInvoicesPage(
+        businessId: dummyBusinessId,
+        authStore: authStore,
+      );
+      ChecksPage(
+        businessId: dummyBusinessId,
+        authStore: authStore,
+        calendarController: calendarController,
+      );
+      CheckFormPage(
+        businessId: dummyBusinessId,
+        authStore: authStore,
+        calendarController: calendarController,
+      );
+      CheckReconciliationPage(
+        businessId: dummyBusinessId,
+        authStore: authStore,
+        calendarController: calendarController,
+      );
+      
+      // Preload صفحه Error
+      const Error404Page();
+    } catch (e) {
+      // خطا در preload نباید برنامه را متوقف کند
+      // فقط log می‌کنیم (در production می‌توانیم debug print کنیم)
+      debugPrint('Error preloading pages: $e');
     }
   }
 
@@ -409,17 +756,30 @@ class _MyAppState extends State<MyApp> {
         GoRoute(
           path: '/login',
           name: 'login',
-          builder: (context, state) => LoginPage(
-            localeController: controller,
-            calendarController: _calendarController!,
-            themeController: themeController,
-            authStore: _authStore!,
-          ),
+          builder: (context, state) {
+            // ثبت صفحه برای preload خودکار
+            registerRoutePage(() => LoginPage(
+              localeController: controller,
+              calendarController: _calendarController!,
+              themeController: themeController,
+              authStore: _authStore!,
+            ));
+            return LoginPage(
+              localeController: controller,
+              calendarController: _calendarController!,
+              themeController: themeController,
+              authStore: _authStore!,
+            );
+          },
         ),
         GoRoute(
           path: '/wallet/payment-result',
           name: 'wallet_payment_result',
-          builder: (context, state) => WalletPaymentResultPage(authStore: _authStore!),
+          builder: (context, state) {
+            // ثبت صفحه برای preload خودکار
+            registerRoutePage(() => WalletPaymentResultPage(authStore: _authStore!));
+            return WalletPaymentResultPage(authStore: _authStore!);
+          },
         ),
         ShellRoute(
           builder: (context, state, child) => ProfileShell(
@@ -433,7 +793,11 @@ class _MyAppState extends State<MyApp> {
             GoRoute(
               path: '/user/profile/dashboard',
               name: 'profile_dashboard',
-              builder: (context, state) => const ProfileDashboardPage(),
+              builder: (context, state) {
+                // ثبت صفحه برای preload خودکار
+                registerRoutePage(() => const ProfileDashboardPage());
+                return const ProfileDashboardPage();
+              },
             ),
             GoRoute(
               path: '/user/profile/announcements',
@@ -988,10 +1352,13 @@ class _MyAppState extends State<MyApp> {
                     final list = extra['person_ids'];
                     if (list is List) {
                       for (final v in list) {
-                        if (v is int) initialPersonIds.add(v);
-                        else {
+                        if (v is int) {
+                          initialPersonIds.add(v);
+                        } else {
                           final p = int.tryParse('$v');
-                          if (p != null) initialPersonIds.add(p);
+                          if (p != null) {
+                            initialPersonIds.add(p);
+                          }
                         }
                       }
                     }

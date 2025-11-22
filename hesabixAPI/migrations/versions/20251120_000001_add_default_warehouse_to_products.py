@@ -24,6 +24,7 @@ def upgrade() -> None:
 
     if table_name in inspector.get_table_names():
         columns = {col["name"] for col in inspector.get_columns(table_name)}
+        indexes = {idx["name"] for idx in inspector.get_indexes(table_name)}
         if "default_warehouse_id" not in columns:
             op.add_column(
                 table_name,
@@ -32,10 +33,10 @@ def upgrade() -> None:
                     sa.Integer(),
                     sa.ForeignKey("warehouses.id", ondelete="SET NULL"),
                     nullable=True,
-                    index=True,
                     comment="انبار پیش‌فرض برای کالا",
                 ),
             )
+        if "ix_products_default_warehouse_id" not in indexes:
             op.create_index(
                 "ix_products_default_warehouse_id",
                 table_name,

@@ -65,7 +65,8 @@ class _ProfileShellState extends State<ProfileShell> {
                 _unreadCount = (_unreadCount + 1).clamp(0, 99);
               });
               if (mounted) {
-                ScaffoldMessenger.of(context)
+                // استفاده از rootNavigator برای نمایش پیام روی دیالوگ‌ها
+                ScaffoldMessenger.of(Navigator.of(context, rootNavigator: true).context)
                   ..hideCurrentSnackBar()
                   ..showSnackBar(SnackBar(content: Text('$title: $body'), duration: const Duration(seconds: 4)));
               }

@@ -205,7 +205,7 @@ class _BusinessShellState extends State<BusinessShell> {
       await widget.authStore.setCurrentBusiness(businessData);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(Navigator.of(context, rootNavigator: true).context).showSnackBar(
           SnackBar(
             content: Text('خطا در بارگذاری اطلاعات کسب و کار: $e'),
             backgroundColor: Colors.red,
@@ -649,7 +649,7 @@ class _BusinessShellState extends State<BusinessShell> {
     Future<void> onLogout() async {
       await widget.authStore.saveApiKey(null);
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context)
+      ScaffoldMessenger.of(Navigator.of(context, rootNavigator: true).context)
         ..hideCurrentSnackBar()
         ..showSnackBar(SnackBar(content: Text(t.logoutDone)));
       context.go('/login');
@@ -668,6 +668,20 @@ class _BusinessShellState extends State<BusinessShell> {
       }
     }
 
+    void _refreshProductsPageIfOpen() {
+      try {
+        final currentPath = GoRouterState.of(context).uri.path;
+        final productsPath = '/business/${widget.businessId}/products';
+        if (currentPath == productsPath) {
+          // If we're on the products page, refresh it
+          _refreshCurrentPage();
+        }
+      } catch (_) {
+        // If GoRouterState is not available, try to refresh anyway
+        _refreshCurrentPage();
+      }
+    }
+
     Future<void> showAddProductDialog() async {
       final result = await showDialog<bool>(
         context: context,
@@ -676,12 +690,13 @@ class _BusinessShellState extends State<BusinessShell> {
           authStore: widget.authStore,
           onSuccess: () {
             // Refresh the products page if it's currently open
-            // This will be handled by the ProductsPage itself
+            _refreshProductsPageIfOpen();
           },
         ),
       );
       if (result == true) {
-        // Product was successfully added
+        // Product was successfully added, refresh if products page is open
+        _refreshProductsPageIfOpen();
       }
     }
 
@@ -1577,6 +1592,15 @@ class _BusinessShellState extends State<BusinessShell> {
                   });
                   _unreadCount = (_unreadCount + 1).clamp(0, 99);
                 });
+                if (mounted) {
+                  // استفاده از rootNavigator برای نمایش پیام روی دیالوگ‌ها
+                  ScaffoldMessenger.of(Navigator.of(context, rootNavigator: true).context)
+                    ..hideCurrentSnackBar()
+                    ..showSnackBar(SnackBar(
+                      content: Text('$title: $body'),
+                      duration: const Duration(seconds: 4),
+                    ));
+                }
               }
             } catch (_) {
               // Ignore message processing errors

@@ -100,10 +100,21 @@ async def create_product_endpoint(
                 if isinstance(value, str):
                     # سعی می‌کنیم به عنوان JSON parse کنیم
                     try:
-                        product_data[key] = json.loads(value)
-                    except:
-                        # اگر JSON نیست، به عنوان string نگه می‌داریم
-                        product_data[key] = value
+                        parsed = json.loads(value)
+                        product_data[key] = parsed
+                    except (json.JSONDecodeError, ValueError):
+                        # اگر JSON نیست، بررسی می‌کنیم که آیا boolean یا number است
+                        value_lower = value.strip().lower()
+                        if value_lower in ('true', 'false'):
+                            product_data[key] = value_lower == 'true'
+                        elif value_lower == 'null' or value_lower == '':
+                            product_data[key] = None
+                        elif value.isdigit() or (value.startswith('-') and value[1:].isdigit()):
+                            product_data[key] = int(value)
+                        elif value.replace('.', '', 1).replace('-', '', 1).isdigit():
+                            product_data[key] = float(value)
+                        else:
+                            product_data[key] = value
                 else:
                     product_data[key] = value
         
@@ -112,7 +123,14 @@ async def create_product_endpoint(
         except Exception as e:
             raise ApiError("INVALID_PAYLOAD", f"خطا در پردازش داده‌ها: {str(e)}", http_status=400)
     else:
-        # اگر JSON است، فایل را از پارامتر file می‌خوانیم
+        # اگر JSON است، payload را از body می‌خوانیم
+        try:
+            body_data = await request.json()
+            payload = ProductCreateRequest(**body_data)
+        except Exception as e:
+            raise ApiError("INVALID_PAYLOAD", f"خطا در پردازش داده‌های JSON: {str(e)}", http_status=400)
+        
+        # اگر فایل هم ارسال شده، آن را پردازش می‌کنیم
         if file and file.filename:
             # بررسی فرمت فایل
             allowed_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'}
@@ -266,10 +284,23 @@ async def update_product_endpoint(
         for key, value in form_data.items():
             if key != "file":
                 if isinstance(value, str):
+                    # سعی می‌کنیم به عنوان JSON parse کنیم
                     try:
-                        product_data[key] = json.loads(value)
-                    except:
-                        product_data[key] = value
+                        parsed = json.loads(value)
+                        product_data[key] = parsed
+                    except (json.JSONDecodeError, ValueError):
+                        # اگر JSON نیست، بررسی می‌کنیم که آیا boolean یا number است
+                        value_lower = value.strip().lower()
+                        if value_lower in ('true', 'false'):
+                            product_data[key] = value_lower == 'true'
+                        elif value_lower == 'null' or value_lower == '':
+                            product_data[key] = None
+                        elif value.isdigit() or (value.startswith('-') and value[1:].isdigit()):
+                            product_data[key] = int(value)
+                        elif value.replace('.', '', 1).replace('-', '', 1).isdigit():
+                            product_data[key] = float(value)
+                        else:
+                            product_data[key] = value
                 else:
                     product_data[key] = value
         
@@ -281,6 +312,8 @@ async def update_product_endpoint(
         # اگر JSON است، payload را از body می‌خوانیم
         try:
             body_data = await request.json()
+            if not isinstance(body_data, dict):
+                raise ApiError("INVALID_PAYLOAD", "داده‌های ارسالی باید یک object JSON باشد", http_status=400)
             # اگر default_warehouse_id در body_data وجود دارد (حتی اگر null باشد)، آن را به صورت صریح set می‌کنیم
             # تا Pydantic آن را در fields_set قرار دهد
             default_warehouse_id_value = body_data.get('default_warehouse_id')
@@ -294,6 +327,8 @@ async def update_product_endpoint(
                     payload.model_fields_set.add('default_warehouse_id')
                 elif hasattr(payload, '__fields_set__'):
                     payload.__fields_set__.add('default_warehouse_id')
+        except ValueError as e:
+            raise ApiError("INVALID_PAYLOAD", f"خطا در parse کردن JSON: {str(e)}", http_status=400)
         except Exception as e:
             raise ApiError("INVALID_PAYLOAD", f"خطا در پردازش داده‌های JSON: {str(e)}", http_status=400)
         

@@ -58,6 +58,25 @@ def upgrade() -> None:
 		)
 		op.create_index("ix_mkp_plans_plugin_id", "marketplace_plugin_plans", ["plugin_id"])
 
+	# marketplace_invoices (create first to avoid foreign key dependency issue)
+	if not _table_exists(conn, "marketplace_invoices"):
+		op.create_table(
+			"marketplace_invoices",
+			sa.Column("id", sa.Integer(), primary_key=True, autoincrement=True),
+			sa.Column("order_id", sa.Integer(), nullable=False),  # FK added later
+			sa.Column("business_id", sa.Integer(), sa.ForeignKey("businesses.id", ondelete="CASCADE"), nullable=False),
+			sa.Column("code", sa.String(length=50), nullable=False),
+			sa.Column("total", sa.Numeric(18, 2), nullable=False, server_default=sa.text("0")),
+			sa.Column("currency_id", sa.Integer(), sa.ForeignKey("currencies.id", ondelete="RESTRICT"), nullable=False),
+			sa.Column("status", sa.String(length=20), nullable=False, server_default=sa.text("'issued'")),
+			sa.Column("issued_at", sa.DateTime(), nullable=False, default=datetime.utcnow),
+			sa.Column("paid_at", sa.DateTime(), nullable=True),
+			sa.Column("extra_info", sa.Text(), nullable=True),
+			sa.Column("created_at", sa.DateTime(), nullable=False, default=datetime.utcnow),
+			sa.Column("updated_at", sa.DateTime(), nullable=False, default=datetime.utcnow),
+		)
+		op.create_index("ix_mkp_invoices_business_id", "marketplace_invoices", ["business_id"])
+
 	# marketplace_orders
 	if not _table_exists(conn, "marketplace_orders"):
 		op.create_table(
@@ -82,25 +101,21 @@ def upgrade() -> None:
 		op.create_index("ix_mkp_orders_plugin_id", "marketplace_orders", ["plugin_id"])
 		op.create_index("ix_mkp_orders_plan_id", "marketplace_orders", ["plan_id"])
 
-	# marketplace_invoices
-	if not _table_exists(conn, "marketplace_invoices"):
-		op.create_table(
-			"marketplace_invoices",
-			sa.Column("id", sa.Integer(), primary_key=True, autoincrement=True),
-			sa.Column("order_id", sa.Integer(), sa.ForeignKey("marketplace_orders.id", ondelete="CASCADE"), nullable=False),
-			sa.Column("business_id", sa.Integer(), sa.ForeignKey("businesses.id", ondelete="CASCADE"), nullable=False),
-			sa.Column("code", sa.String(length=50), nullable=False),
-			sa.Column("total", sa.Numeric(18, 2), nullable=False, server_default=sa.text("0")),
-			sa.Column("currency_id", sa.Integer(), sa.ForeignKey("currencies.id", ondelete="RESTRICT"), nullable=False),
-			sa.Column("status", sa.String(length=20), nullable=False, server_default=sa.text("'issued'")),
-			sa.Column("issued_at", sa.DateTime(), nullable=False, default=datetime.utcnow),
-			sa.Column("paid_at", sa.DateTime(), nullable=True),
-			sa.Column("extra_info", sa.Text(), nullable=True),
-			sa.Column("created_at", sa.DateTime(), nullable=False, default=datetime.utcnow),
-			sa.Column("updated_at", sa.DateTime(), nullable=False, default=datetime.utcnow),
-		)
+	# Add foreign key from marketplace_invoices to marketplace_orders
+	if _table_exists(conn, "marketplace_invoices") and _table_exists(conn, "marketplace_orders"):
+		# Check if FK already exists
+		inspector = sa.inspect(conn)
+		fks = [fk['name'] for fk in inspector.get_foreign_keys("marketplace_invoices")]
+		if not any("order_id" in fk for fk in inspector.get_foreign_keys("marketplace_invoices")):
+			op.create_foreign_key(
+				"fk_marketplace_invoices_order_id",
+				"marketplace_invoices",
+				"marketplace_orders",
+				["order_id"],
+				["id"],
+				ondelete="CASCADE"
+			)
 		op.create_index("ix_mkp_invoices_order_id", "marketplace_invoices", ["order_id"])
-		op.create_index("ix_mkp_invoices_business_id", "marketplace_invoices", ["business_id"])
 
 	# business_plugins
 	if not _table_exists(conn, "business_plugins"):

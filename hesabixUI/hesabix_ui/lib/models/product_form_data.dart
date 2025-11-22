@@ -133,9 +133,19 @@ class ProductFormData {
   }
 
   Map<String, dynamic> toPayload() {
+    // اگر code خالی است یا برابر name باشد، آن را null کن
+    // (احتمالاً کاربر به اشتباه نام را در فیلد کد نوشته یا فیلد کد را پاک کرده)
+    final trimmedCode = code?.trim();
+    final trimmedName = name.trim();
+    final codeValue = (trimmedCode != null && 
+                      trimmedCode.isNotEmpty && 
+                      trimmedCode != trimmedName) 
+        ? trimmedCode 
+        : null;
+    
     final payload = <String, dynamic>{
       'item_type': itemType,
-      'code': code,
+      'code': codeValue,
       'name': name,
       'description': description,
       'category_id': categoryId,
