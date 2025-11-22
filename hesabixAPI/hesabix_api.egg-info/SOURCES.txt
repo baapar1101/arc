@@ -285,6 +285,7 @@ hesabix_api.egg-info/dependency_links.txt
 hesabix_api.egg-info/requires.txt
 hesabix_api.egg-info/top_level.txt
 migrations/env.py
+migrations/versions/023c8d2d2222_merge_heads_latest.py
 migrations/versions/1f0abcdd7300_add_petty_cash_table.py
 migrations/versions/20250102_000001_seed_support_data.py
 migrations/versions/20250106_000001_fix_tax_types_structure.py
@@ -306,6 +307,7 @@ migrations/versions/20250120_000001_add_persons_tables.py
 migrations/versions/20250120_000001_add_warehouse_contact_fields.py
 migrations/versions/20250120_000002_add_join_permission.py
 migrations/versions/20250121_000001_add_ai_expense_account.py
+migrations/versions/20250122_000001_add_last_reset_at_and_expires_at_to_ai_subscriptions.py
 migrations/versions/20250126_000001_add_gift_credit_account.py
 migrations/versions/20250915_000001_init_auth_tables.py
 migrations/versions/20250916_000002_add_referral_fields.py
@@ -364,8 +366,10 @@ migrations/versions/20251119_000001_add_person_share_links.py
 migrations/versions/20251120_000001_add_default_warehouse_to_products.py
 migrations/versions/20251120_053716_add_ai_tables.py
 migrations/versions/27f209ffe151_merge_heads.py
+migrations/versions/4436dcacd94f_merge_heads_final.py
 migrations/versions/4b2ea782bcb3_merge_heads.py
 migrations/versions/5553f8745c6e_add_support_tables.py
+migrations/versions/693b298a0f74_merge_heads.py
 migrations/versions/755d6bd2d6d7_add_business_logo_stamp_columns.py
 migrations/versions/7891282548e9_merge_tax_types_and_unit_fields_heads.py
 migrations/versions/7ecb63029764_merge_heads.py
