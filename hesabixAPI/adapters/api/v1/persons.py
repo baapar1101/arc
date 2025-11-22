@@ -161,11 +161,7 @@ async def create_person_endpoint(
     person_data: PersonCreateRequest,
     db: Session = Depends(get_db),
     auth_context: AuthContext = Depends(get_current_user),
-<<<<<<< Updated upstream
-    _: None = Depends(require_business_permission_dep("people", "add")),
-=======
     _: None = Depends(require_business_access_dep),
->>>>>>> Stashed changes
 ):
     """ایجاد شخص جدید برای کسب و کار"""
     result = create_person(db, business_id, person_data)
