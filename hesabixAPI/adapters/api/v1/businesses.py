@@ -14,7 +14,7 @@ from adapters.api.v1.schemas import (
 )
 from app.core.responses import success_response, format_datetime_fields
 from app.core.auth_dependency import get_current_user, AuthContext
-from app.core.permissions import require_business_management
+from app.core.permissions import require_business_management, require_business_access, require_business_permission_dep
 from app.services.business_service import (
     create_business,
     get_business_by_id,
@@ -265,13 +265,14 @@ def get_business(
         }
     }
 )
-@require_business_management()
+@require_business_access("business_id")
 def update_business_info(
     request: Request,
     business_id: int,
     business_data: BusinessUpdateRequest,
     ctx: AuthContext = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("settings", "business")),
 ) -> dict:
     """ویرایش کسب و کار"""
     owner_id = ctx.get_user_id()
@@ -331,17 +332,18 @@ def delete_business_info(
     description="آپلود تصویر لوگوی کسب‌وکار و ذخیره شناسه فایل روی رکورد Business.",
     response_model=SuccessResponse,
 )
-@require_business_management()
+@require_business_access("business_id")
 async def upload_business_logo(
     request: Request,
     business_id: int,
     file: UploadFile = File(...),
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("settings", "print")),
 ) -> dict:
-    # اطمینان از مالکیت کسب‌وکار
+    # بررسی وجود کسب‌وکار
     business = db.query(Business).filter(Business.id == business_id).first()
-    if not business or business.owner_id != ctx.get_user_id():
+    if not business:
         raise HTTPException(status_code=404, detail="کسب و کار یافت نشد")
 
     storage = FileStorageService(db)
@@ -402,14 +404,16 @@ async def upload_business_logo(
     summary="دریافت لوگوی کسب‌وکار",
     description="بازگرداندن تصویر لوگوی کسب‌وکار به‌صورت فایل برای نمایش در UI یا فاکتور.",
 )
+@require_business_access("business_id")
 async def get_business_logo(
     request: Request,
     business_id: int,
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("settings", "print")),
 ):
     business = db.query(Business).filter(Business.id == business_id).first()
-    if not business or business.owner_id != ctx.get_user_id() or not getattr(business, "logo_file_id", None):
+    if not business or not getattr(business, "logo_file_id", None):
         raise HTTPException(status_code=404, detail="لوگوی کسب و کار تنظیم نشده است")
 
     storage = FileStorageService(db)
@@ -429,16 +433,18 @@ async def get_business_logo(
     description="آپلود تصویر مهر یا امضای رسمی کسب‌وکار و ذخیره شناسه فایل روی رکورد Business.",
     response_model=SuccessResponse,
 )
-@require_business_management()
+@require_business_access("business_id")
 async def upload_business_stamp(
     request: Request,
     business_id: int,
     file: UploadFile = File(...),
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("settings", "print")),
 ) -> dict:
+    # بررسی وجود کسب‌وکار
     business = db.query(Business).filter(Business.id == business_id).first()
-    if not business or business.owner_id != ctx.get_user_id():
+    if not business:
         raise HTTPException(status_code=404, detail="کسب و کار یافت نشد")
 
     storage = FileStorageService(db)
@@ -499,14 +505,16 @@ async def upload_business_stamp(
     summary="دریافت مهر/امضای کسب‌وکار",
     description="بازگرداندن تصویر مهر یا امضای کسب‌وکار به‌صورت فایل برای نمایش در UI یا فاکتور.",
 )
+@require_business_access("business_id")
 async def get_business_stamp(
     request: Request,
     business_id: int,
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("settings", "print")),
 ):
     business = db.query(Business).filter(Business.id == business_id).first()
-    if not business or business.owner_id != ctx.get_user_id() or not getattr(business, "stamp_file_id", None):
+    if not business or not getattr(business, "stamp_file_id", None):
         raise HTTPException(status_code=404, detail="مهر/امضای کسب و کار تنظیم نشده است")
 
     storage = FileStorageService(db)
@@ -570,11 +578,13 @@ def get_business_stats(
     description="دریافت تنظیمات چاپ فاکتور (لوگو، مهر، پرداخت‌ها، اقساط و متن انتهایی) به‌صورت پیش‌فرض و به تفکیک نوع فاکتور.",
     response_model=SuccessResponse,
 )
+@require_business_access("business_id")
 def get_business_print_settings_endpoint(
     request: Request,
     business_id: int,
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("settings", "print")),
 ) -> dict:
     """دریافت تنظیمات چاپ فاکتورهای یک کسب‌وکار."""
     owner_id = ctx.get_user_id()
@@ -592,13 +602,14 @@ def get_business_print_settings_endpoint(
     description="ذخیره تنظیمات چاپ فاکتور (لوگو، مهر، پرداخت‌ها، اقساط و متن انتهایی) به‌صورت پیش‌فرض و به تفکیک نوع فاکتور.",
     response_model=SuccessResponse,
 )
-@require_business_management()
+@require_business_access("business_id")
 def update_business_print_settings_endpoint(
     request: Request,
     business_id: int,
     payload: Dict[str, Any],
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("settings", "print")),
 ) -> dict:
     """ویرایش تنظیمات چاپ فاکتورهای یک کسب‌وکار."""
     owner_id = ctx.get_user_id()

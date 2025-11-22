@@ -11,7 +11,7 @@ from adapters.api.v1.schemas import (
 )
 from app.core.responses import success_response, format_datetime_fields, ApiError
 from app.core.auth_dependency import get_current_user, AuthContext
-from app.core.permissions import require_business_access
+from app.core.permissions import require_business_access, require_business_permission_dep
 from adapters.db.repositories.business_permission_repo import BusinessPermissionRepository
 from adapters.db.models.user import User
 from adapters.db.models.business import Business
@@ -105,7 +105,8 @@ def get_user_details(
     business_id: int,
     user_id: int,
     ctx: AuthContext = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("settings", "users")),
 ) -> dict:
     """دریافت جزئیات کاربر و دسترسی‌هایش"""
     import logging
@@ -114,20 +115,11 @@ def get_user_details(
     current_user_id = ctx.get_user_id()
     logger.info(f"Getting user details for user {user_id} in business {business_id}, current user: {current_user_id}")
     
-    # Check if user is business owner or has permission to manage users
+    # بررسی وجود کسب‌وکار
     business = db.get(Business, business_id)
     if not business:
         logger.error(f"Business {business_id} not found")
         raise HTTPException(status_code=404, detail="کسب و کار یافت نشد")
-    
-    is_owner = business.owner_id == current_user_id
-    can_manage = ctx.can_manage_business_users()
-    
-    logger.info(f"Business owner: {business.owner_id}, is_owner: {is_owner}, can_manage: {can_manage}")
-    
-    if not is_owner and not can_manage:
-        logger.warning(f"User {current_user_id} does not have permission to view user details for business {business_id}")
-        raise HTTPException(status_code=403, detail="شما مجوز مشاهده جزئیات کاربران ندارید")
     
     # Get user details
     user = db.get(User, user_id)
@@ -229,7 +221,8 @@ def get_users(
     request: Request,
     business_id: int,
     ctx: AuthContext = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("settings", "users")),
 ) -> dict:
     """دریافت لیست کاربران کسب و کار"""
     import logging
@@ -238,20 +231,11 @@ def get_users(
     current_user_id = ctx.get_user_id()
     logger.info(f"Getting users for business {business_id}, current user: {current_user_id}")
     
-    # Check if user is business owner or has permission to manage users
+    # بررسی وجود کسب‌وکار
     business = db.get(Business, business_id)
     if not business:
         logger.error(f"Business {business_id} not found")
         raise HTTPException(status_code=404, detail="کسب و کار یافت نشد")
-    
-    is_owner = business.owner_id == current_user_id
-    can_manage = ctx.can_manage_business_users()
-    
-    logger.info(f"Business owner: {business.owner_id}, is_owner: {is_owner}, can_manage: {can_manage}")
-    
-    if not is_owner and not can_manage:
-        logger.warning(f"User {current_user_id} does not have permission to manage users for business {business_id}")
-        raise HTTPException(status_code=403, detail="شما مجوز مدیریت کاربران ندارید")
     
     # Get business permissions for this business
     permission_repo = BusinessPermissionRepository(db)
@@ -373,7 +357,8 @@ def add_user(
     business_id: int,
     add_request: AddUserRequest,
     ctx: AuthContext = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("settings", "users")),
 ) -> dict:
     """افزودن کاربر به کسب و کار"""
     import logging
@@ -383,22 +368,11 @@ def add_user(
     logger.info(f"Adding user to business {business_id}, current user: {current_user_id}")
     logger.info(f"Add request: {add_request.email_or_phone}")
     
-    # Check if user is business owner or has permission to manage users
+    # بررسی وجود کسب‌وکار
     business = db.get(Business, business_id)
     if not business:
         logger.error(f"Business {business_id} not found")
         raise ApiError("BUSINESS_NOT_FOUND", "کسب و کار یافت نشد", http_status=404)
-    
-    is_owner = business.owner_id == current_user_id
-    can_manage = ctx.can_manage_business_users(business_id)
-    
-    logger.info(f"Business owner: {business.owner_id}, is_owner: {is_owner}, can_manage: {can_manage}")
-    logger.info(f"User {current_user_id} business_id from context: {ctx.business_id}")
-    logger.info(f"User {current_user_id} is superadmin: {ctx.is_superadmin()}")
-    
-    if not is_owner and not can_manage:
-        logger.warning(f"User {current_user_id} does not have permission to add users to business {business_id}")
-        raise ApiError("FORBIDDEN", "شما مجوز مدیریت کاربران ندارید", http_status=403)
     
     # Find user by email or phone
     logger.info(f"Searching for user with email/phone: {add_request.email_or_phone}")
@@ -513,21 +487,16 @@ def update_permissions(
     user_id: int,
     update_request: UpdatePermissionsRequest,
     ctx: AuthContext = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("settings", "users")),
 ) -> dict:
     """به‌روزرسانی دسترسی‌های کاربر"""
     current_user_id = ctx.get_user_id()
     
-    # Check if user is business owner or has permission to manage users
+    # بررسی وجود کسب‌وکار
     business = db.get(Business, business_id)
     if not business:
         raise HTTPException(status_code=404, detail="کسب و کار یافت نشد")
-    
-    is_owner = business.owner_id == current_user_id
-    can_manage = ctx.can_manage_business_users()
-    
-    if not is_owner and not can_manage:
-        raise HTTPException(status_code=403, detail="شما مجوز مدیریت کاربران ندارید")
     
     # Check if target user exists
     target_user = db.get(User, user_id)
@@ -582,24 +551,18 @@ def remove_user(
     business_id: int,
     user_id: int,
     ctx: AuthContext = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("settings", "users")),
 ) -> dict:
     """حذف کاربر از کسب و کار"""
     current_user_id = ctx.get_user_id()
     
-    # Check if user is business owner or has permission to manage users
+    # بررسی وجود کسب‌وکار
     business = db.get(Business, business_id)
     if not business:
         raise HTTPException(status_code=404, detail="کسب و کار یافت نشد")
     
-    is_owner = business.owner_id == current_user_id
-    can_manage = ctx.can_manage_business_users()
-    
-    if not is_owner and not can_manage:
-        raise HTTPException(status_code=403, detail="شما مجوز مدیریت کاربران ندارید")
-    
     # Check if target user is business owner
-    business = db.get(Business, business_id)
     if business and business.owner_id == user_id:
         raise HTTPException(status_code=400, detail="نمی‌توان مالک کسب و کار را حذف کرد")
     

@@ -27,7 +27,6 @@ import '../../widgets/warehouse/warehouse_form_dialog.dart';
 import '../../widgets/warehouse/warehouse_doc_wizard_dialog.dart';
 import '../../widgets/ai/ai_chat_dialog.dart';
 import 'check_form_page.dart';
-import '../../utils/snackbar_helper.dart';
 
 class BusinessShell extends StatefulWidget {
   final int businessId;
@@ -984,11 +983,23 @@ class _BusinessShellState extends State<BusinessShell> {
                   if (isChildItem && item.children != null && childIndex >= 0 && childIndex < item.children!.length) {
                     // زیرآیتم
                     final child = item.children![childIndex];
+                    // بررسی اینکه آیا این زیرمنو فعال است یا نه
+                    final bool isChildSelected = child.path != null && location.startsWith(child.path!);
+                    final bool isChildHovered = index == _hoverIndex;
+                    final bool isChildActive = isChildSelected || isChildHovered;
+                    final BorderRadius childBr = isChildSelected
+                        ? BorderRadius.zero
+                        : (isChildHovered ? BorderRadius.zero : BorderRadius.circular(8));
+                    final Color childBgColor = isChildActive
+                        ? (isChildHovered && !isChildSelected 
+                            ? (isDark ? activeBg.withValues(alpha: 0.5) : activeBg.withValues(alpha: 0.7))
+                            : activeBg)
+                        : Colors.transparent;
                     return MouseRegion(
                       onEnter: (_) => setState(() => _hoverIndex = index),
                       onExit: (_) => setState(() => _hoverIndex = -1),
                       child: InkWell(
-                        borderRadius: br,
+                        borderRadius: childBr,
                         onTap: () => onSelectChild(menuIndex, childIndex),
                         child: Container(
                           margin: EdgeInsets.zero,
@@ -997,14 +1008,14 @@ class _BusinessShellState extends State<BusinessShell> {
                             vertical: 8,
                           ),
                           decoration: BoxDecoration(
-                            color: bgColor,
-                            borderRadius: br,
+                            color: childBgColor,
+                            borderRadius: childBr,
                           ),
                           child: Row(
                             children: [
                               Icon(
-                                child.icon,
-                                color: sideFg,
+                                isChildActive ? child.selectedIcon : child.icon,
+                                color: isChildActive ? activeFg : sideFg,
                                 size: 20,
                               ),
                               if (railExtended) ...[
@@ -1013,8 +1024,8 @@ class _BusinessShellState extends State<BusinessShell> {
                                   child: Text(
                                     child.label,
                                     style: TextStyle(
-                                      color: sideFg,
-                                      fontWeight: FontWeight.w400,
+                                      color: isChildActive ? activeFg : sideFg,
+                                      fontWeight: isChildActive ? FontWeight.w600 : FontWeight.w400,
                                     ),
                                   ),
                                 ),
@@ -1067,13 +1078,15 @@ class _BusinessShellState extends State<BusinessShell> {
                                       width: 20,
                                       height: 20,
                                       decoration: BoxDecoration(
-                                        color: sideFg.withValues(alpha: 0.1),
+                                        color: isChildActive 
+                                            ? activeFg.withValues(alpha: 0.15)
+                                            : sideFg.withValues(alpha: 0.1),
                                         borderRadius: BorderRadius.circular(3),
                                       ),
                                       child: Icon(
                                         Icons.add,
                                         size: 14,
-                                        color: sideFg,
+                                        color: isChildActive ? activeFg : sideFg,
                                       ),
                                     ),
                                   ),

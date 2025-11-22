@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from adapters.db.session import get_db
 from app.core.auth_dependency import get_current_user, AuthContext
-from app.core.permissions import require_business_access
+from app.core.permissions import require_business_access, require_business_permission_dep, require_business_permission_by_entity_dep
 from app.core.responses import success_response, ApiError, format_datetime_fields
 from adapters.api.v1.schemas import QueryInfo
 from adapters.api.v1.schema_models.product_attribute import (
@@ -19,6 +19,7 @@ from app.services.product_attribute_service import (
     update_attribute,
     delete_attribute,
 )
+from adapters.db.models.product_attribute import ProductAttribute
 
 
 router = APIRouter(prefix="/product-attributes", tags=["product-attributes"])
@@ -32,9 +33,8 @@ def create_product_attribute(
     payload: ProductAttributeCreateRequest,
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("product_attributes", "add")),
 ) -> Dict[str, Any]:
-    if not ctx.has_business_permission("product_attributes", "add"):
-        raise ApiError("FORBIDDEN", "Missing business permission: product_attributes.add", http_status=403)
     result = create_attribute(db, business_id, payload)
     return success_response(
         data=format_datetime_fields(result["data"], request),
@@ -51,9 +51,8 @@ def search_product_attributes(
     query: QueryInfo,
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("product_attributes", "view")),
 ) -> Dict[str, Any]:
-    if not ctx.can_read_section("product_attributes"):
-        raise ApiError("FORBIDDEN", "Missing business permission: product_attributes.view", http_status=403)
 
     result = list_attributes(db, business_id, {
         "take": query.take,
@@ -76,9 +75,8 @@ def get_product_attribute(
     attribute_id: int,
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_by_entity_dep("product_attributes", "view", ProductAttribute, "attribute_id")),
 ) -> Dict[str, Any]:
-    if not ctx.can_read_section("product_attributes"):
-        raise ApiError("FORBIDDEN", "Missing business permission: product_attributes.view", http_status=403)
     item = get_attribute(db, attribute_id, business_id)
     if not item:
         raise ApiError("NOT_FOUND", "Attribute not found", http_status=404)
@@ -94,9 +92,8 @@ def update_product_attribute(
     payload: ProductAttributeUpdateRequest,
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_by_entity_dep("product_attributes", "edit", ProductAttribute, "attribute_id")),
 ) -> Dict[str, Any]:
-    if not ctx.has_business_permission("product_attributes", "edit"):
-        raise ApiError("FORBIDDEN", "Missing business permission: product_attributes.edit", http_status=403)
     result = update_attribute(db, attribute_id, business_id, payload)
     if not result:
         raise ApiError("NOT_FOUND", "Attribute not found", http_status=404)
@@ -115,9 +112,8 @@ def delete_product_attribute(
     attribute_id: int,
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_by_entity_dep("product_attributes", "delete", ProductAttribute, "attribute_id")),
 ) -> Dict[str, Any]:
-    if not ctx.has_business_permission("product_attributes", "delete"):
-        raise ApiError("FORBIDDEN", "Missing business permission: product_attributes.delete", http_status=403)
     ok = delete_attribute(db, attribute_id, business_id)
     return success_response({"deleted": ok}, request)
 

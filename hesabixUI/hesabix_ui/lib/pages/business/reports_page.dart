@@ -244,6 +244,13 @@ class ReportsPage extends StatelessWidget {
                 ),
                 _buildReportItem(
                   context,
+                  title: t.reportsJournalLedgerTitle,
+                  subtitle: t.reportsJournalLedgerSubtitle,
+                  icon: Icons.book_outlined,
+                  onTap: () => context.go('/business/$businessId/reports/journal-ledger'),
+                ),
+                _buildReportItem(
+                  context,
                   title: 'گزارش مرور حساب‌ها',
                   subtitle: 'ساختار درختی حساب‌ها با مانده‌ها و جزئیات تراکنش‌ها',
                   icon: Icons.account_tree,

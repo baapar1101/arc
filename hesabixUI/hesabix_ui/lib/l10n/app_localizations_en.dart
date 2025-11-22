@@ -2840,6 +2840,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get categoryNameEn => 'Name (English)';
 
   @override
+  String get categoryName => 'Category Name';
+
+  @override
+  String get categoryNameRequired => 'Category name is required';
+
+  @override
+  String get categoryNameHint => 'Enter category name';
+
+  @override
   String get categoryType => 'Type';
 
   @override
@@ -3611,6 +3620,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get fiscalYear => 'Fiscal year';
 
   @override
+  String get fiscalYears => 'Fiscal years';
+
+  @override
   String get addFilterPersons => 'Add filter: People';
 
   @override
@@ -3802,6 +3814,19 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get reportsGeneralLedgerSubtitle => 'Account movements over a period';
+
+  @override
+  String get reportsJournalLedgerTitle => 'Journal Ledger';
+
+  @override
+  String get reportsJournalLedgerSubtitle =>
+      'All financial transactions in chronological order';
+
+  @override
+  String get debitAccount => 'Debit Account';
+
+  @override
+  String get creditAccount => 'Credit Account';
 
   @override
   String get reportsPnlPeriodTitle => 'Period profit and loss';

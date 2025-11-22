@@ -9,7 +9,7 @@ from adapters.api.v1.schemas import SuccessResponse
 from adapters.api.v1.schema_models.account import AccountTreeNode, AccountCreateRequest, AccountUpdateRequest
 from app.core.responses import success_response, ApiError
 from app.core.auth_dependency import get_current_user, AuthContext
-from app.core.permissions import require_business_access
+from app.core.permissions import require_business_access, require_business_permission_dep, require_business_permission_by_entity_dep
 from adapters.db.models.account import Account
 from app.services.account_service import create_account, update_account, delete_account, get_account
 
@@ -61,7 +61,8 @@ def get_accounts_tree(
 	request: Request,
 	business_id: int,
 	ctx: AuthContext = Depends(get_current_user),
-	db: Session = Depends(get_db)
+	db: Session = Depends(get_db),
+	_: None = Depends(require_business_permission_dep("chart_of_accounts", "view")),
 ) -> dict:
 	# دریافت حساب‌های عمومی (business_id IS NULL) و حساب‌های مختص این کسب و کار
 	rows = db.query(Account).filter(
@@ -103,7 +104,8 @@ def get_accounts_list(
 	request: Request,
 	business_id: int,
 	ctx: AuthContext = Depends(get_current_user),
-	db: Session = Depends(get_db)
+	db: Session = Depends(get_db),
+	_: None = Depends(require_business_permission_dep("chart_of_accounts", "view")),
 ) -> dict:
 	"""دریافت لیست ساده حساب‌ها"""
 	rows = db.query(Account).filter(
@@ -136,7 +138,8 @@ def get_account_by_id(
 	business_id: int,
 	account_id: int,
 	ctx: AuthContext = Depends(get_current_user),
-	db: Session = Depends(get_db)
+	db: Session = Depends(get_db),
+	_: None = Depends(require_business_permission_by_entity_dep("chart_of_accounts", "view", Account, "account_id")),
 ) -> dict:
 	"""دریافت یک حساب خاص"""
 	account = db.query(Account).filter(
@@ -172,7 +175,8 @@ def search_accounts(
 	business_id: int,
 	search_request: SearchAccountsRequest,
 	ctx: AuthContext = Depends(get_current_user),
-	db: Session = Depends(get_db)
+	db: Session = Depends(get_db),
+	_: None = Depends(require_business_permission_dep("chart_of_accounts", "view")),
 ) -> dict:
 	"""جستجوی حساب‌ها با فیلتر"""
 	query = db.query(Account).filter(
@@ -238,10 +242,8 @@ def create_business_account(
 	body: AccountCreateRequest = Body(...),
 	ctx: AuthContext = Depends(get_current_user),
 	db: Session = Depends(get_db),
+	_: None = Depends(require_business_permission_dep("chart_of_accounts", "add")),
 ) -> dict:
-	# اجازه نوشتن در بخش حسابداری لازم است
-	if not ctx.can_write_section("accounting"):
-		raise ApiError("FORBIDDEN", "Missing write permission for accounting", http_status=403)
 	# والد اجباری است
 	if body.parent_id is None:
 		raise ApiError("PARENT_REQUIRED", "Parent account is required", http_status=400)
@@ -285,6 +287,7 @@ def update_account_endpoint(
 	body: AccountUpdateRequest = Body(...),
 	ctx: AuthContext = Depends(get_current_user),
 	db: Session = Depends(get_db),
+	_: None = Depends(require_business_permission_by_entity_dep("chart_of_accounts", "edit", Account, "account_id")),
 ) -> dict:
 	data = get_account(db, account_id)
 	if not data:
@@ -293,12 +296,6 @@ def update_account_endpoint(
 	# حساب‌های عمومی غیرقابل‌ویرایش هستند
 	if acc_business_id is None:
 		raise ApiError("FORBIDDEN", "Public accounts are immutable", http_status=403)
-	# اگر متعلق به بیزنس است باید دسترسی داشته باشد و write accounting داشته باشد
-	if acc_business_id is not None:
-		if not ctx.can_access_business(int(acc_business_id)):
-			raise ApiError("FORBIDDEN", "No access to business", http_status=403)
-		if not ctx.can_write_section("accounting"):
-			raise ApiError("FORBIDDEN", "Missing write permission for accounting", http_status=403)
 	try:
 		updated = update_account(
 			db,
@@ -334,6 +331,7 @@ def delete_account_endpoint(
 	account_id: int,
 	ctx: AuthContext = Depends(get_current_user),
 	db: Session = Depends(get_db),
+	_: None = Depends(require_business_permission_by_entity_dep("chart_of_accounts", "delete", Account, "account_id")),
 ) -> dict:
 	data = get_account(db, account_id)
 	if not data:
@@ -342,11 +340,6 @@ def delete_account_endpoint(
 	# حساب‌های عمومی غیرقابل‌حذف هستند
 	if acc_business_id is None:
 		raise ApiError("FORBIDDEN", "Public accounts are immutable", http_status=403)
-	if acc_business_id is not None:
-		if not ctx.can_access_business(int(acc_business_id)):
-			raise ApiError("FORBIDDEN", "No access to business", http_status=403)
-		if not ctx.can_write_section("accounting"):
-			raise ApiError("FORBIDDEN", "Missing write permission for accounting", http_status=403)
 	try:
 		ok = delete_account(db, account_id)
 		if not ok:

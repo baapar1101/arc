@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from adapters.db.session import get_db
 from app.core.auth_dependency import get_current_user, AuthContext
-from app.core.permissions import require_business_access
+from app.core.permissions import require_business_access, require_business_permission_dep
 from app.core.responses import success_response, ApiError
 from adapters.db.repositories.category_repository import CategoryRepository
 
@@ -20,10 +20,8 @@ def get_categories_tree(
     body: Dict[str, Any] | None = None,
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("categories", "view")),
 ) -> Dict[str, Any]:
-    # اجازه مشاهده نیاز به view روی سکشن categories دارد
-    if not ctx.can_read_section("categories"):
-        raise ApiError("FORBIDDEN", "Missing business permission: categories.view", http_status=403)
     repo = CategoryRepository(db)
     # درخت سراسری: بدون فیلتر نوع
     tree = repo.get_tree(business_id, None)
@@ -52,9 +50,8 @@ def create_category(
     body: Dict[str, Any],
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("categories", "add")),
 ) -> Dict[str, Any]:
-    if not ctx.has_business_permission("categories", "add"):
-        raise ApiError("FORBIDDEN", "Missing business permission: categories.add", http_status=403)
     parent_id = body.get("parent_id")
     label: str = (body.get("label") or "").strip()
     # ساخت ترجمه‌ها از روی برچسب واحد
@@ -80,9 +77,8 @@ def update_category(
     body: Dict[str, Any],
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("categories", "edit")),
 ) -> Dict[str, Any]:
-    if not ctx.has_business_permission("categories", "edit"):
-        raise ApiError("FORBIDDEN", "Missing business permission: categories.edit", http_status=403)
     category_id = body.get("category_id")
     label = body.get("label")
     translations = {"fa": label, "en": label} if isinstance(label, str) and label.strip() else None
@@ -109,9 +105,8 @@ def move_category(
     body: Dict[str, Any],
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("categories", "edit")),
 ) -> Dict[str, Any]:
-    if not ctx.has_business_permission("categories", "edit"):
-        raise ApiError("FORBIDDEN", "Missing business permission: categories.edit", http_status=403)
     category_id = body.get("category_id")
     new_parent_id = body.get("new_parent_id")
     repo = CategoryRepository(db)
@@ -137,9 +132,8 @@ def delete_category(
     body: Dict[str, Any],
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("categories", "delete")),
 ) -> Dict[str, Any]:
-    if not ctx.has_business_permission("categories", "delete"):
-        raise ApiError("FORBIDDEN", "Missing business permission: categories.delete", http_status=403)
     repo = CategoryRepository(db)
     category_id = body.get("category_id")
     ok = repo.delete_category(category_id=category_id)
@@ -155,9 +149,8 @@ def search_categories(
     body: Dict[str, Any] | None = None,
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("categories", "view")),
 ) -> Dict[str, Any]:
-    if not ctx.can_read_section("categories"):
-        raise ApiError("FORBIDDEN", "Missing business permission: categories.view", http_status=403)
     q = (body or {}).get("query") if isinstance(body, dict) else None
     limit = (body or {}).get("limit") if isinstance(body, dict) else None
     if not isinstance(q, str) or not q.strip():

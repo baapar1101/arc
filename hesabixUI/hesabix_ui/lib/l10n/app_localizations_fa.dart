@@ -2823,6 +2823,15 @@ class AppLocalizationsFa extends AppLocalizations {
   String get categoryNameEn => 'نام (انگلیسی)';
 
   @override
+  String get categoryName => 'نام دسته‌بندی';
+
+  @override
+  String get categoryNameRequired => 'نام دسته‌بندی الزامی است';
+
+  @override
+  String get categoryNameHint => 'نام دسته‌بندی را وارد کنید';
+
+  @override
   String get categoryType => 'نوع';
 
   @override
@@ -3591,6 +3600,9 @@ class AppLocalizationsFa extends AppLocalizations {
   String get fiscalYear => 'سال مالی';
 
   @override
+  String get fiscalYears => 'سال‌های مالی';
+
+  @override
   String get addFilterPersons => 'افزودن فیلتر: اشخاص';
 
   @override
@@ -3780,6 +3792,19 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get reportsGeneralLedgerSubtitle => 'گردش حساب‌ها در بازه زمانی';
+
+  @override
+  String get reportsJournalLedgerTitle => 'دفتر روزنامه';
+
+  @override
+  String get reportsJournalLedgerSubtitle =>
+      'تمام تراکنش‌های مالی به ترتیب تاریخ';
+
+  @override
+  String get debitAccount => 'حساب بدهکار';
+
+  @override
+  String get creditAccount => 'حساب بستانکار';
 
   @override
   String get reportsPnlPeriodTitle => 'گزارش سود و زیان دوره';

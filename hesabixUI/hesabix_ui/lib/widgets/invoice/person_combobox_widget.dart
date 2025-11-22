@@ -3,7 +3,34 @@ import 'package:flutter/material.dart';
 import '../../services/person_service.dart';
 import '../../models/person_model.dart';
 import '../../widgets/person/person_form_dialog.dart';
-import '../../utils/snackbar_helper.dart';
+
+class _PersonPickerState {
+  final List<Person> persons;
+  final bool isLoading;
+  final bool isSearching;
+  final bool hasSearched;
+
+  _PersonPickerState({
+    required this.persons,
+    required this.isLoading,
+    required this.isSearching,
+    required this.hasSearched,
+  });
+
+  _PersonPickerState copyWith({
+    List<Person>? persons,
+    bool? isLoading,
+    bool? isSearching,
+    bool? hasSearched,
+  }) {
+    return _PersonPickerState(
+      persons: persons ?? this.persons,
+      isLoading: isLoading ?? this.isLoading,
+      isSearching: isSearching ?? this.isSearching,
+      hasSearched: hasSearched ?? this.hasSearched,
+    );
+  }
+}
 
 class PersonComboboxWidget extends StatefulWidget {
   final int businessId;
@@ -37,12 +64,19 @@ class _PersonComboboxWidgetState extends State<PersonComboboxWidget> {
   Timer? _debounceTimer;
   int _searchSeq = 0; // برای جلوگیری از نمایش نتایج قدیمی
   String _latestQuery = '';
-  void Function(void Function())? _setModalState;
   
   List<Person> _persons = [];
   bool _isLoading = false;
   bool _isSearching = false;
   bool _hasSearched = false;
+  final ValueNotifier<_PersonPickerState> _pickerStateNotifier = ValueNotifier<_PersonPickerState>(
+    _PersonPickerState(
+      persons: [],
+      isLoading: false,
+      isSearching: false,
+      hasSearched: false,
+    ),
+  );
 
   @override
   void initState() {
@@ -55,17 +89,27 @@ class _PersonComboboxWidgetState extends State<PersonComboboxWidget> {
   void dispose() {
     _debounceTimer?.cancel();
     _searchController.dispose();
+    _pickerStateNotifier.dispose();
     super.dispose();
   }
 
   Future<void> _loadRecentPersons() async {
     // استفاده از مسیر واحد جست‌وجو با کوئری خالی
     await _performSearch('');
+    // مقداردهی اولیه ValueNotifier
+    _pickerStateNotifier.value = _PersonPickerState(
+      persons: _persons,
+      isLoading: _isLoading,
+      isSearching: _isSearching,
+      hasSearched: _hasSearched,
+    );
   }
 
   void _onSearchChanged(String query) {
+    print('[PersonCombobox] _onSearchChanged called with query: "$query"');
     _debounceTimer?.cancel();
     _debounceTimer = Timer(const Duration(milliseconds: 500), () {
+      print('[PersonCombobox] Debounce timer fired, calling _performSearch with: "${query.trim()}"');
       _performSearch(query.trim());
     });
   }
@@ -73,6 +117,7 @@ class _PersonComboboxWidgetState extends State<PersonComboboxWidget> {
   Future<void> _performSearch(String query) async {
     final int seq = ++_searchSeq;
     _latestQuery = query;
+    print('[PersonCombobox] _performSearch called - seq: $seq, query: "$query", current persons count: ${_persons.length}');
 
     // حالت لودینگ بسته به خالی بودن کوئری
     if (mounted) {
@@ -85,11 +130,17 @@ class _PersonComboboxWidgetState extends State<PersonComboboxWidget> {
           _hasSearched = true;
         }
       });
+      // به‌روزرسانی ValueNotifier
+      _pickerStateNotifier.value = _pickerStateNotifier.value.copyWith(
+        isLoading: _isLoading,
+        isSearching: _isSearching,
+        hasSearched: _hasSearched,
+      );
+      print('[PersonCombobox] setState called - isLoading: $_isLoading, isSearching: $_isSearching');
     }
 
     try {
-      // Debug: نمایش پارامترهای جست‌وجو
-
+      print('[PersonCombobox] Calling _personService.getPersons - businessId: ${widget.businessId}, search: ${query.isEmpty ? "null" : query}');
       final response = await _personService.getPersons(
         businessId: widget.businessId,
         search: query.isEmpty ? null : query,
@@ -98,15 +149,25 @@ class _PersonComboboxWidgetState extends State<PersonComboboxWidget> {
             ? {'person_types': widget.personTypes}
             : null,
       );
+      print('[PersonCombobox] Response received from server - type: ${response.runtimeType}');
 
       // پاسخ کهنه را نادیده بگیر
+      print('[PersonCombobox] Checking sequence - seq: $seq, _searchSeq: $_searchSeq, query: "$query", _latestQuery: "$_latestQuery"');
       if (seq != _searchSeq || query != _latestQuery) {
+        print('[PersonCombobox] WARNING: Response is stale, ignoring! seq match: ${seq == _searchSeq}, query match: ${query == _latestQuery}');
         return;
       }
 
+      print('[PersonCombobox] Parsing response...');
       final persons = _personService.parsePersonsList(response);
+      print('[PersonCombobox] Search completed - seq: $seq, received ${persons.length} persons');
+      if (persons.isNotEmpty) {
+        print('[PersonCombobox] First person: ${persons.first.displayName}');
+      }
 
+      print('[PersonCombobox] Checking mounted state - mounted: $mounted');
       if (mounted) {
+        print('[PersonCombobox] Calling setState to update _persons...');
         setState(() {
           _persons = persons;
           if (query.isEmpty) {
@@ -116,14 +177,30 @@ class _PersonComboboxWidgetState extends State<PersonComboboxWidget> {
             _isSearching = false;
           }
         });
-        _setModalState?.call(() {});
+        print('[PersonCombobox] setState completed - _persons count: ${_persons.length}, _isLoading: $_isLoading, _isSearching: $_isSearching');
+        
+        // به‌روزرسانی ValueNotifier
+        print('[PersonCombobox] Updating ValueNotifier...');
+        _pickerStateNotifier.value = _PersonPickerState(
+          persons: persons,
+          isLoading: _isLoading,
+          isSearching: _isSearching,
+          hasSearched: _hasSearched,
+        );
+        print('[PersonCombobox] ValueNotifier updated - pickerStateNotifier.value.persons.length: ${_pickerStateNotifier.value.persons.length}');
+      } else {
+        print('[PersonCombobox] ERROR: Widget is not mounted!');
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
+      print('[PersonCombobox] ERROR in _performSearch: $e');
+      print('[PersonCombobox] Stack trace: $stackTrace');
       // پاسخ کهنه را نادیده بگیر
       if (seq != _searchSeq || query != _latestQuery) {
+        print('[PersonCombobox] Error response is stale, ignoring');
         return;
       }
       if (mounted) {
+        print('[PersonCombobox] Handling error - setting empty list');
         setState(() {
           _persons = [];
           if (query.isEmpty) {
@@ -133,8 +210,16 @@ class _PersonComboboxWidgetState extends State<PersonComboboxWidget> {
             _isSearching = false;
           }
         });
+        // به‌روزرسانی ValueNotifier
+        _pickerStateNotifier.value = _PersonPickerState(
+          persons: [],
+          isLoading: _isLoading,
+          isSearching: _isSearching,
+          hasSearched: _hasSearched,
+        );
         _showErrorSnackBar('خطا در جست‌وجو: $e');
-        _setModalState?.call(() {});
+      } else {
+        print('[PersonCombobox] ERROR: Widget is not mounted when handling error!');
       }
     }
   }
@@ -184,31 +269,33 @@ class _PersonComboboxWidgetState extends State<PersonComboboxWidget> {
   }
 
   void _showPersonPicker() {
+    print('[PersonCombobox] _showPersonPicker called - _persons count: ${_persons.length}');
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setModalState) {
-          _setModalState = setModalState;
-          return _PersonPickerBottomSheet(
-            persons: _persons,
-            selectedPerson: widget.selectedPerson,
-            onPersonSelected: _selectPerson,
-            searchController: _searchController,
-            onSearchChanged: (query) {
-              _onSearchChanged(query);
-              setModalState(() {});
-            },
-            isLoading: _isLoading,
-            isSearching: _isSearching,
-            hasSearched: _hasSearched,
-            label: widget.label,
-            searchHint: widget.searchHint ?? 'جست‌وجو در اشخاص...',
-            personTypes: widget.personTypes,
-            onAddNew: _addNewPerson,
-          );
-        },
-      ),
+      builder: (context) {
+        print('[PersonCombobox] BottomSheet builder called - _persons count: ${_persons.length}, _isLoading: $_isLoading, _isSearching: $_isSearching');
+        return ValueListenableBuilder<_PersonPickerState>(
+          valueListenable: _pickerStateNotifier,
+          builder: (context, pickerState, _) {
+            print('[PersonCombobox] ValueListenableBuilder rebuild - persons count: ${pickerState.persons.length}, isLoading: ${pickerState.isLoading}, isSearching: ${pickerState.isSearching}, hasSearched: ${pickerState.hasSearched}');
+            return _PersonPickerBottomSheet(
+              pickerStateNotifier: _pickerStateNotifier,
+              selectedPerson: widget.selectedPerson,
+              onPersonSelected: _selectPerson,
+              searchController: _searchController,
+              onSearchChanged: (query) {
+                print('[PersonCombobox] onSearchChanged callback called with: "$query"');
+                _onSearchChanged(query);
+              },
+              label: widget.label,
+              searchHint: widget.searchHint ?? 'جست‌وجو در اشخاص...',
+              personTypes: widget.personTypes,
+              onAddNew: _addNewPerson,
+            );
+          },
+        );
+      },
     );
   }
 
@@ -277,28 +364,22 @@ class _PersonComboboxWidgetState extends State<PersonComboboxWidget> {
 }
 
 class _PersonPickerBottomSheet extends StatefulWidget {
-  final List<Person> persons;
+  final ValueNotifier<_PersonPickerState> pickerStateNotifier;
   final Person? selectedPerson;
   final Function(Person?) onPersonSelected;
   final TextEditingController searchController;
   final Function(String) onSearchChanged;
-  final bool isLoading;
-  final bool isSearching;
-  final bool hasSearched;
   final String label;
   final String searchHint;
   final List<String>? personTypes;
   final VoidCallback? onAddNew;
 
   const _PersonPickerBottomSheet({
-    required this.persons,
+    required this.pickerStateNotifier,
     required this.selectedPerson,
     required this.onPersonSelected,
     required this.searchController,
     required this.onSearchChanged,
-    required this.isLoading,
-    required this.isSearching,
-    required this.hasSearched,
     required this.label,
     required this.searchHint,
     this.personTypes,
@@ -312,80 +393,96 @@ class _PersonPickerBottomSheet extends StatefulWidget {
 class _PersonPickerBottomSheetState extends State<_PersonPickerBottomSheet> {
   @override
   Widget build(BuildContext context) {
+    print('[PersonPickerBottomSheet] build called');
     final theme = Theme.of(context);
-
-    return Container(
-      height: MediaQuery.of(context).size.height * 0.7,
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        children: [
-          // هدر
-          Row(
+    
+    return ValueListenableBuilder<_PersonPickerState>(
+      valueListenable: widget.pickerStateNotifier,
+      builder: (context, pickerState, _) {
+        print('[PersonPickerBottomSheet] ValueListenableBuilder rebuild - persons count: ${pickerState.persons.length}, isLoading: ${pickerState.isLoading}, isSearching: ${pickerState.isSearching}');
+        return Container(
+          height: MediaQuery.of(context).size.height * 0.7,
+          padding: const EdgeInsets.all(16),
+          child: Column(
             children: [
-              Text(
-                widget.label,
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
+              // هدر
+              Row(
+                children: [
+                  Text(
+                    widget.label,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const Spacer(),
+                  if (widget.onAddNew != null)
+                    IconButton(
+                      onPressed: widget.onAddNew,
+                      icon: const Icon(Icons.add),
+                      tooltip: 'افزودن شخص جدید',
+                      color: theme.colorScheme.primary,
+                    ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close),
+                  ),
+                ],
               ),
-              const Spacer(),
-              if (widget.onAddNew != null)
-                IconButton(
-                  onPressed: widget.onAddNew,
-                  icon: const Icon(Icons.add),
-                  tooltip: 'افزودن شخص جدید',
-                  color: theme.colorScheme.primary,
+              const SizedBox(height: 16),
+              
+              // فیلد جست‌وجو
+              TextField(
+                controller: widget.searchController,
+                decoration: InputDecoration(
+                  hintText: widget.searchHint,
+                  prefixIcon: const Icon(Icons.search),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  suffixIcon: pickerState.isSearching
+                      ? const Padding(
+                          padding: EdgeInsets.all(12),
+                          child: SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        )
+                      : null,
                 ),
-              IconButton(
-                onPressed: () => Navigator.pop(context),
-                icon: const Icon(Icons.close),
+                onChanged: (value) {
+                  print('[PersonPickerBottomSheet] TextField onChanged called with: "$value"');
+                  print('[PersonPickerBottomSheet] Current persons count: ${pickerState.persons.length}');
+                  print('[PersonPickerBottomSheet] Calling onSearchChanged callback...');
+                  widget.onSearchChanged(value);
+                  print('[PersonPickerBottomSheet] onSearchChanged callback completed');
+                },
+              ),
+              const SizedBox(height: 16),
+              
+              // لیست اشخاص
+              Expanded(
+                child: _buildPersonsList(context, pickerState),
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          
-          // فیلد جست‌وجو
-          TextField(
-            controller: widget.searchController,
-            decoration: InputDecoration(
-              hintText: widget.searchHint,
-              prefixIcon: const Icon(Icons.search),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-              suffixIcon: widget.isSearching
-                  ? const Padding(
-                      padding: EdgeInsets.all(12),
-                      child: SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      ),
-                    )
-                  : null,
-            ),
-            onChanged: widget.onSearchChanged,
-          ),
-          const SizedBox(height: 16),
-          
-          // لیست اشخاص
-          Expanded(
-            child: _buildPersonsList(),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
-  Widget _buildPersonsList() {
+  Widget _buildPersonsList(BuildContext context, _PersonPickerState pickerState) {
+    print('[PersonPickerBottomSheet] _buildPersonsList called - persons count: ${pickerState.persons.length}, isLoading: ${pickerState.isLoading}, hasSearched: ${pickerState.hasSearched}');
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    if (widget.isLoading) {
+    if (pickerState.isLoading) {
+      print('[PersonPickerBottomSheet] Showing loading indicator');
       return const Center(child: CircularProgressIndicator());
     }
 
-    if (widget.persons.isEmpty) {
+    if (pickerState.persons.isEmpty) {
+      print('[PersonPickerBottomSheet] Showing empty state - hasSearched: ${pickerState.hasSearched}');
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -397,7 +494,7 @@ class _PersonPickerBottomSheetState extends State<_PersonPickerBottomSheet> {
             ),
             const SizedBox(height: 16),
             Text(
-              widget.hasSearched 
+              pickerState.hasSearched 
                   ? 'شخصی با این مشخصات یافت نشد'
                   : 'هیچ شخصی ثبت نشده است',
               style: theme.textTheme.bodyLarge?.copyWith(
@@ -418,10 +515,11 @@ class _PersonPickerBottomSheetState extends State<_PersonPickerBottomSheet> {
       );
     }
 
+    print('[PersonPickerBottomSheet] Building ListView with ${pickerState.persons.length} items');
     return ListView.builder(
-      itemCount: widget.persons.length,
+      itemCount: pickerState.persons.length,
       itemBuilder: (context, index) {
-        final person = widget.persons[index];
+        final person = pickerState.persons[index];
         final isSelected = widget.selectedPerson?.id == person.id;
         
         return ListTile(

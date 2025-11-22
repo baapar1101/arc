@@ -7,7 +7,7 @@ from sqlalchemy import and_
 
 from adapters.db.session import get_db
 from app.core.auth_dependency import get_current_user, AuthContext
-from app.core.permissions import require_business_access
+from app.core.permissions import require_business_access, require_business_permission_dep, require_business_permission_by_entity_dep
 from app.core.responses import success_response, ApiError, format_datetime_fields
 from adapters.api.v1.schemas import QueryInfo
 from adapters.api.v1.schema_models.product import (
@@ -31,6 +31,7 @@ from app.services.bulk_price_update_service import (
     apply_bulk_price_update,
 )
 from adapters.db.models.business import Business
+from adapters.db.models.product import Product
 from app.core.i18n import negotiate_locale
 from fastapi import UploadFile, File, Form, HTTPException
 import os
@@ -48,9 +49,8 @@ async def create_product_endpoint(
     file: UploadFile = File(None),
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("products", "add")),
 ) -> Dict[str, Any]:
-    if not ctx.has_business_permission("products", "add"):
-        raise ApiError("FORBIDDEN", "Missing business permission: products.add", http_status=403)
     
     # بررسی اینکه آیا multipart/form-data است یا JSON
     content_type = request.headers.get("content-type", "")
@@ -220,9 +220,8 @@ def search_products_endpoint(
     query_info: QueryInfo,
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("products", "view")),
 ) -> Dict[str, Any]:
-    if not ctx.can_read_section("products"):
-        raise ApiError("FORBIDDEN", "Missing business permission: products.view", http_status=403)
     result = list_products(db, business_id, {
         "take": query_info.take,
         "skip": query_info.skip,
@@ -244,9 +243,8 @@ def get_product_endpoint(
     product_id: int,
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_by_entity_dep("products", "view", Product, "product_id")),
 ) -> Dict[str, Any]:
-    if not ctx.can_read_section("products"):
-        raise ApiError("FORBIDDEN", "Missing business permission: products.view", http_status=403)
     item = get_product(db, product_id, business_id)
     if not item:
         raise ApiError("NOT_FOUND", "Product not found", http_status=404)
@@ -262,9 +260,8 @@ async def update_product_endpoint(
     file: UploadFile | None = File(None),
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_by_entity_dep("products", "edit", Product, "product_id")),
 ) -> Dict[str, Any]:
-    if not ctx.has_business_permission("products", "edit"):
-        raise ApiError("FORBIDDEN", "Missing business permission: products.edit", http_status=403)
     
     # بررسی وجود محصول
     from adapters.db.models.product import Product
@@ -460,9 +457,8 @@ def delete_product_endpoint(
     product_id: int,
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_by_entity_dep("products", "delete", Product, "product_id")),
 ) -> Dict[str, Any]:
-    if not ctx.has_business_permission("products", "delete"):
-        raise ApiError("FORBIDDEN", "Missing business permission: products.delete", http_status=403)
     ok = delete_product(db, product_id, business_id)
     return success_response({"deleted": ok}, request)
 
@@ -478,9 +474,8 @@ def bulk_delete_products_endpoint(
     body: Dict[str, Any],
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("products", "delete")),
 ) -> Dict[str, Any]:
-    if not ctx.has_business_permission("products", "delete"):
-        raise ApiError("FORBIDDEN", "Missing business permission: products.delete", http_status=403)
 
     from sqlalchemy import and_ as _and
     from adapters.db.models.product import Product
@@ -536,6 +531,7 @@ async def export_products_excel(
     body: dict,
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("products", "export")),
 ):
     import io
     import re
@@ -543,9 +539,6 @@ async def export_products_excel(
     from fastapi.responses import Response
     from openpyxl import Workbook
     from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-
-    if not ctx.can_read_section("products"):
-        raise ApiError("FORBIDDEN", "Missing business permission: products.view", http_status=403)
 
     query_dict = {
         "take": int(body.get("take", 1000)),
@@ -688,15 +681,13 @@ async def download_products_import_template(
     business_id: int,
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("products", "edit")),
 ):
     import io
     import datetime
     from fastapi.responses import Response
     from openpyxl import Workbook
     from openpyxl.styles import Font, Alignment
-
-    if not ctx.has_business_permission("products", "edit"):
-        raise ApiError("FORBIDDEN", "Missing business permission: products.edit", http_status=403)
 
     wb = Workbook()
     ws = wb.active
@@ -767,6 +758,7 @@ async def import_products_excel(
     conflict_policy: str = Form(default="upsert"),
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("products", "edit")),
 ):
     import io
     import json
@@ -776,9 +768,6 @@ async def import_products_excel(
     from decimal import Decimal
     from typing import Optional
     from openpyxl import load_workbook
-
-    if not ctx.has_business_permission("products", "edit"):
-        raise ApiError("FORBIDDEN", "Missing business permission: products.edit", http_status=403)
 
     logger = logging.getLogger(__name__)
 
@@ -968,6 +957,7 @@ async def export_products_pdf(
     body: dict,
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("products", "export")),
 ):
     import json
     import datetime
@@ -975,9 +965,6 @@ async def export_products_pdf(
     from fastapi.responses import Response
     from weasyprint import HTML, CSS
     from weasyprint.text.fonts import FontConfiguration
-
-    if not ctx.can_read_section("products"):
-        raise ApiError("FORBIDDEN", "Missing business permission: products.view", http_status=403)
 
     query_dict = {
         "take": int(body.get("take", 100)),
@@ -1241,9 +1228,8 @@ def preview_bulk_price_update_endpoint(
     payload: BulkPriceUpdateRequest,
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("products", "edit")),
 ) -> Dict[str, Any]:
-    if not ctx.has_business_permission("products", "edit"):
-        raise ApiError("FORBIDDEN", "Missing business permission: products.edit", http_status=403)
     
     result = preview_bulk_price_update(db, business_id, payload)
     return success_response(data=result.dict(), request=request)
@@ -1260,9 +1246,8 @@ def apply_bulk_price_update_endpoint(
     payload: BulkPriceUpdateRequest,
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("products", "edit")),
 ) -> Dict[str, Any]:
-    if not ctx.has_business_permission("products", "edit"):
-        raise ApiError("FORBIDDEN", "Missing business permission: products.edit", http_status=403)
     
     result = apply_bulk_price_update(db, business_id, payload)
     return success_response(data=result, request=request)
@@ -1279,11 +1264,9 @@ async def item_movements_report_endpoint(
     body: Dict[str, Any] = Body(default={}),
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("reports", "view")),
 ) -> Dict[str, Any]:
     """گزارش گردش کالا"""
-    # بررسی دسترسی
-    if not ctx.can_read_section("reports"):
-        raise ApiError("FORBIDDEN", "Missing business permission: reports.read", http_status=403)
     
     # دریافت سال مالی از header یا body
     fiscal_year_id = None
@@ -1392,6 +1375,7 @@ async def export_item_movements_report_excel(
     body: Dict[str, Any] = Body(default={}),
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("reports", "export")),
 ):
     """خروجی Excel گزارش گردش کالا"""
     from fastapi.responses import Response
@@ -1400,10 +1384,6 @@ async def export_item_movements_report_excel(
     import io
     import datetime
     import re
-    
-    # بررسی دسترسی
-    if not ctx.can_read_section("reports"):
-        raise ApiError("FORBIDDEN", "Missing business permission: reports.read", http_status=403)
     
     # دریافت سال مالی از header یا body
     fiscal_year_id = None
@@ -1619,11 +1599,9 @@ async def sales_by_product_report_endpoint(
     body: Dict[str, Any] = Body(default={}),
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("reports", "view")),
 ) -> Dict[str, Any]:
     """گزارش فروش به تفکیک کالا"""
-    # بررسی دسترسی
-    if not ctx.can_read_section("reports"):
-        raise ApiError("FORBIDDEN", "Missing business permission: reports.read", http_status=403)
     
     # دریافت سال مالی از header یا body
     fiscal_year_id = None
@@ -1732,12 +1710,9 @@ async def inventory_kardex_report_endpoint(
     body: Dict[str, Any] = Body(default={}),
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("reports", "view")),
 ) -> Dict[str, Any]:
     """گزارش کاردکس موجودی"""
-    # بررسی دسترسی
-    if not ctx.can_read_section("reports"):
-        raise ApiError("FORBIDDEN", "Missing business permission: reports.read", http_status=403)
-    
     # دریافت سال مالی از header یا body
     fiscal_year_id = None
     fy_header = request.headers.get('X-Fiscal-Year-ID')
@@ -1835,6 +1810,7 @@ async def export_inventory_kardex_report_excel(
     body: Dict[str, Any] = Body(default={}),
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("reports", "export")),
 ):
     """خروجی Excel گزارش کاردکس موجودی"""
     from fastapi.responses import Response
@@ -1843,10 +1819,6 @@ async def export_inventory_kardex_report_excel(
     import io
     import datetime
     import re
-    
-    # بررسی دسترسی
-    if not ctx.can_read_section("reports"):
-        raise ApiError("FORBIDDEN", "Missing business permission: reports.read", http_status=403)
     
     # دریافت سال مالی از header یا body
     fiscal_year_id = None
@@ -2067,6 +2039,7 @@ async def export_sales_by_product_report_excel(
     body: Dict[str, Any] = Body(default={}),
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("reports", "export")),
 ):
     """خروجی Excel گزارش فروش به تفکیک کالا"""
     from fastapi.responses import Response
@@ -2075,10 +2048,6 @@ async def export_sales_by_product_report_excel(
     import io
     import datetime
     import re
-    
-    # بررسی دسترسی
-    if not ctx.can_read_section("reports"):
-        raise ApiError("FORBIDDEN", "Missing business permission: reports.read", http_status=403)
     
     # دریافت سال مالی از header یا body
     fiscal_year_id = None
