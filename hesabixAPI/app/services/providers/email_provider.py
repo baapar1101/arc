@@ -14,7 +14,7 @@ class EmailProvider:
 		self.user_repo = UserRepository(db)
 
 	def send(self, *, user_id: int, subject: str, body_text: str, body_html: Optional[str] = None) -> bool:
-		user = self.user_repo.db.get(self.user_repo.model, user_id)
+		user = self.user_repo.db.get(self.user_repo.model_class, user_id)
 		if user is None or not getattr(user, "email", None):
 			return False
 		return self.email_service.send_email(

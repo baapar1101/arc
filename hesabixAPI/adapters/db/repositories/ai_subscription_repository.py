@@ -56,16 +56,14 @@ class AISubscriptionRepository(BaseRepository[UserAISubscription]):
     
     def get_subscriptions_needing_reset(self) -> List[UserAISubscription]:
         """دریافت اشتراک‌هایی که باید reset شوند (ماهانه)"""
-        # اشتراک‌هایی که last_reset_at ندارند یا بیش از 30 روز گذشته reset شده‌اند
+        # اشتراک‌هایی که period_start بیش از 30 روز گذشته است
+        # برای reset ماهانه، از period_start استفاده می‌کنیم
         cutoff_date = datetime.utcnow() - timedelta(days=30)
         
         query = self.db.query(self.model_class).filter(
             and_(
                 self.model_class.is_active == True,  # noqa: E712
-                (
-                    (self.model_class.last_reset_at == None) |  # noqa: E711
-                    (self.model_class.last_reset_at < cutoff_date)
-                )
+                self.model_class.period_start < cutoff_date
             )
         )
         
@@ -80,9 +78,9 @@ class AISubscriptionRepository(BaseRepository[UserAISubscription]):
         query = self.db.query(self.model_class).filter(
             and_(
                 self.model_class.is_active == True,  # noqa: E712
-                self.model_class.expires_at != None,  # noqa: E711
-                self.model_class.expires_at >= now,
-                self.model_class.expires_at <= future_date
+                self.model_class.period_end != None,  # noqa: E711
+                self.model_class.period_end >= now,
+                self.model_class.period_end <= future_date
             )
         )
         
@@ -93,8 +91,8 @@ class AISubscriptionRepository(BaseRepository[UserAISubscription]):
         query = self.db.query(self.model_class).filter(
             and_(
                 self.model_class.is_active == True,  # noqa: E712
-                self.model_class.expires_at != None,  # noqa: E711
-                self.model_class.expires_at < datetime.utcnow()
+                self.model_class.period_end != None,  # noqa: E711
+                self.model_class.period_end < datetime.utcnow()
             )
         )
         

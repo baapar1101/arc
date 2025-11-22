@@ -17,7 +17,7 @@ from adapters.api.v1.schema_models.person import (
 from adapters.api.v1.schemas import QueryInfo, SuccessResponse
 from app.core.responses import success_response, format_datetime_fields, ApiError
 from app.core.auth_dependency import get_current_user, AuthContext
-from app.core.permissions import require_business_management_dep, require_business_access, require_business_permission_dep, require_business_permission_by_entity_dep
+from app.core.permissions import require_business_management_dep, require_business_access, require_business_permission_dep, require_business_permission_by_entity_dep, require_business_access_dep
 from app.core.i18n import negotiate_locale
 from app.services.person_service import (
     create_person,
@@ -161,7 +161,11 @@ async def create_person_endpoint(
     person_data: PersonCreateRequest,
     db: Session = Depends(get_db),
     auth_context: AuthContext = Depends(get_current_user),
+<<<<<<< Updated upstream
     _: None = Depends(require_business_permission_dep("people", "add")),
+=======
+    _: None = Depends(require_business_access_dep),
+>>>>>>> Stashed changes
 ):
     """ایجاد شخص جدید برای کسب و کار"""
     result = create_person(db, business_id, person_data)

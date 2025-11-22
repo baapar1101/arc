@@ -53,7 +53,7 @@ def link_status(
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
 ) -> Dict[str, Any]:
-	user = UserRepository(db).db.get(UserRepository(db).model, ctx.get_user_id())
+	user = UserRepository(db).db.get(UserRepository(db).model_class, ctx.get_user_id())
 	linked = bool(getattr(user, "telegram_chat_id", None))
 	data: Dict[str, Any] = {
 		"linked": linked,
@@ -71,7 +71,7 @@ def unlink(
 	ctx: AuthContext = Depends(get_current_user),
 ) -> Dict[str, Any]:
 	repo = UserRepository(db)
-	user = repo.db.get(repo.model, ctx.get_user_id())
+	user = repo.db.get(repo.model_class, ctx.get_user_id())
 	if user is None:
 		raise HTTPException(status_code=404, detail="User not found")
 	user.telegram_chat_id = None  # type: ignore[attr-defined]
@@ -111,7 +111,7 @@ def telegram_webhook(
 			return {"ok": False}
 		# Link user to chat
 		u_repo = UserRepository(db)
-		user = u_repo.db.get(u_repo.model, t_obj.user_id)
+		user = u_repo.db.get(u_repo.model_class, t_obj.user_id)
 		if user is None:
 			return {"ok": False}
 		user.telegram_chat_id = int(chat_id) if chat_id else None  # type: ignore[attr-defined]

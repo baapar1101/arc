@@ -9,7 +9,7 @@ from adapters.api.v1.schemas import (
     BusinessUsersListResponse, AddUserRequest, AddUserResponse,
     UpdatePermissionsRequest, UpdatePermissionsResponse, RemoveUserResponse
 )
-from app.core.responses import success_response, format_datetime_fields
+from app.core.responses import success_response, format_datetime_fields, ApiError
 from app.core.auth_dependency import get_current_user, AuthContext
 from app.core.permissions import require_business_access
 from adapters.db.repositories.business_permission_repo import BusinessPermissionRepository
@@ -387,7 +387,7 @@ def add_user(
     business = db.get(Business, business_id)
     if not business:
         logger.error(f"Business {business_id} not found")
-        raise HTTPException(status_code=404, detail="کسب و کار یافت نشد")
+        raise ApiError("BUSINESS_NOT_FOUND", "کسب و کار یافت نشد", http_status=404)
     
     is_owner = business.owner_id == current_user_id
     can_manage = ctx.can_manage_business_users(business_id)
@@ -398,7 +398,7 @@ def add_user(
     
     if not is_owner and not can_manage:
         logger.warning(f"User {current_user_id} does not have permission to add users to business {business_id}")
-        raise HTTPException(status_code=403, detail="شما مجوز مدیریت کاربران ندارید")
+        raise ApiError("FORBIDDEN", "شما مجوز مدیریت کاربران ندارید", http_status=403)
     
     # Find user by email or phone
     logger.info(f"Searching for user with email/phone: {add_request.email_or_phone}")
@@ -427,7 +427,7 @@ def add_user(
     
     if not user:
         logger.warning(f"User not found with email/phone: {add_request.email_or_phone}")
-        raise HTTPException(status_code=404, detail="کاربر یافت نشد")
+        raise ApiError("USER_NOT_FOUND", "کاربر یافت نشد. لطفاً ابتدا کاربر را در سیستم ثبت‌نام کنید.", http_status=404)
     
     logger.info(f"Found user: {user.id} - {user.email}")
     
@@ -437,7 +437,7 @@ def add_user(
     
     if existing_permission:
         logger.warning(f"User {user.id} already exists in business {business_id}")
-        raise HTTPException(status_code=400, detail="کاربر قبلاً به این کسب و کار اضافه شده است")
+        raise ApiError("USER_ALREADY_ADDED", "کاربر قبلاً به این کسب و کار اضافه شده است", http_status=400)
     
     # Add user to business with default permissions
     logger.info(f"Adding user {user.id} to business {business_id}")

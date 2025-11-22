@@ -40,13 +40,14 @@ async def ai_quota_reset_loop(interval_hours: int = 24) -> None:
                         # Reset کردن tokens_used فقط برای پلن‌های ماهانه
                         if subscription.plan.plan_type in [AIPlanType.FREE, AIPlanType.SUBSCRIPTION]:
                             subscription.tokens_used = 0
-                            subscription.last_reset_at = datetime.utcnow()
+                            # به‌روزرسانی period_start برای reset ماهانه
+                            subscription.period_start = datetime.utcnow()
                             reset_count += 1
                         
                         # اگر subscription plan است، بررسی تمدید
                         if subscription.plan.plan_type == AIPlanType.SUBSCRIPTION:
                             # بررسی تاریخ انقضا
-                            if subscription.expires_at and subscription.expires_at < datetime.utcnow():
+                            if subscription.period_end and subscription.period_end < datetime.utcnow():
                                 # اشتراک منقضی شده - غیرفعال کردن
                                 subscription.is_active = False
                                 logger.info(
@@ -158,7 +159,7 @@ async def ai_subscription_check_loop(interval_hours: int = 6) -> None:
                             # فعلاً فقط log می‌کنیم
                             logger.info(
                                 f"Subscription {subscription.id} expiring soon "
-                                f"(expires at {subscription.expires_at})"
+                                f"(expires at {subscription.period_end})"
                             )
                         else:
                             # ارسال اعلان به کاربر
