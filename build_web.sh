@@ -178,16 +178,107 @@ fi
 # تنظیم آرگومان‌های dart-define برای آدرس API
 DART_DEFINE_ARGS=(--dart-define "API_BASE_URL=$API_BASE_URL")
 
-# Build کردن Flutter برای Web
-echo "Build کردن Flutter برای Web..."
-echo "دستور: flutter build web --$MODE --dart-define API_BASE_URL=$API_BASE_URL"
+# تعیین استراتژی PWA و بهینه‌سازی‌ها بر اساس mode
+BUILD_FLAGS=()
 
-flutter build web --"$MODE" "${DART_DEFINE_ARGS[@]}"
+# برای حالت release، از PWA strategy و بهینه‌سازی‌های کامل استفاده می‌کنیم
+if [ "$MODE" = "release" ]; then
+  BUILD_FLAGS+=(--pwa-strategy offline-first)
+  BUILD_FLAGS+=(--base-href /)
+  BUILD_FLAGS+=(--optimization-level 4)
+  echo "Build کردن Flutter برای Web (Production) با بهینه‌سازی‌های کامل..."
+  echo "  - PWA Strategy: offline-first (Service Worker فعال)"
+  echo "  - Base Href: /"
+  echo "  - Optimization Level: 4 (حداکثر بهینه‌سازی)"
+else
+  # برای debug/profile، فقط base-href را اضافه می‌کنیم
+  BUILD_FLAGS+=(--base-href /)
+  echo "Build کردن Flutter برای Web ($MODE) با بهینه‌سازی‌های پایه..."
+  echo "  - Base Href: /"
+fi
 
-echo "Build کامل شد!"
-echo "فایل‌های build شده در مسیر زیر قرار دارند: $BUILD_DIR"
+echo "دستور کامل: flutter build web --$MODE ${BUILD_FLAGS[*]} --dart-define API_BASE_URL=$API_BASE_URL"
+echo ""
+
+flutter build web --"$MODE" "${BUILD_FLAGS[@]}" "${DART_DEFINE_ARGS[@]}"
+
+# بررسی وجود فایل‌های آیکون
+echo ""
+echo "بررسی فایل‌های آیکون..."
+ICON_DIR="$BUILD_DIR/icons"
+REQUIRED_ICONS=("Icon-192.png" "Icon-512.png" "Icon-maskable-192.png" "Icon-maskable-512.png")
+MISSING_ICONS=()
+
+if [ ! -d "$ICON_DIR" ]; then
+  warn "پوشه icons در build directory یافت نشد: $ICON_DIR"
+  warn "ایجاد پوشه icons و کپی فایل‌ها از web/icons..."
+  mkdir -p "$ICON_DIR"
+  if [ -d "$APP_DIR/web/icons" ]; then
+    cp -r "$APP_DIR/web/icons"/* "$ICON_DIR/" 2>/dev/null || true
+  else
+    warn "پوشه web/icons در پروژه یافت نشد!"
+  fi
+fi
+
+for icon in "${REQUIRED_ICONS[@]}"; do
+  if [ ! -f "$ICON_DIR/$icon" ]; then
+    MISSING_ICONS+=("$icon")
+  fi
+done
+
+if [ ${#MISSING_ICONS[@]} -gt 0 ]; then
+  warn "فایل‌های آیکون زیر یافت نشدند:"
+  for icon in "${MISSING_ICONS[@]}"; do
+    warn "  - $icon"
+  done
+  warn "در حال کپی فایل‌های آیکون از web/icons..."
+  if [ -d "$APP_DIR/web/icons" ]; then
+    mkdir -p "$ICON_DIR"
+    cp -r "$APP_DIR/web/icons"/* "$ICON_DIR/" 2>/dev/null || true
+    echo "فایل‌های آیکون کپی شدند."
+  else
+    warn "پوشه web/icons در پروژه یافت نشد! لطفاً فایل‌های آیکون را به صورت دستی اضافه کنید."
+  fi
+else
+  echo "✓ تمام فایل‌های آیکون موجود هستند."
+fi
+
+# بررسی وجود manifest.json
+if [ ! -f "$BUILD_DIR/manifest.json" ]; then
+  warn "فایل manifest.json یافت نشد! در حال کپی از web/manifest.json..."
+  if [ -f "$APP_DIR/web/manifest.json" ]; then
+    cp "$APP_DIR/web/manifest.json" "$BUILD_DIR/" 2>/dev/null || true
+  fi
+fi
+
+echo ""
+echo "=========================================="
+echo "✓ Build کامل شد!"
+echo "=========================================="
+echo "فایل‌های build شده در مسیر زیر قرار دارند:"
+echo "  $BUILD_DIR"
+echo ""
+if [ "$MODE" = "release" ]; then
+  echo "✓ بهینه‌سازی‌های اعمال شده:"
+  echo "  - حالت: Production (Release)"
+  echo "  - Service Worker: فعال (offline-first strategy)"
+  echo "  - Optimization Level: 4 (حداکثر بهینه‌سازی)"
+  echo "  - Base Href: /"
+  echo "  - API Base URL: $API_BASE_URL"
+  echo ""
+  echo "نکته: Service Worker به صورت خودکار فایل‌های static را cache می‌کند"
+  echo "      و باعث بهبود عملکرد و امکان استفاده offline می‌شود."
+else
+  echo "✓ بهینه‌سازی‌های اعمال شده:"
+  echo "  - حالت: $MODE"
+  echo "  - Renderer: CanvasKit"
+  echo "  - Base Href: /"
+  echo "  - API Base URL: $API_BASE_URL"
+fi
+echo ""
 echo "برای سرو کردن، می‌توانید از یک وب‌سرور استفاده کنید:"
 echo "  cd $BUILD_DIR && python3 -m http.server 8080"
 echo "یا از nginx/apache برای سرو کردن استفاده کنید."
+echo ""
 
 

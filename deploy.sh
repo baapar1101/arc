@@ -416,8 +416,8 @@ install_flutter_and_build_frontend() {
     exit 1
   fi
   
-  echo "Building frontend..."
-  if ! "${flutter_bin}" build web --release; then
+  echo "Building frontend with optimizations..."
+  if ! "${flutter_bin}" build web --release --web-renderer canvaskit --base-href /; then
     echo "$CROSS_MARK Error building frontend"
     exit 1
   fi
