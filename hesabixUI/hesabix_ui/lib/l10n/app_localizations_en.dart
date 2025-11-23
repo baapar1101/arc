@@ -2555,6 +2555,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get personTypeSeller => 'Seller';
 
   @override
+  String get personTypeShareholder => 'Shareholder';
+
+  @override
   String get personCreatedSuccessfully => 'Person created successfully';
 
   @override
@@ -3405,6 +3408,23 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String deleteInvoiceErrorWithMessage(String error) {
     return 'Failed to delete invoice: $error';
+  }
+
+  @override
+  String get deleteInvoiceTaxWorkspaceError =>
+      'This invoice is in the tax workspace and cannot be deleted';
+
+  @override
+  String get deleteInvoiceReceiptPaymentsWarning =>
+      'Related receipt/payment documents:';
+
+  @override
+  String get deleteInvoiceWarehouseWarning =>
+      'Related finalized warehouse documents:';
+
+  @override
+  String deleteInvoiceInstallmentsWarning(String count) {
+    return 'This invoice has $count installments that will be deleted';
   }
 
   @override

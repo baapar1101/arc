@@ -101,7 +101,6 @@ def _to_dict(obj: ProductAttribute) -> Dict[str, Any]:
         "business_id": obj.business_id,
         "title": obj.title,
         "description": obj.description,
-        "is_active": obj.is_active,
         "created_at": obj.created_at,
         "updated_at": obj.updated_at,
     }

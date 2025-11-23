@@ -231,6 +231,7 @@ app/services/file_storage_service.py
 app/services/general_ledger_service.py
 app/services/invoice_service.py
 app/services/job_manager.py
+app/services/journal_ledger_service.py
 app/services/kardex_service.py
 app/services/marketplace_service.py
 app/services/notification_processor.py
@@ -308,6 +309,7 @@ migrations/versions/20250120_000001_add_warehouse_contact_fields.py
 migrations/versions/20250120_000002_add_join_permission.py
 migrations/versions/20250121_000001_add_ai_expense_account.py
 migrations/versions/20250122_000001_add_last_reset_at_and_expires_at_to_ai_subscriptions.py
+migrations/versions/20250123_000001_add_description_to_categories.py
 migrations/versions/20250126_000001_add_gift_credit_account.py
 migrations/versions/20250915_000001_init_auth_tables.py
 migrations/versions/20250916_000002_add_referral_fields.py

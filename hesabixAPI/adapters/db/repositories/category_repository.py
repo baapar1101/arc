@@ -26,6 +26,8 @@ class CategoryRepository(BaseRepository[BusinessCategory]):
                 "title": (r.title_translations or {}).get("fa")
                          or (r.title_translations or {}).get("en")
                          or "",
+                "description": r.description,
+                "sort_order": r.sort_order,
             }
             for r in rows
         ]
@@ -40,6 +42,8 @@ class CategoryRepository(BaseRepository[BusinessCategory]):
                 "parent_id": n.get("parent_id"),
                 "title": n.get("title", ""),
                 "translations": n.get("translations", {}),
+                "description": n.get("description"),
+                "sort_order": n.get("sort_order", 0),
                 "children": [],
             }
             by_id[item["id"]] = item
@@ -49,28 +53,69 @@ class CategoryRepository(BaseRepository[BusinessCategory]):
                 by_id[pid]["children"].append(item)
             else:
                 roots.append(item)
+        
+        # مرتب‌سازی children بر اساس sort_order
+        def sort_children(node: Dict[str, Any]) -> None:
+            children = node.get("children", [])
+            if children:
+                children.sort(key=lambda x: (x.get("sort_order", 0), x.get("id", 0)))
+                for child in children:
+                    sort_children(child)
+        
+        for root in roots:
+            sort_children(root)
+        
+        # مرتب‌سازی roots بر اساس sort_order
+        roots.sort(key=lambda x: (x.get("sort_order", 0), x.get("id", 0)))
+        
         return roots
 
-    def create_category(self, *, business_id: int, parent_id: int | None, translations: dict[str, str]) -> BusinessCategory:
+    def create_category(self, *, business_id: int, parent_id: int | None, translations: dict[str, str], description: str | None = None) -> BusinessCategory:
         obj = BusinessCategory(
             business_id=business_id,
             parent_id=parent_id,
             title_translations=translations or {},
+            description=description,
         )
         self.db.add(obj)
         self.db.commit()
         self.db.refresh(obj)
         return obj
 
-    def update_category(self, *, category_id: int, translations: dict[str, str] | None = None) -> BusinessCategory | None:
+    def update_category(self, *, category_id: int, translations: dict[str, str] | None = None, description: str | None = None, sort_order: int | None = None, parent_id: int | None = None) -> BusinessCategory | None:
         obj = self.db.get(BusinessCategory, category_id)
         if not obj:
             return None
         if translations:
             obj.title_translations = {**(obj.title_translations or {}), **translations}
+        if description is not None:
+            obj.description = description
+        if sort_order is not None:
+            obj.sort_order = sort_order
+        if parent_id is not None:
+            # بررسی اینکه parent_id خودش نباشد (جلوگیری از حلقه)
+            if parent_id == category_id:
+                raise ValueError("Category cannot be its own parent")
+            # بررسی اینکه parent_id فرزند این category نباشد (جلوگیری از حلقه)
+            if parent_id and self._is_descendant(category_id, parent_id):
+                raise ValueError("Cannot set parent to a descendant category")
+            obj.parent_id = parent_id
         self.db.commit()
         self.db.refresh(obj)
         return obj
+    
+    def _is_descendant(self, ancestor_id: int, descendant_id: int) -> bool:
+        """بررسی اینکه آیا descendant_id فرزند ancestor_id است یا نه"""
+        def check_children(parent_id: int) -> bool:
+            stmt = select(BusinessCategory).where(BusinessCategory.parent_id == parent_id)
+            children = list(self.db.execute(stmt).scalars().all())
+            for child in children:
+                if child.id == descendant_id:
+                    return True
+                if check_children(child.id):
+                    return True
+            return False
+        return check_children(ancestor_id)
 
     def move_category(self, *, category_id: int, new_parent_id: int | None) -> BusinessCategory | None:
         obj = self.db.get(BusinessCategory, category_id)
@@ -126,6 +171,7 @@ class CategoryRepository(BaseRepository[BusinessCategory]):
                     "parent_id": current.parent_id,
                     "title": title,
                     "translations": current.title_translations or {},
+                    "description": current.description,
                 })
                 pid = current.parent_id
                 current = by_id.get(pid) if pid else None
@@ -138,6 +184,7 @@ class CategoryRepository(BaseRepository[BusinessCategory]):
                 "parent_id": r.parent_id,
                 "title": get_title(r),
                 "translations": r.title_translations or {},
+                "description": r.description,
                 "path": build_path(r),
             })
         return result

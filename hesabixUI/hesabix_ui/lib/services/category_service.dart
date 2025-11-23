@@ -55,18 +55,23 @@ class CategoryService {
     int? parentId,
     required String type, // 'product' | 'service'
     required String label,
+    String? description,
   }) async {
     try {
+      final data = <String, dynamic>{
+        'parent_id': parentId,
+        'type': type,
+        'label': label,
+      };
+      if (description != null) {
+        data['description'] = description;
+      }
       final res = await _apiClient.post<Map<String, dynamic>>(
         '/api/v1/categories/business/$businessId',
-        data: {
-          'parent_id': parentId,
-          'type': type,
-          'label': label,
-        },
+        data: data,
       );
-      final data = res.data?['data'];
-      final item = (data is Map<String, dynamic>) ? data['item'] : null;
+      final responseData = res.data?['data'];
+      final item = (responseData is Map<String, dynamic>) ? responseData['item'] : null;
       return Map<String, dynamic>.from(item ?? const {});
     } on DioException catch (e) {
       throw Exception(e.message);
@@ -78,12 +83,30 @@ class CategoryService {
     required int categoryId,
     String? type, // optional
     String? label,
+    String? description,
+    int? sortOrder,
+    int? parentId,
   }) async {
     try {
       final body = <String, dynamic>{};
       body['category_id'] = categoryId;
       if (type != null) body['type'] = type;
       if (label != null) body['label'] = label;
+      if (description != null) {
+        body['description'] = description;
+      } else if (description == null && label != null) {
+        // اگر description null است و label هم ارسال شده، description را null بفرست
+        body['description'] = null;
+      }
+      if (sortOrder != null) {
+        body['sort_order'] = sortOrder;
+      }
+      if (parentId != null) {
+        body['parent_id'] = parentId;
+      } else if (parentId == null && label != null) {
+        // اگر parent_id null است و label هم ارسال شده، parent_id را null بفرست (برای تغییر به ریشه)
+        // اما فقط اگر صریحاً null ارسال شده باشد
+      }
       final res = await _apiClient.post<Map<String, dynamic>>(
         '/api/v1/categories/business/$businessId/update',
         data: body,

@@ -79,6 +79,13 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
                 _buildSettingItem(
                   context,
+                  title: 'شماره‌گذاری اسناد',
+                  subtitle: 'تنظیم نحوه شماره‌گذاری انواع اسناد',
+                  icon: Icons.numbers,
+                  onTap: () => context.go('/business/${widget.businessId}/settings/document-numbering'),
+                ),
+                _buildSettingItem(
+                  context,
                   title: t.printDocuments,
                   subtitle: t.printDocumentsDescription,
                   icon: Icons.print,

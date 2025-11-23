@@ -35,6 +35,8 @@ def get_categories_tree(
                 "parent_id": n.get("parent_id"),
                 "label": n.get("title", ""),
                 "translations": n.get("translations", {}),
+                "description": n.get("description"),
+                "sort_order": n.get("sort_order", 0),
                 "children": _map_label(children) if isinstance(children, list) else [],
             })
         return mapped
@@ -54,10 +56,13 @@ def create_category(
 ) -> Dict[str, Any]:
     parent_id = body.get("parent_id")
     label: str = (body.get("label") or "").strip()
+    description: str | None = body.get("description")
+    if description:
+        description = description.strip() if isinstance(description, str) else None
     # ساخت ترجمه‌ها از روی برچسب واحد
     translations: Dict[str, str] = {"fa": label, "en": label} if label else {}
     repo = CategoryRepository(db)
-    obj = repo.create_category(business_id=business_id, parent_id=parent_id, translations=translations)
+    obj = repo.create_category(business_id=business_id, parent_id=parent_id, translations=translations, description=description)
     item = {
         "id": obj.id,
         "parent_id": obj.parent_id,
@@ -65,6 +70,7 @@ def create_category(
                  or (obj.title_translations or {}).get("fa")
                  or (obj.title_translations or {}).get("en"),
         "translations": obj.title_translations,
+        "description": obj.description,
     }
     return success_response({"item": item}, request)
 
@@ -81,9 +87,45 @@ def update_category(
 ) -> Dict[str, Any]:
     category_id = body.get("category_id")
     label = body.get("label")
+    description = body.get("description")
+    sort_order = body.get("sort_order")
+    parent_id = body.get("parent_id")
+    
+    if description is not None:
+        description = description.strip() if isinstance(description, str) else None
+    
+    # تبدیل sort_order به int
+    sort_order_int = None
+    if sort_order is not None:
+        try:
+            sort_order_int = int(sort_order)
+        except (ValueError, TypeError):
+            sort_order_int = None
+    
+    # تبدیل parent_id به int یا None
+    parent_id_int = None
+    if parent_id is not None:
+        if parent_id == "" or parent_id == "null":
+            parent_id_int = None
+        else:
+            try:
+                parent_id_int = int(parent_id)
+            except (ValueError, TypeError):
+                parent_id_int = None
+    
     translations = {"fa": label, "en": label} if isinstance(label, str) and label.strip() else None
     repo = CategoryRepository(db)
-    obj = repo.update_category(category_id=category_id, translations=translations)
+    try:
+        obj = repo.update_category(
+            category_id=category_id,
+            translations=translations,
+            description=description,
+            sort_order=sort_order_int,
+            parent_id=parent_id_int if parent_id is not None else None,  # فقط اگر ارسال شده باشد
+        )
+    except ValueError as e:
+        raise ApiError("INVALID_REQUEST", str(e), http_status=400)
+    
     if not obj:
         raise ApiError("NOT_FOUND", "Category not found", http_status=404)
     item = {
@@ -93,6 +135,8 @@ def update_category(
                  or (obj.title_translations or {}).get("fa")
                  or (obj.title_translations or {}).get("en"),
         "translations": obj.title_translations,
+        "description": obj.description,
+        "sort_order": obj.sort_order,
     }
     return success_response({"item": item}, request)
 
@@ -120,6 +164,7 @@ def move_category(
                  or (obj.title_translations or {}).get("fa")
                  or (obj.title_translations or {}).get("en"),
         "translations": obj.title_translations,
+        "description": obj.description,
     }
     return success_response({"item": item}, request)
 
@@ -169,6 +214,7 @@ def search_categories(
             "parent_id": it.get("parent_id"),
             "label": it.get("title") or "",
             "translations": it.get("translations") or {},
+            "description": it.get("description"),
             "path": it.get("path") or [],
         }
         for it in items

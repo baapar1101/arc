@@ -13,6 +13,7 @@ import '../../services/cash_register_service.dart';
 import '../../services/petty_cash_service.dart';
 import '../../services/person_service.dart';
 import '../../services/account_service.dart';
+import '../../services/currency_service.dart';
 import 'person_combobox_widget.dart';
 import 'bank_account_combobox_widget.dart';
 import 'cash_register_combobox_widget.dart';
@@ -21,7 +22,7 @@ import 'account_tree_combobox_widget.dart';
 import 'check_combobox_widget.dart';
 import '../../models/invoice_type_model.dart';
 import '../../utils/number_normalizer.dart';
-import '../../utils/snackbar_helper.dart';
+import '../../core/api_client.dart';
 
 class InvoiceTransactionsWidget extends StatefulWidget {
   final List<InvoiceTransaction> transactions;
@@ -32,6 +33,7 @@ class InvoiceTransactionsWidget extends StatefulWidget {
   final int? selectedCurrencyId;
   final CheckPickerMode checkPickerMode;
   final AuthStore? authStore;
+  final num? invoiceTotal; // مبلغ کل فاکتور
 
   const InvoiceTransactionsWidget({
     super.key,
@@ -43,6 +45,7 @@ class InvoiceTransactionsWidget extends StatefulWidget {
     this.selectedCurrencyId,
     this.checkPickerMode = CheckPickerMode.any,
     this.authStore,
+    this.invoiceTotal,
   });
 
   @override
@@ -50,10 +53,100 @@ class InvoiceTransactionsWidget extends StatefulWidget {
 }
 
 class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
+  final CurrencyService _currencyService = CurrencyService(ApiClient());
+  String? _currencySymbol;
+  
+  @override
+  void initState() {
+    super.initState();
+    _loadCurrencyInfo();
+  }
+  
+  @override
+  void didUpdateWidget(InvoiceTransactionsWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.selectedCurrencyId != widget.selectedCurrencyId) {
+      _loadCurrencyInfo();
+    }
+  }
+  
+  Future<void> _loadCurrencyInfo() async {
+    if (widget.selectedCurrencyId == null) {
+      setState(() {
+        _currencySymbol = null;
+      });
+      return;
+    }
+    
+    try {
+      final currencies = await _currencyService.listBusinessCurrencies(
+        businessId: widget.businessId,
+      );
+      final currency = currencies.firstWhere(
+        (c) => (c['id'] as num?)?.toInt() == widget.selectedCurrencyId,
+        orElse: () => <String, dynamic>{},
+      );
+      
+      setState(() {
+        _currencySymbol = currency['symbol']?.toString() ?? currency['code']?.toString() ?? 'ریال';
+      });
+    } catch (e) {
+      setState(() {
+        _currencySymbol = 'ریال'; // fallback
+      });
+    }
+  }
+  
+  // محاسبه مجموع تراکنش‌ها (بدون کارمزد)
+  num get _totalPaid {
+    return widget.transactions.fold<num>(0, (sum, t) => sum + t.amount);
+  }
+  
+  // محاسبه مانده فاکتور
+  num get _remainingBalance {
+    if (widget.invoiceTotal == null) return 0;
+    return widget.invoiceTotal! - _totalPaid;
+  }
+  
+  // محاسبه درصد پرداخت شده
+  double get _paidPercentage {
+    if (widget.invoiceTotal == null || widget.invoiceTotal == 0) return 0;
+    return (_totalPaid / widget.invoiceTotal!) * 100;
+  }
+  
+  // محاسبه درصد مانده
+  double get _remainingPercentage {
+    if (widget.invoiceTotal == null || widget.invoiceTotal == 0) return 0;
+    return (_remainingBalance / widget.invoiceTotal!) * 100;
+  }
+  
+  // تعیین رنگ مانده
+  Color _getRemainingBalanceColor(ThemeData theme) {
+    if (widget.invoiceTotal == null) return theme.colorScheme.onSurface;
+    if (_remainingBalance > 0) {
+      return theme.colorScheme.error; // قرمز برای مانده مثبت (بدهکار)
+    } else if (_remainingBalance < 0) {
+      return theme.colorScheme.tertiary; // آبی/سبز برای مانده منفی (بستانکار)
+    } else {
+      return theme.colorScheme.primary; // سبز برای تسویه کامل
+    }
+  }
+
+  // بررسی اینکه آیا باید از چیدمان دو ستونه استفاده کنیم
+  bool _isDesktop(BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
+    return width >= 900; // از 900 پیکسل به بالا دو ستونه
+  }
+  
+  // بررسی اینکه آیا می‌توان تراکنش اضافه کرد
+  bool get _canAddTransaction {
+    return widget.invoiceTotal != null && widget.invoiceTotal! > 0;
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDesktop = _isDesktop(context);
     
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -74,50 +167,65 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
               ),
             ),
             const Spacer(),
-            ElevatedButton.icon(
-              onPressed: _addTransaction,
-              icon: const Icon(Icons.add),
-              label: const Text('افزودن تراکنش'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: theme.colorScheme.primary,
-                foregroundColor: theme.colorScheme.onPrimary,
+            // در موبایل فقط آیکون نمایش داده می‌شود
+            if (isDesktop)
+              ElevatedButton.icon(
+                onPressed: _canAddTransaction ? _addTransaction : null,
+                icon: const Icon(Icons.add),
+                label: const Text('افزودن تراکنش'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: theme.colorScheme.primary,
+                  foregroundColor: theme.colorScheme.onPrimary,
+                ),
+              )
+            else
+              IconButton(
+                onPressed: _canAddTransaction ? _addTransaction : null,
+                icon: const Icon(Icons.add),
+                tooltip: _canAddTransaction 
+                    ? 'افزودن تراکنش'
+                    : 'ابتدا باید ردیف‌های کالا را اضافه کنید',
+                style: IconButton.styleFrom(
+                  backgroundColor: _canAddTransaction 
+                      ? theme.colorScheme.primary 
+                      : theme.colorScheme.surfaceContainerHighest,
+                  foregroundColor: _canAddTransaction 
+                      ? theme.colorScheme.onPrimary 
+                      : theme.colorScheme.onSurfaceVariant,
+                ),
               ),
-            ),
           ],
         ),
         const SizedBox(height: 16),
         
-        // لیست تراکنش‌ها با اسکرول عمودی
+        // محتوای اصلی: دو ستونه در دسکتاپ، یک ستونه در موبایل
+        Expanded(
+          child: isDesktop
+              ? _buildDesktopLayout(theme)
+              : _buildMobileLayout(theme),
+        ),
+      ],
+    );
+  }
+  
+  // چیدمان موبایل: یک ستون
+  Widget _buildMobileLayout(ThemeData theme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // نمایش مانده فاکتور یا پیام عدم وجود ردیف کالا
+        if (widget.invoiceTotal != null && widget.invoiceTotal! > 0) ...[
+          _buildBalanceCard(theme),
+          const SizedBox(height: 16),
+        ] else if (widget.invoiceTotal != null && widget.invoiceTotal! == 0) ...[
+          _buildNoItemsMessage(theme),
+          const SizedBox(height: 16),
+        ],
+        
+        // لیست تراکنش‌ها
         Expanded(
           child: widget.transactions.isEmpty
-              ? Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(32),
-                    child: Column(
-                      children: [
-                        Icon(
-                          Icons.receipt_long_outlined,
-                          size: 48,
-                          color: theme.colorScheme.outline,
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'هیچ تراکنشی اضافه نشده است',
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            color: theme.colorScheme.outline,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'برای افزودن تراکنش روی دکمه "افزودن تراکنش" کلیک کنید',
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: theme.colorScheme.outline,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                )
+              ? _buildEmptyState(theme)
               : ListView.separated(
                   itemCount: widget.transactions.length,
                   separatorBuilder: (context, index) => const SizedBox(height: 12),
@@ -128,6 +236,141 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
                 ),
         ),
       ],
+    );
+  }
+  
+  // چیدمان دسکتاپ: دو ستون
+  Widget _buildDesktopLayout(ThemeData theme) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // ستون سمت راست: لیست تراکنش‌ها
+        Expanded(
+          flex: 2,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // هدر لیست تراکنش‌ها
+              Row(
+                children: [
+                  Text(
+                    'لیست تراکنش‌ها',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    '${widget.transactions.length} تراکنش',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              // لیست تراکنش‌ها
+              Expanded(
+                child: widget.transactions.isEmpty
+                    ? _buildEmptyState(theme)
+                    : ListView.separated(
+                        itemCount: widget.transactions.length,
+                        separatorBuilder: (context, index) => const SizedBox(height: 12),
+                        itemBuilder: (context, index) {
+                          final transaction = widget.transactions[index];
+                          return _buildTransactionCard(transaction, index);
+                        },
+                      ),
+              ),
+            ],
+          ),
+        ),
+        
+        const SizedBox(width: 16),
+        
+        // ستون سمت چپ: کارت مانده فاکتور یا پیام عدم وجود ردیف کالا
+        if (widget.invoiceTotal != null && widget.invoiceTotal! > 0)
+          Expanded(
+            flex: 1,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // هدر کارت مانده
+                Text(
+                  'خلاصه مالی',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                // کارت مانده (sticky در بالای صفحه)
+                Flexible(
+                  child: SingleChildScrollView(
+                    child: _buildBalanceCard(theme),
+                  ),
+                ),
+              ],
+            ),
+          )
+        else if (widget.invoiceTotal != null && widget.invoiceTotal! == 0)
+          Expanded(
+            flex: 1,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // هدر
+                Text(
+                  'خلاصه مالی',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                // پیام عدم وجود ردیف کالا
+                Flexible(
+                  child: SingleChildScrollView(
+                    child: _buildNoItemsMessage(theme),
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+  
+  // حالت خالی (بدون تراکنش)
+  Widget _buildEmptyState(ThemeData theme) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.receipt_long_outlined,
+              size: 48,
+              color: theme.colorScheme.outline,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'هیچ تراکنشی اضافه نشده است',
+              style: theme.textTheme.titleMedium?.copyWith(
+                color: theme.colorScheme.outline,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'برای افزودن تراکنش روی دکمه "افزودن تراکنش" کلیک کنید',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.outline,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -353,6 +596,383 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
             widget.onChanged(newTransactions);
           }
         },
+      ),
+    );
+  }
+  
+  Widget _buildBalanceCard(ThemeData theme) {
+    final remainingColor = _getRemainingBalanceColor(theme);
+    final isFullyPaid = _remainingBalance == 0;
+    final isOverPaid = _remainingBalance < 0;
+    final hasRemaining = _remainingBalance > 0;
+    final isDesktop = _isDesktop(context);
+    
+    return Card(
+      color: hasRemaining 
+          ? theme.colorScheme.errorContainer.withOpacity(0.3)
+          : isOverPaid
+              ? theme.colorScheme.tertiaryContainer.withOpacity(0.3)
+              : theme.colorScheme.primaryContainer.withOpacity(0.3),
+      child: Padding(
+        padding: EdgeInsets.all(isDesktop ? 20 : 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: isDesktop ? MainAxisSize.min : MainAxisSize.max,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  hasRemaining 
+                      ? Icons.warning_amber_rounded
+                      : isOverPaid
+                          ? Icons.info_outline
+                          : Icons.check_circle_outline,
+                  color: remainingColor,
+                  size: isDesktop ? 28 : 24,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'مانده فاکتور',
+                    style: isDesktop 
+                        ? theme.textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          )
+                        : theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            // در دسکتاپ: نمایش عمودی (یک ستون)
+            // در موبایل: نمایش دو ستونه
+            if (isDesktop) ...[
+              _buildBalanceRow(
+                theme,
+                'مبلغ کل فاکتور:',
+                formatWithThousands(widget.invoiceTotal!, decimalPlaces: 0),
+                theme.colorScheme.onSurface,
+                isDesktop: true,
+              ),
+              const SizedBox(height: 16),
+              _buildBalanceRow(
+                theme,
+                'مجموع تراکنش‌ها:',
+                formatWithThousands(_totalPaid, decimalPlaces: 0),
+                theme.colorScheme.onSurface,
+                isDesktop: true,
+              ),
+              const SizedBox(height: 16),
+              Divider(color: theme.colorScheme.outline.withOpacity(0.2)),
+              const SizedBox(height: 16),
+              _buildBalanceRow(
+                theme,
+                'مانده فاکتور:',
+                formatWithThousands(_remainingBalance, decimalPlaces: 0),
+                remainingColor,
+                isBold: true,
+                isDesktop: true,
+              ),
+              const SizedBox(height: 12),
+              _buildBalanceRow(
+                theme,
+                'درصد مانده:',
+                '${_remainingPercentage.toStringAsFixed(1)}%',
+                remainingColor,
+                isBold: true,
+                isDesktop: true,
+                showCurrency: false,
+              ),
+              const SizedBox(height: 12),
+              _buildBalanceRow(
+                theme,
+                'درصد پرداخت شده:',
+                '${_paidPercentage.toStringAsFixed(1)}%',
+                theme.colorScheme.onSurface,
+                isDesktop: true,
+                showCurrency: false,
+              ),
+            ] else ...[
+              // موبایل: دو ستونه
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildBalanceRow(
+                      theme,
+                      'مبلغ کل فاکتور:',
+                      formatWithThousands(widget.invoiceTotal!, decimalPlaces: 0),
+                      theme.colorScheme.onSurface,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: _buildBalanceRow(
+                      theme,
+                      'مجموع تراکنش‌ها:',
+                      formatWithThousands(_totalPaid, decimalPlaces: 0),
+                      theme.colorScheme.onSurface,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildBalanceRow(
+                      theme,
+                      'مانده فاکتور:',
+                      formatWithThousands(_remainingBalance, decimalPlaces: 0),
+                      remainingColor,
+                      isBold: true,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: _buildBalanceRow(
+                      theme,
+                      'درصد مانده:',
+                      '${_remainingPercentage.toStringAsFixed(1)}%',
+                      remainingColor,
+                      isBold: true,
+                      showCurrency: false,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              _buildBalanceRow(
+                theme,
+                'درصد پرداخت شده:',
+                '${_paidPercentage.toStringAsFixed(1)}%',
+                theme.colorScheme.onSurface,
+                showCurrency: false,
+              ),
+            ],
+            // هشدار در صورت مانده مثبت
+            if (hasRemaining) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.errorContainer.withOpacity(0.5),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: theme.colorScheme.error,
+                    width: 1,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.warning_amber_rounded,
+                      color: theme.colorScheme.error,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'فاکتور هنوز تسویه نشده است. مانده باقی‌مانده: ${formatWithThousands(_remainingBalance, decimalPlaces: 0)} ${_currencySymbol ?? 'ریال'}',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.error,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            // اطلاع در صورت پرداخت اضافی
+            if (isOverPaid) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.tertiaryContainer.withOpacity(0.5),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: theme.colorScheme.tertiary,
+                    width: 1,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.info_outline,
+                      color: theme.colorScheme.tertiary,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'مبلغ پرداخت شده بیشتر از مبلغ فاکتور است. مبلغ اضافی: ${formatWithThousands(-_remainingBalance, decimalPlaces: 0)} ${_currencySymbol ?? 'ریال'}',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.tertiary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            // پیام تسویه کامل
+            if (isFullyPaid) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primaryContainer.withOpacity(0.5),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: theme.colorScheme.primary,
+                    width: 1,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.check_circle_outline,
+                      color: theme.colorScheme.primary,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'فاکتور به طور کامل تسویه شده است.',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.primary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+  
+  Widget _buildBalanceRow(
+    ThemeData theme,
+    String label,
+    String value,
+    Color valueColor, {
+    bool isBold = false,
+    bool isDesktop = false,
+    bool showCurrency = true,
+  }) {
+    final displayValue = showCurrency && _currencySymbol != null
+        ? '$value $_currencySymbol'
+        : value;
+    
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: isDesktop ? 150 : 120,
+          child: Text(
+            label,
+            style: (isDesktop 
+                ? theme.textTheme.bodyLarge 
+                : theme.textTheme.bodyMedium)?.copyWith(
+              fontWeight: FontWeight.w500,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+        Expanded(
+          child: Text(
+            displayValue,
+            style: (isDesktop 
+                ? theme.textTheme.bodyLarge 
+                : theme.textTheme.bodyMedium)?.copyWith(
+              fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
+              color: valueColor,
+              fontSize: isDesktop && isBold ? 18 : null,
+            ),
+            textAlign: TextAlign.left,
+          ),
+        ),
+      ],
+    );
+  }
+  
+  // پیام عدم وجود ردیف کالا یا مبلغ صفر
+  Widget _buildNoItemsMessage(ThemeData theme) {
+    final isDesktop = _isDesktop(context);
+    
+    return Card(
+      color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
+      child: Padding(
+        padding: EdgeInsets.all(isDesktop ? 24 : 20),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.inventory_2_outlined,
+              size: isDesktop ? 64 : 48,
+              color: theme.colorScheme.outline,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'فاکتور بدون ردیف کالا',
+              style: (isDesktop 
+                  ? theme.textTheme.titleLarge 
+                  : theme.textTheme.titleMedium)?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: theme.colorScheme.onSurface,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'برای افزودن تراکنش، ابتدا باید ردیف‌های کالا و خدمات را در تب "کالاها و خدمات" اضافه کنید.',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primaryContainer.withOpacity(0.3),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: theme.colorScheme.primary.withOpacity(0.3),
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.info_outline,
+                    color: theme.colorScheme.primary,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      'مبلغ کل فاکتور باید بیشتر از صفر باشد تا بتوانید تراکنش اضافه کنید.',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.primary,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -611,37 +611,90 @@ async def export_checks_excel(
     # Helper functions
     def format_date_for_export(item_dict: dict, date_key: str) -> str:
         """Format date based on calendar type (date only, no time)"""
+        # First check if there's a _formatted field (from format_datetime_fields)
+        formatted_key = f"{date_key}_formatted"
+        if formatted_key in item_dict:
+            formatted_value = item_dict.get(formatted_key)
+            if isinstance(formatted_value, dict):
+                date_only = formatted_value.get("date_only")
+                if date_only:
+                    return str(date_only)
+                formatted = formatted_value.get("formatted", "")
+                if formatted:
+                    # Extract date part only (remove time)
+                    date_part = str(formatted).split(' ')[0].split('T')[0]
+                    return date_part
+        
+        # Get the main field value
         value = item_dict.get(date_key)
         if value is None:
             return ""
-        
-        # If it's already a string (formatted by format_datetime_fields), extract date only
-        if isinstance(value, str):
-            # Remove time part if exists (format: "YYYY-MM-DD" or "YYYY/MM/DD" or "YYYY-MM-DD HH:MM:SS" or "YYYY/MM/DD HH:MM:SS")
-            if ' ' in value or 'T' in value:
-                # Extract date part only (remove time)
-                date_part = value.split(' ')[0].split('T')[0]
-                return date_part
-            return value
         
         # If it's a dict (from _formatted field), use date_only
         if isinstance(value, dict):
             date_only = value.get("date_only")
             if date_only:
                 return str(date_only)
-            # Fallback to formatted and extract date part
             formatted = value.get("formatted", "")
             if formatted:
                 date_part = str(formatted).split(' ')[0].split('T')[0]
                 return date_part
         
         # If it's a datetime object, format it based on calendar type
-        try:
-            if isinstance(value, dt_module.datetime):
+        if isinstance(value, dt_module.datetime):
+            try:
                 formatted = CalendarConverter.format_datetime(value, calendar_type)
                 return formatted.get("date_only", "") or formatted.get("formatted", "").split(' ')[0]
-        except Exception:
-            pass
+            except Exception:
+                pass
+        
+        # If it's a date object, format it based on calendar type
+        if isinstance(value, dt_module.date):
+            try:
+                dt_value = dt_module.datetime.combine(value, dt_module.datetime.min.time())
+                formatted = CalendarConverter.format_datetime(dt_value, calendar_type)
+                return formatted.get("date_only", "") or formatted.get("formatted", "").split(' ')[0]
+            except Exception:
+                pass
+        
+        # If it's a string, check if it's already formatted (contains / separator for Jalali)
+        if isinstance(value, str):
+            # Check if it looks like a Jalali date (contains / and has YYYY/MM/DD format)
+            if '/' in value and (len(value.split('/')) == 3):
+                # Might be already formatted, but check if it's ISO format (YYYY-MM-DD) or Jalali (YYYY/MM/DD)
+                if '-' in value:
+                    # ISO format (YYYY-MM-DD), parse and format
+                    try:
+                        if 'T' in value:
+                            dt_value = dt_module.datetime.fromisoformat(value.replace('Z', '+00:00'))
+                        else:
+                            date_value = dt_module.date.fromisoformat(value)
+                            dt_value = dt_module.datetime.combine(date_value, dt_module.datetime.min.time())
+                        formatted = CalendarConverter.format_datetime(dt_value, calendar_type)
+                        return formatted.get("date_only", "") or formatted.get("formatted", "").split(' ')[0]
+                    except Exception:
+                        pass
+                else:
+                    # Might be Jalali format (YYYY/MM/DD), return as is but remove time if exists
+                    if ' ' in value:
+                        return value.split(' ')[0]
+                    return value
+            else:
+                # Try to parse as ISO format
+                try:
+                    if 'T' in value:
+                        dt_value = dt_module.datetime.fromisoformat(value.replace('Z', '+00:00'))
+                    else:
+                        date_value = dt_module.date.fromisoformat(value)
+                        dt_value = dt_module.datetime.combine(date_value, dt_module.datetime.min.time())
+                    formatted = CalendarConverter.format_datetime(dt_value, calendar_type)
+                    return formatted.get("date_only", "") or formatted.get("formatted", "").split(' ')[0]
+                except Exception:
+                    # If parsing fails, return as is (might already be formatted)
+                    if ' ' in value or 'T' in value:
+                        date_part = value.split(' ')[0].split('T')[0]
+                        return date_part
+                    return value
         
         # Fallback
         return str(value) if value else ""
@@ -888,37 +941,90 @@ async def export_checks_pdf(
     # Helper functions
     def format_date_for_export(item_dict: dict, date_key: str) -> str:
         """Format date based on calendar type (date only, no time)"""
+        # First check if there's a _formatted field (from format_datetime_fields)
+        formatted_key = f"{date_key}_formatted"
+        if formatted_key in item_dict:
+            formatted_value = item_dict.get(formatted_key)
+            if isinstance(formatted_value, dict):
+                date_only = formatted_value.get("date_only")
+                if date_only:
+                    return str(date_only)
+                formatted = formatted_value.get("formatted", "")
+                if formatted:
+                    # Extract date part only (remove time)
+                    date_part = str(formatted).split(' ')[0].split('T')[0]
+                    return date_part
+        
+        # Get the main field value
         value = item_dict.get(date_key)
         if value is None:
             return ""
-        
-        # If it's already a string (formatted by format_datetime_fields), extract date only
-        if isinstance(value, str):
-            # Remove time part if exists (format: "YYYY-MM-DD" or "YYYY/MM/DD" or "YYYY-MM-DD HH:MM:SS" or "YYYY/MM/DD HH:MM:SS")
-            if ' ' in value or 'T' in value:
-                # Extract date part only (remove time)
-                date_part = value.split(' ')[0].split('T')[0]
-                return date_part
-            return value
         
         # If it's a dict (from _formatted field), use date_only
         if isinstance(value, dict):
             date_only = value.get("date_only")
             if date_only:
                 return str(date_only)
-            # Fallback to formatted and extract date part
             formatted = value.get("formatted", "")
             if formatted:
                 date_part = str(formatted).split(' ')[0].split('T')[0]
                 return date_part
         
         # If it's a datetime object, format it based on calendar type
-        try:
-            if isinstance(value, dt_module.datetime):
+        if isinstance(value, dt_module.datetime):
+            try:
                 formatted = CalendarConverter.format_datetime(value, calendar_type)
                 return formatted.get("date_only", "") or formatted.get("formatted", "").split(' ')[0]
-        except Exception:
-            pass
+            except Exception:
+                pass
+        
+        # If it's a date object, format it based on calendar type
+        if isinstance(value, dt_module.date):
+            try:
+                dt_value = dt_module.datetime.combine(value, dt_module.datetime.min.time())
+                formatted = CalendarConverter.format_datetime(dt_value, calendar_type)
+                return formatted.get("date_only", "") or formatted.get("formatted", "").split(' ')[0]
+            except Exception:
+                pass
+        
+        # If it's a string, check if it's already formatted (contains / separator for Jalali)
+        if isinstance(value, str):
+            # Check if it looks like a Jalali date (contains / and has YYYY/MM/DD format)
+            if '/' in value and (len(value.split('/')) == 3):
+                # Might be already formatted, but check if it's ISO format (YYYY-MM-DD) or Jalali (YYYY/MM/DD)
+                if '-' in value:
+                    # ISO format (YYYY-MM-DD), parse and format
+                    try:
+                        if 'T' in value:
+                            dt_value = dt_module.datetime.fromisoformat(value.replace('Z', '+00:00'))
+                        else:
+                            date_value = dt_module.date.fromisoformat(value)
+                            dt_value = dt_module.datetime.combine(date_value, dt_module.datetime.min.time())
+                        formatted = CalendarConverter.format_datetime(dt_value, calendar_type)
+                        return formatted.get("date_only", "") or formatted.get("formatted", "").split(' ')[0]
+                    except Exception:
+                        pass
+                else:
+                    # Might be Jalali format (YYYY/MM/DD), return as is but remove time if exists
+                    if ' ' in value:
+                        return value.split(' ')[0]
+                    return value
+            else:
+                # Try to parse as ISO format
+                try:
+                    if 'T' in value:
+                        dt_value = dt_module.datetime.fromisoformat(value.replace('Z', '+00:00'))
+                    else:
+                        date_value = dt_module.date.fromisoformat(value)
+                        dt_value = dt_module.datetime.combine(date_value, dt_module.datetime.min.time())
+                    formatted = CalendarConverter.format_datetime(dt_value, calendar_type)
+                    return formatted.get("date_only", "") or formatted.get("formatted", "").split(' ')[0]
+                except Exception:
+                    # If parsing fails, return as is (might already be formatted)
+                    if ' ' in value or 'T' in value:
+                        date_part = value.split(' ')[0].split('T')[0]
+                        return date_part
+                    return value
         
         # Fallback
         return str(value) if value else ""

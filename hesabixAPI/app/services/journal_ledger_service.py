@@ -39,8 +39,11 @@ def _get_document_type_name(doc_type: str | None) -> str:
         'receipt': 'دریافت',
         'payment': 'پرداخت',
         'transfer': 'انتقال',
+        'expense': 'هزینه',
+        'income': 'درآمد',
         'expense_income': 'درآمد/هزینه',
         'opening_balance': 'تراز افتتاحیه',
+        'manual': 'سند دستی',
         'manual_document': 'سند دستی',
         'check_endorse': 'پاسخگویی چک',
         'check_clear': 'وصول چک',
@@ -51,6 +54,109 @@ def _get_document_type_name(doc_type: str | None) -> str:
         'check_delete': 'حذف چک',
     }
     return mapping.get(doc_type, doc_type)
+
+
+def _find_general_account(account_id: int, accounts_map: Dict[int, Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """
+    پیدا کردن حساب کل با پیمایش به سمت بالا تا parent_id = NULL
+    
+    Args:
+        account_id: شناسه حساب
+        accounts_map: دیکشنری کامل تمام حساب‌ها با parent_id
+    
+    Returns:
+        دیکشنری حساب کل یا None
+    """
+    if account_id not in accounts_map:
+        return None
+    
+    current_id = account_id
+    visited = set()  # جلوگیری از حلقه بی‌نهایت
+    
+    while current_id and current_id in accounts_map:
+        if current_id in visited:
+            break  # حلقه پیدا شد
+        visited.add(current_id)
+        
+        account = accounts_map[current_id]
+        # اگر parent_id ندارد، این حساب کل است
+        if account['parent_id'] is None:
+            return account
+        
+        # به والد برو
+        current_id = account['parent_id']
+    
+    return None
+
+
+def _find_subsidiary_account(
+    account_id: int, 
+    accounts_map: Dict[int, Dict[str, Any]], 
+    general_account: Optional[Dict[str, Any]]
+) -> Optional[Dict[str, Any]]:
+    """
+    پیدا کردن حساب معین:
+    - اگر خود حساب، مستقیماً زیر حساب کل است → خودش حساب معین است
+    - اگر حساب زیر حساب معین است → والد مستقیم حساب معین است
+    
+    Args:
+        account_id: شناسه حساب
+        accounts_map: دیکشنری کامل تمام حساب‌ها با parent_id
+        general_account: حساب کل (اگر پیدا شده باشد)
+    
+    Returns:
+        دیکشنری حساب معین یا None
+    """
+    if account_id not in accounts_map:
+        return None
+    
+    account = accounts_map[account_id]
+    
+    # اگر خودش حساب کل است
+    if account['parent_id'] is None:
+        return None  # حساب معین ندارد
+    
+    # اگر حساب کل پیدا نشده، ابتدا آن را پیدا کن
+    if general_account is None:
+        general_account = _find_general_account(account_id, accounts_map)
+        if general_account is None:
+            return None
+    
+    # اگر والد مستقیم، حساب کل است
+    parent_id = account['parent_id']
+    if parent_id == general_account['id']:
+        # خود حساب، حساب معین است
+        return account
+    
+    # اگر والد مستقیم، خودش حساب معین است (parent_id آن = حساب کل)
+    if parent_id in accounts_map:
+        parent = accounts_map[parent_id]
+        if parent['parent_id'] == general_account['id']:
+            return parent
+    
+    # در غیر این صورت، به سمت بالا برو تا حساب معین را پیدا کنی
+    current_id = account_id
+    visited = set()
+    
+    while current_id and current_id in accounts_map:
+        if current_id in visited:
+            break
+        visited.add(current_id)
+        
+        acc = accounts_map[current_id]
+        if acc['parent_id'] is None:
+            break
+        
+        parent_id = acc['parent_id']
+        if parent_id in accounts_map:
+            parent = accounts_map[parent_id]
+            # اگر والد، مستقیماً زیر حساب کل است
+            if parent['parent_id'] == general_account['id']:
+                return parent
+        
+        current_id = parent_id
+    
+    return None
 
 
 def get_journal_ledger_report(
@@ -164,7 +270,22 @@ def get_journal_ledger_report(
         if line.person_id is not None
     ))
     
-    # دریافت اطلاعات حساب‌ها
+    # دریافت تمام حساب‌های کسب‌وکار (برای پیدا کردن حساب کل و معین)
+    all_accounts = db.query(Account).filter(
+        (Account.business_id == None) | (Account.business_id == business_id)  # noqa: E711
+    ).all()
+    
+    # ساخت دیکشنری کامل از حساب‌ها با parent_id
+    accounts_full_map = {}
+    for acc in all_accounts:
+        accounts_full_map[acc.id] = {
+            'id': acc.id,
+            'code': acc.code,
+            'name': acc.name,
+            'parent_id': acc.parent_id,
+        }
+    
+    # دریافت اطلاعات حساب‌های استفاده شده (برای نمایش در خروجی)
     accounts_map = {}
     if account_ids:
         accounts = db.query(Account).filter(Account.id.in_(account_ids)).all()
@@ -232,13 +353,35 @@ def get_journal_ledger_report(
         
         document_type_name = _get_document_type_name(doc.document_type)
         
+        # پیدا کردن حساب کل و معین برای حساب استفاده شده در این خط
+        # هر خط یک حساب دارد (بدهکار یا بستانکار)
+        account_id_for_general_subsidiary = None
+        if debit > 0 and line.account_id:
+            account_id_for_general_subsidiary = line.account_id
+        elif credit > 0 and line.account_id:
+            account_id_for_general_subsidiary = line.account_id
+        
+        general_account = None
+        subsidiary_account = None
+        if account_id_for_general_subsidiary:
+            general_account = _find_general_account(account_id_for_general_subsidiary, accounts_full_map)
+            subsidiary_account = _find_subsidiary_account(
+                account_id_for_general_subsidiary, 
+                accounts_full_map, 
+                general_account
+            )
+        
         items.append({
             'document_id': doc.id,
             'document_code': doc.code or '',
-            'document_date': doc.document_date.isoformat() if doc.document_date else None,
+            'document_date': doc.document_date if doc.document_date else None,  # Keep as date object for format_datetime_fields
             'document_type': doc.document_type or '',
             'document_type_name': document_type_name,
             'description': line.description or doc.description or '',
+            'general_account_code': general_account['code'] if general_account else None,
+            'general_account_name': general_account['name'] if general_account else None,
+            'subsidiary_account_code': subsidiary_account['code'] if subsidiary_account else None,
+            'subsidiary_account_name': subsidiary_account['name'] if subsidiary_account else None,
             'debit_account_id': debit_account['id'] if debit_account else None,
             'debit_account_code': debit_account['code'] if debit_account else None,
             'debit_account_name': debit_account['name'] if debit_account else None,

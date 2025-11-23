@@ -7,7 +7,7 @@ import '../../../utils/number_normalizer.dart';
 import '../../../utils/product_form_validator.dart';
 import '../../../widgets/invoice/warehouse_combobox_widget.dart';
 
-class ProductPricingInventorySection extends StatelessWidget {
+class ProductPricingInventorySection extends StatefulWidget {
   final int businessId;
   final ProductFormData formData;
   final ValueChanged<ProductFormData> onChanged;
@@ -32,9 +32,54 @@ class ProductPricingInventorySection extends StatelessWidget {
   });
 
   @override
+  State<ProductPricingInventorySection> createState() => _ProductPricingInventorySectionState();
+}
+
+class _ProductPricingInventorySectionState extends State<ProductPricingInventorySection> {
+  late TextEditingController _salesPriceController;
+  late TextEditingController _purchasePriceController;
+
+  @override
+  void initState() {
+    super.initState();
+    _salesPriceController = TextEditingController(
+      text: formatNumberForInput(widget.formData.baseSalesPrice),
+    );
+    _purchasePriceController = TextEditingController(
+      text: formatNumberForInput(widget.formData.basePurchasePrice),
+    );
+  }
+
+  @override
+  void didUpdateWidget(ProductPricingInventorySection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // به‌روزرسانی کنترلرها فقط وقتی مقدار واقعاً تغییر کرده (نه از طریق تایپ کاربر)
+    // این برای حفظ جداکننده هزارگان بعد از تغییر تب‌ها مهم است
+    if (oldWidget.formData.baseSalesPrice != widget.formData.baseSalesPrice) {
+      final newSalesPrice = formatNumberForInput(widget.formData.baseSalesPrice);
+      if (_salesPriceController.text != newSalesPrice) {
+        _salesPriceController.text = newSalesPrice;
+      }
+    }
+    if (oldWidget.formData.basePurchasePrice != widget.formData.basePurchasePrice) {
+      final newPurchasePrice = formatNumberForInput(widget.formData.basePurchasePrice);
+      if (_purchasePriceController.text != newPurchasePrice) {
+        _purchasePriceController.text = newPurchasePrice;
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _salesPriceController.dispose();
+    _purchasePriceController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     // اگر نوع کالا "خدمت" است، بخش کنترل موجودی را نمایش نده
-    final isService = formData.itemType == 'خدمت';
+    final isService = widget.formData.itemType == 'خدمت';
     
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -57,17 +102,17 @@ class ProductPricingInventorySection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SwitchListTile(
-          value: formData.trackInventory,
-          onChanged: (value) => _updateFormData(formData.copyWith(trackInventory: value)),
+          value: widget.formData.trackInventory,
+          onChanged: (value) => _updateFormData(widget.formData.copyWith(trackInventory: value)),
           title: Text(t.inventoryControl),
         ),
-        if (formData.trackInventory) ...[
+        if (widget.formData.trackInventory) ...[
           const SizedBox(height: 16),
           WarehouseComboboxWidget(
-            businessId: businessId,
-            selectedWarehouseId: formData.defaultWarehouseId,
+            businessId: widget.businessId,
+            selectedWarehouseId: widget.formData.defaultWarehouseId,
             onChanged: (warehouseId) {
-              _updateFormData(formData.copyWith(defaultWarehouseId: warehouseId));
+              _updateFormData(widget.formData.copyWith(defaultWarehouseId: warehouseId));
             },
             label: 'انبار پیش‌فرض',
             hintText: 'انتخاب انبار پیش‌فرض',
@@ -78,7 +123,8 @@ class ProductPricingInventorySection extends StatelessWidget {
             children: [
               Expanded(
                 child: TextFormField(
-                  initialValue: formData.reorderPoint?.toString(),
+                  key: ValueKey('reorderPoint_${widget.formData.reorderPoint}'),
+                  initialValue: widget.formData.reorderPoint?.toString(),
                   decoration: InputDecoration(labelText: t.reorderPointRepeat),
                   keyboardType: TextInputType.number,
                   inputFormatters: [
@@ -86,13 +132,14 @@ class ProductPricingInventorySection extends StatelessWidget {
                     FilteringTextInputFormatter.digitsOnly,
                   ],
                   validator: (value) => ProductFormValidator.validateQuantity(value, fieldName: t.reorderPointRepeat),
-                  onChanged: (value) => _updateFormData(formData.copyWith(reorderPoint: int.tryParse(value))),
+                  onChanged: (value) => _updateFormData(widget.formData.copyWith(reorderPoint: int.tryParse(value))),
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: TextFormField(
-                  initialValue: formData.minOrderQty?.toString(),
+                  key: ValueKey('minOrderQty_${widget.formData.minOrderQty}'),
+                  initialValue: widget.formData.minOrderQty?.toString(),
                   decoration: InputDecoration(labelText: t.minOrderQty),
                   keyboardType: TextInputType.number,
                   inputFormatters: [
@@ -100,13 +147,14 @@ class ProductPricingInventorySection extends StatelessWidget {
                     FilteringTextInputFormatter.digitsOnly,
                   ],
                   validator: (value) => ProductFormValidator.validateQuantity(value, fieldName: t.minOrderQty),
-                  onChanged: (value) => _updateFormData(formData.copyWith(minOrderQty: int.tryParse(value))),
+                  onChanged: (value) => _updateFormData(widget.formData.copyWith(minOrderQty: int.tryParse(value))),
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: TextFormField(
-                  initialValue: formData.leadTimeDays?.toString(),
+                  key: ValueKey('leadTimeDays_${widget.formData.leadTimeDays}'),
+                  initialValue: widget.formData.leadTimeDays?.toString(),
                   decoration: InputDecoration(labelText: t.leadTimeDays),
                   keyboardType: TextInputType.number,
                   inputFormatters: [
@@ -114,7 +162,7 @@ class ProductPricingInventorySection extends StatelessWidget {
                     FilteringTextInputFormatter.digitsOnly,
                   ],
                   validator: ProductFormValidator.validateLeadTime,
-                  onChanged: (value) => _updateFormData(formData.copyWith(leadTimeDays: int.tryParse(value))),
+                  onChanged: (value) => _updateFormData(widget.formData.copyWith(leadTimeDays: int.tryParse(value))),
                 ),
               ),
             ],
@@ -132,7 +180,7 @@ class ProductPricingInventorySection extends StatelessWidget {
         Text(t.pricing, style: Theme.of(context).textTheme.titleSmall),
         const SizedBox(height: 8),
         TextFormField(
-          initialValue: formData.baseSalesPrice?.toString(),
+          controller: _salesPriceController,
           decoration: InputDecoration(labelText: t.salesPrice),
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
           inputFormatters: [
@@ -140,18 +188,19 @@ class ProductPricingInventorySection extends StatelessWidget {
             ThousandsSeparatorInputFormatter(),
           ],
           validator: (value) => ProductFormValidator.validatePrice(value, fieldName: t.salesPrice),
-          onChanged: (value) => _updateFormData(formData.copyWith(baseSalesPrice: num.tryParse(value.replaceAll(',', '')))),
+          onChanged: (value) => _updateFormData(widget.formData.copyWith(baseSalesPrice: num.tryParse(value.replaceAll(',', '')))),
         ),
         const SizedBox(height: 16),
         TextFormField(
-          initialValue: formData.baseSalesNote,
+          key: ValueKey('baseSalesNote_${widget.formData.baseSalesNote}'),
+          initialValue: widget.formData.baseSalesNote,
           decoration: InputDecoration(labelText: t.salesPriceNote),
           maxLines: 2,
-          onChanged: (value) => _updateFormData(formData.copyWith(baseSalesNote: value.trim().isEmpty ? null : value)),
+          onChanged: (value) => _updateFormData(widget.formData.copyWith(baseSalesNote: value.trim().isEmpty ? null : value)),
         ),
         const SizedBox(height: 16),
         TextFormField(
-          initialValue: formData.basePurchasePrice?.toString(),
+          controller: _purchasePriceController,
           decoration: InputDecoration(labelText: t.purchasePrice),
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
           inputFormatters: [
@@ -159,14 +208,15 @@ class ProductPricingInventorySection extends StatelessWidget {
             ThousandsSeparatorInputFormatter(),
           ],
           validator: (value) => ProductFormValidator.validatePrice(value, fieldName: t.purchasePrice),
-          onChanged: (value) => _updateFormData(formData.copyWith(basePurchasePrice: num.tryParse(value.replaceAll(',', '')))),
+          onChanged: (value) => _updateFormData(widget.formData.copyWith(basePurchasePrice: num.tryParse(value.replaceAll(',', '')))),
         ),
         const SizedBox(height: 16),
         TextFormField(
-          initialValue: formData.basePurchaseNote,
+          key: ValueKey('basePurchaseNote_${widget.formData.basePurchaseNote}'),
+          initialValue: widget.formData.basePurchaseNote,
           decoration: InputDecoration(labelText: t.purchasePriceNote),
           maxLines: 2,
-          onChanged: (value) => _updateFormData(formData.copyWith(basePurchaseNote: value.trim().isEmpty ? null : value)),
+          onChanged: (value) => _updateFormData(widget.formData.copyWith(basePurchaseNote: value.trim().isEmpty ? null : value)),
         ),
       ],
     );
@@ -183,7 +233,7 @@ class ProductPricingInventorySection extends StatelessWidget {
           alignment: Alignment.centerLeft,
           child: FilledButton.icon(
             onPressed: () async {
-              if (priceLists.isEmpty) {
+              if (widget.priceLists.isEmpty) {
                 _showNoPriceListsWarning(context);
                 return;
               }
@@ -194,7 +244,7 @@ class ProductPricingInventorySection extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
-        ...draftPriceItems.map((it) {
+        ...widget.draftPriceItems.map((it) {
           return Card(
             margin: const EdgeInsets.symmetric(vertical: 6),
             child: ListTile(
@@ -206,7 +256,7 @@ class ProductPricingInventorySection extends StatelessWidget {
                   IconButton(
                     icon: const Icon(Icons.edit),
                     onPressed: () async {
-                      if (priceLists.isEmpty) {
+                      if (widget.priceLists.isEmpty) {
                         _showNoPriceListsWarning(context);
                         return;
                       }
@@ -215,7 +265,7 @@ class ProductPricingInventorySection extends StatelessWidget {
                   ),
                   IconButton(
                     icon: const Icon(Icons.delete, color: Colors.red),
-                    onPressed: () => onDeletePriceItem(it),
+                    onPressed: () => widget.onDeletePriceItem(it),
                   ),
                 ],
               ),
@@ -228,7 +278,7 @@ class ProductPricingInventorySection extends StatelessWidget {
 
   String _resolvePriceListTitle(dynamic id) {
     if (id == null) return '-';
-    for (final pl in priceLists) {
+    for (final pl in widget.priceLists) {
       if (pl['id'] == id) return (pl['name'] ?? '').toString();
     }
     return 'لیست ${id.toString()}';
@@ -293,14 +343,14 @@ class ProductPricingInventorySection extends StatelessWidget {
     int? currencyId = (existing?['currency_id'] as num?)?.toInt();
     
     // Set first price list as default if none provided and price lists exist
-    if (priceListId == null && priceLists.isNotEmpty) {
-      priceListId = (priceLists.first['id'] as num).toInt();
+    if (priceListId == null && widget.priceLists.isNotEmpty) {
+      priceListId = (widget.priceLists.first['id'] as num).toInt();
     }
     
     // Default select business default currency if none provided
-    if (currencyId == null && currencies.isNotEmpty) {
+    if (currencyId == null && widget.currencies.isNotEmpty) {
       try {
-        final def = currencies.firstWhere((c) => (c['is_default'] == true));
+        final def = widget.currencies.firstWhere((c) => (c['is_default'] == true));
         currencyId = (def['id'] as num?)?.toInt() ?? currencyId;
       } catch (_) {
         // If no explicit default flagged, keep null to force selection
@@ -322,7 +372,7 @@ class ProductPricingInventorySection extends StatelessWidget {
               children: [
                 DropdownButtonFormField<int>(
                   initialValue: priceListId,
-                  items: priceLists
+                  items: widget.priceLists
                       .map((pl) => DropdownMenuItem<int>(
                             value: (pl['id'] as num).toInt(),
                             child: Text((pl['name'] ?? '').toString()),
@@ -335,7 +385,7 @@ class ProductPricingInventorySection extends StatelessWidget {
                 const SizedBox(height: 12),
                 DropdownButtonFormField<int>(
                   initialValue: currencyId,
-                  items: currencies
+                  items: widget.currencies
                       .map((c) => DropdownMenuItem<int>(
                             value: (c['id'] as num).toInt(),
                             child: Text('${c['title'] ?? c['name']} (${c['code']})'),
@@ -371,7 +421,7 @@ class ProductPricingInventorySection extends StatelessWidget {
                 'currency_id': currencyId,
                 'price': price,
               }..removeWhere((k, v) => v == null);
-              onAddOrUpdatePriceItem(payload);
+              widget.onAddOrUpdatePriceItem(payload);
               Navigator.of(ctx).pop(true);
             },
             child: Text(AppLocalizations.of(ctx).save),
@@ -382,6 +432,6 @@ class ProductPricingInventorySection extends StatelessWidget {
   }
 
   void _updateFormData(ProductFormData newData) {
-    onChanged(newData);
+    widget.onChanged(newData);
   }
 }

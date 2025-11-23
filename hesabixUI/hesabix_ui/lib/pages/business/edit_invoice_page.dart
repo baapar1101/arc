@@ -633,6 +633,7 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
             invoiceType: _selectedInvoiceType ?? InvoiceType.sales,
             selectedCurrencyId: _selectedCurrencyId,
             authStore: widget.authStore,
+            invoiceTotal: _sumTotal, // ارسال مبلغ کل فاکتور
           ),
         ),
       ),
@@ -684,6 +685,14 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
     }
     final payload = payloadOrError as Map<String, dynamic>;
 
+    // بررسی مبلغ صفر فاکتور
+    if (_sumTotal == 0) {
+      final confirmed = await _showZeroAmountWarning();
+      if (!confirmed) {
+        return; // کاربر انصراف داد
+      }
+    }
+
     try {
       final service = InvoiceService(apiClient: ApiClient());
       await service.updateInvoice(
@@ -711,6 +720,44 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
         SnackBar(content: Text('خطا در ذخیره تغییرات: $e')),
       );
     }
+  }
+
+  /// نمایش هشدار برای فاکتور با مبلغ صفر
+  Future<bool> _showZeroAmountWarning() async {
+    final theme = Theme.of(context);
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        icon: Icon(
+          Icons.warning_amber_rounded,
+          color: theme.colorScheme.error,
+          size: 48,
+        ),
+        title: const Text('هشدار: مبلغ فاکتور صفر است'),
+        content: const Text(
+          'مبلغ کل فاکتور شما صفر است. این می‌تواند به دلایل زیر باشد:\n\n'
+          '• کالای رایگان یا نمونه\n'
+          '• تخفیف ۱۰۰٪\n'
+          '• کالای تبلیغاتی\n\n'
+          'آیا مطمئن هستید که می‌خواهید این فاکتور را ثبت کنید؟\n\n'
+          'توجه: فاکتور با مبلغ صفر در گزارش‌های مالی نمایش داده می‌شود و ممکن است ثبت‌های حسابداری با مبلغ صفر ایجاد شود.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('انصراف'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: FilledButton.styleFrom(
+              backgroundColor: theme.colorScheme.error,
+            ),
+            child: const Text('بله، ثبت کن'),
+          ),
+        ],
+      ),
+    );
+    return result ?? false;
   }
 
   dynamic _validateAndBuildPayload() {

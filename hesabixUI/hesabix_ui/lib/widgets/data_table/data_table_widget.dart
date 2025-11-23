@@ -78,8 +78,10 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
   int? _templateIdForExport;
   // Report templates (for PDF export)
   List<Map<String, dynamic>> _availableTemplates = const [];
-  bool _loadingTemplates = false;
   int? _selectedTemplateIdFromList;
+  bool _isLoadingTemplates = false;
+  bool _templatesLoaded = false;
+  bool _templateLoadCallbackAdded = false;
   // Auto-fit
   bool _autoFitApplied = false;
   
@@ -1337,135 +1339,169 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     AppLocalizations t,
     ThemeData theme,
   ) {
-    Future<void> _ensureTemplatesLoaded() async {
-      if (widget.config.pdfEndpoint == null) return;
-      if (widget.config.businessId == null || widget.config.reportModuleKey == null) return;
-      setState(() => _loadingTemplates = true);
-      try {
-        final service = ReportTemplateService(ApiClient());
-        final list = await service.listTemplates(
-          businessId: widget.config.businessId!,
-          moduleKey: widget.config.reportModuleKey,
-          subtype: widget.config.reportSubtype,
-          status: 'published',
-        );
-        if (mounted) {
-          setState(() {
-            _availableTemplates = list;
-          });
-        }
-      } catch (_) {
-        if (mounted) {
-          setState(() {
-            _availableTemplates = const [];
-          });
-        }
-      } finally {
-        if (mounted) setState(() => _loadingTemplates = false);
-      }
-    }
-    _ensureTemplatesLoaded();
+    // Reset callback flag when opening bottom sheet
+    _templateLoadCallbackAdded = false;
+    
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surface,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Handle bar
-            Container(
-              width: 40,
-              height: 4,
-              margin: const EdgeInsets.symmetric(vertical: 12),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setModalState) {
+          Future<void> ensureTemplatesLoaded() async {
+            if (widget.config.pdfEndpoint == null) return;
+            if (widget.config.businessId == null || widget.config.reportModuleKey == null) return;
+            if (_isLoadingTemplates) return; // Prevent multiple simultaneous loads
             
-            // Title
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Row(
-                children: [
-                  Icon(Icons.download, color: theme.colorScheme.primary, size: 20),
-                  const SizedBox(width: 8),
-                  Text(
-                    t.export,
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
+            setState(() {
+              _isLoadingTemplates = true;
+            });
+            setModalState(() {});
+            
+            try {
+              final service = ReportTemplateService(ApiClient());
+              final list = await service.listTemplates(
+                businessId: widget.config.businessId!,
+                moduleKey: widget.config.reportModuleKey,
+                subtype: widget.config.reportSubtype,
+                status: 'published',
+              );
+              if (context.mounted) {
+                setState(() {
+                  _availableTemplates = list;
+                  _templatesLoaded = true;
+                  _isLoadingTemplates = false;
+                });
+                setModalState(() {});
+              }
+            } catch (_) {
+              if (context.mounted) {
+                setState(() {
+                  _availableTemplates = const [];
+                  _templatesLoaded = true;
+                  _isLoadingTemplates = false;
+                });
+                setModalState(() {});
+              }
+            }
+          }
+
+          // Load templates when bottom sheet opens (only once)
+          if (widget.config.pdfEndpoint != null &&
+              widget.config.businessId != null &&
+              widget.config.reportModuleKey != null &&
+              !_templatesLoaded &&
+              !_isLoadingTemplates &&
+              !_templateLoadCallbackAdded) {
+            _templateLoadCallbackAdded = true;
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              ensureTemplatesLoaded();
+            });
+          }
+
+          return Container(
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surface,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Handle bar
+                Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.symmetric(vertical: 12),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
+                    borderRadius: BorderRadius.circular(2),
                   ),
-                ],
-              ),
-            ),
-            
-            const Divider(height: 1),
-            
-            if (widget.config.pdfEndpoint != null) ...[
-              if (widget.config.businessId != null && widget.config.reportModuleKey != null) ...[
+                ),
+                
+                // Title
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   child: Row(
                     children: [
-                      const Icon(Icons.description_outlined, size: 18),
+                      Icon(Icons.download, color: theme.colorScheme.primary, size: 20),
                       const SizedBox(width: 8),
-                      Expanded(
-                        child: _loadingTemplates
-                            ? const LinearProgressIndicator(minHeight: 2)
-                            : DropdownButtonFormField<int?>(
-                                value: _selectedTemplateIdFromList,
-                                isExpanded: true,
-                                decoration: InputDecoration(
-                                  labelText: AppLocalizations.of(context).printTemplatePublished,
-                                  isDense: true,
-                                  border: const OutlineInputBorder(),
-                                ),
-                                items: [
-                                  DropdownMenuItem<int?>(
-                                    value: null,
-                                    child: Text(AppLocalizations.of(context).noCustomTemplate),
-                                  ),
-                                  ..._availableTemplates.map((tpl) {
-                                    final id = (tpl['id'] as num).toInt();
-                                    final name = (tpl['name'] ?? 'Template').toString();
-                                    final isDefault = tpl['is_default'] == true;
-                                    return DropdownMenuItem<int?>(
-                                      value: id,
-                                      child: Row(
-                                        children: [
-                                          if (isDefault) const Icon(Icons.star, size: 16),
-                                          if (isDefault) const SizedBox(width: 6),
-                                          Expanded(child: Text(name)),
-                                        ],
-                                      ),
-                                    );
-                                  }),
-                                ],
-                                onChanged: (val) {
-                                  setState(() {
-                                    _selectedTemplateIdFromList = val;
-                                    _templateIdForExport = val;
-                                  });
-                                },
-                              ),
-                      ),
-                      const SizedBox(width: 8),
-                      IconButton(
-                        tooltip: AppLocalizations.of(context).reload,
-                        onPressed: _loadingTemplates ? null : _ensureTemplatesLoaded,
-                        icon: const Icon(Icons.refresh),
+                      Text(
+                        t.export,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ],
                   ),
                 ),
+                
                 const Divider(height: 1),
-              ],
-            ],
+                
+                if (widget.config.pdfEndpoint != null) ...[
+                  if (widget.config.businessId != null && widget.config.reportModuleKey != null) ...[
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.description_outlined, size: 18),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: _isLoadingTemplates
+                                ? const LinearProgressIndicator(minHeight: 2)
+                                : DropdownButtonFormField<int?>(
+                                    value: _selectedTemplateIdFromList,
+                                    isExpanded: true,
+                                    decoration: InputDecoration(
+                                      labelText: AppLocalizations.of(context).printTemplatePublished,
+                                      isDense: true,
+                                      border: const OutlineInputBorder(),
+                                    ),
+                                    items: [
+                                      DropdownMenuItem<int?>(
+                                        value: null,
+                                        child: Text(AppLocalizations.of(context).noCustomTemplate),
+                                      ),
+                                      ..._availableTemplates.map((tpl) {
+                                        final id = (tpl['id'] as num).toInt();
+                                        final name = (tpl['name'] ?? 'Template').toString();
+                                        final isDefault = tpl['is_default'] == true;
+                                        return DropdownMenuItem<int?>(
+                                          value: id,
+                                          child: Row(
+                                            children: [
+                                              if (isDefault) const Icon(Icons.star, size: 16),
+                                              if (isDefault) const SizedBox(width: 6),
+                                              Expanded(child: Text(name)),
+                                            ],
+                                          ),
+                                        );
+                                      }),
+                                    ],
+                                    onChanged: (val) {
+                                      setState(() {
+                                        _selectedTemplateIdFromList = val;
+                                        _templateIdForExport = val;
+                                      });
+                                      setModalState(() {});
+                                    },
+                                  ),
+                          ),
+                          const SizedBox(width: 8),
+                          IconButton(
+                            tooltip: AppLocalizations.of(context).reload,
+                            onPressed: _isLoadingTemplates ? null : () {
+                              setState(() {
+                                _templatesLoaded = false;
+                              });
+                              ensureTemplatesLoaded();
+                            },
+                            icon: const Icon(Icons.refresh),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Divider(height: 1),
+                  ],
+                ],
             
             // Excel options
             if (widget.config.excelEndpoint != null) ...[
@@ -1520,6 +1556,8 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
             const SizedBox(height: 16),
           ],
         ),
+      );
+        },
       ),
     );
   }
@@ -1894,6 +1932,17 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
       );
     }
 
+    // Build columns list with LayoutBuilder to get available width
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final availableWidth = constraints.maxWidth;
+        return _buildTableColumns(t, theme, availableWidth);
+      },
+    );
+  }
+
+  /// ساخت ستون‌های جدول با در نظر گرفتن عرض موجود
+  Widget _buildTableColumns(AppLocalizations t, ThemeData theme, double availableWidth) {
     // Build columns list
     final List<DataColumn2> columns = [];
     
@@ -1976,6 +2025,13 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
       dataColumnsToShow = finalOrder.map((k) => mapByKey[k]).whereType<DataTableColumn>().toList();
     }
     
+    // محاسبه و تنظیم عرض ستون‌ها برای پر کردن فضای موجود
+    final adjustedColumnWidths = _calculateAndAdjustColumnWidths(
+      dataColumnsToShow,
+      theme,
+      availableWidth,
+    );
+    
     columns.addAll(dataColumnsToShow.map((column) {
       final headerTextStyle = theme.textTheme.titleSmall?.copyWith(
         fontWeight: FontWeight.w600,
@@ -1987,7 +2043,11 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
       final double minWidth = 96.0;
       final double defaultWidth = math.max(baseWidth, headerTextWidth);
       final double savedWidth = _columnSettings?.columnWidths[column.key] ?? defaultWidth;
-      final double computedWidth = math.max(savedWidth, minWidth);
+      // استفاده از عرض تنظیم شده از متد کمکی
+      final double computedWidth = math.max(
+        adjustedColumnWidths[column.key] ?? savedWidth,
+        minWidth,
+      );
 
       return DataColumn2(
         label: _ColumnHeaderWithSearch(
@@ -2463,6 +2523,96 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     final cellPadding = 32.0;
     final computed = math.max(minWidth, math.max(headerWidth, maxCellWidth + cellPadding));
     return computed;
+  }
+
+  /// محاسبه عرض کل ستون‌ها و تنظیم عرض‌ها برای پر کردن فضای موجود
+  /// این متد عرض کل ستون‌ها را محاسبه می‌کند و اگر شرایط برقرار باشد،
+  /// عرض ستون‌ها را به نسبت افزایش می‌دهد تا فضای موجود را پر کنند
+  Map<String, double> _calculateAndAdjustColumnWidths(
+    List<DataTableColumn> dataColumnsToShow,
+    ThemeData theme,
+    double availableWidth,
+  ) {
+    final headerTextStyle = theme.textTheme.titleSmall?.copyWith(
+      fontWeight: FontWeight.w600,
+      color: theme.colorScheme.onSurface,
+    ) ?? const TextStyle(fontSize: 14, fontWeight: FontWeight.w600);
+    
+    // بررسی اینکه آیا کاربر عرض ستون‌ها را تنظیم کرده یا نه
+    final hasUserCustomizedWidths = _columnSettings?.columnWidths.isNotEmpty ?? false;
+    
+    // محاسبه عرض کل ستون‌ها
+    double totalColumnsWidth = 0.0;
+    final Map<String, double> columnWidths = {};
+    
+    // عرض ستون selection (اگر فعال باشد)
+    if (widget.config.enableRowSelection) {
+      totalColumnsWidth += 50.0; // عرض تقریبی checkbox column
+    }
+    
+    // عرض ستون row number (اگر فعال باشد)
+    if (widget.config.showRowNumbers) {
+      totalColumnsWidth += 60.0; // عرض تقریبی row number column
+    }
+    
+    // عرض ستون action (اگر وجود داشته باشد)
+    ActionColumn? actionColumn;
+    for (final c in widget.config.columns) {
+      if (c is ActionColumn) {
+        actionColumn = c;
+        totalColumnsWidth += 80.0; // عرض ثابت action column
+        break;
+      }
+    }
+    
+    // محاسبه عرض ستون‌های داده
+    for (final column in dataColumnsToShow) {
+      final double baseWidth = DataTableUtils.getColumnWidth(column.width);
+      final double affordancePadding = _getHeaderAffordancePadding(column);
+      final double headerTextWidth = _measureHeaderTextWidth(column.label, headerTextStyle) + affordancePadding;
+      final double minWidth = 96.0;
+      final double defaultWidth = math.max(baseWidth, headerTextWidth);
+      final double savedWidth = _columnSettings?.columnWidths[column.key] ?? defaultWidth;
+      final double computedWidth = math.max(savedWidth, minWidth);
+      
+      columnWidths[column.key] = computedWidth;
+      totalColumnsWidth += computedWidth;
+    }
+    
+    // اضافه کردن horizontalMargin (10 * 2 = 20)
+    totalColumnsWidth += 20.0;
+    
+    // اگر autoFillAvailableWidth فعال باشد و کاربر عرض ستون‌ها را تنظیم نکرده باشد
+    // و عرض کل کمتر از عرض موجود باشد، عرض ستون‌ها را به نسبت افزایش می‌دهیم
+    if (widget.config.autoFillAvailableWidth && 
+        !hasUserCustomizedWidths && 
+        totalColumnsWidth < availableWidth &&
+        dataColumnsToShow.isNotEmpty) {
+      // محاسبه ضریب افزایش (فقط برای ستون‌های داده)
+      final dataColumnsTotalWidth = totalColumnsWidth - 20.0 - 
+          (widget.config.enableRowSelection ? 50.0 : 0.0) -
+          (widget.config.showRowNumbers ? 60.0 : 0.0) -
+          (actionColumn != null ? 80.0 : 0.0);
+      
+      final availableForDataColumns = availableWidth - 20.0 - 
+          (widget.config.enableRowSelection ? 50.0 : 0.0) -
+          (widget.config.showRowNumbers ? 60.0 : 0.0) -
+          (actionColumn != null ? 80.0 : 0.0);
+      
+      if (dataColumnsTotalWidth > 0 && availableForDataColumns > dataColumnsTotalWidth) {
+        final scaleFactor = availableForDataColumns / dataColumnsTotalWidth;
+        
+        // افزایش عرض ستون‌های داده به نسبت
+        for (final column in dataColumnsToShow) {
+          final currentWidth = columnWidths[column.key] ?? 0.0;
+          final newWidth = currentWidth * scaleFactor;
+          // اطمینان از اینکه عرض از minWidth کمتر نشود
+          columnWidths[column.key] = math.max(newWidth, 96.0);
+        }
+      }
+    }
+    
+    return columnWidths;
   }
 }
 

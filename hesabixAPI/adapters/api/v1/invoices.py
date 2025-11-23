@@ -1,8 +1,9 @@
 from typing import Dict, Any, List, Optional
-from fastapi import APIRouter, Depends, Request, Body
+from fastapi import APIRouter, Depends, Request, Body, UploadFile, File, Form
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_
+from decimal import Decimal
 import io
 import json
 import datetime
@@ -20,6 +21,8 @@ from adapters.db.models.document import Document
 from adapters.db.models.document_line import DocumentLine
 from adapters.db.models.account import Account
 from adapters.db.models.currency import Currency
+from adapters.db.models.product import Product
+from adapters.db.models.warehouse import Warehouse
 from adapters.db.models.fiscal_year import FiscalYear
 from adapters.db.models.business import Business
 from adapters.db.models.business_print_settings import BusinessPrintSettings
@@ -199,6 +202,106 @@ def delete_invoice_endpoint(
         data={"deleted": True, "invoice_id": invoice_id},
         request=request,
         message="INVOICE_DELETED"
+    )
+
+
+@router.get("/business/{business_id}/{invoice_id}/delete-info")
+@require_business_access("business_id")
+def get_invoice_delete_info(
+    request: Request,
+    business_id: int,
+    invoice_id: int,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """دریافت اطلاعات مرتبط با فاکتور برای نمایش در هشدار حذف"""
+    from app.core.responses import ApiError
+    
+    # بررسی مالکیت
+    doc = db.query(Document).filter(Document.id == invoice_id).first()
+    if not doc or doc.business_id != business_id or doc.document_type not in SUPPORTED_INVOICE_TYPES:
+        raise ApiError("DOCUMENT_NOT_FOUND", "Invoice document not found", http_status=404)
+    
+    extra_info = doc.extra_info or {}
+    links = extra_info.get("links") or {}
+    
+    # بررسی کارپوشه مودیان
+    is_in_tax_workspace = bool(extra_info.get("tax_workspace"))
+    tax_status = extra_info.get("tax_status", "")
+    
+    # بررسی اقساط
+    has_installments = bool(extra_info.get("installment_plan"))
+    installment_info = None
+    if has_installments:
+        plan = extra_info.get("installment_plan", {})
+        schedule = plan.get("schedule", [])
+        installment_info = {
+            "count": len(schedule),
+            "total_amount": plan.get("principal_total", 0),
+        }
+    
+    # بررسی اسناد دریافت/پرداخت
+    receipt_payment_document_ids = links.get("receipt_payment_document_ids") or []
+    receipt_payment_info = []
+    if receipt_payment_document_ids:
+        related_docs = db.query(Document).filter(
+            Document.id.in_(receipt_payment_document_ids)
+        ).all()
+        for rp_doc in related_docs:
+            total_amount = Decimal(0)
+            try:
+                from adapters.db.models.document_line import DocumentLine
+                lines = db.query(DocumentLine).filter(
+                    DocumentLine.document_id == rp_doc.id
+                ).all()
+                for line in lines:
+                    debit = Decimal(str(line.debit or 0))
+                    credit = Decimal(str(line.credit or 0))
+                    total_amount += max(debit, credit)
+            except Exception:
+                pass
+            
+            receipt_payment_info.append({
+                "id": rp_doc.id,
+                "code": rp_doc.code,
+                "type": rp_doc.document_type,
+                "amount": float(total_amount),
+                "is_zero": total_amount == Decimal(0),
+            })
+    
+    # بررسی حواله‌های انبار
+    warehouse_document_ids = links.get("warehouse_document_ids") or []
+    warehouse_info = []
+    if warehouse_document_ids:
+        try:
+            from adapters.db.models.warehouse_document import WarehouseDocument
+            warehouse_docs = db.query(WarehouseDocument).filter(
+                WarehouseDocument.id.in_(warehouse_document_ids)
+            ).all()
+            for wd in warehouse_docs:
+                status = getattr(wd, "status", None)
+                warehouse_info.append({
+                    "id": wd.id,
+                    "code": getattr(wd, "code", ""),
+                    "status": status,
+                    "is_finalized": status == "finalized",
+                })
+        except ImportError:
+            pass
+    
+    return success_response(
+        data={
+            "invoice_id": invoice_id,
+            "invoice_code": doc.code,
+            "is_in_tax_workspace": is_in_tax_workspace,
+            "tax_status": tax_status,
+            "has_installments": has_installments,
+            "installment_info": installment_info,
+            "receipt_payment_documents": receipt_payment_info,
+            "warehouse_documents": warehouse_info,
+        },
+        request=request,
+        message="INVOICE_DELETE_INFO"
     )
 
 
@@ -1265,16 +1368,21 @@ def _add_counterparty_to_invoice_item(db: Session, item: Dict[str, Any]) -> None
             try:
                 p = db.query(Person).filter(Person.id == int(person_id)).first()
                 if p is not None:
-                    # استفاده از display_name یا alias_name یا name
-                    person_name = getattr(p, "display_name", None) or getattr(p, "alias_name", None)
-                    if not person_name and (p.first_name or p.last_name):
+                    # اولویت: display_name > name > alias_name (که اجباری است)
+                    person_name = getattr(p, "display_name", None) or getattr(p, "name", None)
+                    if not person_name:
+                        # اگر display_name و name خالی باشند، از alias_name استفاده می‌کنیم (که اجباری است)
+                        person_name = getattr(p, "alias_name", None)
+                    if not person_name and (getattr(p, "first_name", None) or getattr(p, "last_name", None)):
+                        # اگر هنوز خالی است، از first_name و last_name استفاده می‌کنیم
                         name_parts = []
-                        if p.first_name:
+                        if getattr(p, "first_name", None):
                             name_parts.append(p.first_name)
-                        if p.last_name:
+                        if getattr(p, "last_name", None):
                             name_parts.append(p.last_name)
                         person_name = " ".join(name_parts) if name_parts else None
-                    if not person_name and p.company_name:
+                    if not person_name and getattr(p, "company_name", None):
+                        # اگر هنوز خالی است، از company_name استفاده می‌کنیم
                         person_name = p.company_name
             except Exception:
                 person_name = None
@@ -2073,6 +2181,97 @@ async def export_invoices_excel(
     # Build items like list endpoint
     locale = negotiate_locale(request.headers.get("Accept-Language"))
     is_fa = locale == 'fa'
+    calendar_type = request.state.calendar_type
+
+    def format_date_for_export(item_dict: dict, date_key: str) -> str:
+        """Format date based on calendar type (date only, no time)"""
+        # First check if there's a _formatted field (from format_datetime_fields)
+        formatted_key = f"{date_key}_formatted"
+        if formatted_key in item_dict:
+            formatted_value = item_dict.get(formatted_key)
+            if isinstance(formatted_value, dict):
+                date_only = formatted_value.get("date_only")
+                if date_only:
+                    return str(date_only)
+                formatted = formatted_value.get("formatted", "")
+                if formatted:
+                    # Extract date part only (remove time)
+                    date_part = str(formatted).split(' ')[0].split('T')[0]
+                    return date_part
+        
+        # Get the main field value
+        value = item_dict.get(date_key)
+        if value is None:
+            return ""
+        
+        # If it's a dict (from _formatted field), use date_only
+        if isinstance(value, dict):
+            date_only = value.get("date_only")
+            if date_only:
+                return str(date_only)
+            formatted = value.get("formatted", "")
+            if formatted:
+                date_part = str(formatted).split(' ')[0].split('T')[0]
+                return date_part
+        
+        # If it's a datetime object, format it based on calendar type
+        if isinstance(value, datetime.datetime):
+            try:
+                formatted = CalendarConverter.format_datetime(value, calendar_type)
+                return formatted.get("date_only", "") or formatted.get("formatted", "").split(' ')[0]
+            except Exception:
+                pass
+        
+        # If it's a date object, format it based on calendar type
+        if isinstance(value, datetime.date):
+            try:
+                dt_value = datetime.datetime.combine(value, datetime.datetime.min.time())
+                formatted = CalendarConverter.format_datetime(dt_value, calendar_type)
+                return formatted.get("date_only", "") or formatted.get("formatted", "").split(' ')[0]
+            except Exception:
+                pass
+        
+        # If it's a string, check if it's already formatted (contains / separator for Jalali)
+        if isinstance(value, str):
+            # Check if it looks like a Jalali date (contains / and has YYYY/MM/DD format)
+            if '/' in value and (len(value.split('/')) == 3):
+                # Might be already formatted, but check if it's ISO format (YYYY-MM-DD) or Jalali (YYYY/MM/DD)
+                if '-' in value:
+                    # ISO format (YYYY-MM-DD), parse and format
+                    try:
+                        if 'T' in value:
+                            dt_value = datetime.datetime.fromisoformat(value.replace('Z', '+00:00'))
+                        else:
+                            date_value = datetime.date.fromisoformat(value)
+                            dt_value = datetime.datetime.combine(date_value, datetime.datetime.min.time())
+                        formatted = CalendarConverter.format_datetime(dt_value, calendar_type)
+                        return formatted.get("date_only", "") or formatted.get("formatted", "").split(' ')[0]
+                    except Exception:
+                        pass
+                else:
+                    # Might be Jalali format (YYYY/MM/DD), return as is but remove time if exists
+                    if ' ' in value:
+                        return value.split(' ')[0]
+                    return value
+            else:
+                # Try to parse as ISO format
+                try:
+                    if 'T' in value:
+                        dt_value = datetime.datetime.fromisoformat(value.replace('Z', '+00:00'))
+                    else:
+                        date_value = datetime.date.fromisoformat(value)
+                        dt_value = datetime.datetime.combine(date_value, datetime.datetime.min.time())
+                    formatted = CalendarConverter.format_datetime(dt_value, calendar_type)
+                    return formatted.get("date_only", "") or formatted.get("formatted", "").split(' ')[0]
+                except Exception:
+                    # If parsing fails, return as is (might already be formatted)
+                    if ' ' in value or 'T' in value:
+                        date_part = value.split(' ')[0].split('T')[0]
+                        return date_part
+                    return value
+        
+        # Fallback
+        return str(value) if value else ""
 
     def _type_name(tp: str) -> str:
         mapping = {
@@ -2117,6 +2316,10 @@ async def export_invoices_excel(
         item['document_type_name'] = _type_name(item.get('document_type'))
         if total_amount is not None:
             item['total_amount'] = total_amount
+        
+        # افزودن counterparty
+        _add_counterparty_to_invoice_item(db, item)
+        
         items.append(format_datetime_fields(item, request))
 
     # Handle selected rows
@@ -2139,16 +2342,28 @@ async def export_invoices_excel(
     keys: List[str] = []
     export_columns = body.get('export_columns')
     if export_columns:
+        # Check if document_type_name exists in export_columns
+        has_document_type_name = any(col.get('key') == 'document_type_name' for col in export_columns)
+        
         for col in export_columns:
             key = col.get('key')
             label = col.get('label', key)
             if key:
                 keys.append(str(key))
                 headers.append(str(label))
+        
+        # If document_type_name is missing, add it at the beginning (after code if exists)
+        if not has_document_type_name:
+            # Find position after 'code' if it exists
+            code_index = keys.index('code') if 'code' in keys else -1
+            insert_pos = code_index + 1 if code_index >= 0 else 0
+            keys.insert(insert_pos, 'document_type_name')
+            headers.insert(insert_pos, 'نوع فاکتور' if is_fa else 'Invoice type')
     else:
         default_columns = [
             ('code', 'کد سند' if is_fa else 'Code'),
             ('document_type_name', 'نوع فاکتور' if is_fa else 'Invoice type'),
+            ('counterparty', 'طرف حساب' if is_fa else 'Counterparty'),
             ('document_date', 'تاریخ سند' if is_fa else 'Document date'),
             ('total_amount', 'مبلغ کل' if is_fa else 'Total amount'),
             ('currency_code', 'ارز' if is_fa else 'Currency'),
@@ -2183,10 +2398,15 @@ async def export_invoices_excel(
     for row_idx, item in enumerate(items, 2):
         for col_idx, key in enumerate(keys, 1):
             value = item.get(key, "")
-            if isinstance(value, list):
+            
+            # Format date fields based on calendar type
+            if key in ('document_date', 'registered_at', 'created_at', 'due_date'):
+                value = format_date_for_export(item, key)
+            elif isinstance(value, list):
                 value = ", ".join(str(v) for v in value)
             elif isinstance(value, dict):
                 value = str(value)
+            
             ws.cell(row=row_idx, column=col_idx, value=value).border = border
 
     # Auto-width
@@ -2344,7 +2564,23 @@ async def export_invoices_pdf(
             p = db.query(Person).filter(Person.id == int(person_id)).first()
             if p is None:
                 return None
-            return getattr(p, "display_name", None) or getattr(p, "name", None)
+            # اولویت: display_name > name > alias_name (که اجباری است)
+            person_name = getattr(p, "display_name", None) or getattr(p, "name", None)
+            if not person_name:
+                # اگر display_name و name خالی باشند، از alias_name استفاده می‌کنیم (که اجباری است)
+                person_name = getattr(p, "alias_name", None)
+            if not person_name and (getattr(p, "first_name", None) or getattr(p, "last_name", None)):
+                # اگر هنوز خالی است، از first_name و last_name استفاده می‌کنیم
+                name_parts = []
+                if getattr(p, "first_name", None):
+                    name_parts.append(p.first_name)
+                if getattr(p, "last_name", None):
+                    name_parts.append(p.last_name)
+                person_name = " ".join(name_parts) if name_parts else None
+            if not person_name and getattr(p, "company_name", None):
+                # اگر هنوز خالی است، از company_name استفاده می‌کنیم
+                person_name = p.company_name
+            return person_name
         except Exception:
             return None
     for d in docs:
@@ -2413,12 +2649,23 @@ async def export_invoices_pdf(
     keys: List[str] = []
     export_columns = body.get('export_columns')
     if export_columns:
+        # Check if document_type_name exists in export_columns
+        has_document_type_name = any(col.get('key') == 'document_type_name' for col in export_columns)
+        
         for col in export_columns:
             key = col.get('key')
             label = col.get('label', key)
             if key:
                 keys.append(str(key))
                 headers.append(str(label))
+        
+        # If document_type_name is missing, add it at the beginning (after code if exists)
+        if not has_document_type_name:
+            # Find position after 'code' if it exists
+            code_index = keys.index('code') if 'code' in keys else -1
+            insert_pos = code_index + 1 if code_index >= 0 else 0
+            keys.insert(insert_pos, 'document_type_name')
+            headers.insert(insert_pos, 'نوع فاکتور' if is_fa else 'Invoice type')
     else:
         default_columns = [
             ('code', 'کد سند' if is_fa else 'Code'),
@@ -2674,4 +2921,517 @@ async def export_invoices_pdf(
             "Access-Control-Expose-Headers": "Content-Disposition",
         },
     )
+
+
+@router.post("/business/{business_id}/import/template",
+    summary="دانلود تمپلیت ایمپورت فاکتورها",
+    description="فایل Excel تمپلیت برای ایمپورت فاکتورها را برمی‌گرداند",
+)
+@require_business_access("business_id")
+async def download_invoices_import_template(
+    request: Request,
+    business_id: int,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("invoices", "add")),
+):
+    import datetime
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, Alignment, PatternFill
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Invoices"
+
+    # Header row
+    headers = [
+        "invoice_number",  # شناسه یکتا برای گروه‌بندی ردیف‌های یک فاکتور
+        "invoice_type",  # نوع فاکتور: sales, purchase, sales_return, purchase_return, direct_consumption, production, waste
+        "document_date",  # تاریخ فاکتور: YYYY-MM-DD
+        "currency_code",  # کد ارز: IRR, USD, etc.
+        "is_proforma",  # پیش‌فاکتور: TRUE/FALSE
+        "description",  # توضیحات فاکتور
+        "person_code",  # کد مشتری/تامین‌کننده (برای sales/purchase)
+        "seller_code",  # کد فروشنده/بازاریاب (اختیاری)
+        "due_date",  # تاریخ سررسید (اختیاری)
+        "post_inventory",  # ثبت انبار: TRUE/FALSE
+        "product_code",  # کد کالا/خدمت
+        "quantity",  # تعداد
+        "unit",  # واحد: main/secondary (پیش‌فرض: main)
+        "unit_price",  # قیمت واحد
+        "discount_type",  # نوع تخفیف: percent/amount (پیش‌فرض: amount)
+        "discount_value",  # مقدار تخفیف
+        "tax_rate",  # نرخ مالیات (درصد)
+        "line_description",  # توضیحات ردیف
+        "movement",  # جهت حرکت: in/out (برای فاکتور تولید)
+        "warehouse_code",  # کد انبار (اختیاری)
+    ]
+    
+    # Header styling
+    header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+    header_font = Font(bold=True, color="FFFFFF")
+    
+    for col, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col, value=header)
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+        cell.fill = header_fill
+
+    # Sample data rows
+    # نکته: در ردیف‌های بعدی هر فاکتور، ستون‌های هدر (invoice_type, document_date, person_code, ...) خالی می‌مانند
+    # فقط invoice_number و اطلاعات ردیف (product_code, quantity, ...) در همه ردیف‌ها وارد می‌شوند
+    samples = [
+        [
+            "INV-001", "sales", "2024-01-15", "IRR", "FALSE", "فاکتور فروش نمونه",
+            "CUST-001", "", "2024-02-15", "TRUE",
+            "P1001", "10", "main", "100000", "amount", "5000", "9", "ردیف اول", "", "WH-001"
+        ],
+        [
+            "INV-001", "", "", "", "", "", "", "", "", "",
+            "P1002", "5", "main", "200000", "percent", "10", "9", "ردیف دوم", "", "WH-001"
+        ],
+        [
+            "INV-002", "purchase", "2024-01-16", "IRR", "FALSE", "فاکتور خرید نمونه",
+            "SUPP-001", "", "", "TRUE",
+            "P1003", "20", "main", "50000", "amount", "0", "9", "", "", "WH-001"
+        ],
+    ]
+    
+    for row_idx, sample in enumerate(samples, start=2):
+        for col, val in enumerate(sample, 1):
+            ws.cell(row=row_idx, column=col, value=val)
+
+    # Auto width
+    for column in ws.columns:
+        try:
+            letter = column[0].column_letter
+            max_len = max(len(str(c.value)) if c.value is not None else 0 for c in column)
+            ws.column_dimensions[letter].width = min(max_len + 2, 50)
+        except Exception:
+            pass
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+
+    filename = f"invoices_import_template_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    return Response(
+        content=buf.getvalue(),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": f"attachment; filename={filename}",
+            "Access-Control-Expose-Headers": "Content-Disposition",
+        },
+    )
+
+
+@router.post("/business/{business_id}/import/excel",
+    summary="ایمپورت فاکتورها از فایل Excel",
+    description="فایل اکسل را دریافت می‌کند و به‌صورت dry-run یا واقعی پردازش می‌کند",
+)
+@require_business_access("business_id")
+async def import_invoices_excel(
+    request: Request,
+    business_id: int,
+    file: UploadFile = File(...),
+    dry_run: str = Form(default="true"),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("invoices", "add")),
+):
+    import zipfile
+    from decimal import Decimal
+    from collections import defaultdict
+    from datetime import datetime as dt
+    from openpyxl import load_workbook
+    from app.services.invoice_service import (
+        INVOICE_SALES, INVOICE_PURCHASE, INVOICE_SALES_RETURN, INVOICE_PURCHASE_RETURN,
+        INVOICE_DIRECT_CONSUMPTION, INVOICE_PRODUCTION, INVOICE_WASTE,
+    )
+
+    def _validate_excel_signature(content: bytes) -> bool:
+        try:
+            if not content.startswith(b'PK'):
+                return False
+            with zipfile.ZipFile(io.BytesIO(content), 'r') as zf:
+                return any(n.startswith('xl/') for n in zf.namelist())
+        except Exception:
+            return False
+
+    def _parse_bool(v: object) -> Optional[bool]:
+        if v is None: return None
+        s = str(v).strip().lower()
+        if s in ("true", "1", "yes", "on", "بله", "هست"):
+            return True
+        if s in ("false", "0", "no", "off", "خیر", "نیست"):
+            return False
+        return None
+
+    def _parse_decimal(v: object) -> Optional[Decimal]:
+        if v is None or str(v).strip() == "":
+            return None
+        try:
+            return Decimal(str(v).replace(",", ""))
+        except Exception:
+            return None
+
+    def _parse_date(v: object) -> Optional[date]:
+        if v is None or str(v).strip() == "":
+            return None
+        try:
+            if isinstance(v, dt):
+                return v.date()
+            s = str(v).strip()
+            # Try different date formats
+            for fmt in ["%Y-%m-%d", "%Y/%m/%d", "%d/%m/%Y", "%d-%m-%Y"]:
+                try:
+                    return dt.strptime(s, fmt).date()
+                except Exception:
+                    continue
+            return None
+        except Exception:
+            return None
+
+    def _normalize_invoice_type(v: object) -> Optional[str]:
+        if v is None: return None
+        s = str(v).strip().lower()
+        mapping = {
+            "sales": INVOICE_SALES,
+            "purchase": INVOICE_PURCHASE,
+            "sales_return": INVOICE_SALES_RETURN,
+            "purchase_return": INVOICE_PURCHASE_RETURN,
+            "direct_consumption": INVOICE_DIRECT_CONSUMPTION,
+            "production": INVOICE_PRODUCTION,
+            "waste": INVOICE_WASTE,
+        }
+        if s in mapping:
+            return mapping[s]
+        # Check if already in correct format
+        if s.startswith("invoice_"):
+            return s
+        return None
+
+    try:
+        is_dry_run = str(dry_run).lower() in ("true", "1", "yes", "on")
+
+        if not file.filename or not file.filename.lower().endswith('.xlsx'):
+            raise ApiError("INVALID_FILE", "فرمت فایل معتبر نیست. تنها xlsx پشتیبانی می‌شود", http_status=400)
+
+        content = await file.read()
+        if len(content) < 100 or not _validate_excel_signature(content):
+            raise ApiError("INVALID_FILE", "فایل Excel معتبر نیست یا خالی است", http_status=400)
+
+        try:
+            wb = load_workbook(filename=io.BytesIO(content), data_only=True)
+        except zipfile.BadZipFile:
+            raise ApiError("INVALID_FILE", "فایل Excel خراب است یا فرمت آن معتبر نیست", http_status=400)
+
+        ws = wb.active
+        rows = list(ws.iter_rows(values_only=True))
+        if not rows:
+            return success_response(data={"summary": {"total": 0}}, request=request, message="EMPTY_FILE")
+
+        headers = [str(h).strip() if h is not None else "" for h in rows[0]]
+        data_rows = rows[1:]
+
+        # Find column indices
+        col_map = {h.lower(): i for i, h in enumerate(headers)}
+        
+        # Required columns
+        required_cols = ["invoice_number", "invoice_type", "document_date", "currency_code", "product_code", "quantity", "unit_price"]
+        missing_cols = [c for c in required_cols if c.lower() not in col_map]
+        if missing_cols:
+            raise ApiError("MISSING_COLUMNS", f"ستون‌های الزامی یافت نشد: {', '.join(missing_cols)}", http_status=400)
+
+        # Group rows by invoice_number
+        invoices_data: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
+        
+        for row_idx, row in enumerate(data_rows, start=2):
+            invoice_number = str(row[col_map["invoice_number"]]).strip() if col_map["invoice_number"] < len(row) else None
+            if not invoice_number:
+                continue
+            
+            row_data = {}
+            for col_name, col_idx in col_map.items():
+                if col_idx < len(row):
+                    row_data[col_name] = row[col_idx]
+            
+            invoices_data[invoice_number].append({
+                "row": row_idx,
+                "data": row_data
+            })
+
+        # Cache lookups
+        product_cache: Dict[str, Optional[Product]] = {}
+        person_cache: Dict[str, Optional[Person]] = {}
+        currency_cache: Dict[str, Optional[Currency]] = {}
+        warehouse_cache: Dict[str, Optional[Warehouse]] = {}
+
+        def _get_product(code: str) -> Optional[Product]:
+            if code in product_cache:
+                return product_cache[code]
+            product = db.query(Product).filter(
+                and_(Product.business_id == business_id, Product.code == code)
+            ).first()
+            product_cache[code] = product
+            return product
+
+        def _get_person(code: str) -> Optional[Person]:
+            if code in person_cache:
+                return person_cache[code]
+            try:
+                code_int = int(code)
+                person = db.query(Person).filter(
+                    and_(Person.business_id == business_id, Person.code == code_int)
+                ).first()
+            except Exception:
+                person = None
+            person_cache[code] = person
+            return person
+
+        def _get_currency(code: str) -> Optional[Currency]:
+            if code in currency_cache:
+                return currency_cache[code]
+            currency = db.query(Currency).filter(Currency.code == code.upper()).first()
+            currency_cache[code] = currency
+            return currency
+
+        def _get_warehouse(code: str) -> Optional[Warehouse]:
+            if code in warehouse_cache:
+                return warehouse_cache[code]
+            warehouse = db.query(Warehouse).filter(
+                and_(Warehouse.business_id == business_id, Warehouse.code == code)
+            ).first()
+            warehouse_cache[code] = warehouse
+            return warehouse
+
+        errors: List[Dict[str, Any]] = []
+        valid_invoices: List[Dict[str, Any]] = []
+        created_count = 0
+
+        # Process each invoice group
+        for invoice_number, rows_list in invoices_data.items():
+            if not rows_list:
+                continue
+
+            # Extract header data from first row (ردیف اول هر فاکتور باید اطلاعات هدر را داشته باشد)
+            # در ردیف‌های بعدی، اگر ستون‌های هدر خالی باشند، از ردیف اول استفاده می‌شود
+            first_row = rows_list[0]["data"]
+            invoice_errors: List[str] = []
+            
+            # Helper function to get header value (from first row if empty in current row)
+            def _get_header_value(key: str, row_data: Dict[str, Any]) -> Any:
+                val = row_data.get(key)
+                # اگر خالی است، از ردیف اول استفاده کن
+                if val is None or (isinstance(val, str) and str(val).strip() == ""):
+                    return first_row.get(key)
+                return val
+            
+            # Parse invoice type
+            invoice_type_raw = str(_get_header_value("invoice_type", first_row) or "").strip()
+            invoice_type = _normalize_invoice_type(invoice_type_raw)
+            if not invoice_type:
+                invoice_errors.append(f"نوع فاکتور نامعتبر: {invoice_type_raw}")
+            
+            # Parse document date
+            doc_date = _parse_date(_get_header_value("document_date", first_row))
+            if not doc_date:
+                invoice_errors.append("تاریخ فاکتور الزامی است")
+            
+            # Parse currency
+            currency_code = str(_get_header_value("currency_code", first_row) or "").strip()
+            currency = _get_currency(currency_code) if currency_code else None
+            if not currency:
+                invoice_errors.append(f"ارز یافت نشد: {currency_code}")
+            
+            # Parse person (for sales/purchase)
+            person_id = None
+            person_code = str(_get_header_value("person_code", first_row) or "").strip()
+            if person_code:
+                person = _get_person(person_code)
+                if person:
+                    person_id = person.id
+                else:
+                    invoice_errors.append(f"شخص یافت نشد: {person_code}")
+            elif invoice_type in {INVOICE_SALES, INVOICE_SALES_RETURN, INVOICE_PURCHASE, INVOICE_PURCHASE_RETURN}:
+                invoice_errors.append("کد مشتری/تامین‌کننده الزامی است")
+            
+            # Parse other header fields
+            is_proforma = _parse_bool(_get_header_value("is_proforma", first_row)) or False
+            description = str(_get_header_value("description", first_row) or "").strip() or None
+            seller_code = str(_get_header_value("seller_code", first_row) or "").strip()
+            seller_id = None
+            if seller_code:
+                seller = _get_person(seller_code)
+                if seller:
+                    seller_id = seller.id
+                else:
+                    invoice_errors.append(f"فروشنده یافت نشد: {seller_code}")
+            
+            due_date = _parse_date(_get_header_value("due_date", first_row))
+            post_inventory = _parse_bool(_get_header_value("post_inventory", first_row))
+            if post_inventory is None:
+                post_inventory = True
+
+            # Parse line items
+            lines: List[Dict[str, Any]] = []
+            for row_info in rows_list:
+                row_data = row_info["data"]
+                row_num = row_info["row"]
+                line_errors: List[str] = []
+                
+                # Product
+                product_code = str(row_data.get("product_code", "")).strip()
+                if not product_code:
+                    line_errors.append("کد محصول الزامی است")
+                    continue
+                
+                product = _get_product(product_code)
+                if not product:
+                    line_errors.append(f"محصول یافت نشد: {product_code}")
+                    continue
+                
+                # Quantity
+                quantity = _parse_decimal(row_data.get("quantity"))
+                if not quantity or quantity <= 0:
+                    line_errors.append("تعداد باید بزرگتر از صفر باشد")
+                    continue
+                
+                # Unit price
+                unit_price = _parse_decimal(row_data.get("unit_price"))
+                if not unit_price or unit_price < 0:
+                    line_errors.append("قیمت واحد الزامی است")
+                    continue
+                
+                # Unit
+                unit = str(row_data.get("unit", "main")).strip().lower()
+                if unit not in ("main", "secondary"):
+                    unit = "main"
+                
+                # Discount
+                discount_type = str(row_data.get("discount_type", "amount")).strip().lower()
+                if discount_type not in ("percent", "amount"):
+                    discount_type = "amount"
+                discount_value = _parse_decimal(row_data.get("discount_value")) or Decimal(0)
+                
+                # Tax rate
+                tax_rate = _parse_decimal(row_data.get("tax_rate")) or Decimal(0)
+                
+                # Line description
+                line_description = str(row_data.get("line_description", "")).strip() or None
+                
+                # Movement (for production invoices)
+                movement = str(row_data.get("movement", "")).strip().lower()
+                if movement not in ("in", "out"):
+                    movement = None
+                
+                # Warehouse
+                warehouse_id = None
+                warehouse_code = row_data.get("warehouse_code", "")
+                if warehouse_code:
+                    warehouse = _get_warehouse(str(warehouse_code))
+                    if warehouse:
+                        warehouse_id = warehouse.id
+                    else:
+                        line_errors.append(f"انبار یافت نشد: {warehouse_code}")
+                
+                if line_errors:
+                    invoice_errors.extend([f"ردیف {row_num}: {e}" for e in line_errors])
+                    continue
+                
+                # Build line extra_info
+                line_extra_info: Dict[str, Any] = {
+                    "unit_price": float(unit_price),
+                    "discount_type": discount_type,
+                    "discount_value": float(discount_value),
+                    "tax_rate": float(tax_rate),
+                }
+                if movement:
+                    line_extra_info["movement"] = movement
+                if warehouse_id:
+                    line_extra_info["warehouse_id"] = warehouse_id
+                
+                lines.append({
+                    "product_id": product.id,
+                    "quantity": float(quantity),
+                    "description": line_description,
+                    "extra_info": line_extra_info,
+                })
+            
+            if not lines:
+                invoice_errors.append("حداقل یک ردیف معتبر الزامی است")
+            
+            if invoice_errors:
+                errors.append({
+                    "invoice_number": invoice_number,
+                    "row": rows_list[0]["row"],
+                    "errors": invoice_errors
+                })
+                continue
+            
+            # Build invoice payload
+            extra_info: Dict[str, Any] = {
+                "post_inventory": post_inventory,
+            }
+            if person_id:
+                extra_info["person_id"] = person_id
+            if seller_id:
+                extra_info["seller_id"] = seller_id
+            
+            invoice_payload = {
+                "invoice_type": invoice_type,
+                "document_date": doc_date.isoformat(),
+                "currency_id": currency.id,
+                "is_proforma": is_proforma,
+                "description": description,
+                "extra_info": extra_info,
+                "lines": lines,
+            }
+            
+            if due_date:
+                invoice_payload["due_date"] = due_date.isoformat()
+            
+            valid_invoices.append({
+                "invoice_number": invoice_number,
+                "payload": invoice_payload,
+            })
+
+        # Create invoices if not dry run
+        if not is_dry_run and valid_invoices:
+            user_id = ctx.get_user_id()
+            for inv_info in valid_invoices:
+                try:
+                    create_invoice(
+                        db=db,
+                        business_id=business_id,
+                        user_id=user_id,
+                        data=inv_info["payload"],
+                    )
+                    created_count += 1
+                except Exception as e:
+                    logger.error(f"Failed to create invoice {inv_info['invoice_number']}: {e}", exc_info=True)
+                    errors.append({
+                        "invoice_number": inv_info["invoice_number"],
+                        "row": 0,
+                        "errors": [f"خطا در ایجاد فاکتور: {str(e)}"]
+                    })
+
+        summary = {
+            "total": len(invoices_data),
+            "valid": len(valid_invoices),
+            "invalid": len(errors),
+            "created": created_count,
+            "dry_run": is_dry_run,
+        }
+
+        return success_response(
+            data={"summary": summary, "errors": errors},
+            request=request,
+            message="INVOICES_IMPORT_RESULT",
+        )
+    except ApiError:
+        raise
+    except Exception as e:
+        logger.error(f"Import error: {e}", exc_info=True)
+        raise ApiError("IMPORT_ERROR", f"خطا در پردازش فایل: {e}", http_status=500)
 

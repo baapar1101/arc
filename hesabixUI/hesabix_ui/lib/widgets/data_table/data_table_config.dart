@@ -286,6 +286,10 @@ class DataTableConfig<T> {
   // Auto-fit configuration
   final bool autoFitColumnsOnFirstLoad;
   final int autoFitSampleRows;
+  
+  // Auto-fill available width: if true, columns will expand to fill available width
+  // when user hasn't customized column widths
+  final bool autoFillAvailableWidth;
 
   const DataTableConfig({
     required this.endpoint,
@@ -367,6 +371,7 @@ class DataTableConfig<T> {
     this.onRefresh,
     this.autoFitColumnsOnFirstLoad = true,
     this.autoFitSampleRows = 50,
+    this.autoFillAvailableWidth = true,
   });
 
   /// Get column width as double

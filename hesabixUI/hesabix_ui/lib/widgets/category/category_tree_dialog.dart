@@ -3,6 +3,7 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../services/category_service.dart';
 import '../../core/api_client.dart';
 import '../../core/auth_store.dart';
+import 'category_picker_field.dart';
 
 class CategoryTreeDialog extends StatefulWidget {
   final int businessId;
@@ -125,6 +126,7 @@ class _CategoryTreeDialogState extends State<CategoryTreeDialog> {
     for (final item in items) {
       final id = item['id'] as int?;
       final label = (item['label'] ?? item['title'] ?? item['name'] ?? '').toString();
+      final description = (item['description'] as String?);
       final children = (item['children'] as List?)?.cast<dynamic>()
           .map((e) => Map<String, dynamic>.from(e as Map))
           .toList() ?? const <Map<String, dynamic>>[];
@@ -135,6 +137,7 @@ class _CategoryTreeDialogState extends State<CategoryTreeDialog> {
         _CategoryTreeNodeWidget(
           id: id,
           label: label,
+          description: description,
           level: level,
           isExpanded: isExpanded,
           hasChildren: hasChildren,
@@ -151,7 +154,17 @@ class _CategoryTreeDialogState extends State<CategoryTreeDialog> {
             });
           } : null,
           onAddChild: _canAdd ? () => _showEditDialog(parentId: id) : null,
-          onEdit: _canEdit ? () => _showEditDialog(categoryId: id, initialLabel: label) : null,
+          onEdit: _canEdit ? () {
+            final sortOrder = (item['sort_order'] as num?)?.toInt();
+            final currentParentId = (item['parent_id'] as num?)?.toInt();
+            _showEditDialog(
+              categoryId: id,
+              initialLabel: label,
+              initialDescription: description,
+              initialSortOrder: sortOrder,
+              initialParentId: currentParentId,
+            );
+          } : null,
           onDelete: _canDelete ? () => _confirmDelete(id) : null,
           t: t,
         ),
@@ -163,6 +176,29 @@ class _CategoryTreeDialogState extends State<CategoryTreeDialog> {
     }
     
     return widgets;
+  }
+
+  /// فیلتر کردن درخت برای حذف یک دسته‌بندی و تمام فرزندانش
+  List<Map<String, dynamic>> _filterTreeExcludingCategory(
+    List<Map<String, dynamic>> tree,
+    int excludeId,
+  ) {
+    List<Map<String, dynamic>> result = [];
+    for (final node in tree) {
+      final id = (node['id'] as num?)?.toInt();
+      if (id == excludeId) {
+        // این نود و تمام فرزندانش را حذف می‌کنیم
+        continue;
+      }
+      final children = (node['children'] as List?)?.cast<dynamic>()
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList() ?? const <Map<String, dynamic>>[];
+      final filteredChildren = _filterTreeExcludingCategory(children, excludeId);
+      final newNode = Map<String, dynamic>.from(node);
+      newNode['children'] = filteredChildren;
+      result.add(newNode);
+    }
+    return result;
   }
 
   /// باز کردن مسیر تا یک نود خاص
@@ -230,98 +266,170 @@ class _CategoryTreeDialogState extends State<CategoryTreeDialog> {
     int? parentId,
     int? categoryId,
     String? initialLabel,
+    String? initialDescription,
+    int? initialSortOrder,
+    int? initialParentId,
   }) async {
     final t = AppLocalizations.of(context);
     final formKey = GlobalKey<FormState>();
     final labelCtrl = TextEditingController(text: initialLabel ?? '');
+    final descriptionCtrl = TextEditingController(text: initialDescription ?? '');
+    final sortOrderCtrl = TextEditingController(text: (initialSortOrder ?? 0).toString());
+    int? selectedParentId = categoryId != null ? (initialParentId) : (isRoot ? null : parentId);
     
     final result = await showDialog<Map<String, dynamic>?>(
       context: context,
       builder: (ctx) => Dialog(
-        child: Container(
-          width: 500,
-          padding: const EdgeInsets.all(24),
-          child: Form(
-            key: formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // Header
-                Row(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: 500,
+            maxHeight: MediaQuery.of(ctx).size.height * 0.8,
+          ),
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            child: Form(
+              key: formKey,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Icon(
-                      categoryId == null ? Icons.add_circle_outline : Icons.edit_outlined,
-                      color: Theme.of(ctx).primaryColor,
-                      size: 28,
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        categoryId == null ? t.createCategory : t.updateCategory,
-                        style: Theme.of(ctx).textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
+                    // Header
+                  Row(
+                    children: [
+                      Icon(
+                        categoryId == null ? Icons.add_circle_outline : Icons.edit_outlined,
+                        color: Theme.of(ctx).primaryColor,
+                        size: 28,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          categoryId == null ? t.createCategory : t.updateCategory,
+                          style: Theme.of(ctx).textTheme.headlineSmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
-                    ),
-                    IconButton(
-                      onPressed: () => Navigator.pop(ctx, null),
-                      icon: const Icon(Icons.close),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                
-                // Category Name Field
-                TextFormField(
-                  controller: labelCtrl,
-                  decoration: InputDecoration(
-                    labelText: t.categoryName,
-                    hintText: t.categoryNameHint,
-                    prefixIcon: const Icon(Icons.category_outlined),
-                    border: const OutlineInputBorder(),
-                    filled: true,
-                    fillColor: Theme.of(ctx).colorScheme.surface,
+                      IconButton(
+                        onPressed: () => Navigator.pop(ctx, null),
+                        icon: const Icon(Icons.close),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                      ),
+                    ],
                   ),
-                  textInputAction: TextInputAction.done,
-                  autofocus: true,
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return t.categoryNameRequired;
-                    }
-                    return null;
-                  },
-                  onFieldSubmitted: (_) {
-                    if (formKey.currentState!.validate()) {
-                      Navigator.pop(ctx, {'label': labelCtrl.text.trim()});
-                    }
-                  },
-                ),
-                const SizedBox(height: 24),
-                
-                // Actions
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(ctx, null),
-                      child: Text(t.cancel),
+                  const SizedBox(height: 24),
+                  
+                  // Category Name Field
+                  TextFormField(
+                    controller: labelCtrl,
+                    decoration: InputDecoration(
+                      labelText: t.categoryName,
+                      hintText: t.categoryNameHint,
+                      prefixIcon: const Icon(Icons.category_outlined),
+                      border: const OutlineInputBorder(),
+                      filled: true,
+                      fillColor: Theme.of(ctx).colorScheme.surface,
                     ),
-                    const SizedBox(width: 8),
-                    FilledButton.icon(
-                      onPressed: () {
-                        if (formKey.currentState!.validate()) {
-                          Navigator.pop(ctx, {'label': labelCtrl.text.trim()});
+                    textInputAction: TextInputAction.next,
+                    autofocus: true,
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return t.categoryNameRequired;
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  // Description Field
+                  TextFormField(
+                    controller: descriptionCtrl,
+                    decoration: InputDecoration(
+                      labelText: 'توضیحات',
+                      hintText: 'توضیحات اختیاری دسته‌بندی',
+                      prefixIcon: const Icon(Icons.description_outlined),
+                      border: const OutlineInputBorder(),
+                      filled: true,
+                      fillColor: Theme.of(ctx).colorScheme.surface,
+                    ),
+                    maxLines: 3,
+                    textInputAction: TextInputAction.next,
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  // Sort Order Field (only for edit mode)
+                  if (categoryId != null)
+                    TextFormField(
+                      controller: sortOrderCtrl,
+                      decoration: InputDecoration(
+                        labelText: 'ترتیب نمایش',
+                        hintText: 'عدد ترتیب نمایش (کمتر = بالاتر)',
+                        prefixIcon: const Icon(Icons.sort),
+                        border: const OutlineInputBorder(),
+                        filled: true,
+                        fillColor: Theme.of(ctx).colorScheme.surface,
+                      ),
+                      keyboardType: TextInputType.number,
+                      textInputAction: TextInputAction.next,
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'ترتیب نمایش الزامی است';
                         }
+                        final intValue = int.tryParse(value.trim());
+                        if (intValue == null) {
+                          return 'لطفاً یک عدد معتبر وارد کنید';
+                        }
+                        return null;
                       },
-                      icon: Icon(categoryId == null ? Icons.add : Icons.save),
-                      label: Text(categoryId == null ? t.createCategory : t.updateCategory),
                     ),
+                  if (categoryId != null) const SizedBox(height: 16),
+                  
+                  // Parent Selection Field (only for edit mode)
+                  if (categoryId != null)
+                    CategoryPickerField(
+                      businessId: widget.businessId,
+                      categoriesTree: _filterTreeExcludingCategory(_tree, categoryId),
+                      initialValue: selectedParentId,
+                      onChanged: (value) {
+                        selectedParentId = value;
+                      },
+                      label: 'والد (دسته‌بندی مادر)',
+                    ),
+                  if (categoryId != null) const SizedBox(height: 24),
+                  
+                  const SizedBox(height: 24),
+                  
+                  // Actions
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx, null),
+                        child: Text(t.cancel),
+                      ),
+                      const SizedBox(width: 8),
+                      FilledButton.icon(
+                        onPressed: () {
+                          if (formKey.currentState!.validate()) {
+                            final sortOrder = categoryId != null ? int.tryParse(sortOrderCtrl.text.trim()) : null;
+                            Navigator.pop(ctx, {
+                              'label': labelCtrl.text.trim(),
+                              'description': descriptionCtrl.text.trim().isEmpty ? null : descriptionCtrl.text.trim(),
+                              'sort_order': sortOrder,
+                              'parent_id': categoryId != null ? selectedParentId : null,
+                            });
+                          }
+                        },
+                        icon: Icon(categoryId == null ? Icons.add : Icons.save),
+                        label: Text(categoryId == null ? t.createCategory : t.updateCategory),
+                      ),
+                    ],
+                  ),
                   ],
                 ),
-              ],
+              ),
             ),
           ),
         ),
@@ -332,6 +440,9 @@ class _CategoryTreeDialogState extends State<CategoryTreeDialog> {
     
     final label = result['label'] as String?;
     if (label == null || label.isEmpty) return;
+    final description = result['description'] as String?;
+    final sortOrder = result['sort_order'] as int?;
+    final newParentId = result['parent_id'] as int?;
     
     int? newCategoryId;
     try {
@@ -341,6 +452,7 @@ class _CategoryTreeDialogState extends State<CategoryTreeDialog> {
           parentId: isRoot ? null : parentId,
           type: 'global',
           label: label,
+          description: description,
         );
         newCategoryId = createResult['id'] as int?;
       } else {
@@ -349,6 +461,9 @@ class _CategoryTreeDialogState extends State<CategoryTreeDialog> {
           categoryId: categoryId,
           type: 'global',
           label: label,
+          description: description,
+          sortOrder: sortOrder,
+          parentId: newParentId,
         );
       }
       await _fetch();
@@ -377,6 +492,7 @@ class _CategoryTreeDialogState extends State<CategoryTreeDialog> {
 class _CategoryTreeNodeWidget extends StatelessWidget {
   final int? id;
   final String label;
+  final String? description;
   final int level;
   final bool isExpanded;
   final bool hasChildren;
@@ -392,6 +508,7 @@ class _CategoryTreeNodeWidget extends StatelessWidget {
   const _CategoryTreeNodeWidget({
     required this.id,
     required this.label,
+    this.description,
     required this.level,
     required this.isExpanded,
     required this.hasChildren,
@@ -476,14 +593,32 @@ class _CategoryTreeNodeWidget extends StatelessWidget {
                 
                 const SizedBox(width: 12),
                 
-                // نام دسته‌بندی
+                // نام دسته‌بندی و توضیحات
                 Expanded(
-                  child: Text(
-                    label,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: hasChildren ? FontWeight.w600 : FontWeight.normal,
-                      color: theme.colorScheme.onSurface,
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        label,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: hasChildren ? FontWeight.w600 : FontWeight.normal,
+                          color: theme.colorScheme.onSurface,
+                        ),
+                      ),
+                      if (description != null && description!.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            description!,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                    ],
                   ),
                 ),
                 

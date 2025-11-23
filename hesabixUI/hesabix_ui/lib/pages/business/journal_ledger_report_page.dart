@@ -217,6 +217,26 @@ class _JournalLedgerReportPageState extends State<JournalLedgerReportPage> {
           formatter: (item) => (item as Map<String, dynamic>)['description']?.toString() ?? '',
         ),
         TextColumn(
+          'general_account_code',
+          'کد حساب کل',
+          formatter: (item) => (item as Map<String, dynamic>)['general_account_code']?.toString() ?? '',
+        ),
+        TextColumn(
+          'general_account_name',
+          'عنوان حساب کل',
+          formatter: (item) => (item as Map<String, dynamic>)['general_account_name']?.toString() ?? '',
+        ),
+        TextColumn(
+          'subsidiary_account_code',
+          'کد حساب معین',
+          formatter: (item) => (item as Map<String, dynamic>)['subsidiary_account_code']?.toString() ?? '',
+        ),
+        TextColumn(
+          'subsidiary_account_name',
+          'عنوان حساب معین',
+          formatter: (item) => (item as Map<String, dynamic>)['subsidiary_account_name']?.toString() ?? '',
+        ),
+        TextColumn(
           'debit_account',
           t.debitAccount,
           formatter: (item) {
@@ -248,7 +268,7 @@ class _JournalLedgerReportPageState extends State<JournalLedgerReportPage> {
           formatter: (item) => (item as Map<String, dynamic>)['person_name']?.toString() ?? '',
         ),
       ],
-      searchFields: const ['document_code', 'description', 'debit_account_name', 'credit_account_name', 'person_name'],
+      searchFields: const ['document_code', 'description', 'general_account_code', 'general_account_name', 'subsidiary_account_code', 'subsidiary_account_name', 'debit_account_name', 'credit_account_name', 'person_name'],
       defaultPageSize: 50,
       additionalParams: _additionalParams(),
       showExportButtons: true,

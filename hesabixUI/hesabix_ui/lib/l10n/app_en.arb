@@ -941,6 +941,7 @@
   "personTypeSupplier": "Supplier",
   "personTypePartner": "Partner",
   "personTypeSeller": "Seller",
+  "personTypeShareholder": "Shareholder",
   "personCreatedSuccessfully": "Person created successfully",
   "personUpdatedSuccessfully": "Person updated successfully",
   "personDeletedSuccessfully": "Person deleted successfully",
@@ -1259,7 +1260,12 @@
   "@deletedInvoiceSuccess": {"placeholders": {"code": {"type": "String"}}},
   "deleteInvoiceError": "Failed to delete invoice",
   "deleteInvoiceErrorWithMessage": "Failed to delete invoice: {error}",
-  "@deleteInvoiceErrorWithMessage": {"placeholders": {"error": {"type": "String"}}}
+  "@deleteInvoiceErrorWithMessage": {"placeholders": {"error": {"type": "String"}}},
+  "deleteInvoiceTaxWorkspaceError": "This invoice is in the tax workspace and cannot be deleted",
+  "deleteInvoiceReceiptPaymentsWarning": "Related receipt/payment documents:",
+  "deleteInvoiceWarehouseWarning": "Related finalized warehouse documents:",
+  "deleteInvoiceInstallmentsWarning": "This invoice has {count} installments that will be deleted",
+  "@deleteInvoiceInstallmentsWarning": {"placeholders": {"count": {"type": "String"}}}
   ,
   "saveInvoice": "Save invoice",
   "invoiceInfoTab": "Invoice info",

@@ -163,9 +163,40 @@
       margin-top: 4px;
       font-size: 11px;
     }
+
+    .invoice-layout .proforma-watermark {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) rotate(-45deg);
+      font-size: 180px;
+      font-weight: bold;
+      color: rgba(0, 0, 0, 0.1);
+      z-index: 0;
+      pointer-events: none;
+      white-space: nowrap;
+      width: 200%;
+      text-align: center;
+      user-select: none;
+      opacity: 0.15;
+    }
+
+    .invoice-layout {
+      position: relative;
+    }
+
+    .invoice-layout > * {
+      position: relative;
+      z-index: 1;
+    }
   </style>
 
   <div class="invoice-layout">
+    {% if invoice.is_proforma %}
+      <div class="proforma-watermark">
+        {{ 'پیش‌فاکتور' if is_fa else 'PROFORMA' }}
+      </div>
+    {% endif %}
     <div class="section-card">
       <div class="header">
         <div class="header-bottom">
@@ -176,10 +207,6 @@
           {% endif %}
           <div class="header-main">
             <div class="title">{{ title_text or invoice.title or ('فاکتور' if is_fa else 'Invoice') }}</div>
-            <div class="meta">
-              {{ 'کسب‌وکار' if is_fa else 'Business' }}:
-              {{ business_name or '-' }}
-            </div>
             <div class="meta">
               {{ 'نوع فاکتور' if is_fa else 'Invoice type' }}:
               {{ invoice.invoice_type_name or '-' }}
@@ -258,13 +285,12 @@
           </div>
           <div class="meta" style="line-height: 1.4;">
             <span><strong>{{ 'نام' if is_fa else 'Name' }}:</strong> {{ buyer.name or '-' }}</span>
-            {% if buyer.national_id or buyer.national_code %}
-              <span style="margin-inline-start: 8px;"> • </span>
-              <span><strong>{{ 'کد/شناسه ملی' if is_fa else 'National ID' }}:</strong> {{ buyer.national_id or buyer.national_code }}</span>
-            {% endif %}
             {% if buyer.economic_id or buyer.economic_code %}
               <span style="margin-inline-start: 8px;"> • </span>
               <span><strong>{{ 'شناسه اقتصادی' if is_fa else 'Economic ID' }}:</strong> {{ buyer.economic_id or buyer.economic_code }}</span>
+            {% elif buyer.national_id or buyer.national_code %}
+              <span style="margin-inline-start: 8px;"> • </span>
+              <span><strong>{{ 'کد/شناسه ملی' if is_fa else 'National ID' }}:</strong> {{ buyer.national_id or buyer.national_code }}</span>
             {% endif %}
             {% if buyer.registration_number %}
               <span style="margin-inline-start: 8px;"> • </span>

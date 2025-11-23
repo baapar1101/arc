@@ -5042,6 +5042,12 @@ abstract class AppLocalizations {
   /// **'Seller'**
   String get personTypeSeller;
 
+  /// No description provided for @personTypeShareholder.
+  ///
+  /// In en, this message translates to:
+  /// **'Shareholder'**
+  String get personTypeShareholder;
+
   /// No description provided for @personCreatedSuccessfully.
   ///
   /// In en, this message translates to:
@@ -6697,6 +6703,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Failed to delete invoice: {error}'**
   String deleteInvoiceErrorWithMessage(String error);
+
+  /// No description provided for @deleteInvoiceTaxWorkspaceError.
+  ///
+  /// In en, this message translates to:
+  /// **'This invoice is in the tax workspace and cannot be deleted'**
+  String get deleteInvoiceTaxWorkspaceError;
+
+  /// No description provided for @deleteInvoiceReceiptPaymentsWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'Related receipt/payment documents:'**
+  String get deleteInvoiceReceiptPaymentsWarning;
+
+  /// No description provided for @deleteInvoiceWarehouseWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'Related finalized warehouse documents:'**
+  String get deleteInvoiceWarehouseWarning;
+
+  /// No description provided for @deleteInvoiceInstallmentsWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'This invoice has {count} installments that will be deleted'**
+  String deleteInvoiceInstallmentsWarning(String count);
 
   /// No description provided for @saveInvoice.
   ///

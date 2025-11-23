@@ -107,6 +107,16 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
   // پلن‌های اقساط
   List<InstallmentPlan> _installmentPlans = <InstallmentPlan>[];
   InstallmentPlan? _selectedInstallmentPlan;
+  
+  // Controller های فیلدهای اقساطی برای جلوگیری از از دست رفتن فوکوس
+  late final TextEditingController _numInstallmentsController;
+  late final TextEditingController _downPaymentController;
+  late final TextEditingController _interestRateController;
+  late final TextEditingController _installmentPeriodDaysController;
+  // Controller های فیلدهای جدول اقساط دستی (key: index)
+  final Map<int, TextEditingController> _installmentPrincipalControllers = {};
+  final Map<int, TextEditingController> _installmentInterestControllers = {};
+  final Map<int, TextEditingController> _installmentTotalControllers = {};
 
   // خلاصه محاسبات اقساط
   double get _installmentsPrincipalTotal {
@@ -190,6 +200,11 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
         taxRate: 0,
       ),
     ];
+    // مقداردهی اولیه Controller های اقساطی
+    _numInstallmentsController = TextEditingController();
+    _downPaymentController = TextEditingController();
+    _interestRateController = TextEditingController();
+    _installmentPeriodDaysController = TextEditingController();
     // بارگذاری پلن‌های فعال اقساط
     _loadInstallmentPlans();
   }
@@ -225,6 +240,35 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
     } catch (_) {
       // در صورت خطا، فقط نادیده بگیر
     }
+  }
+
+  // متد helper برای ایجاد یا دریافت Controller برای فیلدهای جدول اقساط
+  TextEditingController _getInstallmentController(Map<int, TextEditingController> controllers, int index, double value, {bool updateIfChanged = true}) {
+    if (!controllers.containsKey(index)) {
+      controllers[index] = TextEditingController(
+        text: formatNumberForInput(value, decimalPlaces: 0),
+      );
+    } else if (updateIfChanged) {
+      // به‌روزرسانی مقدار Controller اگر تغییر کرده باشد
+      final currentText = formatNumberForInput(value, decimalPlaces: 0);
+      final controller = controllers[index]!;
+      // فقط اگر مقدار واقعاً تغییر کرده باشد، به‌روز کن
+      // توجه: این ممکن است مقدار تایپ شده توسط کاربر را بازنویسی کند
+      // بنابراین فقط در autoDistribute استفاده می‌شود (updateIfChanged: false)
+      if (controller.text != currentText) {
+        controller.text = currentText;
+      }
+    }
+    return controllers[index]!;
+  }
+
+  // پاک کردن Controller های اضافی وقتی ردیف‌ها حذف می‌شوند
+  void _cleanupInstallmentControllers() {
+    final maxIndex = _installmentRows.length - 1;
+    // حذف Controller های مربوط به ردیف‌های حذف شده
+    _installmentPrincipalControllers.removeWhere((key, _) => key > maxIndex);
+    _installmentInterestControllers.removeWhere((key, _) => key > maxIndex);
+    _installmentTotalControllers.removeWhere((key, _) => key > maxIndex);
   }
 
   Widget _buildInstallmentsTab() {
@@ -278,7 +322,19 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
             'total': (principalInt + interestInt).toDouble(),
           });
         }
-        setState(() => _installmentRows = rows);
+        setState(() {
+          _installmentRows = rows;
+          // به‌روزرسانی Controller ها بعد از تغییر ردیف‌ها
+          for (int idx = 0; idx < rows.length; idx++) {
+            final principal = rows[idx]['principal'] as double? ?? 0.0;
+            final interest = rows[idx]['interest'] as double? ?? 0.0;
+            final total = rows[idx]['total'] as double? ?? 0.0;
+            _getInstallmentController(_installmentPrincipalControllers, idx, principal, updateIfChanged: false);
+            _getInstallmentController(_installmentInterestControllers, idx, interest, updateIfChanged: false);
+            _getInstallmentController(_installmentTotalControllers, idx, total, updateIfChanged: false);
+          }
+          _cleanupInstallmentControllers();
+        });
       } else {
         // روش ساده flat: تقسیم مساوی اصل و سود کل
         final principalTotalRounded = principalTotal.round(); // کل اصل بدون اعشار
@@ -301,7 +357,19 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
             'total': (principal + interest).toDouble(),
           });
         }
-        setState(() => _installmentRows = rows);
+        setState(() {
+          _installmentRows = rows;
+          // به‌روزرسانی Controller ها بعد از تغییر ردیف‌ها
+          for (int idx = 0; idx < rows.length; idx++) {
+            final principal = rows[idx]['principal'] as double? ?? 0.0;
+            final interest = rows[idx]['interest'] as double? ?? 0.0;
+            final total = rows[idx]['total'] as double? ?? 0.0;
+            _getInstallmentController(_installmentPrincipalControllers, idx, principal, updateIfChanged: false);
+            _getInstallmentController(_installmentInterestControllers, idx, interest, updateIfChanged: false);
+            _getInstallmentController(_installmentTotalControllers, idx, total, updateIfChanged: false);
+          }
+          _cleanupInstallmentControllers();
+        });
       }
     }
 
@@ -334,6 +402,11 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                         _interestRate = plan.interestRate ?? 0.0;
                         final dpPercent = plan.downPaymentPercent ?? 0.0;
                         _downPayment = (_sumTotal.toDouble() * dpPercent / 100.0);
+                        // به‌روزرسانی Controller ها
+                        _numInstallmentsController.text = formatNumberForInput(_numInstallments, decimalPlaces: 0);
+                        _downPaymentController.text = formatNumberForInput(_downPayment);
+                        _interestRateController.text = formatNumberForInput(_interestRate);
+                        _installmentPeriodDaysController.text = formatNumberForInput(_installmentPeriodDays, decimalPlaces: 0);
                       }
                     });
                     autoDistribute();
@@ -356,6 +429,11 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                     final dpPercent = plan.downPaymentPercent ?? 0.0;
                     _downPayment = (_sumTotal.toDouble() * dpPercent / 100.0);
                     _firstInstallmentDueDate = _invoiceDate ?? DateTime.now();
+                    // به‌روزرسانی Controller ها
+                    _numInstallmentsController.text = formatNumberForInput(_numInstallments, decimalPlaces: 0);
+                    _downPaymentController.text = formatNumberForInput(_downPayment);
+                    _interestRateController.text = formatNumberForInput(_interestRate);
+                    _installmentPeriodDaysController.text = formatNumberForInput(_installmentPeriodDays, decimalPlaces: 0);
                   });
                   autoDistribute();
                 },
@@ -376,8 +454,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                     children: [
                       Expanded(
                         child: TextFormField(
-                          key: ValueKey('num_${_numInstallments ?? 0}'),
-                          initialValue: formatNumberForInput(_numInstallments, decimalPlaces: 0),
+                          controller: _numInstallmentsController,
                           decoration: InputDecoration(labelText: AppLocalizations.of(context).installmentsCount, border: const OutlineInputBorder()),
                           keyboardType: TextInputType.number,
                           inputFormatters: const [
@@ -386,15 +463,15 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                           ],
                           onChanged: (v) {
                             final n = parseFormattedInt(v);
-                            setState(() => _numInstallments = n);
+                            _numInstallments = n;
+                            // بدون setState برای جلوگیری از rebuild
                           },
                         ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: TextFormField(
-                          key: ValueKey('down_${_downPayment ?? 0}'),
-                          initialValue: formatNumberForInput(_downPayment),
+                          controller: _downPaymentController,
                           decoration: InputDecoration(labelText: AppLocalizations.of(context).downPayment, border: const OutlineInputBorder()),
                           keyboardType: const TextInputType.numberWithOptions(decimal: true),
                           inputFormatters: const [
@@ -403,7 +480,8 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                           ],
                           onChanged: (v) {
                             final d = parseFormattedDouble(v);
-                            setState(() => _downPayment = d);
+                            _downPayment = d;
+                            // بدون setState برای جلوگیری از rebuild
                           },
                         ),
                       ),
@@ -415,8 +493,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                     children: [
                       Expanded(
                         child: TextFormField(
-                          key: ValueKey('rate_${_interestRate ?? 0}'),
-                          initialValue: formatNumberForInput(_interestRate),
+                          controller: _interestRateController,
                           decoration: InputDecoration(labelText: AppLocalizations.of(context).interestRatePercent, border: const OutlineInputBorder()),
                           keyboardType: const TextInputType.numberWithOptions(decimal: true),
                           inputFormatters: const [
@@ -425,7 +502,8 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                           ],
                           onChanged: (v) {
                             final r = parseFormattedDouble(v);
-                            setState(() => _interestRate = r);
+                            _interestRate = r;
+                            // بدون setState برای جلوگیری از rebuild
                           },
                         ),
                       ),
@@ -450,8 +528,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                   const SizedBox(height: 12),
                   if (_installmentPeriod == 'days')
                     TextFormField(
-                      key: ValueKey('days_${_installmentPeriodDays ?? 0}'),
-                      initialValue: formatNumberForInput(_installmentPeriodDays, decimalPlaces: 0),
+                      controller: _installmentPeriodDaysController,
                       decoration: InputDecoration(labelText: AppLocalizations.of(context).installmentDaysLength, border: const OutlineInputBorder()),
                       keyboardType: TextInputType.number,
                       inputFormatters: const [
@@ -460,7 +537,8 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                       ],
                       onChanged: (v) {
                         final d = parseFormattedInt(v);
-                        setState(() => _installmentPeriodDays = d);
+                        _installmentPeriodDays = d;
+                        // بدون setState برای جلوگیری از rebuild
                       },
                     ),
                   if (_installmentPeriod == 'days') const SizedBox(height: 12),
@@ -560,6 +638,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                 onPressed: () {
                   setState(() {
                     final idx = _installmentRows.length + 1;
+                    final newIndex = _installmentRows.length;
                     _installmentRows.add({
                       'seq': idx,
                       'due_date': _firstInstallmentDueDate ?? _invoiceDate ?? DateTime.now(),
@@ -567,6 +646,10 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                       'interest': 0.0,
                       'total': 0.0,
                     });
+                    // ایجاد Controller های جدید برای ردیف اضافه شده
+                    _getInstallmentController(_installmentPrincipalControllers, newIndex, 0.0);
+                    _getInstallmentController(_installmentInterestControllers, newIndex, 0.0);
+                    _getInstallmentController(_installmentTotalControllers, newIndex, 0.0);
                   });
                 },
                 icon: const Icon(Icons.add),
@@ -619,7 +702,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                 children: [
                   Row(
                     children: const [
-                      Expanded(child: Text('ردیف')),
+                      SizedBox(width: 50, child: Text('ردیف', textAlign: TextAlign.center)),
                       Expanded(child: Text('تاریخ سررسید')),
                       Expanded(child: Text('اصل')),
                       Expanded(child: Text('سود')),
@@ -639,13 +722,23 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                     return Padding(
                       padding: const EdgeInsets.symmetric(vertical: 6),
                       child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Expanded(child: Text('#$seq')),
+                          SizedBox(
+                            width: 50,
+                            child: Center(
+                              child: Text(
+                                '#$seq',
+                                style: Theme.of(context).textTheme.bodyMedium,
+                              ),
+                            ),
+                          ),
                           Expanded(
                             child: DateInputField(
                               value: due,
                               calendarController: widget.calendarController,
                               labelText: 'تاریخ',
+                              isDense: true,
                               onChanged: (d) {
                                 setState(() => _installmentRows[i]['due_date'] = d ?? due);
                               },
@@ -653,7 +746,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                           ),
                           Expanded(
                             child: TextFormField(
-                              initialValue: formatNumberForInput(principal, decimalPlaces: 0),
+                              controller: _getInstallmentController(_installmentPrincipalControllers, i, principal),
                               keyboardType: TextInputType.number,
                               inputFormatters: const [
                                 EnglishDigitsFormatter(),
@@ -662,17 +755,19 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                               onChanged: (v) {
                                 final pInt = parseFormattedInt(v) ?? 0;
                                 final p = pInt.toDouble();
-                                setState(() {
-                                  _installmentRows[i]['principal'] = p;
-                                  _installmentRows[i]['total'] = p + (( _installmentRows[i]['interest'] as num?)?.toDouble() ?? 0.0);
-                                });
+                                _installmentRows[i]['principal'] = p;
+                                _installmentRows[i]['total'] = p + (( _installmentRows[i]['interest'] as num?)?.toDouble() ?? 0.0);
+                                // به‌روزرسانی Controller جمع
+                                final newTotal = _installmentRows[i]['total'] as double? ?? 0.0;
+                                _getInstallmentController(_installmentTotalControllers, i, newTotal);
+                                // بدون setState برای جلوگیری از rebuild
                               },
                               decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true),
                             ),
                           ),
                           Expanded(
                             child: TextFormField(
-                              initialValue: formatNumberForInput(interest, decimalPlaces: 0),
+                              controller: _getInstallmentController(_installmentInterestControllers, i, interest),
                               keyboardType: TextInputType.number,
                               inputFormatters: const [
                                 EnglishDigitsFormatter(),
@@ -681,17 +776,19 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                               onChanged: (v) {
                                 final sInt = parseFormattedInt(v) ?? 0;
                                 final s = sInt.toDouble(); // سود بدون اعشار
-                                setState(() {
-                                  _installmentRows[i]['interest'] = s;
-                                  _installmentRows[i]['total'] = s + (( _installmentRows[i]['principal'] as num?)?.toDouble() ?? 0.0);
-                                });
+                                _installmentRows[i]['interest'] = s;
+                                _installmentRows[i]['total'] = s + (( _installmentRows[i]['principal'] as num?)?.toDouble() ?? 0.0);
+                                // به‌روزرسانی Controller جمع
+                                final newTotal = _installmentRows[i]['total'] as double? ?? 0.0;
+                                _getInstallmentController(_installmentTotalControllers, i, newTotal);
+                                // بدون setState برای جلوگیری از rebuild
                               },
                               decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true),
                             ),
                           ),
                           Expanded(
                             child: TextFormField(
-                              initialValue: formatNumberForInput(total, decimalPlaces: 0),
+                              controller: _getInstallmentController(_installmentTotalControllers, i, total),
                               keyboardType: TextInputType.number,
                               inputFormatters: const [
                                 EnglishDigitsFormatter(),
@@ -700,9 +797,8 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                               onChanged: (v) {
                                 final totInt = parseFormattedInt(v) ?? 0;
                                 final tot = totInt.toDouble();
-                                setState(() {
-                                  _installmentRows[i]['total'] = tot;
-                                });
+                                _installmentRows[i]['total'] = tot;
+                                // بدون setState برای جلوگیری از rebuild
                               },
                               decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true),
                             ),
@@ -710,7 +806,39 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                           IconButton(
                             onPressed: () {
                               setState(() {
+                                // Dispose و حذف Controller های ردیف حذف شده
+                                _installmentPrincipalControllers[i]?.dispose();
+                                _installmentInterestControllers[i]?.dispose();
+                                _installmentTotalControllers[i]?.dispose();
+                                _installmentPrincipalControllers.remove(i);
+                                _installmentInterestControllers.remove(i);
+                                _installmentTotalControllers.remove(i);
+                                
+                                // حذف ردیف
                                 _installmentRows.removeAt(i);
+                                
+                                // بازسازی Controller ها برای ردیف‌های باقی‌مانده با index جدید
+                                // ابتدا همه Controller های بعدی را dispose کن
+                                for (int idx = i; idx < _installmentRows.length + 10; idx++) {
+                                  if (_installmentPrincipalControllers.containsKey(idx)) {
+                                    _installmentPrincipalControllers[idx]?.dispose();
+                                    _installmentInterestControllers[idx]?.dispose();
+                                    _installmentTotalControllers[idx]?.dispose();
+                                    _installmentPrincipalControllers.remove(idx);
+                                    _installmentInterestControllers.remove(idx);
+                                    _installmentTotalControllers.remove(idx);
+                                  }
+                                }
+                                
+                                // حالا Controller های جدید برای ردیف‌های باقی‌مانده بساز
+                                for (int idx = 0; idx < _installmentRows.length; idx++) {
+                                  final principal = (_installmentRows[idx]['principal'] as num?)?.toDouble() ?? 0.0;
+                                  final interest = (_installmentRows[idx]['interest'] as num?)?.toDouble() ?? 0.0;
+                                  final total = (_installmentRows[idx]['total'] as num?)?.toDouble() ?? 0.0;
+                                  _getInstallmentController(_installmentPrincipalControllers, idx, principal, updateIfChanged: false);
+                                  _getInstallmentController(_installmentInterestControllers, idx, interest, updateIfChanged: false);
+                                  _getInstallmentController(_installmentTotalControllers, idx, total, updateIfChanged: false);
+                                }
                               });
                             },
                             icon: const Icon(Icons.delete_outline),
@@ -802,8 +930,27 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
   }
 
   @override
+  @override
   void dispose() {
     _tabController.dispose();
+    // Dispose کردن Controller های اقساطی
+    _numInstallmentsController.dispose();
+    _downPaymentController.dispose();
+    _interestRateController.dispose();
+    _installmentPeriodDaysController.dispose();
+    // Dispose کردن Controller های جدول اقساط دستی
+    for (final controller in _installmentPrincipalControllers.values) {
+      controller.dispose();
+    }
+    for (final controller in _installmentInterestControllers.values) {
+      controller.dispose();
+    }
+    for (final controller in _installmentTotalControllers.values) {
+      controller.dispose();
+    }
+    _installmentPrincipalControllers.clear();
+    _installmentInterestControllers.clear();
+    _installmentTotalControllers.clear();
     super.dispose();
   }
 
@@ -1521,6 +1668,14 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
     }
     final payload = validation as Map<String, dynamic>;
 
+    // بررسی مبلغ صفر فاکتور
+    if (_sumTotal == 0) {
+      final confirmed = await _showZeroAmountWarning();
+      if (!confirmed) {
+        return; // کاربر انصراف داد
+      }
+    }
+
     try {
       final service = InvoiceService(apiClient: ApiClient());
       await service.createInvoice(businessId: widget.businessId, payload: payload);
@@ -1544,6 +1699,44 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
     } catch (e) {
       _showError(t.saveInvoiceErrorWithMessage(e.toString()));
     }
+  }
+
+  /// نمایش هشدار برای فاکتور با مبلغ صفر
+  Future<bool> _showZeroAmountWarning() async {
+    final theme = Theme.of(context);
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        icon: Icon(
+          Icons.warning_amber_rounded,
+          color: theme.colorScheme.error,
+          size: 48,
+        ),
+        title: const Text('هشدار: مبلغ فاکتور صفر است'),
+        content: const Text(
+          'مبلغ کل فاکتور شما صفر است. این می‌تواند به دلایل زیر باشد:\n\n'
+          '• کالای رایگان یا نمونه\n'
+          '• تخفیف ۱۰۰٪\n'
+          '• کالای تبلیغاتی\n\n'
+          'آیا مطمئن هستید که می‌خواهید این فاکتور را ثبت کنید؟\n\n'
+          'توجه: فاکتور با مبلغ صفر در گزارش‌های مالی نمایش داده می‌شود و ممکن است ثبت‌های حسابداری با مبلغ صفر ایجاد شود.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('انصراف'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: FilledButton.styleFrom(
+              backgroundColor: theme.colorScheme.error,
+            ),
+            child: const Text('بله، ثبت کن'),
+          ),
+        ],
+      ),
+    );
+    return result ?? false;
   }
 
   dynamic _validateAndBuildPayload(AppLocalizations t) {
@@ -1956,6 +2149,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
             invoiceType: _selectedInvoiceType ?? InvoiceType.sales,
             selectedCurrencyId: _selectedCurrencyId,
             authStore: widget.authStore,
+            invoiceTotal: _sumTotal, // ارسال مبلغ کل فاکتور
             onChanged: (transactions) {
               setState(() {
                 _transactions = transactions;

@@ -13,6 +13,7 @@ import 'package:hesabix_ui/utils/number_formatters.dart' show formatWithThousand
 import 'package:hesabix_ui/widgets/document/document_details_dialog.dart';
 import 'package:hesabix_ui/services/invoice_service.dart';
 import '../../utils/snackbar_helper.dart';
+import '../../widgets/invoice/invoice_import_dialog.dart';
 
 /// صفحه لیست فاکتورها با ویجت جدول عمومی
 class InvoicesListPage extends StatefulWidget {
@@ -38,6 +39,7 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
   final InvoiceService _invoiceService = InvoiceService();
 
   String? _selectedInvoiceType;
+  bool _isInitialized = false;
   DateTime? _fromDate;
   DateTime? _toDate;
   bool? _isProforma; // null=همه، true=پیشفاکتور، false=قطعی
@@ -57,6 +59,31 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
       }
       if (mounted) setState(() {});
     });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    // بعد از اولین build، flag را set کن
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _isInitialized = true;
+      }
+    });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // اگر صفحه قبلاً initialize شده بود، داده‌ها را refresh کن
+    // این برای زمانی است که از صفحه دیگری (مثل ثبت فاکتور) به این صفحه برمی‌گردیم
+    if (_isInitialized) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _refreshData();
+        }
+      });
+    }
   }
 
   @override
@@ -103,7 +130,7 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
               ],
             ),
           ),
-          // دکمه افزودن فاکتور (در آینده به فرم ایجاد وصل میشود)
+          // دکمه افزودن فاکتور
           FilledButton.icon(
             onPressed: _onAddNew,
             icon: const Icon(Icons.add),
@@ -363,6 +390,7 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
       showColumnSearch: true,
       showRefreshButton: true,
       showClearFiltersButton: true,
+      showExportButtons: true,
       enableRowSelection: true,
       enableMultiRowSelection: true,
       defaultPageSize: 20,
@@ -377,7 +405,30 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
       emptyStateMessage: t.noInvoicesFound,
       loadingMessage: t.loadingInvoices,
       errorMessage: t.errorLoadingInvoices,
+      customHeaderActions: [
+        Tooltip(
+          message: 'ایمپورت فاکتورها از فایل Excel',
+          child: IconButton(
+            onPressed: _onImport,
+            icon: const Icon(Icons.upload_file),
+            tooltip: 'ایمپورت از اکسل',
+          ),
+        ),
+      ],
     );
+  }
+
+  Future<void> _onImport() async {
+    if (!mounted) return;
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (_) => InvoiceImportDialog(
+        businessId: widget.businessId,
+      ),
+    );
+    if (result == true && mounted) {
+      _refreshData();
+    }
   }
 
   Future<void> _onAddNew() async {
@@ -417,13 +468,181 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
 
   Future<void> _onDelete(InvoiceListItem item) async {
     final t = AppLocalizations.of(context);
+    
+    // دریافت اطلاعات حذف
+    Map<String, dynamic>? deleteInfo;
+    try {
+      deleteInfo = await _invoiceService.getInvoiceDeleteInfo(
+        businessId: widget.businessId,
+        invoiceId: item.id,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      SnackBarHelper.showError(context, message: 'خطا در دریافت اطلاعات: $e');
+      return;
+    }
+    
+    // بررسی کارپوشه مودیان
+    if (deleteInfo['is_in_tax_workspace'] == true) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(t.deleteInvoiceTaxWorkspaceError),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+    
+    // ساخت محتوای هشدار
+    final List<Widget> warningWidgets = [
+      Text(t.deleteInvoiceConfirm(item.code)),
+      const SizedBox(height: 16),
+    ];
+    
+    // نمایش اطلاعات اسناد دریافت/پرداخت
+    final receiptPayments = deleteInfo['receipt_payment_documents'] as List<dynamic>?;
+    if (receiptPayments != null && receiptPayments.isNotEmpty) {
+      final nonZeroPayments = receiptPayments.where((p) => p['is_zero'] != true).toList();
+      if (nonZeroPayments.isNotEmpty) {
+        warningWidgets.add(
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.orange.shade50,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.orange.shade200),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.payment, size: 20, color: Colors.orange.shade700),
+                    const SizedBox(width: 8),
+                    Text(
+                      t.deleteInvoiceReceiptPaymentsWarning,
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.orange.shade900,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                ...nonZeroPayments.take(3).map((p) => Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Text(
+                    '• ${p['code']} (${p['type'] == 'receipt' ? 'دریافت' : 'پرداخت'}): ${formatWithThousands(p['amount'] ?? 0)}',
+                    style: TextStyle(fontSize: 12),
+                  ),
+                )),
+                if (nonZeroPayments.length > 3)
+                  Text(
+                    'و ${nonZeroPayments.length - 3} سند دیگر...',
+                    style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic),
+                  ),
+              ],
+            ),
+          ),
+        );
+        warningWidgets.add(const SizedBox(height: 12));
+      }
+    }
+    
+    // نمایش اطلاعات حواله‌های انبار
+    final warehouseDocs = deleteInfo['warehouse_documents'] as List<dynamic>?;
+    if (warehouseDocs != null && warehouseDocs.isNotEmpty) {
+      final finalizedWarehouses = warehouseDocs.where((w) => w['is_finalized'] == true).toList();
+      if (finalizedWarehouses.isNotEmpty) {
+        warningWidgets.add(
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.orange.shade50,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.orange.shade200),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.inventory_2, size: 20, color: Colors.orange.shade700),
+                    const SizedBox(width: 8),
+                    Text(
+                      t.deleteInvoiceWarehouseWarning,
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.orange.shade900,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                ...finalizedWarehouses.take(3).map((w) => Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Text(
+                    '• ${w['code']}',
+                    style: TextStyle(fontSize: 12),
+                  ),
+                )),
+              ],
+            ),
+          ),
+        );
+        warningWidgets.add(const SizedBox(height: 12));
+      }
+    }
+    
+    // نمایش اطلاعات اقساط
+    if (deleteInfo['has_installments'] == true) {
+      final installmentInfo = deleteInfo['installment_info'] as Map<String, dynamic>?;
+      if (installmentInfo != null) {
+        warningWidgets.add(
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.blue.shade50,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.blue.shade200),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.calendar_today, size: 20, color: Colors.blue.shade700),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    t.deleteInvoiceInstallmentsWarning(
+                      installmentInfo['count']?.toString() ?? '0',
+                    ),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.blue.shade900,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+        warningWidgets.add(const SizedBox(height: 12));
+      }
+    }
+    
     // نمایش dialog تأیید
     final confirmed = await showDialog<bool>(
       context: context,
       useRootNavigator: true,
       builder: (context) => AlertDialog(
         title: Text(t.deleteConfirmTitle),
-        content: Text(t.deleteInvoiceConfirm(item.code)),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: warningWidgets,
+          ),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),

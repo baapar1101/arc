@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:dio/dio.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../widgets/data_table/data_table_widget.dart';
 import '../../widgets/data_table/data_table_config.dart';
 import '../../widgets/permission/permission_widgets.dart';
 import '../../core/auth_store.dart';
 import '../../services/product_attribute_service.dart';
+import '../../utils/snackbar_helper.dart';
 
 class ProductAttributeItem {
   final int id;
@@ -78,7 +80,10 @@ class ProductAttributeItem {
 
   static String? _extractDisplay(dynamic v) {
     if (v is String) {
-      return v.trim().isEmpty ? null : v;
+      final trimmed = v.trim();
+      if (trimmed.isEmpty) return null;
+      // Extract only date part (remove time if present)
+      return trimmed.split(' ').first.trim();
     }
     if (v is Map<String, dynamic>) {
       // First try to get date_only (without time)
@@ -88,7 +93,9 @@ class ProductAttributeItem {
       }
       // Fallback to formatted if date_only is not available
       final s = (v['formatted'] ?? v['date_time'] ?? '').toString();
-      return s.isEmpty ? null : s;
+      if (s.isEmpty) return null;
+      // Extract only date part (remove time if present)
+      return s.split(' ').first.trim();
     }
     return null;
   }
@@ -122,6 +129,19 @@ class _ProductAttributesPageState extends State<ProductAttributesPage> {
         fromJson: ProductAttributeItem.fromJson,
       ),
     );
+  }
+
+  void _refreshTable() {
+    if (!mounted) return;
+    // Use addPostFrameCallback to ensure refresh happens after dialog is closed
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final state = _tableKey.currentState;
+      if (state != null) {
+        // ignore: avoid_dynamic_calls
+        (state as dynamic).refresh();
+      }
+    });
   }
 
   DataTableConfig<ProductAttributeItem> _buildConfig(AppLocalizations t) {
@@ -173,7 +193,10 @@ class _ProductAttributesPageState extends State<ProductAttributesPage> {
   static String _formatDateFromItem(ProductAttributeItem e, BuildContext context, {required bool isUpdated}) {
     final display = isUpdated ? e.updatedAtDisplay : e.createdAtDisplay;
     if (display != null && display.isNotEmpty) {
-      return display; // Respect backend calendar-formatted string
+      // Extract only date part (remove time if present)
+      // If display contains space, take only the first part (date)
+      final dateOnly = display.split(' ').first.trim();
+      return dateOnly;
     }
     return _formatDate(isUpdated ? e.updatedAt : e.createdAt, context);
   }
@@ -207,16 +230,39 @@ class _ProductAttributesPageState extends State<ProductAttributesPage> {
         ],
       ),
     );
-    if (result == true) {
-      if (editing == null) {
-        await _service.create(businessId: widget.businessId, title: titleCtrl.text.trim(), description: descCtrl.text.trim().isEmpty ? null : descCtrl.text.trim());
-      } else {
-        await _service.update(businessId: widget.businessId, id: editing.id, title: titleCtrl.text.trim(), description: descCtrl.text.trim());
-      }
+    if (result == true && mounted) {
       try {
-        // ignore: avoid_dynamic_calls
-        ( _tableKey.currentState as dynamic )?.refresh();
-      } catch (_) {}
+        if (editing == null) {
+          await _service.create(businessId: widget.businessId, title: titleCtrl.text.trim(), description: descCtrl.text.trim().isEmpty ? null : descCtrl.text.trim());
+        } else {
+          await _service.update(businessId: widget.businessId, id: editing.id, title: titleCtrl.text.trim(), description: descCtrl.text.trim());
+        }
+        if (mounted) {
+          _refreshTable();
+          SnackBarHelper.show(
+            context,
+            message: editing == null ? 'ویژگی با موفقیت اضافه شد' : 'ویژگی با موفقیت ویرایش شد',
+            isError: false,
+          );
+        }
+      } on DioException catch (e) {
+        if (!mounted) return;
+        String errorMessage = 'خطا در ذخیره ویژگی';
+        final response = e.response;
+        if (response != null && response.data is Map) {
+          final data = response.data as Map<String, dynamic>;
+          if (data.containsKey('error') && data['error'] is Map) {
+            final errorMap = data['error'] as Map;
+            if (errorMap.containsKey('message')) {
+              errorMessage = errorMap['message'] as String;
+            }
+          }
+        }
+        SnackBarHelper.showError(context, message: errorMessage);
+      } catch (e) {
+        if (!mounted) return;
+        SnackBarHelper.showError(context, message: 'خطا در ذخیره ویژگی: $e');
+      }
     }
   }
 
@@ -231,8 +277,35 @@ class _ProductAttributesPageState extends State<ProductAttributesPage> {
           TextButton(onPressed: () => Navigator.pop(context), child: Text(t.cancel)),
           TextButton(onPressed: () async {
             Navigator.pop(context);
-            await _service.delete(businessId: widget.businessId, id: item.id);
-            try { ( _tableKey.currentState as dynamic )?.refresh(); } catch (_) {}
+            if (!mounted) return;
+            try {
+              await _service.delete(businessId: widget.businessId, id: item.id);
+              if (mounted) {
+                _refreshTable();
+                SnackBarHelper.show(
+                  context,
+                  message: 'ویژگی با موفقیت حذف شد',
+                  isError: false,
+                );
+              }
+            } on DioException catch (e) {
+              if (!mounted) return;
+              String errorMessage = 'خطا در حذف ویژگی';
+              final response = e.response;
+              if (response != null && response.data is Map) {
+                final data = response.data as Map<String, dynamic>;
+                if (data.containsKey('error') && data['error'] is Map) {
+                  final errorMap = data['error'] as Map;
+                  if (errorMap.containsKey('message')) {
+                    errorMessage = errorMap['message'] as String;
+                  }
+                }
+              }
+              SnackBarHelper.showError(context, message: errorMessage);
+            } catch (e) {
+              if (!mounted) return;
+              SnackBarHelper.showError(context, message: 'خطا در حذف ویژگی: $e');
+            }
           }, style: TextButton.styleFrom(foregroundColor: Colors.red), child: Text(t.delete)),
         ],
       ),

@@ -1,4 +1,5 @@
 import 'dart:ui' as ui;
+import 'dart:ui' show FontFeature;
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:hesabix_ui/models/document_model.dart';
@@ -67,7 +68,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
     super.initState();
     _service = DocumentService(ApiClient());
     _storageService = BusinessStorageService(ApiClient());
-    // تعداد تب‌ها: اطلاعات، محصولات (فقط برای فاکتور)، حساب‌ها، فایل‌ها
+    // تعداد تب‌ها: اطلاعات، محصولات (فقط برای فاکتور)، حساب‌ها، تراکنش‌ها (فقط برای فاکتور)، فایل‌ها
     _tabController = TabController(length: 4, vsync: this);
     _loadDocument();
   }
@@ -363,7 +364,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
         });
         // تنظیم مجدد TabController بر اساس نوع سند
         final isInvoice = doc.documentType.startsWith('invoice');
-        final tabCount = isInvoice ? 4 : 3; // اگر فاکتور است 4 تب، وگرنه 3 تب
+        final tabCount = isInvoice ? 5 : 3; // اگر فاکتور است 5 تب (اطلاعات، محصولات، حساب‌ها، تراکنش‌ها، فایل‌ها)، وگرنه 3 تب
         if (_tabController.length != tabCount) {
           _tabController.dispose();
           _tabController = TabController(length: tabCount, vsync: this);
@@ -503,8 +504,10 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                 tabs: [
                   const Tab(icon: Icon(Icons.info_outline), text: 'اطلاعات سند'),
                   if (_document != null && _document!.documentType.startsWith('invoice'))
-                    const Tab(icon: Icon(Icons.shopping_cart), text: 'محصولات'),
+                    const Tab(icon: Icon(Icons.shopping_cart), text: 'کالاها'),
                   const Tab(icon: Icon(Icons.account_balance), text: 'حساب‌ها'),
+                  if (_document != null && _document!.documentType.startsWith('invoice'))
+                    const Tab(icon: Icon(Icons.payment), text: 'تراکنش‌ها'),
                   const Tab(icon: Icon(Icons.attach_file), text: 'فایل‌ها'),
                 ],
               ),
@@ -516,18 +519,21 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                       ? _buildError()
                       : TabBarView(
                           controller: _tabController,
-                          children: [
-                            _buildInfoTab(theme),
-                            if (_document != null && _document!.documentType.startsWith('invoice'))
-                              _buildProductsTab(theme)
-                            else
-                              _buildAccountsTab(theme),
-                            if (_document != null && _document!.documentType.startsWith('invoice'))
-                              _buildAccountsTab(theme)
-                            else
-                              _buildAttachmentsTab(theme),
-                            _buildAttachmentsTab(theme),
-                          ],
+                          children: _document != null && _document!.documentType.startsWith('invoice')
+                              ? [
+                                  // برای فاکتورها: 5 تب
+                                  _buildInfoTab(theme),
+                                  _buildProductsTab(theme),
+                                  _buildAccountsTab(theme),
+                                  _buildTransactionsTab(theme),
+                                  _buildAttachmentsTab(theme),
+                                ]
+                              : [
+                                  // برای سایر اسناد: 3 تب
+                                  _buildInfoTab(theme),
+                                  _buildAccountsTab(theme),
+                                  _buildAttachmentsTab(theme),
+                                ],
                         ),
             ),
             _buildFooter(),
@@ -734,10 +740,6 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
           if (isInvoice) ...[
             const SizedBox(height: 24),
             _buildCounterpartyInfoCard(theme, document),
-          ],
-          if (isInvoice) ...[
-            const SizedBox(height: 24),
-            _buildPaymentTransactions(theme),
           ],
           if (_relatedWhDocs.isNotEmpty) ...[
             const SizedBox(height: 24),
@@ -1071,7 +1073,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
             Icon(Icons.shopping_cart_outlined, size: 64, color: theme.colorScheme.onSurfaceVariant),
             const SizedBox(height: 16),
             Text(
-              'هیچ محصولی در این فاکتور ثبت نشده است',
+              'هیچ کالایی در این فاکتور ثبت نشده است',
               style: theme.textTheme.titleMedium?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
@@ -1081,15 +1083,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
       );
     }
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildProductLinesTable(theme),
-        ],
-      ),
-    );
+    return _buildProductLinesTable(theme);
   }
 
   /// ساخت تب حساب‌ها
@@ -1106,6 +1100,42 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
           _buildLinesTable(theme),
           const SizedBox(height: 16),
           _buildTotals(theme),
+        ],
+      ),
+    );
+  }
+
+  /// ساخت تب تراکنش‌ها
+  Widget _buildTransactionsTab(ThemeData theme) {
+    if (_document == null) {
+      return const Center(child: Text('اطلاعاتی برای نمایش وجود ندارد.'));
+    }
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (_loadingPayments)
+            _buildPaymentTransactions(theme)
+          else if (_paymentDocuments.isEmpty)
+            Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.payment_outlined, size: 64, color: theme.colorScheme.onSurfaceVariant),
+                  const SizedBox(height: 16),
+                  Text(
+                    'هیچ تراکنش پرداختی ثبت نشده است',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else
+            _buildPaymentTransactions(theme),
         ],
       ),
     );
@@ -1156,114 +1186,136 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
       return const SizedBox.shrink();
     }
 
-    return Card(
-      elevation: 2,
-      margin: const EdgeInsets.only(bottom: 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Text(
-              'سطرهای محصول',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
+    return Padding(
+      padding: const EdgeInsets.all(20),
+      child: Card(
+        elevation: 2,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(
+                'لیست کالاها',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
-          ),
-          const Divider(height: 1),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: DataTable(
-              headingRowColor: WidgetStateProperty.all(
-                theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
+            const Divider(height: 1),
+            // اسکرول عمودی برای لیست طولانی کالاها
+            Expanded(
+              child: SingleChildScrollView(
+                scrollDirection: Axis.vertical,
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: DataTable(
+                    headingRowColor: WidgetStateProperty.all(
+                      theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
+                    ),
+                    columns: const [
+                      DataColumn(label: Text('ردیف', style: TextStyle(fontWeight: FontWeight.bold))),
+                      DataColumn(label: Text('نام کالا', style: TextStyle(fontWeight: FontWeight.bold))),
+                      DataColumn(label: Text('تعداد', style: TextStyle(fontWeight: FontWeight.bold))),
+                      DataColumn(label: Text('واحد', style: TextStyle(fontWeight: FontWeight.bold))),
+                      DataColumn(label: Text('فی', style: TextStyle(fontWeight: FontWeight.bold))),
+                      DataColumn(label: Text('تخفیف', style: TextStyle(fontWeight: FontWeight.bold))),
+                      DataColumn(label: Text('مالیات', style: TextStyle(fontWeight: FontWeight.bold))),
+                      DataColumn(label: Text('قیمت', style: TextStyle(fontWeight: FontWeight.bold))),
+                      DataColumn(label: Text('توضیحات', style: TextStyle(fontWeight: FontWeight.bold))),
+                    ],
+                    rows: productLines.asMap().entries.map((entry) {
+                      final index = entry.key;
+                      final line = entry.value as Map<String, dynamic>;
+                      final extraInfo = line['extra_info'] as Map<String, dynamic>?;
+                      final quantity = (line['quantity'] as num?)?.toDouble() ?? 0.0;
+                      final unitPrice = (extraInfo?['unit_price'] as num?)?.toDouble() ?? 0.0;
+                      final discount = (extraInfo?['line_discount'] as num?)?.toDouble() ?? 0.0;
+                      final tax = (extraInfo?['tax_amount'] as num?)?.toDouble() ?? 0.0;
+                      final lineTotal = (extraInfo?['line_total'] as num?)?.toDouble() ?? 0.0;
+                      final unit = extraInfo?['unit'] as String? ?? '-';
+                      
+                      // استایل پایه برای اعداد - استفاده از theme و tabular figures
+                      final baseNumberStyle = theme.textTheme.bodyMedium?.copyWith(
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ) ?? const TextStyle(fontFeatures: [FontFeature.tabularFigures()]);
+                      
+                      return DataRow(
+                        cells: [
+                          DataCell(
+                            Text(
+                              '${index + 1}',
+                              textDirection: ui.TextDirection.ltr,
+                              style: baseNumberStyle,
+                            ),
+                          ),
+                          DataCell(
+                            SizedBox(
+                              width: 200,
+                              child: Text(
+                                line['product_name'] as String? ?? '-',
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ),
+                        DataCell(
+                          Text(
+                            formatWithThousands(quantity, decimalPlaces: quantity % 1 == 0 ? 0 : 2),
+                            textDirection: ui.TextDirection.ltr,
+                            style: baseNumberStyle,
+                          ),
+                        ),
+                        DataCell(Text(unit)),
+                        DataCell(
+                          Text(
+                            formatWithThousands(unitPrice, decimalPlaces: unitPrice % 1 == 0 ? 0 : 2),
+                            textDirection: ui.TextDirection.ltr,
+                            style: baseNumberStyle,
+                          ),
+                        ),
+                        DataCell(
+                          Text(
+                            discount > 0 ? formatWithThousands(discount, decimalPlaces: discount % 1 == 0 ? 0 : 2) : '-',
+                            textDirection: ui.TextDirection.ltr,
+                            style: baseNumberStyle.copyWith(color: Colors.orange),
+                          ),
+                        ),
+                        DataCell(
+                          Text(
+                            tax > 0 ? formatWithThousands(tax, decimalPlaces: tax % 1 == 0 ? 0 : 2) : '-',
+                            textDirection: ui.TextDirection.ltr,
+                            style: baseNumberStyle.copyWith(color: Colors.blue),
+                          ),
+                        ),
+                        DataCell(
+                          Text(
+                            formatWithThousands(lineTotal, decimalPlaces: lineTotal % 1 == 0 ? 0 : 2),
+                            textDirection: ui.TextDirection.ltr,
+                            style: baseNumberStyle.copyWith(
+                              color: Colors.green,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                          DataCell(
+                            SizedBox(
+                              width: 200,
+                              child: Text(
+                                line['description'] as String? ?? '-',
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 2,
+                              ),
+                            ),
+                          ),
+                        ],
+                      );
+                    }).toList(),
+                  ),
+                ),
               ),
-              columns: const [
-                DataColumn(label: Text('ردیف', style: TextStyle(fontWeight: FontWeight.bold))),
-                DataColumn(label: Text('محصول', style: TextStyle(fontWeight: FontWeight.bold))),
-                DataColumn(label: Text('تعداد', style: TextStyle(fontWeight: FontWeight.bold))),
-                DataColumn(label: Text('واحد', style: TextStyle(fontWeight: FontWeight.bold))),
-                DataColumn(label: Text('قیمت واحد', style: TextStyle(fontWeight: FontWeight.bold))),
-                DataColumn(label: Text('تخفیف', style: TextStyle(fontWeight: FontWeight.bold))),
-                DataColumn(label: Text('مالیات', style: TextStyle(fontWeight: FontWeight.bold))),
-                DataColumn(label: Text('جمع', style: TextStyle(fontWeight: FontWeight.bold))),
-                DataColumn(label: Text('توضیحات', style: TextStyle(fontWeight: FontWeight.bold))),
-              ],
-              rows: productLines.asMap().entries.map((entry) {
-                final index = entry.key;
-                final line = entry.value as Map<String, dynamic>;
-                final extraInfo = line['extra_info'] as Map<String, dynamic>?;
-                final quantity = (line['quantity'] as num?)?.toDouble() ?? 0.0;
-                final unitPrice = (extraInfo?['unit_price'] as num?)?.toDouble() ?? 0.0;
-                final discount = (extraInfo?['line_discount'] as num?)?.toDouble() ?? 0.0;
-                final tax = (extraInfo?['tax_amount'] as num?)?.toDouble() ?? 0.0;
-                final lineTotal = (extraInfo?['line_total'] as num?)?.toDouble() ?? 0.0;
-                final unit = extraInfo?['unit'] as String? ?? '-';
-                
-                return DataRow(
-                  cells: [
-                    DataCell(Text('${index + 1}')),
-                    DataCell(
-                      SizedBox(
-                        width: 200,
-                        child: Text(
-                          line['product_name'] as String? ?? '-',
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ),
-                    DataCell(
-                      Text(
-                        formatWithThousands(quantity.toInt()),
-                        textDirection: ui.TextDirection.ltr,
-                        style: const TextStyle(fontFamily: 'monospace'),
-                      ),
-                    ),
-                    DataCell(Text(unit)),
-                    DataCell(
-                      Text(
-                        formatWithThousands(unitPrice.toInt()),
-                        textDirection: ui.TextDirection.ltr,
-                        style: const TextStyle(fontFamily: 'monospace'),
-                      ),
-                    ),
-                    DataCell(
-                      Text(
-                        discount > 0 ? formatWithThousands(discount.toInt()) : '-',
-                        textDirection: ui.TextDirection.ltr,
-                        style: const TextStyle(fontFamily: 'monospace', color: Colors.orange),
-                      ),
-                    ),
-                    DataCell(
-                      Text(
-                        tax > 0 ? formatWithThousands(tax.toInt()) : '-',
-                        textDirection: ui.TextDirection.ltr,
-                        style: const TextStyle(fontFamily: 'monospace', color: Colors.blue),
-                      ),
-                    ),
-                    DataCell(
-                      Text(
-                        formatWithThousands(lineTotal.toInt()),
-                        textDirection: ui.TextDirection.ltr,
-                        style: const TextStyle(fontFamily: 'monospace', color: Colors.green, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                    DataCell(
-                      SizedBox(
-                        width: 200,
-                        child: Text(
-                          line['description'] as String? ?? '-',
-                          overflow: TextOverflow.ellipsis,
-                          maxLines: 2,
-                        ),
-                      ),
-                    ),
-                  ],
-                );
-              }).toList(),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -1379,8 +1431,11 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                       Text(
                         debit > 0 ? formatWithThousands(debit.toInt()) : '-',
                         textDirection: ui.TextDirection.ltr,
-                        style: const TextStyle(
-                          fontFamily: 'monospace',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                          color: Colors.red,
+                        ) ?? const TextStyle(
+                          fontFeatures: [FontFeature.tabularFigures()],
                           color: Colors.red,
                         ),
                       ),
@@ -1389,8 +1444,11 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                       Text(
                         credit > 0 ? formatWithThousands(credit.toInt()) : '-',
                         textDirection: ui.TextDirection.ltr,
-                        style: const TextStyle(
-                          fontFamily: 'monospace',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                          color: Colors.green,
+                        ) ?? const TextStyle(
+                          fontFeatures: [FontFeature.tabularFigures()],
                           color: Colors.green,
                         ),
                       ),
@@ -1508,6 +1566,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
 
   /// ساخت یک آیتم از جمع کل
   Widget _buildTotalItem(String label, String value, Color color) {
+    final theme = Theme.of(context);
     return Column(
       children: [
         Text(
@@ -1521,11 +1580,16 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
         Text(
           value,
           textDirection: ui.TextDirection.ltr,
-          style: TextStyle(
+          style: theme.textTheme.titleLarge?.copyWith(
             fontWeight: FontWeight.bold,
             fontSize: 18,
             color: color,
-            fontFamily: 'monospace',
+            fontFeatures: const [FontFeature.tabularFigures()],
+          ) ?? TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
+            color: color,
+            fontFeatures: const [FontFeature.tabularFigures()],
           ),
         ),
       ],
@@ -1556,9 +1620,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
       );
     }
 
-    if (_paymentDocuments.isEmpty) {
-      return const SizedBox.shrink();
-    }
+    // این بررسی در تب تراکنش‌ها انجام می‌شود، اینجا نیازی نیست
 
     return Card(
       elevation: 2,
@@ -1742,6 +1804,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
 
   /// ساخت یک ردیف اطلاعات در کارت پرداخت
   Widget _buildPaymentInfoRow(String label, String value, {bool isAmount = false}) {
+    final theme = Theme.of(context);
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1760,11 +1823,20 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
           child: Text(
             value,
             textDirection: isAmount ? ui.TextDirection.ltr : null,
-            style: TextStyle(
-              fontWeight: isAmount ? FontWeight.bold : FontWeight.normal,
-              fontSize: 12,
-              fontFamily: isAmount ? 'monospace' : null,
-            ),
+            style: isAmount
+                ? (theme.textTheme.bodySmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ) ?? const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                    fontFeatures: [FontFeature.tabularFigures()],
+                  ))
+                : TextStyle(
+                    fontWeight: FontWeight.normal,
+                    fontSize: 12,
+                  ),
           ),
         ),
       ],

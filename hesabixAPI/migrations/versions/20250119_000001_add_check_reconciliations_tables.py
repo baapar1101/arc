@@ -4,7 +4,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = '20250119_000001_add_check_reconciliations_tables'
-down_revision = '20251118_000001_add_document_monetization'
+down_revision = '20251119_000001_add_person_share_links'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

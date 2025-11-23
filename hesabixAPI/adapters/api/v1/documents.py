@@ -1251,23 +1251,105 @@ async def export_top_suppliers_report_excel(
     )
     
     items = result.get('items', [])
-    # برای گزارش برترین تامین‌کنندگان، format_datetime_fields روی فیلد last_purchase_date اعمال می‌شود
-    formatted_items = []
-    for item in items:
-        formatted_item = dict(item)
-        # اگر فیلد last_purchase_date وجود دارد، آن را فرمت کن
-        if 'last_purchase_date' in formatted_item and formatted_item['last_purchase_date']:
+    items = [format_datetime_fields(item, request) for item in items]
+    
+    # Get calendar type
+    calendar_type = "gregorian"
+    if hasattr(request.state, 'calendar_type'):
+        calendar_type = request.state.calendar_type
+    
+    # Helper function to format date based on calendar type
+    def format_date_for_export(item_dict: dict, date_key: str) -> str:
+        """Format date based on calendar type (date only, no time)"""
+        from app.core.calendar import CalendarConverter
+        
+        # First check if there's a _formatted field (from format_datetime_fields)
+        formatted_key = f"{date_key}_formatted"
+        if formatted_key in item_dict:
+            formatted_value = item_dict.get(formatted_key)
+            if isinstance(formatted_value, dict):
+                date_only = formatted_value.get("date_only")
+                if date_only:
+                    return str(date_only)
+                formatted = formatted_value.get("formatted", "")
+                if formatted:
+                    # Extract date part only (remove time)
+                    date_part = str(formatted).split(' ')[0].split('T')[0]
+                    return date_part
+        
+        # Get the main field value
+        value = item_dict.get(date_key)
+        if value is None:
+            return ""
+        
+        # If it's a dict (from _formatted field), use date_only
+        if isinstance(value, dict):
+            date_only = value.get("date_only")
+            if date_only:
+                return str(date_only)
+            formatted = value.get("formatted", "")
+            if formatted:
+                date_part = str(formatted).split(' ')[0].split('T')[0]
+                return date_part
+        
+        # If it's a datetime object, format it based on calendar type
+        if isinstance(value, datetime.datetime):
             try:
-                from datetime import date as date_class
-                if isinstance(formatted_item['last_purchase_date'], str):
-                    date_obj = date_class.fromisoformat(formatted_item['last_purchase_date'])
-                    formatted_dict = format_datetime_fields({'date': date_obj}, request)
-                    formatted_item['last_purchase_date'] = formatted_dict.get('date', formatted_item['last_purchase_date'])
+                formatted = CalendarConverter.format_datetime(value, calendar_type)
+                return formatted.get("date_only", "") or formatted.get("formatted", "").split(' ')[0]
             except Exception:
                 pass
-        formatted_items.append(formatted_item)
-    
-    items = formatted_items
+        
+        # If it's a date object, format it based on calendar type
+        if isinstance(value, datetime.date):
+            try:
+                dt_value = datetime.datetime.combine(value, datetime.datetime.min.time())
+                formatted = CalendarConverter.format_datetime(dt_value, calendar_type)
+                return formatted.get("date_only", "") or formatted.get("formatted", "").split(' ')[0]
+            except Exception:
+                pass
+        
+        # If it's a string, check if it's already formatted (contains / separator for Jalali)
+        if isinstance(value, str):
+            # Check if it looks like a Jalali date (contains / and has YYYY/MM/DD format)
+            if '/' in value and (len(value.split('/')) == 3):
+                # Might be already formatted, but check if it's ISO format (YYYY-MM-DD) or Jalali (YYYY/MM/DD)
+                if '-' in value:
+                    # ISO format (YYYY-MM-DD), parse and format
+                    try:
+                        if 'T' in value:
+                            dt_value = datetime.datetime.fromisoformat(value.replace('Z', '+00:00'))
+                        else:
+                            date_value = datetime.date.fromisoformat(value)
+                            dt_value = datetime.datetime.combine(date_value, datetime.datetime.min.time())
+                        formatted = CalendarConverter.format_datetime(dt_value, calendar_type)
+                        return formatted.get("date_only", "") or formatted.get("formatted", "").split(' ')[0]
+                    except Exception:
+                        pass
+                else:
+                    # Might be Jalali format (YYYY/MM/DD), return as is but remove time if exists
+                    if ' ' in value:
+                        return value.split(' ')[0]
+                    return value
+            else:
+                # Try to parse as ISO format
+                try:
+                    if 'T' in value:
+                        dt_value = datetime.datetime.fromisoformat(value.replace('Z', '+00:00'))
+                    else:
+                        date_value = datetime.date.fromisoformat(value)
+                        dt_value = datetime.datetime.combine(date_value, datetime.datetime.min.time())
+                    formatted = CalendarConverter.format_datetime(dt_value, calendar_type)
+                    return formatted.get("date_only", "") or formatted.get("formatted", "").split(' ')[0]
+                except Exception:
+                    # If parsing fails, return as is (might already be formatted)
+                    if ' ' in value or 'T' in value:
+                        date_part = value.split(' ')[0].split('T')[0]
+                        return date_part
+                    return value
+        
+        # Fallback
+        return str(value) if value else ""
     
     # Handle selected rows
     selected_only = bool(body.get('selected_only', False))
@@ -1357,8 +1439,7 @@ async def export_top_suppliers_report_excel(
             
             # Format dates
             if key == 'last_purchase_date' and value:
-                # Value is already formatted by format_datetime_fields
-                pass
+                value = format_date_for_export(item, 'last_purchase_date')
             
             if isinstance(value, list):
                 value = ", ".join(str(v) for v in value)
@@ -1587,6 +1668,104 @@ async def export_daily_purchases_report_excel(
     items = result.get('items', [])
     items = [format_datetime_fields(item, request) for item in items]
     
+    # Get calendar type
+    calendar_type = "gregorian"
+    if hasattr(request.state, 'calendar_type'):
+        calendar_type = request.state.calendar_type
+    
+    # Helper function to format date based on calendar type
+    def format_date_for_export(item_dict: dict, date_key: str) -> str:
+        """Format date based on calendar type (date only, no time)"""
+        from app.core.calendar import CalendarConverter
+        
+        # First check if there's a _formatted field (from format_datetime_fields)
+        formatted_key = f"{date_key}_formatted"
+        if formatted_key in item_dict:
+            formatted_value = item_dict.get(formatted_key)
+            if isinstance(formatted_value, dict):
+                date_only = formatted_value.get("date_only")
+                if date_only:
+                    return str(date_only)
+                formatted = formatted_value.get("formatted", "")
+                if formatted:
+                    # Extract date part only (remove time)
+                    date_part = str(formatted).split(' ')[0].split('T')[0]
+                    return date_part
+        
+        # Get the main field value
+        value = item_dict.get(date_key)
+        if value is None:
+            return ""
+        
+        # If it's a dict (from _formatted field), use date_only
+        if isinstance(value, dict):
+            date_only = value.get("date_only")
+            if date_only:
+                return str(date_only)
+            formatted = value.get("formatted", "")
+            if formatted:
+                date_part = str(formatted).split(' ')[0].split('T')[0]
+                return date_part
+        
+        # If it's a datetime object, format it based on calendar type
+        if isinstance(value, datetime.datetime):
+            try:
+                formatted = CalendarConverter.format_datetime(value, calendar_type)
+                return formatted.get("date_only", "") or formatted.get("formatted", "").split(' ')[0]
+            except Exception:
+                pass
+        
+        # If it's a date object, format it based on calendar type
+        if isinstance(value, datetime.date):
+            try:
+                dt_value = datetime.datetime.combine(value, datetime.datetime.min.time())
+                formatted = CalendarConverter.format_datetime(dt_value, calendar_type)
+                return formatted.get("date_only", "") or formatted.get("formatted", "").split(' ')[0]
+            except Exception:
+                pass
+        
+        # If it's a string, check if it's already formatted (contains / separator for Jalali)
+        if isinstance(value, str):
+            # Check if it looks like a Jalali date (contains / and has YYYY/MM/DD format)
+            if '/' in value and (len(value.split('/')) == 3):
+                # Might be already formatted, but check if it's ISO format (YYYY-MM-DD) or Jalali (YYYY/MM/DD)
+                if '-' in value:
+                    # ISO format (YYYY-MM-DD), parse and format
+                    try:
+                        if 'T' in value:
+                            dt_value = datetime.datetime.fromisoformat(value.replace('Z', '+00:00'))
+                        else:
+                            date_value = datetime.date.fromisoformat(value)
+                            dt_value = datetime.datetime.combine(date_value, datetime.datetime.min.time())
+                        formatted = CalendarConverter.format_datetime(dt_value, calendar_type)
+                        return formatted.get("date_only", "") or formatted.get("formatted", "").split(' ')[0]
+                    except Exception:
+                        pass
+                else:
+                    # Might be Jalali format (YYYY/MM/DD), return as is but remove time if exists
+                    if ' ' in value:
+                        return value.split(' ')[0]
+                    return value
+            else:
+                # Try to parse as ISO format
+                try:
+                    if 'T' in value:
+                        dt_value = datetime.datetime.fromisoformat(value.replace('Z', '+00:00'))
+                    else:
+                        date_value = datetime.date.fromisoformat(value)
+                        dt_value = datetime.datetime.combine(date_value, datetime.datetime.min.time())
+                    formatted = CalendarConverter.format_datetime(dt_value, calendar_type)
+                    return formatted.get("date_only", "") or formatted.get("formatted", "").split(' ')[0]
+                except Exception:
+                    # If parsing fails, return as is (might already be formatted)
+                    if ' ' in value or 'T' in value:
+                        date_part = value.split(' ')[0].split('T')[0]
+                        return date_part
+                    return value
+        
+        # Fallback
+        return str(value) if value else ""
+    
     # Handle selected rows
     selected_only = bool(body.get('selected_only', False))
     selected_indices = body.get('selected_indices')
@@ -1676,8 +1855,7 @@ async def export_daily_purchases_report_excel(
             
             # Format dates
             if key == 'date' and value:
-                # Value is already formatted by format_datetime_fields
-                pass
+                value = format_date_for_export(item, 'date')
             
             if isinstance(value, list):
                 value = ", ".join(str(v) for v in value)
@@ -2531,10 +2709,16 @@ async def export_journal_ledger_report_excel(
     from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
     from fastapi.responses import Response
     from adapters.db.models.business import Business
+    from app.core.calendar import CalendarConverter, CalendarType
     
     # بررسی دسترسی
     if not ctx.can_read_section("reports"):
         raise ApiError("FORBIDDEN", "Missing business permission: reports.read", http_status=403)
+    
+    # دریافت calendar_type از request state
+    calendar_type: CalendarType = "gregorian"
+    if hasattr(request.state, 'calendar_type'):
+        calendar_type = request.state.calendar_type
     
     # دریافت سال مالی از header یا body
     fiscal_year_id = None
@@ -2582,6 +2766,130 @@ async def export_journal_ledger_report_excel(
     items = result.get('items', [])
     items = [format_datetime_fields(item, request) for item in items]
     
+    # Helper function to format date based on calendar type
+    def format_date_for_export(item_dict: dict, date_key: str) -> str:
+        """Format date based on calendar type (date only, no time)"""
+        # First check if there's a _formatted field (from format_datetime_fields)
+        formatted_key = f"{date_key}_formatted"
+        if formatted_key in item_dict:
+            formatted_value = item_dict.get(formatted_key)
+            if isinstance(formatted_value, dict):
+                date_only = formatted_value.get("date_only")
+                if date_only:
+                    return str(date_only)
+                formatted = formatted_value.get("formatted", "")
+                if formatted:
+                    # Extract date part only (remove time)
+                    date_part = str(formatted).split(' ')[0].split('T')[0]
+                    return date_part
+        
+        # Get the main field value
+        value = item_dict.get(date_key)
+        if value is None:
+            return ""
+        
+        # If it's a dict (from _formatted field), use date_only
+        if isinstance(value, dict):
+            date_only = value.get("date_only")
+            if date_only:
+                return str(date_only)
+            formatted = value.get("formatted", "")
+            if formatted:
+                date_part = str(formatted).split(' ')[0].split('T')[0]
+                return date_part
+        
+        # If it's a datetime object, format it based on calendar type
+        if isinstance(value, datetime.datetime):
+            try:
+                formatted = CalendarConverter.format_datetime(value, calendar_type)
+                return formatted.get("date_only", "") or formatted.get("formatted", "").split(' ')[0]
+            except Exception:
+                pass
+        
+        # If it's a date object, format it based on calendar type
+        if isinstance(value, datetime.date):
+            try:
+                dt_value = datetime.datetime.combine(value, datetime.datetime.min.time())
+                formatted = CalendarConverter.format_datetime(dt_value, calendar_type)
+                return formatted.get("date_only", "") or formatted.get("formatted", "").split(' ')[0]
+            except Exception:
+                pass
+        
+        # If it's a string, check if it's already formatted (contains Persian or has / separator for Jalali)
+        if isinstance(value, str):
+            # Check if it looks like a Jalali date (contains / and Persian numbers or has YYYY/MM/DD format)
+            if '/' in value and (len(value.split('/')) == 3):
+                # Might be already formatted, but check if it's ISO format (YYYY-MM-DD) or Jalali (YYYY/MM/DD)
+                if '-' in value:
+                    # ISO format (YYYY-MM-DD), parse and format
+                    try:
+                        if 'T' in value:
+                            dt_value = datetime.datetime.fromisoformat(value.replace('Z', '+00:00'))
+                        else:
+                            date_value = datetime.date.fromisoformat(value)
+                            dt_value = datetime.datetime.combine(date_value, datetime.datetime.min.time())
+                        formatted = CalendarConverter.format_datetime(dt_value, calendar_type)
+                        return formatted.get("date_only", "") or formatted.get("formatted", "").split(' ')[0]
+                    except Exception:
+                        pass
+                else:
+                    # Might be Jalali format (YYYY/MM/DD), return as is but remove time if exists
+                    if ' ' in value:
+                        return value.split(' ')[0]
+                    return value
+            else:
+                # Try to parse as ISO format
+                try:
+                    if 'T' in value:
+                        dt_value = datetime.datetime.fromisoformat(value.replace('Z', '+00:00'))
+                    else:
+                        date_value = datetime.date.fromisoformat(value)
+                        dt_value = datetime.datetime.combine(date_value, datetime.datetime.min.time())
+                    formatted = CalendarConverter.format_datetime(dt_value, calendar_type)
+                    return formatted.get("date_only", "") or formatted.get("formatted", "").split(' ')[0]
+                except Exception:
+                    # If parsing fails, return as is (might already be formatted)
+                    if ' ' in value or 'T' in value:
+                        date_part = value.split(' ')[0].split('T')[0]
+                        return date_part
+                    return value
+        
+        # Fallback
+        return str(value) if value else ""
+    
+    # Helper function to get document type name in Persian
+    def get_document_type_name_fa(doc_type: str | None) -> str:
+        """تبدیل نوع سند به نام فارسی"""
+        if not doc_type:
+            return ''
+        
+        mapping = {
+            'invoice_sales': 'فاکتور فروش',
+            'invoice_sales_return': 'برگشت از فروش',
+            'invoice_purchase': 'فاکتور خرید',
+            'invoice_purchase_return': 'برگشت از خرید',
+            'invoice_production': 'فاکتور تولید',
+            'invoice_direct_consumption': 'مصرف مستقیم',
+            'invoice_waste': 'ضایعات',
+            'receipt': 'دریافت',
+            'payment': 'پرداخت',
+            'transfer': 'انتقال',
+            'expense': 'هزینه',
+            'income': 'درآمد',
+            'expense_income': 'درآمد/هزینه',
+            'opening_balance': 'تراز افتتاحیه',
+            'manual': 'سند دستی',
+            'manual_document': 'سند دستی',
+            'check_endorse': 'پاسخگویی چک',
+            'check_clear': 'وصول چک',
+            'check_pay': 'پرداخت چک',
+            'check_return': 'برگشت چک',
+            'check_bounce': 'برگشت خوردن چک',
+            'check_deposit': 'واریز به حساب',
+            'check_delete': 'حذف چک',
+        }
+        return mapping.get(doc_type, doc_type)
+    
     # Handle selected rows
     selected_only = bool(body.get('selected_only', False))
     selected_indices = body.get('selected_indices')
@@ -2604,6 +2912,10 @@ async def export_journal_ledger_report_excel(
             'document_code': '⚠️',
             'document_type_name': 'حداکثر ۱۰,۰۰۰ رکورد قابل export است',
             'description': '',
+            'general_account_code': '',
+            'general_account_name': '',
+            'subsidiary_account_code': '',
+            'subsidiary_account_name': '',
             'debit_account_code': '',
             'debit_account_name': '',
             'debit_amount': '',
@@ -2636,6 +2948,10 @@ async def export_journal_ledger_report_excel(
             ('document_type_name', 'نوع سند' if is_fa else 'Document Type'),
             ('document_code', 'شماره سند' if is_fa else 'Document Code'),
             ('description', 'شرح' if is_fa else 'Description'),
+            ('general_account_code', 'کد حساب کل' if is_fa else 'General Account Code'),
+            ('general_account_name', 'عنوان حساب کل' if is_fa else 'General Account Name'),
+            ('subsidiary_account_code', 'کد حساب معین' if is_fa else 'Subsidiary Account Code'),
+            ('subsidiary_account_name', 'عنوان حساب معین' if is_fa else 'Subsidiary Account Name'),
             ('debit_account_code', 'کد حساب بدهکار' if is_fa else 'Debit Account Code'),
             ('debit_account_name', 'نام حساب بدهکار' if is_fa else 'Debit Account Name'),
             ('debit_amount', 'مبلغ بدهکار' if is_fa else 'Debit Amount'),
@@ -2683,6 +2999,26 @@ async def export_journal_ledger_report_excel(
         for col_idx, key in enumerate(keys, 1):
             value = item.get(key, "")
             
+            # Format dates based on calendar type
+            if key == 'document_date' and value:
+                value = format_date_for_export(item, 'document_date')
+            
+            # Format document type name (ensure it's in Persian)
+            if key == 'document_type_name':
+                # Always use document_type to get the correct translation
+                doc_type = item.get('document_type', '')
+                if doc_type:
+                    value = get_document_type_name_fa(doc_type)
+                elif value:
+                    # If document_type is not available, check if value is English and translate
+                    # Check if value contains Persian characters
+                    has_persian = any('\u0600' <= c <= '\u06FF' for c in str(value))
+                    if not has_persian:
+                        # Value is likely in English, try to translate it
+                        value = get_document_type_name_fa(value)
+                else:
+                    value = ""
+            
             # Format numbers
             if key in ['debit_amount', 'credit_amount'] and value:
                 try:
@@ -2690,11 +3026,6 @@ async def export_journal_ledger_report_excel(
                     value = num_value
                 except (ValueError, TypeError):
                     pass
-            
-            # Format dates
-            if key == 'document_date' and value:
-                # Value is already formatted by format_datetime_fields
-                pass
             
             if isinstance(value, list):
                 value = ", ".join(str(v) for v in value)

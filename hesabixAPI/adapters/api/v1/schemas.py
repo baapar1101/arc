@@ -351,3 +351,56 @@ class BusinessUsersListResponse(BaseModel):
     calendar_type: Optional[str] = None
 
 
+# Document Numbering Settings Schemas
+class DocumentNumberingSettingRequest(BaseModel):
+    document_type: str = Field(..., description="نوع سند (invoice_sales, receipt, payment, ...)")
+    prefix: Optional[str] = Field(default=None, max_length=20, description="پیشوند شماره سند")
+    include_date: bool = Field(default=True, description="آیا تاریخ در شماره سند باشد؟")
+    calendar_type: str = Field(
+        default="gregorian",
+        description="نوع تقویم: gregorian (میلادی) یا jalali (شمسی)"
+    )
+    date_format: Optional[str] = Field(
+        default=None,
+        max_length=20,
+        description="فرمت تاریخ (YYYYMMDD, YYYY/MM/DD, ...)"
+    )
+    separator: str = Field(default="-", max_length=5, description="جداکننده")
+    start_number: int = Field(default=1, ge=1, description="شماره شروع")
+    number_padding: int = Field(default=4, ge=1, le=10, description="تعداد صفرهای پیش‌رو")
+    reset_period: Optional[str] = Field(
+        default=None,
+        description="دوره ریست: daily, monthly, yearly, never"
+    )
+    custom_format: Optional[str] = Field(
+        default=None,
+        max_length=100,
+        description="فرمت سفارشی"
+    )
+    is_active: bool = Field(default=True, description="فعال/غیرفعال")
+
+    class Config:
+        from_attributes = True
+
+
+class DocumentNumberingSettingResponse(BaseModel):
+    id: int
+    business_id: int
+    document_type: str
+    prefix: Optional[str]
+    include_date: bool
+    calendar_type: str
+    date_format: Optional[str]
+    separator: str
+    start_number: int
+    number_padding: int
+    reset_period: Optional[str]
+    custom_format: Optional[str]
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+

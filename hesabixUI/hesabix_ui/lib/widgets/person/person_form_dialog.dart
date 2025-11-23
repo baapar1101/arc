@@ -689,40 +689,70 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
 
   Widget _buildCreditOverrideSection() {
     final t = AppLocalizations.of(context);
-    final currencyLabel = _creditCurrencyLabel?.isNotEmpty == true ? _creditCurrencyLabel! : t.currencyToman;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(t.creditPersonPolicyTitle, style: const TextStyle(fontWeight: FontWeight.bold)),
-        const SizedBox(height: 8),
-        DropdownButtonFormField<String>(
-          initialValue: _creditCheckMode,
-          items: [
-            DropdownMenuItem(value: 'inherit', child: Text(t.creditCheckModeInherit)),
-            DropdownMenuItem(value: 'enabled', child: Text(t.creditCheckModeEnabled)),
-            DropdownMenuItem(value: 'disabled', child: Text(t.creditCheckModeDisabled)),
+    return FutureBuilder<String?>(
+      future: _getCurrencyLabel(),
+      builder: (context, snapshot) {
+        final currencyLabel = snapshot.data;
+        final labelText = currencyLabel != null 
+            ? '${t.creditLimitLabel} ($currencyLabel)'
+            : t.creditLimitLabel;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(t.creditPersonPolicyTitle, style: const TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            DropdownButtonFormField<String>(
+              initialValue: _creditCheckMode,
+              items: [
+                DropdownMenuItem(value: 'inherit', child: Text(t.creditCheckModeInherit)),
+                DropdownMenuItem(value: 'enabled', child: Text(t.creditCheckModeEnabled)),
+                DropdownMenuItem(value: 'disabled', child: Text(t.creditCheckModeDisabled)),
+              ],
+              onChanged: (v) => setState(() => _creditCheckMode = v ?? 'inherit'),
+              decoration: InputDecoration(labelText: t.creditCheckModeLabel),
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _creditLimitController,
+              decoration: InputDecoration(
+                labelText: labelText,
+                hintText: t.creditLimitHint,
+                border: const OutlineInputBorder(),
+                suffixText: currencyLabel,
+              ),
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(t.creditTipText),
           ],
-          onChanged: (v) => setState(() => _creditCheckMode = v ?? 'inherit'),
-          decoration: InputDecoration(labelText: t.creditCheckModeLabel),
-        ),
-        const SizedBox(height: 12),
-        TextFormField(
-          controller: _creditLimitController,
-          decoration: InputDecoration(
-            labelText: '${t.creditLimitLabel} ($currencyLabel)',
-            hintText: t.creditLimitHint,
-            border: const OutlineInputBorder(),
-            suffixText: currencyLabel,
-          ),
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          inputFormatters: [
-            FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Text(t.creditTipText),
-      ],
+        );
+      },
     );
+  }
+
+  Future<String?> _getCurrencyLabel() async {
+    if (_creditCurrencyLabel?.isNotEmpty == true) {
+      return _creditCurrencyLabel;
+    }
+    // Try to load currency label if not already loaded
+    try {
+      final business = await _businessDashboardService.getBusinessWithPermissions(widget.businessId);
+      final currency = business.defaultCurrency ?? (business.currencies.isNotEmpty ? business.currencies.first : null);
+      if (currency == null) return null;
+      final label = _formatCurrencyLabel(currency);
+      if (label.isNotEmpty) {
+        setState(() {
+          _creditCurrencyLabel = label;
+        });
+        return label;
+      }
+    } catch (_) {
+      // Silent fail
+    }
+    return null;
   }
 
 
@@ -908,7 +938,7 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
           children: types.map((type) {
             final selected = _selectedPersonTypes.contains(type);
             return FilterChip(
-              label: Text(type.persianName),
+              label: Text(_getPersonTypeLabel(type, t)),
               selected: selected,
               onSelected: (v) {
                 setState(() {
@@ -924,6 +954,25 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
         ),
       ],
     );
+  }
+
+  String _getPersonTypeLabel(PersonType type, AppLocalizations t) {
+    switch (type) {
+      case PersonType.customer:
+        return t.personTypeCustomer;
+      case PersonType.marketer:
+        return t.personTypeMarketer;
+      case PersonType.employee:
+        return t.personTypeEmployee;
+      case PersonType.supplier:
+        return t.personTypeSupplier;
+      case PersonType.partner:
+        return t.personTypePartner;
+      case PersonType.seller:
+        return t.personTypeSeller;
+      case PersonType.shareholder:
+        return t.personTypeShareholder;
+    }
   }
 
   Widget _buildEconomicInfoFields(AppLocalizations t) {

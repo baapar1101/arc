@@ -87,6 +87,7 @@ import 'pages/business/warehouses_page.dart';
 import 'pages/warehouse/warehouse_docs_page.dart';
 import 'pages/business/installments_report_page.dart';
 import 'pages/business/credit_settings_page.dart';
+import 'pages/business/document_numbering_settings_page.dart';
 import 'pages/business/print_settings_page.dart';
 import 'pages/business/installment_plans_page.dart';
 import 'pages/error_404_page.dart';
@@ -1723,6 +1724,21 @@ class _MyAppState extends State<MyApp> {
                 }
                 return NoTransitionPage(
                   child: CreditSettingsPage(businessId: businessId),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/settings/document-numbering',
+              name: 'business_settings_document_numbering',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                if (!_authStore!.hasBusinessPermission('settings', 'join')) {
+                  return NoTransitionPage(
+                    child: PermissionGuard.buildAccessDeniedPage(),
+                  );
+                }
+                return NoTransitionPage(
+                  child: DocumentNumberingSettingsPage(businessId: businessId),
                 );
               },
             ),

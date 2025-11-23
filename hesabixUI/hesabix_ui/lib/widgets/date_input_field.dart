@@ -15,6 +15,7 @@ class DateInputField extends StatefulWidget {
   final String? helpText;
   final bool enabled;
   final CalendarController calendarController;
+  final bool isDense;
 
   const DateInputField({
     super.key,
@@ -27,6 +28,7 @@ class DateInputField extends StatefulWidget {
     this.helpText,
     this.enabled = true,
     required this.calendarController,
+    this.isDense = false,
   });
 
   @override
@@ -130,6 +132,10 @@ class _DateInputFieldState extends State<DateInputField> {
           onPressed: _selectDate,
         ),
         border: const OutlineInputBorder(),
+        isDense: widget.isDense,
+        contentPadding: widget.isDense
+            ? const EdgeInsets.symmetric(horizontal: 12, vertical: 16)
+            : null,
       ),
       onTap: _selectDate,
       inputFormatters: [

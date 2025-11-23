@@ -94,6 +94,17 @@ class InvoiceService {
     return Map<String, dynamic>.from(res.data?['data'] ?? const {});
   }
 
+  /// دریافت اطلاعات مرتبط با فاکتور برای نمایش در هشدار حذف
+  Future<Map<String, dynamic>> getInvoiceDeleteInfo({
+    required int businessId,
+    required int invoiceId,
+  }) async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/invoices/business/$businessId/$invoiceId/delete-info',
+    );
+    return Map<String, dynamic>.from(res.data?['data'] ?? const {});
+  }
+
   Future<bool> deleteInvoice({
     required int businessId,
     required int invoiceId,
@@ -217,6 +228,41 @@ class InvoiceService {
       return num.tryParse(value) ?? 0;
     }
     return 0;
+  }
+
+  /// دانلود تمپلیت Excel برای ایمپورت فاکتورها
+  Future<Uint8List> downloadImportTemplate({
+    required int businessId,
+  }) async {
+    final res = await _api.post<dynamic>(
+      '/api/v1/invoices/business/$businessId/import/template',
+      options: Options(responseType: ResponseType.bytes),
+    );
+    final data = res.data;
+    if (data is Uint8List) return data;
+    if (data is List<int>) return Uint8List.fromList(data);
+    throw Exception('Invalid template response');
+  }
+
+  /// ایمپورت فاکتورها از فایل Excel
+  Future<Map<String, dynamic>> importInvoicesFromExcel({
+    required int businessId,
+    required List<int> fileBytes,
+    required String filename,
+    required bool dryRun,
+  }) async {
+    final form = FormData.fromMap({
+      'file': MultipartFile.fromBytes(fileBytes, filename: filename),
+      'dry_run': dryRun.toString(),
+    });
+    
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/invoices/business/$businessId/import/excel',
+      data: form,
+      options: Options(contentType: 'multipart/form-data'),
+    );
+    
+    return Map<String, dynamic>.from(res.data?['data'] ?? const {});
   }
 
 }

@@ -1950,7 +1950,7 @@ class AppLocalizationsFa extends AppLocalizations {
   String get cash => 'صندوق';
 
   @override
-  String get invoices => 'صورتحساب‌ها';
+  String get invoices => 'فاکتورها';
 
   @override
   String get expensesIncome => 'هزینه و درآمد';
@@ -2541,6 +2541,9 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get personTypeSeller => 'فروشنده';
+
+  @override
+  String get personTypeShareholder => 'سهامدار';
 
   @override
   String get personCreatedSuccessfully => 'شخص با موفقیت ایجاد شد';
@@ -3386,6 +3389,22 @@ class AppLocalizationsFa extends AppLocalizations {
   @override
   String deleteInvoiceErrorWithMessage(String error) {
     return 'خطا در حذف فاکتور: $error';
+  }
+
+  @override
+  String get deleteInvoiceTaxWorkspaceError =>
+      'این فاکتور در کارپوشه سامانه مودیان قرار دارد و قابل حذف نمی‌باشد';
+
+  @override
+  String get deleteInvoiceReceiptPaymentsWarning =>
+      'اسناد دریافت/پرداخت مرتبط:';
+
+  @override
+  String get deleteInvoiceWarehouseWarning => 'حواله‌های انبار قطعی شده مرتبط:';
+
+  @override
+  String deleteInvoiceInstallmentsWarning(String count) {
+    return 'این فاکتور دارای $count قسط است که حذف خواهند شد';
   }
 
   @override

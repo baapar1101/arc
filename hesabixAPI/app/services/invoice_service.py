@@ -1047,7 +1047,9 @@ def create_invoice(
     )
 
     # Create document
-    doc_code = _build_invoice_code(db, business_id, invoice_type)
+    # استفاده از سرویس جدید شماره‌گذاری
+    from app.services.document_numbering_service import generate_document_code
+    doc_code = generate_document_code(db, business_id, invoice_type, document_date)
 
     # Enrich extra_info
     new_extra_info = dict(header_extra)
@@ -2231,13 +2233,18 @@ def delete_invoice(db: Session, document_id: int) -> bool:
     Raises:
         ApiError: در صورت عدم وجود سند، عدم امکان حذف، یا خطاهای دیگر
     """
+    logger.info(f"[DELETE_INVOICE] ===== Starting delete process for invoice {document_id} =====")
     try:
         document = db.query(Document).filter(Document.id == document_id).first()
         if not document:
+            logger.error(f"[DELETE_INVOICE] Invoice {document_id} not found")
             raise ApiError("DOCUMENT_NOT_FOUND", "Invoice document not found", http_status=404)
+        
+        logger.info(f"[DELETE_INVOICE] Invoice {document_id}: Found document - code={document.code}, type={document.document_type}, business_id={document.business_id}")
         
         # بررسی نوع سند
         if document.document_type not in SUPPORTED_INVOICE_TYPES:
+            logger.error(f"[DELETE_INVOICE] Invoice {document_id}: Invalid document type {document.document_type}")
             raise ApiError("INVALID_DOCUMENT_TYPE", "Document is not an invoice", http_status=400)
         
         # 1) جلوگیری از حذف در سال مالی غیر جاری
@@ -2274,65 +2281,191 @@ def delete_invoice(db: Session, document_id: int) -> bool:
         except Exception:
             pass
         
-        # 3) بررسی حواله‌های انبار مرتبط و اسناد دریافت/پرداخت
+        # 3) بررسی کارپوشه مودیان
         try:
             extra_info = document.extra_info or {}
-            links = extra_info.get("links") or {}
+            tax_workspace = bool(extra_info.get("tax_workspace"))
+            tax_status = extra_info.get("tax_status", "")
+            logger.info(f"[DELETE_INVOICE] Invoice {document_id}: Tax workspace check - in_workspace={tax_workspace}, status={tax_status}")
             
-            # بررسی حواله‌های انبار
-            warehouse_document_ids = links.get("warehouse_document_ids") or []
-            if warehouse_document_ids:
-                # بررسی اینکه آیا حواله‌ها قطعی شده‌اند یا نه
-                try:
-                    from adapters.db.models.warehouse_document import WarehouseDocument
-                    warehouse_docs = db.query(WarehouseDocument).filter(
-                        WarehouseDocument.id.in_(warehouse_document_ids)
-                    ).all()
-                    finalized_warehouses = [wd for wd in warehouse_docs if getattr(wd, "status", None) == "finalized"]
-                    if finalized_warehouses:
-                        raise ApiError(
-                            "WAREHOUSE_DOCUMENTS_EXIST",
-                            "این فاکتور دارای حواله‌های قطعی شده است و قابل حذف نمی‌باشد",
-                            http_status=409,
-                        )
-                except ImportError:
-                    # اگر مدل WarehouseDocument وجود نداشت، از بررسی صرف‌نظر می‌کنیم
-                    pass
-            
-            # 4) بررسی اسناد دریافت/پرداخت مرتبط
-            receipt_payment_document_ids = links.get("receipt_payment_document_ids") or []
-            if receipt_payment_document_ids:
-                related_docs = db.query(Document).filter(
-                    Document.id.in_(receipt_payment_document_ids)
-                ).all()
-                if related_docs:
-                    # اگر اسناد دریافت/پرداخت وجود دارند، نمی‌توان فاکتور را حذف کرد
-                    raise ApiError(
-                        "RECEIPT_PAYMENT_DOCUMENTS_EXIST",
-                        "این فاکتور دارای اسناد دریافت/پرداخت مرتبط است و قابل حذف نمی‌باشد",
-                        http_status=409,
-                    )
+            if tax_workspace:
+                logger.error(f"[DELETE_INVOICE] Invoice {document_id}: Cannot delete - invoice is in tax workspace")
+                raise ApiError(
+                    "TAX_WORKSPACE_INVOICE",
+                    "این فاکتور در کارپوشه سامانه مودیان قرار دارد و قابل حذف نمی‌باشد",
+                    http_status=409,
+                )
         except ApiError:
             raise
-        except Exception:
+        except Exception as ex:
+            logger.warning(f"[DELETE_INVOICE] Invoice {document_id}: Error checking tax workspace: {ex}")
             pass
         
-        # حذف خطوط سند حسابداری
-        db.query(DocumentLine).filter(DocumentLine.document_id == document_id).delete(synchronize_session=False)
+        # 4) بررسی و حذف حواله‌های انبار مرتبط و اسناد دریافت/پرداخت
+        # همه عملیات در یک transaction انجام می‌شوند و در صورت خطا rollback می‌شود
+        extra_info = document.extra_info or {}
+        links = extra_info.get("links") or {}
+        logger.info(f"[DELETE_INVOICE] Invoice {document_id}: Extra info links: {links}")
+        
+        # بررسی و حذف حواله‌های انبار (همه انواع: draft و finalized)
+        warehouse_document_ids = links.get("warehouse_document_ids") or []
+        if warehouse_document_ids:
+            try:
+                from adapters.db.models.warehouse_document import WarehouseDocument
+                from adapters.db.models.warehouse_document_line import WarehouseDocumentLine
+                warehouse_docs = db.query(WarehouseDocument).filter(
+                    WarehouseDocument.id.in_(warehouse_document_ids)
+                ).all()
+                logger.info(f"[DELETE_INVOICE] Invoice {document_id}: Found {len(warehouse_docs)} warehouse documents")
+                
+                # حذف همه حواله‌های انبار (draft و finalized) - بدون commit
+                for wd in warehouse_docs:
+                    status = getattr(wd, "status", None)
+                    logger.info(f"[DELETE_INVOICE] Invoice {document_id}: Warehouse document {wd.id} (code: {getattr(wd, 'code', 'N/A')}, status: {status})")
+                    
+                    # حذف خطوط حواله
+                    lines_deleted = db.query(WarehouseDocumentLine).filter(
+                        WarehouseDocumentLine.warehouse_document_id == wd.id
+                    ).delete(synchronize_session=False)
+                    logger.info(f"[DELETE_INVOICE] Invoice {document_id}: Deleted {lines_deleted} lines from warehouse document {wd.id}")
+                    
+                    # حذف حواله
+                    db.delete(wd)
+                    logger.info(f"[DELETE_INVOICE] Invoice {document_id}: Marked warehouse document {wd.id} for deletion")
+            except ImportError:
+                # اگر مدل WarehouseDocument وجود نداشت، از بررسی صرف‌نظر می‌کنیم
+                logger.warning(f"[DELETE_INVOICE] Invoice {document_id}: WarehouseDocument model not available")
+            except Exception as ex:
+                logger.error(f"[DELETE_INVOICE] Invoice {document_id}: Error processing warehouse documents: {ex}", exc_info=True)
+                raise  # خطا را propagate کن تا rollback شود
+        
+        # 5) حذف خودکار همه اسناد دریافت/پرداخت مرتبط (بدون توجه به مبلغ) - بدون commit
+        receipt_payment_document_ids = links.get("receipt_payment_document_ids") or []
+        logger.info(f"[DELETE_INVOICE] Invoice {document_id}: Found {len(receipt_payment_document_ids)} receipt/payment document IDs in links: {receipt_payment_document_ids}")
+        
+        if receipt_payment_document_ids:
+            # ابتدا همه اسناد را بخوان
+            related_docs = db.query(Document).filter(
+                Document.id.in_(receipt_payment_document_ids)
+            ).all()
+            logger.info(f"[DELETE_INVOICE] Invoice {document_id}: Found {len(related_docs)} receipt/payment documents in database")
+            
+            # حذف همه اسناد دریافت/پرداخت مرتبط (بدون توجه به مبلغ) - بدون commit
+            deleted_count = 0
+            for rp_doc in related_docs:
+                logger.info(f"[DELETE_INVOICE] Invoice {document_id}: Checking receipt/payment document {rp_doc.id} (code: {rp_doc.code}, type: {rp_doc.document_type})")
+                
+                # بررسی اینکه آیا این سند واقعاً برای این فاکتور است
+                rp_extra_info = rp_doc.extra_info or {}
+                rp_invoice_id = rp_extra_info.get("invoice_id")
+                logger.info(f"[DELETE_INVOICE] Invoice {document_id}: Receipt/payment {rp_doc.id} extra_info.invoice_id={rp_invoice_id}, expected invoice_id={document_id}")
+                
+                # اگر invoice_id در extra_info وجود دارد و با document_id مطابقت ندارد، این سند برای فاکتور دیگری است
+                if rp_invoice_id is not None and int(rp_invoice_id) != int(document_id):
+                    logger.warning(f"[DELETE_INVOICE] Invoice {document_id}: Receipt/payment {rp_doc.id} belongs to different invoice {rp_invoice_id}, skipping deletion")
+                    continue
+                
+                # بررسی نوع سند (باید receipt یا payment باشد)
+                if rp_doc.document_type not in ("receipt", "payment"):
+                    logger.warning(f"[DELETE_INVOICE] Invoice {document_id}: Receipt/payment {rp_doc.id} has invalid type {rp_doc.document_type}, skipping")
+                    continue
+                
+                # بررسی محدودیت‌های حذف (سال مالی، قفل بودن، چک)
+                # این بررسی‌ها را انجام می‌دهیم اما commit نمی‌کنیم
+                try:
+                    fiscal_year = db.query(FiscalYear).filter(FiscalYear.id == rp_doc.fiscal_year_id).first()
+                    if fiscal_year is not None and getattr(fiscal_year, "is_last", False) is not True:
+                        raise ApiError(
+                            "FISCAL_YEAR_LOCKED",
+                            f"سند دریافت/پرداخت {rp_doc.code} متعلق به سال مالی غیر جاری است",
+                            http_status=409,
+                        )
+                    
+                    # بررسی قفل بودن
+                    locked_flags = []
+                    if isinstance(rp_doc.extra_info, dict):
+                        locked_flags.append(bool(rp_doc.extra_info.get("locked")))
+                        locked_flags.append(bool(rp_doc.extra_info.get("is_locked")))
+                    if isinstance(rp_doc.developer_settings, dict):
+                        locked_flags.append(bool(rp_doc.developer_settings.get("locked")))
+                        locked_flags.append(bool(rp_doc.developer_settings.get("is_locked")))
+                    if any(locked_flags):
+                        raise ApiError(
+                            "DOCUMENT_LOCKED",
+                            f"سند دریافت/پرداخت {rp_doc.code} قفل است",
+                            http_status=409,
+                        )
+                    
+                    # بررسی چک
+                    has_related_checks = db.query(DocumentLine).filter(
+                        and_(
+                            DocumentLine.document_id == rp_doc.id,
+                            DocumentLine.check_id.isnot(None),
+                        )
+                    ).first() is not None
+                    if has_related_checks:
+                        raise ApiError(
+                            "DOCUMENT_REFERENCED",
+                            f"سند دریافت/پرداخت {rp_doc.code} دارای اقلام مرتبط با چک است",
+                            http_status=409,
+                        )
+                except ApiError:
+                    raise  # خطاهای ApiError را propagate کن تا rollback شود
+                except Exception as ex:
+                    logger.warning(f"[DELETE_INVOICE] Invoice {document_id}: Error checking receipt/payment {rp_doc.id} constraints: {ex}")
+                    raise  # هر خطای دیگری را هم propagate کن
+                
+                # حذف خطوط سند دریافت/پرداخت
+                rp_lines_deleted = db.query(DocumentLine).filter(
+                    DocumentLine.document_id == rp_doc.id
+                ).delete(synchronize_session=False)
+                logger.info(f"[DELETE_INVOICE] Invoice {document_id}: Deleted {rp_lines_deleted} lines from receipt/payment document {rp_doc.id}")
+                
+                # حذف سند دریافت/پرداخت (بدون commit)
+                db.delete(rp_doc)
+                deleted_count += 1
+                logger.info(f"[DELETE_INVOICE] Invoice {document_id}: Marked receipt/payment document {rp_doc.id} for deletion")
+            
+            logger.info(f"[DELETE_INVOICE] Invoice {document_id}: Marked {deleted_count} receipt/payment documents for deletion")
+        
+        logger.info(f"[DELETE_INVOICE] Invoice {document_id}: All checks passed, proceeding with final deletion")
+        
+        # حذف خطوط سند حسابداری فاکتور
+        lines_deleted = db.query(DocumentLine).filter(DocumentLine.document_id == document_id).delete(synchronize_session=False)
+        logger.info(f"[DELETE_INVOICE] Invoice {document_id}: Deleted {lines_deleted} document lines")
         
         # حذف اقلام فاکتور
-        db.query(InvoiceItemLine).filter(InvoiceItemLine.document_id == document_id).delete(synchronize_session=False)
+        items_deleted = db.query(InvoiceItemLine).filter(InvoiceItemLine.document_id == document_id).delete(synchronize_session=False)
+        logger.info(f"[DELETE_INVOICE] Invoice {document_id}: Deleted {items_deleted} invoice item lines")
         
-        # حذف سند
+        # اقساط در extra_info.installment_plan ذخیره می‌شوند و با حذف سند خودشان حذف می‌شوند
+        # نیازی به حذف جداگانه نیست
+        
+        # حذف سند فاکتور
         db.delete(document)
-        db.commit()
+        logger.info(f"[DELETE_INVOICE] Invoice {document_id}: Marked invoice document for deletion")
+        
+        # commit همه تغییرات به صورت اتمیک
+        try:
+            db.commit()
+            logger.info(f"[DELETE_INVOICE] Invoice {document_id}: ===== Successfully committed all deletions =====")
+        except Exception as commit_ex:
+            logger.error(f"[DELETE_INVOICE] Invoice {document_id}: Error committing transaction: {commit_ex}", exc_info=True)
+            db.rollback()
+            raise ApiError("DELETE_FAILED", f"Failed to commit invoice deletion: {str(commit_ex)}", http_status=500)
         
         return True
-    except ApiError:
+    except ApiError as api_err:
+        # ApiError code و message در detail ذخیره می‌شوند
+        error_detail = api_err.detail if isinstance(api_err.detail, dict) else {}
+        error_info = error_detail.get("error", {}) if isinstance(error_detail, dict) else {}
+        error_code = error_info.get("code", "UNKNOWN") if isinstance(error_info, dict) else "UNKNOWN"
+        error_message = error_info.get("message", str(api_err.detail)) if isinstance(error_info, dict) else str(api_err.detail)
+        logger.error(f"[DELETE_INVOICE] Invoice {document_id}: ApiError raised - code={error_code}, message={error_message}, status={api_err.status_code}")
         db.rollback()
         raise
     except Exception as e:
-        logger.error(f"Error deleting invoice document {document_id}: {e}")
+        logger.error(f"[DELETE_INVOICE] Invoice {document_id}: Unexpected error deleting invoice: {e}", exc_info=True)
         db.rollback()
         raise ApiError("DELETE_FAILED", f"Failed to delete invoice: {str(e)}", http_status=500)
 
