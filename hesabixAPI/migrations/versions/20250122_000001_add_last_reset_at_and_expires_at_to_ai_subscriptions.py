@@ -19,17 +19,25 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # اضافه کردن فیلد expires_at
-    op.add_column(
-        'user_ai_subscriptions',
-        sa.Column('expires_at', sa.DateTime(), nullable=True)
-    )
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
     
-    # اضافه کردن فیلد last_reset_at
-    op.add_column(
-        'user_ai_subscriptions',
-        sa.Column('last_reset_at', sa.DateTime(), nullable=True)
-    )
+    # بررسی وجود ستون‌ها قبل از اضافه کردن
+    columns = {c['name'] for c in inspector.get_columns('user_ai_subscriptions')}
+    
+    # اضافه کردن فیلد expires_at در صورت عدم وجود
+    if 'expires_at' not in columns:
+        op.add_column(
+            'user_ai_subscriptions',
+            sa.Column('expires_at', sa.DateTime(), nullable=True)
+        )
+    
+    # اضافه کردن فیلد last_reset_at در صورت عدم وجود
+    if 'last_reset_at' not in columns:
+        op.add_column(
+            'user_ai_subscriptions',
+            sa.Column('last_reset_at', sa.DateTime(), nullable=True)
+        )
     
     # کپی کردن period_end به expires_at برای رکوردهای موجود
     op.execute("""
