@@ -5004,6 +5004,47 @@ class AppLocalizationsFa extends AppLocalizations {
   }
 
   @override
+  String taxSendSelectedPartialTitle(int success, int failed) {
+    return '$success فاکتور ارسال شد و $failed فاکتور ناموفق بود';
+  }
+
+  @override
+  String taxBatchFailedRow(String id) {
+    return 'فاکتور $id';
+  }
+
+  @override
+  String get taxInquireSelectedTooltip => 'استعلام وضعیت فاکتورهای انتخاب‌شده';
+
+  @override
+  String taxInquireSelectedButton(int count) {
+    return 'استعلام وضعیت ($count)';
+  }
+
+  @override
+  String get taxInquireSelectedDialogTitle =>
+      'استعلام وضعیت فاکتورهای انتخاب‌شده';
+
+  @override
+  String taxInquireSelectedDialogMessage(int count) {
+    return 'وضعیت $count فاکتور انتخاب‌شده استعلام شود؟';
+  }
+
+  @override
+  String taxInquireSelectedErrorWithMessage(String error) {
+    return 'خطا در استعلام وضعیت: $error';
+  }
+
+  @override
+  String get taxInquiryResultTitle => 'نتیجه استعلام وضعیت';
+
+  @override
+  String get taxInquiryResultEmpty => 'نتیجه‌ای برای نمایش وجود ندارد.';
+
+  @override
+  String get taxInquiryStatusUnknown => 'وضعیت نامشخص';
+
+  @override
   String get taxRemoveSelectedDialogTitle => 'حذف انتخاب‌شده‌ها از کارپوشه';
 
   @override

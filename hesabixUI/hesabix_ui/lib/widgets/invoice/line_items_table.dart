@@ -114,6 +114,13 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
         _notify();
       }
     }
+
+    if (oldWidget.invoiceType != widget.invoiceType) {
+      if (_applyInvoiceTypeDescriptionAdjustments()) {
+        setState(() {});
+        _notify();
+      }
+    }
   }
 
   // لیست قیمت سراسری حذف شده است؛ انتخاب قیمت از داخل سلول انجام می‌شود
@@ -176,6 +183,91 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
       return item.basePurchasePriceMainUnit ?? 0;
     }
     return item.baseSalesPriceMainUnit ?? 0;
+  }
+
+  String? _noteForInvoiceType(String invoiceType, {String? salesNote, String? purchaseNote}) {
+    final trimmedSales = salesNote?.trim();
+    final trimmedPurchase = purchaseNote?.trim();
+    if (invoiceType == 'purchase' || invoiceType == 'purchase_return') {
+      return (trimmedPurchase != null && trimmedPurchase.isNotEmpty) ? trimmedPurchase : null;
+    }
+    return (trimmedSales != null && trimmedSales.isNotEmpty) ? trimmedSales : null;
+  }
+
+  String? _cleanNote(dynamic value) {
+    if (value == null) return null;
+    final text = value.toString().trim();
+    return text.isEmpty ? null : text;
+  }
+
+  bool _shouldReplaceDescription(String? current, String? previousAuto) {
+    final trimmed = current?.trim() ?? '';
+    if (trimmed.isEmpty) return true;
+    if (previousAuto == null || previousAuto.isEmpty) return false;
+    return trimmed == previousAuto;
+  }
+
+  Map<String, dynamic> _mergeExtraInfoWithNotes(
+    InvoiceLineItem item, {
+    String? salesNote,
+    String? purchaseNote,
+  }) {
+    final metadata = Map<String, dynamic>.from(item.extraInfo ?? const {});
+    if (salesNote != null) {
+      metadata['_local_sales_note'] = salesNote;
+    } else {
+      metadata.remove('_local_sales_note');
+    }
+    if (purchaseNote != null) {
+      metadata['_local_purchase_note'] = purchaseNote;
+    } else {
+      metadata.remove('_local_purchase_note');
+    }
+    return metadata;
+  }
+
+  bool _applyInvoiceTypeDescriptionAdjustments() {
+    bool changed = false;
+    for (var i = 0; i < _rows.length; i++) {
+      final item = _rows[i];
+      final metadata = Map<String, dynamic>.from(item.extraInfo ?? const {});
+      final salesNote = metadata['_local_sales_note']?.toString();
+      final purchaseNote = metadata['_local_purchase_note']?.toString();
+      final previousAuto = metadata['_local_auto_description']?.toString();
+      final newAuto = _noteForInvoiceType(
+        widget.invoiceType,
+        salesNote: salesNote,
+        purchaseNote: purchaseNote,
+      );
+
+      bool metadataChanged = false;
+      if (newAuto?.isNotEmpty == true) {
+        if (previousAuto != newAuto) {
+          metadata['_local_auto_description'] = newAuto;
+          metadataChanged = true;
+        }
+      } else if (previousAuto != null) {
+        metadata.remove('_local_auto_description');
+        metadataChanged = true;
+      }
+
+      final currentDesc = item.description?.trim() ?? '';
+      final shouldReplace = _shouldReplaceDescription(currentDesc, previousAuto);
+      InvoiceLineItem updated = item;
+      if (shouldReplace && currentDesc != (newAuto ?? '')) {
+        updated = updated.copyWith(description: newAuto);
+        changed = true;
+      }
+      if (metadataChanged) {
+        final cleaned = metadata.isEmpty ? null : metadata;
+        updated = updated.copyWith(extraInfo: cleaned);
+        changed = true;
+      }
+      if (!identical(updated, item)) {
+        _rows[i] = updated;
+      }
+    }
+    return changed;
   }
 
   num _convertFromMain(num priceOnMainUnit, InvoiceLineItem item) {
@@ -384,6 +476,8 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                   onChanged: (p) async {
                     if (p == null) {
                       setState(() {
+                        final cleanedExtra = Map<String, dynamic>.from(item.extraInfo ?? {});
+                        cleanedExtra.removeWhere((key, value) => key.toString().startsWith('_local_'));
                         _rows[index] = item.copyWith(
                           productId: null,
                           productCode: null,
@@ -394,6 +488,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                           selectedUnit: null,
                           unitPriceSource: 'base',
                           unitPrice: 0,
+                          extraInfo: cleanedExtra.isEmpty ? null : cleanedExtra,
                         );
                       });
                       _notify();
@@ -404,6 +499,25 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                     final secondaryUnit = p['secondary_unit']?.toString();
                     final taxRate = _defaultTaxRateFromProduct(p);
                     final defaultWarehouseId = _toInt(p['default_warehouse_id']);
+                    final salesNote = _cleanNote(p['base_sales_note']);
+                    final purchaseNote = _cleanNote(p['base_purchase_note']);
+                    final previousAuto = item.extraInfo?['_local_auto_description']?.toString();
+                    final autoDescription = _noteForInvoiceType(
+                      widget.invoiceType,
+                      salesNote: salesNote,
+                      purchaseNote: purchaseNote,
+                    );
+                    final metadata = _mergeExtraInfoWithNotes(
+                      item,
+                      salesNote: salesNote,
+                      purchaseNote: purchaseNote,
+                    );
+                    if (autoDescription?.isNotEmpty == true) {
+                      metadata['_local_auto_description'] = autoDescription;
+                    } else {
+                      metadata.remove('_local_auto_description');
+                    }
+                    final shouldReplaceDescription = _shouldReplaceDescription(item.description, previousAuto);
                     
                     final updated = item.copyWith(
                       productId: _toInt(p['id']),
@@ -420,6 +534,8 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                       trackInventory: p['track_inventory'] == true,
                       // تنظیم خودکار انبار کالا (اگر انبار قبلاً انتخاب نشده باشد)
                       warehouseId: item.warehouseId ?? defaultWarehouseId,
+                      extraInfo: metadata.isEmpty ? null : metadata,
+                      description: shouldReplaceDescription ? autoDescription : item.description,
                     );
                     final priced = await _resolveUnitPrice(updated, preferManual: false);
                     setState(() => _rows[index] = priced);

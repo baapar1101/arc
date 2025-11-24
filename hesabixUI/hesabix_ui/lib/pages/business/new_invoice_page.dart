@@ -2278,7 +2278,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
     
     // اضافه کردن اطلاعات از extra_info InvoiceLineItem (مانند bom_id)
     if (e.extraInfo != null) {
-      extraInfo.addAll(e.extraInfo!);
+      extraInfo.addAll(_stripLocalExtraInfo(e.extraInfo!));
     }
     
     return <String, dynamic>{
@@ -2287,6 +2287,17 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
       if ((e.description ?? '').isNotEmpty) 'description': e.description,
       'extra_info': extraInfo,
     };
+  }
+
+  Map<String, dynamic> _stripLocalExtraInfo(Map<String, dynamic> source) {
+    final sanitized = <String, dynamic>{};
+    source.forEach((key, value) {
+      if (key.toString().startsWith('_local_')) {
+        return;
+      }
+      sanitized[key] = value;
+    });
+    return sanitized;
   }
 
   void _showError(String message) {

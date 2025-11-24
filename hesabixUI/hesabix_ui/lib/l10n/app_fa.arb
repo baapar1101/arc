@@ -1998,6 +1998,54 @@
       }
     }
   },
+  "taxSendSelectedPartialTitle": "{success} فاکتور ارسال شد و {failed} فاکتور ناموفق بود",
+  "@taxSendSelectedPartialTitle": {
+    "placeholders": {
+      "success": {
+        "type": "int"
+      },
+      "failed": {
+        "type": "int"
+      }
+    }
+  },
+  "taxBatchFailedRow": "فاکتور {id}",
+  "@taxBatchFailedRow": {
+    "placeholders": {
+      "id": {
+        "type": "String"
+      }
+    }
+  },
+  "taxInquireSelectedTooltip": "استعلام وضعیت فاکتورهای انتخاب‌شده",
+  "taxInquireSelectedButton": "استعلام وضعیت ({count})",
+  "@taxInquireSelectedButton": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "taxInquireSelectedDialogTitle": "استعلام وضعیت فاکتورهای انتخاب‌شده",
+  "taxInquireSelectedDialogMessage": "وضعیت {count} فاکتور انتخاب‌شده استعلام شود؟",
+  "@taxInquireSelectedDialogMessage": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "taxInquireSelectedErrorWithMessage": "خطا در استعلام وضعیت: {error}",
+  "@taxInquireSelectedErrorWithMessage": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "taxInquiryResultTitle": "نتیجه استعلام وضعیت",
+  "taxInquiryResultEmpty": "نتیجه‌ای برای نمایش وجود ندارد.",
+  "taxInquiryStatusUnknown": "وضعیت نامشخص",
 
   "taxRemoveSelectedDialogTitle": "حذف انتخاب‌شده‌ها از کارپوشه",
   "taxRemoveSelectedDialogMessage": "{count} فاکتور انتخاب‌شده از کارپوشه مالیاتی حذف شوند؟",

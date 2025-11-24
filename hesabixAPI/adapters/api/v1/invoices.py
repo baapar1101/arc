@@ -39,7 +39,7 @@ from app.services.invoice_service import (
     export_installments_csv,
     export_installments_xlsx,
 )
-from app.services.tax_submission_service import send_document_to_tax_system
+from app.services.tax_submission_service import send_document_to_tax_system, inquire_tax_status
 from app.services.pdf.template_renderer import render_template
 from app.core.calendar import CalendarConverter
 from adapters.db.models.person import Person
@@ -1510,21 +1510,6 @@ async def search_tax_workspace_endpoint(
                 pass
 
     # Date range from flat body
-    if isinstance(body.get("from_date"), str):
-        try:
-            from app.services.transfer_service import _parse_iso_date as _p
-
-            q = q.filter(Document.document_date >= _p(body.get("from_date")))
-        except Exception:
-            pass
-    if isinstance(body.get("to_date"), str):
-        try:
-            from app.services.transfer_service import _parse_iso_date as _p
-
-            q = q.filter(Document.document_date <= _p(body.get("to_date")))
-        except Exception:
-            pass
-
     # Sorting similar to main invoice list
     sort_desc = bool(getattr(query_info, "sort_desc", True))
     sort_by = getattr(query_info, "sort_by", None) or "document_date"
@@ -1680,7 +1665,7 @@ def _ensure_sales_or_return(doc: Document) -> None:
 
 @router.post("/business/{business_id}/{invoice_id}/tax-workspace/add")
 @require_business_access("business_id")
-async def add_invoice_to_tax_workspace(
+def add_invoice_to_tax_workspace(
     request: Request,
     business_id: int,
     invoice_id: int,
@@ -1709,7 +1694,7 @@ async def add_invoice_to_tax_workspace(
 
 @router.post("/business/{business_id}/{invoice_id}/tax-workspace/remove")
 @require_business_access("business_id")
-async def remove_invoice_from_tax_workspace(
+def remove_invoice_from_tax_workspace(
     request: Request,
     business_id: int,
     invoice_id: int,
@@ -1742,7 +1727,7 @@ async def remove_invoice_from_tax_workspace(
 
 @router.post("/business/{business_id}/{invoice_id}/tax-workspace/send-to-system")
 @require_business_access("business_id")
-async def send_invoice_to_tax_system(
+def send_invoice_to_tax_system(
     request: Request,
     business_id: int,
     invoice_id: int,
@@ -1784,7 +1769,7 @@ async def send_invoice_to_tax_system(
 
 @router.post("/business/{business_id}/tax-workspace/send-to-system-batch")
 @require_business_access("business_id")
-async def send_invoices_to_tax_system_batch(
+def send_invoices_to_tax_system_batch(
     request: Request,
     business_id: int,
     body: Dict[str, Any] = Body(...),
@@ -1821,10 +1806,16 @@ async def send_invoices_to_tax_system_batch(
             send_document_to_tax_system(db, doc)
             succeeded.append(invoice_id)
         except ApiError as e:
+            error_detail = getattr(e, "detail", {}) or {}
+            error_info = error_detail.get("error") if isinstance(error_detail, dict) else {}
             failed.append(
                 {
                     "id": invoice_id,
-                    "error": e.detail.get("error", {}).get("code") if hasattr(e, "detail") else str(e),
+                    "error": (error_info or {}).get("code") or str(e),
+                    "message": (error_info or {}).get("message"),
+                    "issues": (error_info or {}).get("details", {}).get("issues")
+                    if isinstance((error_info or {}).get("details"), dict)
+                    else None,
                 }
             )
         except Exception as e:
@@ -1841,7 +1832,7 @@ async def send_invoices_to_tax_system_batch(
 
 @router.post("/business/{business_id}/tax-workspace/remove-batch")
 @require_business_access("business_id")
-async def remove_invoices_from_tax_workspace_batch(
+def remove_invoices_from_tax_workspace_batch(
     request: Request,
     business_id: int,
     body: Dict[str, Any] = Body(...),
@@ -1887,220 +1878,42 @@ async def remove_invoices_from_tax_workspace_batch(
     )
 
 
-    # Merge flat body extras
-    body: Dict[str, Any] = {}
-    try:
-        body_json = await request.json()
-        if isinstance(body_json, dict):
-            body = body_json
-    except Exception:
-        body = {}
+@router.post("/business/{business_id}/tax-workspace/inquire-status")
+@require_business_access("business_id")
+def inquire_tax_status_endpoint(
+    request: Request,
+    business_id: int,
+    body: Dict[str, Any] = Body(...),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("invoices", "view")),
+) -> Dict[str, Any]:
+    invoice_ids = body.get("invoice_ids")
+    tracking_codes = body.get("tracking_codes")
+    if not isinstance(invoice_ids, list):
+        invoice_ids = []
+    if not isinstance(tracking_codes, list):
+        tracking_codes = []
+    if not invoice_ids and not tracking_codes:
+        raise ApiError("INVALID_REQUEST", "لیست فاکتور یا کد رهگیری لازم است.", http_status=400)
 
-    # Search on code/description
-    search: Optional[str] = getattr(query_info, "search", None)
-    if isinstance(search, str) and search.strip():
-        s = f"%{search.strip()}%"
-        q = q.filter(or_(Document.code.ilike(s), Document.description.ilike(s)))
-
-    # Document type filter (sales / sales_return / ...)
-    doc_type = body.get("document_type")
-    if isinstance(doc_type, str) and doc_type in SUPPORTED_INVOICE_TYPES:
-        q = q.filter(Document.document_type == doc_type)
-
-    # Proforma filter
-    is_proforma = body.get("is_proforma")
-    if isinstance(is_proforma, bool):
-        q = q.filter(Document.is_proforma == is_proforma)
-
-    # Currency filter
-    currency_id = body.get("currency_id")
-    try:
-        if currency_id is not None:
-            q = q.filter(Document.currency_id == int(currency_id))
-    except Exception:
-        pass
-
-    # Fiscal year from header or body
-    fiscal_year_id = None
-    try:
-        fy_header = request.headers.get("X-Fiscal-Year-ID")
-        if fy_header:
-            fiscal_year_id = int(fy_header)
-    except Exception:
-        fiscal_year_id = None
-    if fiscal_year_id is None:
-        try:
-            if body.get("fiscal_year_id") is not None:
-                fiscal_year_id = int(body.get("fiscal_year_id"))
-        except Exception:
-            fiscal_year_id = None
-    if fiscal_year_id is not None:
-        q = q.filter(Document.fiscal_year_id == fiscal_year_id)
-
-    # Date range filters
-    try:
-        filters = getattr(query_info, "filters", None)
-    except Exception:
-        filters = None
-    if filters and isinstance(filters, (list, tuple)):
-        for flt in filters:
-            try:
-                prop = getattr(flt, "property", None) if not isinstance(flt, dict) else flt.get("property")
-                op = getattr(flt, "operator", None) if not isinstance(flt, dict) else flt.get("operator")
-                val = getattr(flt, "value", None) if not isinstance(flt, dict) else flt.get("value")
-                if prop == "document_date" and isinstance(val, str) and val:
-                    from app.services.transfer_service import _parse_iso_date as _p
-
-                    dt = _p(val)
-                    col = getattr(Document, prop)
-                    if op == ">=":
-                        q = q.filter(col >= dt)
-                    elif op == "<=":
-                        q = q.filter(col <= dt)
-            except Exception:
-                pass
-
-    if isinstance(body.get("from_date"), str):
-        try:
-            from app.services.transfer_service import _parse_iso_date as _p
-
-            q = q.filter(Document.document_date >= _p(body.get("from_date")))
-        except Exception:
-            pass
-    if isinstance(body.get("to_date"), str):
-        try:
-            from app.services.transfer_service import _parse_iso_date as _p
-
-            q = q.filter(Document.document_date <= _p(body.get("to_date")))
-        except Exception:
-            pass
-
-    # Sorting (reuse same logic as main invoice list)
-    sort_desc = bool(getattr(query_info, "sort_desc", True))
-    sort_by = getattr(query_info, "sort_by", None) or "document_date"
-    sort_col = Document.document_date
-    if isinstance(sort_by, str):
-        if sort_by == "code" and hasattr(Document, "code"):
-            sort_col = Document.code
-        elif sort_by == "created_at" and hasattr(Document, "created_at"):
-            sort_col = Document.created_at
-        elif sort_by == "registered_at" and hasattr(Document, "registered_at"):
-            sort_col = Document.registered_at
-        else:
-            sort_col = Document.document_date
-    q = q.order_by(sort_col.desc() if sort_desc else sort_col.asc())
-
-    # Fetch all candidates and filter by workspace and tax_status in Python (JSON-friendly)
-    all_docs: List[Document] = q.all()
-    requested_status = body.get("tax_status")
-    requested_status = requested_status.strip() if isinstance(requested_status, str) else None
-
-    workspace_docs: List[Document] = []
-    for d in all_docs:
-        extra = d.extra_info or {}
-        in_workspace = bool(extra.get("tax_workspace"))
-        if not in_workspace:
-            continue
-        status = extra.get("tax_status")
-        if isinstance(status, str):
-            status = status.strip()
-        if not status:
-            status = "not_sent"
-        if requested_status and status != requested_status:
-            continue
-        workspace_docs.append(d)
-
-    # Pagination (after workspace filter)
-    take = int(getattr(query_info, "take", 20) or 20)
-    skip = int(getattr(query_info, "skip", 0) or 0)
-    total = len(workspace_docs)
-    page_docs = workspace_docs[skip : skip + take] if take > 0 else workspace_docs
-
-    # Locale for display fields
-    locale = negotiate_locale(request.headers.get("Accept-Language"))
-    is_fa = locale == "fa"
-
-    def _type_name(tp: str) -> str:
-        mapping = {
-            "invoice_sales": ("فروش" if is_fa else "Sales"),
-            "invoice_sales_return": ("برگشت از فروش" if is_fa else "Sales return"),
-            "invoice_purchase": ("خرید" if is_fa else "Purchase"),
-            "invoice_purchase_return": ("برگشت از خرید" if is_fa else "Purchase return"),
-            "invoice_direct_consumption": ("مصرف مستقیم" if is_fa else "Direct consumption"),
-            "invoice_production": ("تولید" if is_fa else "Production"),
-            "invoice_waste": ("ضایعات" if is_fa else "Waste"),
-        }
-        return mapping.get(str(tp), str(tp))
-
-    data_items: List[Dict[str, Any]] = []
-    for d in page_docs:
-        item = invoice_document_to_dict(db, d)
-        extra = item.get("extra_info") or {}
-        tax_status = extra.get("tax_status")
-        if isinstance(tax_status, str):
-            tax_status = tax_status.strip()
-        if not tax_status:
-            tax_status = "not_sent"
-        item["tax_status"] = tax_status
-        item["tax_tracking_code"] = extra.get("tax_tracking_code")
-        item["tax_last_send_at"] = extra.get("tax_last_send_at")
-
-        # total_amount from totals.net or recomputed
-        total_amount = None
-        try:
-            totals = (item.get("extra_info") or {}).get("totals") or {}
-            if isinstance(totals, dict) and "net" in totals:
-                total_amount = totals.get("net")
-        except Exception:
-            total_amount = None
-        if total_amount is None:
-            try:
-                net_sum = 0.0
-                for pl in item.get("product_lines", []) or []:
-                    info = pl.get("extra_info") or {}
-                    qty = float(pl.get("quantity") or 0)
-                    unit_price = float(info.get("unit_price") or 0)
-                    line_discount = float(info.get("line_discount") or 0)
-                    tax_amount = float(info.get("tax_amount") or 0)
-                    line_total = info.get("line_total")
-                    if line_total is None:
-                        line_total = (qty * unit_price) - line_discount + tax_amount
-                    net_sum += float(line_total)
-                total_amount = float(net_sum)
-            except Exception:
-                total_amount = None
-
-        item["document_type_name"] = _type_name(item.get("document_type"))
-        if total_amount is not None:
-            item["total_amount"] = total_amount
-        
-        # افزودن counterparty
-        _add_counterparty_to_invoice_item(db, item)
-        
-        data_items.append(format_datetime_fields(item, request))
-
-    page = (skip // take) + 1 if take > 0 else 1
-    total_pages = (total + take - 1) // take if take > 0 else 1
-
-    return success_response(
-        data={
-            "items": data_items,
-            "total": total,
-            "take": take,
-            "skip": skip,
-            "pagination": {
-                "page": page,
-                "per_page": take,
-                "total": total,
-                "total_pages": total_pages,
-            },
-            "page": page,
-            "limit": take,
-            "total_pages": total_pages,
-        },
-        request=request,
-        message="INVOICE_TAX_WORKSPACE_LIST",
+    result = inquire_tax_status(
+        db,
+        business_id,
+        invoice_ids=[
+            int(i)
+            for i in invoice_ids
+            if i is not None and str(i).isdigit()
+        ],
+        tracking_codes=[str(code) for code in tracking_codes if code],
     )
+    db.commit()
+    return success_response(
+        data=result,
+        request=request,
+        message="TAX_STATUS_INQUIRY_COMPLETED",
+    )
+
 
 @router.post(
     "/business/{business_id}/export/excel",

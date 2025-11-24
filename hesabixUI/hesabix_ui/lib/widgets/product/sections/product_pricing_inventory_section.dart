@@ -38,6 +38,8 @@ class ProductPricingInventorySection extends StatefulWidget {
 class _ProductPricingInventorySectionState extends State<ProductPricingInventorySection> {
   late TextEditingController _salesPriceController;
   late TextEditingController _purchasePriceController;
+  late TextEditingController _salesNoteController;
+  late TextEditingController _purchaseNoteController;
 
   @override
   void initState() {
@@ -48,6 +50,8 @@ class _ProductPricingInventorySectionState extends State<ProductPricingInventory
     _purchasePriceController = TextEditingController(
       text: formatNumberForInput(widget.formData.basePurchasePrice),
     );
+    _salesNoteController = TextEditingController(text: widget.formData.baseSalesNote ?? '');
+    _purchaseNoteController = TextEditingController(text: widget.formData.basePurchaseNote ?? '');
   }
 
   @override
@@ -67,12 +71,26 @@ class _ProductPricingInventorySectionState extends State<ProductPricingInventory
         _purchasePriceController.text = newPurchasePrice;
       }
     }
+    if (oldWidget.formData.baseSalesNote != widget.formData.baseSalesNote) {
+      final newSalesNote = widget.formData.baseSalesNote ?? '';
+      if (_salesNoteController.text != newSalesNote) {
+        _salesNoteController.text = newSalesNote;
+      }
+    }
+    if (oldWidget.formData.basePurchaseNote != widget.formData.basePurchaseNote) {
+      final newPurchaseNote = widget.formData.basePurchaseNote ?? '';
+      if (_purchaseNoteController.text != newPurchaseNote) {
+        _purchaseNoteController.text = newPurchaseNote;
+      }
+    }
   }
 
   @override
   void dispose() {
     _salesPriceController.dispose();
     _purchasePriceController.dispose();
+    _salesNoteController.dispose();
+    _purchaseNoteController.dispose();
     super.dispose();
   }
 
@@ -192,11 +210,14 @@ class _ProductPricingInventorySectionState extends State<ProductPricingInventory
         ),
         const SizedBox(height: 16),
         TextFormField(
-          key: ValueKey('baseSalesNote_${widget.formData.baseSalesNote}'),
-          initialValue: widget.formData.baseSalesNote,
+          controller: _salesNoteController,
           decoration: InputDecoration(labelText: t.salesPriceNote),
           maxLines: 2,
-          onChanged: (value) => _updateFormData(widget.formData.copyWith(baseSalesNote: value.trim().isEmpty ? null : value)),
+          onChanged: (value) => _updateFormData(
+            widget.formData.copyWith(
+              baseSalesNote: value.trim().isEmpty ? null : value,
+            ),
+          ),
         ),
         const SizedBox(height: 16),
         TextFormField(
@@ -212,11 +233,14 @@ class _ProductPricingInventorySectionState extends State<ProductPricingInventory
         ),
         const SizedBox(height: 16),
         TextFormField(
-          key: ValueKey('basePurchaseNote_${widget.formData.basePurchaseNote}'),
-          initialValue: widget.formData.basePurchaseNote,
+          controller: _purchaseNoteController,
           decoration: InputDecoration(labelText: t.purchasePriceNote),
           maxLines: 2,
-          onChanged: (value) => _updateFormData(widget.formData.copyWith(basePurchaseNote: value.trim().isEmpty ? null : value)),
+          onChanged: (value) => _updateFormData(
+            widget.formData.copyWith(
+              basePurchaseNote: value.trim().isEmpty ? null : value,
+            ),
+          ),
         ),
       ],
     );

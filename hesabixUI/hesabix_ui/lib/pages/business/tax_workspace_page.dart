@@ -279,6 +279,15 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
             label: Text(t.taxRemoveSelectedButton(_selectedCount)),
           ),
         ),
+        const SizedBox(width: 8),
+        Tooltip(
+          message: t.taxInquireSelectedTooltip,
+          child: OutlinedButton.icon(
+            onPressed: _selectedCount > 0 ? _onInquireSelectedStatus : null,
+            icon: const Icon(Icons.sync),
+            label: Text(t.taxInquireSelectedButton(_selectedCount)),
+          ),
+        ),
       ],
       columns: [
         ActionColumn(
@@ -576,10 +585,14 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
     try {
       final api = widget.apiClient;
       final ids = selectedItems.map((e) => e['id']).toList();
-      await api.post<Map<String, dynamic>>(
+      final response = await api.post<Map<String, dynamic>>(
         '/invoices/business/${widget.businessId}/tax-workspace/send-to-system-batch',
         data: {'invoice_ids': ids},
       );
+      final body = response.data;
+      final result = (body?['data'] as Map<String, dynamic>?) ?? const {};
+      final failed = (result['failed'] as List<dynamic>?) ?? const [];
+      final succeeded = (result['succeeded'] as List<dynamic>?) ?? const [];
 
       if (navigator.canPop()) {
         navigator.pop();
@@ -587,12 +600,16 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(t.taxSendSelectedSuccess),
-          backgroundColor: Colors.green,
-        ),
-      );
+      if (failed.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(t.taxSendSelectedSuccess),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else {
+        _showBatchResultDialog(succeeded.length, failed);
+      }
       _refreshData();
     } catch (e) {
       if (navigator.canPop()) {
@@ -677,12 +694,92 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
     }
   }
 
+  Future<void> _onInquireSelectedStatus() async {
+    final t = AppLocalizations.of(context);
+    final dynamic state = _tableKey.currentState;
+    if (state == null) return;
+    List<Map<String, dynamic>> selectedItems = const [];
+    try {
+      selectedItems = state.getSelectedItems().cast<Map<String, dynamic>>();
+    } catch (_) {
+      selectedItems = const [];
+    }
+    if (selectedItems.isEmpty) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(t.taxInquireSelectedDialogTitle),
+        content: Text(t.taxInquireSelectedDialogMessage(selectedItems.length)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(t.cancel),
+          ),
+          FilledButton.icon(
+            onPressed: () => Navigator.pop(context, true),
+            icon: const Icon(Icons.sync),
+            label: Text(t.confirm),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    final navigator = Navigator.of(context, rootNavigator: true);
+    showDialog<void>(
+      context: context,
+      useRootNavigator: true,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      final api = widget.apiClient;
+      final ids = selectedItems.map((e) => e['id']).toList();
+      final response = await api.post<Map<String, dynamic>>(
+        '/invoices/business/${widget.businessId}/tax-workspace/inquire-status',
+        data: {'invoice_ids': ids},
+      );
+
+      if (navigator.canPop()) {
+        navigator.pop();
+      }
+
+      if (!mounted) return;
+
+      final data = response.data?['data'];
+      final results = (data is Map<String, dynamic> ? data['results'] : null) as List<dynamic>? ?? const [];
+      _showInquiryResultDialog(results);
+      _refreshData();
+    } catch (e) {
+      if (navigator.canPop()) {
+        navigator.pop();
+      }
+      if (!mounted) return;
+      SnackBarHelper.showError(context, message: t.taxInquireSelectedErrorWithMessage(e.toString()));
+    }
+  }
+
   bool _handleTaxSendError(Object error) {
     ApiErrorDetails? apiError;
     if (error is DioException && error.error is ApiErrorDetails) {
       apiError = error.error as ApiErrorDetails;
     } else if (error is ApiErrorDetails) {
       apiError = error;
+    } else if (error is DioException) {
+      final data = error.response?.data;
+      if (data is Map<String, dynamic>) {
+        final err = data['error'];
+        if (err is Map<String, dynamic>) {
+          apiError = ApiErrorDetails(
+            code: err['code']?.toString(),
+            message: err['message']?.toString(),
+            details: err['details'],
+          );
+        }
+      }
     }
     if (apiError == null) {
       return false;
@@ -695,6 +792,73 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
     final List<dynamic> issueList = issues is List ? issues : const [];
     _showValidationIssuesDialog(issueList);
     return true;
+  }
+
+  void _showBatchResultDialog(int successCount, List<dynamic> failedItems) {
+    final t = AppLocalizations.of(context);
+    showDialog<void>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text(t.taxSendSelectedPartialTitle(successCount, failedItems.length)),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: failedItems.isEmpty
+                ? Text(t.taxSendSelectedSuccess)
+                : Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: failedItems.map((item) {
+                      final map = item is Map<String, dynamic> ? item : <String, dynamic>{};
+                      final invoiceId = map['id'];
+                      final errorCode = map['error']?.toString() ?? '-';
+                      final message = map['message']?.toString();
+                      final issues = map['issues'];
+                      return ListTile(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(Icons.error_outline, color: Colors.redAccent),
+                        title: Text(t.taxBatchFailedRow(invoiceId?.toString() ?? '-')),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              message == null || message.isEmpty
+                                  ? errorCode
+                                  : '$errorCode — $message',
+                            ),
+                            if (issues is List && issues.isNotEmpty) ...[
+                              const SizedBox(height: 4),
+                              ...issues.map((issue) {
+                                final issueMap = issue is Map<String, dynamic>
+                                    ? issue
+                                    : <String, dynamic>{};
+                                final msg = issueMap['message']?.toString() ?? '-';
+                                final code = issueMap['code']?.toString();
+                                return Text(
+                                  code == null || code.isEmpty ? '• $msg' : '• [$code] $msg',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodySmall
+                                      ?.copyWith(color: Theme.of(context).colorScheme.error),
+                                );
+                              }),
+                            ],
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                  ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(t.close),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   void _showValidationIssuesDialog(List<dynamic> issues) {
@@ -743,5 +907,124 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
         ],
       ),
     );
+  }
+
+  void _showInquiryResultDialog(List<dynamic> results) {
+    final t = AppLocalizations.of(context);
+    showDialog<void>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text(t.taxInquiryResultTitle),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: results.isEmpty
+                ? Text(t.taxInquiryResultEmpty)
+                : Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: results.map((item) {
+                      final map = item is Map<String, dynamic> ? item : <String, dynamic>{};
+                      final reference = map['reference_number']?.toString() ??
+                          map['tracking_code']?.toString() ??
+                          '-';
+                      final status = map['status']?.toString();
+                      final errorMessage = map['error_message']?.toString();
+                      final inquiryAt = map['inquiry_at']?.toString();
+                      return ListTile(
+                        dense: true,
+                        leading: Icon(
+                          _statusIcon(status),
+                          color: _statusColor(status, Theme.of(context).colorScheme),
+                        ),
+                        title: Text(reference),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(_statusLabel(status, t)),
+                            if (errorMessage != null && errorMessage.isNotEmpty)
+                              Text(
+                                errorMessage,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodySmall
+                                    ?.copyWith(color: Theme.of(context).colorScheme.error),
+                              ),
+                            if (inquiryAt != null)
+                              Text(
+                                inquiryAt,
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                  ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(t.close),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  String _statusLabel(String? status, AppLocalizations t) {
+    final normalized = status?.toLowerCase();
+    switch (normalized) {
+      case 'pending':
+        return t.taxStatusPending;
+      case 'sent':
+        return t.taxStatusSent;
+      case 'finalized':
+      case 'accepted':
+      case 'success':
+        return t.taxStatusFinalized;
+      case 'failed':
+      case 'error':
+        return t.taxStatusFailed;
+      default:
+        return t.taxInquiryStatusUnknown;
+    }
+  }
+
+  IconData _statusIcon(String? status) {
+    final normalized = status?.toLowerCase();
+    switch (normalized) {
+      case 'finalized':
+      case 'accepted':
+      case 'success':
+        return Icons.check_circle_outline;
+      case 'failed':
+      case 'error':
+        return Icons.error_outline;
+      case 'pending':
+        return Icons.hourglass_top;
+      case 'sent':
+        return Icons.send_outlined;
+      default:
+        return Icons.help_outline;
+    }
+  }
+
+  Color _statusColor(String? status, ColorScheme colorScheme) {
+    final normalized = status?.toLowerCase();
+    switch (normalized) {
+      case 'finalized':
+      case 'accepted':
+      case 'success':
+        return colorScheme.primary;
+      case 'failed':
+      case 'error':
+        return colorScheme.error;
+      case 'pending':
+        return colorScheme.secondary;
+      case 'sent':
+        return colorScheme.tertiary;
+      default:
+        return colorScheme.outline;
+    }
   }
 }

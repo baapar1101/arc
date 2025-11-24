@@ -106,13 +106,32 @@ def format_datetime_fields(data: Any, request: Request) -> Any:
 
 
 class ApiError(HTTPException):
-	def __init__(self, code: str, message: str, http_status: int = status.HTTP_400_BAD_REQUEST, translator=None) -> None:
-		# اگر translator موجود است، پیام را ترجمه کن
+	def __init__(
+		self,
+		code: str,
+		message: str,
+		http_status: int = status.HTTP_400_BAD_REQUEST,
+		translator=None,
+		details: dict[str, Any] | None = None,
+	) -> None:
 		if translator:
-			translated_message = translator.t(code) if hasattr(translator, 't') else message
+			translated_message = translator.t(code) if hasattr(translator, "t") else message
 		else:
 			translated_message = message
-		
-		super().__init__(status_code=http_status, detail={"success": False, "error": {"code": code, "message": translated_message}})
+
+		error_payload: dict[str, Any] = {
+			"code": code,
+			"message": translated_message,
+		}
+		if details:
+			error_payload["details"] = details
+
+		super().__init__(
+			status_code=http_status,
+			detail={
+				"success": False,
+				"error": error_payload,
+			},
+		)
 
 

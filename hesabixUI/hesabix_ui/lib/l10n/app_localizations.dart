@@ -9614,6 +9614,66 @@ abstract class AppLocalizations {
   /// **'Failed to send selected invoices: {error}'**
   String taxSendSelectedErrorWithMessage(String error);
 
+  /// No description provided for @taxSendSelectedPartialTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'{success} sent, {failed} failed'**
+  String taxSendSelectedPartialTitle(int success, int failed);
+
+  /// No description provided for @taxBatchFailedRow.
+  ///
+  /// In en, this message translates to:
+  /// **'Invoice {id}'**
+  String taxBatchFailedRow(String id);
+
+  /// No description provided for @taxInquireSelectedTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Inquire status for selected invoices'**
+  String get taxInquireSelectedTooltip;
+
+  /// No description provided for @taxInquireSelectedButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Inquire status ({count})'**
+  String taxInquireSelectedButton(int count);
+
+  /// No description provided for @taxInquireSelectedDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Inquire status'**
+  String get taxInquireSelectedDialogTitle;
+
+  /// No description provided for @taxInquireSelectedDialogMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Inquire status for {count} selected invoices?'**
+  String taxInquireSelectedDialogMessage(int count);
+
+  /// No description provided for @taxInquireSelectedErrorWithMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to inquire status: {error}'**
+  String taxInquireSelectedErrorWithMessage(String error);
+
+  /// No description provided for @taxInquiryResultTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Status inquiry result'**
+  String get taxInquiryResultTitle;
+
+  /// No description provided for @taxInquiryResultEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No results to display.'**
+  String get taxInquiryResultEmpty;
+
+  /// No description provided for @taxInquiryStatusUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown status'**
+  String get taxInquiryStatusUnknown;
+
   /// No description provided for @taxRemoveSelectedDialogTitle.
   ///
   /// In en, this message translates to:

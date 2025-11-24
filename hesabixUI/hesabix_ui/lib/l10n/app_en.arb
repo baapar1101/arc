@@ -1954,6 +1954,54 @@
       }
     }
   },
+  "taxSendSelectedPartialTitle": "{success} sent, {failed} failed",
+  "@taxSendSelectedPartialTitle": {
+    "placeholders": {
+      "success": {
+        "type": "int"
+      },
+      "failed": {
+        "type": "int"
+      }
+    }
+  },
+  "taxBatchFailedRow": "Invoice {id}",
+  "@taxBatchFailedRow": {
+    "placeholders": {
+      "id": {
+        "type": "String"
+      }
+    }
+  },
+  "taxInquireSelectedTooltip": "Inquire status for selected invoices",
+  "taxInquireSelectedButton": "Inquire status ({count})",
+  "@taxInquireSelectedButton": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "taxInquireSelectedDialogTitle": "Inquire status",
+  "taxInquireSelectedDialogMessage": "Inquire status for {count} selected invoices?",
+  "@taxInquireSelectedDialogMessage": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "taxInquireSelectedErrorWithMessage": "Failed to inquire status: {error}",
+  "@taxInquireSelectedErrorWithMessage": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "taxInquiryResultTitle": "Status inquiry result",
+  "taxInquiryResultEmpty": "No results to display.",
+  "taxInquiryStatusUnknown": "Unknown status",
 
   "taxRemoveSelectedDialogTitle": "Remove selected from tax workspace",
   "taxRemoveSelectedDialogMessage": "Remove {count} selected invoices from tax workspace?",

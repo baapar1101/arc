@@ -5032,6 +5032,47 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String taxSendSelectedPartialTitle(int success, int failed) {
+    return '$success sent, $failed failed';
+  }
+
+  @override
+  String taxBatchFailedRow(String id) {
+    return 'Invoice $id';
+  }
+
+  @override
+  String get taxInquireSelectedTooltip =>
+      'Inquire status for selected invoices';
+
+  @override
+  String taxInquireSelectedButton(int count) {
+    return 'Inquire status ($count)';
+  }
+
+  @override
+  String get taxInquireSelectedDialogTitle => 'Inquire status';
+
+  @override
+  String taxInquireSelectedDialogMessage(int count) {
+    return 'Inquire status for $count selected invoices?';
+  }
+
+  @override
+  String taxInquireSelectedErrorWithMessage(String error) {
+    return 'Failed to inquire status: $error';
+  }
+
+  @override
+  String get taxInquiryResultTitle => 'Status inquiry result';
+
+  @override
+  String get taxInquiryResultEmpty => 'No results to display.';
+
+  @override
+  String get taxInquiryStatusUnknown => 'Unknown status';
+
+  @override
   String get taxRemoveSelectedDialogTitle =>
       'Remove selected from tax workspace';
 
