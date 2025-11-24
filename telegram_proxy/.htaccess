@@ -1,0 +1,28 @@
+# تنظیمات پروکسی تلگرام برای cPanel
+# این فایل باید در root domain شما قرار بگیرد (همان جایی که index.php است)
+
+RewriteEngine On
+
+# هدایت مسیر /telegram/webhook به index.php
+RewriteCond %{REQUEST_URI} ^/telegram/webhook$ [NC]
+RewriteCond %{REQUEST_METHOD} POST [NC]
+RewriteRule ^(.*)$ index.php [QSA,L]
+
+# هدایت مسیر /telegram/send به index.php
+RewriteCond %{REQUEST_URI} ^/telegram/send$ [NC]
+RewriteCond %{REQUEST_METHOD} POST [NC]
+RewriteRule ^(.*)$ index.php [QSA,L]
+
+# هدایت مسیر /health به index.php
+RewriteCond %{REQUEST_URI} ^/health$ [NC]
+RewriteCond %{REQUEST_METHOD} GET [NC]
+RewriteRule ^(.*)$ index.php [QSA,L]
+
+# هدایت مسیر /telegram/webhook/status به index.php
+RewriteCond %{REQUEST_URI} ^/telegram/webhook/status$ [NC]
+RewriteCond %{REQUEST_METHOD} GET [NC]
+RewriteRule ^(.*)$ index.php [QSA,L]
+
+# اطمینان از اینکه index.php در دسترس است
+DirectoryIndex index.php
+

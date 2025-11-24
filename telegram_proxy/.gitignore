@@ -1,0 +1,5 @@
+logs/
+*.log
+config.php
+report_*.json
+

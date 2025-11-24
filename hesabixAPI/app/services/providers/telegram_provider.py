@@ -3,8 +3,11 @@ from __future__ import annotations
 import json
 from typing import Any, Dict, Optional
 from urllib import request, parse
+import structlog
 
 from app.core.settings import get_settings
+
+logger = structlog.get_logger()
 
 
 class TelegramProvider:
@@ -24,28 +27,69 @@ class TelegramProvider:
 
 	def _proxy_request(self, method: str, payload: Dict[str, Any]) -> tuple[bool, str | None]:
 		if not self._proxy_enabled():
+			logger.warning("telegram_proxy_request_failed", reason="proxy_not_configured", method=method)
 			return False, "proxy_not_configured"
+		
 		base_url = str(self.proxy_config.get("base_url")).rstrip("/")
 		url = f"{base_url}/telegram/send"
 		body = json.dumps({"method": method, "payload": payload}, ensure_ascii=False).encode("utf-8")
+		
+		logger.info("telegram_proxy_request_start", 
+			method=method,
+			proxy_url=url,
+			payload_keys=list(payload.keys()) if isinstance(payload, dict) else None,
+			has_api_key=bool(self.proxy_config.get("api_key"))
+		)
+		
 		req = request.Request(url, data=body, method="POST")
 		req.add_header("Content-Type", "application/json")
 		api_key = self.proxy_config.get("api_key")
 		if api_key:
 			req.add_header("X-Proxy-Key", str(api_key))
+		
 		try:
 			with request.urlopen(req, timeout=10) as resp:
 				raw = resp.read().decode("utf-8")
+				http_code = resp.getcode()
+				
 				try:
 					j = json.loads(raw)
 				except json.JSONDecodeError:
+					logger.error("telegram_proxy_request_invalid_json", 
+						method=method,
+						http_code=http_code,
+						response_preview=raw[:200] if raw else None
+					)
 					return False, "invalid_proxy_response"
+				
 				ok = bool(j.get("ok"))
 				description = j.get("description")
 				if not ok and not description:
 					description = j.get("error")
+				
+				if ok:
+					logger.info("telegram_proxy_request_success", 
+						method=method,
+						http_code=http_code,
+						description=description
+					)
+				else:
+					logger.error("telegram_proxy_request_failed", 
+						method=method,
+						http_code=http_code,
+						error=description,
+						response=j
+					)
+				
 				return ok, description
+				
 		except Exception as exc:
+			logger.error("telegram_proxy_request_exception", 
+				method=method,
+				proxy_url=url,
+				exception_type=type(exc).__name__,
+				exception_message=str(exc)
+			)
 			return False, str(exc)
 
 	def send_text(self, chat_id: int, text: str, parse_mode: str | None = "HTML") -> bool:
@@ -87,30 +131,75 @@ class TelegramProvider:
 		وب‌هوک ربات را در تلگرام ثبت می‌کند و نتیجه را برمی‌گرداند.
 		"""
 		if not self.is_configured():
+			logger.error("telegram_set_webhook_failed", reason="bot_not_configured")
 			return False, "bot_not_configured"
+		
 		payload: dict[str, object] = {"url": url, "drop_pending_updates": drop_pending_updates}
 		if secret_token:
 			payload["secret_token"] = secret_token
+		
+		logger.info("telegram_set_webhook_start", 
+			webhook_url=url,
+			has_secret_token=bool(secret_token),
+			drop_pending_updates=drop_pending_updates,
+			proxy_enabled=self._proxy_enabled()
+		)
+		
 		if self._proxy_enabled():
+			logger.info("telegram_set_webhook_using_proxy")
 			return self._proxy_request("setWebhook", payload)
+		
+		# استفاده مستقیم از Telegram API
 		token = self.bot_token
 		assert token
+		telegram_url = f"https://api.telegram.org/bot{token}/setWebhook"
+		
+		logger.info("telegram_set_webhook_direct", telegram_url=telegram_url)
+		
 		data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
-		req = request.Request(
-			f"https://api.telegram.org/bot{token}/setWebhook",
-			data=data,
-			method="POST",
-		)
+		req = request.Request(telegram_url, data=data, method="POST")
 		req.add_header("Content-Type", "application/json")
+		
 		try:
 			with request.urlopen(req, timeout=10) as resp:
+				http_code = resp.getcode()
 				raw = resp.read().decode("utf-8")
+				
 				try:
 					j = json.loads(raw)
 				except json.JSONDecodeError:
+					logger.error("telegram_set_webhook_invalid_response", 
+						http_code=http_code,
+						response_preview=raw[:200] if raw else None
+					)
 					return False, "invalid_response"
-				return bool(j.get("ok")), j.get("description")
+				
+				ok = bool(j.get("ok"))
+				description = j.get("description")
+				
+				if ok:
+					logger.info("telegram_set_webhook_success", 
+						webhook_url=url,
+						http_code=http_code,
+						description=description
+					)
+				else:
+					logger.error("telegram_set_webhook_failed", 
+						webhook_url=url,
+						http_code=http_code,
+						error=description,
+						response=j
+					)
+				
+				return ok, description
+				
 		except Exception as exc:
+			logger.error("telegram_set_webhook_exception", 
+				webhook_url=url,
+				telegram_url=telegram_url,
+				exception_type=type(exc).__name__,
+				exception_message=str(exc)
+			)
 			return False, str(exc)
 
 

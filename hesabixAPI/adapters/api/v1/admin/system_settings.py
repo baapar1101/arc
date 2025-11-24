@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Dict, Any
 from urllib.parse import urlsplit, urlunsplit
+import structlog
 
 from fastapi import APIRouter, Depends, Body, Request
 from sqlalchemy.orm import Session
@@ -20,6 +21,8 @@ from app.services.system_settings_service import (
 	get_effective_notifications_settings,
 )
 from app.services.providers.telegram_provider import TelegramProvider
+
+logger = structlog.get_logger()
 
 
 router = APIRouter(prefix="/admin/system-settings", tags=["admin-system-settings"])
@@ -166,21 +169,32 @@ def register_telegram_webhook_endpoint(
 	if not ctx.has_any_permission("system_settings", "superadmin"):
 		raise ApiError("FORBIDDEN", "Missing permission: system_settings", http_status=403)
 
+	logger.info("telegram_webhook_register_start", user_id=ctx.get_user_id())
+	
 	cfg = get_effective_notifications_settings(db)
 	bot_token = cfg.get("telegram_bot_token")
 	webhook_secret = cfg.get("telegram_webhook_secret")
 
 	if not bot_token:
+		logger.error("telegram_webhook_register_failed", reason="bot_token_missing")
 		raise ApiError("TELEGRAM_BOT_TOKEN_MISSING", "توکن ربات تلگرام تنظیم نشده است.", http_status=400)
 	if not webhook_secret:
+		logger.error("telegram_webhook_register_failed", reason="webhook_secret_missing")
 		raise ApiError("TELEGRAM_WEBHOOK_SECRET_MISSING", "رمز وب‌هوک تلگرام تنظیم نشده است.", http_status=400)
 
 	proxy_cfg = cfg.get("telegram_proxy") or {}
 	proxy_enabled = bool(proxy_cfg.get("enabled") and proxy_cfg.get("base_url"))
+	
+	logger.info("telegram_webhook_register_config", 
+		proxy_enabled=proxy_enabled,
+		proxy_base_url=proxy_cfg.get("base_url"),
+		has_secret_header=bool(cfg.get("telegram_secret_header"))
+	)
 
 	if proxy_enabled:
 		base_url = str(proxy_cfg.get("base_url")).rstrip("/")
 		webhook_url = f"{base_url}/telegram/webhook"
+		logger.info("telegram_webhook_url_proxy_mode", webhook_url=webhook_url, proxy_base_url=base_url)
 	else:
 		webhook_url = str(request.url_for("telegram_webhook", secret=webhook_secret))
 		forwarded_proto = request.headers.get("X-Forwarded-Proto")
@@ -191,12 +205,25 @@ def register_telegram_webhook_endpoint(
 				webhook_url = urlunsplit(
 					(normalized_proto, parts.netloc, parts.path, parts.query, parts.fragment)
 				)
+		logger.info("telegram_webhook_url_direct_mode", webhook_url=webhook_url)
 
+	logger.info("telegram_webhook_register_calling", webhook_url=webhook_url, proxy_enabled=proxy_enabled)
+	
 	provider = TelegramProvider(bot_token=bot_token, proxy_config=proxy_cfg if proxy_enabled else None)
 	ok, description = provider.set_webhook(
 		url=webhook_url,
 		secret_token=cfg.get("telegram_secret_header"),
 	)
+	
+	if ok:
+		logger.info("telegram_webhook_register_success", webhook_url=webhook_url)
+	else:
+		logger.error("telegram_webhook_register_failed", 
+			webhook_url=webhook_url,
+			error=description,
+			proxy_enabled=proxy_enabled
+		)
+	
 	data = {
 		"ok": ok,
 		"webhook_url": webhook_url,

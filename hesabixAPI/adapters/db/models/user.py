@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import String, DateTime, Boolean, Integer, ForeignKey, JSON
+from sqlalchemy import String, DateTime, Boolean, Integer, BigInteger, ForeignKey, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from adapters.db.session import Base
@@ -24,7 +24,8 @@ class User(Base):
 	# App permissions
 	app_permissions: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 	# Telegram linking
-	telegram_chat_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+	# استفاده از BigInteger به جای Integer چون chat_id تلگرام می‌تواند بزرگ‌تر از INT max باشد
+	telegram_chat_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True, index=True)
 	telegram_connected_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 	created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 	updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)

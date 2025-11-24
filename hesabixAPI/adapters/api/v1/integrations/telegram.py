@@ -95,7 +95,13 @@ def telegram_webhook(
 		header_val = request.headers.get("X-Telegram-Bot-Api-Secret-Token") if request else None
 		if header_val != settings.get("telegram_secret_header"):
 			raise HTTPException(status_code=403, detail="Forbidden")
-	provider = TelegramProvider(bot_token=settings.get("telegram_bot_token"))
+	
+	# تنظیم proxy_config برای TelegramProvider تا بتواند پیام‌ها را از طریق پروکسی ارسال کند
+	proxy_cfg = settings.get("telegram_proxy") or {}
+	provider = TelegramProvider(
+		bot_token=settings.get("telegram_bot_token"),
+		proxy_config=proxy_cfg if proxy_cfg.get("enabled") else None
+	)
 
 	message = payload.get("message") or {}
 	text: str = message.get("text") or ""
