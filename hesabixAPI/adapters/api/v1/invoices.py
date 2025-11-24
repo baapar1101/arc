@@ -39,6 +39,7 @@ from app.services.invoice_service import (
     export_installments_csv,
     export_installments_xlsx,
 )
+from app.services.tax_submission_service import send_document_to_tax_system
 from app.services.pdf.template_renderer import render_template
 from app.core.calendar import CalendarConverter
 from adapters.db.models.person import Person
@@ -389,6 +390,8 @@ async def export_single_invoice_pdf(
         except Exception:
             return None
 
+    show_stamp_override = None
+
     # تنظیمات چاپ کسب‌وکار (لوگو، مهر، پرداخت‌ها، اقساط و متن انتهایی)
     # یک کانفیگ پیش‌فرض تعریف می‌کنیم تا در صورت بروز خطا یا نبود کسب‌وکار، همچنان در دسترس باشد
     print_settings: Dict[str, Any] = {
@@ -463,6 +466,25 @@ async def export_single_invoice_pdf(
                 return merged
 
             print_settings = _pick_print_settings()
+
+            def _normalize_bool(value):
+                if isinstance(value, bool):
+                    return value
+                if value is None:
+                    return None
+                if isinstance(value, (int, float)):
+                    return bool(value)
+                if isinstance(value, str):
+                    v = value.strip().lower()
+                    if v in {"1", "true", "yes", "on"}:
+                        return True
+                    if v in {"0", "false", "no", "off"}:
+                        return False
+                return None
+
+            override_value = _normalize_bool(show_stamp_override)
+            if override_value is not None:
+                print_settings["show_stamp"] = override_value
 
             # لوگو و مهر کسب‌وکار بر اساس تنظیمات چاپ
             if print_settings.get("show_logo", True):
@@ -1065,15 +1087,18 @@ async def export_single_invoice_pdf(
 
     # HTML پیش‌فرض در نبود قالب: استفاده از قالب فایل
     # پارامترهای صفحه از کوئری (اختیاری)
+    show_stamp_override = None
     try:
         qp = request.query_params
         paper_size = qp.get("paper_size")
         orientation = qp.get("orientation")
         disposition = qp.get("disposition") or "attachment"
+        show_stamp_override = qp.get("show_stamp")
     except Exception:
         paper_size = None
         orientation = None
         disposition = "attachment"
+        show_stamp_override = None
 
     # حالت پیش‌فرض صفحه برای فاکتور: افقی (landscape)، مگر این‌که صراحتاً چیز دیگری ارسال شده باشد
     if not orientation:
@@ -1715,23 +1740,6 @@ async def remove_invoice_from_tax_workspace(
         message="INVOICE_REMOVED_FROM_TAX_WORKSPACE",
     )
 
-
-def _simulate_send_to_tax_system(doc: Document, db: Session) -> None:
-    """
-    شبیه‌سازی ارسال فاکتور به سامانه مودیان.
-    در این نسخه اولیه، فقط وضعیت و کد رهگیری آزمایشی ذخیره می‌شود.
-    """
-    extra = dict(doc.extra_info or {})
-    now = datetime.datetime.utcnow().isoformat()
-    extra["tax_workspace"] = True
-    extra["tax_status"] = "sent"
-    extra["tax_tracking_code"] = extra.get("tax_tracking_code") or f"SIM-{doc.id}-{int(datetime.datetime.utcnow().timestamp())}"
-    extra["tax_last_send_at"] = now
-    extra.pop("tax_error_message", None)
-    doc.extra_info = extra
-    db.add(doc)
-
-
 @router.post("/business/{business_id}/{invoice_id}/tax-workspace/send-to-system")
 @require_business_access("business_id")
 async def send_invoice_to_tax_system(
@@ -1763,8 +1771,7 @@ async def send_invoice_to_tax_system(
             http_status=409,
         )
 
-    # Simulated send (replace with real integration later)
-    _simulate_send_to_tax_system(doc, db)
+    send_document_to_tax_system(db, doc)
     db.commit()
     db.refresh(doc)
 
@@ -1811,10 +1818,15 @@ async def send_invoices_to_tax_system_batch(
             if status == "finalized":
                 raise ApiError("TAX_ALREADY_FINALIZED", "Invoice is already finalized in tax system", http_status=409)
 
-            _simulate_send_to_tax_system(doc, db)
+            send_document_to_tax_system(db, doc)
             succeeded.append(invoice_id)
         except ApiError as e:
-            failed.append({"id": invoice_id, "error": e.detail.get("error", {}).get("code")})
+            failed.append(
+                {
+                    "id": invoice_id,
+                    "error": e.detail.get("error", {}).get("code") if hasattr(e, "detail") else str(e),
+                }
+            )
         except Exception as e:
             failed.append({"id": invoice_id, "error": str(e)})
 

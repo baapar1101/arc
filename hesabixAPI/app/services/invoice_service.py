@@ -8,6 +8,7 @@ import logging
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 from sqlalchemy import and_, or_, func
+from sqlalchemy.exc import IntegrityError
 
 from adapters.db.models.document import Document
 from adapters.db.models.document_line import DocumentLine
@@ -22,6 +23,7 @@ from adapters.db.models.fiscal_year import FiscalYear
 from adapters.db.models.person import Person
 from adapters.db.models.product import Product
 from adapters.db.models.invoice_item_line import InvoiceItemLine
+from adapters.db.models.tax_unit import TaxUnit
 from app.core.calendar import CalendarConverter, CalendarType
 from app.core.responses import ApiError
 from app.services.document_monetization_service import ensure_document_policy_allows_creation
@@ -80,6 +82,47 @@ def _is_inventory_posting_enabled(data: Dict[str, Any]) -> bool:
         return s not in ("false", "0", "no", "off")
     except Exception:
         return True
+
+
+def _build_product_tax_snapshot_map(
+    db: Session,
+    business_id: int,
+    product_ids: List[int],
+) -> Dict[int, Dict[str, Any]]:
+    """
+    تهیه اطلاعات مالیاتی کالا برای ذخیره در snapshot خطوط فاکتور.
+    """
+    if not product_ids:
+        return {}
+    unique_ids = list({int(pid) for pid in product_ids if pid})
+    if not unique_ids:
+        return {}
+    rows = db.query(
+        Product.id,
+        Product.tax_code,
+        Product.tax_unit_id,
+        Product.main_unit,
+    ).filter(
+        Product.business_id == business_id,
+        Product.id.in_(unique_ids),
+    ).all()
+    unit_ids = {row.tax_unit_id for row in rows if row.tax_unit_id}
+    unit_map: Dict[int, Dict[str, Any]] = {}
+    if unit_ids:
+        units = db.query(TaxUnit.id, TaxUnit.code, TaxUnit.name).filter(TaxUnit.id.in_(unit_ids)).all()
+        for unit in units:
+            unit_map[int(unit.id)] = {"code": unit.code, "name": unit.name}
+    result: Dict[int, Dict[str, Any]] = {}
+    for row in rows:
+        unit_info = unit_map.get(int(row.tax_unit_id)) if row.tax_unit_id else None
+        result[int(row.id)] = {
+            "tax_code": row.tax_code,
+            "tax_unit_id": int(row.tax_unit_id) if row.tax_unit_id else None,
+            "tax_unit_code": unit_info["code"] if unit_info else None,
+            "tax_unit_name": unit_info["name"] if unit_info else None,
+            "product_main_unit": row.main_unit,
+        }
+    return result
 
 
 def _iter_product_movements(
@@ -1016,12 +1059,19 @@ def create_invoice(
         ).all():
             track_map[int(pid)] = bool(tracked)
 
+    product_tax_map = _build_product_tax_snapshot_map(db, business_id, all_product_ids)
+
     for ln in lines_input:
         pid = ln.get("product_id")
         if not pid:
             continue
         info = dict(ln.get("extra_info") or {})
         info["inventory_tracked"] = bool(track_map.get(int(pid), False))
+        tax_meta = product_tax_map.get(int(pid))
+        if tax_meta:
+            snapshot = {k: v for k, v in tax_meta.items() if v is not None}
+            snapshot["captured_at"] = datetime.utcnow().isoformat()
+            info["tax_snapshot"] = snapshot
         ln["extra_info"] = info
     # انبار از فاکتور جدا شده است؛ انتخاب انبار در فاکتور اجباری نیست
 
@@ -1046,11 +1096,6 @@ def create_invoice(
         amount=abs(total_with_tax),
     )
 
-    # Create document
-    # استفاده از سرویس جدید شماره‌گذاری
-    from app.services.document_numbering_service import generate_document_code
-    doc_code = generate_document_code(db, business_id, invoice_type, document_date)
-
     # Enrich extra_info
     new_extra_info = dict(header_extra)
     new_extra_info["totals"] = {
@@ -1060,21 +1105,46 @@ def create_invoice(
         "net": float(Decimal(str(totals["net"]))),
     }
 
-    document = Document(
-        business_id=business_id,
-        fiscal_year_id=fiscal_year.id,
-        code=doc_code,
-        document_type=invoice_type,
-        document_date=document_date,
-        currency_id=int(currency_id),
-        created_by_user_id=user_id,
-        registered_at=datetime.utcnow(),
-        is_proforma=bool(data.get("is_proforma", False)),
-        description=data.get("description"),
-        extra_info=new_extra_info,
-    )
-    db.add(document)
-    db.flush()
+    # Create document با کنترل رقابت در شماره‌گذاری
+    from app.services.document_numbering_service import generate_document_code
+
+    document: Optional[Document] = None
+    max_code_attempts = 5
+    for attempt in range(max_code_attempts):
+        doc_code = generate_document_code(db, business_id, invoice_type, document_date)
+        candidate = Document(
+            business_id=business_id,
+            fiscal_year_id=fiscal_year.id,
+            code=doc_code,
+            document_type=invoice_type,
+            document_date=document_date,
+            currency_id=int(currency_id),
+            created_by_user_id=user_id,
+            registered_at=datetime.utcnow(),
+            is_proforma=bool(data.get("is_proforma", False)),
+            description=data.get("description"),
+            extra_info=new_extra_info,
+        )
+        try:
+            with db.begin_nested():
+                db.add(candidate)
+                db.flush()
+        except IntegrityError as exc:
+            # اگر به دلیل تکرار کد شکست خورد، دوباره تلاش کن
+            msg = str(getattr(exc.orig, "args", exc))
+            if "uq_documents_business_code" in msg or "Duplicate entry" in msg:
+                continue
+            raise
+        else:
+            document = candidate
+            break
+
+    if not document:
+        raise ApiError(
+            "DOCUMENT_CODE_RACE",
+            "تولید شماره سند پس از چند تلاش ناموفق بود. لطفاً دوباره تلاش کنید.",
+            http_status=409,
+        )
 
     # ذخیره اقلام فاکتور در جدول مجزا (invoice_item_lines)
     for line in lines_input:
@@ -1716,12 +1786,19 @@ def update_invoice(
             Product.id.in_(all_product_ids),
         ).all():
             track_map[int(pid)] = bool(tracked)
+    product_tax_map = _build_product_tax_snapshot_map(db, document.business_id, all_product_ids)
+
     for ln in lines_input:
         pid = ln.get("product_id")
         if not pid:
             continue
         info = dict(ln.get("extra_info") or {})
         info["inventory_tracked"] = bool(track_map.get(int(pid), False))
+        tax_meta = product_tax_map.get(int(pid))
+        if tax_meta:
+            snapshot = {k: v for k, v in tax_meta.items() if v is not None}
+            snapshot["captured_at"] = datetime.utcnow().isoformat()
+            info["tax_snapshot"] = snapshot
         ln["extra_info"] = info
     # انتخاب انبار در مرحله فاکتور الزامی نیست
 

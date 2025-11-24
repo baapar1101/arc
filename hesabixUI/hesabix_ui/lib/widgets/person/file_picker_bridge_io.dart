@@ -1,4 +1,5 @@
 import 'dart:io';
+
 import 'package:file_picker/file_picker.dart';
 
 class PickedFileData {
@@ -8,10 +9,18 @@ class PickedFileData {
 }
 
 class FilePickerBridge {
-  static Future<PickedFileData?> pickExcel() async {
+  static Future<PickedFileData?> pickExcel() {
+    return _pickFile(extensions: const ['xlsx']);
+  }
+
+  static Future<PickedFileData?> pickXml() {
+    return _pickFile(extensions: const ['xml', 'zip']);
+  }
+
+  static Future<PickedFileData?> _pickFile({required List<String> extensions}) async {
     final res = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: const ['xlsx'],
+      allowedExtensions: extensions,
       withData: false,
     );
     if (res == null || res.files.isEmpty) return null;
@@ -21,5 +30,3 @@ class FilePickerBridge {
     return PickedFileData(pf.name, bytes);
   }
 }
-
-

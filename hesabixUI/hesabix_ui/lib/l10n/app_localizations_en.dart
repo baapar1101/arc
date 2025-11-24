@@ -3040,6 +3040,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String get taxUnitId => 'Tax unit id';
 
   @override
+  String get vatColumn => 'VAT';
+
+  @override
+  String taxVatPercent(Object value) {
+    return '$value%';
+  }
+
+  @override
+  String get taxVatUnknown => 'Not specified';
+
+  @override
   String get bulkPriceUpdateTitle => 'Bulk price update';
 
   @override
@@ -4005,6 +4016,22 @@ class AppLocalizationsEn extends AppLocalizations {
       'Exactly as registered in your vendor panel.';
 
   @override
+  String get notificationsProxySectionTitle => 'Telegram proxy';
+
+  @override
+  String get notificationsProxySectionSubtitle =>
+      'When servers are hosted inside Iran, enable the proxy to route Telegram traffic through an external relay.';
+
+  @override
+  String get notificationsProxyEnableLabel => 'Enable Telegram proxy';
+
+  @override
+  String get notificationsFieldTelegramProxyBaseUrl => 'Proxy base URL';
+
+  @override
+  String get notificationsFieldTelegramProxyApiKey => 'Proxy access key';
+
+  @override
   String get notificationsAdvancedRestartHint =>
       'After changes, restart the notification service during low traffic if needed.';
 
@@ -4529,6 +4556,334 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get taxWorkspaceSubtitle =>
       'Review invoices before sending them to the tax system.';
+
+  @override
+  String get taxIntegrationTitle => 'Tax system integration';
+
+  @override
+  String get taxIntegrationSubtitle =>
+      'Manage credentials and keys required to connect to the national tax platform.';
+
+  @override
+  String get taxSettingsTabConnection => 'Connection & basics';
+
+  @override
+  String get taxSettingsTabKeys => 'Keys & certificates';
+
+  @override
+  String get taxSettingsTabDataQuality => 'Data quality';
+
+  @override
+  String get taxSettingsTabGuide => 'Guide';
+
+  @override
+  String get taxGuideIntroTitle => 'How to complete the Tax System setup?';
+
+  @override
+  String get taxGuideIntroDescription =>
+      'This guide walks through the entire integration flow with the Iranian Taxpayers System in the new Hesabix version—from key generation to data quality checks and invoice submission.';
+
+  @override
+  String get taxGuidePrereqTitle => 'Prerequisites before you begin';
+
+  @override
+  String get taxGuidePrereqItem1 =>
+      'Access to the “Tax System” menu as a business admin';
+
+  @override
+  String get taxGuidePrereqItem2 =>
+      'Accurate registration data (national ID, economic code, corporate email)';
+
+  @override
+  String get taxGuidePrereqItem3 =>
+      'Active access to your taxpayer workspace on my.tax.gov.ir';
+
+  @override
+  String get taxGuideStep1Title => '1) Generate keys inside Hesabix';
+
+  @override
+  String get taxGuideStep1Description =>
+      'Use the “Generate new keys” card to create the private/public key pair and CSR.';
+
+  @override
+  String get taxGuideStep1Bullet1 =>
+      'Open the Keys & Certificates tab and tap the generate button.';
+
+  @override
+  String get taxGuideStep1Bullet2 =>
+      'Provide the exact taxpayer type and national ID.';
+
+  @override
+  String get taxGuideStep1Bullet3 =>
+      'Persian/English names and email must match the tax records.';
+
+  @override
+  String get taxGuideStep2Title => '2) Download and store securely';
+
+  @override
+  String get taxGuideStep2Description =>
+      'Keys are shown only once; store them safely.';
+
+  @override
+  String get taxGuideStep2Bullet1 =>
+      'Download the key files and keep them in offline, encrypted storage.';
+
+  @override
+  String get taxGuideStep2Bullet2 =>
+      'Never share the private key outside the tax integration team.';
+
+  @override
+  String get taxGuideStep2Bullet3 =>
+      'If the private key is lost you must regenerate the entire pair.';
+
+  @override
+  String get taxGuideStep3Title =>
+      '3) Register the public key on my.tax.gov.ir';
+
+  @override
+  String get taxGuideStep3Description =>
+      'You must upload the Public Key to obtain the tax memory ID.';
+
+  @override
+  String get taxGuideStep3Bullet1 =>
+      'Log into my.tax.gov.ir and navigate to Case Access > Enrollment > Tax Memory ID.';
+
+  @override
+  String get taxGuideStep3Bullet2 =>
+      'Select “By taxpayer” and upload the generated Public Key file.';
+
+  @override
+  String get taxGuideStep3Bullet3 =>
+      'Copy the issued memory ID and paste it back into Hesabix.';
+
+  @override
+  String get taxGuideStep4Title => '4) Complete the connection form in Hesabix';
+
+  @override
+  String get taxGuideStep4Description =>
+      'Tax memory ID, economic code and private key are mandatory under the Connection tab.';
+
+  @override
+  String get taxGuideStep4Bullet1 =>
+      'Enter the ID and economic code without extra spaces.';
+
+  @override
+  String get taxGuideStep4Bullet2 =>
+      'Paste the PEM private key and optionally store the Public Key and CSR.';
+
+  @override
+  String get taxGuideStep4Bullet3 =>
+      'Enable sandbox mode only for staging/testing environments.';
+
+  @override
+  String get taxGuideStep5Title =>
+      '5) Request the intermediate certificate via CSR';
+
+  @override
+  String get taxGuideStep5Description =>
+      'Legal entities must submit the CSR to the national certificate authority.';
+
+  @override
+  String get taxGuideStep5Bullet1 =>
+      'Visit gica.ir and choose the CSR-based request option.';
+
+  @override
+  String get taxGuideStep5Bullet2 =>
+      'Fill in the company details and pay the issuance fee.';
+
+  @override
+  String get taxGuideStep5Bullet3 =>
+      'After in-person verification upload the issued certificate into Hesabix.';
+
+  @override
+  String get taxGuideStep6Title => '6) Assign product/service tax codes';
+
+  @override
+  String get taxGuideStep6Description =>
+      'Invoices will be rejected if items lack tax code and unit.';
+
+  @override
+  String get taxGuideStep6Bullet1 =>
+      'Edit each item under Products & Services and add the 13-digit tax code.';
+
+  @override
+  String get taxGuideStep6Bullet2 =>
+      'Use the public code list from stuffid.tax.gov.ir or request dedicated codes.';
+
+  @override
+  String get taxGuideStep6Bullet3 =>
+      'Service codes can be obtained from portal.gs1-ir.org.';
+
+  @override
+  String get taxGuideStep7Title =>
+      '7) Run data quality checks before submission';
+
+  @override
+  String get taxGuideStep7Description =>
+      'Review the Data Quality tab and the tax workspace before sending invoices.';
+
+  @override
+  String get taxGuideStep7Bullet1 =>
+      'The Data Quality tab highlights missing fields for products, customers and invoices.';
+
+  @override
+  String get taxGuideStep7Bullet2 =>
+      'Add invoices to the tax workspace first and fix validation errors inline.';
+
+  @override
+  String get taxGuideStep7Bullet3 =>
+      'Send single or bulk invoices only after the checklist is green.';
+
+  @override
+  String get taxGuideResourcesTitle => 'Shortcuts and resources';
+
+  @override
+  String get taxGuideResourcesWorkspace =>
+      'Tax workspace: available under Sales > Tax Workspace.';
+
+  @override
+  String get taxGuideResourcesProducts =>
+      'Products & Services: update tax codes via the same menu or Excel import.';
+
+  @override
+  String get taxGuideResourcesSupport =>
+      'For integration issues review the Tax Settings logs or open a support ticket.';
+
+  @override
+  String get taxMemoryIdLabel => 'Tax memory ID';
+
+  @override
+  String get taxEconomicCodeLabel => 'Economic code';
+
+  @override
+  String get taxSandboxModeLabel => 'Sandbox mode';
+
+  @override
+  String get taxSandboxModeSubtitle =>
+      'When enabled, requests are sent to the sandbox environment.';
+
+  @override
+  String get taxPrivateKeyLabel => 'Private key (PEM)';
+
+  @override
+  String get taxPublicKeyLabel => 'Public key (optional)';
+
+  @override
+  String get taxCertificateLabel => 'Digital certificate (optional)';
+
+  @override
+  String get taxCertificateRequestLabel => 'Certificate request (CSR)';
+
+  @override
+  String get taxGenerateKeys => 'Generate new keys';
+
+  @override
+  String get taxMemoryIdRequired => 'Tax memory ID is required';
+
+  @override
+  String get taxEconomicCodeRequired => 'Economic code is required';
+
+  @override
+  String get taxPrivateKeyRequired => 'Private key is required';
+
+  @override
+  String get taxKeysGenerated => 'Keys generated successfully';
+
+  @override
+  String get taxSettingsSaved => 'Tax integration settings saved';
+
+  @override
+  String taxLastUpdated(String date) {
+    return 'Last updated: $date';
+  }
+
+  @override
+  String get taxPersonTypeLabel => 'Taxpayer type';
+
+  @override
+  String get taxPersonTypeNatural => 'Individual';
+
+  @override
+  String get taxPersonTypeLegal => 'Legal entity';
+
+  @override
+  String get taxNationalIdLabel => 'Taxpayer national ID';
+
+  @override
+  String get taxLegalNameFaLabel => 'Persian company name';
+
+  @override
+  String get taxLegalNameEnLabel => 'English company name';
+
+  @override
+  String get taxLegalEmailLabel => 'Corporate email';
+
+  @override
+  String get taxDataQualityTitle => 'Data quality check';
+
+  @override
+  String get taxDataQualitySubtitle =>
+      'Review missing tax data before submitting invoices.';
+
+  @override
+  String get taxDataQualityReload => 'Refresh report';
+
+  @override
+  String get taxDataQualityProductsHeader => 'Products & services';
+
+  @override
+  String get taxDataQualityPersonsHeader => 'Persons & customers';
+
+  @override
+  String get taxDataQualityMissingTaxCode => 'Items missing tax code';
+
+  @override
+  String get taxDataQualityMissingTaxUnit => 'Items missing tax unit';
+
+  @override
+  String get taxDataQualityMissingNationalId => 'Persons missing national ID';
+
+  @override
+  String get taxDataQualityMissingEconomicId => 'Persons missing economic ID';
+
+  @override
+  String get taxDataQualitySamples => 'Samples';
+
+  @override
+  String get taxDataQualityNoSamples => 'No samples available.';
+
+  @override
+  String get taxDataQualityNoIssues => 'All good! No pending data issues.';
+
+  @override
+  String get taxDataQualityNoData => 'No report to display.';
+
+  @override
+  String taxDataQualityFetchError(String error) {
+    return 'Failed to fetch quality report: $error';
+  }
+
+  @override
+  String get taxDataQualityTaxCodeLabel => 'Tax code';
+
+  @override
+  String get taxDataQualityTaxUnitLabel => 'Tax unit';
+
+  @override
+  String get taxDataQualityNationalIdLabel => 'National ID';
+
+  @override
+  String get taxDataQualityEconomicIdLabel => 'Economic ID';
+
+  @override
+  String get taxValidationIssuesTitle => 'Tax validation issues';
+
+  @override
+  String get taxValidationIssuesDescription =>
+      'Resolve the following items before sending invoices to the tax platform.';
+
+  @override
+  String get taxValidationIssuesEmpty => 'No issue details provided.';
 
   @override
   String get taxAddToWorkspaceSingle => 'Add to tax workspace';

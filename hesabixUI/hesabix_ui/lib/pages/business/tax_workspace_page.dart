@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:dio/dio.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/core/auth_store.dart';
@@ -8,6 +9,7 @@ import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
 import 'package:hesabix_ui/widgets/date_input_field.dart';
 import 'package:hesabix_ui/core/date_utils.dart' show HesabixDateUtils;
 import '../../utils/snackbar_helper.dart';
+import '../../services/errors/api_error.dart';
 
 /// صفحه کارپوشه مودیان (لیست فاکتورهای موجود در کارپوشه و وضعیت ارسال به سامانه)
 class TaxWorkspacePage extends StatefulWidget {
@@ -463,7 +465,9 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
         navigator.pop();
       }
       if (!mounted) return;
+      if (!_handleTaxSendError(e)) {
       SnackBarHelper.showError(context, message: t.taxSendErrorWithMessage(e.toString()));
+      }
     }
   }
 
@@ -595,7 +599,9 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
         navigator.pop();
       }
       if (!mounted) return;
+      if (!_handleTaxSendError(e)) {
       SnackBarHelper.showError(context, message: t.taxSendSelectedErrorWithMessage(e.toString()));
+      }
     }
   }
 
@@ -670,6 +676,72 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
       SnackBarHelper.showError(context, message: t.taxRemoveSelectedErrorWithMessage(e.toString()));
     }
   }
+
+  bool _handleTaxSendError(Object error) {
+    ApiErrorDetails? apiError;
+    if (error is DioException && error.error is ApiErrorDetails) {
+      apiError = error.error as ApiErrorDetails;
+    } else if (error is ApiErrorDetails) {
+      apiError = error;
+    }
+    if (apiError == null) {
+      return false;
+    }
+    final code = (apiError.code ?? '').toUpperCase();
+    if (code != 'TAX_VALIDATION_FAILED') {
+      return false;
+    }
+    final issues = apiError.details?['issues'];
+    final List<dynamic> issueList = issues is List ? issues : const [];
+    _showValidationIssuesDialog(issueList);
+    return true;
+  }
+
+  void _showValidationIssuesDialog(List<dynamic> issues) {
+    final t = AppLocalizations.of(context);
+    showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(t.taxValidationIssuesTitle),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: issues.isEmpty
+              ? Text(t.taxValidationIssuesEmpty)
+              : Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      t.taxValidationIssuesDescription,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                    const SizedBox(height: 12),
+                    ...issues.map(
+                      (issue) {
+                        final map = issue is Map<String, dynamic> ? issue : <String, dynamic>{};
+                        final message = map['message']?.toString() ?? '-';
+                        final code = map['code']?.toString();
+                        return ListTile(
+                          dense: true,
+                          contentPadding: EdgeInsets.zero,
+                          leading: const Icon(Icons.error_outline, color: Colors.redAccent),
+                          title: Text(message),
+                          subtitle: code != null && code.isNotEmpty
+                              ? Text('${t.code}: $code')
+                              : null,
+                        );
+                      },
+                    ),
+                  ],
+                ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(t.close),
+          ),
+        ],
+      ),
+    );
+  }
 }
-
-

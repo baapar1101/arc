@@ -226,6 +226,7 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
       _isLoading = true;
     });
 
+    Person? resultPerson;
     try {
       if (widget.person == null) {
         // Create new person
@@ -297,6 +298,7 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
         if (creditLimit != null || creditCheckEnabled != null) {
           await CreditApiService.updatePersonCredit(widget.businessId, created.id!, creditLimit: creditLimit, creditCheckEnabled: creditCheckEnabled);
         }
+        resultPerson = created;
       } else {
         // Update existing person
         final personData = PersonUpdateRequest(
@@ -364,11 +366,12 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
         if (creditLimit != null || creditCheckEnabled != null) {
           await CreditApiService.updatePersonCredit(widget.businessId, updated.id!, creditLimit: creditLimit, creditCheckEnabled: creditCheckEnabled);
         }
+        resultPerson = updated;
       }
 
       if (mounted) {
-        Navigator.of(context).pop();
         widget.onSuccess?.call();
+        Navigator.of(context).pop(resultPerson);
         SnackBarHelper.showSuccess(
           context,
           message: widget.person == null 

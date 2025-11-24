@@ -2,6 +2,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../services/product_service.dart';
 import '../../core/api_client.dart';
+import '../../core/auth_store.dart';
+import '../../widgets/product/product_form_dialog.dart';
 
 class ProductComboboxWidget extends StatefulWidget {
   final int businessId;
@@ -9,6 +11,7 @@ class ProductComboboxWidget extends StatefulWidget {
   final ValueChanged<Map<String, dynamic>?> onChanged;
   final String label;
   final String hintText;
+  final AuthStore? authStore;
 
   const ProductComboboxWidget({
     super.key,
@@ -17,6 +20,7 @@ class ProductComboboxWidget extends StatefulWidget {
     this.selectedProduct,
     this.label = 'کالا/خدمت',
     this.hintText = 'جست‌وجو و انتخاب کالا/خدمت',
+    this.authStore,
   });
 
   @override
@@ -105,6 +109,66 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
     widget.onChanged(item);
   }
 
+  Future<void> _addNewProduct(BuildContext bottomSheetContext) async {
+    final authStore = widget.authStore;
+    if (authStore == null) {
+      // اگر AuthStore ارائه نشده باشد، نمی‌توانیم کالای جدید اضافه کنیم
+      return;
+    }
+
+    // بستن bottom sheet قبل از باز کردن dialog
+    Navigator.pop(bottomSheetContext);
+
+    final result = await showDialog<dynamic>(
+      context: context,
+      builder: (context) => ProductFormDialog(
+        businessId: widget.businessId,
+        authStore: authStore,
+        onSuccess: () {},
+      ),
+    );
+    
+    if (result != null && result != false && mounted) {
+      int? newProductId;
+      if (result is int) {
+        newProductId = result;
+      } else if (result == true) {
+        // اگر true برگردانده شد، از روش fallback استفاده می‌کنیم
+      }
+      
+      // اگر ID کالای جدید را داریم، مستقیماً آن را جستجو و انتخاب کنیم
+      if (newProductId != null) {
+        try {
+          final product = await _service.getProduct(
+            businessId: widget.businessId,
+            productId: newProductId,
+          );
+          if (product.isNotEmpty && mounted) {
+            _select(product);
+            return;
+          }
+        } catch (_) {
+          // اگر خطا رخ داد، به روش قبلی برمی‌گردیم
+        }
+      }
+      
+      // Refresh لیست و پیدا کردن کالای جدید
+      await _loadRecent();
+      
+      // پیدا کردن کالای جدید (احتمالاً آخرین آیتم در لیست یا آیتمی با بیشترین ID)
+      if (_items.isNotEmpty) {
+        // مرتب‌سازی بر اساس ID (بزرگترین = جدیدترین)
+        final sortedItems = List<Map<String, dynamic>>.from(_items);
+        sortedItems.sort((a, b) {
+          final idA = (a['id'] as num?)?.toInt() ?? 0;
+          final idB = (b['id'] as num?)?.toInt() ?? 0;
+          return idB.compareTo(idA);
+        });
+        _select(sortedItems.first);
+      }
+    }
+  }
+
   void _openPicker() {
     showModalBottomSheet(
       context: context,
@@ -121,6 +185,13 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
                   children: [
                     Text(widget.label, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
                     const Spacer(),
+                    if (widget.authStore != null)
+                      IconButton(
+                        onPressed: () => _addNewProduct(ctx),
+                        icon: const Icon(Icons.add),
+                        tooltip: 'افزودن کالا/خدمت جدید',
+                        color: theme.colorScheme.primary,
+                      ),
                     IconButton(onPressed: () => Navigator.pop(ctx), icon: const Icon(Icons.close)),
                   ],
                 ),

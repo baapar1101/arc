@@ -1,7 +1,10 @@
+import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'dart:math' as math;
 import 'package:hesabix_ui/l10n/app_localizations.dart';
+import 'package:hesabix_ui/utils/web/web_utils.dart' as web_utils;
 import '../../core/auth_store.dart';
 import '../../core/calendar_controller.dart';
 import '../../widgets/permission/access_denied_page.dart';
@@ -25,7 +28,9 @@ import '../../utils/number_formatters.dart';
 import '../../utils/number_normalizer.dart';
 import '../../services/currency_service.dart';
 import '../../core/api_client.dart';
+import '../../services/business_api_service.dart';
 import '../../services/person_service.dart';
+import '../../services/report_template_service.dart';
 import '../../models/invoice_transaction.dart';
 import '../../models/invoice_line_item.dart';
 import '../../services/invoice_service.dart';
@@ -81,11 +86,16 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
   
   // تنظیمات چاپ و ارسال
   bool _printAfterSave = false;
-  String? _selectedPrinter;
   String? _selectedPaperSize;
-  bool _isOfficialInvoice = false;
+  bool _showStampOnPrint = true;
   String? _selectedPrintTemplate;
+  String? _selectedPaperOrientation = 'landscape';
   bool _sendToTaxFolder = false;
+  bool _hasUserCustomizedSettings = false;
+  Map<String, dynamic>? _businessPrintSettingsDefault;
+  Map<String, Map<String, dynamic>> _businessPrintSettingsPerType = {};
+  List<Map<String, dynamic>> _availablePrintTemplates = const [];
+  bool _isLoadingPrintTemplates = false;
   
   // تراکنش‌های فاکتور
   List<InvoiceTransaction> _transactions = [];
@@ -207,6 +217,10 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
     _installmentPeriodDaysController = TextEditingController();
     // بارگذاری پلن‌های فعال اقساط
     _loadInstallmentPlans();
+    _loadLocalSettingsForCurrentType();
+    // بارگذاری تنظیمات چاپ کسب‌وکار
+    _loadPrintSettings();
+    _loadPrintTemplates();
   }
 
   void _attachTabListener() {
@@ -228,6 +242,174 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
         _installmentPlans = items;
       });
     } catch (_) {}
+  }
+
+  Future<void> _loadPrintTemplates() async {
+    setState(() {
+      _isLoadingPrintTemplates = true;
+    });
+    try {
+      final service = ReportTemplateService(ApiClient());
+      final templates = await service.listTemplates(
+        businessId: widget.businessId,
+        moduleKey: 'invoices',
+        subtype: 'detail',
+        status: 'published',
+      );
+      if (!mounted) return;
+      setState(() {
+        _availablePrintTemplates = templates;
+      });
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _availablePrintTemplates = const [];
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoadingPrintTemplates = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _loadPrintSettings() async {
+    try {
+      final data = await BusinessApiService.getPrintSettings(widget.businessId);
+      final defaultSettings = (data['default'] as Map?)?.cast<String, dynamic>();
+      final perTypeRaw = (data['per_type'] as Map?)?.cast<String, dynamic>();
+      final perType = <String, Map<String, dynamic>>{};
+      perTypeRaw?.forEach((key, value) {
+        if (value is Map) {
+          perType[key] = value.cast<String, dynamic>();
+        }
+      });
+      if (!mounted) return;
+      setState(() {
+        _businessPrintSettingsDefault = defaultSettings;
+        _businessPrintSettingsPerType = perType;
+      });
+      _applyPrintSettingsForCurrentType();
+    } catch (e) {
+      if (mounted) {
+        _showError('خطا در دریافت تنظیمات چاپ: $e');
+      }
+    } finally {
+      // no-op
+    }
+  }
+
+  void _applyPrintSettingsForCurrentType() {
+    if (_hasUserCustomizedSettings) {
+      return;
+    }
+    final selectedType = _selectedInvoiceType;
+    Map<String, dynamic>? target;
+    if (selectedType != null) {
+      final key = _convertInvoiceTypeToApi(selectedType);
+      target = _businessPrintSettingsPerType[key];
+    }
+    target ??= _businessPrintSettingsDefault;
+    if (target == null) {
+      return;
+    }
+    final showStamp = target['show_stamp'];
+    if (showStamp is bool) {
+      setState(() {
+        _showStampOnPrint = showStamp;
+      });
+    }
+    _loadLocalSettingsForCurrentType();
+  }
+
+  void _loadLocalSettingsForCurrentType() {
+    if (!kIsWeb) return;
+    final key = _currentSettingsStorageKey();
+    if (key == null) return;
+    final raw = web_utils.getLocalStorageValue(key);
+    if (raw == null || raw.isEmpty) {
+      return;
+    }
+    try {
+      final Map<String, dynamic> data = jsonDecode(raw);
+      setState(() {
+        final savedPrintAfterSave = _parseBool(data['print_after_save']);
+        if (savedPrintAfterSave != null) {
+          _printAfterSave = savedPrintAfterSave;
+        }
+        _selectedPaperSize = data['paper_size']?.toString();
+        _selectedPrintTemplate = data['print_template']?.toString();
+        final orientation = data['orientation']?.toString();
+        if (orientation != null && orientation.isNotEmpty) {
+          _selectedPaperOrientation = orientation;
+        }
+        final showStamp = _parseBool(data['show_stamp']);
+        if (showStamp != null) {
+          _showStampOnPrint = showStamp;
+        }
+        final sendTax = _parseBool(data['send_to_tax_folder']);
+        if (sendTax != null) {
+          _sendToTaxFolder = sendTax;
+        }
+        final postInventory = _parseBool(data['post_inventory']);
+        if (postInventory != null) {
+          _postInventory = postInventory;
+        }
+        final ignoreCredit = _parseBool(data['ignore_credit_check']);
+        if (ignoreCredit != null) {
+          _ignoreCreditCheck = ignoreCredit;
+        }
+        final useInstallments = _parseBool(data['use_installments']);
+        if (useInstallments != null) {
+          _useInstallments = useInstallments;
+        }
+      });
+      _hasUserCustomizedSettings = true;
+    } catch (_) {}
+  }
+
+  void _saveLocalSettings() {
+    if (!kIsWeb) return;
+    final key = _currentSettingsStorageKey();
+    if (key == null) return;
+    final data = jsonEncode({
+      'print_after_save': _printAfterSave,
+      'paper_size': _selectedPaperSize,
+      'print_template': _selectedPrintTemplate,
+      'orientation': _selectedPaperOrientation,
+      'show_stamp': _showStampOnPrint,
+      'send_to_tax_folder': _sendToTaxFolder,
+      'post_inventory': _postInventory,
+      'ignore_credit_check': _ignoreCreditCheck,
+      'use_installments': _useInstallments,
+    });
+    web_utils.setLocalStorageValue(key, data);
+  }
+
+  bool? _parseBool(dynamic value) {
+    if (value is bool) return value;
+    if (value is num) return value != 0;
+    if (value is String) {
+      final normalized = value.trim().toLowerCase();
+      if (normalized.isEmpty) return null;
+      if (normalized == 'true' || normalized == '1' || normalized == 'yes' || normalized == 'on') {
+        return true;
+      }
+      if (normalized == 'false' || normalized == '0' || normalized == 'no' || normalized == 'off') {
+        return false;
+      }
+    }
+    return null;
+  }
+
+  String? _currentSettingsStorageKey() {
+    final type = _selectedInvoiceType;
+    if (type == null) {
+      return null;
+    }
+    return 'invoice_settings_${widget.businessId}_${type.value}';
   }
 
   Future<void> _loadCustomerCreditIfNeeded() async {
@@ -1043,6 +1225,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                           onTypeChanged: (type) {
                                   setState(() {
                                     _selectedInvoiceType = type;
+                                  _hasUserCustomizedSettings = false;
                                     // پاک کردن bom_ids در صورت تغییر نوع فاکتور
                                     if (type != InvoiceType.production) {
                                       _bomIds.clear();
@@ -1066,6 +1249,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                                       _attachTabListener();
                                     }
                                   });
+                                  _applyPrintSettingsForCurrentType();
                                 },
                           isDraft: _isDraft,
                           onDraftChanged: (isDraft) {
@@ -1074,6 +1258,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                               // اگر پیش‌فاکتور فعال شد، اقساط را غیرفعال کن
                               if (isDraft && _useInstallments) {
                                 _useInstallments = false;
+                                _hasUserCustomizedSettings = true;
                                 _numInstallments = null;
                                 _downPayment = null;
                                 _interestRate = null;
@@ -1088,6 +1273,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                                 }
                               }
                             });
+                            _saveLocalSettings();
                           },
                           isRequired: true,
                           label: 'نوع فاکتور',
@@ -1340,6 +1526,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                                 onTypeChanged: (type) {
                                   setState(() {
                                     _selectedInvoiceType = type;
+                                    _hasUserCustomizedSettings = false;
                                     // پاک کردن bom_ids در صورت تغییر نوع فاکتور
                                     if (type != InvoiceType.production) {
                                       _bomIds.clear();
@@ -1363,6 +1550,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                                       _attachTabListener();
                                     }
                                   });
+                                  _applyPrintSettingsForCurrentType();
                                 },
                                 isDraft: _isDraft,
                                 onDraftChanged: (isDraft) {
@@ -1678,8 +1866,14 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
 
     try {
       final service = InvoiceService(apiClient: ApiClient());
-      await service.createInvoice(businessId: widget.businessId, payload: payload);
-      if (!mounted) return;
+      final result = await service.createInvoice(businessId: widget.businessId, payload: payload);
+      final invoiceId = (result['id'] as num?)?.toInt();
+      final invoiceCode = result['code']?.toString();
+
+      if (!mounted) {
+        return;
+      }
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(t.invoiceCreatedSuccess),
@@ -1687,6 +1881,19 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
           duration: const Duration(seconds: 2),
         ),
       );
+
+      if (_printAfterSave) {
+        if (invoiceId == null) {
+          _showError('شناسه فاکتور برای چاپ در دسترس نیست');
+        } else {
+          await _printInvoiceAfterSave(
+            service: service,
+            invoiceId: invoiceId,
+            invoiceCode: invoiceCode,
+          );
+        }
+      }
+
       // هدایت به لیست فاکتورها بعد از ثبت موفق
       if (mounted) {
         context.goNamed(
@@ -1699,6 +1906,65 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
     } catch (e) {
       _showError(t.saveInvoiceErrorWithMessage(e.toString()));
     }
+  }
+
+  Future<void> _printInvoiceAfterSave({
+    required InvoiceService service,
+    required int invoiceId,
+    String? invoiceCode,
+  }) async {
+    try {
+      final query = <String, dynamic>{};
+      final paperSize = _selectedPaperSize;
+      if (paperSize != null && paperSize.isNotEmpty) {
+        query['paper_size'] = paperSize;
+      }
+      final orientation = _selectedPaperOrientation;
+      if (orientation != null && orientation.isNotEmpty) {
+        query['orientation'] = orientation;
+      }
+      final templateId = int.tryParse(_selectedPrintTemplate ?? '');
+      if (templateId != null) {
+        query['template_id'] = templateId;
+      }
+      query['show_stamp'] = _showStampOnPrint ? 'true' : 'false';
+
+      final bytes = await service.downloadInvoicePdf(
+        businessId: widget.businessId,
+        invoiceId: invoiceId,
+        query: query.isEmpty ? null : query,
+      );
+      await _saveInvoicePdf(bytes, invoiceCode ?? 'invoice_$invoiceId');
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('فایل PDF فاکتور دانلود شد'),
+          backgroundColor: Theme.of(context).colorScheme.primary,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      _showError('خطا در چاپ فاکتور: $e');
+    }
+  }
+
+  Future<void> _saveInvoicePdf(List<int> bytes, String filename) async {
+    if (!kIsWeb) {
+      throw UnsupportedError('چاپ فاکتور فعلاً فقط در نسخه وب در دسترس است');
+    }
+    final trimmed = filename.trim();
+    final safeName = trimmed.isEmpty ? 'invoice.pdf' : trimmed;
+    final finalName = safeName.toLowerCase().endsWith('.pdf') ? safeName : '$safeName.pdf';
+    await web_utils.saveBytesAsFileWeb(
+      bytes,
+      finalName,
+      mimeType: 'application/pdf',
+    );
+  }
+
+  String _convertInvoiceTypeToApi(InvoiceType type) {
+    return 'invoice_${type.value}';
   }
 
   /// نمایش هشدار برای فاکتور با مبلغ صفر
@@ -1848,11 +2114,6 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
       }
     }
 
-    // تبدیل نوع فاکتور به فرمت API
-    String _convertInvoiceTypeToApi(InvoiceType type) {
-      return 'invoice_${type.value}';
-    }
-    
     // ساخت extra_info با person_id و totals
     final extraInfo = <String, dynamic>{
       'totals': {
@@ -2100,6 +2361,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
               ],
               InvoiceLineItemsTable(
                 businessId: widget.businessId,
+                authStore: widget.authStore,
                 selectedCurrencyId: _selectedCurrencyId,
                 invoiceType: (_selectedInvoiceType?.value ?? 'sales'),
                 postInventory: _postInventory,
@@ -2163,6 +2425,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
 
   Widget _buildSettingsTab() {
     final theme = Theme.of(context);
+    final t = AppLocalizations.of(context);
     
     // بررسی اینکه آیا فاکتور فروش یا برگشت از فروش است و پیش‌نویس نیست
     final isSalesOrReturn = _selectedInvoiceType == InvoiceType.sales || 
@@ -2203,6 +2466,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                             setState(() {
                               _useInstallments = value;
                               _firstInstallmentDueDate ??= _invoiceDate ?? DateTime.now();
+                              _hasUserCustomizedSettings = true;
                               // همگام‌سازی TabController با تعداد تب‌ها پس از تغییر وضعیت اقساط
                               final newTabCount = _getTabCountForType(_selectedInvoiceType);
                               if (newTabCount != _tabController.length) {
@@ -2225,6 +2489,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                                 }
                               }
                             });
+                            _saveLocalSettings();
                           },
                         ),
                         // سایر تنظیمات اقساط به تب «اقساط» منتقل شد
@@ -2249,7 +2514,9 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                         onChanged: (value) {
                           setState(() {
                             _postInventory = value;
+                            _hasUserCustomizedSettings = true;
                           });
+                          _saveLocalSettings();
                         },
                       ),
                       const Divider(),
@@ -2259,7 +2526,13 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                           title: const Text('نادیده گرفتن اعتبار مشتری'),
                           subtitle: const Text('در صورت فعال بودن، محدودیت اعتبار برای این فاکتور اعمال نمی‌شود'),
                           value: _ignoreCreditCheck,
-                          onChanged: (value) => setState(() => _ignoreCreditCheck = value),
+                            onChanged: (value) {
+                            setState(() {
+                              _ignoreCreditCheck = value;
+                              _hasUserCustomizedSettings = true;
+                            });
+                              _saveLocalSettings();
+                            },
                         ),
                     ],
                   ),
@@ -2282,33 +2555,15 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                         onChanged: (value) {
                           setState(() {
                             _printAfterSave = value;
+                            _hasUserCustomizedSettings = true;
                           });
+                          _saveLocalSettings();
                         },
                       ),
                       
                       // تنظیمات چاپ (فقط اگر چاپ فعال باشد)
                       if (_printAfterSave) ...[
                         const Divider(),
-                        const SizedBox(height: 16),
-                        
-                        // انتخاب پرینتر
-                        DropdownButtonFormField<String>(
-                          initialValue: _selectedPrinter,
-                          decoration: const InputDecoration(
-                            labelText: 'پرینتر',
-                            border: OutlineInputBorder(),
-                          ),
-                          items: const [
-                            DropdownMenuItem(value: 'default', child: Text('پرینتر پیش‌فرض')),
-                            DropdownMenuItem(value: 'printer1', child: Text('پرینتر 1')),
-                            DropdownMenuItem(value: 'printer2', child: Text('پرینتر 2')),
-                          ],
-                          onChanged: (value) {
-                            setState(() {
-                              _selectedPrinter = value;
-                            });
-                          },
-                        ),
                         const SizedBox(height: 16),
                         
                         // انتخاب سایز کاغذ
@@ -2327,43 +2582,79 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                           onChanged: (value) {
                             setState(() {
                               _selectedPaperSize = value;
+                              _hasUserCustomizedSettings = true;
                             });
+                            _saveLocalSettings();
+                          },
+                        ),
+                        const SizedBox(height: 16),
+
+                        DropdownButtonFormField<String>(
+                          value: _selectedPaperOrientation,
+                          decoration: const InputDecoration(
+                            labelText: 'جهت چاپ',
+                            border: OutlineInputBorder(),
+                          ),
+                          items: const [
+                            DropdownMenuItem(value: 'portrait', child: Text('عمودی (Portrait)')),
+                            DropdownMenuItem(value: 'landscape', child: Text('افقی (Landscape)')),
+                          ],
+                          onChanged: (value) {
+                            setState(() {
+                              _selectedPaperOrientation = value;
+                              _hasUserCustomizedSettings = true;
+                            });
+                            _saveLocalSettings();
                           },
                         ),
                         const SizedBox(height: 16),
                         
                         // فاکتور رسمی
                         SwitchListTile(
-                          title: const Text('فاکتور رسمی'),
-                          subtitle: const Text('فاکتور با مهر و امضا رسمی چاپ شود'),
-                          value: _isOfficialInvoice,
+                          title: const Text('نمایش مهر و امضا'),
+                          subtitle: const Text('در صورت غیرفعال بودن، مهر و امضا در PDF نمایش داده نمی‌شود'),
+                          value: _showStampOnPrint,
                           onChanged: (value) {
                             setState(() {
-                              _isOfficialInvoice = value;
+                              _showStampOnPrint = value;
+                              _hasUserCustomizedSettings = true;
                             });
+                            _saveLocalSettings();
                           },
                         ),
                         const SizedBox(height: 16),
                         
                         // انتخاب قالب چاپ
-                        DropdownButtonFormField<String>(
-                          initialValue: _selectedPrintTemplate,
-                          decoration: InputDecoration(
-                            labelText: AppLocalizations.of(context).printTemplate,
-                            border: const OutlineInputBorder(),
+                        if (_isLoadingPrintTemplates) ...[
+                          const Center(child: CircularProgressIndicator()),
+                        ] else ...[
+                          DropdownButtonFormField<String?>(
+                            value: _selectedPrintTemplate,
+                            decoration: InputDecoration(
+                              labelText: t.printTemplate,
+                              border: const OutlineInputBorder(),
+                            ),
+                            items: [
+                              DropdownMenuItem<String?>(
+                                value: null,
+                                child: Text(t.noCustomTemplate),
+                              ),
+                              ..._availablePrintTemplates.map(
+                                (tpl) => DropdownMenuItem<String?>(
+                                  value: tpl['id']?.toString(),
+                                  child: Text(tpl['name']?.toString() ?? 'Template ${tpl['id']}'),
+                                ),
+                              ),
+                            ],
+                            onChanged: (value) {
+                              setState(() {
+                                _selectedPrintTemplate = value;
+                                _hasUserCustomizedSettings = true;
+                              });
+                              _saveLocalSettings();
+                            },
                           ),
-                          items: [
-                            DropdownMenuItem(value: 'standard', child: Text(AppLocalizations.of(context).templateStandard)),
-                            DropdownMenuItem(value: 'compact', child: Text(AppLocalizations.of(context).templateCompact)),
-                            DropdownMenuItem(value: 'detailed', child: Text(AppLocalizations.of(context).templateDetailed)),
-                            DropdownMenuItem(value: 'custom', child: Text(AppLocalizations.of(context).templateCustom)),
-                          ],
-                          onChanged: (value) {
-                            setState(() {
-                              _selectedPrintTemplate = value;
-                            });
-                          },
-                        ),
+                        ],
                       ],
                     ],
                   ),
@@ -2387,7 +2678,9 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                           onChanged: (value) {
                             setState(() {
                               _sendToTaxFolder = value;
+                              _hasUserCustomizedSettings = true;
                             });
+                            _saveLocalSettings();
                           },
                         ),
                       ],

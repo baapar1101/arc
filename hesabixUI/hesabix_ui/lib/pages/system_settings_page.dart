@@ -135,6 +135,13 @@ class _SystemSettingsPageState extends State<SystemSettingsPage> {
         color: const Color(0xFF5E35B1),
         route: '/user/profile/system-settings/ai-prompts',
       ),
+      SettingsItem(
+        title: 'کدهای مالیاتی کالا',
+        description: 'جستجو و ایمپورت لیست جدید از فایل XML',
+        icon: Icons.qr_code_2_outlined,
+        color: const Color(0xFF00695C),
+        route: '/user/profile/system-settings/tax-product-codes',
+      ),
     ];
   }
 

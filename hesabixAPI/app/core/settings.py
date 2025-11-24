@@ -45,6 +45,9 @@ class Settings(BaseSettings):
 	telegram_bot_username: str | None = None  # optional, used to build deep-links
 	telegram_webhook_secret: str | None = None
 	telegram_secret_header: str | None = None  # optional header to validate Telegram webhook
+	telegram_proxy_enabled: bool | None = None
+	telegram_proxy_base_url: str | None = None
+	telegram_proxy_api_key: str | None = None
 	# SMS (optional)
 	sms_provider_name: str | None = None  # e.g., "twilio" or custom
 	sms_api_key: str | None = None
@@ -57,6 +60,13 @@ class Settings(BaseSettings):
 	share_link_public_base_url: str = "https://app.hesabix.com/p"
 	share_link_secret: str = "change_me_share_link"
 	share_link_public_app_url: str = "https://app.hesabix.com/public"
+
+	# Tax system (Moadian) integration
+	tax_system_force_simulation: bool = True
+	tax_system_timeout_seconds: int = 45
+	tax_system_sandbox_base_url: str = "https://sandboxrc.tax.gov.ir"
+	tax_system_production_base_url: str = "https://tp.tax.gov.ir"
+	tax_system_user_agent: str = "HesabixTaxClient/1.0"
 
 	@property
 	def mysql_dsn(self) -> str:

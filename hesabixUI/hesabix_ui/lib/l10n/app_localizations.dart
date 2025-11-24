@@ -5990,6 +5990,24 @@ abstract class AppLocalizations {
   /// **'Tax unit id'**
   String get taxUnitId;
 
+  /// No description provided for @vatColumn.
+  ///
+  /// In en, this message translates to:
+  /// **'VAT'**
+  String get vatColumn;
+
+  /// Formatted VAT percent value
+  ///
+  /// In en, this message translates to:
+  /// **'{value}%'**
+  String taxVatPercent(Object value);
+
+  /// No description provided for @taxVatUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Not specified'**
+  String get taxVatUnknown;
+
   /// No description provided for @bulkPriceUpdateTitle.
   ///
   /// In en, this message translates to:
@@ -7790,6 +7808,36 @@ abstract class AppLocalizations {
   /// **'Exactly as registered in your vendor panel.'**
   String get notificationsFieldSmsSenderHint;
 
+  /// No description provided for @notificationsProxySectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Telegram proxy'**
+  String get notificationsProxySectionTitle;
+
+  /// No description provided for @notificationsProxySectionSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'When servers are hosted inside Iran, enable the proxy to route Telegram traffic through an external relay.'**
+  String get notificationsProxySectionSubtitle;
+
+  /// No description provided for @notificationsProxyEnableLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable Telegram proxy'**
+  String get notificationsProxyEnableLabel;
+
+  /// No description provided for @notificationsFieldTelegramProxyBaseUrl.
+  ///
+  /// In en, this message translates to:
+  /// **'Proxy base URL'**
+  String get notificationsFieldTelegramProxyBaseUrl;
+
+  /// No description provided for @notificationsFieldTelegramProxyApiKey.
+  ///
+  /// In en, this message translates to:
+  /// **'Proxy access key'**
+  String get notificationsFieldTelegramProxyApiKey;
+
   /// No description provided for @notificationsAdvancedRestartHint.
   ///
   /// In en, this message translates to:
@@ -8761,6 +8809,570 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Review invoices before sending them to the tax system.'**
   String get taxWorkspaceSubtitle;
+
+  /// No description provided for @taxIntegrationTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Tax system integration'**
+  String get taxIntegrationTitle;
+
+  /// No description provided for @taxIntegrationSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage credentials and keys required to connect to the national tax platform.'**
+  String get taxIntegrationSubtitle;
+
+  /// No description provided for @taxSettingsTabConnection.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection & basics'**
+  String get taxSettingsTabConnection;
+
+  /// No description provided for @taxSettingsTabKeys.
+  ///
+  /// In en, this message translates to:
+  /// **'Keys & certificates'**
+  String get taxSettingsTabKeys;
+
+  /// No description provided for @taxSettingsTabDataQuality.
+  ///
+  /// In en, this message translates to:
+  /// **'Data quality'**
+  String get taxSettingsTabDataQuality;
+
+  /// No description provided for @taxSettingsTabGuide.
+  ///
+  /// In en, this message translates to:
+  /// **'Guide'**
+  String get taxSettingsTabGuide;
+
+  /// No description provided for @taxGuideIntroTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'How to complete the Tax System setup?'**
+  String get taxGuideIntroTitle;
+
+  /// No description provided for @taxGuideIntroDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'This guide walks through the entire integration flow with the Iranian Taxpayers System in the new Hesabix version—from key generation to data quality checks and invoice submission.'**
+  String get taxGuideIntroDescription;
+
+  /// No description provided for @taxGuidePrereqTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Prerequisites before you begin'**
+  String get taxGuidePrereqTitle;
+
+  /// No description provided for @taxGuidePrereqItem1.
+  ///
+  /// In en, this message translates to:
+  /// **'Access to the “Tax System” menu as a business admin'**
+  String get taxGuidePrereqItem1;
+
+  /// No description provided for @taxGuidePrereqItem2.
+  ///
+  /// In en, this message translates to:
+  /// **'Accurate registration data (national ID, economic code, corporate email)'**
+  String get taxGuidePrereqItem2;
+
+  /// No description provided for @taxGuidePrereqItem3.
+  ///
+  /// In en, this message translates to:
+  /// **'Active access to your taxpayer workspace on my.tax.gov.ir'**
+  String get taxGuidePrereqItem3;
+
+  /// No description provided for @taxGuideStep1Title.
+  ///
+  /// In en, this message translates to:
+  /// **'1) Generate keys inside Hesabix'**
+  String get taxGuideStep1Title;
+
+  /// No description provided for @taxGuideStep1Description.
+  ///
+  /// In en, this message translates to:
+  /// **'Use the “Generate new keys” card to create the private/public key pair and CSR.'**
+  String get taxGuideStep1Description;
+
+  /// No description provided for @taxGuideStep1Bullet1.
+  ///
+  /// In en, this message translates to:
+  /// **'Open the Keys & Certificates tab and tap the generate button.'**
+  String get taxGuideStep1Bullet1;
+
+  /// No description provided for @taxGuideStep1Bullet2.
+  ///
+  /// In en, this message translates to:
+  /// **'Provide the exact taxpayer type and national ID.'**
+  String get taxGuideStep1Bullet2;
+
+  /// No description provided for @taxGuideStep1Bullet3.
+  ///
+  /// In en, this message translates to:
+  /// **'Persian/English names and email must match the tax records.'**
+  String get taxGuideStep1Bullet3;
+
+  /// No description provided for @taxGuideStep2Title.
+  ///
+  /// In en, this message translates to:
+  /// **'2) Download and store securely'**
+  String get taxGuideStep2Title;
+
+  /// No description provided for @taxGuideStep2Description.
+  ///
+  /// In en, this message translates to:
+  /// **'Keys are shown only once; store them safely.'**
+  String get taxGuideStep2Description;
+
+  /// No description provided for @taxGuideStep2Bullet1.
+  ///
+  /// In en, this message translates to:
+  /// **'Download the key files and keep them in offline, encrypted storage.'**
+  String get taxGuideStep2Bullet1;
+
+  /// No description provided for @taxGuideStep2Bullet2.
+  ///
+  /// In en, this message translates to:
+  /// **'Never share the private key outside the tax integration team.'**
+  String get taxGuideStep2Bullet2;
+
+  /// No description provided for @taxGuideStep2Bullet3.
+  ///
+  /// In en, this message translates to:
+  /// **'If the private key is lost you must regenerate the entire pair.'**
+  String get taxGuideStep2Bullet3;
+
+  /// No description provided for @taxGuideStep3Title.
+  ///
+  /// In en, this message translates to:
+  /// **'3) Register the public key on my.tax.gov.ir'**
+  String get taxGuideStep3Title;
+
+  /// No description provided for @taxGuideStep3Description.
+  ///
+  /// In en, this message translates to:
+  /// **'You must upload the Public Key to obtain the tax memory ID.'**
+  String get taxGuideStep3Description;
+
+  /// No description provided for @taxGuideStep3Bullet1.
+  ///
+  /// In en, this message translates to:
+  /// **'Log into my.tax.gov.ir and navigate to Case Access > Enrollment > Tax Memory ID.'**
+  String get taxGuideStep3Bullet1;
+
+  /// No description provided for @taxGuideStep3Bullet2.
+  ///
+  /// In en, this message translates to:
+  /// **'Select “By taxpayer” and upload the generated Public Key file.'**
+  String get taxGuideStep3Bullet2;
+
+  /// No description provided for @taxGuideStep3Bullet3.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy the issued memory ID and paste it back into Hesabix.'**
+  String get taxGuideStep3Bullet3;
+
+  /// No description provided for @taxGuideStep4Title.
+  ///
+  /// In en, this message translates to:
+  /// **'4) Complete the connection form in Hesabix'**
+  String get taxGuideStep4Title;
+
+  /// No description provided for @taxGuideStep4Description.
+  ///
+  /// In en, this message translates to:
+  /// **'Tax memory ID, economic code and private key are mandatory under the Connection tab.'**
+  String get taxGuideStep4Description;
+
+  /// No description provided for @taxGuideStep4Bullet1.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the ID and economic code without extra spaces.'**
+  String get taxGuideStep4Bullet1;
+
+  /// No description provided for @taxGuideStep4Bullet2.
+  ///
+  /// In en, this message translates to:
+  /// **'Paste the PEM private key and optionally store the Public Key and CSR.'**
+  String get taxGuideStep4Bullet2;
+
+  /// No description provided for @taxGuideStep4Bullet3.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable sandbox mode only for staging/testing environments.'**
+  String get taxGuideStep4Bullet3;
+
+  /// No description provided for @taxGuideStep5Title.
+  ///
+  /// In en, this message translates to:
+  /// **'5) Request the intermediate certificate via CSR'**
+  String get taxGuideStep5Title;
+
+  /// No description provided for @taxGuideStep5Description.
+  ///
+  /// In en, this message translates to:
+  /// **'Legal entities must submit the CSR to the national certificate authority.'**
+  String get taxGuideStep5Description;
+
+  /// No description provided for @taxGuideStep5Bullet1.
+  ///
+  /// In en, this message translates to:
+  /// **'Visit gica.ir and choose the CSR-based request option.'**
+  String get taxGuideStep5Bullet1;
+
+  /// No description provided for @taxGuideStep5Bullet2.
+  ///
+  /// In en, this message translates to:
+  /// **'Fill in the company details and pay the issuance fee.'**
+  String get taxGuideStep5Bullet2;
+
+  /// No description provided for @taxGuideStep5Bullet3.
+  ///
+  /// In en, this message translates to:
+  /// **'After in-person verification upload the issued certificate into Hesabix.'**
+  String get taxGuideStep5Bullet3;
+
+  /// No description provided for @taxGuideStep6Title.
+  ///
+  /// In en, this message translates to:
+  /// **'6) Assign product/service tax codes'**
+  String get taxGuideStep6Title;
+
+  /// No description provided for @taxGuideStep6Description.
+  ///
+  /// In en, this message translates to:
+  /// **'Invoices will be rejected if items lack tax code and unit.'**
+  String get taxGuideStep6Description;
+
+  /// No description provided for @taxGuideStep6Bullet1.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit each item under Products & Services and add the 13-digit tax code.'**
+  String get taxGuideStep6Bullet1;
+
+  /// No description provided for @taxGuideStep6Bullet2.
+  ///
+  /// In en, this message translates to:
+  /// **'Use the public code list from stuffid.tax.gov.ir or request dedicated codes.'**
+  String get taxGuideStep6Bullet2;
+
+  /// No description provided for @taxGuideStep6Bullet3.
+  ///
+  /// In en, this message translates to:
+  /// **'Service codes can be obtained from portal.gs1-ir.org.'**
+  String get taxGuideStep6Bullet3;
+
+  /// No description provided for @taxGuideStep7Title.
+  ///
+  /// In en, this message translates to:
+  /// **'7) Run data quality checks before submission'**
+  String get taxGuideStep7Title;
+
+  /// No description provided for @taxGuideStep7Description.
+  ///
+  /// In en, this message translates to:
+  /// **'Review the Data Quality tab and the tax workspace before sending invoices.'**
+  String get taxGuideStep7Description;
+
+  /// No description provided for @taxGuideStep7Bullet1.
+  ///
+  /// In en, this message translates to:
+  /// **'The Data Quality tab highlights missing fields for products, customers and invoices.'**
+  String get taxGuideStep7Bullet1;
+
+  /// No description provided for @taxGuideStep7Bullet2.
+  ///
+  /// In en, this message translates to:
+  /// **'Add invoices to the tax workspace first and fix validation errors inline.'**
+  String get taxGuideStep7Bullet2;
+
+  /// No description provided for @taxGuideStep7Bullet3.
+  ///
+  /// In en, this message translates to:
+  /// **'Send single or bulk invoices only after the checklist is green.'**
+  String get taxGuideStep7Bullet3;
+
+  /// No description provided for @taxGuideResourcesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Shortcuts and resources'**
+  String get taxGuideResourcesTitle;
+
+  /// No description provided for @taxGuideResourcesWorkspace.
+  ///
+  /// In en, this message translates to:
+  /// **'Tax workspace: available under Sales > Tax Workspace.'**
+  String get taxGuideResourcesWorkspace;
+
+  /// No description provided for @taxGuideResourcesProducts.
+  ///
+  /// In en, this message translates to:
+  /// **'Products & Services: update tax codes via the same menu or Excel import.'**
+  String get taxGuideResourcesProducts;
+
+  /// No description provided for @taxGuideResourcesSupport.
+  ///
+  /// In en, this message translates to:
+  /// **'For integration issues review the Tax Settings logs or open a support ticket.'**
+  String get taxGuideResourcesSupport;
+
+  /// No description provided for @taxMemoryIdLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Tax memory ID'**
+  String get taxMemoryIdLabel;
+
+  /// No description provided for @taxEconomicCodeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Economic code'**
+  String get taxEconomicCodeLabel;
+
+  /// No description provided for @taxSandboxModeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Sandbox mode'**
+  String get taxSandboxModeLabel;
+
+  /// No description provided for @taxSandboxModeSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'When enabled, requests are sent to the sandbox environment.'**
+  String get taxSandboxModeSubtitle;
+
+  /// No description provided for @taxPrivateKeyLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Private key (PEM)'**
+  String get taxPrivateKeyLabel;
+
+  /// No description provided for @taxPublicKeyLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Public key (optional)'**
+  String get taxPublicKeyLabel;
+
+  /// No description provided for @taxCertificateLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Digital certificate (optional)'**
+  String get taxCertificateLabel;
+
+  /// No description provided for @taxCertificateRequestLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Certificate request (CSR)'**
+  String get taxCertificateRequestLabel;
+
+  /// No description provided for @taxGenerateKeys.
+  ///
+  /// In en, this message translates to:
+  /// **'Generate new keys'**
+  String get taxGenerateKeys;
+
+  /// No description provided for @taxMemoryIdRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Tax memory ID is required'**
+  String get taxMemoryIdRequired;
+
+  /// No description provided for @taxEconomicCodeRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Economic code is required'**
+  String get taxEconomicCodeRequired;
+
+  /// No description provided for @taxPrivateKeyRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Private key is required'**
+  String get taxPrivateKeyRequired;
+
+  /// No description provided for @taxKeysGenerated.
+  ///
+  /// In en, this message translates to:
+  /// **'Keys generated successfully'**
+  String get taxKeysGenerated;
+
+  /// No description provided for @taxSettingsSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Tax integration settings saved'**
+  String get taxSettingsSaved;
+
+  /// No description provided for @taxLastUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'Last updated: {date}'**
+  String taxLastUpdated(String date);
+
+  /// No description provided for @taxPersonTypeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Taxpayer type'**
+  String get taxPersonTypeLabel;
+
+  /// No description provided for @taxPersonTypeNatural.
+  ///
+  /// In en, this message translates to:
+  /// **'Individual'**
+  String get taxPersonTypeNatural;
+
+  /// No description provided for @taxPersonTypeLegal.
+  ///
+  /// In en, this message translates to:
+  /// **'Legal entity'**
+  String get taxPersonTypeLegal;
+
+  /// No description provided for @taxNationalIdLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Taxpayer national ID'**
+  String get taxNationalIdLabel;
+
+  /// No description provided for @taxLegalNameFaLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Persian company name'**
+  String get taxLegalNameFaLabel;
+
+  /// No description provided for @taxLegalNameEnLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'English company name'**
+  String get taxLegalNameEnLabel;
+
+  /// No description provided for @taxLegalEmailLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Corporate email'**
+  String get taxLegalEmailLabel;
+
+  /// No description provided for @taxDataQualityTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Data quality check'**
+  String get taxDataQualityTitle;
+
+  /// No description provided for @taxDataQualitySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Review missing tax data before submitting invoices.'**
+  String get taxDataQualitySubtitle;
+
+  /// No description provided for @taxDataQualityReload.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh report'**
+  String get taxDataQualityReload;
+
+  /// No description provided for @taxDataQualityProductsHeader.
+  ///
+  /// In en, this message translates to:
+  /// **'Products & services'**
+  String get taxDataQualityProductsHeader;
+
+  /// No description provided for @taxDataQualityPersonsHeader.
+  ///
+  /// In en, this message translates to:
+  /// **'Persons & customers'**
+  String get taxDataQualityPersonsHeader;
+
+  /// No description provided for @taxDataQualityMissingTaxCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Items missing tax code'**
+  String get taxDataQualityMissingTaxCode;
+
+  /// No description provided for @taxDataQualityMissingTaxUnit.
+  ///
+  /// In en, this message translates to:
+  /// **'Items missing tax unit'**
+  String get taxDataQualityMissingTaxUnit;
+
+  /// No description provided for @taxDataQualityMissingNationalId.
+  ///
+  /// In en, this message translates to:
+  /// **'Persons missing national ID'**
+  String get taxDataQualityMissingNationalId;
+
+  /// No description provided for @taxDataQualityMissingEconomicId.
+  ///
+  /// In en, this message translates to:
+  /// **'Persons missing economic ID'**
+  String get taxDataQualityMissingEconomicId;
+
+  /// No description provided for @taxDataQualitySamples.
+  ///
+  /// In en, this message translates to:
+  /// **'Samples'**
+  String get taxDataQualitySamples;
+
+  /// No description provided for @taxDataQualityNoSamples.
+  ///
+  /// In en, this message translates to:
+  /// **'No samples available.'**
+  String get taxDataQualityNoSamples;
+
+  /// No description provided for @taxDataQualityNoIssues.
+  ///
+  /// In en, this message translates to:
+  /// **'All good! No pending data issues.'**
+  String get taxDataQualityNoIssues;
+
+  /// No description provided for @taxDataQualityNoData.
+  ///
+  /// In en, this message translates to:
+  /// **'No report to display.'**
+  String get taxDataQualityNoData;
+
+  /// No description provided for @taxDataQualityFetchError.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to fetch quality report: {error}'**
+  String taxDataQualityFetchError(String error);
+
+  /// No description provided for @taxDataQualityTaxCodeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Tax code'**
+  String get taxDataQualityTaxCodeLabel;
+
+  /// No description provided for @taxDataQualityTaxUnitLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Tax unit'**
+  String get taxDataQualityTaxUnitLabel;
+
+  /// No description provided for @taxDataQualityNationalIdLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'National ID'**
+  String get taxDataQualityNationalIdLabel;
+
+  /// No description provided for @taxDataQualityEconomicIdLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Economic ID'**
+  String get taxDataQualityEconomicIdLabel;
+
+  /// No description provided for @taxValidationIssuesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Tax validation issues'**
+  String get taxValidationIssuesTitle;
+
+  /// No description provided for @taxValidationIssuesDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Resolve the following items before sending invoices to the tax platform.'**
+  String get taxValidationIssuesDescription;
+
+  /// No description provided for @taxValidationIssuesEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No issue details provided.'**
+  String get taxValidationIssuesEmpty;
 
   /// No description provided for @taxAddToWorkspaceSingle.
   ///

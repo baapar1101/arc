@@ -247,8 +247,11 @@ class _PersonComboboxWidgetState extends State<PersonComboboxWidget> {
     widget.onChanged(person);
   }
 
-  Future<void> _addNewPerson() async {
-    final result = await showDialog<bool>(
+  Future<void> _addNewPerson(BuildContext bottomSheetContext) async {
+    // بستن bottom sheet قبل از باز کردن dialog
+    Navigator.pop(bottomSheetContext);
+
+    final result = await showDialog<Person?>(
       context: context,
       builder: (context) => PersonFormDialog(
         businessId: widget.businessId,
@@ -256,14 +259,23 @@ class _PersonComboboxWidgetState extends State<PersonComboboxWidget> {
       ),
     );
     
-    if (result == true && mounted) {
-      // Refresh لیست
+    if (result != null && mounted) {
+      // اگر Person ایجاد شده را دریافت کردیم، مستقیماً آن را انتخاب کنیم
+      _selectPerson(result);
+    } else if (result == true && mounted) {
+      // Fallback: اگر true برگردانده شد (برای سازگاری با کد قدیمی)
+      // Refresh لیست و پیدا کردن شخص جدید
       await _performSearch(_latestQuery);
       
-      // پیدا کردن آخرین آیتم اضافه شده (احتمالاً آخرین آیتم در لیست)
+      // پیدا کردن شخص جدید (با بیشترین ID)
       if (_persons.isNotEmpty) {
-        final lastPerson = _persons.last;
-        _selectPerson(lastPerson);
+        final sortedPersons = List<Person>.from(_persons);
+        sortedPersons.sort((a, b) {
+          final idA = a.id ?? 0;
+          final idB = b.id ?? 0;
+          return idB.compareTo(idA);
+        });
+        _selectPerson(sortedPersons.first);
       }
     }
   }
@@ -291,7 +303,7 @@ class _PersonComboboxWidgetState extends State<PersonComboboxWidget> {
               label: widget.label,
               searchHint: widget.searchHint ?? 'جست‌وجو در اشخاص...',
               personTypes: widget.personTypes,
-              onAddNew: _addNewPerson,
+              onAddNew: () => _addNewPerson(context),
             );
           },
         );

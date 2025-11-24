@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 from typing import Optional
-from datetime import datetime, date, timedelta
+from datetime import datetime, date
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
 
-from adapters.db.models.document_numbering import BusinessDocumentNumberingSetting
-from adapters.db.models.document import Document
+from sqlalchemy.exc import IntegrityError
+
+from adapters.db.models.document_numbering import (
+    BusinessDocumentNumberingSetting,
+    DocumentNumberCounter,
+)
 from app.core.calendar import CalendarConverter
 
 
@@ -121,6 +125,26 @@ def _format_date(document_date: date, date_format: str, calendar_type: str) -> s
     return formatted
 
 
+def _build_bucket_key(document_date: date, calendar_type: str, reset_period: Optional[str]) -> str:
+    period = (reset_period or "never").lower()
+    dt = datetime.combine(document_date, datetime.min.time())
+    if calendar_type == "jalali":
+        cal = CalendarConverter.to_jalali(dt)
+    else:
+        cal = CalendarConverter.to_gregorian(dt)
+    year = cal["year"]
+    month = cal["month"]
+    day = cal["day"]
+
+    if period == "daily":
+        return f"{calendar_type}-D-{year:04d}{month:02d}{day:02d}"
+    if period == "monthly":
+        return f"{calendar_type}-M-{year:04d}{month:02d}"
+    if period == "yearly":
+        return f"{calendar_type}-Y-{year:04d}"
+    return f"{calendar_type}-ALL"
+
+
 def _get_next_number(
     db: Session,
     business_id: int,
@@ -130,92 +154,50 @@ def _get_next_number(
     reset_period: Optional[str],
     document_date: date,
     calendar_type: str = "gregorian",
-    separator: str = "-",
 ) -> str:
     """
-    دریافت شماره بعدی بر اساس دوره ریست
+    دریافت شماره بعدی با استفاده از جدول شمارنده
     """
-    # تعیین محدوده جستجو بر اساس reset_period
-    if reset_period == "daily":
-        date_from = document_date
-        date_to = document_date
-    elif reset_period == "monthly":
-        date_from = document_date.replace(day=1)
-        date_to = (date_from + timedelta(days=32)).replace(day=1) - timedelta(days=1)
-    elif reset_period == "yearly":
-        date_from = document_date.replace(month=1, day=1)
-        date_to = document_date.replace(month=12, day=31)
-    else:  # never
-        date_from = None
-        date_to = None
+    bucket_key = _build_bucket_key(document_date, calendar_type, reset_period)
 
-    # جستجوی آخرین سند
-    query = db.query(Document).filter(
+    counter_query = db.query(DocumentNumberCounter).filter(
         and_(
-            Document.business_id == business_id,
-            Document.document_type == document_type,
+            DocumentNumberCounter.business_id == business_id,
+            DocumentNumberCounter.document_type == document_type,
+            DocumentNumberCounter.date_bucket == bucket_key,
         )
     )
 
-    if date_from and date_to:
-        if calendar_type == "jalali" and reset_period in ["daily", "monthly", "yearly"]:
-            # برای تقویم شمسی، باید اسناد را بر اساس تاریخ شمسی فیلتر کنیم
-            query = query.filter(
-                and_(
-                    Document.document_date >= date_from,
-                    Document.document_date <= date_to,
-                )
-            )
-            # سپس در Python، اسناد را بر اساس تاریخ شمسی فیلتر می‌کنیم
-            docs = query.all()
-            dt = datetime.combine(document_date, datetime.min.time())
-            target_jalali = CalendarConverter.to_jalali(dt)
-
-            filtered_docs = []
-            for doc in docs:
-                doc_dt = datetime.combine(doc.document_date, datetime.min.time())
-                doc_jalali = CalendarConverter.to_jalali(doc_dt)
-
-                if reset_period == "daily":
-                    if (
-                        doc_jalali["year"] == target_jalali["year"]
-                        and doc_jalali["month"] == target_jalali["month"]
-                        and doc_jalali["day"] == target_jalali["day"]
-                    ):
-                        filtered_docs.append(doc)
-                elif reset_period == "monthly":
-                    if (
-                        doc_jalali["year"] == target_jalali["year"]
-                        and doc_jalali["month"] == target_jalali["month"]
-                    ):
-                        filtered_docs.append(doc)
-                elif reset_period == "yearly":
-                    if doc_jalali["year"] == target_jalali["year"]:
-                        filtered_docs.append(doc)
-
-            last_doc = max(filtered_docs, key=lambda d: d.code) if filtered_docs else None
-        else:
-            # برای میلادی یا never، از فیلتر ساده استفاده می‌کنیم
-            query = query.filter(
-                and_(
-                    Document.document_date >= date_from,
-                    Document.document_date <= date_to,
-                )
-            )
-            last_doc = query.order_by(Document.code.desc()).first()
-    else:
-        last_doc = query.order_by(Document.code.desc()).first()
-
-    if last_doc:
+    counter: DocumentNumberCounter | None = None
+    max_attempts = 5
+    for _ in range(max_attempts):
+        counter = counter_query.with_for_update().first()
+        if counter:
+            break
         try:
-            # استخراج شماره از کد آخرین سند
-            parts = last_doc.code.split(separator)
-            last_num = int(parts[-1])
-            next_num = last_num + 1
-        except Exception:
-            next_num = start_number
-    else:
+            with db.begin_nested():
+                counter = DocumentNumberCounter(
+                    business_id=business_id,
+                    document_type=document_type,
+                    date_bucket=bucket_key,
+                    last_number=start_number - 1,
+                )
+                db.add(counter)
+                db.flush()
+            break
+        except IntegrityError:
+            continue
+
+    if not counter:
+        raise RuntimeError("Failed to initialize document counter.")
+
+    next_num = counter.last_number + 1
+    if next_num < start_number:
         next_num = start_number
+
+    counter.last_number = next_num
+    counter.updated_at = datetime.utcnow()
+    db.flush()
 
     return f"{next_num:0{padding}d}"
 
@@ -278,7 +260,6 @@ def generate_document_code(
         reset_period,
         document_date,
         calendar_type,
-        separator,
     )
 
     # ترکیب نهایی

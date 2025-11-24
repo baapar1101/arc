@@ -7,6 +7,7 @@ import './product_combobox_widget.dart';
 // import './price_list_combobox_widget.dart';
 import '../../services/price_list_service.dart';
 import '../../core/api_client.dart';
+import '../../core/auth_store.dart';
 import './warehouse_combobox_widget.dart';
 import '../../utils/number_normalizer.dart';
 
@@ -17,6 +18,7 @@ class InvoiceLineItemsTable extends StatefulWidget {
   final String invoiceType; // sales | purchase | sales_return | purchase_return | ...
   final bool postInventory;
   final List<InvoiceLineItem>? initialRows; // برای مقداردهی اولیه (ویرایش فاکتور)
+  final AuthStore? authStore;
 
   const InvoiceLineItemsTable({
     super.key,
@@ -26,6 +28,7 @@ class InvoiceLineItemsTable extends StatefulWidget {
     this.invoiceType = 'sales',
     this.postInventory = true,
     this.initialRows,
+    this.authStore,
   });
 
   @override
@@ -367,6 +370,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                   height: 36,
                   child: ProductComboboxWidget(
                   businessId: widget.businessId,
+                  authStore: widget.authStore,
                   selectedProduct: item.productId != null
                       ? {
                           'id': item.productId,

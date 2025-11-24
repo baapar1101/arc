@@ -3023,6 +3023,17 @@ class AppLocalizationsFa extends AppLocalizations {
   String get taxUnitId => 'شناسه واحد مالیاتی';
 
   @override
+  String get vatColumn => 'مالیات بر ارزش افزوده';
+
+  @override
+  String taxVatPercent(Object value) {
+    return '$value٪';
+  }
+
+  @override
+  String get taxVatUnknown => 'نامشخص';
+
+  @override
   String get bulkPriceUpdateTitle => 'تغییر قیمت‌های گروهی';
 
   @override
@@ -3981,6 +3992,22 @@ class AppLocalizationsFa extends AppLocalizations {
       'دقیقاً همان مقداری که در پنل سرویس‌دهنده ثبت شده است.';
 
   @override
+  String get notificationsProxySectionTitle => 'پروکسی تلگرام';
+
+  @override
+  String get notificationsProxySectionSubtitle =>
+      'در صورت قرار داشتن سرورها در ایران، با فعال کردن پروکسی درخواست‌های تلگرام از مسیر امن بیرونی عبور می‌کند.';
+
+  @override
+  String get notificationsProxyEnableLabel => 'فعال‌سازی پروکسی تلگرام';
+
+  @override
+  String get notificationsFieldTelegramProxyBaseUrl => 'آدرس پایه پروکسی';
+
+  @override
+  String get notificationsFieldTelegramProxyApiKey => 'کلید دسترسی پروکسی';
+
+  @override
   String get notificationsAdvancedRestartHint =>
       'پس از تغییر، در صورت نیاز سرویس ارسال اعلان را در زمان کم‌ترافیک ریستارت کنید.';
 
@@ -4501,6 +4528,332 @@ class AppLocalizationsFa extends AppLocalizations {
   @override
   String get taxWorkspaceSubtitle =>
       'فاکتورها را قبل از ارسال به سامانه مودیان بررسی و مدیریت کنید.';
+
+  @override
+  String get taxIntegrationTitle => 'سامانه مودیان مالیاتی';
+
+  @override
+  String get taxIntegrationSubtitle =>
+      'اطلاعات اتصال و کلیدهای ارتباط با سامانه مودیان را مدیریت کنید.';
+
+  @override
+  String get taxSettingsTabConnection => 'اتصال و اطلاعات پایه';
+
+  @override
+  String get taxSettingsTabKeys => 'کلیدها و گواهی‌ها';
+
+  @override
+  String get taxSettingsTabDataQuality => 'کیفیت داده';
+
+  @override
+  String get taxSettingsTabGuide => 'راهنما';
+
+  @override
+  String get taxGuideIntroTitle => 'چگونه تنظیمات سامانه مودیان را تکمیل کنیم؟';
+
+  @override
+  String get taxGuideIntroDescription =>
+      'این راهنما تمام مراحل اتصال کسب‌وکار به سامانه مودیان در نسخه جدید حسابیکس را مرور می‌کند؛ از تولید کلیدها تا کنترل کیفیت داده و ارسال صورتحساب.';
+
+  @override
+  String get taxGuidePrereqTitle => 'پیش‌نیازهای قبل از شروع';
+
+  @override
+  String get taxGuidePrereqItem1 =>
+      'دسترسی کاربر اصلی کسب‌وکار به منوی «سامانه مودیان» در حسابیکس';
+
+  @override
+  String get taxGuidePrereqItem2 =>
+      'اطلاعات ثبتی صحیح (شناسه ملی، کد اقتصادی و ایمیل سازمانی معتبر)';
+
+  @override
+  String get taxGuidePrereqItem3 =>
+      'دسترسی به کارپوشه مالیاتی در سامانه my.tax.gov.ir';
+
+  @override
+  String get taxGuideStep1Title => '۱) ساخت کلیدها در حسابیکس';
+
+  @override
+  String get taxGuideStep1Description =>
+      'از کارت «تولید کلید جدید» استفاده کنید تا کلید خصوصی، عمومی و در صورت نیاز CSR را ایجاد کنید.';
+
+  @override
+  String get taxGuideStep1Bullet1 =>
+      'از برگه «کلیدها و گواهی‌ها» روی دکمه تولید کلید بزنید.';
+
+  @override
+  String get taxGuideStep1Bullet2 =>
+      'نوع شخص (حقیقی/حقوقی) و شناسه ملی را دقیق وارد کنید.';
+
+  @override
+  String get taxGuideStep1Bullet3 =>
+      'نام فارسی، نام انگلیسی و ایمیل باید با پرونده مالیاتی یکسان باشند.';
+
+  @override
+  String get taxGuideStep2Title => '۲) دانلود و نگهداری امن';
+
+  @override
+  String get taxGuideStep2Description =>
+      'پس از تولید، کلیدها فقط یک‌بار نمایش داده می‌شوند؛ آن‌ها را در جای امن نگهداری کنید.';
+
+  @override
+  String get taxGuideStep2Bullet1 =>
+      'فایل‌های کلید را دانلود و در فضای آفلاین (USB یا رمزدار) نگهداری کنید.';
+
+  @override
+  String get taxGuideStep2Bullet2 =>
+      'از اشتراک‌گذاری کلید خصوصی با افراد غیرمسئول خودداری کنید.';
+
+  @override
+  String get taxGuideStep2Bullet3 =>
+      'در صورت مفقودی کلید خصوصی باید فرآیند تولید کلید را از ابتدا طی کنید.';
+
+  @override
+  String get taxGuideStep3Title => '۳) ثبت کلید عمومی در سامانه مودیان';
+
+  @override
+  String get taxGuideStep3Description =>
+      'برای دریافت شناسه یکتای حافظه باید Public Key را در کارپوشه مالیاتی ثبت کنید.';
+
+  @override
+  String get taxGuideStep3Bullet1 =>
+      'به my.tax.gov.ir وارد شوید و مسیر «ورود به پرونده > عضویت > شناسه یکتا حافظه مالیاتی» را دنبال کنید.';
+
+  @override
+  String get taxGuideStep3Bullet2 =>
+      'گزینه «توسط مودی» را انتخاب و فایل Public Key را بارگذاری کنید.';
+
+  @override
+  String get taxGuideStep3Bullet3 =>
+      'شناسه یکتای نمایش داده شده را ذخیره و در حسابیکس وارد کنید.';
+
+  @override
+  String get taxGuideStep4Title => '۴) تکمیل فرم اتصال در حسابیکس';
+
+  @override
+  String get taxGuideStep4Description =>
+      'شناسه حافظه، کد اقتصادی و کلید خصوصی باید در تب «اتصال و اطلاعات پایه» ثبت شوند.';
+
+  @override
+  String get taxGuideStep4Bullet1 =>
+      'شناسه یکتا و کد اقتصادی را بدون فاصله اضافی وارد کنید.';
+
+  @override
+  String get taxGuideStep4Bullet2 =>
+      'کلید خصوصی (PEM) را در فیلد مربوطه جای‌گذاری و در صورت نیاز Public Key و CSR را نیز ذخیره کنید.';
+
+  @override
+  String get taxGuideStep4Bullet3 =>
+      'در صورت استفاده از محیط تست، گزینه حالت سندباکس را فعال کنید.';
+
+  @override
+  String get taxGuideStep5Title => '۵) دریافت گواهی میانی با CSR';
+
+  @override
+  String get taxGuideStep5Description =>
+      'برای اشخاص حقوقی لازم است CSR تولید شده را در مرکز صدور گواهی میانی ثبت کنید.';
+
+  @override
+  String get taxGuideStep5Bullet1 =>
+      'به سایت gica.ir مراجعه و گزینه «درخواست گواهی از طریق CSR» را انتخاب کنید.';
+
+  @override
+  String get taxGuideStep5Bullet2 =>
+      'فرم‌ها را با اطلاعات شرکت تکمیل و هزینه صدور را پرداخت کنید.';
+
+  @override
+  String get taxGuideStep5Bullet3 =>
+      'پس از مراجعه حضوری، فایل گواهی صادره را در حسابیکس بارگذاری کنید.';
+
+  @override
+  String get taxGuideStep6Title => '۶) ثبت کد کالا و خدمت';
+
+  @override
+  String get taxGuideStep6Description =>
+      'بدون درج کد و واحد مالیاتی برای کالا/خدمت ارسال صورتحساب رد می‌شود.';
+
+  @override
+  String get taxGuideStep6Bullet1 =>
+      'از مسیر «کالا و خدمات > ویرایش» کد ۱۳ رقمی را در بخش مالیات ثبت کنید.';
+
+  @override
+  String get taxGuideStep6Bullet2 =>
+      'در صورت نیاز از فایل کدهای عمومی stuffid.tax.gov.ir استفاده کنید یا کد اختصاصی بسازید.';
+
+  @override
+  String get taxGuideStep6Bullet3 =>
+      'برای خدمات خاص، کد مربوطه را از portal.gs1-ir.org دریافت کنید.';
+
+  @override
+  String get taxGuideStep7Title => '۷) کنترل کیفیت داده و ارسال امن';
+
+  @override
+  String get taxGuideStep7Description =>
+      'پس از تکمیل تنظیمات، گزارش کیفیت داده و کارپوشه مودیان را بررسی کنید.';
+
+  @override
+  String get taxGuideStep7Bullet1 =>
+      'در تب «کیفیت داده» موارد ناقص برای کالا، مشتری و فاکتور نشان داده می‌شود.';
+
+  @override
+  String get taxGuideStep7Bullet2 =>
+      'فاکتورها را ابتدا به کارپوشه مودیان اضافه و وضعیت خطاها را در همان صفحه پیگیری کنید.';
+
+  @override
+  String get taxGuideStep7Bullet3 =>
+      'ارسال تکی یا گروهی را فقط بعد از رفع خطاهای اعتبارسنجی انجام دهید.';
+
+  @override
+  String get taxGuideResourcesTitle => 'یادآوری مسیرها و منابع';
+
+  @override
+  String get taxGuideResourcesWorkspace =>
+      'کارپوشه مودیان: از منوی فروش > کارپوشه مالیاتی قابل دسترسی است.';
+
+  @override
+  String get taxGuideResourcesProducts =>
+      'کالا و خدمات: در همین منو می‌توانید کد مالیاتی و واحد را ویرایش یا از اکسل وارد کنید.';
+
+  @override
+  String get taxGuideResourcesSupport =>
+      'در صورت بروز خطای اتصال، لاگ کامل در ماژول «تنظیمات سامانه مودیان» و بخش تیکتینگ در دسترس است.';
+
+  @override
+  String get taxMemoryIdLabel => 'شناسه حافظه مالیاتی';
+
+  @override
+  String get taxEconomicCodeLabel => 'کد اقتصادی';
+
+  @override
+  String get taxSandboxModeLabel => 'حالت سندباکس';
+
+  @override
+  String get taxSandboxModeSubtitle =>
+      'با فعال بودن این گزینه، درخواست‌ها به محیط آزمایشی سامانه ارسال می‌شوند.';
+
+  @override
+  String get taxPrivateKeyLabel => 'کلید خصوصی (PEM)';
+
+  @override
+  String get taxPublicKeyLabel => 'کلید عمومی (اختیاری)';
+
+  @override
+  String get taxCertificateLabel => 'گواهی دیجیتال (اختیاری)';
+
+  @override
+  String get taxCertificateRequestLabel => 'درخواست گواهی (CSR)';
+
+  @override
+  String get taxGenerateKeys => 'تولید کلید جدید';
+
+  @override
+  String get taxMemoryIdRequired => 'شناسه حافظه مالیاتی الزامی است';
+
+  @override
+  String get taxEconomicCodeRequired => 'کد اقتصادی الزامی است';
+
+  @override
+  String get taxPrivateKeyRequired => 'کلید خصوصی الزامی است';
+
+  @override
+  String get taxKeysGenerated => 'کلید جدید تولید شد';
+
+  @override
+  String get taxSettingsSaved => 'تنظیمات سامانه مودیان ذخیره شد';
+
+  @override
+  String taxLastUpdated(String date) {
+    return 'آخرین بروزرسانی: $date';
+  }
+
+  @override
+  String get taxPersonTypeLabel => 'نوع مودی';
+
+  @override
+  String get taxPersonTypeNatural => 'شخص حقیقی';
+
+  @override
+  String get taxPersonTypeLegal => 'شخص حقوقی';
+
+  @override
+  String get taxNationalIdLabel => 'شناسه ملی مودی';
+
+  @override
+  String get taxLegalNameFaLabel => 'نام فارسی شرکت';
+
+  @override
+  String get taxLegalNameEnLabel => 'نام انگلیسی شرکت';
+
+  @override
+  String get taxLegalEmailLabel => 'ایمیل سازمانی';
+
+  @override
+  String get taxDataQualityTitle => 'کنترل کیفیت داده';
+
+  @override
+  String get taxDataQualitySubtitle =>
+      'اقلام فاقد اطلاعات مالیاتی را پیش از ارسال بررسی کنید.';
+
+  @override
+  String get taxDataQualityReload => 'به‌روزرسانی گزارش';
+
+  @override
+  String get taxDataQualityProductsHeader => 'کالا و خدمات';
+
+  @override
+  String get taxDataQualityPersonsHeader => 'اشخاص و مشتریان';
+
+  @override
+  String get taxDataQualityMissingTaxCode => 'کالاهای فاقد کد مالیاتی';
+
+  @override
+  String get taxDataQualityMissingTaxUnit => 'کالاهای فاقد واحد مالیاتی';
+
+  @override
+  String get taxDataQualityMissingNationalId => 'اشخاص فاقد کد ملی';
+
+  @override
+  String get taxDataQualityMissingEconomicId => 'اشخاص فاقد شناسه اقتصادی';
+
+  @override
+  String get taxDataQualitySamples => 'نمونه‌ها';
+
+  @override
+  String get taxDataQualityNoSamples => 'نمونه‌ای یافت نشد.';
+
+  @override
+  String get taxDataQualityNoIssues =>
+      'همه چیز آماده است! موردی برای تکمیل وجود ندارد.';
+
+  @override
+  String get taxDataQualityNoData => 'گزارشی برای نمایش وجود ندارد.';
+
+  @override
+  String taxDataQualityFetchError(String error) {
+    return 'خطا در دریافت گزارش: $error';
+  }
+
+  @override
+  String get taxDataQualityTaxCodeLabel => 'کد مالیاتی';
+
+  @override
+  String get taxDataQualityTaxUnitLabel => 'واحد مالیاتی';
+
+  @override
+  String get taxDataQualityNationalIdLabel => 'کد ملی';
+
+  @override
+  String get taxDataQualityEconomicIdLabel => 'شناسه اقتصادی';
+
+  @override
+  String get taxValidationIssuesTitle => 'مشکلات اعتبارسنجی مالیاتی';
+
+  @override
+  String get taxValidationIssuesDescription =>
+      'برای ارسال موفق به سامانه مودیان، ابتدا موارد زیر را برطرف کنید.';
+
+  @override
+  String get taxValidationIssuesEmpty => 'جزئیاتی برای نمایش وجود ندارد.';
 
   @override
   String get taxAddToWorkspaceSingle => 'افزودن به کارپوشه مالیاتی';

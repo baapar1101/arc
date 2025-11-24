@@ -18,6 +18,7 @@ adapters/api/v1/checks.py
 adapters/api/v1/credit.py
 adapters/api/v1/currencies.py
 adapters/api/v1/customers.py
+adapters/api/v1/document_numbering.py
 adapters/api/v1/documents.py
 adapters/api/v1/expense_income.py
 adapters/api/v1/fiscal_years.py
@@ -42,6 +43,8 @@ adapters/api/v1/public_share_links.py
 adapters/api/v1/receipts_payments.py
 adapters/api/v1/report_templates.py
 adapters/api/v1/schemas.py
+adapters/api/v1/tax_product_codes.py
+adapters/api/v1/tax_settings.py
 adapters/api/v1/tax_types.py
 adapters/api/v1/tax_units.py
 adapters/api/v1/transfers.py
@@ -83,6 +86,7 @@ adapters/api/v1/schema_models/price_list.py
 adapters/api/v1/schema_models/product.py
 adapters/api/v1/schema_models/product_attribute.py
 adapters/api/v1/schema_models/product_bom.py
+adapters/api/v1/schema_models/tax_settings.py
 adapters/api/v1/schema_models/warehouse.py
 adapters/api/v1/support/__init__.py
 adapters/api/v1/support/ai_tickets.py
@@ -119,6 +123,7 @@ adapters/db/models/currency.py
 adapters/db/models/document.py
 adapters/db/models/document_line.py
 adapters/db/models/document_monetization.py
+adapters/db/models/document_numbering.py
 adapters/db/models/email_config.py
 adapters/db/models/file_storage.py
 adapters/db/models/fiscal_year.py
@@ -137,9 +142,11 @@ adapters/db/models/product.py
 adapters/db/models/product_attribute.py
 adapters/db/models/product_attribute_link.py
 adapters/db/models/product_bom.py
+adapters/db/models/product_tax_code.py
 adapters/db/models/report_template.py
 adapters/db/models/storage_plan.py
 adapters/db/models/system_setting.py
+adapters/db/models/tax_setting.py
 adapters/db/models/tax_type.py
 adapters/db/models/tax_unit.py
 adapters/db/models/telegram.py
@@ -203,6 +210,7 @@ app/core/responses.py
 app/core/security.py
 app/core/settings.py
 app/core/smart_normalizer.py
+app/integrations/moadian/client.py
 app/services/account_review_service.py
 app/services/account_service.py
 app/services/ai_background_jobs.py
@@ -223,6 +231,7 @@ app/services/credit_service.py
 app/services/dashboard_widgets_service.py
 app/services/document_monetization_jobs.py
 app/services/document_monetization_service.py
+app/services/document_numbering_service.py
 app/services/document_service.py
 app/services/email_service.py
 app/services/expense_income_service.py
@@ -257,6 +266,11 @@ app/services/storage_invoice_service.py
 app/services/storage_plan_service.py
 app/services/storage_subscription_service.py
 app/services/system_settings_service.py
+app/services/tax_data_quality_service.py
+app/services/tax_product_code_service.py
+app/services/tax_setting_service.py
+app/services/tax_submission_service.py
+app/services/tax_validation_service.py
 app/services/template_builder_compiler.py
 app/services/transfer_service.py
 app/services/trial_balance_service.py
@@ -288,6 +302,7 @@ hesabix_api.egg-info/top_level.txt
 migrations/env.py
 migrations/versions/023c8d2d2222_merge_heads_latest.py
 migrations/versions/1f0abcdd7300_add_petty_cash_table.py
+migrations/versions/20241120_000001_add_document_numbering_settings.py
 migrations/versions/20250102_000001_seed_support_data.py
 migrations/versions/20250106_000001_fix_tax_types_structure.py
 migrations/versions/20250106_000002_remove_tax_fields.py
@@ -311,6 +326,8 @@ migrations/versions/20250121_000001_add_ai_expense_account.py
 migrations/versions/20250122_000001_add_last_reset_at_and_expires_at_to_ai_subscriptions.py
 migrations/versions/20250123_000001_add_description_to_categories.py
 migrations/versions/20250126_000001_add_gift_credit_account.py
+migrations/versions/20250130_000001_create_tax_settings_table.py
+migrations/versions/20250205_000001_create_document_number_counters.py
 migrations/versions/20250915_000001_init_auth_tables.py
 migrations/versions/20250916_000002_add_referral_fields.py
 migrations/versions/20250926_000010_add_person_code.py
@@ -367,6 +384,8 @@ migrations/versions/20251118_000001_add_document_monetization.py
 migrations/versions/20251119_000001_add_person_share_links.py
 migrations/versions/20251120_000001_add_default_warehouse_to_products.py
 migrations/versions/20251120_053716_add_ai_tables.py
+migrations/versions/20251124_000001_seed_tax_types_list.py
+migrations/versions/20251124_150001_add_product_tax_codes.py
 migrations/versions/27f209ffe151_merge_heads.py
 migrations/versions/4436dcacd94f_merge_heads_final.py
 migrations/versions/4b2ea782bcb3_merge_heads.py
@@ -384,6 +403,7 @@ migrations/versions/b2b68cf299a3_convert_unit_fields_to_string.py
 migrations/versions/c302bc2f2cb8_remove_person_type_column.py
 migrations/versions/caf3f4ef4b76_add_tax_units_table.py
 migrations/versions/d3e84892c1c2_sync_person_type_enum_values_callable_.py
+migrations/versions/eb9be5452535_merge_all_final_heads.py
 migrations/versions/f876bfa36805_merge_multiple_heads.py
 tests/__init__.py
 tests/test_health.py

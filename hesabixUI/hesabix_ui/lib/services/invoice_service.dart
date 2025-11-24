@@ -178,6 +178,17 @@ class InvoiceService {
     throw Exception('Invalid CSV response');
   }
 
+  Future<List<int>> downloadInvoicePdf({
+    required int businessId,
+    required int invoiceId,
+    Map<String, dynamic>? query,
+  }) async {
+    return _api.downloadPdf(
+      '/invoices/business/$businessId/$invoiceId/pdf',
+      query: query,
+    );
+  }
+
   num _extractInvoiceAmount(Map<String, dynamic> payload) {
     final extraInfo = payload['extra_info'];
     if (extraInfo is Map<String, dynamic>) {

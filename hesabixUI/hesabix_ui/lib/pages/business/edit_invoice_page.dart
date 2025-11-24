@@ -579,6 +579,7 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
             children: [
               InvoiceLineItemsTable(
                 businessId: widget.businessId,
+                authStore: widget.authStore,
                 selectedCurrencyId: _selectedCurrencyId,
                 invoiceType: (_selectedInvoiceType?.value ?? 'sales'),
                 postInventory: _postInventory,

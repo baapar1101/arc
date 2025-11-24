@@ -92,15 +92,64 @@ class UserRepository(BaseRepository[User]):
 		stmt = stmt.order_by(User.created_at.desc()).offset(offset).limit(limit)
 		return self.db.execute(stmt).scalars().all()
 	
-	def to_dict(self, user: User) -> dict:
+	def to_dict(self, user: User, include_extended: bool = False) -> dict:
 		"""تبدیل User object به dictionary برای API response"""
-		return {
+		# ساخت full_name
+		full_name = None
+		if user.first_name or user.last_name:
+			parts = [p for p in [user.first_name, user.last_name] if p]
+			full_name = " ".join(parts) if parts else None
+		
+		# تعیین status از is_active
+		status = "active" if user.is_active else "inactive"
+		
+		# تعیین role از app_permissions
+		role = "user"
+		if user.app_permissions:
+			if user.app_permissions.get("superadmin"):
+				role = "admin"
+			elif user.app_permissions.get("operator"):
+				role = "operator"
+			elif user.app_permissions.get("supervisor"):
+				role = "supervisor"
+		
+		# شمارش کسب‌وکارها
+		businesses_count = 0
+		last_login_ip = None
+		last_login_at = None
+		
+		if include_extended:
+			from adapters.db.repositories.business_permission_repo import BusinessPermissionRepository
+			from adapters.db.repositories.api_key_repo import ApiKeyRepository
+			
+			# شمارش کسب‌وکارها
+			bp_repo = BusinessPermissionRepository(self.db)
+			business_permissions = bp_repo.get_user_businesses(user.id)
+			businesses_count = len(business_permissions)
+			
+			# آخرین ورود
+			api_repo = ApiKeyRepository(self.db)
+			from sqlalchemy import select, desc
+			from adapters.db.models.api_key import ApiKey
+			stmt = select(ApiKey).where(
+				ApiKey.user_id == user.id,
+				ApiKey.revoked_at.is_(None)
+			).order_by(desc(ApiKey.last_used_at)).limit(1)
+			last_key = self.db.execute(stmt).scalars().first()
+			if last_key:
+				last_login_ip = last_key.ip
+				last_login_at = last_key.last_used_at or last_key.created_at
+		
+		result = {
 			"id": user.id,
 			"email": user.email,
 			"mobile": user.mobile,
 			"first_name": user.first_name,
 			"last_name": user.last_name,
+			"full_name": full_name,
 			"is_active": user.is_active,
+			"status": status,
+			"role": role,
 			"referral_code": user.referral_code,
 			"referred_by_user_id": user.referred_by_user_id,
 			"app_permissions": user.app_permissions,
@@ -108,5 +157,14 @@ class UserRepository(BaseRepository[User]):
 			"updated_at": user.updated_at,
 			"signature_file_id": getattr(user, "signature_file_id", None),
 		}
+		
+		if include_extended:
+			result.update({
+				"businesses_count": businesses_count,
+				"last_login_ip": last_login_ip,
+				"last_login_at": last_login_at,
+			})
+		
+		return result
 
 

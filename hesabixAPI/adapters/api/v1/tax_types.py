@@ -54,6 +54,6 @@ def list_tax_types(
             "created_at": it.created_at.isoformat(),
             "updated_at": it.updated_at.isoformat(),
         }
-        for it in db.query(TaxType).order_by(TaxType.title).all()
+        for it in db.query(TaxType).order_by(TaxType.id).all()
     ]
     return success_response(items, request)

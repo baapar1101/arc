@@ -52,3 +52,28 @@ class BusinessDocumentNumberingSetting(Base):
 
     business = relationship("Business", backref="document_numbering_settings")
 
+
+class DocumentNumberCounter(Base):
+    __tablename__ = "document_number_counters"
+    __table_args__ = (
+        UniqueConstraint(
+            "business_id",
+            "document_type",
+            "date_bucket",
+            name="uq_doc_number_counter_bucket",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    business_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("businesses.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    document_type: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    date_bucket: Mapped[str] = mapped_column(String(32), nullable=False, default="GLOBAL")
+    last_number: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+    )
+
+    business = relationship("Business", backref="document_number_counters")

@@ -61,13 +61,15 @@ class CustomerService {
   }) async {
     try {
       final response = await _apiClient.get(
-        '/api/v1/customers/$customerId',
+        '/api/v1/customers/detail/$customerId',
         query: {'business_id': businessId},
       );
 
       if (response.statusCode == 200) {
-        final customerJson = response.data as Map<String, dynamic>;
-        return Customer.fromJson(customerJson);
+        // بررسی اینکه آیا response در wrapper است یا نه
+        final responseData = response.data as Map<String, dynamic>;
+        final customerJson = responseData['data'] ?? responseData;
+        return Customer.fromJson(customerJson as Map<String, dynamic>);
       } else {
         return null;
       }

@@ -106,6 +106,13 @@ class _SettingsPageState extends State<SettingsPage> {
                   icon: Icons.receipt_long_outlined,
                   onTap: () => context.go('/business/${widget.businessId}/document-monetization'),
                 ),
+                _buildSettingItem(
+                  context,
+                  title: t.taxIntegrationTitle,
+                  subtitle: t.taxIntegrationSubtitle,
+                  icon: Icons.cloud_sync_outlined,
+                  onTap: () => context.go('/business/${widget.businessId}/settings/tax'),
+                ),
               ],
             ),
             

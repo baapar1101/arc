@@ -24,6 +24,11 @@ from adapters.api.v1.cash_registers import router as cash_registers_router
 from adapters.api.v1.petty_cash import router as petty_cash_router
 from adapters.api.v1.tax_units import router as tax_units_router
 from adapters.api.v1.tax_types import router as tax_types_router
+from adapters.api.v1.tax_product_codes import (
+    router as tax_product_codes_router,
+    admin_router as admin_tax_product_codes_router,
+)
+from adapters.api.v1.tax_settings import router as tax_settings_router
 from adapters.api.v1.support.tickets import router as support_tickets_router
 from adapters.api.v1.support.operator import router as support_operator_router
 from adapters.api.v1.support.categories import router as support_categories_router
@@ -345,6 +350,9 @@ def create_app() -> FastAPI:
     application.include_router(petty_cash_router, prefix=settings.api_v1_prefix)
     application.include_router(tax_units_router, prefix=settings.api_v1_prefix)
     application.include_router(tax_types_router, prefix=settings.api_v1_prefix)
+    application.include_router(tax_product_codes_router, prefix=settings.api_v1_prefix)
+    application.include_router(admin_tax_product_codes_router, prefix=settings.api_v1_prefix)
+    application.include_router(tax_settings_router, prefix=settings.api_v1_prefix)
     application.include_router(receipts_payments_router, prefix=settings.api_v1_prefix)
     application.include_router(transfers_router, prefix=settings.api_v1_prefix)
     application.include_router(expense_income_router, prefix=settings.api_v1_prefix)

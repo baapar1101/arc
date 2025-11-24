@@ -58,6 +58,7 @@ class _PersonsPageState extends State<PersonsPage> {
       title: t.personsList,
       excelEndpoint: '/api/v1/persons/businesses/${widget.businessId}/persons/export/excel',
       pdfEndpoint: '/api/v1/persons/businesses/${widget.businessId}/persons/export/pdf',
+      showExportButtons: true,
       businessId: widget.businessId,
       reportModuleKey: 'persons',
       reportSubtype: 'list',

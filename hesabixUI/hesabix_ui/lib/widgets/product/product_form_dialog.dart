@@ -236,16 +236,18 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
     }
 
     bool success;
+    int? createdProductId;
     if (widget.product != null) {
       final productId = widget.product!['id'] as int;
       success = await _controller.updateProduct(productId);
     } else {
       success = await _controller.submitForm();
+      createdProductId = _controller.lastCreatedProductId;
     }
 
     if (success && mounted) {
       widget.onSuccess?.call();
-      Navigator.of(context).pop(true);
+      Navigator.of(context).pop(createdProductId ?? true);
     } else if (mounted) {
       SnackBarHelper.showError(
         context,

@@ -4,6 +4,8 @@ import '../../models/customer_model.dart';
 import '../../services/customer_service.dart';
 import '../../core/auth_store.dart';
 import '../../core/api_client.dart';
+import '../../widgets/person/person_form_dialog.dart';
+import '../../models/person_model.dart';
 
 class _CustomerPickerState {
   final List<Customer> customers;
@@ -186,6 +188,65 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
 
 
 
+  Future<void> _addNewPerson() async {
+    // بستن bottom sheet قبل از باز کردن dialog
+    Navigator.pop(context);
+
+    final result = await showDialog<Person?>(
+      context: context,
+      builder: (context) => PersonFormDialog(
+        businessId: widget.businessId,
+        onSuccess: () {},
+      ),
+    );
+    
+    if (result != null && mounted) {
+      // Customer ID همان Person ID است (چون Customer یک view از Person است)
+      final personId = result.id;
+      
+      if (personId != null) {
+        // سعی می‌کنیم Customer را با ID پیدا کنیم
+        try {
+          final customer = await _customerService.getCustomerById(
+            businessId: widget.businessId,
+            customerId: personId,
+          );
+          
+          if (customer != null && mounted) {
+            widget.onCustomerChanged(customer);
+            return;
+          }
+        } catch (_) {
+          // اگر خطا رخ داد، به روش fallback برمی‌گردیم
+        }
+      }
+      
+      // Fallback: Refresh لیست و پیدا کردن Customer جدید
+      await _loadRecentCustomers();
+      
+      // پیدا کردن Customer جدید (با بیشترین ID یا با Person ID)
+      if (_customers.isNotEmpty) {
+        Customer? foundCustomer;
+        if (personId != null) {
+          // سعی می‌کنیم Customer را با Person ID پیدا کنیم
+          foundCustomer = _customers.firstWhere(
+            (c) => c.id == personId,
+            orElse: () => _customers.first,
+          );
+        }
+        
+        if (foundCustomer == null) {
+          // اگر پیدا نشد، جدیدترین Customer را انتخاب می‌کنیم
+          final sortedCustomers = List<Customer>.from(_customers);
+          sortedCustomers.sort((a, b) => b.id.compareTo(a.id));
+          foundCustomer = sortedCustomers.first;
+        }
+        
+        widget.onCustomerChanged(foundCustomer);
+      }
+    }
+  }
+
   void _showCustomerPicker() {
     print('[CustomerCombobox] _showCustomerPicker called - _customers count: ${_customers.length}');
     // مقداردهی اولیه ValueNotifier
@@ -211,6 +272,7 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
             print('[CustomerCombobox] onSearchChanged callback called with: "$query"');
             _onSearchChanged(query);
           },
+          onAddNew: _addNewPerson,
         );
       },
     );
@@ -277,6 +339,7 @@ class _CustomerPickerBottomSheet extends StatefulWidget {
   final Function(Customer) onCustomerSelected;
   final TextEditingController searchController;
   final Function(String) onSearchChanged;
+  final VoidCallback? onAddNew;
 
   const _CustomerPickerBottomSheet({
     required this.pickerStateNotifier,
@@ -284,6 +347,7 @@ class _CustomerPickerBottomSheet extends StatefulWidget {
     required this.onCustomerSelected,
     required this.searchController,
     required this.onSearchChanged,
+    this.onAddNew,
   });
 
   @override
@@ -315,6 +379,13 @@ class _CustomerPickerBottomSheetState extends State<_CustomerPickerBottomSheet> 
                     ),
                   ),
                   const Spacer(),
+                  if (widget.onAddNew != null)
+                    IconButton(
+                      onPressed: widget.onAddNew,
+                      icon: const Icon(Icons.add),
+                      tooltip: 'افزودن شخص جدید',
+                      color: theme.colorScheme.primary,
+                    ),
                   IconButton(
                     onPressed: () => Navigator.pop(context),
                     icon: const Icon(Icons.close),

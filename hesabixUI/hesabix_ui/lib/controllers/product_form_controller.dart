@@ -26,6 +26,7 @@ class ProductFormController extends ChangeNotifier {
   bool _isLoading = false;
   String? _errorMessage;
   int? _editingProductId;
+  int? _lastCreatedProductId;
   
   // Reference data
   List<Map<String, dynamic>> _categories = [];
@@ -64,6 +65,7 @@ class ProductFormController extends ChangeNotifier {
   ProductFormData get formData => _formData;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
+  int? get lastCreatedProductId => _lastCreatedProductId;
   List<Map<String, dynamic>> get categories => _categories;
   List<Map<String, dynamic>> get attributes => _attributes;
   List<Map<String, dynamic>> get taxTypes => _taxTypes;
@@ -121,19 +123,6 @@ class ProductFormController extends ChangeNotifier {
           basePurchasePrice: 0,
           unitConversionFactor: 1,
         );
-        // پیش‌فرض انتخاب اولین نوع مالیات و واحد مالیاتی اگر موجود باشد
-        if (_taxTypes.isNotEmpty && _formData.taxTypeId == null) {
-          final firstTaxTypeId = (_taxTypes.first['id'] as num?)?.toInt();
-          if (firstTaxTypeId != null) {
-            _formData = _formData.copyWith(taxTypeId: firstTaxTypeId);
-          }
-        }
-        if (_taxUnits.isNotEmpty && _formData.taxUnitId == null) {
-          final firstTaxUnitId = (_taxUnits.first['id'] as num?)?.toInt();
-          if (firstTaxUnitId != null) {
-            _formData = _formData.copyWith(taxUnitId: firstTaxUnitId);
-          }
-        }
       }
       // دیگر واحد اصلی را به‌صورت خودکار مقداردهی نکن؛
       // کاربر می‌تواند عنوان واحد را در فرم وارد کند و در صورت تطبیق با لیست، آیدی ست می‌شود
@@ -280,6 +269,7 @@ class ProductFormController extends ChangeNotifier {
         imageFilename: _selectedImageFilename,
       );
       final newId = (created['id'] as num?)?.toInt();
+      _lastCreatedProductId = newId;
       if (newId != null) {
         await _saveDraftPriceItems(productId: newId);
       }

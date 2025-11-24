@@ -29,11 +29,18 @@ class _NotificationsSettingsPageState extends State<NotificationsSettingsPage> {
   final _tgUsernameCtrl = TextEditingController();
   final _tgWebhookSecretCtrl = TextEditingController();
   final _tgSecretHeaderCtrl = TextEditingController();
+  final _tgProxyBaseUrlCtrl = TextEditingController();
+  final _tgProxyApiKeyCtrl = TextEditingController();
   final _smsProviderCtrl = TextEditingController();
   final _smsApiKeyCtrl = TextEditingController();
   final _smsSenderCtrl = TextEditingController();
   bool _adminLoading = true;
   bool _adminSaving = false;
+  bool _webhookRegistering = false;
+  bool? _webhookLastOk;
+  String? _webhookLastMessage;
+  String? _webhookLastUrl;
+  bool _tgProxyEnabled = false;
 
   @override
   void initState() {
@@ -47,6 +54,8 @@ class _NotificationsSettingsPageState extends State<NotificationsSettingsPage> {
     _tgUsernameCtrl.dispose();
     _tgWebhookSecretCtrl.dispose();
     _tgSecretHeaderCtrl.dispose();
+    _tgProxyBaseUrlCtrl.dispose();
+    _tgProxyApiKeyCtrl.dispose();
     _smsProviderCtrl.dispose();
     _smsApiKeyCtrl.dispose();
     _smsSenderCtrl.dispose();
@@ -60,6 +69,7 @@ class _NotificationsSettingsPageState extends State<NotificationsSettingsPage> {
         _error = null;
       });
       final s = await _svc.getSettings();
+      bool proxyEnabled = _tgProxyEnabled;
       // Load admin config (ignore errors silently if no permission)
       try {
         final admin = await _adminSvc.getNotificationsConfig();
@@ -67,6 +77,9 @@ class _NotificationsSettingsPageState extends State<NotificationsSettingsPage> {
         _tgUsernameCtrl.text = '${admin['telegram_bot_username'] ?? ''}';
         _tgWebhookSecretCtrl.text = '${admin['telegram_webhook_secret'] ?? ''}';
         _tgSecretHeaderCtrl.text = '${admin['telegram_secret_header'] ?? ''}';
+        _tgProxyBaseUrlCtrl.text = '${admin['telegram_proxy_base_url'] ?? ''}';
+        _tgProxyApiKeyCtrl.text = '${admin['telegram_proxy_api_key'] ?? ''}';
+        proxyEnabled = (admin['telegram_proxy_enabled'] ?? false) == true;
         _smsProviderCtrl.text = '${admin['sms_provider_name'] ?? ''}';
         _smsApiKeyCtrl.text = '${admin['sms_api_key'] ?? ''}';
         _smsSenderCtrl.text = '${admin['sms_sender'] ?? ''}';
@@ -77,6 +90,7 @@ class _NotificationsSettingsPageState extends State<NotificationsSettingsPage> {
         _email = (s['email_enabled'] ?? true) == true;
         _sms = (s['sms_enabled'] ?? true) == true;
         _inapp = (s['inapp_enabled'] ?? true) == true;
+        _tgProxyEnabled = proxyEnabled;
         _loading = false;
         _adminLoading = false;
       });
@@ -138,12 +152,47 @@ class _NotificationsSettingsPageState extends State<NotificationsSettingsPage> {
     }
   }
 
+  Future<void> _registerTelegramWebhook(AppLocalizations t) async {
+    setState(() => _webhookRegistering = true);
+    try {
+      final res = await _adminSvc.registerTelegramWebhook();
+      final ok = (res['ok'] ?? false) == true;
+      final description = res['description']?.toString();
+      final webhookUrl = res['webhook_url']?.toString();
+      if (!mounted) return;
+      setState(() {
+        _webhookLastOk = ok;
+        _webhookLastMessage = description?.isNotEmpty == true ? description : null;
+        _webhookLastUrl = webhookUrl;
+      });
+      if (ok) {
+        SnackBarHelper.show(context, message: t.notificationsTelegramConnectionSuccess);
+      } else {
+        final msg = description?.isNotEmpty == true ? description! : t.notificationsTelegramConnectionError;
+        SnackBarHelper.showError(context, message: msg);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _webhookLastOk = false;
+        _webhookLastMessage = '$e';
+      });
+      SnackBarHelper.showError(context, message: '${t.notificationsTelegramConnectionError}\n$e');
+    } finally {
+      if (!mounted) return;
+      setState(() => _webhookRegistering = false);
+    }
+  }
+
   Map<String, dynamic> _collectAdvancedPayload() {
     return {
       'telegram_bot_token': _tgTokenCtrl.text.trim(),
       'telegram_bot_username': _tgUsernameCtrl.text.trim(),
       'telegram_webhook_secret': _tgWebhookSecretCtrl.text.trim(),
       'telegram_secret_header': _tgSecretHeaderCtrl.text.trim(),
+      'telegram_proxy_enabled': _tgProxyEnabled,
+      'telegram_proxy_base_url': _tgProxyBaseUrlCtrl.text.trim(),
+      'telegram_proxy_api_key': _tgProxyApiKeyCtrl.text.trim(),
       'sms_provider_name': _smsProviderCtrl.text.trim(),
       'sms_api_key': _smsApiKeyCtrl.text.trim(),
       'sms_sender': _smsSenderCtrl.text.trim(),
@@ -430,6 +479,10 @@ class _NotificationsSettingsPageState extends State<NotificationsSettingsPage> {
                   _buildCredentialField(_tgSecretHeaderCtrl, t.notificationsFieldTelegramSecretHeader),
                 ],
               ),
+              const SizedBox(height: 12),
+              _buildWebhookControls(t, theme, colorScheme),
+              const SizedBox(height: 24),
+              _buildProxySection(t, theme, colorScheme),
               const SizedBox(height: 24),
               Align(
                 alignment: AlignmentDirectional.centerStart,
@@ -484,6 +537,113 @@ class _NotificationsSettingsPageState extends State<NotificationsSettingsPage> {
       textInputAction: TextInputAction.next,
       enableSuggestions: false,
       autocorrect: false,
+    );
+  }
+
+  Widget _buildWebhookControls(AppLocalizations t, ThemeData theme, ColorScheme colorScheme) {
+    final statusColor = _webhookLastOk == true ? colorScheme.primary : colorScheme.error;
+    final backgroundColor = (_webhookLastOk == true ? colorScheme.primaryContainer : colorScheme.errorContainer).withValues(alpha: 0.3);
+    final statusText = _webhookLastOk == true ? t.notificationsTelegramConnected : t.notificationsTelegramConnectionError;
+    final displayMessage = _webhookLastMessage?.isNotEmpty == true ? _webhookLastMessage! : statusText;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        FilledButton.icon(
+          onPressed: _webhookRegistering ? null : () => _registerTelegramWebhook(t),
+          icon: _webhookRegistering
+              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+              : const Icon(Icons.link_outlined),
+          label: Text(t.notificationsTelegramConnectButton),
+        ),
+        if (_webhookLastOk != null)
+          Container(
+            margin: const EdgeInsets.only(top: 12),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: backgroundColor,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      _webhookLastOk == true ? Icons.check_circle_outline : Icons.error_outline,
+                      color: statusColor,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        displayMessage,
+                        style: theme.textTheme.bodyMedium?.copyWith(color: statusColor, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ],
+                ),
+                if (_webhookLastUrl?.isNotEmpty == true)
+                  Container(
+                    margin: const EdgeInsets.only(top: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.link, color: colorScheme.primary),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: SelectableText(
+                            _webhookLastUrl!,
+                            style: theme.textTheme.bodySmall?.copyWith(fontFamily: 'monospace'),
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: t.copyLink,
+                          onPressed: () => _copyToClipboard(_webhookLastUrl!, t.copied),
+                          icon: const Icon(Icons.copy_all_outlined),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildProxySection(AppLocalizations t, ThemeData theme, ColorScheme colorScheme) {
+    final showFields = _tgProxyEnabled || _tgProxyBaseUrlCtrl.text.isNotEmpty || _tgProxyApiKeyCtrl.text.isNotEmpty;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          t.notificationsProxySectionTitle,
+          style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          t.notificationsProxySectionSubtitle,
+          style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+        ),
+        const SizedBox(height: 8),
+        SwitchListTile.adaptive(
+          value: _tgProxyEnabled,
+          onChanged: (val) => setState(() {
+            _tgProxyEnabled = val;
+          }),
+          title: Text(t.notificationsProxyEnableLabel),
+          contentPadding: EdgeInsets.zero,
+        ),
+        if (showFields) ...[
+          const SizedBox(height: 12),
+          _buildCredentialField(_tgProxyBaseUrlCtrl, t.notificationsFieldTelegramProxyBaseUrl),
+          const SizedBox(height: 12),
+          _buildCredentialField(_tgProxyApiKeyCtrl, t.notificationsFieldTelegramProxyApiKey),
+        ],
+      ],
     );
   }
 }

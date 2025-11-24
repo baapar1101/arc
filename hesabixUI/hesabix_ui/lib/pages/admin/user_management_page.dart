@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
+import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/utils/date_formatters.dart' as date_formatters;
 import 'package:hesabix_ui/widgets/data_table/data_table.dart';
-import '../../utils/snackbar_helper.dart';
 
 class UserManagementPage extends StatefulWidget {
   const UserManagementPage({super.key});
@@ -79,7 +79,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
       defaultSortDesc: true,
       defaultPageSize: 20,
       pageSizeOptions: const [10, 20, 50, 100],
-      searchFields: const ['full_name', 'email', 'mobile', 'national_id'],
+      searchFields: const ['full_name', 'email', 'mobile'],
       filterFields: const ['status', 'role'],
       emptyStateMessage: 'کاربری یافت نشد',
       onRowTap: (item) => _openUserDetailsDialog(item as Map<String, dynamic>),
@@ -127,57 +127,45 @@ class _UserManagementPageState extends State<UserManagementPage> {
       columns: [
         TextColumn(
           'id',
-          'شناسه',
+          'ID',
           width: ColumnWidth.small,
           sortable: true,
           searchable: true,
+          textAlign: TextAlign.center,
         ),
-        CustomColumn(
+        TextColumn(
           'full_name',
-          'اطلاعات کاربر',
-          width: ColumnWidth.large,
-          builder: (item, index) {
+          'نام کاربر',
+          width: ColumnWidth.medium,
+          sortable: true,
+          searchable: true,
+          formatter: (item) {
             final map = item as Map<String, dynamic>;
             final fullName = (map['full_name'] as String?) ??
                 '${map['first_name'] ?? ''} ${map['last_name'] ?? ''}'.trim();
-            final email = map['email'] as String?;
-            final mobile = _cleanMobileNumber(map['mobile'] as String?);
-            return Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    fullName.isNotEmpty ? fullName : 'نام ثبت نشده',
-                    style: const TextStyle(fontWeight: FontWeight.w600),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  if (email != null && email.isNotEmpty) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      email,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey[700],
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                  if (mobile != null && mobile.isNotEmpty) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      mobile,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey[600],
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            );
+            return fullName.isNotEmpty ? fullName : 'نام ثبت نشده';
+          },
+        ),
+        TextColumn(
+          'email',
+          'ایمیل',
+          width: ColumnWidth.medium,
+          sortable: true,
+          searchable: true,
+          formatter: (item) {
+            final email = (item as Map<String, dynamic>)['email'] as String?;
+            return email ?? '-';
+          },
+        ),
+        TextColumn(
+          'mobile',
+          'موبایل',
+          width: ColumnWidth.medium,
+          sortable: true,
+          searchable: true,
+          formatter: (item) {
+            final mobile = _cleanMobileNumber((item as Map<String, dynamic>)['mobile'] as String?);
+            return mobile ?? '-';
           },
         ),
         CustomColumn(
@@ -193,7 +181,10 @@ class _UserManagementPageState extends State<UserManagementPage> {
           ],
           builder: (item, index) {
             final map = item as Map<String, dynamic>;
-            return _StatusChip(value: map['status']?.toString() ?? 'unknown');
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+              child: _StatusChip(value: map['status']?.toString() ?? 'unknown'),
+            );
           },
           formatter: (item) =>
               _statusLabel((item as Map<String, dynamic>)['status']),
@@ -211,40 +202,51 @@ class _UserManagementPageState extends State<UserManagementPage> {
           ],
           builder: (item, index) {
             final map = item as Map<String, dynamic>;
-            return _RoleChip(value: map['role']?.toString() ?? 'user');
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+              child: _RoleChip(value: map['role']?.toString() ?? 'user'),
+            );
           },
           formatter: (item) =>
               _roleLabel((item as Map<String, dynamic>)['role']),
         ),
-        NumberColumn(
+        CustomColumn(
           'businesses_count',
-          'کسب‌وکارهای متصل',
+          'کسب‌وکارها',
           width: ColumnWidth.small,
+          builder: (item, index) {
+            final count = (item as Map<String, dynamic>)['businesses_count'] ?? 0;
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.business_outlined, size: 14, color: Colors.grey[600]),
+                  const SizedBox(width: 4),
+                  Text(
+                    count.toString(),
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                  ),
+                ],
+              ),
+            );
+          },
           formatter: (item) =>
               ((item as Map<String, dynamic>)['businesses_count'] ?? 0)
                   .toString(),
-        ),
-        TextColumn(
-          'last_login_ip',
-          'IP آخرین ورود',
-          width: ColumnWidth.medium,
-          sortable: false,
-          searchable: false,
-          formatter: (item) =>
-              (item as Map<String, dynamic>)['last_login_ip'] ?? '-',
         ),
         DateColumn(
           'last_login_at',
           'آخرین ورود',
           width: ColumnWidth.medium,
-          showTime: true,
+          showTime: false,
           formatter: (item) =>
               _formatDate((item as Map<String, dynamic>)['last_login_at'],
-                  showTime: true),
+                  showTime: false),
         ),
         DateColumn(
           'created_at',
-          'تاریخ ایجاد',
+          'تاریخ ثبت‌نام',
           width: ColumnWidth.medium,
           showTime: false,
           formatter: (item) =>
@@ -263,19 +265,13 @@ class _UserManagementPageState extends State<UserManagementPage> {
             DataTableAction(
               icon: Icons.key,
               label: 'بازنشانی رمز',
-              onTap: (item) => _showActionSnack(
-                context,
-                'درخواست بازنشانی رمز برای ${(item as Map<String, dynamic>)['full_name'] ?? 'کاربر'} ثبت شد',
-              ),
+              onTap: (item) => _resetUserPassword(item as Map<String, dynamic>),
             ),
             DataTableAction(
               icon: Icons.pause_circle_outline,
               label: 'تعلیق',
               isDestructive: true,
-              onTap: (item) => _showActionSnack(
-                context,
-                'وضعیت ${(item as Map<String, dynamic>)['full_name'] ?? 'کاربر'} به تعلیق تغییر خواهد کرد',
-              ),
+              onTap: (item) => _suspendUser(item as Map<String, dynamic>),
             ),
           ],
         ),
@@ -283,36 +279,159 @@ class _UserManagementPageState extends State<UserManagementPage> {
     );
   }
 
-  void _handleBulkAction(_BulkUserAction action) {
+  Future<void> _handleBulkAction(_BulkUserAction action) async {
+    if (_selectedRowIndexes.isEmpty) return;
+    
     final messenger = ScaffoldMessenger.of(context);
+    
+    // TODO: دریافت شناسه‌های واقعی کاربران از DataTableWidget
+    // برای حالا، یک پیام نمایش می‌دهیم
     String message;
     switch (action) {
       case _BulkUserAction.activate:
-        message = 'درخواست فعال‌سازی $_selectedCount کاربر ارسال شد.';
+        message = 'این عملیات نیاز به دریافت شناسه‌های کاربران دارد.';
         break;
       case _BulkUserAction.deactivate:
-        message = 'درخواست تعلیق $_selectedCount کاربر ارسال شد.';
+        message = 'این عملیات نیاز به دریافت شناسه‌های کاربران دارد.';
         break;
       case _BulkUserAction.resetPassword:
-        message = 'لینک بازنشانی رمز برای $_selectedCount کاربر ارسال خواهد شد.';
+        message = 'این عملیات نیاز به دریافت شناسه‌های کاربران دارد.';
         break;
     }
-    messenger.showSnackBar(SnackBar(content: Text(message)));
+    
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.orange,
+      ),
+    );
   }
 
-  void _openUserDetailsDialog(Map<String, dynamic> user) {
-    showDialog(
+  Future<void> _openUserDetailsDialog(Map<String, dynamic> user) async {
+    final userId = user['id'] as int?;
+    if (userId == null) return;
+    
+    // دریافت اطلاعات کامل کاربر از API
+    try {
+      final api = ApiClient();
+      final response = await api.get('/api/v1/users/$userId');
+      if (response.statusCode == 200 && mounted) {
+        final userData = response.data?['data'] as Map<String, dynamic>?;
+        if (userData != null) {
+          if (mounted) {
+            showDialog(
+              context: context,
+              builder: (context) => _UserDetailsDialog(user: userData),
+            );
+          }
+        }
+      }
+    } catch (e) {
+      // در صورت خطا، از داده‌های موجود استفاده می‌کنیم
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => _UserDetailsDialog(user: user),
+        );
+      }
+    }
+  }
+
+  Future<void> _suspendUser(Map<String, dynamic> user) async {
+    final userId = user['id'] as int?;
+    if (userId == null) return;
+    
+    final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => _UserDetailsDialog(user: user),
+      builder: (context) => AlertDialog(
+        title: const Text('تعلیق کاربر'),
+        content: Text('آیا مطمئن هستید که می‌خواهید ${user['full_name'] ?? 'کاربر'} را تعلیق کنید؟'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('انصراف'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.red,
+            ),
+            child: const Text('تعلیق'),
+          ),
+        ],
+      ),
     );
+    
+    if (confirmed != true) return;
+    
+    try {
+      final api = ApiClient();
+      final response = await api.post('/api/v1/users/$userId/suspend');
+      if (response.statusCode == 200) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('کاربر با موفقیت تعلیق شد')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('خطا در تعلیق کاربر: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
-
-  void _showActionSnack(BuildContext context, String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
+  
+  Future<void> _resetUserPassword(Map<String, dynamic> user) async {
+    final userId = user['id'] as int?;
+    if (userId == null) return;
+    
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('بازنشانی رمز عبور'),
+        content: Text('آیا مطمئن هستید که می‌خواهید رمز عبور ${user['full_name'] ?? 'کاربر'} را بازنشانی کنید؟'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('انصراف'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('بازنشانی'),
+          ),
+        ],
+      ),
     );
+    
+    if (confirmed != true) return;
+    
+    try {
+      final api = ApiClient();
+      final response = await api.post('/api/v1/users/$userId/reset-password');
+      if (response.statusCode == 200) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('توکن بازنشانی رمز عبور ایجاد شد')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('خطا در بازنشانی رمز عبور: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
-
+  
   static String? _cleanMobileNumber(String? mobile) {
     if (mobile == null || mobile.isEmpty) return null;
     var cleaned = mobile.replaceAll('+', '').replaceAll(' ', '');
@@ -397,15 +516,15 @@ class _StatusChip extends StatelessWidget {
         break;
     }
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
         color: background,
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: BorderRadius.circular(12),
       ),
       child: Text(
         label,
         style: TextStyle(
-          fontSize: 12,
+          fontSize: 11,
           fontWeight: FontWeight.w600,
           color: foreground,
         ),
@@ -447,15 +566,15 @@ class _RoleChip extends StatelessWidget {
         break;
     }
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
         color: background,
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: BorderRadius.circular(12),
       ),
       child: Text(
         label,
         style: TextStyle(
-          fontSize: 12,
+          fontSize: 11,
           fontWeight: FontWeight.w600,
           color: foreground,
         ),
@@ -575,7 +694,6 @@ class _OverviewTab extends StatelessWidget {
               _InfoRow(label: 'نام کامل', value: user['full_name'] ?? '-'),
               _InfoRow(label: 'ایمیل', value: user['email'] ?? '-'),
               _InfoRow(label: 'موبایل', value: user['mobile'] ?? '-'),
-              _InfoRow(label: 'کد ملی', value: user['national_id'] ?? '-'),
             ],
           ),
           const SizedBox(height: 16),
@@ -601,16 +719,6 @@ class _OverviewTab extends StatelessWidget {
                   showTime: true,
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          _SectionTitle(title: 'نشانی و اطلاعات تکمیلی', theme: theme),
-          _InfoCard(
-            children: [
-              _InfoRow(label: 'استان', value: user['province'] ?? '-'),
-              _InfoRow(label: 'شهر', value: user['city'] ?? '-'),
-              _InfoRow(label: 'آدرس', value: user['address'] ?? '-'),
-              _InfoRow(label: 'کدپستی', value: user['postal_code'] ?? '-'),
             ],
           ),
         ],

@@ -233,8 +233,25 @@ class EmailService {
   String _handleError(DioException e) {
     if (e.response != null) {
       final data = e.response!.data;
-      if (data is Map<String, dynamic> && data.containsKey('detail')) {
-        return data['detail'] as String;
+      if (data is Map<String, dynamic>) {
+        // پاسخ‌های ساختارمند شامل success/error/details
+        final structuredError = data['error'];
+        if (structuredError is Map<String, dynamic>) {
+          final detailsMsg = _formatErrorDetails(structuredError['details']);
+          final message = structuredError['message']?.toString();
+          if (detailsMsg != null && detailsMsg.isNotEmpty) {
+            return message != null && message.isNotEmpty ? '$message\n$detailsMsg' : detailsMsg;
+          }
+          if (message != null && message.isNotEmpty) {
+            return message;
+          }
+        }
+        if (data.containsKey('detail')) {
+          return data['detail'].toString();
+        }
+        if (data.containsKey('message')) {
+          return data['message'].toString();
+        }
       }
       return 'خطا در ارتباط با سرور: ${e.response!.statusCode}';
     } else if (e.type == DioExceptionType.connectionTimeout) {
@@ -243,6 +260,75 @@ class EmailService {
       return 'زمان دریافت پاسخ از سرور به پایان رسید';
     } else {
       return 'خطای نامشخص: ${e.message}';
+    }
+  }
+
+  String? _formatErrorDetails(dynamic rawDetails) {
+    if (rawDetails is! List) {
+      return null;
+    }
+    final messages = <String>[];
+    for (final item in rawDetails) {
+      if (item is! Map<String, dynamic>) {
+        continue;
+      }
+      final loc = _localizeFieldPath(item['loc']);
+      final msg = item['msg']?.toString();
+      if ((loc?.isNotEmpty ?? false) && (msg?.isNotEmpty ?? false)) {
+        messages.add('$loc: $msg');
+      } else if (msg?.isNotEmpty ?? false) {
+        messages.add(msg!);
+      }
+    }
+    if (messages.isEmpty) {
+      return null;
+    }
+    return messages.join('\n');
+  }
+
+  String? _localizeFieldPath(dynamic loc) {
+    if (loc is! List) {
+      return loc?.toString();
+    }
+    final labels = <String>[];
+    for (final part in loc) {
+      if (part is! String) {
+        continue;
+      }
+      labels.add(_mapFieldLabel(part));
+    }
+    if (labels.isEmpty) {
+      return null;
+    }
+    return labels.join(' › ');
+  }
+
+  String _mapFieldLabel(String key) {
+    switch (key) {
+      case 'body':
+        return 'بدنه درخواست';
+      case 'name':
+        return 'نام کانفیگ';
+      case 'smtp_host':
+        return 'میزبان SMTP';
+      case 'smtp_port':
+        return 'پورت SMTP';
+      case 'smtp_username':
+        return 'نام کاربری SMTP';
+      case 'smtp_password':
+        return 'رمز عبور SMTP';
+      case 'use_tls':
+        return 'TLS';
+      case 'use_ssl':
+        return 'SSL';
+      case 'from_email':
+        return 'ایمیل فرستنده';
+      case 'from_name':
+        return 'نام فرستنده';
+      case 'is_active':
+        return 'وضعیت فعال';
+      default:
+        return key;
     }
   }
 }

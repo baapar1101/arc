@@ -89,6 +89,7 @@ import 'pages/business/installments_report_page.dart';
 import 'pages/business/credit_settings_page.dart';
 import 'pages/business/document_numbering_settings_page.dart';
 import 'pages/business/print_settings_page.dart';
+import 'pages/business/tax_settings_page.dart';
 import 'pages/business/installment_plans_page.dart';
 import 'pages/error_404_page.dart';
 import 'core/locale_controller.dart';
@@ -114,6 +115,7 @@ import 'pages/public/public_person_share_link_page.dart';
 import 'pages/admin/ai_settings_page.dart';
 import 'pages/admin/ai_plans_admin_page.dart';
 import 'pages/admin/ai_prompts_admin_page.dart';
+import 'pages/admin/tax_product_codes_page.dart';
 import 'pages/business/ai_subscription_page.dart';
 import 'pages/business/ai_usage_page.dart';
 
@@ -1074,6 +1076,20 @@ class _MyAppState extends State<MyApp> {
                   },
                 ),
                 GoRoute(
+                  path: 'tax-product-codes',
+                  name: 'system_settings_tax_product_codes',
+                  builder: (context, state) {
+                    if (_authStore == null) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    final allowed = _authStore!.isSuperAdmin || _authStore!.hasAppPermission('system_settings');
+                    if (!allowed) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    return const TaxProductCodesPage();
+                  },
+                ),
+                GoRoute(
                   path: 'storage-plans',
                   name: 'system_settings_storage_plans',
                   builder: (context, state) {
@@ -1739,6 +1755,21 @@ class _MyAppState extends State<MyApp> {
                 }
                 return NoTransitionPage(
                   child: DocumentNumberingSettingsPage(businessId: businessId),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/settings/tax',
+              name: 'business_settings_tax',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                if (!_authStore!.hasBusinessPermission('settings', 'join')) {
+                  return NoTransitionPage(
+                    child: PermissionGuard.buildAccessDeniedPage(),
+                  );
+                }
+                return NoTransitionPage(
+                  child: TaxSettingsPage(businessId: businessId),
                 );
               },
             ),
