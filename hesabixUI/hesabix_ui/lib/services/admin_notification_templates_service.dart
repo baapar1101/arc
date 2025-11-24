@@ -4,12 +4,13 @@ class AdminNotificationTemplatesService {
   final ApiClient _api;
   AdminNotificationTemplatesService(this._api);
 
-  Future<Map<String, dynamic>> list({String? eventKey, String? channel}) async {
+  Future<Map<String, dynamic>> list({String? eventKey, String? channel, bool? isActive}) async {
     final res = await _api.get<Map<String, dynamic>>(
       '/api/v1/admin/notification-templates',
       query: {
         if (eventKey != null && eventKey.isNotEmpty) 'event_key': eventKey,
         if (channel != null && channel.isNotEmpty) 'channel': channel,
+        if (isActive != null) 'is_active': isActive.toString(),
       },
     );
     return Map<String, dynamic>.from(res.data?['data'] as Map? ?? const {});

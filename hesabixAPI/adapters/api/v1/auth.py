@@ -9,6 +9,7 @@ from adapters.db.session import get_db
 from app.core.responses import success_response, format_datetime_fields
 from app.services.captcha_service import create_captcha
 from app.services.auth_service import register_user, login_user, create_password_reset, reset_password, change_password, referral_stats
+from app.services.email_verification_service import verify_email_token, resend_verification_email
 from app.services.pdf import PDFService
 from .schemas import (
 	RegisterRequest, LoginRequest, ForgotPasswordRequest, ResetPasswordRequest, 
@@ -162,6 +163,15 @@ def get_current_user_info(
 	}
 )
 def register(request: Request, payload: RegisterRequest, db: Session = Depends(get_db)) -> dict:
+	# ساخت base_url از request برای verification email
+	base_url = None
+	if request.headers.get("X-Forwarded-Host"):
+		proto = request.headers.get("X-Forwarded-Proto", "https")
+		host = request.headers.get("X-Forwarded-Host")
+		base_url = f"{proto}://{host}"
+	elif request.url:
+		base_url = str(request.url).replace(request.url.path, "").rstrip("/")
+	
 	user_id = register_user(
 		db=db,
 		first_name=payload.first_name,
@@ -172,6 +182,7 @@ def register(request: Request, payload: RegisterRequest, db: Session = Depends(g
 		captcha_id=payload.captcha_id,
 		captcha_code=payload.captcha_code,
 		referrer_code=payload.referrer_code,
+		base_url=base_url,
 	)
 	# Create a session api key similar to login
 	user_agent = request.headers.get("User-Agent")
@@ -183,7 +194,16 @@ def register(request: Request, payload: RegisterRequest, db: Session = Depends(g
 	api_repo.create_session_key(user_id=user_id, key_hash=key_hash, device_id=payload.device_id, user_agent=user_agent, ip=ip, expires_at=None)
 	from adapters.db.models.user import User
 	user_obj = db.get(User, user_id)
-	user = {"id": user_id, "first_name": payload.first_name, "last_name": payload.last_name, "email": payload.email, "mobile": payload.mobile, "referral_code": getattr(user_obj, "referral_code", None), "app_permissions": getattr(user_obj, "app_permissions", None)}
+	user = {
+		"id": user_id, 
+		"first_name": payload.first_name, 
+		"last_name": payload.last_name, 
+		"email": payload.email, 
+		"mobile": payload.mobile, 
+		"referral_code": getattr(user_obj, "referral_code", None), 
+		"app_permissions": getattr(user_obj, "app_permissions", None),
+		"email_verified": getattr(user_obj, "email_verified", False)
+	}
 	response_data = {"api_key": api_key, "expires_at": None, "user": user}
 	formatted_data = format_datetime_fields(response_data, request)
 	return success_response(formatted_data, request)
@@ -942,4 +962,122 @@ def export_referrals_excel(
 			"Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 		}
 	)
+
+
+@router.get(
+	"/verify-email",
+	summary="تایید ایمیل کاربر",
+	description="تایید ایمیل کاربر با استفاده از token ارسال شده در ایمیل verification",
+	response_model=SuccessResponse,
+	responses={
+		200: {
+			"description": "ایمیل با موفقیت تایید شد",
+			"content": {
+				"application/json": {
+					"example": {
+						"success": True,
+						"message": "ایمیل با موفقیت تایید شد",
+						"data": {
+							"user_id": 1,
+							"email": "user@example.com",
+							"email_verified": True
+						}
+					}
+				}
+			}
+		},
+		400: {
+			"description": "Token نامعتبر یا منقضی شده",
+			"content": {
+				"application/json": {
+					"example": {
+						"success": False,
+						"error_code": "INVALID_TOKEN",
+						"message": "Token نامعتبر یا استفاده شده است"
+					}
+				}
+			}
+		}
+	}
+)
+def verify_email(
+	request: Request,
+	token: str = Query(..., description="Token verification از ایمیل"),
+	db: Session = Depends(get_db)
+) -> dict:
+	"""تایید ایمیل کاربر با token"""
+	user = verify_email_token(db, token)
+	
+	response_data = {
+		"user_id": user.id,
+		"email": user.email,
+		"email_verified": user.email_verified
+	}
+	
+	return success_response(response_data, request, message="EMAIL_VERIFIED")
+
+
+@router.post(
+	"/resend-verification",
+	summary="ارسال مجدد ایمیل verification",
+	description="ارسال مجدد ایمیل verification برای کاربر. نیاز به authentication دارد.",
+	response_model=SuccessResponse,
+	responses={
+		200: {
+			"description": "ایمیل verification با موفقیت ارسال شد",
+			"content": {
+				"application/json": {
+					"example": {
+						"success": True,
+						"message": "ایمیل verification با موفقیت ارسال شد"
+					}
+				}
+			}
+		},
+		400: {
+			"description": "ایمیل قبلاً تایید شده یا تنظیم نشده",
+			"content": {
+				"application/json": {
+					"example": {
+						"success": False,
+						"error_code": "EMAIL_ALREADY_VERIFIED",
+						"message": "ایمیل کاربر قبلاً تایید شده است"
+					}
+				}
+			}
+		},
+		429: {
+			"description": "تعداد درخواست‌ها بیش از حد مجاز",
+			"content": {
+				"application/json": {
+					"example": {
+						"success": False,
+						"error_code": "RATE_LIMIT_EXCEEDED",
+						"message": "شما بیش از حد مجاز درخواست ارسال مجدد داده‌اید"
+					}
+				}
+			}
+		}
+	}
+)
+def resend_verification(
+	request: Request,
+	ctx: AuthContext = Depends(get_current_user),
+	db: Session = Depends(get_db)
+) -> dict:
+	"""ارسال مجدد ایمیل verification"""
+	user_id = ctx.get_user_id()
+	
+	# ساخت base_url از request
+	base_url = None
+	if request.headers.get("X-Forwarded-Host"):
+		proto = request.headers.get("X-Forwarded-Proto", "https")
+		host = request.headers.get("X-Forwarded-Host")
+		base_url = f"{proto}://{host}"
+	elif request.url:
+		base_url = str(request.url).replace(request.url.path, "").rstrip("/")
+	
+	resend_verification_email(db, user_id, base_url)
+	
+	return success_response({}, request, message="VERIFICATION_EMAIL_SENT")
 

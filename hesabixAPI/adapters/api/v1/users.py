@@ -446,38 +446,42 @@ def get_user(
 	# دریافت اطلاعات پایه کاربر
 	user_dict = repo.to_dict(user, include_extended=True)
 	
-	# دریافت کسب‌وکارهای کاربر
-	from adapters.db.repositories.business_permission_repo import BusinessPermissionRepository
-	from adapters.db.models.business import Business
-	bp_repo = BusinessPermissionRepository(db)
-	business_permissions = bp_repo.get_user_businesses(user_id)
+	# دریافت کسب‌وکارهای کاربر (هم مالک و هم عضو)
+	# استفاده از متد get_user_businesses که قبلاً تست شده و در business_service موجود است
+	from app.services.business_service import get_user_businesses
+	query_info = {"skip": 0, "take": 1000}  # دریافت همه کسب‌وکارها بدون محدودیت
+	businesses_result = get_user_businesses(db, user_id, query_info)
 	
+	# تبدیل فرمت کسب‌وکارها به فرمت مورد نیاز برای نمایش در مدیریت کاربران
 	businesses = []
-	for bp in business_permissions:
-		business = db.get(Business, bp.business_id)
-		if business:
-			# تعیین نقش کاربر در کسب‌وکار
-			role = "user"
-			if business.owner_id == user_id:
-				role = "owner"
-			elif bp.business_permissions:
-				# بررسی نقش از permissions
-				perms = bp.business_permissions
-				if perms.get("admin"):
+	for business_item in businesses_result.get("items", []):
+		# تبدیل نقش از فارسی به انگلیسی برای سازگاری با UI
+		role = business_item.get("role", "user")
+		if role == "مالک":
+			role = "owner"
+		elif role == "عضو":
+			# بررسی permissions برای تعیین نقش دقیق‌تر
+			permissions = business_item.get("permissions", {})
+			if isinstance(permissions, dict):
+				if permissions.get("admin"):
 					role = "admin"
-				elif perms.get("operator"):
+				elif permissions.get("operator"):
 					role = "operator"
-				elif perms.get("supervisor"):
+				elif permissions.get("supervisor"):
 					role = "supervisor"
-			
-			businesses.append({
-				"id": business.id,
-				"name": business.name,
-				"field": business.business_field.value if business.business_field else None,
-				"role": role,
-				"status": "active",  # می‌تواند از business status استخراج شود
-				"created_at": bp.created_at,
-			})
+				else:
+					role = "user"
+			else:
+				role = "user"
+		
+		businesses.append({
+			"id": business_item.get("id"),
+			"name": business_item.get("name"),
+			"field": business_item.get("business_field"),
+			"role": role,
+			"status": "active",
+			"created_at": business_item.get("created_at"),
+		})
 	
 	user_dict["businesses"] = businesses
 	

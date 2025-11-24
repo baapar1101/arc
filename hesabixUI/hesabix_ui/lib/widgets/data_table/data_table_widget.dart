@@ -278,40 +278,48 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
       final res = await api.post<Map<String, dynamic>>(widget.config.endpoint, data: requestData);
       final body = res.data;
       
-      if (body is Map<String, dynamic>) {
-        final response = DataTableResponse<T>.fromJson(body, widget.fromJson);
-        
-        // Extract summary from API response if available
-        Map<String, dynamic>? summaryData;
-        if (body['data'] is Map<String, dynamic>) {
-          summaryData = body['data']['summary'] as Map<String, dynamic>?;
-        }
-        
-        if (mounted) {
-          setState(() {
-            _items = response.items;
-            _page = response.page;
-            _limit = response.limit;
-            _total = response.total;
-            _totalPages = response.totalPages;
-            _summary = summaryData;
-            _selectedRows.clear(); // Clear selection when data changes
-            _activeRowIndex = _items.isNotEmpty ? 0 : -1;
-            _lastSelectedRowIndex = null;
-          });
-        }
-        
-        // Auto-fit columns on first load if configured
-        await _maybeAutoFitColumns();
-        
-        // Call the refresh callback if provided
-        if (widget.onRefresh != null) {
-          widget.onRefresh!();
-        } else if (widget.config.onRefresh != null) {
-          widget.config.onRefresh!();
-        }
+      if (body == null) {
+        throw Exception('Response data is null');
       }
-    } catch (e) {
+      
+      if (body is! Map<String, dynamic>) {
+        throw FormatException('Invalid response format: expected Map<String, dynamic>, got ${body.runtimeType}');
+      }
+      
+      final response = DataTableResponse<T>.fromJson(body, widget.fromJson);
+      
+      // Extract summary from API response if available
+      Map<String, dynamic>? summaryData;
+      if (body['data'] is Map<String, dynamic>) {
+        summaryData = body['data']['summary'] as Map<String, dynamic>?;
+      }
+      
+      if (mounted) {
+        setState(() {
+          _items = response.items;
+          _page = response.page;
+          _limit = response.limit;
+          _total = response.total;
+          _totalPages = response.totalPages;
+          _summary = summaryData;
+          _selectedRows.clear(); // Clear selection when data changes
+          _activeRowIndex = _items.isNotEmpty ? 0 : -1;
+          _lastSelectedRowIndex = null;
+        });
+      }
+      
+      // Auto-fit columns on first load if configured
+      await _maybeAutoFitColumns();
+      
+      // Call the refresh callback if provided
+      if (widget.onRefresh != null) {
+        widget.onRefresh!();
+      } else if (widget.config.onRefresh != null) {
+        widget.config.onRefresh!();
+      }
+    } catch (e, stackTrace) {
+      debugPrint('Error fetching data: $e');
+      debugPrint('Stack trace: $stackTrace');
       if (mounted) {
         setState(() {
           _error = e.toString();

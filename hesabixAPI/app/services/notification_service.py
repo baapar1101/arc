@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from typing import Any, Dict, Iterable, Optional
+from typing import Any, Dict, Iterable, Optional, List
 
 from sqlalchemy.orm import Session
 
@@ -209,5 +209,55 @@ class NotificationService:
 				outbox.error_message = "unknown_channel"
 				self.db.add(outbox)
 				self.db.commit()
+
+	def notify_support_operators(
+		self,
+		event_key: str,
+		context: Dict[str, Any],
+		assigned_operator_id: Optional[int] = None,
+		locale: Optional[str] = None
+	) -> None:
+		"""
+		ارسال ناتیفیکیشن به اپراتورهای پشتیبانی
+		
+		Args:
+			event_key: کلید رویداد (مثلاً "support.ticket_created")
+			context: داده‌های context برای قالب
+			assigned_operator_id: اگر مشخص باشد، فقط به این اپراتور ارسال می‌شود
+			locale: زبان مورد نظر (اختیاری)
+		"""
+		import logging
+		logger = logging.getLogger(__name__)
+		
+		if assigned_operator_id:
+			# ارسال فقط به اپراتور تخصیص‌یافته
+			operator = self.user_repo.get_by_id(assigned_operator_id)
+			if operator and operator.is_active:
+				try:
+					self.send(
+						user_id=operator.id,
+						event_key=event_key,
+						context=context,
+						preferred_channels=["inapp", "email", "telegram", "sms"],
+						locale=locale
+					)
+				except Exception as e:
+					logger.error(f"خطا در ارسال ناتیفیکیشن به اپراتور {operator.id}: {e}")
+		else:
+			# ارسال به تمام اپراتورها
+			operators = self.user_repo.get_support_operators()
+			for operator in operators:
+				try:
+					self.send(
+						user_id=operator.id,
+						event_key=event_key,
+						context=context,
+						preferred_channels=["inapp", "email", "telegram", "sms"],
+						locale=locale
+					)
+				except Exception as e:
+					# در صورت خطا، ادامه می‌دهیم تا به سایر اپراتورها ارسال شود
+					logger.error(f"خطا در ارسال ناتیفیکیشن به اپراتور {operator.id}: {e}")
+					continue
 
 

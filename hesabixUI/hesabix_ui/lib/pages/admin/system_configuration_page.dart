@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/utils/number_normalizer.dart';
+import '../../core/api_client.dart';
+import '../../services/admin_system_settings_service.dart';
 import '../../utils/snackbar_helper.dart';
 
 class SystemConfigurationPage extends StatefulWidget {
@@ -14,11 +16,14 @@ class SystemConfigurationPage extends StatefulWidget {
 
 class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
   final _formKey = GlobalKey<FormState>();
+  final _service = AdminSystemSettingsService(ApiClient());
   bool _isLoading = false;
+  bool _isLoadingData = true;
+  String? _error;
 
   // Configuration values
-  String _appName = 'Hesabix';
-  String _appVersion = '1.0.0';
+  String _appName = '';
+  String _appVersion = '';
   String _defaultLanguage = 'fa';
   String _defaultTheme = 'system';
   bool _enableRegistration = true;
@@ -29,9 +34,121 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
   int _maxUsers = 1000;
 
   @override
+  void initState() {
+    super.initState();
+    _loadConfiguration();
+  }
+
+  Future<void> _loadConfiguration() async {
+    setState(() {
+      _isLoadingData = true;
+      _error = null;
+    });
+
+    try {
+      final data = await _service.getSystemConfiguration();
+      if (mounted) {
+        setState(() {
+          _appName = data['app_name']?.toString() ?? 'Hesabix';
+          _appVersion = data['app_version']?.toString() ?? '1.0.0';
+          _defaultLanguage = data['default_language']?.toString() ?? 'fa';
+          _defaultTheme = data['default_theme']?.toString() ?? 'system';
+          _enableRegistration = data['enable_registration'] as bool? ?? true;
+          _enableEmailVerification = data['enable_email_verification'] as bool? ?? true;
+          _enableMaintenanceMode = data['enable_maintenance_mode'] as bool? ?? false;
+          _sessionTimeout = data['session_timeout'] as int? ?? 30;
+          _maxFileSize = data['max_file_size'] as int? ?? 10;
+          _maxUsers = data['max_users'] as int? ?? 1000;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        final t = AppLocalizations.of(context);
+        setState(() {
+          _error = '${t.errorLoadingSettings}: $e';
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${t.errorLoadingSettings}: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoadingData = false;
+        });
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final t = AppLocalizations.of(context);
+
+    if (_isLoadingData) {
+      return Scaffold(
+        appBar: AppBar(
+          title: Text(
+            t.systemConfiguration,
+            style: theme.textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: theme.colorScheme.onPrimary,
+            ),
+          ),
+          backgroundColor: theme.colorScheme.primary,
+          foregroundColor: theme.colorScheme.onPrimary,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => context.go('/user/profile/system-settings'),
+          ),
+        ),
+        body: const Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    if (_error != null && _appName.isEmpty) {
+      return Scaffold(
+        appBar: AppBar(
+          title: Text(
+            t.systemConfiguration,
+            style: theme.textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: theme.colorScheme.onPrimary,
+            ),
+          ),
+          backgroundColor: theme.colorScheme.primary,
+          foregroundColor: theme.colorScheme.onPrimary,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => context.go('/user/profile/system-settings'),
+          ),
+        ),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                _error!,
+                style: const TextStyle(color: Colors.red),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: _loadConfiguration,
+                child: Text(t.retry),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -86,31 +203,31 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
                   Icons.settings_outlined,
                   [
                     _buildTextField(
-                      label: 'Application Name',
+                      label: t.applicationName,
                       value: _appName,
                       onChanged: (value) => setState(() => _appName = value),
                     ),
                     _buildTextField(
-                      label: 'Application Version',
+                      label: t.applicationVersion,
                       value: _appVersion,
                       onChanged: (value) => setState(() => _appVersion = value),
                     ),
                     _buildDropdownField(
-                      label: 'Default Language',
+                      label: t.defaultLanguage,
                       value: _defaultLanguage,
-                      items: const [
-                        DropdownMenuItem(value: 'fa', child: Text('فارسی')),
-                        DropdownMenuItem(value: 'en', child: Text('English')),
+                      items: [
+                        DropdownMenuItem(value: 'fa', child: Text(t.persian)),
+                        DropdownMenuItem(value: 'en', child: Text(t.english)),
                       ],
                       onChanged: (value) => setState(() => _defaultLanguage = value!),
                     ),
                     _buildDropdownField(
-                      label: 'Default Theme',
+                      label: t.defaultTheme,
                       value: _defaultTheme,
-                      items: const [
-                        DropdownMenuItem(value: 'system', child: Text('System')),
-                        DropdownMenuItem(value: 'light', child: Text('Light')),
-                        DropdownMenuItem(value: 'dark', child: Text('Dark')),
+                      items: [
+                        DropdownMenuItem(value: 'system', child: Text(t.system)),
+                        DropdownMenuItem(value: 'light', child: Text(t.light)),
+                        DropdownMenuItem(value: 'dark', child: Text(t.dark)),
                       ],
                       onChanged: (value) => setState(() => _defaultTheme = value!),
                     ),
@@ -123,21 +240,23 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
                   Icons.security_outlined,
                   [
                     _buildSwitchField(
-                      label: 'Enable User Registration',
+                      label: t.enableUserRegistration,
                       value: _enableRegistration,
                       onChanged: (value) => setState(() => _enableRegistration = value),
                     ),
                     _buildSwitchField(
-                      label: 'Enable Email Verification',
+                      label: t.enableEmailVerification,
                       value: _enableEmailVerification,
                       onChanged: (value) => setState(() => _enableEmailVerification = value),
                     ),
                     _buildNumberField(
-                      label: 'Session Timeout (minutes)',
+                      label: t.sessionTimeoutMinutes,
                       value: _sessionTimeout,
                       onChanged: (value) => setState(() => _sessionTimeout = value),
-                      min: 5,
+                      min: 0,
                       max: 1440,
+                      allowUnlimited: true,
+                      unlimitedLabel: t.unlimited,
                     ),
                   ],
                 ),
@@ -148,23 +267,25 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
                   Icons.build_outlined,
                   [
                     _buildSwitchField(
-                      label: 'Maintenance Mode',
+                      label: t.maintenanceMode,
                       value: _enableMaintenanceMode,
                       onChanged: (value) => setState(() => _enableMaintenanceMode = value),
                     ),
                     _buildNumberField(
-                      label: 'Max File Size (MB)',
+                      label: t.maxFileSizeMB,
                       value: _maxFileSize,
                       onChanged: (value) => setState(() => _maxFileSize = value),
                       min: 1,
                       max: 1000,
                     ),
                     _buildNumberField(
-                      label: 'Max Users',
+                      label: t.maxUsers,
                       value: _maxUsers,
                       onChanged: (value) => setState(() => _maxUsers = value),
-                      min: 1,
+                      min: 0,
                       max: 10000,
+                      allowUnlimited: true,
+                      unlimitedLabel: t.unlimited,
                     ),
                   ],
                 ),
@@ -275,27 +396,42 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
     required ValueChanged<int> onChanged,
     required int min,
     required int max,
+    bool allowUnlimited = false,
+    String? unlimitedLabel,
   }) {
+    final t = AppLocalizations.of(context);
+    final effectiveMin = allowUnlimited && min == 0 ? 0 : min;
+    final displayValue = value.toString();
+    final finalUnlimitedLabel = unlimitedLabel ?? t.unlimited;
+    final suffixText = value == 0 && allowUnlimited ? ' ($finalUnlimitedLabel)' : '';
+    
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Row(
         children: [
           Expanded(
             child: TextFormField(
-              initialValue: value.toString(),
+              key: ValueKey('$label-$value'),
+              initialValue: displayValue,
               decoration: InputDecoration(
                 labelText: label,
+                helperText: allowUnlimited ? t.zeroMeansUnlimited : null,
+                suffixText: suffixText,
                 border: const OutlineInputBorder(),
               ),
               keyboardType: TextInputType.number,
-        inputFormatters: [
-          EnglishDigitsFormatter(),
-          FilteringTextInputFormatter.digitsOnly,
-        ],
-              onChanged: (value) {
-                final intValue = int.tryParse(value);
-                if (intValue != null && intValue >= min && intValue <= max) {
-                  onChanged(intValue);
+              inputFormatters: [
+                EnglishDigitsFormatter(),
+                FilteringTextInputFormatter.allow(RegExp(r'[0-9]')),
+              ],
+              onChanged: (inputValue) {
+                final intValue = int.tryParse(inputValue);
+                if (intValue != null) {
+                  if (intValue == 0 && allowUnlimited) {
+                    onChanged(0);
+                  } else if (intValue >= effectiveMin && intValue <= max) {
+                    onChanged(intValue);
+                  }
                 }
               },
             ),
@@ -308,7 +444,7 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
                 icon: const Icon(Icons.add),
               ),
               IconButton(
-                onPressed: value > min ? () => onChanged(value - 1) : null,
+                onPressed: value > effectiveMin ? () => onChanged(value - 1) : null,
                 icon: const Icon(Icons.remove),
               ),
             ],
@@ -324,22 +460,34 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
     setState(() => _isLoading = true);
 
     try {
-      // Simulate API call
-      await Future.delayed(const Duration(seconds: 2));
+      await _service.updateSystemConfiguration({
+        'app_name': _appName.trim(),
+        'app_version': _appVersion.trim(),
+        'default_language': _defaultLanguage,
+        'default_theme': _defaultTheme,
+        'enable_registration': _enableRegistration,
+        'enable_email_verification': _enableEmailVerification,
+        'enable_maintenance_mode': _enableMaintenanceMode,
+        'session_timeout': _sessionTimeout,
+        'max_file_size': _maxFileSize,
+        'max_users': _maxUsers,
+      });
 
       if (mounted) {
+        final t = AppLocalizations.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(AppLocalizations.of(context).save),
+            content: Text(t.settingsSavedSuccessfully),
             backgroundColor: Colors.green,
           ),
         );
       }
     } catch (e) {
       if (mounted) {
+        final t = AppLocalizations.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error: $e'),
+            content: Text('${t.errorSavingSettings}: $e'),
             backgroundColor: Colors.red,
           ),
         );

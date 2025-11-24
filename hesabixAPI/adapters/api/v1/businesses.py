@@ -145,6 +145,53 @@ def list_user_businesses(
     return success_response(formatted_data, request)
 
 
+@router.get(
+    "/{business_id}/print-settings",
+    summary="تنظیمات چاپ فاکتورهای کسب‌وکار",
+    description="دریافت تنظیمات چاپ فاکتور (لوگو، مهر، پرداخت‌ها، اقساط و متن انتهایی) به‌صورت پیش‌فرض و به تفکیک نوع فاکتور.",
+    response_model=SuccessResponse,
+)
+async def get_business_print_settings_endpoint(
+    request: Request,
+    business_id: int,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("settings", "print")),
+) -> dict:
+    """دریافت تنظیمات چاپ فاکتورهای یک کسب‌وکار."""
+    # بررسی وجود کسب‌وکار (require_business_permission_dep دسترسی را چک کرده است)
+    business = db.query(Business).filter(Business.id == business_id).first()
+    if not business:
+        raise HTTPException(status_code=404, detail="کسب و کار یافت نشد")
+
+    data = get_business_print_settings(db, business_id)
+    return success_response(data, request)
+
+
+@router.put(
+    "/{business_id}/print-settings",
+    summary="ویرایش تنظیمات چاپ فاکتورهای کسب‌وکار",
+    description="ذخیره تنظیمات چاپ فاکتور (لوگو، مهر، پرداخت‌ها، اقساط و متن انتهایی) به‌صورت پیش‌فرض و به تفکیک نوع فاکتور.",
+    response_model=SuccessResponse,
+)
+async def update_business_print_settings_endpoint(
+    request: Request,
+    business_id: int,
+    payload: Dict[str, Any],
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("settings", "print")),
+) -> dict:
+    """ویرایش تنظیمات چاپ فاکتورهای یک کسب‌وکار."""
+    # بررسی وجود کسب‌وکار (require_business_permission_dep دسترسی را چک کرده است)
+    business = db.query(Business).filter(Business.id == business_id).first()
+    if not business:
+        raise HTTPException(status_code=404, detail="کسب و کار یافت نشد")
+
+    updated = update_business_print_settings(db, business_id, payload or {})
+    return success_response(updated, request, "تنظیمات چاپ با موفقیت ذخیره شد")
+
+
 @router.get("/{business_id}", 
     summary="جزئیات کسب و کار", 
     description="دریافت جزئیات یک کسب و کار خاص",
@@ -570,52 +617,3 @@ def get_business_stats(
     owner_id = ctx.get_user_id()
     stats = get_business_summary(db, owner_id)
     return success_response(stats, request)
-
-
-@router.get(
-    "/{business_id}/print-settings",
-    summary="تنظیمات چاپ فاکتورهای کسب‌وکار",
-    description="دریافت تنظیمات چاپ فاکتور (لوگو، مهر، پرداخت‌ها، اقساط و متن انتهایی) به‌صورت پیش‌فرض و به تفکیک نوع فاکتور.",
-    response_model=SuccessResponse,
-)
-@require_business_access("business_id")
-def get_business_print_settings_endpoint(
-    request: Request,
-    business_id: int,
-    ctx: AuthContext = Depends(get_current_user),
-    db: Session = Depends(get_db),
-    _: None = Depends(require_business_permission_dep("settings", "print")),
-) -> dict:
-    """دریافت تنظیمات چاپ فاکتورهای یک کسب‌وکار."""
-    owner_id = ctx.get_user_id()
-    business = get_business_by_id(db, business_id, owner_id)
-    if not business:
-        raise HTTPException(status_code=404, detail="کسب و کار یافت نشد")
-
-    data = get_business_print_settings(db, business_id)
-    return success_response(data, request)
-
-
-@router.put(
-    "/{business_id}/print-settings",
-    summary="ویرایش تنظیمات چاپ فاکتورهای کسب‌وکار",
-    description="ذخیره تنظیمات چاپ فاکتور (لوگو، مهر، پرداخت‌ها، اقساط و متن انتهایی) به‌صورت پیش‌فرض و به تفکیک نوع فاکتور.",
-    response_model=SuccessResponse,
-)
-@require_business_access("business_id")
-def update_business_print_settings_endpoint(
-    request: Request,
-    business_id: int,
-    payload: Dict[str, Any],
-    ctx: AuthContext = Depends(get_current_user),
-    db: Session = Depends(get_db),
-    _: None = Depends(require_business_permission_dep("settings", "print")),
-) -> dict:
-    """ویرایش تنظیمات چاپ فاکتورهای یک کسب‌وکار."""
-    owner_id = ctx.get_user_id()
-    business = get_business_by_id(db, business_id, owner_id)
-    if not business:
-        raise HTTPException(status_code=404, detail="کسب و کار یافت نشد")
-
-    updated = update_business_print_settings(db, business_id, payload or {})
-    return success_response(updated, request, "تنظیمات چاپ با موفقیت ذخیره شد")

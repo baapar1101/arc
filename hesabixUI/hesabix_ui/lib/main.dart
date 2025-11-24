@@ -284,7 +284,7 @@ class _MyAppState extends State<MyApp> {
       MarketingPage(calendarController: calendarController);
       const UserSignaturePage();
       const ChangePasswordPage();
-      const UserNotificationsPage();
+      UserNotificationsPage(calendarController: calendarController);
       OperatorTicketsPage(calendarController: calendarController);
       const SystemSettingsPage();
       const WalletSettingsPage();
@@ -847,7 +847,7 @@ class _MyAppState extends State<MyApp> {
             GoRoute(
               path: '/user/profile/notifications',
               name: 'profile_notifications',
-              builder: (context, state) => const UserNotificationsPage(),
+              builder: (context, state) => UserNotificationsPage(calendarController: _calendarController!),
             ),
             GoRoute(
               path: '/user/profile/operator',

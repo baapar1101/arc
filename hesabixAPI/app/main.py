@@ -3,6 +3,9 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.settings import get_settings
 from app.core.logging import configure_logging
+from adapters.db.session import get_db
+from app.services.system_settings_service import get_app_name, get_app_version, is_maintenance_mode_enabled
+from app.core.responses import ApiError
 from adapters.api.v1.health import router as health_router
 from adapters.api.v1.auth import router as auth_router
 from adapters.api.v1.users import router as users_router
@@ -78,9 +81,25 @@ def create_app() -> FastAPI:
     settings = get_settings()
     configure_logging(settings)
 
+    # خواندن تنظیمات از DB در صورت امکان، در غیر این صورت از env
+    app_name = settings.app_name
+    app_version = settings.app_version
+    try:
+        # تلاش برای خواندن از DB (در startup event به‌روزرسانی می‌شود)
+        db_gen = get_db()
+        db = next(db_gen)
+        try:
+            app_name = get_app_name(db)
+            app_version = get_app_version(db)
+        finally:
+            db.close()
+    except Exception:
+        # در صورت خطا از env استفاده می‌شود
+        pass
+
     application = FastAPI(
-        title=settings.app_name,
-        version=settings.app_version,
+        title=app_name,
+        version=app_version,
         debug=settings.debug,
         description="""
         # Hesabix API
@@ -310,8 +329,58 @@ def create_app() -> FastAPI:
         return response
 
     @application.middleware("http")
+    async def maintenance_mode_middleware(request: Request, call_next):
+        """بررسی حالت تعمیرات - باید قبل از سایر middleware ها باشد"""
+        # استثنا برای endpoint های health و admin system settings
+        if request.url.path in ["/", "/health", "/api/v1/health"] or \
+           request.url.path.startswith("/api/v1/admin/system-settings/configuration"):
+            response = await call_next(request)
+            return response
+        
+        # بررسی maintenance mode
+        db_gen = get_db()
+        db = next(db_gen)
+        try:
+            if is_maintenance_mode_enabled(db):
+                # اجازه دسترسی به admin endpoints برای مدیریت maintenance mode
+                if request.url.path.startswith("/api/v1/admin/system-settings"):
+                    response = await call_next(request)
+                    return response
+                # برای سایر درخواست‌ها خطا برگردان
+                from fastapi.responses import JSONResponse
+                return JSONResponse(
+                    status_code=503,
+                    content={
+                        "success": False,
+                        "error_code": "MAINTENANCE_MODE",
+                        "message": "سیستم در حال تعمیرات است. لطفاً بعداً تلاش کنید."
+                    }
+                )
+        finally:
+            db.close()
+        
+        response = await call_next(request)
+        return response
+
+    @application.middleware("http")
     async def add_locale(request: Request, call_next):
-        lang = negotiate_locale(request.headers.get("Accept-Language"))
+        # استفاده از default_language از DB در صورت نبود Accept-Language
+        accept_language = request.headers.get("Accept-Language")
+        lang = negotiate_locale(accept_language)
+        
+        # اگر زبان تشخیص داده نشد، از تنظیمات سیستم استفاده کن
+        if not accept_language:
+            db_gen = get_db()
+            db = next(db_gen)
+            try:
+                from app.services.system_settings_service import get_default_language
+                default_lang = get_default_language(db)
+                lang = default_lang
+            except Exception:
+                pass
+            finally:
+                db.close()
+        
         request.state.locale = lang
         request.state.translator = Translator(lang)
         response = await call_next(request)
@@ -479,7 +548,15 @@ def create_app() -> FastAPI:
         tags=["general"]
     )
     def read_root() -> dict[str, str]:
-        return {"service": settings.app_name, "version": settings.app_version}
+        # خواندن از DB در هر درخواست برای به‌روز بودن
+        db_gen = get_db()
+        db = next(db_gen)
+        try:
+            current_app_name = get_app_name(db)
+            current_app_version = get_app_version(db)
+            return {"service": current_app_name, "version": current_app_version}
+        finally:
+            db.close()
     
     # اضافه کردن security schemes
     from fastapi.openapi.utils import get_openapi

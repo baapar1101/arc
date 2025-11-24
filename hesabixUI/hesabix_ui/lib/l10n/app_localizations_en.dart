@@ -5307,4 +5307,61 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get printWarehouseDocument => 'Print PDF';
+
+  @override
+  String get applicationName => 'Application Name';
+
+  @override
+  String get applicationVersion => 'Application Version';
+
+  @override
+  String get defaultLanguage => 'Default Language';
+
+  @override
+  String get defaultTheme => 'Default Theme';
+
+  @override
+  String get enableUserRegistration => 'Enable User Registration';
+
+  @override
+  String get enableEmailVerification => 'Enable Email Verification';
+
+  @override
+  String get sessionTimeout => 'Session Timeout';
+
+  @override
+  String get sessionTimeoutMinutes => 'Session Timeout (minutes)';
+
+  @override
+  String get maxFileSize => 'Max File Size';
+
+  @override
+  String get maxFileSizeMB => 'Max File Size (MB)';
+
+  @override
+  String get maxUsers => 'Max Users';
+
+  @override
+  String get maintenanceMode => 'Maintenance Mode';
+
+  @override
+  String get unlimited => 'Unlimited';
+
+  @override
+  String get errorLoadingSettings => 'Error loading settings';
+
+  @override
+  String get errorSavingSettings => 'Error saving settings';
+
+  @override
+  String get settingsSavedSuccessfully => 'Settings saved successfully';
+
+  @override
+  String get persian => 'Persian';
+
+  @override
+  String get english => 'English';
+
+  @override
+  String get zeroMeansUnlimited => '0 = Unlimited';
 }

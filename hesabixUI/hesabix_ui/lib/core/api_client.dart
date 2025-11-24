@@ -35,6 +35,10 @@ class ApiClient {
     _authStore = store;
   }
 
+  static AuthStore? getAuthStore() {
+    return _authStore;
+  }
+
   static void bindCalendarController(CalendarController controller) {
     _calendarController = controller;
   }

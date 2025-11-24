@@ -10123,6 +10123,120 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Print PDF'**
   String get printWarehouseDocument;
+
+  /// No description provided for @applicationName.
+  ///
+  /// In en, this message translates to:
+  /// **'Application Name'**
+  String get applicationName;
+
+  /// No description provided for @applicationVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'Application Version'**
+  String get applicationVersion;
+
+  /// No description provided for @defaultLanguage.
+  ///
+  /// In en, this message translates to:
+  /// **'Default Language'**
+  String get defaultLanguage;
+
+  /// No description provided for @defaultTheme.
+  ///
+  /// In en, this message translates to:
+  /// **'Default Theme'**
+  String get defaultTheme;
+
+  /// No description provided for @enableUserRegistration.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable User Registration'**
+  String get enableUserRegistration;
+
+  /// No description provided for @enableEmailVerification.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable Email Verification'**
+  String get enableEmailVerification;
+
+  /// No description provided for @sessionTimeout.
+  ///
+  /// In en, this message translates to:
+  /// **'Session Timeout'**
+  String get sessionTimeout;
+
+  /// No description provided for @sessionTimeoutMinutes.
+  ///
+  /// In en, this message translates to:
+  /// **'Session Timeout (minutes)'**
+  String get sessionTimeoutMinutes;
+
+  /// No description provided for @maxFileSize.
+  ///
+  /// In en, this message translates to:
+  /// **'Max File Size'**
+  String get maxFileSize;
+
+  /// No description provided for @maxFileSizeMB.
+  ///
+  /// In en, this message translates to:
+  /// **'Max File Size (MB)'**
+  String get maxFileSizeMB;
+
+  /// No description provided for @maxUsers.
+  ///
+  /// In en, this message translates to:
+  /// **'Max Users'**
+  String get maxUsers;
+
+  /// No description provided for @maintenanceMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Maintenance Mode'**
+  String get maintenanceMode;
+
+  /// No description provided for @unlimited.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlimited'**
+  String get unlimited;
+
+  /// No description provided for @errorLoadingSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Error loading settings'**
+  String get errorLoadingSettings;
+
+  /// No description provided for @errorSavingSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Error saving settings'**
+  String get errorSavingSettings;
+
+  /// No description provided for @settingsSavedSuccessfully.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings saved successfully'**
+  String get settingsSavedSuccessfully;
+
+  /// No description provided for @persian.
+  ///
+  /// In en, this message translates to:
+  /// **'Persian'**
+  String get persian;
+
+  /// No description provided for @english.
+  ///
+  /// In en, this message translates to:
+  /// **'English'**
+  String get english;
+
+  /// No description provided for @zeroMeansUnlimited.
+  ///
+  /// In en, this message translates to:
+  /// **'0 = Unlimited'**
+  String get zeroMeansUnlimited;
 }
 
 class _AppLocalizationsDelegate

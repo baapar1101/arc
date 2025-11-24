@@ -65,6 +65,21 @@ class FileStorageService:
             file_content = await file.read()
             file_size = len(file_content)
             
+            # بررسی محدودیت حجم فایل سیستم
+            from app.services.system_settings_service import get_max_file_size_mb
+            max_file_size_mb = get_max_file_size_mb(self.db)
+            max_file_size_bytes = max_file_size_mb * 1024 * 1024  # تبدیل به بایت
+            if file_size > max_file_size_bytes:
+                raise HTTPException(
+                    status_code=400,
+                    detail={
+                        "error": "FILE_SIZE_EXCEEDED",
+                        "message": f"حجم فایل از حداکثر مجاز ({max_file_size_mb} مگابایت) تجاوز می‌کند",
+                        "file_size_mb": round(file_size / (1024 * 1024), 2),
+                        "max_file_size_mb": max_file_size_mb
+                    }
+                )
+            
             # بررسی محدودیت ذخیره‌سازی (اگر business_id ارائه شده باشد)
             subscription_id = None
             if business_id and check_storage_limit:

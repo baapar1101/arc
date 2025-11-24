@@ -417,6 +417,7 @@ class AuthContext:
 				"mobile": self.user.mobile,
 				"referral_code": getattr(self.user, "referral_code", None),
 				"is_active": self.user.is_active,
+				"email_verified": getattr(self.user, "email_verified", False),
 				"app_permissions": self.app_permissions,
 				"created_at": self.user.created_at.isoformat() if self.user.created_at else None,
 				"updated_at": self.user.updated_at.isoformat() if self.user.updated_at else None,
@@ -466,8 +467,8 @@ def get_current_user(
 	if not user or not user.is_active:
 		raise ApiError("UNAUTHORIZED", "Invalid API key", http_status=401)
 
-	# تشخیص زبان از هدر Accept-Language
-	language = _detect_language(request)
+	# تشخیص زبان از هدر Accept-Language با fallback به تنظیمات سیستم
+	language = _detect_language(request, db)
 	
 	# تشخیص نوع تقویم از هدر X-Calendar-Type
 	calendar_type = _detect_calendar_type(request)
@@ -504,10 +505,21 @@ def get_current_user(
 	return auth_context
 
 
-def _detect_language(request: Request) -> str:
-	"""تشخیص زبان از هدر Accept-Language"""
+def _detect_language(request: Request, db: Session | None = None) -> str:
+	"""تشخیص زبان از هدر Accept-Language با fallback به تنظیمات سیستم"""
 	accept_language = request.headers.get("Accept-Language")
-	return negotiate_locale(accept_language)
+	detected = negotiate_locale(accept_language)
+	
+	# اگر زبان تشخیص داده نشد یا db ارائه شده، از تنظیمات سیستم استفاده کن
+	if detected == "en" and db is not None:
+		from app.services.system_settings_service import get_default_language
+		default_lang = get_default_language(db)
+		# اگر default_language تنظیم شده و با detected متفاوت است، از default استفاده کن
+		# اما اگر accept_language وجود دارد، اولویت با آن است
+		if not accept_language:
+			return default_lang
+	
+	return detected
 
 
 def _detect_calendar_type(request: Request) -> CalendarType:

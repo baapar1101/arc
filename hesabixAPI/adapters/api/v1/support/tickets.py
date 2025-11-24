@@ -16,6 +16,8 @@ from adapters.api.v1.support.schemas import (
 )
 from app.core.auth_dependency import get_current_user, AuthContext
 from app.core.responses import success_response, format_datetime_fields
+from app.services.notification_service import NotificationService
+import logging
 
 router = APIRouter()
 
@@ -130,6 +132,33 @@ async def create_ticket(
     # دریافت تیکت با جزئیات
     ticket_with_details = ticket_repo.get_ticket_with_details(ticket.id, current_user.get_user_id())
     
+    # ارسال ناتیفیکیشن به اپراتورها
+    try:
+        notification_service = NotificationService(db)
+        user = current_user.user
+        user_name = f"{user.first_name or ''} {user.last_name or ''}".strip() or user.email or "کاربر"
+        message_preview = ticket_request.description[:200] + ("..." if len(ticket_request.description) > 200 else "")
+        
+        context = {
+            "subject": f"تیکت جدید #{ticket.id}: {ticket.title}",
+            "message": f"کاربر {user_name} تیکت جدیدی ایجاد کرده است:\n\n{message_preview}",
+            "ticket_id": ticket.id,
+            "ticket_title": ticket.title,
+            "user_name": user_name,
+            "user_email": user.email or "",
+            "category": ticket_with_details.category.name if ticket_with_details.category else "نامشخص",
+            "priority": ticket_with_details.priority.name if ticket_with_details.priority else "نامشخص"
+        }
+        
+        notification_service.notify_support_operators(
+            event_key="support.ticket_created",
+            context=context
+        )
+    except Exception as e:
+        # در صورت خطا، لاگ می‌کنیم اما فرآیند اصلی ادامه می‌یابد
+        logger = logging.getLogger(__name__)
+        logger.error(f"خطا در ارسال ناتیفیکیشن برای تیکت جدید {ticket.id}: {e}")
+    
     # Format datetime fields based on calendar type
     ticket_data = TicketResponse.from_orm(ticket_with_details).dict()
     formatted_data = format_datetime_fields(ticket_data, request)
@@ -189,6 +218,37 @@ async def send_message(
         content=message_request.content,
         is_internal=message_request.is_internal
     )
+    
+    # ارسال ناتیفیکیشن به اپراتورها (فقط برای پیام‌های غیرداخلی)
+    if not message_request.is_internal:
+        try:
+            notification_service = NotificationService(db)
+            user = current_user.user
+            user_name = f"{user.first_name or ''} {user.last_name or ''}".strip() or user.email or "کاربر"
+            message_preview = message_request.content[:200] + ("..." if len(message_request.content) > 200 else "")
+            
+            context = {
+                "subject": f"پاسخ جدید به تیکت #{ticket.id}",
+                "message": f"کاربر {user_name} به تیکت شما پاسخ داد:\n\n{message_preview}",
+                "ticket_id": ticket.id,
+                "ticket_title": ticket.title,
+                "user_name": user_name,
+                "user_email": user.email or "",
+                "message_preview": message_preview
+            }
+            
+            # اگر تیکت به اپراتور خاصی تخصیص شده، فقط به او ارسال می‌کنیم
+            assigned_operator_id = getattr(ticket, 'assigned_operator_id', None)
+            
+            notification_service.notify_support_operators(
+                event_key="support.user_reply",
+                context=context,
+                assigned_operator_id=assigned_operator_id
+            )
+        except Exception as e:
+            # در صورت خطا، لاگ می‌کنیم اما فرآیند اصلی ادامه می‌یابد
+            logger = logging.getLogger(__name__)
+            logger.error(f"خطا در ارسال ناتیفیکیشن برای پاسخ کاربر به تیکت {ticket_id}: {e}")
     
     # Format datetime fields based on calendar type
     message_data = MessageResponse.from_orm(message).dict()

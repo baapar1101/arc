@@ -72,7 +72,7 @@ class AppLocalizationsFa extends AppLocalizations {
   String get light => 'روشن';
 
   @override
-  String get dark => 'تیره';
+  String get dark => 'تاریک';
 
   @override
   String get welcomeTitle => 'حسابداری ابری حسابیکس';
@@ -5278,4 +5278,61 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get printWarehouseDocument => 'چاپ PDF';
+
+  @override
+  String get applicationName => 'نام برنامه';
+
+  @override
+  String get applicationVersion => 'نسخه برنامه';
+
+  @override
+  String get defaultLanguage => 'زبان پیش‌فرض';
+
+  @override
+  String get defaultTheme => 'تم پیش‌فرض';
+
+  @override
+  String get enableUserRegistration => 'فعال‌سازی ثبت‌نام کاربر';
+
+  @override
+  String get enableEmailVerification => 'فعال‌سازی تایید ایمیل';
+
+  @override
+  String get sessionTimeout => 'زمان انقضای نشست';
+
+  @override
+  String get sessionTimeoutMinutes => 'زمان انقضای نشست (دقیقه)';
+
+  @override
+  String get maxFileSize => 'حداکثر حجم فایل';
+
+  @override
+  String get maxFileSizeMB => 'حداکثر حجم فایل (مگابایت)';
+
+  @override
+  String get maxUsers => 'حداکثر تعداد کاربران';
+
+  @override
+  String get maintenanceMode => 'حالت تعمیرات';
+
+  @override
+  String get unlimited => 'نامحدود';
+
+  @override
+  String get errorLoadingSettings => 'خطا در بارگذاری تنظیمات';
+
+  @override
+  String get errorSavingSettings => 'خطا در ذخیره تنظیمات';
+
+  @override
+  String get settingsSavedSuccessfully => 'تنظیمات با موفقیت ذخیره شد';
+
+  @override
+  String get persian => 'فارسی';
+
+  @override
+  String get english => 'English';
+
+  @override
+  String get zeroMeansUnlimited => '0 = نامحدود';
 }

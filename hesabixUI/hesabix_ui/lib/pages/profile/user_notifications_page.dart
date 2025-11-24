@@ -1,18 +1,41 @@
+import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../core/api_client.dart';
+import '../../core/calendar_controller.dart';
+import '../../core/date_utils.dart';
 import '../../services/notifications_service.dart';
 import '../../services/telegram_integration_service.dart';
-import 'package:intl/intl.dart';
 import '../../utils/snackbar_helper.dart';
 
 class UserNotificationsPage extends StatefulWidget {
-  const UserNotificationsPage({super.key});
+  final CalendarController calendarController;
+  const UserNotificationsPage({super.key, required this.calendarController});
 
   @override
   State<UserNotificationsPage> createState() => _UserNotificationsPageState();
+}
+
+class _ChannelOption {
+  const _ChannelOption({
+    required this.key,
+    required this.enabled,
+    required this.icon,
+    required this.title,
+    required this.description,
+    required this.onChanged,
+  });
+
+  final String key;
+  final bool enabled;
+  final IconData icon;
+  final String title;
+  final String description;
+  final ValueChanged<bool> onChanged;
 }
 
 class _UserNotificationsPageState extends State<UserNotificationsPage> {
@@ -33,11 +56,21 @@ class _UserNotificationsPageState extends State<UserNotificationsPage> {
   String? _telegramLinkToken;
   String? _telegramDeepLink;
   DateTime? _telegramLinkExpiresAt;
+  Timer? _timer;
+  int _remainingSeconds = 0;
+  bool _isPolling = false; // برای جلوگیری از بسته شدن بخش در حین polling
+  bool _showLinkSection = false; // متغیر جداگانه برای کنترل نمایش بخش QR code
 
   @override
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -65,41 +98,170 @@ class _UserNotificationsPageState extends State<UserNotificationsPage> {
     }
   }
 
-  Future<void> _loadTelegramStatus() async {
+  Future<void> _loadTelegramStatus({bool updateLoading = true, bool skipSetState = false}) async {
+    debugPrint('[TelegramStatus] _loadTelegramStatus called - updateLoading: $updateLoading, skipSetState: $skipSetState');
+    debugPrint('[TelegramStatus] Current state - _telegramLinkToken: ${_telegramLinkToken != null ? "exists" : "null"}, _showLinkSection: $_showLinkSection');
     try {
-      setState(() => _telegramLoading = true);
+      if (updateLoading && mounted && !skipSetState) {
+        debugPrint('[TelegramStatus] Setting _telegramLoading = true');
+        setState(() => _telegramLoading = true);
+      }
       final status = await _telegramSvc.getStatus();
-      if (!mounted) return;
-      setState(() {
-        _telegramLinked = status['linked'] == true;
-        _telegramConnectedAt = status['connected_at']?.toString();
-        _telegramLoading = false;
-      });
+      if (!mounted) {
+        debugPrint('[TelegramStatus] Widget not mounted, returning');
+        return;
+      }
+      
+      // فقط متغیرهای status را به‌روزرسانی کن، نه link token و deep link
+      final newLinked = status['linked'] == true;
+      final newConnectedAt = status['connected_at']?.toString();
+      debugPrint('[TelegramStatus] Status received - linked: $newLinked, connectedAt: $newConnectedAt');
+      
+      // اگر skipSetState true باشد، فقط متغیرها را به‌روزرسانی کن بدون setState
+      if (skipSetState) {
+        debugPrint('[TelegramStatus] skipSetState=true, updating variables without setState');
+        debugPrint('[TelegramStatus] Before: _telegramLinked=$_telegramLinked, _telegramConnectedAt=$_telegramConnectedAt');
+        _telegramLinked = newLinked;
+        _telegramConnectedAt = newConnectedAt;
+        debugPrint('[TelegramStatus] After: _telegramLinked=$_telegramLinked, _telegramConnectedAt=$_telegramConnectedAt');
+        debugPrint('[TelegramStatus] _telegramLinkToken: ${_telegramLinkToken != null ? "exists" : "null"}, _showLinkSection: $_showLinkSection');
+        return;
+      }
+      
+      // فقط اگر مقدار تغییر کرده باشد، setState را صدا بزن
+      if (newLinked != _telegramLinked || newConnectedAt != _telegramConnectedAt) {
+        debugPrint('[TelegramStatus] Status changed, calling setState');
+        debugPrint('[TelegramStatus] Before setState - _telegramLinkToken: ${_telegramLinkToken != null ? "exists" : "null"}, _showLinkSection: $_showLinkSection');
+        if (mounted) {
+          setState(() {
+            _telegramLinked = newLinked;
+            _telegramConnectedAt = newConnectedAt;
+            if (updateLoading) {
+              _telegramLoading = false;
+            }
+            // مهم: متغیرهای link token و deep link را دست نزن
+            // تا بخش QR code باز بماند
+          });
+          debugPrint('[TelegramStatus] After setState - _telegramLinkToken: ${_telegramLinkToken != null ? "exists" : "null"}, _showLinkSection: $_showLinkSection');
+        }
+      } else if (updateLoading && mounted) {
+        // اگر فقط loading باید تغییر کند
+        debugPrint('[TelegramStatus] Only loading changed, calling setState for loading');
+        setState(() {
+          _telegramLoading = false;
+        });
+      } else {
+        debugPrint('[TelegramStatus] No changes, skipping setState');
+      }
     } catch (_) {
       if (!mounted) return;
-      setState(() {
+      if (skipSetState) {
         _telegramLinked = false;
-        _telegramLoading = false;
-      });
+        return;
+      }
+      final wasLinked = _telegramLinked;
+      if (wasLinked || updateLoading) {
+        // فقط اگر مقدار تغییر کرده باشد، setState را صدا بزن
+        if (mounted) {
+          setState(() {
+            _telegramLinked = false;
+            if (updateLoading) {
+              _telegramLoading = false;
+            }
+            // مهم: متغیرهای link token و deep link را دست نزن
+          });
+        }
+      }
     }
   }
 
   Future<void> _connectTelegram(AppLocalizations t) async {
+    debugPrint('[TelegramConnect] _connectTelegram called');
     try {
       setState(() => _telegramConnecting = true);
       final linkData = await _telegramSvc.createLink();
-      if (!mounted) return;
+      debugPrint('[TelegramConnect] Link data received: ${linkData.keys}');
+      if (!mounted) {
+        debugPrint('[TelegramConnect] Widget not mounted, returning');
+        return;
+      }
+      final expiresAtStr = linkData['expires_at']?.toString();
+      DateTime? expiresAt;
+      if (expiresAtStr != null) {
+        try {
+          // زمان از سرور به صورت ISO format می‌آید اما ممکن است Z نداشته باشد
+          // سرور زمان را به صورت UTC برمی‌گرداند (با isoformat()) اما ممکن است Z نداشته باشد
+          // باید Z اضافه کنیم تا Flutter آن را به عنوان UTC parse کند
+          String utcStr = expiresAtStr.trim();
+          
+          // بررسی کن که آیا Z یا timezone offset دارد یا نه
+          final hasZ = utcStr.endsWith('Z');
+          final hasTimezoneOffset = utcStr.contains('+') || (utcStr.contains('-') && utcStr.length > 19);
+          
+          if (!hasZ && !hasTimezoneOffset) {
+            // اگر Z ندارد و timezone offset هم ندارد، Z اضافه کن
+            utcStr = '${utcStr}Z';
+            debugPrint('[TelegramConnect] Added Z to expires_at: $utcStr');
+          }
+          
+          // Parse به عنوان UTC
+          expiresAt = DateTime.parse(utcStr);
+          debugPrint('[TelegramConnect] Parsed expires_at: $expiresAt (isUtc: ${expiresAt.isUtc})');
+          
+          // اگر هنوز UTC نیست، به UTC تبدیل کن
+          if (!expiresAt.isUtc) {
+            debugPrint('[TelegramConnect] Converting to UTC');
+            expiresAt = expiresAt.toUtc();
+          }
+          
+          // بررسی کن که آیا زمان در آینده است یا نه
+          final now = DateTime.now().toUtc();
+          final diff = expiresAt.difference(now).inSeconds;
+          debugPrint('[TelegramConnect] Expires at: $expiresAt (UTC: ${expiresAt.isUtc})');
+          debugPrint('[TelegramConnect] Current time: $now (UTC)');
+          debugPrint('[TelegramConnect] Difference: $diff seconds (${diff / 60} minutes)');
+          
+          if (diff <= 0) {
+            debugPrint('[TelegramConnect] WARNING: Expires time is in the past! This should not happen.');
+          }
+        } catch (e) {
+          debugPrint('[TelegramConnect] ERROR: Failed to parse expires_at: $expiresAtStr, error: $e');
+          expiresAt = null;
+        }
+      }
+      debugPrint('[TelegramConnect] Before setState - _telegramLinkToken: ${_telegramLinkToken != null ? "exists" : "null"}, _showLinkSection: $_showLinkSection');
       setState(() {
         _telegramLinkToken = linkData['link_token']?.toString();
         _telegramDeepLink = linkData['deep_link']?.toString();
-        final expiresAtStr = linkData['expires_at']?.toString();
-        if (expiresAtStr != null) {
-          _telegramLinkExpiresAt = DateTime.tryParse(expiresAtStr);
+        _telegramLinkExpiresAt = expiresAt;
+        _showLinkSection = true; // فعال کردن نمایش بخش QR code
+        debugPrint('[TelegramConnect] Inside setState - _telegramLinkToken: ${_telegramLinkToken != null ? "exists" : "null"}, _showLinkSection: $_showLinkSection');
+        if (_telegramLinkExpiresAt != null) {
+          // محاسبه زمان باقیمانده قبل از شروع تایمر
+          final now = DateTime.now().toUtc();
+          final expiresAt = _telegramLinkExpiresAt!.isUtc 
+              ? _telegramLinkExpiresAt! 
+              : _telegramLinkExpiresAt!.toUtc();
+          final difference = expiresAt.difference(now);
+          _remainingSeconds = difference.inSeconds;
+          debugPrint('[TelegramConnect] Time calculation - now: $now, expiresAt: $expiresAt, difference: ${difference.inSeconds} seconds');
+          if (_remainingSeconds > 0) {
+            _startTimer();
+          } else {
+            debugPrint('[TelegramConnect] Time already expired, not starting timer');
+            _showLinkSection = false;
+            _telegramLinkToken = null;
+            _telegramDeepLink = null;
+            _telegramLinkExpiresAt = null;
+          }
         }
         _telegramConnecting = false;
       });
+      debugPrint('[TelegramConnect] After setState - _telegramLinkToken: ${_telegramLinkToken != null ? "exists" : "null"}, _showLinkSection: $_showLinkSection');
+      debugPrint('[TelegramConnect] Starting poll');
       _pollTelegramStatus(t);
     } catch (e) {
+      debugPrint('[TelegramConnect] Error: $e');
       if (!mounted) return;
       setState(() => _telegramConnecting = false);
       ScaffoldMessenger.of(context).showSnackBar(
@@ -108,31 +270,150 @@ class _UserNotificationsPageState extends State<UserNotificationsPage> {
     }
   }
 
+  void _startTimer() {
+    debugPrint('[TelegramTimer] _startTimer called');
+    _timer?.cancel();
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        debugPrint('[TelegramTimer] Widget not mounted, canceling timer');
+        timer.cancel();
+        return;
+      }
+      _updateRemainingTime();
+      debugPrint('[TelegramTimer] Remaining seconds: $_remainingSeconds, _showLinkSection: $_showLinkSection');
+      // فقط اگر زمان واقعاً منقضی شده باشد (منفی یا صفر)، بخش را ببند
+      if (_remainingSeconds <= 0) {
+        debugPrint('[TelegramTimer] Time expired, closing section');
+        timer.cancel();
+        if (mounted) {
+          setState(() {
+            debugPrint('[TelegramTimer] Before setState - _telegramLinkToken: ${_telegramLinkToken != null ? "exists" : "null"}, _showLinkSection: $_showLinkSection');
+            _telegramLinkToken = null;
+            _telegramDeepLink = null;
+            _telegramLinkExpiresAt = null;
+            _remainingSeconds = 0;
+            _showLinkSection = false; // بستن بخش QR code
+            debugPrint('[TelegramTimer] After setState - _telegramLinkToken: ${_telegramLinkToken != null ? "exists" : "null"}, _showLinkSection: $_showLinkSection');
+          });
+        }
+      }
+    });
+  }
+
+  void _updateRemainingTime() {
+    if (_telegramLinkExpiresAt != null) {
+      // استفاده از UTC برای مقایسه صحیح
+      final now = DateTime.now().toUtc();
+      final expiresAt = _telegramLinkExpiresAt!.isUtc 
+          ? _telegramLinkExpiresAt! 
+          : _telegramLinkExpiresAt!.toUtc();
+      final difference = expiresAt.difference(now);
+      final oldSeconds = _remainingSeconds;
+      _remainingSeconds = difference.inSeconds;
+      debugPrint('[TelegramTimer] _updateRemainingTime - now: $now, expiresAt: $expiresAt, difference: ${difference.inSeconds} seconds, oldSeconds: $oldSeconds');
+      // فقط اگر زمان باقیمانده مثبت باشد، setState را صدا بزن
+      if (mounted && _remainingSeconds >= 0) {
+        if (oldSeconds != _remainingSeconds) {
+          debugPrint('[TelegramTimer] Time updated: $_remainingSeconds seconds remaining');
+        }
+        setState(() {});
+      } else if (_remainingSeconds < 0) {
+        debugPrint('[TelegramTimer] Time expired (negative: $_remainingSeconds), not calling setState');
+      }
+    } else {
+      debugPrint('[TelegramTimer] _updateRemainingTime called but _telegramLinkExpiresAt is null');
+    }
+  }
+
   Future<void> _pollTelegramStatus(AppLocalizations t) async {
+    debugPrint('[TelegramPoll] _pollTelegramStatus called - _isPolling: $_isPolling');
+    if (_isPolling) {
+      debugPrint('[TelegramPoll] Already polling, returning');
+      return; // جلوگیری از polling همزمان
+    }
+    _isPolling = true;
+    debugPrint('[TelegramPoll] Starting poll - _telegramLinkToken: ${_telegramLinkToken != null ? "exists" : "null"}, _showLinkSection: $_showLinkSection');
     int attempts = 0;
     const maxAttempts = 120;
-    while (attempts < maxAttempts && mounted) {
-      await Future.delayed(const Duration(seconds: 5));
-      await _loadTelegramStatus();
-      if (_telegramLinked) {
-        setState(() {
-          _telegramLinkToken = null;
-          _telegramDeepLink = null;
-          _telegramLinkExpiresAt = null;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(t.notificationsTelegramConnectionSuccess)),
-        );
-        break;
+    try {
+      while (attempts < maxAttempts && mounted) {
+        await Future.delayed(const Duration(seconds: 5));
+        debugPrint('[TelegramPoll] Poll attempt ${attempts + 1}/$maxAttempts');
+        debugPrint('[TelegramPoll] Before _loadTelegramStatus - _telegramLinkToken: ${_telegramLinkToken != null ? "exists" : "null"}, _showLinkSection: $_showLinkSection');
+        // استفاده از skipSetState=true تا کاملاً از rebuild جلوگیری شود
+        await _loadTelegramStatus(updateLoading: false, skipSetState: true);
+        debugPrint('[TelegramPoll] After _loadTelegramStatus - _telegramLinkToken: ${_telegramLinkToken != null ? "exists" : "null"}, _showLinkSection: $_showLinkSection, _telegramLinked: $_telegramLinked');
+        if (_telegramLinked) {
+          debugPrint('[TelegramPoll] Telegram linked! Closing section');
+          _timer?.cancel();
+          if (mounted) {
+            setState(() {
+              _telegramLinkToken = null;
+              _telegramDeepLink = null;
+              _telegramLinkExpiresAt = null;
+              _remainingSeconds = 0;
+              _isPolling = false;
+              _showLinkSection = false; // بستن بخش QR code
+            });
+          }
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(t.notificationsTelegramConnectionSuccess)),
+            );
+          }
+          break;
+        }
+        attempts++;
       }
-      attempts++;
-    }
-    if (!_telegramLinked && mounted) {
-      setState(() {
-        _telegramLinkToken = null;
-        _telegramDeepLink = null;
-        _telegramLinkExpiresAt = null;
-      });
+      // فقط اگر بعد از تمام تلاش‌ها هنوز متصل نشده باشد، بخش را ببند
+      if (!_telegramLinked && mounted && _showLinkSection) {
+        // بررسی کن که آیا زمان انقضا گذشته یا نه
+        if (_telegramLinkExpiresAt != null) {
+          final now = DateTime.now().toUtc();
+          final expiresAt = _telegramLinkExpiresAt!.isUtc 
+              ? _telegramLinkExpiresAt! 
+              : _telegramLinkExpiresAt!.toUtc();
+          final difference = expiresAt.difference(now);
+          // فقط اگر زمان واقعاً منقضی شده باشد، بخش را ببند
+          if (difference.inSeconds <= 0) {
+            _timer?.cancel();
+            if (mounted) {
+              setState(() {
+                _telegramLinkToken = null;
+                _telegramDeepLink = null;
+                _telegramLinkExpiresAt = null;
+                _remainingSeconds = 0;
+                _isPolling = false;
+                _showLinkSection = false; // بستن بخش QR code
+              });
+            }
+          } else {
+            // اگر زمان هنوز باقی مانده، فقط flag را reset کن
+            if (mounted) {
+              setState(() {
+                _isPolling = false;
+              });
+            }
+          }
+        } else {
+          // اگر expires_at وجود نداشت، فقط flag را reset کن
+          if (mounted) {
+            setState(() {
+              _isPolling = false;
+            });
+          }
+        }
+      } else if (mounted) {
+        setState(() {
+          _isPolling = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isPolling = false;
+        });
+      }
     }
   }
 
@@ -183,6 +464,17 @@ class _UserNotificationsPageState extends State<UserNotificationsPage> {
     await Clipboard.setData(ClipboardData(text: value));
     if (!mounted) return;
     SnackBarHelper.show(context, message: confirmationMessage);
+  }
+
+  String _formatRemainingTime(int seconds) {
+    if (seconds <= 0) return 'منقضی شده';
+    final minutes = seconds ~/ 60;
+    final remainingSecs = seconds % 60;
+    if (minutes > 0) {
+      return '${minutes} دقیقه و ${remainingSecs} ثانیه باقیمانده';
+    } else {
+      return '${remainingSecs} ثانیه باقیمانده';
+    }
   }
 
   @override
@@ -337,6 +629,7 @@ class _UserNotificationsPageState extends State<UserNotificationsPage> {
   }
 
   Widget _buildTelegramChannelTile(AppLocalizations t, ThemeData theme, ColorScheme colorScheme, _ChannelOption option) {
+    debugPrint('[TelegramUI] _buildTelegramChannelTile called - _telegramLinkToken: ${_telegramLinkToken != null ? "exists" : "null"}, _showLinkSection: $_showLinkSection');
     return Column(
       children: [
         SwitchListTile.adaptive(
@@ -368,7 +661,10 @@ class _UserNotificationsPageState extends State<UserNotificationsPage> {
                     Expanded(
                       child: Text(
                         t.notificationsTelegramConnectedSince(
-                          DateFormat('yyyy/MM/dd').format(DateTime.parse(_telegramConnectedAt!)),
+                          HesabixDateUtils.formatForDisplay(
+                            DateTime.tryParse(_telegramConnectedAt!),
+                            widget.calendarController.isJalali,
+                          ),
                         ),
                         style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
                         overflow: TextOverflow.ellipsis,
@@ -437,81 +733,141 @@ class _UserNotificationsPageState extends State<UserNotificationsPage> {
             ],
           ),
         ),
-        if (_telegramLinkToken != null) ...[
-          const SizedBox(height: 8),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: colorScheme.outline.withValues(alpha: 0.2)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+        Builder(
+          builder: (context) {
+            debugPrint('[TelegramUI] Checking QR section condition - _showLinkSection: $_showLinkSection, _telegramLinkToken: ${_telegramLinkToken != null ? "exists" : "null"}');
+            if (_showLinkSection && _telegramLinkToken != null) {
+              debugPrint('[TelegramUI] Building QR section');
+              return Column(
                 children: [
-                  Text(
-                    t.notificationsTelegramLinkInstructions(_telegramLinkToken!),
-                    style: theme.textTheme.bodySmall,
-                  ),
-                  if (_telegramDeepLink != null) ...[
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: SelectableText(
-                            _telegramDeepLink!,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              fontFamily: 'monospace',
-                              color: colorScheme.primary,
-                            ),
-                          ),
-                        ),
-                        IconButton(
-                          tooltip: t.copyLink,
-                          onPressed: () => _copyToClipboard(_telegramDeepLink!, t.copied),
-                          icon: const Icon(Icons.copy_all_outlined, size: 18),
-                        ),
-                      ],
-                    ),
-                  ],
-                  if (_telegramLinkExpiresAt != null) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      t.notificationsTelegramLinkExpiresIn(
-                        _telegramLinkExpiresAt!.difference(DateTime.now()).inMinutes,
+                  const SizedBox(height: 8),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: colorScheme.outline.withValues(alpha: 0.2)),
                       ),
-                      style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            t.notificationsTelegramLinkInstructions(_telegramLinkToken!),
+                            style: theme.textTheme.bodySmall,
+                          ),
+                          if (_telegramDeepLink != null) ...[
+                            const SizedBox(height: 12),
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // QR Code
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: colorScheme.outline.withValues(alpha: 0.2)),
+                                  ),
+                                  child: QrImageView(
+                                    data: _telegramDeepLink!,
+                                    version: QrVersions.auto,
+                                    size: 120,
+                                    backgroundColor: Colors.white,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                // Link and copy button
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        t.copyLink,
+                                        style: theme.textTheme.bodySmall?.copyWith(
+                                          fontWeight: FontWeight.w500,
+                                          color: colorScheme.onSurfaceVariant,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      SelectableText(
+                                        _telegramDeepLink!,
+                                        style: theme.textTheme.bodySmall?.copyWith(
+                                          fontFamily: 'monospace',
+                                          color: colorScheme.primary,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      OutlinedButton.icon(
+                                        onPressed: () => _copyToClipboard(_telegramDeepLink!, t.copied),
+                                        icon: const Icon(Icons.copy_all_outlined, size: 16),
+                                        label: Text(t.copyLink),
+                                        style: OutlinedButton.styleFrom(
+                                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                          if (_remainingSeconds > 0) ...[
+                            const SizedBox(height: 12),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: _remainingSeconds < 60 
+                                    ? Colors.red.withValues(alpha: 0.1)
+                                    : colorScheme.primaryContainer.withValues(alpha: 0.3),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: _remainingSeconds < 60 
+                                      ? Colors.red.withValues(alpha: 0.3)
+                                      : colorScheme.primary.withValues(alpha: 0.3),
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.timer_outlined,
+                                    size: 16,
+                                    color: _remainingSeconds < 60 
+                                        ? Colors.red
+                                        : colorScheme.primary,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      _formatRemainingTime(_remainingSeconds),
+                                      style: theme.textTheme.bodySmall?.copyWith(
+                                        color: _remainingSeconds < 60 
+                                            ? Colors.red.shade700
+                                            : colorScheme.onPrimaryContainer,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
                     ),
-                  ],
+                  ),
+                  const SizedBox(height: 8),
                 ],
-              ),
-            ),
-          ),
-        ],
-        const SizedBox(height: 8),
+              );
+            } else {
+              debugPrint('[TelegramUI] QR section NOT shown - _showLinkSection: $_showLinkSection, _telegramLinkToken: ${_telegramLinkToken != null ? "exists" : "null"}');
+              return const SizedBox.shrink();
+            }
+          },
+        ),
       ],
     );
   }
-
-}
-
-class _ChannelOption {
-  const _ChannelOption({
-    required this.key,
-    required this.enabled,
-    required this.icon,
-    required this.title,
-    required this.description,
-    required this.onChanged,
-  });
-
-  final String key;
-  final bool enabled;
-  final IconData icon;
-  final String title;
-  final String description;
-  final ValueChanged<bool> onChanged;
 }
 

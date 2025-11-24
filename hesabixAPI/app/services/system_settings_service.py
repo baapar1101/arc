@@ -28,6 +28,18 @@ NOTIFY_TG_PROXY_API_KEY = "telegram_proxy_api_key"
 DEFAULT_DOCUMENT_POLICIES_KEY = "default_document_monetization_policies"
 SHARE_LINK_PUBLIC_APP_URL_KEY = "share_link_public_app_url"
 
+# System Configuration Keys
+SYSTEM_CONFIG_APP_NAME = "system_config_app_name"
+SYSTEM_CONFIG_APP_VERSION = "system_config_app_version"
+SYSTEM_CONFIG_DEFAULT_LANGUAGE = "system_config_default_language"
+SYSTEM_CONFIG_DEFAULT_THEME = "system_config_default_theme"
+SYSTEM_CONFIG_ENABLE_REGISTRATION = "system_config_enable_registration"
+SYSTEM_CONFIG_ENABLE_EMAIL_VERIFICATION = "system_config_enable_email_verification"
+SYSTEM_CONFIG_ENABLE_MAINTENANCE_MODE = "system_config_enable_maintenance_mode"
+SYSTEM_CONFIG_SESSION_TIMEOUT = "system_config_session_timeout"
+SYSTEM_CONFIG_MAX_FILE_SIZE = "system_config_max_file_size"
+SYSTEM_CONFIG_MAX_USERS = "system_config_max_users"
+
 
 def _default_share_link_base_url() -> str:
 	full = (get_settings().share_link_public_app_url or "").strip().rstrip("/")
@@ -87,6 +99,31 @@ def _get_setting_json(db: Session, key: str) -> Optional[Dict[str, Any]]:
 		except (json.JSONDecodeError, TypeError):
 			return None
 	return None
+
+
+def _get_setting_int(db: Session, key: str) -> Optional[int]:
+	obj = _get_setting(db, key)
+	if obj and obj.value_int is not None:
+		return obj.value_int
+	if obj and obj.value_string is not None:
+		try:
+			return int(obj.value_string.strip())
+		except (ValueError, TypeError):
+			return None
+	return None
+
+
+def _upsert_setting_int(db: Session, key: str, value: int) -> SystemSetting:
+	obj = _get_setting(db, key)
+	if obj:
+		obj.value_int = value
+		obj.value_string = None
+		obj.value_json = None
+	else:
+		obj = SystemSetting(key=key, value_int=value)
+		db.add(obj)
+	db.flush()
+	return obj
 
 
 def get_wallet_settings(db: Session) -> Dict[str, Any]:
@@ -309,3 +346,167 @@ def set_default_document_policies(db: Session, policies: List[Dict[str, Any]]) -
 	data = {"default_policies": policies}
 	_upsert_setting_json(db, DEFAULT_DOCUMENT_POLICIES_KEY, data)
 	return policies
+
+
+def get_app_name(db: Session) -> str:
+	"""خواندن نام اپلیکیشن از DB یا env"""
+	env = get_settings()
+	app_name = _get_setting(db, SYSTEM_CONFIG_APP_NAME)
+	return (app_name.value_string if app_name and app_name.value_string else env.app_name)
+
+
+def get_app_version(db: Session) -> str:
+	"""خواندن نسخه اپلیکیشن از DB یا env"""
+	env = get_settings()
+	app_version = _get_setting(db, SYSTEM_CONFIG_APP_VERSION)
+	return (app_version.value_string if app_version and app_version.value_string else env.app_version)
+
+
+def is_registration_enabled(db: Session) -> bool:
+	"""بررسی فعال بودن ثبت‌نام"""
+	enable_registration = _get_setting_bool(db, SYSTEM_CONFIG_ENABLE_REGISTRATION)
+	return (enable_registration if enable_registration is not None else True)
+
+
+def is_email_verification_enabled(db: Session) -> bool:
+	"""بررسی فعال بودن تایید ایمیل"""
+	enable_email_verification = _get_setting_bool(db, SYSTEM_CONFIG_ENABLE_EMAIL_VERIFICATION)
+	return (enable_email_verification if enable_email_verification is not None else True)
+
+
+def is_maintenance_mode_enabled(db: Session) -> bool:
+	"""بررسی فعال بودن حالت تعمیرات"""
+	enable_maintenance_mode = _get_setting_bool(db, SYSTEM_CONFIG_ENABLE_MAINTENANCE_MODE)
+	return (enable_maintenance_mode if enable_maintenance_mode is not None else False)
+
+
+def get_session_timeout(db: Session) -> int:
+	"""خواندن زمان انقضای نشست (0 = نامحدود)"""
+	session_timeout = _get_setting_int(db, SYSTEM_CONFIG_SESSION_TIMEOUT)
+	return (session_timeout if session_timeout is not None else 30)
+
+
+def get_max_file_size_mb(db: Session) -> int:
+	"""خواندن حداکثر حجم فایل به مگابایت"""
+	max_file_size = _get_setting_int(db, SYSTEM_CONFIG_MAX_FILE_SIZE)
+	return (max_file_size if max_file_size is not None else 10)
+
+
+def get_max_users(db: Session) -> int:
+	"""خواندن حداکثر تعداد کاربران (0 = نامحدود)"""
+	max_users = _get_setting_int(db, SYSTEM_CONFIG_MAX_USERS)
+	return (max_users if max_users is not None else 1000)
+
+
+def get_default_language(db: Session) -> str:
+	"""خواندن زبان پیش‌فرض"""
+	default_language = _get_setting(db, SYSTEM_CONFIG_DEFAULT_LANGUAGE)
+	return (default_language.value_string if default_language and default_language.value_string else "fa")
+
+
+def get_default_theme(db: Session) -> str:
+	"""خواندن تم پیش‌فرض"""
+	default_theme = _get_setting(db, SYSTEM_CONFIG_DEFAULT_THEME)
+	return (default_theme.value_string if default_theme and default_theme.value_string else "system")
+
+
+def get_system_configuration(db: Session) -> Dict[str, Any]:
+	"""
+	خواندن تنظیمات پیکربندی سیستم
+	"""
+	env = get_settings()
+	
+	app_name = _get_setting(db, SYSTEM_CONFIG_APP_NAME)
+	app_version = _get_setting(db, SYSTEM_CONFIG_APP_VERSION)
+	default_language = _get_setting(db, SYSTEM_CONFIG_DEFAULT_LANGUAGE)
+	default_theme = _get_setting(db, SYSTEM_CONFIG_DEFAULT_THEME)
+	enable_registration = _get_setting_bool(db, SYSTEM_CONFIG_ENABLE_REGISTRATION)
+	enable_email_verification = _get_setting_bool(db, SYSTEM_CONFIG_ENABLE_EMAIL_VERIFICATION)
+	enable_maintenance_mode = _get_setting_bool(db, SYSTEM_CONFIG_ENABLE_MAINTENANCE_MODE)
+	session_timeout = _get_setting_int(db, SYSTEM_CONFIG_SESSION_TIMEOUT)
+	max_file_size = _get_setting_int(db, SYSTEM_CONFIG_MAX_FILE_SIZE)
+	max_users = _get_setting_int(db, SYSTEM_CONFIG_MAX_USERS)
+	
+	return {
+		"app_name": (app_name.value_string if app_name and app_name.value_string else env.app_name),
+		"app_version": (app_version.value_string if app_version and app_version.value_string else env.app_version),
+		"default_language": (default_language.value_string if default_language and default_language.value_string else "fa"),
+		"default_theme": (default_theme.value_string if default_theme and default_theme.value_string else "system"),
+		"enable_registration": (enable_registration if enable_registration is not None else True),
+		"enable_email_verification": (enable_email_verification if enable_email_verification is not None else True),
+		"enable_maintenance_mode": (enable_maintenance_mode if enable_maintenance_mode is not None else False),
+		"session_timeout": (session_timeout if session_timeout is not None else 30),
+		"max_file_size": (max_file_size if max_file_size is not None else 10),
+		"max_users": (max_users if max_users is not None else 1000),
+	}
+
+
+def set_system_configuration(
+	db: Session,
+	*,
+	app_name: str | None = None,
+	app_version: str | None = None,
+	default_language: str | None = None,
+	default_theme: str | None = None,
+	enable_registration: bool | None = None,
+	enable_email_verification: bool | None = None,
+	enable_maintenance_mode: bool | None = None,
+	session_timeout: int | None = None,
+	max_file_size: int | None = None,
+	max_users: int | None = None,
+) -> Dict[str, Any]:
+	"""
+	تنظیم پیکربندی سیستم با اعتبارسنجی
+	"""
+	if app_name is not None:
+		app_name = str(app_name).strip()
+		if not app_name:
+			raise ApiError("APP_NAME_REQUIRED", "نام اپلیکیشن الزامی است", http_status=400)
+		_upsert_setting_string(db, SYSTEM_CONFIG_APP_NAME, app_name)
+	
+	if app_version is not None:
+		app_version = str(app_version).strip()
+		if not app_version:
+			raise ApiError("APP_VERSION_REQUIRED", "نسخه اپلیکیشن الزامی است", http_status=400)
+		_upsert_setting_string(db, SYSTEM_CONFIG_APP_VERSION, app_version)
+	
+	if default_language is not None:
+		default_language = str(default_language).strip().lower()
+		if default_language not in {"fa", "en"}:
+			raise ApiError("INVALID_LANGUAGE", "زبان باید fa یا en باشد", http_status=400)
+		_upsert_setting_string(db, SYSTEM_CONFIG_DEFAULT_LANGUAGE, default_language)
+	
+	if default_theme is not None:
+		default_theme = str(default_theme).strip().lower()
+		if default_theme not in {"system", "light", "dark"}:
+			raise ApiError("INVALID_THEME", "تم باید system، light یا dark باشد", http_status=400)
+		_upsert_setting_string(db, SYSTEM_CONFIG_DEFAULT_THEME, default_theme)
+	
+	if enable_registration is not None:
+		_upsert_setting_bool(db, SYSTEM_CONFIG_ENABLE_REGISTRATION, enable_registration)
+	
+	if enable_email_verification is not None:
+		_upsert_setting_bool(db, SYSTEM_CONFIG_ENABLE_EMAIL_VERIFICATION, enable_email_verification)
+	
+	if enable_maintenance_mode is not None:
+		_upsert_setting_bool(db, SYSTEM_CONFIG_ENABLE_MAINTENANCE_MODE, enable_maintenance_mode)
+	
+	if session_timeout is not None:
+		# 0 به معنی نامحدود است
+		if session_timeout < 0 or (session_timeout > 0 and (session_timeout < 5 or session_timeout > 1440)):
+			raise ApiError("INVALID_SESSION_TIMEOUT", "زمان انقضای نشست باید 0 (نامحدود) یا بین 5 تا 1440 دقیقه باشد", http_status=400)
+		_upsert_setting_int(db, SYSTEM_CONFIG_SESSION_TIMEOUT, session_timeout)
+	
+	if max_file_size is not None:
+		if max_file_size < 1 or max_file_size > 1000:
+			raise ApiError("INVALID_MAX_FILE_SIZE", "حداکثر حجم فایل باید بین 1 تا 1000 مگابایت باشد", http_status=400)
+		_upsert_setting_int(db, SYSTEM_CONFIG_MAX_FILE_SIZE, max_file_size)
+	
+	if max_users is not None:
+		# 0 به معنی نامحدود است
+		if max_users < 0 or (max_users > 0 and max_users > 10000):
+			raise ApiError("INVALID_MAX_USERS", "حداکثر تعداد کاربران باید 0 (نامحدود) یا بین 1 تا 10000 باشد", http_status=400)
+		_upsert_setting_int(db, SYSTEM_CONFIG_MAX_USERS, max_users)
+	
+	db.commit()
+	return get_system_configuration(db)

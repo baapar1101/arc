@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'helpers/column_settings_service.dart';
 
 /// Configuration for data table columns
@@ -443,8 +444,21 @@ class DataTableResponse<T> {
     Map<String, dynamic> json,
     T Function(Map<String, dynamic>) fromJsonT,
   ) {
-    final data = json['data'] as Map<String, dynamic>;
-    final itemsList = data['items'] as List? ?? [];
+    final data = json['data'];
+    if (data == null || data is! Map<String, dynamic>) {
+      throw FormatException('Invalid response format: missing or invalid "data" field');
+    }
+    
+    final itemsList = data['items'];
+    List<dynamic> items;
+    if (itemsList == null) {
+      items = [];
+    } else if (itemsList is List) {
+      items = itemsList;
+    } else {
+      items = [];
+    }
+    
     // Support both old and new pagination shapes
     final pagination = data['pagination'] as Map<String, dynamic>?;
     final total = pagination != null
@@ -460,8 +474,21 @@ class DataTableResponse<T> {
         ? (pagination['total_pages'] as num?)?.toInt() ?? 0
         : (data['total_pages'] as num?)?.toInt() ?? 0;
     
+    // Parse items safely
+    final parsedItems = <T>[];
+    for (final item in items) {
+      try {
+        if (item is Map<String, dynamic>) {
+          parsedItems.add(fromJsonT(item));
+        }
+      } catch (e) {
+        debugPrint('Error parsing item: $e, item: $item');
+        // Skip invalid items instead of failing completely
+      }
+    }
+    
     return DataTableResponse<T>(
-      items: itemsList.map((item) => fromJsonT(item as Map<String, dynamic>)).toList(),
+      items: parsedItems,
       total: total,
       page: page,
       limit: limit,

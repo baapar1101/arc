@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from typing import Optional
+from typing import Optional, List
 
-from sqlalchemy import select, func, and_, or_
+from sqlalchemy import select, func, and_, or_, text
 from sqlalchemy.orm import Session
 
 from adapters.db.models.user import User
@@ -32,7 +32,7 @@ class UserRepository(BaseRepository[User]):
 		count = self.db.execute(stmt).scalar() or 0
 		return count == 0
 
-	def create(self, *, email: str | None, mobile: str | None, password_hash: str, first_name: str | None, last_name: str | None, referral_code: str, referred_by_user_id: int | None = None) -> User:
+	def create(self, *, email: str | None, mobile: str | None, password_hash: str, first_name: str | None, last_name: str | None, referral_code: str, referred_by_user_id: int | None = None, email_verified: bool = False) -> User:
 		# تعیین دسترسی‌های برنامه بر اساس اینکه آیا کاربر اول است یا نه
 		app_permissions = {"superadmin": True} if self.is_first_user() else {}
 		
@@ -44,7 +44,8 @@ class UserRepository(BaseRepository[User]):
 			last_name=last_name, 
 			referral_code=referral_code, 
 			referred_by_user_id=referred_by_user_id,
-			app_permissions=app_permissions
+			app_permissions=app_permissions,
+			email_verified=email_verified
 		)
 		self.db.add(user)
 		self.db.commit()
@@ -92,6 +93,13 @@ class UserRepository(BaseRepository[User]):
 		stmt = stmt.order_by(User.created_at.desc()).offset(offset).limit(limit)
 		return self.db.execute(stmt).scalars().all()
 	
+	def get_support_operators(self) -> List[User]:
+		"""دریافت لیست تمام اپراتورهای پشتیبانی فعال"""
+		stmt = select(User).where(
+			text("app_permissions->>'support_operator' = 'true'")
+		).where(User.is_active == True)
+		return list(self.db.execute(stmt).scalars().all())
+	
 	def to_dict(self, user: User, include_extended: bool = False) -> dict:
 		"""تبدیل User object به dictionary برای API response"""
 		# ساخت full_name
@@ -120,12 +128,24 @@ class UserRepository(BaseRepository[User]):
 		
 		if include_extended:
 			from adapters.db.repositories.business_permission_repo import BusinessPermissionRepository
+			from adapters.db.repositories.business_repo import BusinessRepository
 			from adapters.db.repositories.api_key_repo import ApiKeyRepository
 			
-			# شمارش کسب‌وکارها
+			# شمارش کسب‌وکارها (هم مالک و هم عضو)
+			business_repo = BusinessRepository(self.db)
 			bp_repo = BusinessPermissionRepository(self.db)
-			business_permissions = bp_repo.get_user_businesses(user.id)
-			businesses_count = len(business_permissions)
+			
+			# دریافت کسب‌وکارهایی که کاربر مالک آن‌هاست
+			owned_businesses = business_repo.get_by_owner_id(user.id)
+			owned_business_ids = {b.id for b in owned_businesses}
+			
+			# دریافت کسب‌وکارهایی که کاربر عضو آن‌هاست (از طریق BusinessPermission با join=True)
+			member_permissions = bp_repo.get_user_member_businesses(user.id)
+			member_business_ids = {perm.business_id for perm in member_permissions}
+			
+			# ترکیب و حذف تکراری
+			all_business_ids = owned_business_ids | member_business_ids
+			businesses_count = len(all_business_ids)
 			
 			# آخرین ورود
 			api_repo = ApiKeyRepository(self.db)

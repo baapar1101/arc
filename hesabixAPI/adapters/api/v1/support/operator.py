@@ -16,6 +16,8 @@ from adapters.api.v1.support.schemas import (
 from app.core.auth_dependency import get_current_user, AuthContext
 from app.core.permissions import require_app_permission
 from app.core.responses import success_response, format_datetime_fields
+from app.services.notification_service import NotificationService
+import logging
 
 router = APIRouter()
 
@@ -228,6 +230,33 @@ async def send_operator_message(
     # اگر تیکت هنوز به اپراتور تخصیص نشده، آن را تخصیص ده
     if not ticket.assigned_operator_id:
         ticket_repo.assign_ticket(ticket_id, current_user.get_user_id())
+    
+    # ارسال ناتیفیکیشن به کاربر (فقط برای پیام‌های غیرداخلی)
+    if not message_request.is_internal and ticket.user_id:
+        try:
+            notification_service = NotificationService(db)
+            operator_name = f"{current_user.user.first_name or ''} {current_user.user.last_name or ''}".strip() or "اپراتور پشتیبانی"
+            message_preview = message_request.content[:200] + ("..." if len(message_request.content) > 200 else "")
+            
+            context = {
+                "subject": f"پاسخ جدید به تیکت #{ticket_id}",
+                "message": f"اپراتور {operator_name} به تیکت شما پاسخ داد:\n\n{message_preview}",
+                "ticket_id": ticket_id,
+                "ticket_title": ticket.title,
+                "operator_name": operator_name,
+                "message_preview": message_preview
+            }
+            
+            notification_service.send(
+                user_id=ticket.user_id,
+                event_key="support.operator_reply",
+                context=context,
+                preferred_channels=["inapp", "email", "telegram", "sms"]
+            )
+        except Exception as e:
+            # در صورت خطا، لاگ می‌کنیم اما فرآیند اصلی ادامه می‌یابد
+            logger = logging.getLogger(__name__)
+            logger.error(f"خطا در ارسال ناتیفیکیشن برای پاسخ اپراتور به تیکت {ticket_id}: {e}")
     
     # Format datetime fields based on calendar type
     message_data = MessageResponse.from_orm(message).dict()

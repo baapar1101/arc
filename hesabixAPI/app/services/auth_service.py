@@ -57,15 +57,28 @@ def _generate_referral_code(db: Session) -> str:
 	return token_urlsafe(12).replace('-', '').replace('_', '')[:12]
 
 
-def register_user(*, db: Session, first_name: str | None, last_name: str | None, email: str | None, mobile: str | None, password: str, captcha_id: str, captcha_code: str, referrer_code: str | None = None) -> int:
+def register_user(*, db: Session, first_name: str | None, last_name: str | None, email: str | None, mobile: str | None, password: str, captcha_id: str, captcha_code: str, referrer_code: str | None = None, base_url: str | None = None) -> int:
+	from app.core.responses import ApiError
+	from app.services.system_settings_service import is_registration_enabled, get_max_users
+	
+	# بررسی فعال بودن ثبت‌نام
+	if not is_registration_enabled(db):
+		raise ApiError("REGISTRATION_DISABLED", "ثبت‌نام در حال حاضر غیرفعال است", http_status=403)
+	
+	# بررسی محدودیت تعداد کاربران
+	max_users = get_max_users(db)
+	if max_users > 0:  # 0 به معنی نامحدود است
+		repo = UserRepository(db)
+		current_user_count = repo.count_all()
+		if current_user_count >= max_users:
+			raise ApiError("MAX_USERS_REACHED", f"حداکثر تعداد کاربران ({max_users}) رسیده است", http_status=403)
+	
 	if not validate_captcha(db, captcha_id, captcha_code):
-		from app.core.responses import ApiError
 		raise ApiError("INVALID_CAPTCHA", "Invalid captcha code")
 
 	email_n = _normalize_email(email)
 	mobile_n = _normalize_mobile(mobile)
 	if not email_n and not mobile_n:
-		from app.core.responses import ApiError
 		# اگر کاربر موبایل وارد کرده اما نامعتبر بوده، پیام دقیق‌تر بدهیم
 		if mobile and mobile.strip():
 			raise ApiError("INVALID_MOBILE", "Invalid mobile number")
@@ -74,10 +87,8 @@ def register_user(*, db: Session, first_name: str | None, last_name: str | None,
 
 	repo = UserRepository(db)
 	if email_n and repo.get_by_email(email_n):
-		from app.core.responses import ApiError
 		raise ApiError("EMAIL_IN_USE", "Email is already in use")
 	if mobile_n and repo.get_by_mobile(mobile_n):
-		from app.core.responses import ApiError
 		raise ApiError("MOBILE_IN_USE", "Mobile is already in use")
 
 	pwd_hash = hash_password(password)
@@ -88,6 +99,11 @@ def register_user(*, db: Session, first_name: str | None, last_name: str | None,
 			# prevent self-referral at signup theoretically not applicable; rule kept for safety
 			referred_by_user_id = ref_user.id
 	referral_code = _generate_referral_code(db)
+	
+	# تنظیم email_verified بر اساس enable_email_verification
+	from app.services.system_settings_service import is_email_verification_enabled
+	email_verified = not is_email_verification_enabled(db)  # اگر verification فعال باشد، false است
+	
 	user = repo.create(
 		email=email_n,
 		mobile=mobile_n,
@@ -96,7 +112,20 @@ def register_user(*, db: Session, first_name: str | None, last_name: str | None,
 		last_name=last_name,
 		referral_code=referral_code,
 		referred_by_user_id=referred_by_user_id,
+		email_verified=email_verified
 	)
+	
+	# اگر email verification فعال باشد و کاربر ایمیل دارد، token ایجاد و ایمیل ارسال کن
+	if is_email_verification_enabled(db) and email_n:
+		try:
+			from app.services.email_verification_service import create_email_verification_token
+			create_email_verification_token(db, user.id, email_n, base_url=base_url)
+		except Exception as e:
+			# در صورت خطا در ارسال ایمیل، ثبت‌نام ادامه می‌یابد اما log می‌کنیم
+			import logging
+			logger = logging.getLogger(__name__)
+			logger.error(f"Failed to send verification email for user {user.id}: {e}")
+	
 	return user.id
 
 
@@ -119,9 +148,18 @@ def login_user(*, db: Session, identifier: str, password: str, captcha_id: str, 
 		from app.core.responses import ApiError
 		raise ApiError("ACCOUNT_DISABLED", "Your account is disabled")
 
+	from app.services.system_settings_service import get_session_timeout
+	from datetime import timedelta
+	
 	settings = get_settings()
 	api_key, key_hash = generate_api_key()
-	expires_at = None  # could be set from settings later
+	
+	# تنظیم زمان انقضای نشست
+	session_timeout = get_session_timeout(db)
+	expires_at = None
+	if session_timeout > 0:  # 0 به معنی نامحدود است
+		expires_at = datetime.utcnow() + timedelta(minutes=session_timeout)
+	
 	api_repo = ApiKeyRepository(db)
 	api_repo.create_session_key(user_id=user.id, key_hash=key_hash, device_id=device_id, user_agent=user_agent, ip=ip, expires_at=expires_at)
 
@@ -132,6 +170,7 @@ def login_user(*, db: Session, identifier: str, password: str, captcha_id: str, 
 		"email": user.email,
 		"mobile": user.mobile,
 		"referral_code": getattr(user, "referral_code", None),
+		"email_verified": getattr(user, "email_verified", False),
 	}
 	return api_key, expires_at, user_data
 

@@ -37,13 +37,29 @@ class NotificationTemplateRepository:
 			return self.db.execute(stmt2).scalars().first()
 		return None
 
-	def list(self, *, event_key: str | None = None, channel: str | None = None) -> List[NotificationTemplate]:
+	def list(self, *, event_key: str | None = None, channel: str | None = None, is_active: bool | None = None) -> List[NotificationTemplate]:
 		stmt = select(self.model)
 		if event_key:
 			stmt = stmt.where(self.model.event_key == event_key)
 		if channel:
 			stmt = stmt.where(self.model.channel == channel)
+		if is_active is not None:
+			stmt = stmt.where(self.model.is_active.is_(is_active))
 		return list(self.db.execute(stmt).scalars().all())
+
+	def exists(self, *, event_key: str, channel: str, locale: str | None, exclude_id: int | None = None) -> bool:
+		"""بررسی وجود قالب با همان event_key, channel, locale"""
+		stmt = select(self.model).where(
+			and_(
+				self.model.event_key == event_key,
+				self.model.channel == channel,
+				(self.model.locale == locale) if locale is not None else (self.model.locale.is_(None)),
+			)
+		)
+		if exclude_id is not None:
+			stmt = stmt.where(self.model.id != exclude_id)
+		obj = self.db.execute(stmt).scalars().first()
+		return obj is not None
 
 	def create(self, *, event_key: str, channel: str, locale: str | None, subject: str | None, body: str, is_active: bool) -> NotificationTemplate:
 		obj = self.model(event_key=event_key, channel=channel, locale=locale, subject=subject, body=body, is_active=is_active)

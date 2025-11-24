@@ -19,6 +19,8 @@ from app.services.system_settings_service import (
 	get_share_link_settings,
 	set_share_link_settings,
 	get_effective_notifications_settings,
+	get_system_configuration,
+	set_system_configuration,
 )
 from app.services.providers.telegram_provider import TelegramProvider
 
@@ -231,3 +233,61 @@ def register_telegram_webhook_endpoint(
 	}
 	message = "TELEGRAM_WEBHOOK_REGISTERED" if ok else "TELEGRAM_WEBHOOK_FAILED"
 	return success_response(data, request, message=message)
+
+
+class SystemConfigurationPayload(BaseModel):
+	app_name: str | None = None
+	app_version: str | None = None
+	default_language: str | None = None
+	default_theme: str | None = None
+	enable_registration: bool | None = None
+	enable_email_verification: bool | None = None
+	enable_maintenance_mode: bool | None = None
+	session_timeout: int | None = None
+	max_file_size: int | None = None
+	max_users: int | None = None
+
+
+@router.get(
+	"/configuration",
+	summary="دریافت تنظیمات پیکربندی سیستم",
+	description="خواندن تنظیمات عمومی سیستم شامل نام اپلیکیشن، نسخه، زبان پیش‌فرض، تم و سایر تنظیمات.",
+)
+def get_system_configuration_endpoint(
+	request: Request,
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	if not ctx.has_any_permission("system_settings", "superadmin"):
+		raise ApiError("FORBIDDEN", "Missing permission: system_settings", http_status=403)
+	data = get_system_configuration(db)
+	return success_response(data, request)
+
+
+@router.put(
+	"/configuration",
+	summary="به‌روزرسانی تنظیمات پیکربندی سیستم",
+	description="ذخیره تنظیمات عمومی سیستم. تنها برای مدیر سیستم.",
+)
+def set_system_configuration_endpoint(
+	payload: SystemConfigurationPayload,
+	request: Request,
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	if not ctx.has_any_permission("system_settings", "superadmin"):
+		raise ApiError("FORBIDDEN", "Missing permission: system_settings", http_status=403)
+	data = set_system_configuration(
+		db,
+		app_name=payload.app_name,
+		app_version=payload.app_version,
+		default_language=payload.default_language,
+		default_theme=payload.default_theme,
+		enable_registration=payload.enable_registration,
+		enable_email_verification=payload.enable_email_verification,
+		enable_maintenance_mode=payload.enable_maintenance_mode,
+		session_timeout=payload.session_timeout,
+		max_file_size=payload.max_file_size,
+		max_users=payload.max_users,
+	)
+	return success_response(data, request, message="SYSTEM_CONFIGURATION_UPDATED")

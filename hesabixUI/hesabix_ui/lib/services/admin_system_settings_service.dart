@@ -18,6 +18,16 @@ class AdminSystemSettingsService {
     final res = await _api.post<Map<String, dynamic>>('/api/v1/admin/system-settings/notifications/telegram/webhook');
     return Map<String, dynamic>.from(res.data?['data'] as Map? ?? const {});
   }
+
+  Future<Map<String, dynamic>> getSystemConfiguration() async {
+    final res = await _api.get<Map<String, dynamic>>('/api/v1/admin/system-settings/configuration');
+    return Map<String, dynamic>.from(res.data?['data'] as Map? ?? const {});
+  }
+
+  Future<Map<String, dynamic>> updateSystemConfiguration(Map<String, dynamic> data) async {
+    final res = await _api.put<Map<String, dynamic>>('/api/v1/admin/system-settings/configuration', data: data);
+    return Map<String, dynamic>.from(res.data?['data'] as Map? ?? const {});
+  }
 }
 
 
