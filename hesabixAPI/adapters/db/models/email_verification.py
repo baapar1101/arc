@@ -19,3 +19,4 @@ class EmailVerificationToken(Base):
 	used_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 	created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 
+

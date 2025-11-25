@@ -243,3 +243,4 @@ def resend_verification_email(db: Session, user_id: int, base_url: str | None = 
 	
 	return True
 
+

@@ -99,3 +99,4 @@
 - اگر `email_verified = False`:
   - فرانت‌اند باید صفحه verification را نمایش دهد
 
+

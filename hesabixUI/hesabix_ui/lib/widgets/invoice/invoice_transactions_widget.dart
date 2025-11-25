@@ -139,8 +139,13 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
   }
   
   // بررسی اینکه آیا می‌توان تراکنش اضافه کرد
+  // اگر invoiceTotal null باشد (مثل حالت دریافت و پرداخت)، همیشه فعال است
+  // در غیر این صورت، باید invoiceTotal بیشتر از صفر باشد
   bool get _canAddTransaction {
-    return widget.invoiceTotal != null && widget.invoiceTotal! > 0;
+    if (widget.invoiceTotal == null) {
+      return true; // برای حالت دریافت و پرداخت که invoiceTotal ندارند
+    }
+    return widget.invoiceTotal! > 0;
   }
 
   @override

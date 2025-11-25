@@ -50,3 +50,4 @@ def downgrade() -> None:
     op.drop_index(op.f('ix_users_email_verified'), table_name='users')
     op.drop_column('users', 'email_verified')
 
+
