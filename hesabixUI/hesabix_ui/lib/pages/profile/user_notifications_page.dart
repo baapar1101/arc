@@ -189,17 +189,17 @@ class _UserNotificationsPageState extends State<UserNotificationsPage> {
       DateTime? expiresAt;
       if (expiresAtStr != null) {
         try {
-          // زمان از سرور به صورت ISO format می‌آید اما ممکن است Z نداشته باشد
-          // سرور زمان را به صورت UTC برمی‌گرداند (با isoformat()) اما ممکن است Z نداشته باشد
-          // باید Z اضافه کنیم تا Flutter آن را به عنوان UTC parse کند
+          // زمان از سرور به صورت ISO format می‌آید
+          // سرور زمان را به صورت UTC برمی‌گرداند (با isoformat())
           String utcStr = expiresAtStr.trim();
           
           // بررسی کن که آیا Z یا timezone offset دارد یا نه
           final hasZ = utcStr.endsWith('Z');
-          final hasTimezoneOffset = utcStr.contains('+') || (utcStr.contains('-') && utcStr.length > 19);
+          final hasTimezoneOffset = RegExp(r'[+-]\d{2}:?\d{2}$').hasMatch(utcStr);
           
           if (!hasZ && !hasTimezoneOffset) {
             // اگر Z ندارد و timezone offset هم ندارد، Z اضافه کن
+            // این یعنی سرور زمان را بدون timezone فرستاده و باید آن را UTC در نظر بگیریم
             utcStr = '${utcStr}Z';
             debugPrint('[TelegramConnect] Added Z to expires_at: $utcStr');
           }
@@ -223,6 +223,7 @@ class _UserNotificationsPageState extends State<UserNotificationsPage> {
           
           if (diff <= 0) {
             debugPrint('[TelegramConnect] WARNING: Expires time is in the past! This should not happen.');
+            debugPrint('[TelegramConnect] However, we will still show the QR code.');
           }
         } catch (e) {
           debugPrint('[TelegramConnect] ERROR: Failed to parse expires_at: $expiresAtStr, error: $e');
@@ -234,26 +235,28 @@ class _UserNotificationsPageState extends State<UserNotificationsPage> {
         _telegramLinkToken = linkData['link_token']?.toString();
         _telegramDeepLink = linkData['deep_link']?.toString();
         _telegramLinkExpiresAt = expiresAt;
-        _showLinkSection = true; // فعال کردن نمایش بخش QR code
+        _showLinkSection = true; // همیشه فعال کردن نمایش بخش QR code
         debugPrint('[TelegramConnect] Inside setState - _telegramLinkToken: ${_telegramLinkToken != null ? "exists" : "null"}, _showLinkSection: $_showLinkSection');
         if (_telegramLinkExpiresAt != null) {
           // محاسبه زمان باقیمانده قبل از شروع تایمر
           final now = DateTime.now().toUtc();
-          final expiresAt = _telegramLinkExpiresAt!.isUtc 
+          final expiresAtUtc = _telegramLinkExpiresAt!.isUtc 
               ? _telegramLinkExpiresAt! 
               : _telegramLinkExpiresAt!.toUtc();
-          final difference = expiresAt.difference(now);
+          final difference = expiresAtUtc.difference(now);
           _remainingSeconds = difference.inSeconds;
-          debugPrint('[TelegramConnect] Time calculation - now: $now, expiresAt: $expiresAt, difference: ${difference.inSeconds} seconds');
+          debugPrint('[TelegramConnect] Time calculation - now: $now, expiresAt: $expiresAtUtc, difference: ${difference.inSeconds} seconds');
           if (_remainingSeconds > 0) {
             _startTimer();
           } else {
-            debugPrint('[TelegramConnect] Time already expired, not starting timer');
-            _showLinkSection = false;
-            _telegramLinkToken = null;
-            _telegramDeepLink = null;
-            _telegramLinkExpiresAt = null;
+            debugPrint('[TelegramConnect] Time already expired or in past, not starting timer but keeping QR section visible');
+            // حتی اگر زمان منقضی شده باشد، بخش QR را نمایش بده
+            // فقط تایمر را شروع نکن
+            _remainingSeconds = 0;
           }
+        } else {
+          // اگر expires_at وجود نداشت، باز هم بخش را نمایش بده
+          _remainingSeconds = 0;
         }
         _telegramConnecting = false;
       });
@@ -813,38 +816,48 @@ class _UserNotificationsPageState extends State<UserNotificationsPage> {
                               ],
                             ),
                           ],
-                          if (_remainingSeconds > 0) ...[
+                          if (_telegramLinkExpiresAt != null) ...[
                             const SizedBox(height: 12),
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                               decoration: BoxDecoration(
-                                color: _remainingSeconds < 60 
-                                    ? Colors.red.withValues(alpha: 0.1)
-                                    : colorScheme.primaryContainer.withValues(alpha: 0.3),
+                                color: _remainingSeconds <= 0
+                                    ? Colors.orange.withValues(alpha: 0.1)
+                                    : (_remainingSeconds < 60 
+                                        ? Colors.red.withValues(alpha: 0.1)
+                                        : colorScheme.primaryContainer.withValues(alpha: 0.3)),
                                 borderRadius: BorderRadius.circular(8),
                                 border: Border.all(
-                                  color: _remainingSeconds < 60 
-                                      ? Colors.red.withValues(alpha: 0.3)
-                                      : colorScheme.primary.withValues(alpha: 0.3),
+                                  color: _remainingSeconds <= 0
+                                      ? Colors.orange.withValues(alpha: 0.3)
+                                      : (_remainingSeconds < 60 
+                                          ? Colors.red.withValues(alpha: 0.3)
+                                          : colorScheme.primary.withValues(alpha: 0.3)),
                                 ),
                               ),
                               child: Row(
                                 children: [
                                   Icon(
-                                    Icons.timer_outlined,
+                                    _remainingSeconds <= 0 ? Icons.warning_amber_rounded : Icons.timer_outlined,
                                     size: 16,
-                                    color: _remainingSeconds < 60 
-                                        ? Colors.red
-                                        : colorScheme.primary,
+                                    color: _remainingSeconds <= 0
+                                        ? Colors.orange
+                                        : (_remainingSeconds < 60 
+                                            ? Colors.red
+                                            : colorScheme.primary),
                                   ),
                                   const SizedBox(width: 8),
                                   Expanded(
                                     child: Text(
-                                      _formatRemainingTime(_remainingSeconds),
+                                      _remainingSeconds <= 0 
+                                          ? t.notificationsTelegramLinkExpired
+                                          : _formatRemainingTime(_remainingSeconds),
                                       style: theme.textTheme.bodySmall?.copyWith(
-                                        color: _remainingSeconds < 60 
-                                            ? Colors.red.shade700
-                                            : colorScheme.onPrimaryContainer,
+                                        color: _remainingSeconds <= 0
+                                            ? Colors.orange.shade700
+                                            : (_remainingSeconds < 60 
+                                                ? Colors.red.shade700
+                                                : colorScheme.onPrimaryContainer),
                                         fontWeight: FontWeight.w500,
                                       ),
                                     ),

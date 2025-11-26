@@ -213,6 +213,17 @@ def register_telegram_webhook_endpoint(
 				webhook_url = urlunsplit(
 					(normalized_proto, parts.netloc, parts.path, parts.query, parts.fragment)
 				)
+		else:
+			# اگر X-Forwarded-Proto وجود ندارد، از scheme فعلی request استفاده می‌کنیم
+			# و اگر http است، به https تبدیل می‌کنیم (برای امنیت)
+			parts = urlsplit(webhook_url)
+			current_scheme = parts.scheme or (request.url.scheme if request.url else "https")
+			# اگر http است، به https تبدیل می‌کنیم
+			if current_scheme == "http":
+				current_scheme = "https"
+			webhook_url = urlunsplit(
+				(current_scheme, parts.netloc, parts.path, parts.query, parts.fragment)
+			)
 		logger.info("telegram_webhook_url_direct_mode", webhook_url=webhook_url)
 
 	logger.info("telegram_webhook_register_calling", webhook_url=webhook_url, proxy_enabled=proxy_enabled)

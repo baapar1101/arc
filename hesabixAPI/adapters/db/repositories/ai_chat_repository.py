@@ -1,6 +1,6 @@
 from typing import Optional, List
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, func
+from sqlalchemy import and_, func, select
 from datetime import datetime
 from adapters.db.models.ai_chat_session import AIChatSession
 from adapters.db.models.ai_chat_message import AIChatMessage
@@ -64,7 +64,7 @@ class AIChatSessionRepository(BaseRepository[AIChatSession]):
         ).subquery()
         
         deleted = self.db.query(AIChatSession).filter(
-            AIChatSession.id.in_(subquery)
+            AIChatSession.id.in_(select(subquery.c.id))
         ).delete(synchronize_session=False)
         
         return deleted

@@ -83,7 +83,7 @@ def unlink(
 	return success_response({"unlinked": True}, request)
 
 
-@router.post("/webhook/{secret}", summary="وبهوک تلگرام")
+@router.post("/webhook/{secret}", summary="وبهوک تلگرام", name="telegram_webhook")
 def telegram_webhook(
 	secret: str,
 	payload: Dict[str, Any] = Body(...),
