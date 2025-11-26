@@ -134,7 +134,7 @@ class AIFunctionRegistry:
         
         self.register(AIFunction(
             name="search_invoices",
-            description="جستجو و فیلتر کردن فاکتورها بر اساس تاریخ، نوع، مشتری و سایر فیلترها. شناسه کسب‌وکار به صورت خودکار از جلسه گفت‌وگو گرفته می‌شود.",
+            description="جستجو و فیلتر کردن فاکتورها بر اساس تاریخ، نوع، مشتری و سایر فیلترها. شناسه کسب‌وکار به صورت خودکار از جلسه گفت‌وگو گرفته می‌شود. نتیجه شامل لیست فاکتورها در 'items' و تعداد کل فاکتورها در 'pagination.total' است. برای دریافت تعداد کل فاکتورها، از 'pagination.total' استفاده کنید.",
             parameters_schema={
                 "type": "object",
                 "properties": {
@@ -146,7 +146,9 @@ class AIFunctionRegistry:
                         "enum": ["invoice_sales", "invoice_purchase", "invoice_sales_return"],
                         "description": "نوع فاکتور (اختیاری)"
                     },
-                    "person_id": {"type": "integer", "description": "شناسه مشتری/تامین‌کننده (اختیاری)"}
+                    "person_id": {"type": "integer", "description": "شناسه مشتری/تامین‌کننده (اختیاری)"},
+                    "take": {"type": "integer", "description": "تعداد نتایج (اختیاری، پیش‌فرض: 50)"},
+                    "skip": {"type": "integer", "description": "تعداد نتایج صرف‌نظر شده (اختیاری، پیش‌فرض: 0)"}
                 },
                 "required": []
             },
@@ -192,6 +194,81 @@ class AIFunctionRegistry:
                 "required": ["invoice_id"]
             },
             handler=self._create_handler(get_invoice_details_wrapper),
+            allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
+            required_permissions=["invoices.read"],
+            category="invoices"
+        ))
+        
+        # اضافه کردن get_invoices_count
+        def get_invoices_count_wrapper(db, business_id, user_id, **kwargs):
+            """Wrapper برای دریافت تعداد فاکتورها"""
+            from app.services.document_service import list_documents
+            
+            # فیلتر کردن فقط فاکتورها
+            invoice_types = [
+                "invoice_sales", "invoice_sales_return",
+                "invoice_purchase", "invoice_purchase_return",
+                "invoice_direct_consumption", "invoice_production", "invoice_waste"
+            ]
+            
+            # ساخت query dict برای list_documents
+            query = {}
+            
+            # document_type
+            if "document_type" in kwargs:
+                query["document_type"] = kwargs["document_type"]
+            elif "document_types" in kwargs:
+                doc_types = kwargs["document_types"]
+                if isinstance(doc_types, list) and doc_types:
+                    query["document_type"] = doc_types[0]
+            
+            # سایر فیلترها
+            if "fiscal_year_id" in kwargs:
+                query["fiscal_year_id"] = kwargs["fiscal_year_id"]
+            if "from_date" in kwargs:
+                query["from_date"] = kwargs["from_date"]
+            if "to_date" in kwargs:
+                query["to_date"] = kwargs["to_date"]
+            if "person_id" in kwargs:
+                query["person_id"] = kwargs["person_id"]
+            
+            # برای دریافت تعداد، فقط یک رکورد می‌خواهیم
+            query["take"] = 1
+            query["skip"] = 0
+            
+            result = list_documents(db, business_id, query)
+            total = result.get("pagination", {}).get("total", 0)
+            
+            return {
+                "total": total,
+                "filters_applied": {
+                    "document_type": query.get("document_type"),
+                    "fiscal_year_id": query.get("fiscal_year_id"),
+                    "from_date": query.get("from_date"),
+                    "to_date": query.get("to_date"),
+                    "person_id": query.get("person_id")
+                }
+            }
+        
+        self.register(AIFunction(
+            name="get_invoices_count",
+            description="دریافت تعداد کل فاکتورها بر اساس فیلترهای انتخابی (تاریخ، نوع، مشتری و غیره). شناسه کسب‌وکار به صورت خودکار از جلسه گفت‌وگو گرفته می‌شود. این function برای پاسخ به سوالات مربوط به تعداد فاکتورها استفاده می‌شود.",
+            parameters_schema={
+                "type": "object",
+                "properties": {
+                    "fiscal_year_id": {"type": "integer", "description": "شناسه سال مالی (اختیاری)"},
+                    "from_date": {"type": "string", "format": "date", "description": "تاریخ شروع (اختیاری)"},
+                    "to_date": {"type": "string", "format": "date", "description": "تاریخ پایان (اختیاری)"},
+                    "document_type": {
+                        "type": "string",
+                        "enum": ["invoice_sales", "invoice_purchase", "invoice_sales_return", "invoice_purchase_return", "invoice_direct_consumption", "invoice_production", "invoice_waste"],
+                        "description": "نوع فاکتور (اختیاری)"
+                    },
+                    "person_id": {"type": "integer", "description": "شناسه مشتری/تامین‌کننده (اختیاری)"}
+                },
+                "required": []
+            },
+            handler=self._create_handler(get_invoices_count_wrapper),
             allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
             required_permissions=["invoices.read"],
             category="invoices"

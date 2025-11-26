@@ -221,7 +221,15 @@ class _UserNotificationsPageState extends State<UserNotificationsPage> {
           debugPrint('[TelegramConnect] Current time: $now (UTC)');
           debugPrint('[TelegramConnect] Difference: $diff seconds (${diff / 60} minutes)');
           
-          if (diff <= 0) {
+          // اگر زمان در گذشته است (با اختلاف بیشتر از 1 ساعت)، احتمالاً مشکل timezone است
+          // در این صورت، یک زمان پیش‌فرض (10 دقیقه) را تنظیم می‌کنیم
+          if (diff < -3600) {
+            debugPrint('[TelegramConnect] WARNING: Expires time is way in the past (more than 1 hour)!');
+            debugPrint('[TelegramConnect] This is likely a timezone issue. Setting default 10 minutes.');
+            // تنظیم زمان انقضا به 10 دقیقه بعد از الان
+            expiresAt = now.add(const Duration(minutes: 10));
+            debugPrint('[TelegramConnect] Adjusted expires_at to: $expiresAt');
+          } else if (diff <= 0) {
             debugPrint('[TelegramConnect] WARNING: Expires time is in the past! This should not happen.');
             debugPrint('[TelegramConnect] However, we will still show the QR code.');
           }

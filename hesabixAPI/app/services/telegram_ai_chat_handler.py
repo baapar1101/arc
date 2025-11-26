@@ -25,26 +25,47 @@ async def handle_telegram_message(
 	chat_id = chat.get("id")
 	text: str = message.get("text", "").strip()
 	
+	logger.info(f"Processing telegram message: chat_id={chat_id}, text={text[:50] if text else 'empty'}")
+	
 	if not chat_id or not text:
+		logger.warning(f"Invalid message: chat_id={chat_id}, text={text[:50] if text else 'empty'}")
 		return False
 	
 	# پیدا کردن کاربر از chat_id
 	user = get_user_by_telegram_chat_id(db, chat_id)
 	if not user:
 		logger.warning(f"User not found for chat_id: {chat_id}")
+		# ارسال پیام به کاربر که اتصال برقرار نشده است
+		telegram_provider.send_text(
+			chat_id=chat_id,
+			text="❌ اتصال تلگرام شما برقرار نشده است.\n\nلطفاً از داخل برنامه، لینک اتصال تلگرام را ایجاد کنید و دوباره امتحان کنید."
+		)
 		return False
 	
 	# ایجاد service
-	service = TelegramAIChatService(db, user.id, chat_id, telegram_provider)
-	user_context = service._create_auth_context()
+	try:
+		service = TelegramAIChatService(db, user.id, chat_id, telegram_provider)
+		user_context = service._create_auth_context()
+		logger.info(f"Service created for user_id={user.id}, chat_id={chat_id}")
+	except Exception as e:
+		logger.error(f"Error creating service: {e}", exc_info=True)
+		if chat_id:
+			telegram_provider.send_text(
+				chat_id=chat_id,
+				text="❌ خطا در ایجاد سرویس. لطفاً دوباره امتحان کنید."
+			)
+		return False
 	
 	# بررسی دستورات
 	if text == "/start":
 		# اگر لینک شده، منوی اصلی را نمایش بده
+		logger.info(f"Handling /start command for chat_id={chat_id}")
 		return service.send_main_menu(user_context)
 	elif text == "/menu":
+		logger.info(f"Handling /menu command for chat_id={chat_id}")
 		return service.send_main_menu(user_context)
 	elif text == "/help":
+		logger.info(f"Handling /help command for chat_id={chat_id}")
 		help_text = """🤖 دستیار هوش مصنوعی Hesabix
 
 دستورات:
@@ -55,7 +76,19 @@ async def handle_telegram_message(
 		return telegram_provider.send_text(chat_id=chat_id, text=help_text)
 	
 	# پردازش پیام متنی به عنوان سوال از AI
-	return await service.process_message(text, user_context)
+	logger.info(f"Processing AI message for chat_id={chat_id}, text={text[:50]}")
+	try:
+		result = await service.process_message(text, user_context)
+		logger.info(f"process_message result for chat_id={chat_id}: {result}")
+		return result
+	except Exception as e:
+		logger.error(f"Error in process_message: {e}", exc_info=True)
+		if chat_id:
+			telegram_provider.send_text(
+				chat_id=chat_id,
+				text="❌ خطا در پردازش پیام شما. لطفاً دوباره امتحان کنید."
+			)
+		return False
 
 
 async def handle_telegram_callback_query(

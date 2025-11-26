@@ -46,7 +46,8 @@ class TelegramAIChatService:
 			raise ValueError(f"User {self.user_id} not found")
 		
 		from app.core.auth_dependency import AuthContext
-		return AuthContext(db=self.db, user=user)
+		# برای تلگرام، api_key_id را 0 می‌گذاریم (نشان می‌دهد از طریق تلگرام است)
+		return AuthContext(db=self.db, user=user, api_key_id=0)
 	
 	def _build_inline_keyboard(self, buttons: List[List[Dict[str, str]]]) -> Dict[str, Any]:
 		"""ساخت Inline Keyboard از لیست دکمه‌ها"""

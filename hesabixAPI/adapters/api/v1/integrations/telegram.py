@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from typing import Any, Dict
-from datetime import datetime
+from datetime import datetime, timezone
 import logging
 
 from fastapi import APIRouter, Depends, Request, Body, HTTPException
@@ -39,11 +39,18 @@ def create_link(
 	)
 	bot_username = settings.get("telegram_bot_username") or ""
 	deep_link = f"https://t.me/{bot_username}?start={link.token}" if bot_username else None
+	# اطمینان از اینکه expires_at با Z (UTC) برگردانده می‌شود
+	# اگر datetime بدون timezone باشد، آن را به UTC تبدیل کن
+	if link.expires_at.tzinfo is None:
+		expires_at_utc = link.expires_at.replace(tzinfo=timezone.utc)
+	else:
+		expires_at_utc = link.expires_at.astimezone(timezone.utc)
+	expires_at_iso = expires_at_utc.isoformat()
 	return success_response(
 		{
 			"deep_link": deep_link,
 			"link_token": link.token,
-			"expires_at": link.expires_at.isoformat(),
+			"expires_at": expires_at_iso,
 		},
 		request,
 	)
@@ -134,7 +141,8 @@ def telegram_webhook(
 			from app.services.telegram_ai_chat_service import TelegramAIChatService
 			from app.core.auth_dependency import AuthContext
 			service = TelegramAIChatService(db, user.id, int(chat_id), provider)
-			user_context = AuthContext(db=db, user=user)
+			# برای تلگرام، api_key_id را 0 می‌گذاریم (نشان می‌دهد از طریق تلگرام است)
+			user_context = AuthContext(db=db, user=user, api_key_id=0)
 			service.send_main_menu(user_context)
 		return {"ok": True}
 
@@ -166,9 +174,13 @@ def telegram_webhook(
 			# پردازش پیام به عنوان سوال از AI
 			from app.services.telegram_ai_chat_handler import handle_telegram_message
 			import asyncio
+			chat = message.get("chat", {})
+			chat_id = chat.get("id")
 			try:
 				# استفاده از asyncio.run برای ایجاد event loop جدید
-				asyncio.run(handle_telegram_message(message, db, provider))
+				result = asyncio.run(handle_telegram_message(message, db, provider))
+				if not result and chat_id:
+					logger.warning(f"handle_telegram_message returned False for chat_id: {chat_id}")
 			except RuntimeError:
 				# اگر event loop از قبل وجود دارد، از get_event_loop استفاده می‌کنیم
 				try:
@@ -178,13 +190,33 @@ def telegram_webhook(
 						import concurrent.futures
 						with concurrent.futures.ThreadPoolExecutor() as executor:
 							future = executor.submit(asyncio.run, handle_telegram_message(message, db, provider))
-							future.result(timeout=60)
+							result = future.result(timeout=60)
+							if not result and chat_id:
+								logger.warning(f"handle_telegram_message returned False for chat_id: {chat_id}")
 					else:
-						loop.run_until_complete(handle_telegram_message(message, db, provider))
+						result = loop.run_until_complete(handle_telegram_message(message, db, provider))
+						if not result and chat_id:
+							logger.warning(f"handle_telegram_message returned False for chat_id: {chat_id}")
 				except Exception as e:
 					logger.error(f"Error handling telegram message: {e}", exc_info=True)
+					if chat_id:
+						try:
+							provider.send_text(
+								chat_id=chat_id,
+								text="❌ خطا در پردازش پیام شما. لطفاً دوباره امتحان کنید."
+							)
+						except Exception as send_error:
+							logger.error(f"Error sending error message to user: {send_error}", exc_info=True)
 			except Exception as e:
 				logger.error(f"Error handling telegram message: {e}", exc_info=True)
+				if chat_id:
+					try:
+						provider.send_text(
+							chat_id=chat_id,
+							text="❌ خطا در پردازش پیام شما. لطفاً دوباره امتحان کنید."
+						)
+					except Exception as send_error:
+						logger.error(f"Error sending error message to user: {send_error}", exc_info=True)
 	
 	# پردازش Callback Query (فشار دادن دکمه)
 	if "callback_query" in payload:
