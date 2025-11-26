@@ -12,6 +12,11 @@ class ProductFormData {
   int? minOrderQty;
   int? leadTimeDays;
   
+  // Unique Inventory Mode
+  String? inventoryMode; // "bulk" or "unique"
+  bool trackSerial;
+  bool trackBarcode;
+  
   // Pricing
   num? baseSalesPrice;
   num? basePurchasePrice;
@@ -52,6 +57,9 @@ class ProductFormData {
     this.reorderPoint,
     this.minOrderQty,
     this.leadTimeDays,
+    this.inventoryMode,
+    this.trackSerial = false,
+    this.trackBarcode = false,
     this.baseSalesPrice,
     this.basePurchasePrice,
     this.baseSalesNote,
@@ -82,6 +90,9 @@ class ProductFormData {
     int? reorderPoint,
     int? minOrderQty,
     int? leadTimeDays,
+    String? inventoryMode,
+    bool? trackSerial,
+    bool? trackBarcode,
     num? baseSalesPrice,
     num? basePurchasePrice,
     String? baseSalesNote,
@@ -111,6 +122,9 @@ class ProductFormData {
       reorderPoint: reorderPoint ?? this.reorderPoint,
       minOrderQty: minOrderQty ?? this.minOrderQty,
       leadTimeDays: leadTimeDays ?? this.leadTimeDays,
+      inventoryMode: inventoryMode ?? this.inventoryMode,
+      trackSerial: trackSerial ?? this.trackSerial,
+      trackBarcode: trackBarcode ?? this.trackBarcode,
       baseSalesPrice: baseSalesPrice ?? this.baseSalesPrice,
       basePurchasePrice: basePurchasePrice ?? this.basePurchasePrice,
       baseSalesNote: baseSalesNote ?? this.baseSalesNote,
@@ -150,6 +164,9 @@ class ProductFormData {
       'description': description,
       'category_id': categoryId,
       'track_inventory': trackInventory,
+      'inventory_mode': inventoryMode ?? 'bulk',
+      'track_serial': trackSerial,
+      'track_barcode': trackBarcode,
       // Default numeric fields to zero when null
       'base_sales_price': baseSalesPrice ?? 0,
       'base_purchase_price': basePurchasePrice ?? 0,
@@ -169,13 +186,13 @@ class ProductFormData {
       'tax_type_id': taxTypeId,
       'tax_code': taxCode,
       'tax_unit_id': taxUnitId,
-      'attribute_ids': selectedAttributeIds.isEmpty ? null : selectedAttributeIds.toList(),
+      'attribute_ids': selectedAttributeIds.toList(), // همیشه لیست ارسال می‌شود (حتی اگر خالی باشد) تا بک‌اند بتواند ویژگی‌ها را به‌روزرسانی کند
       'image_file_id': imageFileId,
       'default_warehouse_id': defaultWarehouseId,
     };
     // Remove only nulls we intentionally kept nullable
-    // اما default_warehouse_id را همیشه نگه می‌داریم (حتی اگر null باشد) تا بک‌اند بتواند آن را به‌روزرسانی کند
-    payload.removeWhere((k, v) => v == null && k != 'default_warehouse_id');
+    // اما default_warehouse_id و attribute_ids را همیشه نگه می‌داریم (حتی اگر null/خالی باشند) تا بک‌اند بتواند آن‌ها را به‌روزرسانی کند
+    payload.removeWhere((k, v) => v == null && k != 'default_warehouse_id' && k != 'attribute_ids');
     return payload;
   }
 
@@ -187,6 +204,9 @@ class ProductFormData {
       description: product['description']?.toString(),
       categoryId: product['category_id'] as int?,
       trackInventory: (product['track_inventory'] == true),
+      inventoryMode: product['inventory_mode']?.toString(),
+      trackSerial: (product['track_serial'] == true),
+      trackBarcode: (product['track_barcode'] == true),
       baseSalesPrice: _parseNumeric(product['base_sales_price']),
       basePurchasePrice: _parseNumeric(product['base_purchase_price']),
       mainUnit: product['main_unit']?.toString(),

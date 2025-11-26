@@ -1,7 +1,12 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../../core/api_client.dart';
+import '../../core/calendar_controller.dart';
+import '../../core/date_utils.dart';
 import '../../models/warehouse_invoice_source.dart';
-import '../../services/warehouse_service.dart';
+import '../../utils/number_formatters.dart';
+import '../../widgets/data_table/data_table_widget.dart';
+import '../../widgets/data_table/data_table_config.dart';
 
 class WarehouseDocWizardResult {
   final bool isManual;
@@ -106,11 +111,13 @@ const List<WarehouseDocSourceOption> _sourceOptions = [
 class WarehouseDocWizardDialog extends StatefulWidget {
   final int businessId;
   final ApiClient apiClient;
+  final CalendarController? calendarController;
 
   const WarehouseDocWizardDialog({
     super.key,
     required this.businessId,
     required this.apiClient,
+    this.calendarController,
   });
 
   @override
@@ -118,63 +125,31 @@ class WarehouseDocWizardDialog extends StatefulWidget {
 }
 
 class _WarehouseDocWizardDialogState extends State<WarehouseDocWizardDialog> {
-  late final WarehouseService _service;
   int _currentStep = 0;
   WarehouseDocSourceOption? _selectedOption;
-  final TextEditingController _searchCtrl = TextEditingController();
-  bool _includeCompleted = false;
-  bool _loadingInvoices = false;
-  String? _invoiceError;
-  List<WarehouseInvoiceSource> _invoiceItems = const [];
-  int _page = 1;
-  int _totalPages = 1;
   WarehouseInvoiceSource? _selectedInvoice;
+  bool _includeCompleted = false;
 
   @override
   void initState() {
     super.initState();
-    _service = WarehouseService(apiClient: widget.apiClient);
   }
 
   @override
   void dispose() {
-    _searchCtrl.dispose();
     super.dispose();
   }
 
-  Future<void> _loadInvoices({bool resetPage = false}) async {
-    if (_selectedOption == null || _selectedOption!.isManual) return;
-    setState(() {
-      _loadingInvoices = true;
-      _invoiceError = null;
-      if (resetPage) _page = 1;
-    });
+  void _selectInvoice(Map<String, dynamic> item) {
     try {
-      final payload = {
-        'invoice_type': _selectedOption!.key,
-        'take': 20,
-        'skip': (_page - 1) * 20,
-        if (_searchCtrl.text.trim().isNotEmpty) 'search': _searchCtrl.text.trim(),
-        if (_includeCompleted) 'include_completed': true,
-      };
-      final res = await _service.searchInvoiceSources(businessId: widget.businessId, payload: payload);
-      final items = List<Map<String, dynamic>>.from(res['items'] ?? const []);
-      if (!mounted) return;
+      final invoice = WarehouseInvoiceSource.fromJson(item);
       setState(() {
-        _invoiceItems = items.map((e) => WarehouseInvoiceSource.fromJson(e)).toList();
-        _totalPages = (res['total_pages'] as num?)?.toInt() ?? 1;
-        _selectedInvoice = null;
+        _selectedInvoice = invoice;
       });
+      debugPrint('Invoice selected: ${invoice.code}, ID: ${invoice.invoiceId}');
     } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _invoiceError = e.toString();
-        _invoiceItems = const [];
-      });
-    } finally {
-      if (mounted) {
-        setState(() => _loadingInvoices = false);
-      }
+      debugPrint('Error parsing invoice: $e');
+      debugPrint('Item data: $item');
     }
   }
 
@@ -186,21 +161,30 @@ class _WarehouseDocWizardDialogState extends State<WarehouseDocWizardDialog> {
     }
     setState(() {
       _currentStep = 1;
+      _selectedInvoice = null;
     });
-    _loadInvoices(resetPage: true);
   }
 
   void _confirmInvoiceSelection() {
-    if (_selectedOption == null || _selectedInvoice == null) return;
-    Navigator.of(context).pop(
-      WarehouseDocWizardResult.invoice(
-        sourceKey: _selectedOption!.key,
-        docType: _selectedOption!.docType ?? _selectedInvoice!.warehouseDocTypeHint ?? 'issue',
-        invoiceId: _selectedInvoice!.invoiceId,
-        invoiceCode: _selectedInvoice!.code,
-        sourceLabel: _selectedOption!.title,
-      ),
+    debugPrint('_confirmInvoiceSelection called');
+    debugPrint('_selectedOption: ${_selectedOption?.key}');
+    debugPrint('_selectedInvoice: ${_selectedInvoice?.code} (ID: ${_selectedInvoice?.invoiceId})');
+    
+    if (_selectedOption == null || _selectedInvoice == null) {
+      debugPrint('Cannot confirm: _selectedOption or _selectedInvoice is null');
+      return;
+    }
+    
+    final result = WarehouseDocWizardResult.invoice(
+      sourceKey: _selectedOption!.key,
+      docType: _selectedOption!.docType ?? _selectedInvoice!.warehouseDocTypeHint ?? 'issue',
+      invoiceId: _selectedInvoice!.invoiceId,
+      invoiceCode: _selectedInvoice!.code,
+      sourceLabel: _selectedOption!.title,
     );
+    
+    debugPrint('Returning result: invoiceId=${result.invoiceId}, code=${result.invoiceCode}');
+    Navigator.of(context).pop(result);
   }
 
   String _stateLabel(String state) {
@@ -232,237 +216,321 @@ class _WarehouseDocWizardDialogState extends State<WarehouseDocWizardDialog> {
   }
 
   Widget _buildSourceStep() {
-    return SizedBox(
-      width: 700,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Text('ابتدا مشخص کنید این حواله برای چه فرآیندی است:'),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: _sourceOptions.map((option) {
-              final selected = _selectedOption?.key == option.key;
-              return GestureDetector(
-                onTap: () => setState(() => _selectedOption = option),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  width: 210,
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: selected ? Theme.of(context).colorScheme.primary : Colors.grey.shade300,
-                      width: selected ? 2 : 1,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final screenWidth = MediaQuery.of(context).size.width;
+        final isMobile = screenWidth < 600;
+        final isTablet = screenWidth >= 600 && screenWidth < 1024;
+        final cardWidth = isMobile
+            ? (constraints.maxWidth - 24) / 2
+            : isTablet
+                ? (constraints.maxWidth - 36) / 3
+                : 210.0;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('ابتدا مشخص کنید این حواله برای چه فرآیندی است:'),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: _sourceOptions.map((option) {
+                final selected = _selectedOption?.key == option.key;
+                return GestureDetector(
+                  onTap: () => setState(() => _selectedOption = option),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    width: cardWidth,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: selected ? Theme.of(context).colorScheme.primary : Colors.grey.shade300,
+                        width: selected ? 2 : 1,
+                      ),
+                      color: selected ? Theme.of(context).colorScheme.primaryContainer.withOpacity(0.4) : Colors.white,
                     ),
-                    color: selected ? Theme.of(context).colorScheme.primaryContainer.withOpacity(0.4) : Colors.white,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(option.icon, color: Theme.of(context).colorScheme.primary),
+                        const SizedBox(height: 8),
+                        Text(
+                          option.title,
+                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          option.description,
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.black87),
+                        ),
+                      ],
+                    ),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(option.icon, color: Theme.of(context).colorScheme.primary),
-                      const SizedBox(height: 8),
-                      Text(
-                        option.title,
-                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        option.description,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.black87),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            }).toList(),
-          ),
-        ],
-      ),
+                );
+              }).toList(),
+            ),
+          ],
+        );
+      },
     );
   }
 
   Widget _buildInvoiceStep() {
-    return SizedBox(
-      width: 760,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('انتخاب فاکتور مرتبط (${_selectedOption?.title ?? ''})', style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _searchCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'جستجو بر اساس کد فاکتور',
-                    border: OutlineInputBorder(),
-                    isDense: true,
-                  ),
-                  textInputAction: TextInputAction.search,
-                  onSubmitted: (_) => _loadInvoices(resetPage: true),
+    if (_selectedOption == null || _selectedOption!.isManual) {
+      return const SizedBox.shrink();
+    }
+
+    final isJalali = widget.calendarController?.isJalali ?? false;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'انتخاب فاکتور مرتبط (${_selectedOption?.title ?? ''})',
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+        const SizedBox(height: 12),
+        CheckboxListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('نمایش فاکتورهایی که حواله کامل دارند'),
+          value: _includeCompleted,
+          onChanged: (val) {
+            setState(() {
+              _includeCompleted = val ?? false;
+            });
+          },
+        ),
+        const SizedBox(height: 8),
+        Expanded(
+          child: DataTableWidget<Map<String, dynamic>>(
+            key: ValueKey('${_selectedOption?.key}_$_includeCompleted'),
+            config: DataTableConfig<Map<String, dynamic>>(
+              endpoint: '/api/v1/warehouse-docs/business/${widget.businessId}/sources/invoices/search',
+              title: null,
+              showSearch: true,
+              showFilters: false,
+              showPagination: true,
+              showColumnSearch: false,
+              showRefreshButton: false,
+              showClearFiltersButton: false,
+              showBackButton: false,
+              showTableIcon: false,
+              enableRowSelection: false,
+              enableMultiRowSelection: false,
+              searchFields: ['code'],
+              columns: [
+                TextColumn(
+                  'code',
+                  'کد فاکتور',
+                  width: ColumnWidth.medium,
                 ),
-              ),
-              const SizedBox(width: 12),
-              SizedBox(
-                height: 48,
-                child: FilledButton.tonalIcon(
-                  onPressed: () => _loadInvoices(resetPage: true),
-                  icon: const Icon(Icons.search),
-                  label: const Text('اعمال'),
+                TextColumn(
+                  'person_name',
+                  'طرف حساب',
+                  width: ColumnWidth.medium,
+                  formatter: (item) => item['person_name']?.toString() ?? 'بدون طرف حساب',
                 ),
-              ),
-            ],
-          ),
-          CheckboxListTile(
-            contentPadding: EdgeInsets.zero,
-            title: const Text('نمایش فاکتورهایی که حواله کامل دارند'),
-            value: _includeCompleted,
-            onChanged: (val) {
-              setState(() => _includeCompleted = val ?? false);
-              _loadInvoices(resetPage: true);
-            },
-          ),
-          const SizedBox(height: 8),
-          Expanded(
-            child: _loadingInvoices
-                ? const Center(child: CircularProgressIndicator())
-                : _invoiceError != null
-                    ? Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text('خطا: $_invoiceError'),
-                            const SizedBox(height: 8),
-                            FilledButton(
-                              onPressed: () => _loadInvoices(resetPage: false),
-                              child: const Text('تلاش مجدد'),
-                            ),
-                          ],
-                        ),
-                      )
-                    : _invoiceItems.isEmpty
-                        ? const Center(child: Text('فاکتوری مطابق فیلتر یافت نشد'))
-                        : ListView.builder(
-                            itemCount: _invoiceItems.length,
-                            itemBuilder: (context, index) {
-                              final item = _invoiceItems[index];
-                              final selected = _selectedInvoice?.invoiceId == item.invoiceId;
-                              return Card(
-                                child: RadioListTile<WarehouseInvoiceSource>(
-                                  value: item,
-                                  groupValue: _selectedInvoice,
-                                  onChanged: (val) => setState(() => _selectedInvoice = val),
-                                  title: Row(
-                                    children: [
-                                      Expanded(child: Text(item.code)),
-                                      Chip(
-                                        label: Text(_stateLabel(item.warehouseState)),
-                                        backgroundColor: _stateColor(context, item.warehouseState).withOpacity(0.15),
-                                        labelStyle: TextStyle(
-                                          color: _stateColor(context, item.warehouseState),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  subtitle: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(item.personName ?? 'بدون طرف حساب'),
-                                      Text(
-                                        'تاریخ: ${item.documentDate?.toIso8601String().split('T').first ?? '-'} | مبلغ: ${item.netAmount?.toStringAsFixed(0) ?? '-'}',
-                                      ),
-                                      if (item.warehouseDocuments.isNotEmpty)
-                                        Wrap(
-                                          spacing: 6,
-                                          children: item.warehouseDocuments
-                                              .map(
-                                                (doc) => Chip(
-                                                  label: Text('${doc.code} (${doc.status})'),
-                                                  visualDensity: VisualDensity.compact,
-                                                ),
-                                              )
-                                              .toList(),
-                                        ),
-                                    ],
-                                  ),
-                                  selected: selected,
-                                ),
-                              );
-                            },
-                          ),
-          ),
-          if (!_loadingInvoices)
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('صفحه $_page از $_totalPages'),
-                Row(
-                  children: [
-                    IconButton(
-                      onPressed: _page > 1 && !_loadingInvoices
-                          ? () {
-                              setState(() => _page -= 1);
-                              _loadInvoices(resetPage: false);
-                            }
-                          : null,
-                      icon: const Icon(Icons.chevron_right),
-                    ),
-                    IconButton(
-                      onPressed: _page < _totalPages && !_loadingInvoices
-                          ? () {
-                              setState(() => _page += 1);
-                              _loadInvoices(resetPage: false);
-                            }
-                          : null,
-                      icon: const Icon(Icons.chevron_left),
-                    ),
-                  ],
+                DateColumn(
+                  'document_date',
+                  'تاریخ',
+                  width: ColumnWidth.medium,
+                  formatter: (item) {
+                    final dateStr = item['document_date']?.toString();
+                    if (dateStr == null || dateStr.isEmpty) return null;
+                    final date = DateTime.tryParse(dateStr);
+                    if (date == null) return null;
+                    return HesabixDateUtils.formatForDisplay(date, isJalali);
+                  },
+                ),
+                NumberColumn(
+                  'net_amount',
+                  'مبلغ',
+                  width: ColumnWidth.medium,
+                  decimalPlaces: 0,
+                  formatter: (item) {
+                    final amount = item['net_amount'];
+                    if (amount == null) return null;
+                    return formatWithThousands(amount, decimalPlaces: 0);
+                  },
+                ),
+                CustomColumn(
+                  'warehouse_state',
+                  'وضعیت',
+                  width: ColumnWidth.small,
+                  builder: (item, index) {
+                    final state = item['warehouse_state']?.toString() ?? 'missing';
+                    return Chip(
+                      label: Text(_stateLabel(state)),
+                      backgroundColor: _stateColor(context, state).withOpacity(0.15),
+                      labelStyle: TextStyle(
+                        color: _stateColor(context, state),
+                        fontSize: 12,
+                      ),
+                      visualDensity: VisualDensity.compact,
+                    );
+                  },
                 ),
               ],
+              additionalParams: {
+                'invoice_type': _selectedOption!.key,
+                if (_includeCompleted) 'include_completed': true,
+              },
+              rowColorBuilder: (item, index) {
+                try {
+                  final invoice = WarehouseInvoiceSource.fromJson(item);
+                  if (_selectedInvoice?.invoiceId == invoice.invoiceId) {
+                    return Theme.of(context).colorScheme.primaryContainer.withOpacity(0.3);
+                  }
+                } catch (e) {
+                  // Ignore parsing errors
+                }
+                return null;
+              },
+              onRowTap: (item) {
+                _selectInvoice(item);
+              },
+              onRowDoubleTap: (item) {
+                // Double tap to quickly confirm selection
+                _selectInvoice(item);
+                if (_selectedInvoice != null && _selectedOption != null) {
+                  Future.microtask(() => _confirmInvoiceSelection());
+                }
+              },
+              emptyStateMessage: 'فاکتوری مطابق فیلتر یافت نشد',
             ),
-        ],
-      ),
+            fromJson: (json) => json,
+            calendarController: widget.calendarController,
+          ),
+        ),
+      ],
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Text(_currentStep == 0 ? 'ایجاد حواله جدید' : 'انتخاب فاکتور'),
-      content: SizedBox(
-        height: _currentStep == 0 ? 360 : 520,
-        child: _currentStep == 0 ? _buildSourceStep() : _buildInvoiceStep(),
-      ),
-      actions: [
-        if (_currentStep == 1)
-          TextButton(
-            onPressed: () => setState(() {
-              _currentStep = 0;
-              _selectedInvoice = null;
-            }),
-            child: const Text('بازگشت'),
-          ),
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('انصراف'),
+    final media = MediaQuery.of(context);
+    final screenWidth = media.size.width;
+    final screenHeight = media.size.height;
+    final isMobile = screenWidth < 600;
+    final isTablet = screenWidth >= 600 && screenWidth < 1024;
+
+    final dialogWidth = (isMobile
+        ? screenWidth * 0.95
+        : isTablet
+            ? screenWidth * 0.85
+            : screenWidth > 1200
+                ? 900.0
+                : screenWidth * 0.75).toDouble();
+
+    final dialogHeight = (_currentStep == 0
+        ? (isMobile ? screenHeight * 0.6 : 400.0)
+        : (isMobile ? screenHeight * 0.75 : 580.0)).toDouble();
+
+    return PopScope(
+      canPop: false,
+      child: Dialog(
+        insetPadding: EdgeInsets.all(isMobile ? 8 : 16),
+        child: Container(
+        constraints: BoxConstraints(
+          maxWidth: dialogWidth,
+          maxHeight: screenHeight * 0.9,
         ),
-        if (_currentStep == 0)
-          FilledButton(
-            onPressed: _selectedOption == null ? null : _goToInvoices,
-            child: const Text('ادامه'),
-          )
-        else
-          FilledButton(
-            onPressed: _selectedInvoice == null ? null : _confirmInvoiceSelection,
-            child: const Text('تأیید و ادامه'),
-          ),
-      ],
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Header
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.3),
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(12),
+                  topRight: Radius.circular(12),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    _currentStep == 0 ? Icons.add_circle_outline : Icons.receipt_long,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _currentStep == 0 ? 'ایجاد حواله جدید' : 'انتخاب فاکتور',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.of(context).pop(),
+                    tooltip: 'بستن',
+                  ),
+                ],
+              ),
+            ),
+            // Content
+            Flexible(
+              child: Container(
+                constraints: BoxConstraints(
+                  maxHeight: dialogHeight,
+                  minHeight: isMobile ? 300 : 360,
+                ),
+                padding: const EdgeInsets.all(16),
+                child: _currentStep == 0 ? _buildSourceStep() : _buildInvoiceStep(),
+              ),
+            ),
+            // Actions
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                border: Border(
+                  top: BorderSide(color: Colors.grey.shade300),
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  if (_currentStep == 1)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 8),
+                      child: TextButton(
+                        onPressed: () => setState(() {
+                          _currentStep = 0;
+                          _selectedInvoice = null;
+                        }),
+                        child: const Text('بازگشت'),
+                      ),
+                    ),
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('انصراف'),
+                  ),
+                  const SizedBox(width: 8),
+                  if (_currentStep == 0)
+                    FilledButton(
+                      onPressed: _selectedOption == null ? null : _goToInvoices,
+                      child: const Text('ادامه'),
+                    )
+                  else
+                    FilledButton(
+                      onPressed: _selectedInvoice == null ? null : _confirmInvoiceSelection,
+                      child: const Text('تأیید و ادامه'),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+      ),
     );
   }
 }

@@ -8,6 +8,7 @@ import '../../services/business_user_service.dart';
 import '../../models/business_user_model.dart';
 import '../../utils/number_normalizer.dart';
 import '../../utils/snackbar_helper.dart';
+import '../../utils/responsive_helper.dart';
 
 class UsersPermissionsPage extends StatefulWidget {
   final String businessId;
@@ -402,35 +403,72 @@ class _UsersPermissionsPageState extends State<UsersPermissionsPage> {
             ],
           ),
           const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _emailOrPhoneController,
-                  decoration: InputDecoration(
-                    labelText: t.userEmailOrPhone,
-                    hintText: t.userEmailOrPhoneHint,
-                    prefixIcon: const Icon(Icons.email_outlined),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isMobile = ResponsiveHelper.isMobile(context);
+              if (isMobile) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    TextField(
+                      controller: _emailOrPhoneController,
+                      decoration: InputDecoration(
+                        labelText: t.userEmailOrPhone,
+                        hintText: t.userEmailOrPhoneHint,
+                        prefixIcon: const Icon(Icons.email_outlined),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      ),
                     ),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              ElevatedButton.icon(
-                onPressed: _addUser,
-                icon: const Icon(Icons.add, size: 18),
-                label: Text(t.addUser),
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-            ],
+                    const SizedBox(height: 12),
+                    ElevatedButton.icon(
+                      onPressed: _addUser,
+                      icon: const Icon(Icons.add, size: 18),
+                      label: Text(t.addUser),
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              } else {
+                return Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _emailOrPhoneController,
+                        decoration: InputDecoration(
+                          labelText: t.userEmailOrPhone,
+                          hintText: t.userEmailOrPhoneHint,
+                          prefixIcon: const Icon(Icons.email_outlined),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    ElevatedButton.icon(
+                      onPressed: _addUser,
+                      icon: const Icon(Icons.add, size: 18),
+                      label: Text(t.addUser),
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              }
+            },
           ),
         ],
       ),

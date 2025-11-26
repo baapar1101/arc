@@ -17,12 +17,24 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # اضافه کردن فیلد email_verified به جدول users
-    op.add_column('users', sa.Column('email_verified', sa.Boolean(), nullable=False, server_default='0'))
-    op.create_index(op.f('ix_users_email_verified'), 'users', ['email_verified'], unique=False)
+    # اضافه کردن فیلد email_verified به جدول users (اگر وجود نداشته باشد)
+    from sqlalchemy import inspect
+    conn = op.get_bind()
+    inspector = inspect(conn)
+    columns = [col['name'] for col in inspector.get_columns('users')]
     
-    # ایجاد جدول email_verification_tokens
-    op.create_table('email_verification_tokens',
+    if 'email_verified' not in columns:
+        op.add_column('users', sa.Column('email_verified', sa.Boolean(), nullable=False, server_default='0'))
+    
+    # ایجاد ایندکس (اگر وجود نداشته باشد)
+    indexes = [idx['name'] for idx in inspector.get_indexes('users')]
+    if 'ix_users_email_verified' not in indexes:
+        op.create_index(op.f('ix_users_email_verified'), 'users', ['email_verified'], unique=False)
+    
+    # ایجاد جدول email_verification_tokens (اگر وجود نداشته باشد)
+    tables = inspector.get_table_names()
+    if 'email_verification_tokens' not in tables:
+        op.create_table('email_verification_tokens',
         sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
         sa.Column('user_id', sa.Integer(), nullable=False),
         sa.Column('email', sa.String(length=255), nullable=False),
@@ -30,13 +42,18 @@ def upgrade() -> None:
         sa.Column('expires_at', sa.DateTime(), nullable=False),
         sa.Column('used_at', sa.DateTime(), nullable=True),
         sa.Column('created_at', sa.DateTime(), nullable=False),
-        sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
-        sa.PrimaryKeyConstraint('id'),
-        sa.UniqueConstraint('token_hash')
-    )
-    op.create_index(op.f('ix_email_verification_tokens_user_id'), 'email_verification_tokens', ['user_id'], unique=False)
-    op.create_index(op.f('ix_email_verification_tokens_email'), 'email_verification_tokens', ['email'], unique=False)
-    op.create_index(op.f('ix_email_verification_tokens_token_hash'), 'email_verification_tokens', ['token_hash'], unique=True)
+            sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
+            sa.PrimaryKeyConstraint('id'),
+            sa.UniqueConstraint('token_hash')
+        )
+        # ایجاد ایندکس‌ها (اگر وجود نداشته باشند)
+        existing_indexes = [idx['name'] for idx in inspector.get_indexes('email_verification_tokens')] if 'email_verification_tokens' in tables else []
+        if 'ix_email_verification_tokens_user_id' not in existing_indexes:
+            op.create_index(op.f('ix_email_verification_tokens_user_id'), 'email_verification_tokens', ['user_id'], unique=False)
+        if 'ix_email_verification_tokens_email' not in existing_indexes:
+            op.create_index(op.f('ix_email_verification_tokens_email'), 'email_verification_tokens', ['email'], unique=False)
+        if 'ix_email_verification_tokens_token_hash' not in existing_indexes:
+            op.create_index(op.f('ix_email_verification_tokens_token_hash'), 'email_verification_tokens', ['token_hash'], unique=True)
 
 
 def downgrade() -> None:

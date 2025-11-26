@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../services/category_service.dart';
+import '../../services/product_service.dart';
 import '../../core/api_client.dart';
 import '../../core/auth_store.dart';
+import '../../utils/number_formatters.dart';
 import 'category_picker_field.dart';
 
 class CategoryTreeDialog extends StatefulWidget {
@@ -17,15 +19,21 @@ class CategoryTreeDialog extends StatefulWidget {
 
 class _CategoryTreeDialogState extends State<CategoryTreeDialog> {
   late final CategoryService _service;
+  late final ProductService _productService;
   bool _loading = true;
   String? _error;
   List<Map<String, dynamic>> _tree = const <Map<String, dynamic>>[];
   final Set<int> _expandedNodes = <int>{};
+  bool _showProducts = false; // سوئیچ نمایش کالاها
+  int? _selectedCategoryForProducts; // دسته‌بندی انتخاب شده برای نمایش کالاها
+  bool _loadingProducts = false;
+  List<Map<String, dynamic>> _categoryProducts = const <Map<String, dynamic>>[];
 
   @override
   void initState() {
     super.initState();
     _service = CategoryService(ApiClient());
+    _productService = ProductService();
     _fetch();
   }
 
@@ -48,7 +56,38 @@ class _CategoryTreeDialogState extends State<CategoryTreeDialog> {
     }
   }
 
-  
+  /// جمع‌آوری تمام ID های نودهایی که فرزند دارند
+  Set<int> _collectAllNodeIdsWithChildren(List<Map<String, dynamic>> nodes) {
+    final Set<int> ids = {};
+    for (final node in nodes) {
+      final id = node['id'] as int?;
+      if (id == null) continue;
+      
+      final children = (node['children'] as List?)?.cast<dynamic>()
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList() ?? const <Map<String, dynamic>>[];
+      
+      if (children.isNotEmpty) {
+        ids.add(id);
+        ids.addAll(_collectAllNodeIdsWithChildren(children));
+      }
+    }
+    return ids;
+  }
+
+  /// باز کردن همه نودهای درخت
+  void _expandAll() {
+    setState(() {
+      _expandedNodes.addAll(_collectAllNodeIdsWithChildren(_tree));
+    });
+  }
+
+  /// بستن همه نودهای درخت
+  void _collapseAll() {
+    setState(() {
+      _expandedNodes.clear();
+    });
+  }
 
   bool get _canAdd => widget.authStore.hasBusinessPermission('categories', 'add');
   bool get _canEdit => widget.authStore.hasBusinessPermission('categories', 'edit');
@@ -77,11 +116,23 @@ class _CategoryTreeDialogState extends State<CategoryTreeDialog> {
                   style: Theme.of(context).textTheme.headlineSmall,
                 ),
                 const Spacer(),
+                // دکمه‌های باز/بسته کردن همه
+                IconButton(
+                  tooltip: 'باز کردن همه',
+                  onPressed: _expandAll,
+                  icon: const Icon(Icons.unfold_more),
+                ),
+                IconButton(
+                  tooltip: 'بستن همه',
+                  onPressed: _collapseAll,
+                  icon: const Icon(Icons.unfold_less),
+                ),
+                const SizedBox(width: 8),
                 if (_canAdd)
-                  FilledButton.icon(
+                  IconButton(
+                    tooltip: t.addCategory,
                     onPressed: () => _showEditDialog(isRoot: true),
                     icon: const Icon(Icons.add),
-                    label: Text(t.addCategory),
                   ),
                 const SizedBox(width: 8),
                 IconButton(
@@ -91,6 +142,33 @@ class _CategoryTreeDialogState extends State<CategoryTreeDialog> {
               ],
             ),
             const Divider(),
+            const SizedBox(height: 16),
+
+            // سوئیچ نمایش کالاها
+            Card(
+              elevation: 0,
+              margin: EdgeInsets.zero,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+                side: BorderSide(color: Theme.of(context).dividerColor),
+              ),
+              child: SwitchListTile(
+                title: const Text('نمایش کالاهای دسته‌بندی'),
+                subtitle: const Text('با فعال کردن این گزینه، با کلیک روی هر دسته‌بندی کالاهای آن نمایش داده می‌شود'),
+                value: _showProducts,
+                onChanged: (value) {
+                  setState(() {
+                    _showProducts = value;
+                    if (!value) {
+                      _selectedCategoryForProducts = null;
+                      _categoryProducts = const [];
+                    }
+                  });
+                },
+                dense: true,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              ),
+            ),
             const SizedBox(height: 16),
 
             // Content
@@ -111,6 +189,12 @@ class _CategoryTreeDialogState extends State<CategoryTreeDialog> {
     if (_error != null) {
       return Center(child: Text(_error!));
     }
+    
+    // اگر نمایش کالاها فعال است و دسته‌بندی انتخاب شده، لیست کالاها را نمایش بده
+    if (_showProducts && _selectedCategoryForProducts != null) {
+      return _buildProductsList(t);
+    }
+    
     return RefreshIndicator(
       onRefresh: _fetch,
       child: ListView(
@@ -166,6 +250,7 @@ class _CategoryTreeDialogState extends State<CategoryTreeDialog> {
             );
           } : null,
           onDelete: _canDelete ? () => _confirmDelete(id) : null,
+          onShowProducts: _showProducts ? () => _loadCategoryProducts(id) : null,
           t: t,
         ),
       );
@@ -238,6 +323,250 @@ class _CategoryTreeDialogState extends State<CategoryTreeDialog> {
     }
     
     findAndExpand(_tree, targetId, []);
+  }
+
+  /// پیدا کردن یک نود در درخت بر اساس ID
+  Map<String, dynamic>? findNode(List<Map<String, dynamic>> nodes, int targetId) {
+    for (final node in nodes) {
+      if ((node['id'] as int?) == targetId) {
+        return node;
+      }
+      final children = (node['children'] as List?)?.cast<dynamic>()
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList() ?? const <Map<String, dynamic>>[];
+      final found = findNode(children, targetId);
+      if (found != null) return found;
+    }
+    return null;
+  }
+
+  /// جمع‌آوری تمام ID های فرزندان یک نود
+  Set<int> _collectAllDescendantIds(Map<String, dynamic> node) {
+    final Set<int> ids = {};
+    final id = node['id'] as int?;
+    if (id != null) {
+      ids.add(id);
+    }
+    final children = (node['children'] as List?)?.cast<dynamic>()
+        .map((e) => Map<String, dynamic>.from(e as Map))
+        .toList() ?? const <Map<String, dynamic>>[];
+    for (final child in children) {
+      ids.addAll(_collectAllDescendantIds(child));
+    }
+    return ids;
+  }
+
+  /// بارگذاری کالاهای یک دسته‌بندی و زیرمجموعه‌هایش
+  Future<void> _loadCategoryProducts(int? categoryId) async {
+    if (categoryId == null) return;
+    
+    setState(() {
+      _selectedCategoryForProducts = categoryId;
+      _loadingProducts = true;
+      _categoryProducts = const [];
+    });
+
+    try {
+      // جمع‌آوری تمام ID های فرزندان این دسته‌بندی
+      final node = findNode(_tree, categoryId);
+      final categoryIds = <int>[categoryId];
+      if (node != null) {
+        final allDescendantIds = _collectAllDescendantIds(node);
+        categoryIds.addAll(allDescendantIds);
+      }
+
+      // دریافت کالاهای این دسته‌بندی و زیرمجموعه‌هایش
+      final filters = [
+        {
+          'property': 'category_id',
+          'operator': 'in',
+          'value': categoryIds.map((id) => id.toString()).toList(),
+        },
+      ];
+
+      final products = await _productService.searchProducts(
+        businessId: widget.businessId,
+        filters: filters,
+        limit: 1000, // دریافت حداکثر 1000 کالا
+        skip: 0,
+      );
+
+      if (mounted) {
+        setState(() {
+          _categoryProducts = products;
+          _loadingProducts = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _loadingProducts = false;
+          _error = 'خطا در بارگذاری کالاها: $e';
+        });
+      }
+    }
+  }
+
+  /// ساخت ویجت لیست کالاها
+  Widget _buildProductsList(AppLocalizations t) {
+    final theme = Theme.of(context);
+    // پیدا کردن نام دسته‌بندی
+    String categoryName = 'دسته‌بندی';
+    final node = findNode(_tree, _selectedCategoryForProducts!);
+    if (node != null) {
+      categoryName = (node['label'] ?? node['title'] ?? node['name'] ?? 'دسته‌بندی').toString();
+    }
+
+    return Column(
+      children: [
+        // هدر با نام دسته‌بندی و دکمه بازگشت
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surfaceContainerHighest,
+            border: Border(
+              bottom: BorderSide(color: theme.dividerColor),
+            ),
+          ),
+          child: Row(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () {
+                  setState(() {
+                    _selectedCategoryForProducts = null;
+                    _categoryProducts = const [];
+                  });
+                },
+                tooltip: 'بازگشت به درخت دسته‌بندی',
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'کالاهای دسته‌بندی: $categoryName',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Text(
+                      '${_categoryProducts.length} کالا',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        // لیست کالاها
+        Expanded(
+          child: _loadingProducts
+              ? const Center(child: CircularProgressIndicator())
+              : _categoryProducts.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.inventory_2_outlined,
+                            size: 64,
+                            color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'کالایی در این دسته‌بندی یافت نشد',
+                            style: theme.textTheme.bodyLarge?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  : ListView.builder(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      itemCount: _categoryProducts.length,
+                      itemBuilder: (context, index) {
+                        final product = _categoryProducts[index];
+                        final code = product['code']?.toString() ?? '-';
+                        final name = product['name']?.toString() ?? '-';
+                        final itemType = product['item_type']?.toString() ?? '-';
+                        final salesPrice = product['base_sales_price'];
+                        final purchasePrice = product['base_purchase_price'];
+                        final categoryName = product['category_name']?.toString();
+
+                        return Card(
+                          elevation: 0,
+                          margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            side: BorderSide(color: theme.dividerColor),
+                          ),
+                          child: ListTile(
+                            leading: CircleAvatar(
+                              backgroundColor: theme.colorScheme.primaryContainer,
+                              child: Icon(
+                                Icons.inventory_2,
+                                color: theme.colorScheme.onPrimaryContainer,
+                                size: 20,
+                              ),
+                            ),
+                            title: Text(
+                              name,
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('کد: $code'),
+                                if (categoryName != null && categoryName.isNotEmpty)
+                                  Text('دسته‌بندی: $categoryName'),
+                                Text('نوع: $itemType'),
+                                if (salesPrice != null || purchasePrice != null)
+                                  Row(
+                                    children: [
+                                      if (salesPrice != null)
+                                        Text(
+                                          'قیمت فروش: ${_formatNumber(salesPrice)}',
+                                          style: theme.textTheme.bodySmall?.copyWith(
+                                            color: theme.colorScheme.primary,
+                                          ),
+                                        ),
+                                      if (salesPrice != null && purchasePrice != null)
+                                        const Text(' • '),
+                                      if (purchasePrice != null)
+                                        Text(
+                                          'قیمت خرید: ${_formatNumber(purchasePrice)}',
+                                          style: theme.textTheme.bodySmall?.copyWith(
+                                            color: theme.colorScheme.secondary,
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                              ],
+                            ),
+                            isThreeLine: true,
+                          ),
+                        );
+                      },
+                    ),
+        ),
+      ],
+    );
+  }
+
+  String _formatNumber(dynamic value) {
+    if (value == null) return '-';
+    if (value is num) {
+      return formatWithThousands(value, decimalPlaces: 0);
+    }
+    return value.toString();
   }
 
   // _buildNodeTile حذف شد؛ از TreeView استفاده می‌کنیم
@@ -503,6 +832,7 @@ class _CategoryTreeNodeWidget extends StatelessWidget {
   final VoidCallback? onAddChild;
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
+  final VoidCallback? onShowProducts;
   final AppLocalizations t;
 
   const _CategoryTreeNodeWidget({
@@ -519,6 +849,7 @@ class _CategoryTreeNodeWidget extends StatelessWidget {
     this.onAddChild,
     this.onEdit,
     this.onDelete,
+    this.onShowProducts,
     required this.t,
   });
 
@@ -624,6 +955,15 @@ class _CategoryTreeNodeWidget extends StatelessWidget {
                 
                 const SizedBox(width: 8),
                 
+                // دکمه نمایش کالاها (اگر فعال باشد)
+                if (onShowProducts != null)
+                  IconButton(
+                    icon: const Icon(Icons.inventory_2_outlined, size: 20),
+                    tooltip: 'نمایش کالاهای این دسته‌بندی',
+                    onPressed: onShowProducts,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  ),
                 // دکمه‌های عملیات
                 if (canAdd)
                   IconButton(

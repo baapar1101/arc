@@ -99,6 +99,79 @@ def _load_invoice_lines(db: Session, invoice_id: int) -> List[Dict[str, Any]]:
 	return lines
 
 
+@router.get("/business/{business_id}/invoice/{invoice_id}/line-quantities")
+@require_business_access("business_id")
+def get_invoice_line_quantities(
+	request: Request,
+	business_id: int,
+	invoice_id: int,
+	ctx: AuthContext = Depends(get_current_user),
+	db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+	"""محاسبه مقادیر مورد نیاز، از قبل و باقی مانده برای خطوط فاکتور."""
+	if not ctx.has_business_permission("inventory", "read"):
+		raise ApiError("FORBIDDEN", "Missing business permission: inventory.read", http_status=403)
+	
+	inv = db.query(Document).filter(Document.id == invoice_id).first()
+	if not inv or inv.business_id != business_id:
+		raise ApiError("DOCUMENT_NOT_FOUND", "Invoice document not found", http_status=404)
+	
+	# بارگذاری خطوط فاکتور
+	invoice_lines = _load_invoice_lines(db, invoice_id)
+	
+	# پیدا کردن حواله‌های مرتبط با فاکتور
+	warehouse_docs = db.query(WarehouseDocument).filter(
+		and_(
+			WarehouseDocument.business_id == business_id,
+			WarehouseDocument.source_type == "invoice",
+			WarehouseDocument.source_document_id == invoice_id,
+		)
+	).all()
+	
+	# محاسبه مقادیر از قبل برای هر محصول
+	from decimal import Decimal
+	processed_quantities: Dict[int, Decimal] = {}  # product_id -> total processed quantity
+	
+	for wh_doc in warehouse_docs:
+		# فقط حواله‌های posted را در نظر بگیریم
+		if wh_doc.status != "posted":
+			continue
+		
+		for wh_line in wh_doc.lines:
+			pid = wh_line.product_id
+			# فقط خطوط با movement مناسب را در نظر بگیریم
+			# برای issue/production_out: movement باید out باشد
+			# برای receipt/production_in: movement باید in باشد
+			if inv.document_type in (INVOICE_SALES, INVOICE_PURCHASE_RETURN, INVOICE_DIRECT_CONSUMPTION, INVOICE_PRODUCTION, INVOICE_WASTE):
+				# خروجی - فقط movement="out" را در نظر بگیریم
+				if wh_line.movement == "out":
+					processed_quantities[pid] = processed_quantities.get(pid, Decimal(0)) + Decimal(str(wh_line.quantity))
+			elif inv.document_type in (INVOICE_PURCHASE, INVOICE_SALES_RETURN):
+				# ورودی - فقط movement="in" را در نظر بگیریم
+				if wh_line.movement == "in":
+					processed_quantities[pid] = processed_quantities.get(pid, Decimal(0)) + Decimal(str(wh_line.quantity))
+	
+	# ساخت پاسخ برای هر خط فاکتور
+	line_quantities = []
+	for inv_line in invoice_lines:
+		pid = inv_line.get("product_id")
+		if not pid:
+			continue
+		
+		required_qty = Decimal(str(inv_line.get("quantity", 0)))
+		processed_qty = processed_quantities.get(pid, Decimal(0))
+		remaining_qty = required_qty - processed_qty
+		
+		line_quantities.append({
+			"product_id": pid,
+			"required_quantity": float(required_qty),
+			"processed_quantity": float(processed_qty),
+			"remaining_quantity": float(remaining_qty) if remaining_qty > 0 else 0.0,
+		})
+	
+	return success_response(data={"lines": line_quantities}, request=request)
+
+
 @router.post("/business/{business_id}/from-invoice/{invoice_id}")
 @require_business_access("business_id")
 def create_warehouse_doc_from_invoice(
@@ -137,7 +210,19 @@ def create_warehouse_doc_from_invoice(
 	doc_type_override = payload.get("doc_type")
 	wh_type = _resolve_doc_type(inv.document_type, movement_filter or None, doc_type_override)
 
-	wh = create_from_invoice(db, business_id, inv, lines, wh_type, ctx.get_user_id())
+	# استخراج فیلدهای ارسال از payload
+	extra_data = {
+		"description": payload.get("description"),
+		"delivery_method": payload.get("delivery_method"),
+		"carrier_name": payload.get("carrier_name"),
+		"recipient_name": payload.get("recipient_name"),
+		"recipient_phone": payload.get("recipient_phone"),
+		"tracking_number": payload.get("tracking_number"),
+	}
+	# حذف فیلدهای None
+	extra_data = {k: v for k, v in extra_data.items() if v is not None}
+
+	wh = create_from_invoice(db, business_id, inv, lines, wh_type, ctx.get_user_id(), extra_data if extra_data else None)
 	db.commit()
 	return success_response(data={"id": wh.id, "code": wh.code, "status": wh.status}, request=request)
 
@@ -688,6 +773,48 @@ async def get_warehouse_doc_pdf(
 		except Exception:
 			pass
 	
+	# تابع کمکی برای ساخت HTML اطلاعات ارسال
+	def _build_delivery_info_html(doc_data: Dict[str, Any]) -> str:
+		has_delivery_info = any([
+			doc_data.get('description'),
+			doc_data.get('delivery_method'),
+			doc_data.get('carrier_name'),
+			doc_data.get('recipient_name'),
+			doc_data.get('recipient_phone'),
+			doc_data.get('tracking_number'),
+		])
+		if not has_delivery_info:
+			return ''
+		
+		delivery_method_names = {
+			'warehouse_door': 'تحویل درب انبار',
+			'post_regular': 'پست عادی',
+			'post_express': 'پست پیشتاز',
+			'freight': 'باربری',
+			'bus': 'اتوبوس',
+			'tipax': 'تیپاکس',
+			'courier': 'پیک',
+		}
+		
+		rows = []
+		if doc_data.get('description'):
+			rows.append(f"<tr><td>شرح/توضیحات:</td><td>{escape(str(doc_data.get('description', '')))}</td></tr>")
+		if doc_data.get('delivery_method'):
+			method_name = delivery_method_names.get(doc_data.get('delivery_method', ''), doc_data.get('delivery_method', '-'))
+			rows.append(f"<tr><td>روش ارسال:</td><td>{escape(method_name)}</td></tr>")
+		if doc_data.get('carrier_name'):
+			rows.append(f"<tr><td>نام باربری/حمل و نقل:</td><td>{escape(str(doc_data.get('carrier_name', '')))}</td></tr>")
+		if doc_data.get('recipient_name'):
+			rows.append(f"<tr><td>تحویل گیرنده:</td><td>{escape(str(doc_data.get('recipient_name', '')))}</td></tr>")
+		if doc_data.get('recipient_phone'):
+			rows.append(f"<tr><td>تلفن تحویل گیرنده:</td><td>{escape(str(doc_data.get('recipient_phone', '')))}</td></tr>")
+		if doc_data.get('tracking_number'):
+			rows.append(f"<tr><td>شماره پیگیری/بارنامه/قبض:</td><td>{escape(str(doc_data.get('tracking_number', '')))}</td></tr>")
+		
+		if rows:
+			return f'<h3>اطلاعات ارسال:</h3><table class="info-table">{"".join(rows)}</table>'
+		return ''
+	
 	# اطلاعات محصولات در خطوط
 	lines_data = doc_data.get("lines", [])
 	lines_html = ""
@@ -768,6 +895,9 @@ async def get_warehouse_doc_pdf(
 			{('<tr><td>انبار مبدا:</td><td>' + escape(warehouse_from_name) + '</td></tr>') if warehouse_from_name else ''}
 			{('<tr><td>انبار مقصد:</td><td>' + escape(warehouse_to_name) + '</td></tr>') if warehouse_to_name else ''}
 		</table>
+		
+		<!-- اطلاعات ارسال -->
+		{_build_delivery_info_html(doc_data)}
 		
 		<h3>خطوط حواله:</h3>
 		<table class="lines-table">

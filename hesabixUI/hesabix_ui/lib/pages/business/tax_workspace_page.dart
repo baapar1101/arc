@@ -10,6 +10,7 @@ import 'package:hesabix_ui/widgets/date_input_field.dart';
 import 'package:hesabix_ui/core/date_utils.dart' show HesabixDateUtils;
 import '../../utils/snackbar_helper.dart';
 import '../../services/errors/api_error.dart';
+import '../../utils/responsive_helper.dart';
 
 /// صفحه کارپوشه مودیان (لیست فاکتورهای موجود در کارپوشه و وضعیت ارسال به سامانه)
 class TaxWorkspacePage extends StatefulWidget {
@@ -54,6 +55,7 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
+    final isMobile = ResponsiveHelper.isMobile(context);
 
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
@@ -61,8 +63,8 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _buildHeader(t),
-            _buildFilters(t),
+            _buildHeader(t, isMobile),
+            _buildFilters(t, isMobile),
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.all(8.0),
@@ -80,10 +82,11 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
     );
   }
 
-  Widget _buildHeader(AppLocalizations t) {
+  Widget _buildHeader(AppLocalizations t, bool isMobile) {
     final theme = Theme.of(context);
+    final padding = ResponsiveHelper.getPadding(context);
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      padding: EdgeInsets.fromLTRB(padding, padding, padding, 8),
       child: Row(
         children: [
           Expanded(
@@ -109,48 +112,50 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
     );
   }
 
-  Widget _buildFilters(AppLocalizations t) {
+  Widget _buildFilters(AppLocalizations t, bool isMobile) {
+    final padding = ResponsiveHelper.getPadding(context);
+    
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: EdgeInsets.symmetric(horizontal: padding, vertical: 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: SegmentedButton<String?>(
-                  segments: [
-                    ButtonSegment<String?>(
-                      value: null,
-                      label: Text(t.all),
-                      icon: const Icon(Icons.all_inclusive),
-                    ),
-                    ButtonSegment<String?>(
-                      value: 'invoice_sales',
-                      label: Text(t.invoiceTypeSales),
-                      icon: const Icon(Icons.sell_outlined),
-                    ),
-                    ButtonSegment<String?>(
-                      value: 'invoice_sales_return',
-                      label: Text(t.invoiceTypeSalesReturn),
-                      icon: const Icon(Icons.undo_outlined),
-                    ),
-                  ],
-                  selected: _selectedInvoiceType != null ? {_selectedInvoiceType} : <String?>{},
-                  onSelectionChanged: (set) {
-                    setState(() => _selectedInvoiceType = set.first);
-                    _refreshData();
-                  },
+          // نوع فاکتور - در موبایل scrollable
+          SingleChildScrollView(
+            scrollDirection: isMobile ? Axis.horizontal : Axis.vertical,
+            child: SegmentedButton<String?>(
+              segments: [
+                ButtonSegment<String?>(
+                  value: null,
+                  label: Text(t.all),
+                  icon: const Icon(Icons.all_inclusive),
                 ),
-              ),
-            ],
+                ButtonSegment<String?>(
+                  value: 'invoice_sales',
+                  label: Text(t.invoiceTypeSales),
+                  icon: const Icon(Icons.sell_outlined),
+                ),
+                ButtonSegment<String?>(
+                  value: 'invoice_sales_return',
+                  label: Text(t.invoiceTypeSalesReturn),
+                  icon: const Icon(Icons.undo_outlined),
+                ),
+              ],
+              selected: _selectedInvoiceType != null ? {_selectedInvoiceType} : <String?>{},
+              onSelectionChanged: (set) {
+                setState(() => _selectedInvoiceType = set.first);
+                _refreshData();
+              },
+            ),
           ),
           const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                flex: 3,
-                child: Row(
+          // فیلترهای تاریخ و وضعیت
+          if (isMobile)
+            // موبایل: Column layout
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
                   children: [
                     Expanded(
                       child: DateInputField(
@@ -191,11 +196,8 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
                     ),
                   ],
                 ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                flex: 2,
-                child: DropdownButtonFormField<String>(
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String>(
                   value: _selectedTaxStatus,
                   decoration: InputDecoration(
                     labelText: t.taxStatus,
@@ -232,9 +234,99 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
                     _refreshData();
                   },
                 ),
-              ),
-            ],
-          ),
+              ],
+            )
+          else
+            // دسکتاپ/تبلت: Row layout
+            Row(
+              children: [
+                Expanded(
+                  flex: 3,
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: DateInputField(
+                          value: _fromDate,
+                          calendarController: widget.calendarController,
+                          onChanged: (date) {
+                            setState(() => _fromDate = date);
+                            _refreshData();
+                          },
+                          labelText: t.dateFrom,
+                          hintText: t.selectDate,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: DateInputField(
+                          value: _toDate,
+                          calendarController: widget.calendarController,
+                          onChanged: (date) {
+                            setState(() => _toDate = date);
+                            _refreshData();
+                          },
+                          labelText: t.dateTo,
+                          hintText: t.selectDate,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        onPressed: () {
+                          setState(() {
+                            _fromDate = null;
+                            _toDate = null;
+                          });
+                          _refreshData();
+                        },
+                        icon: const Icon(Icons.clear),
+                        tooltip: t.clearDateFilter,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  flex: 2,
+                  child: DropdownButtonFormField<String>(
+                    value: _selectedTaxStatus,
+                    decoration: InputDecoration(
+                      labelText: t.taxStatus,
+                      border: const OutlineInputBorder(),
+                    ),
+                    items: [
+                      DropdownMenuItem(
+                        value: null,
+                        child: Text(t.all),
+                      ),
+                      DropdownMenuItem(
+                        value: 'not_sent',
+                        child: Text(t.taxStatusNotSent),
+                      ),
+                      DropdownMenuItem(
+                        value: 'pending',
+                        child: Text(t.taxStatusPending),
+                      ),
+                      DropdownMenuItem(
+                        value: 'sent',
+                        child: Text(t.taxStatusSent),
+                      ),
+                      DropdownMenuItem(
+                        value: 'finalized',
+                        child: Text(t.taxStatusFinalized),
+                      ),
+                      DropdownMenuItem(
+                        value: 'failed',
+                        child: Text(t.taxStatusFailed),
+                      ),
+                    ],
+                    onChanged: (value) {
+                      setState(() => _selectedTaxStatus = value);
+                      _refreshData();
+                    },
+                  ),
+                ),
+              ],
+            ),
         ],
       ),
     );

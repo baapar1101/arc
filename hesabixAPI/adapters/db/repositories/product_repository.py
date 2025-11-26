@@ -6,6 +6,8 @@ from sqlalchemy import select, and_, or_, func
 
 from .base_repo import BaseRepository
 from ..models.product import Product
+from ..models.product_attribute_link import ProductAttributeLink
+from ..models.category import BusinessCategory
 
 
 class ProductRepository(BaseRepository[Product]):
@@ -57,6 +59,22 @@ class ProductRepository(BaseRepository[Product]):
                         stmt = stmt.where(Product.name == value)
                     continue
 
+                # Category ID filter (supports "in" operator for multi-select)
+                if field == "category_id":
+                    if operator == "in" and isinstance(value, (list, tuple)):
+                        # Convert string IDs to integers
+                        category_ids = [int(v) for v in value if v]
+                        if category_ids:
+                            stmt = stmt.where(Product.category_id.in_(category_ids))
+                    elif operator == "=":
+                        try:
+                            category_id = int(value) if value else None
+                            if category_id:
+                                stmt = stmt.where(Product.category_id == category_id)
+                        except (ValueError, TypeError):
+                            pass
+                    continue
+
         total = self.db.execute(select(func.count()).select_from(stmt.subquery())).scalar() or 0
 
         # Sorting
@@ -67,11 +85,18 @@ class ProductRepository(BaseRepository[Product]):
             stmt = stmt.order_by(Product.id.desc() if sort_desc else Product.id.asc())
 
         stmt = stmt.offset(skip).limit(take)
-        # Load default_warehouse relationship
-        stmt = stmt.options(joinedload(Product.default_warehouse))
+        # Load relationships
+        stmt = stmt.options(
+            joinedload(Product.default_warehouse),
+            joinedload(Product.category)
+        )
         rows = list(self.db.execute(stmt).unique().scalars().all())
 
         def _to_dict(p: Product) -> dict[str, Any]:
+            # دریافت attribute_ids از ProductAttributeLink
+            links = self.db.query(ProductAttributeLink).filter(ProductAttributeLink.product_id == p.id).all()
+            attribute_ids = [link.attribute_id for link in links]
+            
             return {
                 "id": p.id,
                 "business_id": p.business_id,
@@ -80,6 +105,11 @@ class ProductRepository(BaseRepository[Product]):
                 "name": p.name,
                 "description": p.description,
                 "category_id": p.category_id,
+                "category_name": (
+                    (p.category.title_translations or {}).get("fa")
+                    or (p.category.title_translations or {}).get("en")
+                    or ""
+                ) if p.category else None,
                 "main_unit": p.main_unit,
                 "secondary_unit": p.secondary_unit,
                 "unit_conversion_factor": p.unit_conversion_factor,
@@ -91,6 +121,9 @@ class ProductRepository(BaseRepository[Product]):
                 "reorder_point": p.reorder_point,
                 "min_order_qty": p.min_order_qty,
                 "lead_time_days": p.lead_time_days,
+                "inventory_mode": p.inventory_mode or "bulk",
+                "track_serial": p.track_serial,
+                "track_barcode": p.track_barcode,
                 "is_sales_taxable": p.is_sales_taxable,
                 "is_purchase_taxable": p.is_purchase_taxable,
                 "sales_tax_rate": p.sales_tax_rate,
@@ -98,6 +131,7 @@ class ProductRepository(BaseRepository[Product]):
                 "tax_type_id": p.tax_type_id,
                 "tax_code": p.tax_code,
                 "tax_unit_id": p.tax_unit_id,
+                "attribute_ids": attribute_ids,
                 "image_file_id": p.image_file_id,
                 "image_url": f"/api/v1/business/{p.business_id}/storage/files/{p.image_file_id}/download" if p.image_file_id else None,
                 "default_warehouse_id": p.default_warehouse_id,

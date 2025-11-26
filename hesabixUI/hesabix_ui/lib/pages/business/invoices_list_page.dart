@@ -14,6 +14,7 @@ import 'package:hesabix_ui/widgets/document/document_details_dialog.dart';
 import 'package:hesabix_ui/services/invoice_service.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../widgets/invoice/invoice_import_dialog.dart';
+import '../../utils/responsive_helper.dart';
 
 /// صفحه لیست فاکتورها با ویجت جدول عمومی
 class InvoicesListPage extends StatefulWidget {
@@ -89,6 +90,7 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
+    final isMobile = ResponsiveHelper.isMobile(context);
 
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
@@ -96,8 +98,8 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _buildHeader(t),
-            _buildFilters(t),
+            _buildHeader(t, isMobile),
+            _buildFilters(t, isMobile),
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.all(8.0),
@@ -112,12 +114,24 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
           ],
         ),
       ),
+      floatingActionButton: isMobile
+          ? FloatingActionButton.extended(
+              onPressed: _onAddNew,
+              icon: const Icon(Icons.add),
+              label: Text(t.add),
+            )
+          : null,
     );
   }
 
-  Widget _buildHeader(AppLocalizations t) {
+  Widget _buildHeader(AppLocalizations t, bool isMobile) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      padding: EdgeInsets.fromLTRB(
+        ResponsiveHelper.getPadding(context),
+        ResponsiveHelper.getPadding(context),
+        ResponsiveHelper.getPadding(context),
+        8,
+      ),
       child: Row(
         children: [
           Expanded(
@@ -130,52 +144,58 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
               ],
             ),
           ),
-          // دکمه افزودن فاکتور
-          FilledButton.icon(
-            onPressed: _onAddNew,
-            icon: const Icon(Icons.add),
-            label: Text(t.add),
-          ),
+          // دکمه افزودن فاکتور - فقط در دسکتاپ نمایش داده می‌شود
+          if (!isMobile)
+            FilledButton.icon(
+              onPressed: _onAddNew,
+              icon: const Icon(Icons.add),
+              label: Text(t.add),
+            ),
         ],
       ),
     );
   }
 
-  Widget _buildFilters(AppLocalizations t) {
+  Widget _buildFilters(AppLocalizations t, bool isMobile) {
+    final padding = ResponsiveHelper.getPadding(context);
+    
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: EdgeInsets.symmetric(horizontal: padding, vertical: 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: SegmentedButton<String?>(
-                  segments: [
-                    ButtonSegment<String?>(value: null, label: Text(t.all), icon: const Icon(Icons.all_inclusive)),
-                    ButtonSegment<String?>(value: 'invoice_sales', label: Text(t.invoiceTypeSales), icon: const Icon(Icons.sell_outlined)),
-                    ButtonSegment<String?>(value: 'invoice_purchase', label: Text(t.invoiceTypePurchase), icon: const Icon(Icons.shopping_cart_outlined)),
-                    ButtonSegment<String?>(value: 'invoice_sales_return', label: Text(t.invoiceTypeSalesReturn), icon: const Icon(Icons.undo_outlined)),
-                    ButtonSegment<String?>(value: 'invoice_purchase_return', label: Text(t.invoiceTypePurchaseReturn), icon: const Icon(Icons.undo)),
-                    ButtonSegment<String?>(value: 'invoice_production', label: Text(t.invoiceTypeProduction), icon: const Icon(Icons.factory_outlined)),
-                    ButtonSegment<String?>(value: 'invoice_direct_consumption', label: Text(t.invoiceTypeDirectConsumption), icon: const Icon(Icons.dining_outlined)),
-                    ButtonSegment<String?>(value: 'invoice_waste', label: Text(t.invoiceTypeWaste), icon: const Icon(Icons.delete_outline)),
-                  ],
-                  selected: _selectedInvoiceType != null ? {_selectedInvoiceType} : <String?>{},
-                  onSelectionChanged: (set) {
-                    setState(() => _selectedInvoiceType = set.first);
-                    _refreshData();
-                  },
-                ),
+          // نوع فاکتور - همیشه scrollable افقی
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: SegmentedButton<String?>(
+              style: SegmentedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
               ),
-            ],
+              segments: [
+                ButtonSegment<String?>(value: null, label: Text(t.all), icon: const Icon(Icons.all_inclusive)),
+                ButtonSegment<String?>(value: 'invoice_sales', label: Text(t.invoiceTypeSales), icon: const Icon(Icons.sell_outlined)),
+                ButtonSegment<String?>(value: 'invoice_purchase', label: Text(t.invoiceTypePurchase), icon: const Icon(Icons.shopping_cart_outlined)),
+                ButtonSegment<String?>(value: 'invoice_sales_return', label: Text(t.invoiceTypeSalesReturn), icon: const Icon(Icons.undo_outlined)),
+                ButtonSegment<String?>(value: 'invoice_purchase_return', label: Text(t.invoiceTypePurchaseReturn), icon: const Icon(Icons.undo)),
+                ButtonSegment<String?>(value: 'invoice_production', label: Text(t.invoiceTypeProduction), icon: const Icon(Icons.factory_outlined)),
+                ButtonSegment<String?>(value: 'invoice_direct_consumption', label: Text(t.invoiceTypeDirectConsumption), icon: const Icon(Icons.dining_outlined)),
+                ButtonSegment<String?>(value: 'invoice_waste', label: Text(t.invoiceTypeWaste), icon: const Icon(Icons.delete_outline)),
+              ],
+              selected: _selectedInvoiceType != null ? {_selectedInvoiceType} : <String?>{},
+              onSelectionChanged: (set) {
+                setState(() => _selectedInvoiceType = set.first);
+                _refreshData();
+              },
+            ),
           ),
           const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                flex: 3,
-                child: Row(
+          // فیلترهای تاریخ و وضعیت
+          if (isMobile)
+            // موبایل: Column layout
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
                   children: [
                     Expanded(
                       child: DateInputField(
@@ -216,11 +236,8 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
                     ),
                   ],
                 ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                flex: 2,
-                child: SegmentedButton<bool?>(
+                const SizedBox(height: 8),
+                SegmentedButton<bool?>(
                   segments: [
                     ButtonSegment<bool?>(value: null, label: Text(t.all)),
                     ButtonSegment<bool?>(value: true, label: Text(t.proforma)),
@@ -232,9 +249,74 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
                     _refreshData();
                   },
                 ),
-              ),
-            ],
-          ),
+              ],
+            )
+          else
+            // دسکتاپ/تبلت: Row layout
+            Row(
+              children: [
+                Expanded(
+                  flex: 3,
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: DateInputField(
+                          value: _fromDate,
+                          calendarController: widget.calendarController,
+                          onChanged: (date) {
+                            setState(() => _fromDate = date);
+                            _refreshData();
+                          },
+                          labelText: t.dateFrom,
+                          hintText: t.selectDate,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: DateInputField(
+                          value: _toDate,
+                          calendarController: widget.calendarController,
+                          onChanged: (date) {
+                            setState(() => _toDate = date);
+                            _refreshData();
+                          },
+                          labelText: t.dateTo,
+                          hintText: t.selectDate,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        onPressed: () {
+                          setState(() {
+                            _fromDate = null;
+                            _toDate = null;
+                          });
+                          _refreshData();
+                        },
+                        icon: const Icon(Icons.clear),
+                        tooltip: t.clearDateFilter,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  flex: 2,
+                  child: SegmentedButton<bool?>(
+                    segments: [
+                      ButtonSegment<bool?>(value: null, label: Text(t.all)),
+                      ButtonSegment<bool?>(value: true, label: Text(t.proforma)),
+                      ButtonSegment<bool?>(value: false, label: Text(t.finalized)),
+                    ],
+                    selected: {_isProforma},
+                    onSelectionChanged: (set) {
+                      setState(() => _isProforma = set.first);
+                      _refreshData();
+                    },
+                  ),
+                ),
+              ],
+            ),
         ],
       ),
     );

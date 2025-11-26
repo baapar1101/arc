@@ -16,6 +16,7 @@ import '../../core/api_client.dart';
 import '../../utils/number_normalizer.dart';
 import '../../widgets/banking/currency_picker_widget.dart';
 import '../../utils/snackbar_helper.dart';
+import '../../utils/responsive_helper.dart';
 
 class ExpenseIncomePage extends StatefulWidget {
   final int businessId;
@@ -59,42 +60,81 @@ class _ExpenseIncomePageState extends State<ExpenseIncomePage> {
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-              child: Row(
-                children: [
-                  const Expanded(
-                    child: Text('هزینه و درآمد', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600)),
-                  ),
-                  SegmentedButton<String>(
-                    segments: const [
-                      ButtonSegment<String>(value: 'expense', label: Text('هزینه')),
-                      ButtonSegment<String>(value: 'income', label: Text('درآمد')),
-                    ],
-                    selected: {_docType},
-                    onSelectionChanged: (s) => setState(() => _docType = s.first),
-                  ),
-                  const SizedBox(width: 12),
-                  SizedBox(
-                    width: 220,
-                    child: DateInputField(
-                      value: _docDate,
-                      calendarController: widget.calendarController,
-                      onChanged: (d) => setState(() => _docDate = d ?? DateTime.now()),
-                      labelText: 'تاریخ سند',
-                      hintText: 'انتخاب تاریخ',
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  SizedBox(
-                    width: 220,
-                    child: CurrencyPickerWidget(
-                      businessId: widget.businessId,
-                      selectedCurrencyId: _currencyId,
-                      onChanged: (currencyId) => setState(() => _currencyId = currencyId),
-                      label: 'ارز',
-                      hintText: 'انتخاب ارز',
-                    ),
-                  ),
-                ],
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final isMobile = ResponsiveHelper.isMobile(context);
+                  if (isMobile) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const Text('هزینه و درآمد', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600)),
+                        const SizedBox(height: 12),
+                        SegmentedButton<String>(
+                          segments: const [
+                            ButtonSegment<String>(value: 'expense', label: Text('هزینه')),
+                            ButtonSegment<String>(value: 'income', label: Text('درآمد')),
+                          ],
+                          selected: {_docType},
+                          onSelectionChanged: (s) => setState(() => _docType = s.first),
+                        ),
+                        const SizedBox(height: 12),
+                        DateInputField(
+                          value: _docDate,
+                          calendarController: widget.calendarController,
+                          onChanged: (d) => setState(() => _docDate = d ?? DateTime.now()),
+                          labelText: 'تاریخ سند',
+                          hintText: 'انتخاب تاریخ',
+                        ),
+                        const SizedBox(height: 12),
+                        CurrencyPickerWidget(
+                          businessId: widget.businessId,
+                          selectedCurrencyId: _currencyId,
+                          onChanged: (currencyId) => setState(() => _currencyId = currencyId),
+                          label: 'ارز',
+                          hintText: 'انتخاب ارز',
+                        ),
+                      ],
+                    );
+                  } else {
+                    return Row(
+                      children: [
+                        const Expanded(
+                          child: Text('هزینه و درآمد', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600)),
+                        ),
+                        SegmentedButton<String>(
+                          segments: const [
+                            ButtonSegment<String>(value: 'expense', label: Text('هزینه')),
+                            ButtonSegment<String>(value: 'income', label: Text('درآمد')),
+                          ],
+                          selected: {_docType},
+                          onSelectionChanged: (s) => setState(() => _docType = s.first),
+                        ),
+                        const SizedBox(width: 12),
+                        SizedBox(
+                          width: 220,
+                          child: DateInputField(
+                            value: _docDate,
+                            calendarController: widget.calendarController,
+                            onChanged: (d) => setState(() => _docDate = d ?? DateTime.now()),
+                            labelText: 'تاریخ سند',
+                            hintText: 'انتخاب تاریخ',
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        SizedBox(
+                          width: 220,
+                          child: CurrencyPickerWidget(
+                            businessId: widget.businessId,
+                            selectedCurrencyId: _currencyId,
+                            onChanged: (currencyId) => setState(() => _currencyId = currencyId),
+                            label: 'ارز',
+                            hintText: 'انتخاب ارز',
+                          ),
+                        ),
+                      ],
+                    );
+                  }
+                },
               ),
             ),
             Padding(
@@ -111,42 +151,87 @@ class _ExpenseIncomePageState extends State<ExpenseIncomePage> {
             ),
             const Divider(height: 1),
             Expanded(
-              child: Row(
-                children: [
-                  // پنل سطرهای حساب (هزینه/درآمد)
-                  Expanded(
-                    child: _ItemsPanel(
-                      businessId: widget.businessId,
-                      lines: _itemLines,
-                      documentType: _docType,
-                      onChanged: (ls) => setState(() {
-                        _itemLines
-                          ..clear()
-                          ..addAll(ls);
-                      }),
-                    ),
-                  ),
-                  const VerticalDivider(width: 1),
-                  // پنل سطرهای طرف‌حساب (بازاستفاده از ویجت تراکنش‌ها)
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: InvoiceTransactionsWidget(
-                        transactions: const <InvoiceTransaction>[],
-                        onChanged: (txs) => setState(() {
-                          _txLines
-                            ..clear()
-                            ..addAll(txs.map(_TxLine.fromInvoiceTransaction));
-                        }),
-                        businessId: widget.businessId,
-                        calendarController: widget.calendarController,
-                        invoiceType: _docType == 'income' ? InvoiceType.sales : InvoiceType.purchase,
-                        selectedCurrencyId: _currencyId,
-                        authStore: widget.authStore,
-                      ),
-                    ),
-                  ),
-                ],
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final isMobile = ResponsiveHelper.isMobile(context);
+                  if (isMobile) {
+                    // موبایل: Column layout
+                    return Column(
+                      children: [
+                        Expanded(
+                          child: _ItemsPanel(
+                            businessId: widget.businessId,
+                            lines: _itemLines,
+                            documentType: _docType,
+                            onChanged: (ls) => setState(() {
+                              _itemLines
+                                ..clear()
+                                ..addAll(ls);
+                            }),
+                          ),
+                        ),
+                        const Divider(height: 1),
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: InvoiceTransactionsWidget(
+                              transactions: const <InvoiceTransaction>[],
+                              onChanged: (txs) => setState(() {
+                                _txLines
+                                  ..clear()
+                                  ..addAll(txs.map(_TxLine.fromInvoiceTransaction));
+                              }),
+                              businessId: widget.businessId,
+                              calendarController: widget.calendarController,
+                              invoiceType: _docType == 'income' ? InvoiceType.sales : InvoiceType.purchase,
+                              selectedCurrencyId: _currencyId,
+                              authStore: widget.authStore,
+                            ),
+                          ),
+                        ),
+                      ],
+                    );
+                  } else {
+                    // دسکتاپ/تبلت: Row layout
+                    return Row(
+                      children: [
+                        // پنل سطرهای حساب (هزینه/درآمد)
+                        Expanded(
+                          child: _ItemsPanel(
+                            businessId: widget.businessId,
+                            lines: _itemLines,
+                            documentType: _docType,
+                            onChanged: (ls) => setState(() {
+                              _itemLines
+                                ..clear()
+                                ..addAll(ls);
+                            }),
+                          ),
+                        ),
+                        const VerticalDivider(width: 1),
+                        // پنل سطرهای طرف‌حساب (بازاستفاده از ویجت تراکنش‌ها)
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: InvoiceTransactionsWidget(
+                              transactions: const <InvoiceTransaction>[],
+                              onChanged: (txs) => setState(() {
+                                _txLines
+                                  ..clear()
+                                  ..addAll(txs.map(_TxLine.fromInvoiceTransaction));
+                              }),
+                              businessId: widget.businessId,
+                              calendarController: widget.calendarController,
+                              invoiceType: _docType == 'income' ? InvoiceType.sales : InvoiceType.purchase,
+                              selectedCurrencyId: _currencyId,
+                              authStore: widget.authStore,
+                            ),
+                          ),
+                        ),
+                      ],
+                    );
+                  }
+                },
               ),
             ),
             const Divider(height: 1),

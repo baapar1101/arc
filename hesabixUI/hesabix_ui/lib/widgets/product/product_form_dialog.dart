@@ -159,6 +159,8 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
           _controller.removeDraftPriceItem(item);
           _controller.updateFormData(_controller.formData);
         },
+        controller: _controller,
+        productId: widget.product?['id'] as int?,
       ),
     );
   }

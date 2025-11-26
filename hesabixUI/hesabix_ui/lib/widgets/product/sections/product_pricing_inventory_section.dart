@@ -17,6 +17,8 @@ class ProductPricingInventorySection extends StatefulWidget {
   final List<Map<String, dynamic>> draftPriceItems;
   final void Function(Map<String, dynamic> item) onAddOrUpdatePriceItem;
   final void Function(Map<String, dynamic> item) onDeletePriceItem;
+  final dynamic controller; // ProductFormController
+  final int? productId; // برای تشخیص ویرایش
 
   const ProductPricingInventorySection({
     super.key,
@@ -29,6 +31,8 @@ class ProductPricingInventorySection extends StatefulWidget {
     required this.draftPriceItems,
     required this.onAddOrUpdatePriceItem,
     required this.onDeletePriceItem,
+    this.controller,
+    this.productId,
   });
 
   @override
@@ -125,6 +129,71 @@ class _ProductPricingInventorySectionState extends State<ProductPricingInventory
           title: Text(t.inventoryControl),
         ),
         if (widget.formData.trackInventory) ...[
+          const SizedBox(height: 16),
+          // انتخاب حالت موجودی (فله‌ای/یونیک)
+          Card(
+            elevation: 1,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'حالت موجودی',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  SegmentedButton<String>(
+                    segments: const [
+                      ButtonSegment(
+                        value: 'bulk',
+                        label: Text('فله‌ای'),
+                        icon: Icon(Icons.inventory_2_outlined),
+                      ),
+                      ButtonSegment(
+                        value: 'unique',
+                        label: Text('یونیک'),
+                        icon: Icon(Icons.qr_code_scanner),
+                      ),
+                    ],
+                    selected: {widget.formData.inventoryMode ?? 'bulk'},
+                    onSelectionChanged: (Set<String> newSelection) {
+                      final mode = newSelection.first;
+                      _updateFormData(
+                        widget.formData.copyWith(
+                          inventoryMode: mode,
+                          // اگر به حالت فله‌ای تغییر کرد، track_serial و track_barcode را false کن
+                          trackSerial: mode == 'unique' ? widget.formData.trackSerial : false,
+                          trackBarcode: mode == 'unique' ? widget.formData.trackBarcode : false,
+                        ),
+                      );
+                    },
+                  ),
+                  // گزینه‌های ردیابی برای حالت یونیک
+                  if (widget.formData.inventoryMode == 'unique') ...[
+                    const SizedBox(height: 16),
+                    SwitchListTile(
+                      value: widget.formData.trackSerial,
+                      onChanged: (value) => _updateFormData(widget.formData.copyWith(trackSerial: value)),
+                      title: const Text('ردیابی سریال نامبر'),
+                      subtitle: const Text('هر واحد کالا دارای شماره سریال یکتا خواهد بود'),
+                    ),
+                    SwitchListTile(
+                      value: widget.formData.trackBarcode,
+                      onChanged: (value) => _updateFormData(widget.formData.copyWith(trackBarcode: value)),
+                      title: const Text('ردیابی بارکد'),
+                      subtitle: const Text('هر واحد کالا دارای بارکد یکتا خواهد بود'),
+                    ),
+                  ],
+                  // هشدار تبدیل از bulk به unique
+                  if (widget.productId != null && widget.controller != null) 
+                    _buildConversionWarning(),
+                ],
+              ),
+            ),
+          ),
           const SizedBox(height: 16),
           WarehouseComboboxWidget(
             businessId: widget.businessId,
@@ -457,5 +526,107 @@ class _ProductPricingInventorySectionState extends State<ProductPricingInventory
 
   void _updateFormData(ProductFormData newData) {
     widget.onChanged(newData);
+  }
+
+  Widget _buildConversionWarning() {
+    if (widget.productId == null || widget.controller == null) {
+      return const SizedBox.shrink();
+    }
+    
+    // استفاده از dynamic برای دسترسی به controller
+    final controller = widget.controller;
+    final needsConversion = controller?.needsConversion ?? false;
+    
+    if (!needsConversion) {
+      return const SizedBox.shrink();
+    }
+    
+    return FutureBuilder<int?>(
+      future: controller?.getCurrentStock(widget.productId!),
+      builder: (context, snapshot) {
+        final stock = snapshot.data ?? 0;
+        
+        if (stock <= 0) {
+          return const SizedBox.shrink();
+        }
+        
+        return Container(
+          margin: const EdgeInsets.only(top: 16),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.orange.shade50,
+            border: Border.all(color: Colors.orange.shade200),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.warning_amber_rounded, color: Colors.orange.shade700),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'تبدیل به حالت یونیک',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.orange.shade900,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'این کالا دارای $stock واحد موجودی است. برای تبدیل به حالت یونیک، باید برای هر واحد موجودی یک instance ایجاد شود.',
+                style: TextStyle(color: Colors.orange.shade800),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () {
+                      // بازگشت به حالت bulk
+                      _updateFormData(widget.formData.copyWith(inventoryMode: 'bulk'));
+                    },
+                    child: const Text('انصراف'),
+                  ),
+                  const SizedBox(width: 8),
+                  FilledButton.icon(
+                    onPressed: () async {
+                      // تبدیل کالا
+                      final success = await controller?.convertProductToUnique(widget.productId!);
+                      if (success == true && mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('کالا با موفقیت به حالت یونیک تبدیل شد'),
+                            backgroundColor: Colors.green,
+                          ),
+                        );
+                        // به‌روزرسانی فرم
+                        setState(() {});
+                      } else if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(controller?.errorMessage ?? 'خطا در تبدیل کالا'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    },
+                    icon: const Icon(Icons.transform),
+                    label: const Text('تبدیل و ایجاد Instance ها'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Colors.orange.shade700,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 }

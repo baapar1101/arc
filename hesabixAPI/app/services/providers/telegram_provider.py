@@ -92,7 +92,14 @@ class TelegramProvider:
 			)
 			return False, str(exc)
 
-	def send_text(self, chat_id: int, text: str, parse_mode: str | None = "HTML") -> bool:
+	def send_text(
+		self,
+		chat_id: int,
+		text: str,
+		parse_mode: str | None = "HTML",
+		reply_markup: Dict[str, Any] | None = None
+	) -> bool:
+		"""ارسال پیام متنی با امکان اضافه کردن Inline Keyboard"""
 		if not self.is_configured():
 			return False
 		if self._proxy_enabled():
@@ -102,20 +109,158 @@ class TelegramProvider:
 			}
 			if parse_mode:
 				payload["parse_mode"] = parse_mode
+			if reply_markup:
+				payload["reply_markup"] = reply_markup
 			ok, _ = self._proxy_request("sendMessage", payload)
 			return ok
 		token = self.bot_token
 		assert token
 		url = f"https://api.telegram.org/bot{token}/sendMessage"
-		data = {
+		data: Dict[str, Any] = {
 			"chat_id": chat_id,
 			"text": text,
 		}
 		if parse_mode:
 			data["parse_mode"] = parse_mode
-		body = parse.urlencode(data).encode("utf-8")
+		if reply_markup:
+			data["reply_markup"] = json.dumps(reply_markup, ensure_ascii=False)
+		
+		body = json.dumps(data, ensure_ascii=False).encode("utf-8")
 		req = request.Request(url, data=body, method="POST")
-		req.add_header("Content-Type", "application/x-www-form-urlencoded")
+		req.add_header("Content-Type", "application/json")
+		try:
+			with request.urlopen(req, timeout=10) as resp:
+				if resp.status != 200:
+					return False
+				raw = resp.read().decode("utf-8")
+				j = json.loads(raw)
+				return bool(j.get("ok"))
+		except Exception:
+			return False
+	
+	def edit_message_text(
+		self,
+		chat_id: int,
+		message_id: int,
+		text: str,
+		parse_mode: str | None = "HTML",
+		reply_markup: Dict[str, Any] | None = None
+	) -> bool:
+		"""ویرایش متن پیام با امکان تغییر Inline Keyboard"""
+		if not self.is_configured():
+			return False
+		if self._proxy_enabled():
+			payload: Dict[str, Any] = {
+				"chat_id": chat_id,
+				"message_id": message_id,
+				"text": text,
+			}
+			if parse_mode:
+				payload["parse_mode"] = parse_mode
+			if reply_markup:
+				payload["reply_markup"] = reply_markup
+			ok, _ = self._proxy_request("editMessageText", payload)
+			return ok
+		token = self.bot_token
+		assert token
+		url = f"https://api.telegram.org/bot{token}/editMessageText"
+		data: Dict[str, Any] = {
+			"chat_id": chat_id,
+			"message_id": message_id,
+			"text": text,
+		}
+		if parse_mode:
+			data["parse_mode"] = parse_mode
+		if reply_markup:
+			data["reply_markup"] = json.dumps(reply_markup, ensure_ascii=False)
+		
+		body = json.dumps(data, ensure_ascii=False).encode("utf-8")
+		req = request.Request(url, data=body, method="POST")
+		req.add_header("Content-Type", "application/json")
+		try:
+			with request.urlopen(req, timeout=10) as resp:
+				if resp.status != 200:
+					return False
+				raw = resp.read().decode("utf-8")
+				j = json.loads(raw)
+				return bool(j.get("ok"))
+		except Exception:
+			return False
+	
+	def edit_message_reply_markup(
+		self,
+		chat_id: int,
+		message_id: int,
+		reply_markup: Dict[str, Any] | None = None
+	) -> bool:
+		"""ویرایش فقط Inline Keyboard یک پیام"""
+		if not self.is_configured():
+			return False
+		if self._proxy_enabled():
+			payload: Dict[str, Any] = {
+				"chat_id": chat_id,
+				"message_id": message_id,
+			}
+			if reply_markup:
+				payload["reply_markup"] = reply_markup
+			ok, _ = self._proxy_request("editMessageReplyMarkup", payload)
+			return ok
+		token = self.bot_token
+		assert token
+		url = f"https://api.telegram.org/bot{token}/editMessageReplyMarkup"
+		data: Dict[str, Any] = {
+			"chat_id": chat_id,
+			"message_id": message_id,
+		}
+		if reply_markup:
+			data["reply_markup"] = json.dumps(reply_markup, ensure_ascii=False)
+		
+		body = json.dumps(data, ensure_ascii=False).encode("utf-8")
+		req = request.Request(url, data=body, method="POST")
+		req.add_header("Content-Type", "application/json")
+		try:
+			with request.urlopen(req, timeout=10) as resp:
+				if resp.status != 200:
+					return False
+				raw = resp.read().decode("utf-8")
+				j = json.loads(raw)
+				return bool(j.get("ok"))
+		except Exception:
+			return False
+	
+	def answer_callback_query(
+		self,
+		callback_query_id: str,
+		text: str | None = None,
+		show_alert: bool = False
+	) -> bool:
+		"""پاسخ به Callback Query (برای حذف loading)"""
+		if not self.is_configured():
+			return False
+		if self._proxy_enabled():
+			payload: Dict[str, Any] = {
+				"callback_query_id": callback_query_id,
+			}
+			if text:
+				payload["text"] = text
+			if show_alert:
+				payload["show_alert"] = True
+			ok, _ = self._proxy_request("answerCallbackQuery", payload)
+			return ok
+		token = self.bot_token
+		assert token
+		url = f"https://api.telegram.org/bot{token}/answerCallbackQuery"
+		data: Dict[str, Any] = {
+			"callback_query_id": callback_query_id,
+		}
+		if text:
+			data["text"] = text
+		if show_alert:
+			data["show_alert"] = True
+		
+		body = json.dumps(data, ensure_ascii=False).encode("utf-8")
+		req = request.Request(url, data=body, method="POST")
+		req.add_header("Content-Type", "application/json")
 		try:
 			with request.urlopen(req, timeout=10) as resp:
 				if resp.status != 200:

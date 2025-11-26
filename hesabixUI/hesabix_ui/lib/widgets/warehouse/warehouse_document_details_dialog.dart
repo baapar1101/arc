@@ -8,7 +8,6 @@ import '../../core/calendar_controller.dart';
 import '../../l10n/app_localizations.dart';
 import '../../utils/web/web_utils.dart' as web_utils;
 import '../../core/date_utils.dart' show HesabixDateUtils;
-import '../../utils/snackbar_helper.dart';
 
 class WarehouseDocumentDetailsDialog extends StatefulWidget {
   final int businessId;
@@ -225,9 +224,11 @@ class _WarehouseDocumentDetailsDialogState extends State<WarehouseDocumentDetail
     final theme = Theme.of(context);
     final t = AppLocalizations.of(context);
 
-    return Dialog(
-      insetPadding: const EdgeInsets.all(24),
-      child: ConstrainedBox(
+    return PopScope(
+      canPop: false,
+      child: Dialog(
+        insetPadding: const EdgeInsets.all(24),
+        child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 1000, maxHeight: 800),
         child: Column(
           children: [
@@ -256,6 +257,7 @@ class _WarehouseDocumentDetailsDialogState extends State<WarehouseDocumentDetail
                           : _buildContent(theme, t),
             ),
           ],
+        ),
         ),
       ),
     );
@@ -456,6 +458,45 @@ class _WarehouseDocumentDetailsDialogState extends State<WarehouseDocumentDetail
               ),
             ),
           ),
+          // اطلاعات ارسال (در صورت وجود)
+          if (_hasDeliveryInfo(doc)) ...[
+            const SizedBox(height: 16),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.local_shipping, size: 20, color: theme.colorScheme.primary),
+                        const SizedBox(width: 8),
+                        Text(
+                          'اطلاعات ارسال',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    if (doc['description'] != null && (doc['description'] as String).isNotEmpty)
+                      _buildInfoRow(theme, 'شرح/توضیحات', doc['description']),
+                    if (doc['delivery_method'] != null)
+                      _buildInfoRow(theme, 'روش ارسال', _getDeliveryMethodName(doc['delivery_method'])),
+                    if (doc['carrier_name'] != null && (doc['carrier_name'] as String).isNotEmpty)
+                      _buildInfoRow(theme, 'نام باربری/حمل و نقل', doc['carrier_name']),
+                    if (doc['recipient_name'] != null && (doc['recipient_name'] as String).isNotEmpty)
+                      _buildInfoRow(theme, 'تحویل گیرنده', doc['recipient_name']),
+                    if (doc['recipient_phone'] != null && (doc['recipient_phone'] as String).isNotEmpty)
+                      _buildInfoRow(theme, 'تلفن تحویل گیرنده', doc['recipient_phone']),
+                    if (doc['tracking_number'] != null && (doc['tracking_number'] as String).isNotEmpty)
+                      _buildInfoRow(theme, 'شماره پیگیری/بارنامه/قبض', doc['tracking_number']),
+                  ],
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: 16),
           // خطوط حواله
           Card(
@@ -521,6 +562,28 @@ class _WarehouseDocumentDetailsDialogState extends State<WarehouseDocumentDetail
         ],
       ),
     );
+  }
+
+  bool _hasDeliveryInfo(Map<String, dynamic> doc) {
+    return (doc['description'] != null && (doc['description'] as String).isNotEmpty) ||
+           doc['delivery_method'] != null ||
+           (doc['carrier_name'] != null && (doc['carrier_name'] as String).isNotEmpty) ||
+           (doc['recipient_name'] != null && (doc['recipient_name'] as String).isNotEmpty) ||
+           (doc['recipient_phone'] != null && (doc['recipient_phone'] as String).isNotEmpty) ||
+           (doc['tracking_number'] != null && (doc['tracking_number'] as String).isNotEmpty);
+  }
+
+  String _getDeliveryMethodName(String? method) {
+    switch (method) {
+      case 'warehouse_door': return 'تحویل درب انبار';
+      case 'post_regular': return 'پست عادی';
+      case 'post_express': return 'پست پیشتاز';
+      case 'freight': return 'باربری';
+      case 'bus': return 'اتوبوس';
+      case 'tipax': return 'تیپاکس';
+      case 'courier': return 'پیک';
+      default: return method ?? '-';
+    }
   }
 
   Widget _buildInfoRow(ThemeData theme, String label, String value) {

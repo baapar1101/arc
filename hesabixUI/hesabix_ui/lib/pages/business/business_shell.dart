@@ -25,6 +25,8 @@ import '../../widgets/transfer/transfer_form_dialog.dart';
 import '../../widgets/expense_income/expense_income_form_dialog.dart';
 import '../../widgets/warehouse/warehouse_form_dialog.dart';
 import '../../widgets/warehouse/warehouse_doc_wizard_dialog.dart';
+import '../../widgets/warehouse/warehouse_document_form_dialog.dart';
+import '../../services/invoice_service.dart';
 import '../../widgets/ai/ai_chat_dialog.dart';
 import 'check_form_page.dart';
 
@@ -791,20 +793,36 @@ class _BusinessShellState extends State<BusinessShell> {
       }
     }
 
-    Future<void> showAddWarehouseDocumentDialog() async {
-      if (!context.mounted) return;
-      final result = await showDialog<WarehouseDocWizardResult>(
+  Future<void> showAddWarehouseDocumentDialog() async {
+    if (!context.mounted) return;
+    final calendarController = widget.calendarController ?? await CalendarController.load();
+    final result = await showDialog<WarehouseDocWizardResult>(
+      context: context,
+      builder: (context) => WarehouseDocWizardDialog(
+        businessId: widget.businessId,
+        apiClient: ApiClient(),
+        calendarController: calendarController,
+      ),
+    );
+    if (result == null) return;
+    
+    if (result.isManual) {
+      // Manual document creation
+      final calendarController = widget.calendarController ?? await CalendarController.load();
+      await showDialog(
         context: context,
-        builder: (context) => WarehouseDocWizardDialog(
+        builder: (_) => WarehouseDocumentFormDialog(
           businessId: widget.businessId,
-          apiClient: ApiClient(),
+          calendarController: calendarController,
+          onSuccess: () => _refreshCurrentPage(),
         ),
       );
-      if (result != null) {
-        // Warehouse document wizard was completed, refresh the current page
-        _refreshCurrentPage();
-      }
+      return;
     }
+    
+    // Handle invoice-based document creation
+    await _handleInvoiceWizardResult(result);
+  }
 
 
     bool isExpanded(_MenuItem item) {
@@ -1457,6 +1475,112 @@ class _BusinessShellState extends State<BusinessShell> {
       ),
       body: content,
     );
+  }
+
+  Future<void> _handleInvoiceWizardResult(WarehouseDocWizardResult wizardResult) async {
+    if (wizardResult.invoiceId == null) return;
+    
+    final apiClient = ApiClient();
+    final invoiceService = InvoiceService(apiClient: apiClient);
+    
+    bool loaderDismissed = false;
+    void dismissLoader() {
+      if (!loaderDismissed && mounted) {
+        loaderDismissed = true;
+        Navigator.of(context, rootNavigator: true).pop();
+      }
+    }
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    ).then((_) => loaderDismissed = true);
+
+    try {
+      final invoiceData = await invoiceService.getInvoice(
+        businessId: widget.businessId,
+        invoiceId: wizardResult.invoiceId!,
+      );
+      dismissLoader();
+      if (!mounted) return;
+      
+      final invoiceItem = Map<String, dynamic>.from(invoiceData['item'] ?? const {});
+      final initialLines = _extractLinesFromInvoice(invoiceItem, wizardResult.docType ?? 'issue');
+      
+      if (initialLines.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('هیچ کالایی برای این فاکتور ثبت نشده است')),
+        );
+        return;
+      }
+      
+      final dateStr = invoiceItem['document_date']?.toString();
+      final initialDate = dateStr == null ? null : DateTime.tryParse(dateStr);
+
+        final calendarController = widget.calendarController ?? await CalendarController.load();
+        await showDialog(
+          context: context,
+          builder: (_) => WarehouseDocumentFormDialog(
+            businessId: widget.businessId,
+            calendarController: calendarController,
+            initialDocType: wizardResult.docType,
+            lockDocType: true,
+            initialDocumentDate: initialDate,
+            initialLines: initialLines,
+            sourceInvoiceId: wizardResult.invoiceId,
+            sourceInvoiceCode: wizardResult.invoiceCode,
+            sourceInvoiceType: wizardResult.sourceLabel,
+            onSuccess: () => _refreshCurrentPage(),
+          ),
+        );
+    } catch (e) {
+      dismissLoader();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('خطا در دریافت فاکتور: $e')),
+      );
+    } finally {
+      dismissLoader();
+    }
+  }
+
+  List<Map<String, dynamic>> _extractLinesFromInvoice(Map<String, dynamic> invoice, String docType) {
+    final movementFallback = docType == 'receipt' ? 'in' : 'out';
+    final rawLines = List<dynamic>.from(invoice['product_lines'] ?? const []);
+    final List<Map<String, dynamic>> result = [];
+    for (final raw in rawLines) {
+      if (raw is! Map) continue;
+      final map = Map<String, dynamic>.from(raw);
+      if (map['product_id'] == null) continue;
+      final qty = _toDouble(map['quantity']);
+      if (qty <= 0) continue;
+      final extra = Map<String, dynamic>.from(map['extra_info'] ?? const {});
+      final warehouseId = _toInt(map['warehouse_id'] ?? extra['warehouse_id']);
+      final movement = (extra['movement'] ?? movementFallback).toString();
+      result.add({
+        'product_id': map['product_id'],
+        'quantity': qty,
+        'warehouse_id': warehouseId,
+        'movement': movement,
+        'extra_info': extra,
+      });
+    }
+    return result;
+  }
+
+  double _toDouble(dynamic value) {
+    if (value is num) return value.toDouble();
+    if (value is String) return double.tryParse(value) ?? 0;
+    return 0;
+  }
+
+  int? _toInt(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    if (value is String && value.isNotEmpty) return int.tryParse(value);
+    return null;
   }
 
   // فیلتر کردن منو بر اساس دسترسی‌ها

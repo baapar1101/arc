@@ -19,6 +19,7 @@ import '../../utils/date_formatters.dart';
 import '../../services/warehouse_service.dart';
 import 'price_lists_page.dart';
 import '../../utils/snackbar_helper.dart';
+import '../../utils/responsive_helper.dart';
 
 class ProductsPage extends StatefulWidget {
   final int businessId;
@@ -125,15 +126,21 @@ class _ProductsPageState extends State<ProductsPage> {
     );
   }
   
-  Widget _buildInfoGrid(ThemeData theme, List<_InfoTileData> items) {
+  Widget _buildInfoGrid(ThemeData theme, List<_InfoTileData> items, BuildContext context) {
+    final isMobile = ResponsiveHelper.isMobile(context);
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-        maxCrossAxisExtent: 260,
+      gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+        maxCrossAxisExtent: ResponsiveHelper.getGridMaxCrossAxisExtent(
+          context,
+          mobile: double.infinity,
+          tablet: 260,
+          desktop: 300,
+        ),
         mainAxisSpacing: 12,
         crossAxisSpacing: 12,
-        childAspectRatio: 2.15,
+        childAspectRatio: isMobile ? 3.0 : 2.15,
       ),
       itemCount: items.length,
       itemBuilder: (context, index) {
@@ -342,26 +349,50 @@ class _ProductsPageState extends State<ProductsPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (fullImageUrl != null) ...[
-                _buildProductImagePreview(dialogContext, fullImageUrl, t.imageNotAvailable),
-                const SizedBox(width: 20),
-              ],
-              Expanded(
-                child: Column(
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isMobile = ResponsiveHelper.isMobile(context);
+              if (isMobile) {
+                // موبایل: Column layout
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (fullImageUrl != null) ...[
+                      _buildProductImagePreview(dialogContext, fullImageUrl, t.imageNotAvailable),
+                      const SizedBox(height: 16),
+                    ],
+                    _buildSectionCard(theme, t.generalInformation, _buildInfoGrid(theme, generalItems, dialogContext)),
+                    const SizedBox(height: 16),
+                    _buildSectionCard(theme, t.pricing, _buildInfoGrid(theme, pricingItems, dialogContext)),
+                    const SizedBox(height: 16),
+                    _buildSectionCard(theme, t.inventory, _buildInfoGrid(theme, inventoryItems, dialogContext)),
+                  ],
+                );
+              } else {
+                // دسکتاپ/تبلت: Row layout
+                return Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildSectionCard(theme, t.generalInformation, _buildInfoGrid(theme, generalItems)),
-                    const SizedBox(height: 16),
-                    _buildSectionCard(theme, t.pricing, _buildInfoGrid(theme, pricingItems)),
-                    const SizedBox(height: 16),
-                    _buildSectionCard(theme, t.inventory, _buildInfoGrid(theme, inventoryItems)),
+                    if (fullImageUrl != null) ...[
+                      _buildProductImagePreview(dialogContext, fullImageUrl, t.imageNotAvailable),
+                      const SizedBox(width: 20),
+                    ],
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildSectionCard(theme, t.generalInformation, _buildInfoGrid(theme, generalItems, dialogContext)),
+                          const SizedBox(height: 16),
+                          _buildSectionCard(theme, t.pricing, _buildInfoGrid(theme, pricingItems, dialogContext)),
+                          const SizedBox(height: 16),
+                          _buildSectionCard(theme, t.inventory, _buildInfoGrid(theme, inventoryItems, dialogContext)),
+                        ],
+                      ),
+                    ),
                   ],
-                ),
-              ),
-            ],
+                );
+              }
+            },
           ),
           const SizedBox(height: 16),
           _buildSectionCard(
@@ -379,8 +410,9 @@ class _ProductsPageState extends State<ProductsPage> {
   
   Widget _buildProductImagePreview(BuildContext context, String imageUrl, String fallbackLabel) {
     final theme = Theme.of(context);
+    final isMobile = ResponsiveHelper.isMobile(context);
     return SizedBox(
-      width: 240,
+      width: isMobile ? double.infinity : 240,
       child: Card(
         elevation: 0,
         clipBehavior: Clip.antiAlias,
@@ -715,16 +747,14 @@ class _ProductsPageState extends State<ProductsPage> {
               );
             }
             
+            final isMobileDialog = ResponsiveHelper.isMobile(dialogContext);
             return Dialog(
-              insetPadding: const EdgeInsets.all(24),
+              insetPadding: ResponsiveHelper.getDialogPadding(dialogContext),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               child: DefaultTabController(
                 length: 3,
                 child: ConstrainedBox(
-                  constraints: BoxConstraints(
-                    maxWidth: 900,
-                    maxHeight: MediaQuery.of(dialogContext).size.height * 0.9,
-                  ),
+                  constraints: ResponsiveHelper.getDialogConstraints(dialogContext),
                   child: Column(
                     children: [
                       _buildProductDialogHeader(
@@ -744,7 +774,7 @@ class _ProductsPageState extends State<ProductsPage> {
                             TabBar(
                               labelColor: theme.colorScheme.primary,
                               indicatorColor: theme.colorScheme.primary,
-                              isScrollable: true,
+                              isScrollable: isMobileDialog,
                               tabs: [
                                 Tab(
                                   icon: const Icon(Icons.info_outline),
@@ -802,11 +832,12 @@ class _ProductsPageState extends State<ProductsPage> {
   
   /// نمایش دیالوگ تصویر
   void _showImageDialog(BuildContext context, String imageUrl) {
+    final isMobile = ResponsiveHelper.isMobile(context);
     showDialog(
       context: context,
       builder: (dialogContext) => Dialog(
         backgroundColor: Colors.transparent,
-        insetPadding: const EdgeInsets.all(20),
+        insetPadding: isMobile ? EdgeInsets.zero : const EdgeInsets.all(20),
         child: Stack(
           children: [
             Center(
@@ -845,8 +876,8 @@ class _ProductsPageState extends State<ProductsPage> {
                   }
                   return Container(
                     constraints: BoxConstraints(
-                      maxWidth: MediaQuery.of(context).size.width * 0.9,
-                      maxHeight: MediaQuery.of(context).size.height * 0.9,
+                      maxWidth: isMobile ? double.infinity : MediaQuery.of(context).size.width * 0.9,
+                      maxHeight: isMobile ? double.infinity : MediaQuery.of(context).size.height * 0.9,
                     ),
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(12),
@@ -1037,6 +1068,12 @@ class _ProductsPageState extends State<ProductsPage> {
             ),
             TextColumn('code', t.code, width: ColumnWidth.small),
             TextColumn('name', t.title, width: ColumnWidth.large),
+            TextColumn(
+              'category_name',
+              t.category,
+              width: ColumnWidth.medium,
+              filterType: ColumnFilterType.categoryTree,
+            ),
             TextColumn('item_type', t.service, width: ColumnWidth.small),
             NumberColumn(
               'base_sales_price',

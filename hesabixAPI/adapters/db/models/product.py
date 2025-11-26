@@ -71,6 +71,11 @@ class Product(Base):
     reorder_point: Mapped[int | None] = mapped_column(Integer, nullable=True)
     min_order_qty: Mapped[int | None] = mapped_column(Integer, nullable=True)
     lead_time_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    
+    # حالت موجودی (فله‌ای/یونیک)
+    inventory_mode: Mapped[str | None] = mapped_column(String(16), nullable=True, default="bulk", comment="حالت موجودی: bulk (فله‌ای) یا unique (یونیک)")
+    track_serial: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, comment="ردیابی سریال نامبر برای کالاهای یونیک")
+    track_barcode: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, comment="ردیابی بارکد برای کالاهای یونیک")
 
     # مالیات
     is_sales_taxable: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
@@ -93,5 +98,6 @@ class Product(Base):
     # Relationships
     image_file = relationship("FileStorage", foreign_keys=[image_file_id], lazy="select")
     default_warehouse = relationship("Warehouse", foreign_keys=[default_warehouse_id], lazy="select")
+    category = relationship("BusinessCategory", foreign_keys=[category_id], lazy="select")
 
 

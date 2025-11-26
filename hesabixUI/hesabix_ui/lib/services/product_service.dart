@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:dio/dio.dart' as dio;
 import '../core/api_client.dart';
 
@@ -14,8 +15,14 @@ class ProductService {
   }) async {
     if (imageBytes != null && imageFilename != null) {
       // استفاده از multipart/form-data برای آپلود فایل
+      // تبدیل attribute_ids به JSON string برای ارسال صحیح
+      final payloadForForm = Map<String, dynamic>.from(payload);
+      if (payloadForForm.containsKey('attribute_ids') && payloadForForm['attribute_ids'] is List) {
+        payloadForForm['attribute_ids'] = jsonEncode(payloadForForm['attribute_ids']);
+      }
+      
       final formData = dio.FormData.fromMap({
-        ...payload.map((key, value) => MapEntry(key, value?.toString() ?? '')),
+        ...payloadForForm.map((key, value) => MapEntry(key, value?.toString() ?? '')),
         if (imageBytes.isNotEmpty && imageFilename.isNotEmpty)
           'file': dio.MultipartFile.fromBytes(
             imageBytes,
@@ -58,8 +65,14 @@ class ProductService {
   }) async {
     if (imageBytes != null && imageFilename != null) {
       // استفاده از multipart/form-data برای آپلود فایل
+      // تبدیل attribute_ids به JSON string برای ارسال صحیح
+      final payloadForForm = Map<String, dynamic>.from(payload);
+      if (payloadForForm.containsKey('attribute_ids') && payloadForForm['attribute_ids'] is List) {
+        payloadForForm['attribute_ids'] = jsonEncode(payloadForForm['attribute_ids']);
+      }
+      
       final formData = dio.FormData.fromMap({
-        ...payload.map((key, value) => MapEntry(key, value?.toString() ?? '')),
+        ...payloadForForm.map((key, value) => MapEntry(key, value?.toString() ?? '')),
         if (imageBytes.isNotEmpty && imageFilename.isNotEmpty)
           'file': dio.MultipartFile.fromBytes(
             imageBytes,

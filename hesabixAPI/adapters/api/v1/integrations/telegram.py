@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Dict
 from datetime import datetime
+import logging
 
 from fastapi import APIRouter, Depends, Request, Body, HTTPException
 from sqlalchemy.orm import Session
@@ -14,6 +15,7 @@ from adapters.db.repositories.user_repo import UserRepository
 from app.services.providers.telegram_provider import TelegramProvider
 from app.services.system_settings_service import get_effective_notifications_settings
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/integrations/telegram", tags=["integrations.telegram"])
 
 
@@ -127,7 +129,13 @@ def telegram_webhook(
 		u_repo.db.commit()
 		t_repo.mark_used(t_obj)
 		if chat_id:
-			provider.send_text(chat_id=int(chat_id), text="✅ اتصال تلگرام شما با موفقیت برقرار شد.\nاز این پس پیام‌های مهم برایتان ارسال می‌شود.")
+			provider.send_text(chat_id=int(chat_id), text="✅ اتصال تلگرام شما با موفقیت برقرار شد.\n\n👋 خوش آمدید! من دستیار هوش مصنوعی شما هستم.\n\nبرای شروع از منوی اصلی استفاده کنید:")
+			# ارسال منوی اصلی
+			from app.services.telegram_ai_chat_service import TelegramAIChatService
+			from app.core.auth_dependency import AuthContext
+			service = TelegramAIChatService(db, user.id, int(chat_id), provider)
+			user_context = AuthContext(db=db, user=user)
+			service.send_main_menu(user_context)
 		return {"ok": True}
 
 	# Optional: unlink command
@@ -149,7 +157,32 @@ def telegram_webhook(
 		provider.send_text(chat_id=int(chat_id), text="اتصال تلگرام شما قطع شد.")
 		return {"ok": True}
 
-	# Optional commands like /unlink could be handled later
+	# پردازش پیام‌های AI Chat
+	if "message" in payload:
+		message = payload["message"]
+		# فقط پیام‌های متنی را پردازش می‌کنیم (نه دستورات /start و /unlink)
+		text = message.get("text", "").strip()
+		if text and not text.startswith("/"):
+			# پردازش پیام به عنوان سوال از AI
+			from app.services.telegram_ai_chat_handler import handle_telegram_message
+			import asyncio
+			try:
+				loop = asyncio.get_event_loop()
+				loop.run_until_complete(handle_telegram_message(message, db, provider))
+			except Exception as e:
+				logger.error(f"Error handling telegram message: {e}", exc_info=True)
+	
+	# پردازش Callback Query (فشار دادن دکمه)
+	if "callback_query" in payload:
+		callback_query = payload["callback_query"]
+		from app.services.telegram_ai_chat_handler import handle_telegram_callback_query
+		import asyncio
+		try:
+			loop = asyncio.get_event_loop()
+			loop.run_until_complete(handle_telegram_callback_query(callback_query, db, provider))
+		except Exception as e:
+			logger.error(f"Error handling callback query: {e}", exc_info=True)
+	
 	return {"ok": True}
 
 

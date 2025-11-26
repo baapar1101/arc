@@ -175,6 +175,95 @@ class WarehouseService {
     );
     return Map<String, dynamic>.from(res.data?['data'] ?? const {});
   }
+
+  Future<Map<String, dynamic>> getInvoiceLineQuantities({
+    required int businessId,
+    required int invoiceId,
+  }) async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/warehouse-docs/business/$businessId/invoice/$invoiceId/line-quantities',
+    );
+    return Map<String, dynamic>.from(res.data?['data'] ?? const {});
+  }
+
+  Future<Map<String, dynamic>> getAvailableInstances({
+    required int businessId,
+    required int productId,
+    int? warehouseId,
+  }) async {
+    final queryParams = <String, dynamic>{};
+    if (warehouseId != null) {
+      queryParams['warehouse_id'] = warehouseId;
+    }
+    
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/product-instances/business/$businessId/product/$productId/available',
+      query: queryParams,
+    );
+    return Map<String, dynamic>.from(res.data?['data'] ?? const {});
+  }
+
+  Future<Map<String, dynamic>> searchInstanceByCode({
+    required int businessId,
+    required String code,
+  }) async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/product-instances/business/$businessId/search-by-code',
+      query: {'code': code},
+    );
+    return Map<String, dynamic>.from(res.data?['data'] ?? const {});
+  }
+
+  Future<Map<String, dynamic>> convertProductToUnique({
+    required int businessId,
+    required int productId,
+    bool autoGenerateSerial = true,
+    String? serialPrefix,
+    bool createForExistingStock = true,
+    bool? trackSerial,
+    bool? trackBarcode,
+  }) async {
+    final payload = <String, dynamic>{
+      'auto_generate_serial': autoGenerateSerial,
+      'create_for_existing_stock': createForExistingStock,
+    };
+    if (serialPrefix != null) {
+      payload['serial_prefix'] = serialPrefix;
+    }
+    if (trackSerial != null) {
+      payload['track_serial'] = trackSerial;
+    }
+    if (trackBarcode != null) {
+      payload['track_barcode'] = trackBarcode;
+    }
+    
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/product-instances/business/$businessId/product/$productId/convert-to-unique',
+      data: payload,
+    );
+    return Map<String, dynamic>.from(res.data?['data'] ?? const {});
+  }
+
+  Future<Map<String, dynamic>> getWarehouseStockReport({
+    required int businessId,
+    List<int>? productIds,
+    List<int>? warehouseIds,
+    String? asOfDate,
+    bool includeZero = false,
+  }) async {
+    final query = <String, dynamic>{
+      if (productIds != null && productIds.isNotEmpty) 'product_ids': productIds,
+      if (warehouseIds != null && warehouseIds.isNotEmpty) 'warehouse_ids': warehouseIds,
+      if (asOfDate != null) 'as_of_date': asOfDate,
+      'include_zero': includeZero,
+    };
+    
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/warehouse-docs/business/$businessId/reports/stock',
+      data: query,
+    );
+    return Map<String, dynamic>.from(res.data?['data'] ?? const {});
+  }
 }
 
 

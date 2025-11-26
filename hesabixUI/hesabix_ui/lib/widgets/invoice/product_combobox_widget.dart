@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../services/product_service.dart';
+import '../../services/warehouse_service.dart';
 import '../../core/api_client.dart';
 import '../../core/auth_store.dart';
 import '../../widgets/product/product_form_dialog.dart';
@@ -29,6 +30,7 @@ class ProductComboboxWidget extends StatefulWidget {
 
 class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
   final ProductService _service = ProductService(apiClient: ApiClient());
+  final WarehouseService _warehouseService = WarehouseService();
   final TextEditingController _searchCtrl = TextEditingController();
   Timer? _debounce;
   bool _loading = false;
@@ -169,6 +171,90 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
     }
   }
 
+  Future<void> _searchByBarcode(BuildContext bottomSheetContext) async {
+    final barcodeController = TextEditingController();
+    
+    await showDialog<Map<String, dynamic>?>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('جستجو با بارکد/سریال'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: barcodeController,
+              decoration: const InputDecoration(
+                labelText: 'بارکد یا سریال نامبر',
+                hintText: 'بارکد یا سریال را وارد کنید',
+                prefixIcon: Icon(Icons.qr_code_scanner),
+              ),
+              autofocus: true,
+              onSubmitted: (value) async {
+                if (value.trim().isNotEmpty) {
+                  await _performBarcodeSearch(value.trim(), context);
+                }
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('انصراف'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              if (barcodeController.text.trim().isNotEmpty) {
+                await _performBarcodeSearch(barcodeController.text.trim(), context);
+              }
+            },
+            child: const Text('جستجو'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _performBarcodeSearch(String code, BuildContext dialogContext) async {
+    try {
+      final instanceData = await _warehouseService.searchInstanceByCode(
+        businessId: widget.businessId,
+        code: code,
+      );
+      
+      final productId = instanceData['product_id'] as int?;
+      if (productId == null) {
+        if (dialogContext.mounted) {
+          ScaffoldMessenger.of(dialogContext).showSnackBar(
+            const SnackBar(content: Text('کالای یونیکی با این بارکد/سریال یافت نشد')),
+          );
+        }
+        return;
+      }
+      
+      // دریافت اطلاعات کالا
+      final product = await _service.getProduct(
+        businessId: widget.businessId,
+        productId: productId,
+      );
+      
+      if (dialogContext.mounted) {
+        Navigator.of(dialogContext).pop();
+        _select(product);
+        // بستن bottom sheet اگر باز است
+        if (Navigator.canPop(context)) {
+          Navigator.pop(context);
+        }
+      }
+    } catch (e) {
+      if (dialogContext.mounted) {
+        ScaffoldMessenger.of(dialogContext).showSnackBar(
+          SnackBar(content: Text('خطا در جستجو: $e')),
+        );
+      }
+    }
+  }
+
   void _openPicker() {
     showModalBottomSheet(
       context: context,
@@ -185,6 +271,13 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
                   children: [
                     Text(widget.label, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
                     const Spacer(),
+                    // دکمه جستجو با بارکد
+                    IconButton(
+                      onPressed: () => _searchByBarcode(ctx),
+                      icon: const Icon(Icons.qr_code_scanner),
+                      tooltip: 'جستجو با بارکد/سریال',
+                      color: theme.colorScheme.primary,
+                    ),
                     if (widget.authStore != null)
                       IconButton(
                         onPressed: () => _addNewProduct(ctx),

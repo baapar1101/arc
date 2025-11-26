@@ -23,6 +23,7 @@ import '../../services/invoice_service.dart';
 import '../../services/receipt_payment_service.dart';
 import '../../core/api_client.dart';
 import '../../services/person_service.dart';
+import '../../utils/responsive_helper.dart';
 
 class EditInvoicePage extends StatefulWidget {
   final int businessId;
@@ -442,121 +443,165 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
             children: [
               LayoutBuilder(
                 builder: (context, constraints) {
-                  return Column(
-                    children: [
-                      // سطر اول
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: InvoiceTypeCombobox(
-                              selectedType: _selectedInvoiceType,
-                              onTypeChanged: (type) {
-                                setState(() {
-                                  _selectedInvoiceType = type;
-                                });
-                              },
-                              isDraft: _isProforma,
-                              onDraftChanged: (isDraft) {
-                                setState(() {
-                                  _isProforma = isDraft;
-                                  // اگر پیش‌فاکتور فعال شد، تراکنش‌های پرداخت را پاک کن
-                                  if (isDraft && _transactions.isNotEmpty) {
-                                    _transactions = [];
-                                  }
-                                  // به‌روزرسانی TabController
-                                  final newTabCount = _getTabCount();
-                                  if (newTabCount != _tabController.length) {
-                                    _tabController.dispose();
-                                    _tabController = TabController(length: newTabCount, vsync: this);
-                                  }
-                                });
-                              },
-                              isRequired: true,
-                              label: 'نوع فاکتور',
-                              hintText: 'انتخاب نوع فاکتور',
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: CodeFieldWidget(
-                              initialValue: _invoiceNumber,
-                              onChanged: (_) {},
-                              isRequired: true,
-                              label: 'شماره فاکتور',
-                              hintText: 'کد فاکتور',
-                              autoGenerateCode: true, // فقط نمایشی در ویرایش
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: DateInputField(
-                              value: _invoiceDate,
-                              labelText: 'تاریخ فاکتور *',
-                              hintText: 'انتخاب تاریخ فاکتور',
-                              calendarController: widget.calendarController,
-                              onChanged: (date) {
-                                setState(() {
-                                  _invoiceDate = date;
-                                });
-                              },
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: CurrencyPickerWidget(
-                              businessId: widget.businessId,
-                              selectedCurrencyId: _selectedCurrencyId,
-                              onChanged: (currencyId) {
-                                setState(() {
-                                  _selectedCurrencyId = currencyId;
-                                });
-                              },
-                              label: 'ارز فاکتور',
-                              hintText: 'انتخاب ارز فاکتور',
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      // طرف حساب فقط نمایشی در صورت امکان
-                      if (_selectedInvoiceType == InvoiceType.sales || _selectedInvoiceType == InvoiceType.salesReturn)
-                        CustomerComboboxWidget(
-                          selectedCustomer: _selectedCustomer,
-                          onCustomerChanged: (c) => setState(() => _selectedCustomer = c),
-                          businessId: widget.businessId,
-                          authStore: widget.authStore,
-                          isRequired: false,
-                          label: 'طرف حساب',
-                          hintText: _selectedCustomer?.name ?? 'انتخاب طرف حساب',
+                  final isMobile = ResponsiveHelper.isMobile(context);
+                  if (isMobile) {
+                    // موبایل: Column layout
+                    return Column(
+                      children: [
+                        InvoiceTypeCombobox(
+                          selectedType: _selectedInvoiceType,
+                          onTypeChanged: (type) {
+                            setState(() {
+                              _selectedInvoiceType = type;
+                            });
+                          },
+                          isDraft: _isProforma,
+                          onDraftChanged: (isDraft) {
+                            setState(() {
+                              _isProforma = isDraft;
+                              if (isDraft && _transactions.isNotEmpty) {
+                                _transactions = [];
+                              }
+                              final newTabCount = _getTabCount();
+                              if (newTabCount != _tabController.length) {
+                                _tabController.dispose();
+                                _tabController = TabController(length: newTabCount, vsync: this);
+                              }
+                            });
+                          },
+                          isRequired: true,
+                          label: 'نوع فاکتور',
+                          hintText: 'انتخاب نوع فاکتور',
                         ),
-                      if (_selectedInvoiceType == InvoiceType.purchase || _selectedInvoiceType == InvoiceType.purchaseReturn) ...[
-                        const SizedBox(height: 16),
-                        PersonComboboxWidget(
-                          businessId: widget.businessId,
-                          selectedPerson: _selectedSupplier,
-                          onChanged: (p) => setState(() => _selectedSupplier = p),
-                          isRequired: false,
-                          label: 'تامین‌کننده',
-                          hintText: 'انتخاب تامین‌کننده',
-                          personTypes: const ['تامین‌کننده', 'فروشنده'],
-                          searchHint: 'جست‌وجو در تامین‌کنندگان...',
+                        const SizedBox(height: 12),
+                        CodeFieldWidget(
+                          initialValue: _invoiceNumber,
+                          onChanged: (_) {},
+                          isRequired: true,
+                          label: 'شماره فاکتور',
+                          hintText: 'کد فاکتور',
+                          autoGenerateCode: true,
                         ),
                       ],
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        initialValue: _invoiceTitle,
-                        onChanged: (v) => setState(() => _invoiceTitle = v.trim().isEmpty ? null : v.trim()),
-                        decoration: const InputDecoration(
-                          labelText: 'توضیحات فاکتور',
-                          hintText: 'مثال: فروش محصولات',
-                          border: OutlineInputBorder(),
+                    );
+                  } else {
+                    // دسکتاپ/تبلت: Row layout
+                    return Column(
+                      children: [
+                        // سطر اول
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: InvoiceTypeCombobox(
+                                selectedType: _selectedInvoiceType,
+                                onTypeChanged: (type) {
+                                  setState(() {
+                                    _selectedInvoiceType = type;
+                                  });
+                                },
+                                isDraft: _isProforma,
+                                onDraftChanged: (isDraft) {
+                                  setState(() {
+                                    _isProforma = isDraft;
+                                    // اگر پیش‌فاکتور فعال شد، تراکنش‌های پرداخت را پاک کن
+                                    if (isDraft && _transactions.isNotEmpty) {
+                                      _transactions = [];
+                                    }
+                                    // به‌روزرسانی TabController
+                                    final newTabCount = _getTabCount();
+                                    if (newTabCount != _tabController.length) {
+                                      _tabController.dispose();
+                                      _tabController = TabController(length: newTabCount, vsync: this);
+                                    }
+                                  });
+                                },
+                                isRequired: true,
+                                label: 'نوع فاکتور',
+                                hintText: 'انتخاب نوع فاکتور',
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: CodeFieldWidget(
+                                initialValue: _invoiceNumber,
+                                onChanged: (_) {},
+                                isRequired: true,
+                                label: 'شماره فاکتور',
+                                hintText: 'کد فاکتور',
+                                autoGenerateCode: true, // فقط نمایشی در ویرایش
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: DateInputField(
+                                value: _invoiceDate,
+                                labelText: 'تاریخ فاکتور *',
+                                hintText: 'انتخاب تاریخ فاکتور',
+                                calendarController: widget.calendarController,
+                                onChanged: (date) {
+                                  setState(() {
+                                    _invoiceDate = date;
+                                  });
+                                },
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: CurrencyPickerWidget(
+                                businessId: widget.businessId,
+                                selectedCurrencyId: _selectedCurrencyId,
+                                onChanged: (currencyId) {
+                                  setState(() {
+                                    _selectedCurrencyId = currencyId;
+                                  });
+                                },
+                                label: 'ارز فاکتور',
+                                hintText: 'انتخاب ارز فاکتور',
+                              ),
+                            ),
+                          ],
                         ),
-                        textInputAction: TextInputAction.next,
-                        maxLines: 3,
-                      ),
-                    ],
-                  );
+                        const SizedBox(height: 16),
+                        // طرف حساب فقط نمایشی در صورت امکان
+                        if (_selectedInvoiceType == InvoiceType.sales || _selectedInvoiceType == InvoiceType.salesReturn)
+                          CustomerComboboxWidget(
+                            selectedCustomer: _selectedCustomer,
+                            onCustomerChanged: (c) => setState(() => _selectedCustomer = c),
+                            businessId: widget.businessId,
+                            authStore: widget.authStore,
+                            isRequired: false,
+                            label: 'طرف حساب',
+                            hintText: _selectedCustomer?.name ?? 'انتخاب طرف حساب',
+                          ),
+                        if (_selectedInvoiceType == InvoiceType.purchase || _selectedInvoiceType == InvoiceType.purchaseReturn) ...[
+                          const SizedBox(height: 16),
+                          PersonComboboxWidget(
+                            businessId: widget.businessId,
+                            selectedPerson: _selectedSupplier,
+                            onChanged: (p) => setState(() => _selectedSupplier = p),
+                            isRequired: false,
+                            label: 'تامین‌کننده',
+                            hintText: 'انتخاب تامین‌کننده',
+                            personTypes: const ['تامین‌کننده', 'فروشنده'],
+                            searchHint: 'جست‌وجو در تامین‌کنندگان...',
+                          ),
+                        ],
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          initialValue: _invoiceTitle,
+                          onChanged: (v) => setState(() => _invoiceTitle = v.trim().isEmpty ? null : v.trim()),
+                          decoration: const InputDecoration(
+                            labelText: 'توضیحات فاکتور',
+                            hintText: 'مثال: فروش محصولات',
+                            border: OutlineInputBorder(),
+                          ),
+                          textInputAction: TextInputAction.next,
+                          maxLines: 3,
+                        ),
+                      ],
+                    );
+                  }
                 },
               ),
               const SizedBox(height: 24),

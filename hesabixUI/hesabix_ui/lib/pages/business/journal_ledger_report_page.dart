@@ -304,314 +304,340 @@ class _JournalLedgerReportPageState extends State<JournalLedgerReportPage> {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          // Filters
-          Card(
-            margin: const EdgeInsets.all(16),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Wrap(
-                    spacing: 16,
-                    runSpacing: 16,
-                    children: [
-                      // Fiscal Year
-                      SizedBox(
-                        width: 280,
-                        child: DropdownButtonFormField<int>(
-                          value: _selectedFiscalYearId,
-                          decoration: InputDecoration(
-                            labelText: 'سال مالی',
-                            border: const OutlineInputBorder(),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-                          ),
-                          items: _fiscalYears.map((fy) {
-                            return DropdownMenuItem<int>(
-                              value: fy['id'] as int?,
-                              child: Text(
-                                fy['title']?.toString() ?? '',
-                                overflow: TextOverflow.ellipsis,
-                                maxLines: 1,
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          return Column(
+            children: [
+              // Scrollable filters and summary section
+              SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Filters
+                    Card(
+                        margin: const EdgeInsets.all(16),
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Wrap(
+                                spacing: 16,
+                                runSpacing: 16,
+                                children: [
+                                  // Fiscal Year
+                                  SizedBox(
+                                    width: 280,
+                                    child: DropdownButtonFormField<int>(
+                                      value: _selectedFiscalYearId,
+                                      decoration: InputDecoration(
+                                        labelText: 'سال مالی',
+                                        border: const OutlineInputBorder(),
+                                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                                      ),
+                                      items: _fiscalYears.map((fy) {
+                                        return DropdownMenuItem<int>(
+                                          value: fy['id'] as int?,
+                                          child: Text(
+                                            fy['title']?.toString() ?? '',
+                                            overflow: TextOverflow.ellipsis,
+                                            maxLines: 1,
+                                          ),
+                                        );
+                                      }).toList(),
+                                      onChanged: (value) {
+                                        setState(() {
+                                          _selectedFiscalYearId = value;
+                                        });
+                                        _refreshData();
+                                      },
+                                    ),
+                                  ),
+                                  
+                                  // Date From
+                                  SizedBox(
+                                    width: 180,
+                                    child: DateInputField(
+                                      value: _fromDate,
+                                      calendarController: widget.calendarController,
+                                      onChanged: (date) {
+                                        setState(() {
+                                          _fromDate = date;
+                                        });
+                                        _refreshData();
+                                      },
+                                    ),
+                                  ),
+                                  
+                                  // Date To
+                                  SizedBox(
+                                    width: 180,
+                                    child: DateInputField(
+                                      value: _toDate,
+                                      calendarController: widget.calendarController,
+                                      onChanged: (date) {
+                                        setState(() {
+                                          _toDate = date;
+                                        });
+                                        _refreshData();
+                                      },
+                                    ),
+                                  ),
+                                  
+                                  // Currency
+                                  SizedBox(
+                                    width: 200,
+                                    child: DropdownButtonFormField<int>(
+                                      value: _selectedCurrencyId,
+                                      decoration: InputDecoration(
+                                        labelText: 'ارز',
+                                        border: const OutlineInputBorder(),
+                                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                                      ),
+                                      items: [
+                                        const DropdownMenuItem<int>(
+                                          value: null,
+                                          child: Text('همه ارزها'),
+                                        ),
+                                        ..._currencies.map<DropdownMenuItem<int>>((c) {
+                                          final id = c['id'] as int?;
+                                          final code = (c['code'] ?? '').toString();
+                                          final name = (c['name'] ?? '').toString();
+                                          final displayName = code.isNotEmpty ? '$code - $name' : name;
+                                          return DropdownMenuItem<int>(
+                                            key: ValueKey('currency_$id'),
+                                            value: id,
+                                            child: Text(
+                                              displayName,
+                                              overflow: TextOverflow.ellipsis,
+                                              maxLines: 1,
+                                            ),
+                                          );
+                                        }).toList(),
+                                      ],
+                                      onChanged: (val) {
+                                        setState(() {
+                                          _selectedCurrencyId = val;
+                                        });
+                                        _refreshData();
+                                      },
+                                    ),
+                                  ),
+                                  
+                                  // Document Type
+                                  SizedBox(
+                                    width: 200,
+                                    child: DropdownButtonFormField<String>(
+                                      value: _selectedDocumentType,
+                                      decoration: InputDecoration(
+                                        labelText: 'نوع سند',
+                                        border: const OutlineInputBorder(),
+                                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                                      ),
+                                      items: [
+                                        const DropdownMenuItem<String>(
+                                          value: null,
+                                          child: Text('همه انواع'),
+                                        ),
+                                        ..._documentTypes.entries.map((entry) {
+                                          return DropdownMenuItem<String>(
+                                            value: entry.key,
+                                            child: Text(entry.value),
+                                          );
+                                        }),
+                                      ],
+                                      onChanged: (value) {
+                                        setState(() {
+                                          _selectedDocumentType = value;
+                                        });
+                                        _refreshData();
+                                      },
+                                    ),
+                                  ),
+                                  
+                                  // Include Proforma
+                                  SizedBox(
+                                    width: 200,
+                                    child: CheckboxListTile(
+                                      title: const Text('شامل اسناد پیش‌نویس'),
+                                      value: _includeProforma,
+                                      onChanged: (value) {
+                                        setState(() {
+                                          _includeProforma = value ?? false;
+                                        });
+                                        _refreshData();
+                                      },
+                                      contentPadding: EdgeInsets.zero,
+                                      dense: true,
+                                    ),
+                                  ),
+                                ],
                               ),
-                            );
-                          }).toList(),
-                          onChanged: (value) {
-                            setState(() {
-                              _selectedFiscalYearId = value;
-                            });
-                            _refreshData();
-                          },
-                        ),
-                      ),
-                      
-                      // Date From
-                      SizedBox(
-                        width: 180,
-                        child: DateInputField(
-                          value: _fromDate,
-                          calendarController: widget.calendarController,
-                          onChanged: (date) {
-                            setState(() {
-                              _fromDate = date;
-                            });
-                            _refreshData();
-                          },
-                        ),
-                      ),
-                      
-                      // Date To
-                      SizedBox(
-                        width: 180,
-                        child: DateInputField(
-                          value: _toDate,
-                          calendarController: widget.calendarController,
-                          onChanged: (date) {
-                            setState(() {
-                              _toDate = date;
-                            });
-                            _refreshData();
-                          },
-                        ),
-                      ),
-                      
-                      // Currency
-                      SizedBox(
-                        width: 200,
-                        child: DropdownButtonFormField<int>(
-                          value: _selectedCurrencyId,
-                          decoration: InputDecoration(
-                            labelText: 'ارز',
-                            border: const OutlineInputBorder(),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                            ],
                           ),
-                          items: [
-                            const DropdownMenuItem<int>(
-                              value: null,
-                              child: Text('همه ارزها'),
+                        ),
+                      ),
+                      
+                      // Balance Validation Warning
+                      if (_summary != null && _summary!['balance_valid'] == false)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          child: Card(
+                            color: cs.errorContainer,
+                            child: Padding(
+                              padding: const EdgeInsets.all(12),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.warning, color: cs.onErrorContainer),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Text(
+                                      'تراز برقرار نیست: تفاوت = ${_formatNumber(_summary!['balance_diff'])}',
+                                      style: TextStyle(
+                                        color: cs.onErrorContainer,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                            ..._currencies.map<DropdownMenuItem<int>>((c) {
-                              final id = c['id'] as int?;
-                              final code = (c['code'] ?? '').toString();
-                              final name = (c['name'] ?? '').toString();
-                              final displayName = code.isNotEmpty ? '$code - $name' : name;
-                              return DropdownMenuItem<int>(
-                                key: ValueKey('currency_$id'),
-                                value: id,
-                                child: Text(
-                                  displayName,
-                                  overflow: TextOverflow.ellipsis,
-                                  maxLines: 1,
+                          ),
+                        ),
+                      
+                      // Summary Cards
+                      if (_summary != null)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Card(
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(16),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'جمع بدهکار',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: cs.onSurface.withOpacity(0.7),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          _formatNumber(_summary!['total_debit']),
+                                          style: const TextStyle(
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
                                 ),
-                              );
-                            }).toList(),
-                          ],
-                          onChanged: (val) {
-                            setState(() {
-                              _selectedCurrencyId = val;
-                            });
-                            _refreshData();
-                          },
-                        ),
-                      ),
-                      
-                      // Document Type
-                      SizedBox(
-                        width: 200,
-                        child: DropdownButtonFormField<String>(
-                          value: _selectedDocumentType,
-                          decoration: InputDecoration(
-                            labelText: 'نوع سند',
-                            border: const OutlineInputBorder(),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-                          ),
-                          items: [
-                            const DropdownMenuItem<String>(
-                              value: null,
-                              child: Text('همه انواع'),
-                            ),
-                            ..._documentTypes.entries.map((entry) {
-                              return DropdownMenuItem<String>(
-                                value: entry.key,
-                                child: Text(entry.value),
-                              );
-                            }),
-                          ],
-                          onChanged: (value) {
-                            setState(() {
-                              _selectedDocumentType = value;
-                            });
-                            _refreshData();
-                          },
-                        ),
-                      ),
-                      
-                      // Include Proforma
-                      SizedBox(
-                        width: 200,
-                        child: CheckboxListTile(
-                          title: const Text('شامل اسناد پیش‌نویس'),
-                          value: _includeProforma,
-                          onChanged: (value) {
-                            setState(() {
-                              _includeProforma = value ?? false;
-                            });
-                            _refreshData();
-                          },
-                          contentPadding: EdgeInsets.zero,
-                          dense: true,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-          
-          // Balance Validation Warning
-          if (_summary != null && _summary!['balance_valid'] == false)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Card(
-                color: cs.errorContainer,
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Row(
-                    children: [
-                      Icon(Icons.warning, color: cs.onErrorContainer),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          'تراز برقرار نیست: تفاوت = ${_formatNumber(_summary!['balance_diff'])}',
-                          style: TextStyle(
-                            color: cs.onErrorContainer,
-                            fontWeight: FontWeight.bold,
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Card(
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(16),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'جمع بستانکار',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: cs.onSurface.withOpacity(0.7),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          _formatNumber(_summary!['total_credit']),
+                                          style: const TextStyle(
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Card(
+                                  color: _summary!['balance_valid'] == true 
+                                      ? cs.primaryContainer 
+                                      : cs.errorContainer,
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(16),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'وضعیت تراز',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: (_summary!['balance_valid'] == true 
+                                                ? cs.onPrimaryContainer 
+                                                : cs.onErrorContainer).withOpacity(0.7),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          _summary!['balance_valid'] == true ? 'برقرار' : 'برقرار نیست',
+                                          style: TextStyle(
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.bold,
+                                            color: _summary!['balance_valid'] == true 
+                                                ? cs.onPrimaryContainer 
+                                                : cs.onErrorContainer,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      ),
-                    ],
-                  ),
+                  ],
                 ),
               ),
-            ),
-          
-          // Summary Cards
-          if (_summary != null)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'جمع بدهکار',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: cs.onSurface.withOpacity(0.7),
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              _formatNumber(_summary!['total_debit']),
-                              style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
+              
+              // Data Table - takes remaining space with minimum height for 10 rows
+              Expanded(
+                child: LayoutBuilder(
+                  builder: (context, tableConstraints) {
+                    // Calculate minimum height for 10 rows
+                    // Each row is 38px (dense mode) + header 40px + footer ~60px + padding ~32px = ~510px
+                    final minHeight = 510.0;
+                    final availableHeight = tableConstraints.maxHeight;
+                    // Use available height if it's more than minimum, otherwise use minimum
+                    final tableHeight = availableHeight > minHeight ? availableHeight : minHeight;
+                    
+                    return SizedBox(
+                      height: tableHeight,
+                      child: DataTableWidget<Map<String, dynamic>>(
+                        key: ValueKey(
+                          'journal_ledger_${_selectedFiscalYearId}_${_selectedCurrencyId}_${_selectedDocumentType}_${_includeProforma}_${_fromDate?.toIso8601String()}_${_toDate?.toIso8601String()}',
                         ),
+                        config: _buildTableConfig(t),
+                        fromJson: (json) => Map<String, dynamic>.from(json),
+                        calendarController: widget.calendarController,
+                        onRefresh: _fetchSummary,
                       ),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'جمع بستانکار',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: cs.onSurface.withOpacity(0.7),
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              _formatNumber(_summary!['total_credit']),
-                              style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Card(
-                      color: _summary!['balance_valid'] == true 
-                          ? cs.primaryContainer 
-                          : cs.errorContainer,
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'وضعیت تراز',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: (_summary!['balance_valid'] == true 
-                                    ? cs.onPrimaryContainer 
-                                    : cs.onErrorContainer).withOpacity(0.7),
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              _summary!['balance_valid'] == true ? 'برقرار' : 'برقرار نیست',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: _summary!['balance_valid'] == true 
-                                    ? cs.onPrimaryContainer 
-                                    : cs.onErrorContainer,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
+                    );
+                  },
+                ),
               ),
-            ),
-          
-          // Data Table
-          Expanded(
-            child: DataTableWidget<Map<String, dynamic>>(
-              key: ValueKey(
-                'journal_ledger_${_selectedFiscalYearId}_${_selectedCurrencyId}_${_selectedDocumentType}_${_includeProforma}_${_fromDate?.toIso8601String()}_${_toDate?.toIso8601String()}',
-              ),
-              config: _buildTableConfig(t),
-              fromJson: (json) => Map<String, dynamic>.from(json),
-              calendarController: widget.calendarController,
-              onRefresh: _fetchSummary,
-            ),
-          ),
-        ],
+            ],
+          );
+        },
       ),
     );
   }

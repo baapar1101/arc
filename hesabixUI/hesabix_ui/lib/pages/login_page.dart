@@ -15,6 +15,7 @@ import '../theme/theme_controller.dart';
 import '../utils/number_normalizer.dart';
 import '../widgets/auth_footer.dart';
 import '../../utils/snackbar_helper.dart';
+import '../utils/responsive_helper.dart';
 
 class LoginPage extends StatefulWidget {
   final LocaleController localeController;
@@ -496,12 +497,12 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                 child: Center(
                   child: ConstrainedBox(
                     constraints: BoxConstraints(
-                      maxWidth: 520,
+                      maxWidth: ResponsiveHelper.getCardMaxWidth(context),
                       minHeight: constraints.maxHeight - 32, // to keep card vertically centered when possible
                     ),
                     child: Card(
                       elevation: 2,
-                      margin: const EdgeInsets.all(16),
+                      margin: EdgeInsets.all(ResponsiveHelper.isMobile(context) ? 8 : 16),
                       child: Padding(
                         padding: const EdgeInsets.all(24.0),
                         child: Column(

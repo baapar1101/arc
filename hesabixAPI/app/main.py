@@ -402,6 +402,8 @@ def create_app() -> FastAPI:
     application.include_router(categories_router, prefix=settings.api_v1_prefix)
     application.include_router(product_attributes_router, prefix=settings.api_v1_prefix)
     application.include_router(products_router, prefix=settings.api_v1_prefix)
+    from adapters.api.v1.product_instances import router as product_instances_router
+    application.include_router(product_instances_router, prefix=settings.api_v1_prefix)
     from adapters.api.v1.warehouse_docs import router as warehouse_docs_router
     application.include_router(warehouse_docs_router, prefix=settings.api_v1_prefix)
     from adapters.api.v1.warehouses import router as warehouses_router

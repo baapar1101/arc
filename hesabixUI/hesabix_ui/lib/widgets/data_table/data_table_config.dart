@@ -15,6 +15,7 @@ enum ColumnFilterType {
   text,           // Text filter (default)
   dateRange,      // Date range filter
   multiSelect,    // Multi-select filter with checkboxes
+  categoryTree,   // Category tree filter with hierarchical selection
 }
 
 /// Filter option for multi-select filters

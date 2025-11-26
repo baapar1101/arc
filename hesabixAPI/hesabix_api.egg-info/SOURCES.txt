@@ -125,6 +125,7 @@ adapters/db/models/document_line.py
 adapters/db/models/document_monetization.py
 adapters/db/models/document_numbering.py
 adapters/db/models/email_config.py
+adapters/db/models/email_verification.py
 adapters/db/models/file_storage.py
 adapters/db/models/fiscal_year.py
 adapters/db/models/invoice_item_line.py
@@ -176,6 +177,7 @@ adapters/db/repositories/cash_register_repository.py
 adapters/db/repositories/category_repository.py
 adapters/db/repositories/document_repository.py
 adapters/db/repositories/email_config_repository.py
+adapters/db/repositories/email_verification_repo.py
 adapters/db/repositories/file_storage_repository.py
 adapters/db/repositories/fiscal_year_repo.py
 adapters/db/repositories/notification_repo.py
@@ -210,6 +212,7 @@ app/core/responses.py
 app/core/security.py
 app/core/settings.py
 app/core/smart_normalizer.py
+app/integrations/moadian/__init__.py
 app/integrations/moadian/client.py
 app/services/account_review_service.py
 app/services/account_service.py
@@ -234,6 +237,7 @@ app/services/document_monetization_service.py
 app/services/document_numbering_service.py
 app/services/document_service.py
 app/services/email_service.py
+app/services/email_verification_service.py
 app/services/expense_income_service.py
 app/services/file_dependency_service.py
 app/services/file_storage_service.py
@@ -267,6 +271,7 @@ app/services/storage_plan_service.py
 app/services/storage_subscription_service.py
 app/services/system_settings_service.py
 app/services/tax_data_quality_service.py
+app/services/tax_payload_builder.py
 app/services/tax_product_code_service.py
 app/services/tax_setting_service.py
 app/services/tax_submission_service.py
@@ -386,7 +391,10 @@ migrations/versions/20251120_000001_add_default_warehouse_to_products.py
 migrations/versions/20251120_053716_add_ai_tables.py
 migrations/versions/20251124_000001_seed_tax_types_list.py
 migrations/versions/20251124_150001_add_product_tax_codes.py
+migrations/versions/20251124_200000_fix_telegram_chat_id_bigint.py
+migrations/versions/20251124_200001_add_email_verification.py
 migrations/versions/27f209ffe151_merge_heads.py
+migrations/versions/3f8bc1df5f7c_merge_all_heads_final.py
 migrations/versions/4436dcacd94f_merge_heads_final.py
 migrations/versions/4b2ea782bcb3_merge_heads.py
 migrations/versions/5553f8745c6e_add_support_tables.py

@@ -32,6 +32,10 @@ class ProductCreateRequest(BaseModel):
     min_order_qty: Optional[int] = None
     lead_time_days: Optional[int] = None
 
+    inventory_mode: Optional[str] = Field(default=None, description="حالت موجودی: bulk (فله‌ای) یا unique (یونیک)")
+    track_serial: bool = Field(default=False, description="ردیابی سریال نامبر برای کالاهای یونیک")
+    track_barcode: bool = Field(default=False, description="ردیابی بارکد برای کالاهای یونیک")
+
     is_sales_taxable: bool = Field(default=False)
     is_purchase_taxable: bool = Field(default=False)
     sales_tax_rate: Optional[Decimal] = None
@@ -67,6 +71,10 @@ class ProductUpdateRequest(BaseModel):
     reorder_point: Optional[int] = None
     min_order_qty: Optional[int] = None
     lead_time_days: Optional[int] = None
+
+    inventory_mode: Optional[str] = Field(default=None, description="حالت موجودی: bulk (فله‌ای) یا unique (یونیک)")
+    track_serial: Optional[bool] = Field(default=None, description="ردیابی سریال نامبر برای کالاهای یونیک")
+    track_barcode: Optional[bool] = Field(default=None, description="ردیابی بارکد برای کالاهای یونیک")
 
     is_sales_taxable: Optional[bool] = None
     is_purchase_taxable: Optional[bool] = None

@@ -9,6 +9,7 @@ import '../../core/calendar_controller.dart';
 import '../../widgets/date_input_field.dart';
 import '../../core/date_utils.dart';
 import '../../utils/number_normalizer.dart';
+import '../../utils/responsive_helper.dart';
 
 class NewBusinessPage extends StatefulWidget {
   final CalendarController calendarController;
@@ -251,7 +252,7 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
   }
 
   bool _isMobile(BuildContext context) {
-    return MediaQuery.of(context).size.width < 768;
+    return ResponsiveHelper.isMobile(context);
   }
 
   String _getCurrentStepTitle(AppLocalizations t) {

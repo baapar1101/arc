@@ -65,15 +65,34 @@ class _WarehouseComboboxWidgetState extends State<WarehouseComboboxWidget> {
     final theme = Theme.of(context);
     if (_loading) {
       return SizedBox(
-        height: 56,
+        height: 36,
         child: Center(
           child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: theme.colorScheme.primary)),
         ),
       );
     }
+    // ساخت لیست آیتم‌ها
+    final List<DropdownMenuItem<int?>> menuItems = [
+      if (!widget.isRequired)
+        const DropdownMenuItem<int?>(
+          value: null,
+          child: Text('بدون انبار', maxLines: 1, overflow: TextOverflow.ellipsis),
+        ),
+      ..._items.map((w) {
+        final title = (w.code.isNotEmpty) ? '${w.code} - ${w.name}' : w.name;
+        return DropdownMenuItem<int?>(
+          value: w.id!,
+          child: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
+        );
+      }),
+    ];
+
     return DropdownButtonFormField<int?>(
       value: _selectedValue,
+      isExpanded: true,
       decoration: InputDecoration(
+        isDense: true,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
         labelText: widget.label,
         hintText: widget.hintText,
         border: const OutlineInputBorder(),
@@ -91,22 +110,39 @@ class _WarehouseComboboxWidgetState extends State<WarehouseComboboxWidget> {
               )
             : null,
       ),
-      items: [
-        // گزینه خالی برای پاک کردن
-        if (!widget.isRequired)
-          const DropdownMenuItem<int?>(
-            value: null,
-            child: Text('بدون انبار'),
-          ),
-        // لیست انبارها
-        ..._items.map((w) {
-          final title = (w.code.isNotEmpty) ? '${w.code} - ${w.name}' : w.name;
-          return DropdownMenuItem<int?>(
-            value: w.id!,
-            child: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
+      selectedItemBuilder: (BuildContext context) {
+        // برگرداندن لیست ویجت‌ها با همان ترتیب items برای نمایش متن انتخاب شده
+        final List<Widget> result = [];
+        if (!widget.isRequired) {
+          result.add(
+            Align(
+              alignment: AlignmentDirectional.centerEnd,
+              child: Text(
+                'بدون انبار',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.right,
+              ),
+            ),
           );
-        }),
-      ],
+        }
+        for (final w in _items) {
+          final title = (w.code.isNotEmpty) ? '${w.code} - ${w.name}' : w.name;
+          result.add(
+            Align(
+              alignment: AlignmentDirectional.centerEnd,
+              child: Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.right,
+              ),
+            ),
+          );
+        }
+        return result;
+      },
+      items: menuItems,
       onChanged: (int? value) {
         setState(() {
           _selectedValue = value;

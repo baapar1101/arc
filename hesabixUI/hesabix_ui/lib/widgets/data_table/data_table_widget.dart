@@ -457,8 +457,16 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
   void _openColumnSearchDialog(String columnName, String columnLabel) {
     // Get column configuration
     final column = widget.config.getColumnByKey(columnName);
-    final filterType = column?.filterType;
+    var filterType = column?.filterType;
     final filterOptions = column?.filterOptions;
+
+    // اگر filterType از ستون برابر با categoryTree است، از فیلتر درختی استفاده کن
+    // همچنین اگر columnName برابر با category_name یا category_id است و businessId موجود است
+    if (filterType == ColumnFilterType.categoryTree ||
+        ((columnName == 'category_id' || columnName == 'category_name') && 
+         widget.config.businessId != null)) {
+      filterType = ColumnFilterType.categoryTree;
+    }
 
     // Initialize controller if not exists
     if (!_columnSearchControllers.containsKey(columnName)) {
@@ -503,11 +511,26 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
           _page = 1;
           _fetchData();
         },
+        onApplyCategoryTree: (categoryIds) {
+          setState(() {
+            // اگر columnName برابر با category_name است، از category_id برای فیلتر استفاده کن
+            final filterColumnName = columnName == 'category_name' ? 'category_id' : columnName;
+            _columnMultiSelectValues[filterColumnName] = categoryIds;
+          });
+          _page = 1;
+          _fetchData();
+        },
+        businessId: widget.config.businessId,
         onClear: () {
           setState(() {
             _columnSearchValues.remove(columnName);
             _columnSearchTypes.remove(columnName);
-            _columnMultiSelectValues.remove(columnName);
+            // اگر columnName برابر با category_name است، category_id را نیز پاک کن
+            if (columnName == 'category_name') {
+              _columnMultiSelectValues.remove('category_id');
+            } else {
+              _columnMultiSelectValues.remove(columnName);
+            }
             _columnDateFromValues.remove(columnName);
             _columnDateToValues.remove(columnName);
             _columnSearchControllers[columnName]?.clear();
@@ -1096,7 +1119,12 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                   setState(() {
                     _columnSearchValues.remove(columnName);
                     _columnSearchTypes.remove(columnName);
-                    _columnMultiSelectValues.remove(columnName);
+                    // اگر category_name پاک می‌شود، category_id را نیز پاک کن
+                    if (columnName == 'category_name') {
+                      _columnMultiSelectValues.remove('category_id');
+                    } else {
+                      _columnMultiSelectValues.remove(columnName);
+                    }
                     _columnDateFromValues.remove(columnName);
                     _columnDateToValues.remove(columnName);
                     _columnSearchControllers[columnName]?.clear();

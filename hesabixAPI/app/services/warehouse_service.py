@@ -69,10 +69,26 @@ def create_from_invoice(
 	lines: List[Dict[str, Any]],
 	wh_doc_type: str,
 	created_by_user_id: Optional[int] = None,
+	extra_data: Optional[Dict[str, Any]] = None,
 ) -> WarehouseDocument:
 	"""ساخت حواله انبار draft از روی فاکتور (بدون پست)."""
 	fy = _get_current_fiscal_year(db, business_id)
 	code = _build_wh_code("WH")
+	
+	# آماده‌سازی extra_info با فیلدهای ارسال
+	extra_data = extra_data or {}
+	delivery_fields = {
+		"description": extra_data.get("description"),
+		"delivery_method": extra_data.get("delivery_method"),
+		"carrier_name": extra_data.get("carrier_name"),
+		"recipient_name": extra_data.get("recipient_name"),
+		"recipient_phone": extra_data.get("recipient_phone"),
+		"tracking_number": extra_data.get("tracking_number"),
+	}
+	# حذف فیلدهای None
+	delivery_fields = {k: v for k, v in delivery_fields.items() if v is not None}
+	extra_info = delivery_fields if delivery_fields else None
+	
 	wh = WarehouseDocument(
 		business_id=business_id,
 		fiscal_year_id=fy.id,
@@ -83,6 +99,7 @@ def create_from_invoice(
 		source_type="invoice",
 		source_document_id=invoice.id,
 		created_by_user_id=created_by_user_id,
+		extra_info=extra_info,
 	)
 	db.add(wh)
 	db.flush()
@@ -174,6 +191,26 @@ def create_manual_warehouse_document(
 	if document_date < fy.start_date or (fy.end_date and document_date > fy.end_date):
 		raise ApiError("DATE_OUT_OF_RANGE", f"تاریخ باید در بازه سال مالی ({fy.start_date} تا {fy.end_date or 'نامحدود'}) باشد", http_status=400)
 	
+	# آماده‌سازی extra_info با فیلدهای ارسال
+	existing_extra_info = data.get("extra_info") or {}
+	if not isinstance(existing_extra_info, dict):
+		existing_extra_info = {}
+	
+	# استخراج فیلدهای ارسال از payload
+	delivery_fields = {
+		"description": data.get("description"),
+		"delivery_method": data.get("delivery_method"),
+		"carrier_name": data.get("carrier_name"),
+		"recipient_name": data.get("recipient_name"),
+		"recipient_phone": data.get("recipient_phone"),
+		"tracking_number": data.get("tracking_number"),
+	}
+	# حذف فیلدهای None
+	delivery_fields = {k: v for k, v in delivery_fields.items() if v is not None}
+	
+	# ادغام با extra_info موجود
+	extra_info = {**existing_extra_info, **delivery_fields}
+	
 	# ایجاد حواله
 	code = _build_wh_code("WH")
 	wh = WarehouseDocument(
@@ -188,7 +225,7 @@ def create_manual_warehouse_document(
 		source_type="manual",
 		source_document_id=None,
 		created_by_user_id=user_id,
-		extra_info=data.get("extra_info"),
+		extra_info=extra_info if extra_info else None,
 	)
 	db.add(wh)
 	db.flush()
@@ -208,6 +245,100 @@ def create_manual_warehouse_document(
 		if not product:
 			raise ApiError("PRODUCT_NOT_FOUND", f"خط {i}: محصول یافت نشد", http_status=404)
 		
+		# بررسی و ایجاد instance های کالای یونیک (فقط برای حواله ورود)
+		instance_data = ln.get("instance_data")
+		instance_ids = []
+		
+		if instance_data and isinstance(instance_data, list) and len(instance_data) > 0:
+			# بررسی اینکه کالا یونیک است
+			if product.inventory_mode != "unique":
+				raise ApiError("NOT_UNIQUE_PRODUCT", f"خط {i}: این کالا در حالت یونیک نیست", http_status=400)
+			
+			# برای حواله ورود، instance ها را ایجاد می‌کنیم
+			if doc_type in ("receipt", "production_in"):
+				from adapters.db.models.product_instance import ProductInstance
+				from datetime import date as date_type
+				
+				for inst_idx, inst_data in enumerate(instance_data, start=1):
+					if not isinstance(inst_data, dict):
+						raise ApiError("INVALID_INSTANCE_DATA", f"خط {i}، واحد {inst_idx}: اطلاعات instance معتبر نیست", http_status=400)
+					
+					serial_number = inst_data.get("serial_number")
+					barcode = inst_data.get("barcode")
+					custom_attributes = inst_data.get("custom_attributes")
+					
+					if not serial_number and product.track_serial:
+						raise ApiError("SERIAL_REQUIRED", f"خط {i}، واحد {inst_idx}: شماره سریال الزامی است", http_status=400)
+					
+					# بررسی یکتایی سریال نامبر
+					if serial_number:
+						existing = db.query(ProductInstance).filter(
+							and_(
+								ProductInstance.business_id == business_id,
+								ProductInstance.serial_number == serial_number,
+							)
+						).first()
+						if existing:
+							raise ApiError("DUPLICATE_SERIAL", f"خط {i}، واحد {inst_idx}: شماره سریال {serial_number} تکراری است", http_status=409)
+					
+					# بررسی یکتایی بارکد
+					if barcode:
+						existing_barcode = db.query(ProductInstance).filter(
+							and_(
+								ProductInstance.business_id == business_id,
+								ProductInstance.barcode == barcode,
+							)
+						).first()
+						if existing_barcode:
+							raise ApiError("DUPLICATE_BARCODE", f"خط {i}، واحد {inst_idx}: بارکد {barcode} تکراری است", http_status=409)
+					
+					# تعیین انبار
+					instance_warehouse_id = line_wh if doc_type in ("receipt", "production_in") else None
+					
+					# ایجاد instance
+					instance = ProductInstance(
+						business_id=business_id,
+						product_id=int(pid),
+						serial_number=serial_number or f"SN-{wh.id}-{i}-{inst_idx}",  # اگر track_serial false باشد
+						barcode=barcode,
+						warehouse_id=int(instance_warehouse_id) if instance_warehouse_id else None,
+						status="available",
+						custom_attributes=custom_attributes if custom_attributes else None,
+						entry_date=document_date,
+					)
+					db.add(instance)
+					db.flush()  # برای دریافت ID
+					instance_ids.append(instance.id)
+		
+		# برای حواله خروج، instance_ids را پردازش می‌کنیم
+		instance_ids_from_line = ln.get("instance_ids")
+		if instance_ids_from_line and isinstance(instance_ids_from_line, list) and len(instance_ids_from_line) > 0:
+			from adapters.db.models.product_instance import ProductInstance
+			
+			# بررسی اینکه کالا یونیک است
+			if product.inventory_mode != "unique":
+				raise ApiError("NOT_UNIQUE_PRODUCT", f"خط {i}: این کالا در حالت یونیک نیست", http_status=400)
+			
+			# برای حواله خروج، instance ها را به‌روزرسانی می‌کنیم
+			if doc_type in ("issue", "production_out"):
+				for inst_id in instance_ids_from_line:
+					instance = db.query(ProductInstance).filter(
+						and_(
+							ProductInstance.id == int(inst_id),
+							ProductInstance.business_id == business_id,
+							ProductInstance.product_id == int(pid),
+							ProductInstance.status == "available",
+						)
+					).first()
+					
+					if not instance:
+						raise ApiError("INSTANCE_NOT_FOUND", f"خط {i}: کالای یونیک با ID {inst_id} یافت نشد یا در دسترس نیست", http_status=404)
+					
+					# به‌روزرسانی instance
+					instance.warehouse_id = None  # از انبار خارج می‌شود
+					instance.status = "sold"  # یا می‌توانیم status دیگری استفاده کنیم
+					instance.last_movement_date = document_date
+		
 		# تعیین movement و warehouse_id بر اساس نوع حواله
 		if doc_type == "transfer":
 			# برای انتقال: یک خط out از مبدا و یک خط in به مقصد
@@ -217,6 +348,11 @@ def create_manual_warehouse_document(
 			if not line_wh_from or not line_wh_to:
 				raise ApiError("WAREHOUSES_REQUIRED", f"خط {i}: برای انتقال، انبار مبدا و مقصد باید مشخص باشد", http_status=400)
 			
+			# اضافه کردن instance_ids به extra_info برای transfer
+			extra_info_transfer = ln.get("extra_info") or {}
+			if instance_ids:
+				extra_info_transfer["instance_ids"] = instance_ids
+			
 			# ایجاد خط خروج از مبدا
 			wline_out = WarehouseDocumentLine(
 				warehouse_document_id=wh.id,
@@ -224,7 +360,8 @@ def create_manual_warehouse_document(
 				warehouse_id=int(line_wh_from),
 				movement="out",
 				quantity=qty,
-				extra_info=ln.get("extra_info") or {},
+				extra_info=extra_info_transfer,
+				instance_ids=instance_ids if instance_ids else None,
 			)
 			db.add(wline_out)
 			
@@ -235,7 +372,8 @@ def create_manual_warehouse_document(
 				warehouse_id=int(line_wh_to),
 				movement="in",
 				quantity=qty,
-				extra_info=ln.get("extra_info") or {},
+				extra_info=extra_info_transfer,
+				instance_ids=instance_ids if instance_ids else None,
 			)
 			db.add(wline_in)
 		else:
@@ -264,13 +402,24 @@ def create_manual_warehouse_document(
 			if not wh_check:
 				raise ApiError("WAREHOUSE_NOT_FOUND", f"خط {i}: انبار یافت نشد", http_status=404)
 			
+			# اضافه کردن instance_ids به extra_info
+			extra_info = ln.get("extra_info") or {}
+			if instance_ids:
+				extra_info["instance_ids"] = instance_ids
+			if instance_ids_from_line:
+				extra_info["instance_ids"] = instance_ids_from_line
+			
+			# instance_ids برای خط (از instance_ids یا instance_ids_from_line)
+			line_instance_ids = instance_ids_from_line if instance_ids_from_line else (instance_ids if instance_ids else None)
+			
 			wline = WarehouseDocumentLine(
 				warehouse_document_id=wh.id,
 				product_id=int(pid),
 				warehouse_id=int(line_wh),
 				movement=movement,
 				quantity=qty,
-				extra_info=ln.get("extra_info") or {},
+				extra_info=extra_info,
+				instance_ids=line_instance_ids,
 			)
 			db.add(wline)
 	
@@ -322,8 +471,34 @@ def update_warehouse_document(
 			if not wh_check:
 				raise ApiError("WAREHOUSE_NOT_FOUND", "انبار مقصد یافت نشد", http_status=404)
 	
-	if "extra_info" in data:
-		wh.extra_info = data["extra_info"]
+	# به‌روزرسانی extra_info با فیلدهای ارسال
+	if "extra_info" in data or any(key in data for key in ["description", "delivery_method", "carrier_name", "recipient_name", "recipient_phone", "tracking_number"]):
+		existing_extra_info = wh.extra_info or {}
+		if not isinstance(existing_extra_info, dict):
+			existing_extra_info = {}
+		
+		# اگر extra_info کامل ارسال شده، از آن استفاده کن
+		if "extra_info" in data and isinstance(data["extra_info"], dict):
+			existing_extra_info = data["extra_info"]
+		else:
+			# در غیر این صورت، فیلدهای ارسال را به extra_info اضافه کن
+			delivery_fields = {
+				"description": data.get("description"),
+				"delivery_method": data.get("delivery_method"),
+				"carrier_name": data.get("carrier_name"),
+				"recipient_name": data.get("recipient_name"),
+				"recipient_phone": data.get("recipient_phone"),
+				"tracking_number": data.get("tracking_number"),
+			}
+			# فقط فیلدهایی که ارسال شده‌اند را به‌روزرسانی کن
+			for key, value in delivery_fields.items():
+				if key in data:
+					if value is None:
+						existing_extra_info.pop(key, None)
+					else:
+						existing_extra_info[key] = value
+		
+		wh.extra_info = existing_extra_info if existing_extra_info else None
 	
 	wh.touch()
 	db.flush()
@@ -634,6 +809,17 @@ def warehouse_document_to_dict(db: Session, wh: WarehouseDocument) -> Dict[str, 
 		total_quantity += qty
 	if total_quantity < 0:
 		total_quantity = Decimal(0)
+	# استخراج فیلدهای ارسال از extra_info
+	extra_info = wh.extra_info or {}
+	delivery_info = {
+		"description": extra_info.get("description") if isinstance(extra_info, dict) else None,
+		"delivery_method": extra_info.get("delivery_method") if isinstance(extra_info, dict) else None,
+		"carrier_name": extra_info.get("carrier_name") if isinstance(extra_info, dict) else None,
+		"recipient_name": extra_info.get("recipient_name") if isinstance(extra_info, dict) else None,
+		"recipient_phone": extra_info.get("recipient_phone") if isinstance(extra_info, dict) else None,
+		"tracking_number": extra_info.get("tracking_number") if isinstance(extra_info, dict) else None,
+	}
+	
 	return {
 		"id": wh.id,
 		"code": wh.code,
@@ -647,6 +833,12 @@ def warehouse_document_to_dict(db: Session, wh: WarehouseDocument) -> Dict[str, 
 		"source_type": wh.source_type,
 		"source_document_id": wh.source_document_id,
 		"extra_info": wh.extra_info,
+		"description": delivery_info["description"],
+		"delivery_method": delivery_info["delivery_method"],
+		"carrier_name": delivery_info["carrier_name"],
+		"recipient_name": delivery_info["recipient_name"],
+		"recipient_phone": delivery_info["recipient_phone"],
+		"tracking_number": delivery_info["tracking_number"],
 		"total_quantity": float(total_quantity),
 		"lines": [
 			{

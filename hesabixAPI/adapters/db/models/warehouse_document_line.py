@@ -16,6 +16,8 @@ class WarehouseDocumentLine(Base):
 	movement = Column(String(8), nullable=False)  # in|out
 	quantity = Column(Numeric(18, 6), nullable=False)
 	extra_info = Column(JSON, nullable=True)
+	# برای کالاهای یونیک: لیست ID کالاهای یونیک
+	instance_ids = Column(JSON, nullable=True, comment="لیست ID کالاهای یونیک (برای inventory_mode=unique)")
 
 	document = relationship("WarehouseDocument", back_populates="lines")
 

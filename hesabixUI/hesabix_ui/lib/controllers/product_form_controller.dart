@@ -27,6 +27,7 @@ class ProductFormController extends ChangeNotifier {
   String? _errorMessage;
   int? _editingProductId;
   int? _lastCreatedProductId;
+  String? _originalInventoryMode; // برای تشخیص تغییر از bulk به unique
   
   // Reference data
   List<Map<String, dynamic>> _categories = [];
@@ -114,6 +115,8 @@ class ProductFormController extends ChangeNotifier {
       if (product != null) {
         _editingProductId = product['id'] as int?;
         _formData = ProductFormData.fromProduct(product);
+        // ذخیره inventory_mode اولیه برای تشخیص تغییر
+        _originalInventoryMode = _formData.inventoryMode ?? 'bulk';
         if (_editingProductId != null) {
           await _loadExistingPriceItems(productId: _editingProductId!);
         }
@@ -123,6 +126,7 @@ class ProductFormController extends ChangeNotifier {
           basePurchasePrice: 0,
           unitConversionFactor: 1,
         );
+        _originalInventoryMode = 'bulk';
       }
       // دیگر واحد اصلی را به‌صورت خودکار مقداردهی نکن؛
       // کاربر می‌تواند عنوان واحد را در فرم وارد کند و در صورت تطبیق با لیست، آیدی ست می‌شود
@@ -297,6 +301,38 @@ class ProductFormController extends ChangeNotifier {
 
     _setLoading(true);
     try {
+      // بررسی تغییر از bulk به unique
+      final oldMode = _originalInventoryMode ?? 'bulk';
+      final newMode = _formData.inventoryMode ?? 'bulk';
+      final convertingToUnique = (oldMode != 'unique' && newMode == 'unique');
+      
+      if (convertingToUnique && _formData.trackInventory) {
+        // بررسی موجودی فعلی
+        try {
+          final stockReport = await _warehouseService.getWarehouseStockReport(
+            businessId: businessId,
+            productIds: [productId],
+          );
+          final items = stockReport['items'] as List<dynamic>? ?? [];
+          final totalStock = items.fold<int>(0, (sum, item) {
+            final qty = (item as Map<String, dynamic>)['quantity'] as num? ?? 0;
+            return sum + qty.toInt();
+          });
+          
+          if (totalStock > 0) {
+            // موجودی دارد - باید از endpoint تبدیل استفاده شود
+            // این خطا را throw می‌کنیم تا در UI نمایش داده شود
+            throw Exception('CONVERSION_REQUIRES_INSTANCES:$totalStock');
+          }
+        } catch (e) {
+          if (e.toString().contains('CONVERSION_REQUIRES_INSTANCES')) {
+            // این خطا را propagate می‌کنیم
+            rethrow;
+          }
+          // خطاهای دیگر را ignore می‌کنیم و ادامه می‌دهیم
+        }
+      }
+      
       final payload = _formData.toPayload();
       // Pre-check duplicate code before sending
       final trimmedCode = _formData.code?.trim();
@@ -324,6 +360,9 @@ class ProductFormController extends ChangeNotifier {
       _selectedImageBytes = null;
       _selectedImageFilename = null;
       
+      // به‌روزرسانی originalInventoryMode
+      _originalInventoryMode = _formData.inventoryMode ?? 'bulk';
+      
       _clearError();
       return true;
     } catch (e) {
@@ -331,6 +370,65 @@ class ProductFormController extends ChangeNotifier {
       return false;
     } finally {
       _setLoading(false);
+    }
+  }
+  
+  // تبدیل کالا از bulk به unique
+  Future<bool> convertProductToUnique(int productId) async {
+    _setLoading(true);
+    try {
+      final result = await _warehouseService.convertProductToUnique(
+        businessId: businessId,
+        productId: productId,
+        autoGenerateSerial: true,
+        serialPrefix: _formData.code,
+        createForExistingStock: true,
+        trackSerial: _formData.trackSerial,
+        trackBarcode: _formData.trackBarcode,
+      );
+      
+      // به‌روزرسانی formData با مقادیر جدید
+      _formData = _formData.copyWith(
+        inventoryMode: 'unique',
+        trackSerial: result['track_serial'] ?? _formData.trackSerial,
+        trackBarcode: result['track_barcode'] ?? _formData.trackBarcode,
+      );
+      _originalInventoryMode = 'unique';
+      
+      _clearError();
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _setError(_extractErrorMessage(e));
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+  
+  // بررسی اینکه آیا تبدیل نیاز است یا نه
+  bool get needsConversion {
+    if (_editingProductId == null) return false;
+    final oldMode = _originalInventoryMode ?? 'bulk';
+    final newMode = _formData.inventoryMode ?? 'bulk';
+    return (oldMode != 'unique' && newMode == 'unique' && _formData.trackInventory);
+  }
+  
+  // دریافت موجودی فعلی (برای نمایش در UI)
+  Future<int?> getCurrentStock(int productId) async {
+    try {
+      final stockReport = await _warehouseService.getWarehouseStockReport(
+        businessId: businessId,
+        productIds: [productId],
+      );
+      final items = stockReport['items'] as List<dynamic>? ?? [];
+      final totalStock = items.fold<int>(0, (sum, item) {
+        final qty = (item as Map<String, dynamic>)['quantity'] as num? ?? 0;
+        return sum + qty.toInt();
+      });
+      return totalStock;
+    } catch (_) {
+      return null;
     }
   }
   

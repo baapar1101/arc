@@ -13,6 +13,13 @@ class WarehouseDocument {
   final DateTime? createdAt;
   final DateTime? updatedAt;
   final double? totalQuantity;
+  // فیلدهای ارسال
+  final String? description;
+  final String? deliveryMethod;
+  final String? carrierName;
+  final String? recipientName;
+  final String? recipientPhone;
+  final String? trackingNumber;
 
   const WarehouseDocument({
     this.id,
@@ -29,9 +36,22 @@ class WarehouseDocument {
     this.createdAt,
     this.updatedAt,
     this.totalQuantity,
+    this.description,
+    this.deliveryMethod,
+    this.carrierName,
+    this.recipientName,
+    this.recipientPhone,
+    this.trackingNumber,
   });
 
   factory WarehouseDocument.fromJson(Map<String, dynamic> json) {
+    // استخراج فیلدهای ارسال از extra_info در صورت عدم وجود مستقیم
+    final extraInfo = json['extra_info'] as Map<String, dynamic>?;
+    String? getField(String key) {
+      return json[key] as String? ?? 
+             (extraInfo != null ? extraInfo[key] as String? : null);
+    }
+    
     return WarehouseDocument(
       id: json['id'] as int?,
       businessId: (json['business_id'] ?? json['businessId']) as int,
@@ -55,6 +75,12 @@ class WarehouseDocument {
       totalQuantity: json['total_quantity'] != null
           ? (json['total_quantity'] as num).toDouble()
           : null,
+      description: getField('description'),
+      deliveryMethod: getField('delivery_method'),
+      carrierName: getField('carrier_name'),
+      recipientName: getField('recipient_name'),
+      recipientPhone: getField('recipient_phone'),
+      trackingNumber: getField('tracking_number'),
     );
   }
 
@@ -74,6 +100,12 @@ class WarehouseDocument {
       'created_at': createdAt?.toIso8601String(),
       'updated_at': updatedAt?.toIso8601String(),
       'total_quantity': totalQuantity,
+      'description': description,
+      'delivery_method': deliveryMethod,
+      'carrier_name': carrierName,
+      'recipient_name': recipientName,
+      'recipient_phone': recipientPhone,
+      'tracking_number': trackingNumber,
     };
   }
 }

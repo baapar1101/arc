@@ -9,6 +9,7 @@ import 'package:hesabix_ui/models/business_models.dart';
 import 'package:hesabix_ui/services/business_api_service.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import '../../utils/snackbar_helper.dart';
+import '../../utils/responsive_helper.dart';
 
 class BusinessInfoSettingsPage extends StatefulWidget {
   final int businessId;
@@ -357,12 +358,27 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
               const SizedBox(height: 8),
               _buildTextField(controller: _nameController, label: t.businessName, required: true),
               const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(child: _buildBusinessTypeDropdown(t)),
-                  const SizedBox(width: 12),
-                  Expanded(child: _buildBusinessFieldDropdown(t)),
-                ],
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final isMobile = ResponsiveHelper.isMobile(context);
+                  if (isMobile) {
+                    return Column(
+                      children: [
+                        _buildBusinessTypeDropdown(t),
+                        const SizedBox(height: 12),
+                        _buildBusinessFieldDropdown(t),
+                      ],
+                    );
+                  } else {
+                    return Row(
+                      children: [
+                        Expanded(child: _buildBusinessTypeDropdown(t)),
+                        const SizedBox(width: 12),
+                        Expanded(child: _buildBusinessFieldDropdown(t)),
+                      ],
+                    );
+                  }
+                },
               ),
 
               const SizedBox(height: 24),
@@ -370,12 +386,27 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
               const SizedBox(height: 8),
               _buildTextField(controller: _addressController, label: t.address, maxLines: 2),
               const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(child: _buildTextField(controller: _phoneController, label: t.phone)),
-                  const SizedBox(width: 12),
-                  Expanded(child: _buildTextField(controller: _mobileController, label: t.mobile)),
-                ],
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final isMobile = ResponsiveHelper.isMobile(context);
+                  if (isMobile) {
+                    return Column(
+                      children: [
+                        _buildTextField(controller: _phoneController, label: t.phone),
+                        const SizedBox(height: 12),
+                        _buildTextField(controller: _mobileController, label: t.mobile),
+                      ],
+                    );
+                  } else {
+                    return Row(
+                      children: [
+                        Expanded(child: _buildTextField(controller: _phoneController, label: t.phone)),
+                        const SizedBox(width: 12),
+                        Expanded(child: _buildTextField(controller: _mobileController, label: t.mobile)),
+                      ],
+                    );
+                  }
+                },
               ),
               const SizedBox(height: 12),
               _buildTextField(controller: _postalCodeController, label: t.postalCode),
@@ -383,12 +414,27 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
               const SizedBox(height: 24),
               _buildSectionTitle(t.businessLegalInfo, cs),
               const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(child: _buildTextField(controller: _nationalIdController, label: t.nationalId)),
-                  const SizedBox(width: 12),
-                  Expanded(child: _buildTextField(controller: _registrationNumberController, label: t.registrationNumber)),
-                ],
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final isMobile = ResponsiveHelper.isMobile(context);
+                  if (isMobile) {
+                    return Column(
+                      children: [
+                        _buildTextField(controller: _nationalIdController, label: t.nationalId),
+                        const SizedBox(height: 12),
+                        _buildTextField(controller: _registrationNumberController, label: t.registrationNumber),
+                      ],
+                    );
+                  } else {
+                    return Row(
+                      children: [
+                        Expanded(child: _buildTextField(controller: _nationalIdController, label: t.nationalId)),
+                        const SizedBox(width: 12),
+                        Expanded(child: _buildTextField(controller: _registrationNumberController, label: t.registrationNumber)),
+                      ],
+                    );
+                  }
+                },
               ),
               const SizedBox(height: 12),
               _buildTextField(controller: _economicIdController, label: t.economicId),
@@ -396,24 +442,54 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
               const SizedBox(height: 24),
               _buildSectionTitle('لوگو و مهر کسب‌وکار', cs),
               const SizedBox(height: 8),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(child: _buildLogoCard(cs)),
-                  const SizedBox(width: 12),
-                  Expanded(child: _buildStampCard(cs)),
-                ],
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final isMobile = ResponsiveHelper.isMobile(context);
+                  if (isMobile) {
+                    return Column(
+                      children: [
+                        _buildLogoCard(cs),
+                        const SizedBox(height: 12),
+                        _buildStampCard(cs),
+                      ],
+                    );
+                  } else {
+                    return Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(child: _buildLogoCard(cs)),
+                        const SizedBox(width: 12),
+                        Expanded(child: _buildStampCard(cs)),
+                      ],
+                    );
+                  }
+                },
               ),
 
               const SizedBox(height: 24),
               _buildSectionTitle(t.businessGeographicInfo, cs),
               const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(child: _buildTextField(controller: _countryController, label: t.country)),
-                  const SizedBox(width: 12),
-                  Expanded(child: _buildTextField(controller: _provinceController, label: t.province)),
-                ],
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final isMobile = ResponsiveHelper.isMobile(context);
+                  if (isMobile) {
+                    return Column(
+                      children: [
+                        _buildTextField(controller: _countryController, label: t.country),
+                        const SizedBox(height: 12),
+                        _buildTextField(controller: _provinceController, label: t.province),
+                      ],
+                    );
+                  } else {
+                    return Row(
+                      children: [
+                        Expanded(child: _buildTextField(controller: _countryController, label: t.country)),
+                        const SizedBox(width: 12),
+                        Expanded(child: _buildTextField(controller: _provinceController, label: t.province)),
+                      ],
+                    );
+                  }
+                },
               ),
               const SizedBox(height: 12),
               _buildTextField(controller: _cityController, label: t.city),

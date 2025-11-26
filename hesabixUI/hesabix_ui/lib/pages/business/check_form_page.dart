@@ -12,6 +12,7 @@ import '../../models/person_model.dart';
 import '../../utils/number_normalizer.dart';
 import '../../utils/number_formatters.dart';
 import '../../utils/snackbar_helper.dart';
+import '../../utils/responsive_helper.dart';
 
 class CheckFormDialog extends StatefulWidget {
   final int businessId;
@@ -279,6 +280,7 @@ class _CheckFormDialogState extends State<CheckFormDialog> {
       );
     }
 
+    final isMobile = ResponsiveHelper.isMobile(context);
     return AlertDialog(
       title: Row(
         children: [
@@ -291,7 +293,7 @@ class _CheckFormDialogState extends State<CheckFormDialog> {
         ],
       ),
       content: SizedBox(
-        width: 600,
+        width: isMobile ? double.infinity : 600,
         child: IgnorePointer(
           ignoring: _loading,
           child: AbsorbPointer(
@@ -335,143 +337,289 @@ class _CheckFormDialogState extends State<CheckFormDialog> {
                   const SizedBox(height: 12),
 
                   // تاریخ‌ها
-                  Row(
-                    children: [
-                      Expanded(
-                        child: widget.calendarController != null
-                            ? DateInputField(
-                                value: _issueDate,
-                                labelText: 'تاریخ صدور *',
-                                hintText: 'انتخاب تاریخ صدور',
-                                calendarController: widget.calendarController!,
-                                onChanged: (d) => setState(() => _issueDate = d),
-                              )
-                            : const SizedBox.shrink(),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: widget.calendarController != null
-                            ? DateInputField(
-                                value: _dueDate,
-                                labelText: 'تاریخ سررسید *',
-                                hintText: 'انتخاب تاریخ سررسید',
-                                calendarController: widget.calendarController!,
-                                onChanged: (d) => setState(() => _dueDate = d),
-                              )
-                            : const SizedBox.shrink(),
-                      ),
-                    ],
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final isMobile = ResponsiveHelper.isMobile(context);
+                      if (isMobile) {
+                        return Column(
+                          children: [
+                            widget.calendarController != null
+                                ? DateInputField(
+                                    value: _issueDate,
+                                    labelText: 'تاریخ صدور *',
+                                    hintText: 'انتخاب تاریخ صدور',
+                                    calendarController: widget.calendarController!,
+                                    onChanged: (d) => setState(() => _issueDate = d),
+                                  )
+                                : const SizedBox.shrink(),
+                            const SizedBox(height: 12),
+                            widget.calendarController != null
+                                ? DateInputField(
+                                    value: _dueDate,
+                                    labelText: 'تاریخ سررسید *',
+                                    hintText: 'انتخاب تاریخ سررسید',
+                                    calendarController: widget.calendarController!,
+                                    onChanged: (d) => setState(() => _dueDate = d),
+                                  )
+                                : const SizedBox.shrink(),
+                          ],
+                        );
+                      } else {
+                        return Row(
+                          children: [
+                            Expanded(
+                              child: widget.calendarController != null
+                                  ? DateInputField(
+                                      value: _issueDate,
+                                      labelText: 'تاریخ صدور *',
+                                      hintText: 'انتخاب تاریخ صدور',
+                                      calendarController: widget.calendarController!,
+                                      onChanged: (d) => setState(() => _issueDate = d),
+                                    )
+                                  : const SizedBox.shrink(),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: widget.calendarController != null
+                                  ? DateInputField(
+                                      value: _dueDate,
+                                      labelText: 'تاریخ سررسید *',
+                                      hintText: 'انتخاب تاریخ سررسید',
+                                      calendarController: widget.calendarController!,
+                                      onChanged: (d) => setState(() => _dueDate = d),
+                                    )
+                                  : const SizedBox.shrink(),
+                            ),
+                          ],
+                        );
+                      }
+                    },
                   ),
                   const SizedBox(height: 12),
 
                   // شماره چک و شناسه صیاد
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextFormField(
-                          controller: _checkNumberCtrl,
-                          decoration: const InputDecoration(
-                            labelText: 'شماره چک *',
-                            border: OutlineInputBorder(),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: TextFormField(
-                          controller: _sayadCtrl,
-                          decoration: const InputDecoration(
-                            labelText: 'شناسه صیاد',
-                            border: OutlineInputBorder(),
-                          ),
-                        ),
-                      ),
-                    ],
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final isMobile = ResponsiveHelper.isMobile(context);
+                      if (isMobile) {
+                        return Column(
+                          children: [
+                            TextFormField(
+                              controller: _checkNumberCtrl,
+                              decoration: const InputDecoration(
+                                labelText: 'شماره چک *',
+                                border: OutlineInputBorder(),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            TextFormField(
+                              controller: _sayadCtrl,
+                              decoration: const InputDecoration(
+                                labelText: 'شناسه صیاد',
+                                border: OutlineInputBorder(),
+                              ),
+                            ),
+                          ],
+                        );
+                      } else {
+                        return Row(
+                          children: [
+                            Expanded(
+                              child: TextFormField(
+                                controller: _checkNumberCtrl,
+                                decoration: const InputDecoration(
+                                  labelText: 'شماره چک *',
+                                  border: OutlineInputBorder(),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: TextFormField(
+                                controller: _sayadCtrl,
+                                decoration: const InputDecoration(
+                                  labelText: 'شناسه صیاد',
+                                  border: OutlineInputBorder(),
+                                ),
+                              ),
+                            ),
+                          ],
+                        );
+                      }
+                    },
                   ),
                   const SizedBox(height: 12),
 
                   // بانک و شعبه
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextFormField(
-                          controller: _bankCtrl,
-                          decoration: const InputDecoration(
-                            labelText: 'بانک صادرکننده',
-                            border: OutlineInputBorder(),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: TextFormField(
-                          controller: _branchCtrl,
-                          decoration: const InputDecoration(
-                            labelText: 'شعبه',
-                            border: OutlineInputBorder(),
-                          ),
-                        ),
-                      ),
-                    ],
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final isMobile = ResponsiveHelper.isMobile(context);
+                      if (isMobile) {
+                        return Column(
+                          children: [
+                            TextFormField(
+                              controller: _bankCtrl,
+                              decoration: const InputDecoration(
+                                labelText: 'بانک صادرکننده',
+                                border: OutlineInputBorder(),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            TextFormField(
+                              controller: _branchCtrl,
+                              decoration: const InputDecoration(
+                                labelText: 'شعبه',
+                                border: OutlineInputBorder(),
+                              ),
+                            ),
+                          ],
+                        );
+                      } else {
+                        return Row(
+                          children: [
+                            Expanded(
+                              child: TextFormField(
+                                controller: _bankCtrl,
+                                decoration: const InputDecoration(
+                                  labelText: 'بانک صادرکننده',
+                                  border: OutlineInputBorder(),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: TextFormField(
+                                controller: _branchCtrl,
+                                decoration: const InputDecoration(
+                                  labelText: 'شعبه',
+                                  border: OutlineInputBorder(),
+                                ),
+                              ),
+                            ),
+                          ],
+                        );
+                      }
+                    },
                   ),
                   const SizedBox(height: 12),
 
                   // مبلغ و ارز
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextFormField(
-                          controller: _amountCtrl,
-                          keyboardType: TextInputType.number,
-                          inputFormatters: [
-                            EnglishDigitsFormatter(),
-                            FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final isMobile = ResponsiveHelper.isMobile(context);
+                      if (isMobile) {
+                        return Column(
+                          children: [
+                            TextFormField(
+                              controller: _amountCtrl,
+                              keyboardType: TextInputType.number,
+                              inputFormatters: [
+                                EnglishDigitsFormatter(),
+                                FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+                              ],
+                              decoration: const InputDecoration(
+                                labelText: 'مبلغ *',
+                                border: OutlineInputBorder(),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            CurrencyPickerWidget(
+                              businessId: widget.businessId,
+                              selectedCurrencyId: _currencyId,
+                              onChanged: (id) => setState(() => _currencyId = id),
+                              label: 'واحد پول',
+                              hintText: 'انتخاب واحد پول',
+                            ),
                           ],
-                          decoration: const InputDecoration(
-                            labelText: 'مبلغ *',
-                            border: OutlineInputBorder(),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: CurrencyPickerWidget(
-                          businessId: widget.businessId,
-                          selectedCurrencyId: _currencyId,
-                          onChanged: (id) => setState(() => _currencyId = id),
-                          label: 'واحد پول',
-                          hintText: 'انتخاب واحد پول',
-                        ),
-                      ),
-                    ],
+                        );
+                      } else {
+                        return Row(
+                          children: [
+                            Expanded(
+                              child: TextFormField(
+                                controller: _amountCtrl,
+                                keyboardType: TextInputType.number,
+                                inputFormatters: [
+                                  EnglishDigitsFormatter(),
+                                  FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+                                ],
+                                decoration: const InputDecoration(
+                                  labelText: 'مبلغ *',
+                                  border: OutlineInputBorder(),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: CurrencyPickerWidget(
+                                businessId: widget.businessId,
+                                selectedCurrencyId: _currencyId,
+                                onChanged: (id) => setState(() => _currencyId = id),
+                                label: 'واحد پول',
+                                hintText: 'انتخاب واحد پول',
+                              ),
+                            ),
+                          ],
+                        );
+                      }
+                    },
                   ),
 
                   const SizedBox(height: 16),
                   if (canAccountingWrite) ...[
-                    Row(
-                      children: [
-                        Expanded(
-                          child: widget.calendarController != null
-                              ? DateInputField(
-                                  value: _documentDate,
-                                  labelText: 'تاریخ سند',
-                                  hintText: 'انتخاب تاریخ سند',
-                                  calendarController: widget.calendarController!,
-                                  onChanged: (d) => setState(() => _documentDate = d),
-                                )
-                              : const SizedBox.shrink(),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: TextFormField(
-                            controller: _docDescCtrl,
-                            decoration: const InputDecoration(
-                              labelText: 'شرح سند',
-                              border: OutlineInputBorder(),
-                            ),
-                          ),
-                        ),
-                      ],
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        final isMobile = ResponsiveHelper.isMobile(context);
+                        if (isMobile) {
+                          return Column(
+                            children: [
+                              widget.calendarController != null
+                                  ? DateInputField(
+                                      value: _documentDate,
+                                      labelText: 'تاریخ سند',
+                                      hintText: 'انتخاب تاریخ سند',
+                                      calendarController: widget.calendarController!,
+                                      onChanged: (d) => setState(() => _documentDate = d),
+                                    )
+                                  : const SizedBox.shrink(),
+                              const SizedBox(height: 12),
+                              TextFormField(
+                                controller: _docDescCtrl,
+                                decoration: const InputDecoration(
+                                  labelText: 'شرح سند',
+                                  border: OutlineInputBorder(),
+                                ),
+                              ),
+                            ],
+                          );
+                        } else {
+                          return Row(
+                            children: [
+                              Expanded(
+                                child: widget.calendarController != null
+                                    ? DateInputField(
+                                        value: _documentDate,
+                                        labelText: 'تاریخ سند',
+                                        hintText: 'انتخاب تاریخ سند',
+                                        calendarController: widget.calendarController!,
+                                        onChanged: (d) => setState(() => _documentDate = d),
+                                      )
+                                    : const SizedBox.shrink(),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: TextFormField(
+                                  controller: _docDescCtrl,
+                                  decoration: const InputDecoration(
+                                    labelText: 'شرح سند',
+                                    border: OutlineInputBorder(),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          );
+                        }
+                      },
                     ),
                   ],
                 ],

@@ -65,6 +65,7 @@ class _WarehouseDocsPageState extends State<WarehouseDocsPage> {
       builder: (_) => WarehouseDocWizardDialog(
         businessId: widget.businessId,
         apiClient: _apiClient,
+        calendarController: _calendarController,
       ),
     );
     if (wizardResult == null) return;
@@ -73,6 +74,7 @@ class _WarehouseDocsPageState extends State<WarehouseDocsPage> {
         context: context,
         builder: (_) => WarehouseDocumentFormDialog(
           businessId: widget.businessId,
+          calendarController: _calendarController,
           onSuccess: () => _refreshTable(),
         ),
       );
@@ -119,6 +121,7 @@ class _WarehouseDocsPageState extends State<WarehouseDocsPage> {
         context: context,
         builder: (_) => WarehouseDocumentFormDialog(
           businessId: widget.businessId,
+          calendarController: _calendarController,
           initialDocType: wizardResult.docType,
           lockDocType: true,
           initialDocumentDate: initialDate,

@@ -147,19 +147,23 @@ class _WarehouseFormDialogState extends State<WarehouseFormDialog> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isEditing = widget.warehouse != null;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isDesktop = screenWidth > 900;
 
-    return Dialog(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Container(
-        width: MediaQuery.of(context).size.width * 0.9,
-        constraints: BoxConstraints(
-          maxWidth: 800,
-          maxHeight: MediaQuery.of(context).size.height * 0.9,
+    final screenHeight = MediaQuery.of(context).size.height;
+    
+    return PopScope(
+      canPop: false,
+      child: Dialog(
+        insetPadding: EdgeInsets.zero,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.zero,
         ),
+        child: Container(
+        width: screenWidth,
+        height: screenHeight,
         child: Column(
-          mainAxisSize: MainAxisSize.min,
+          mainAxisSize: MainAxisSize.max,
           children: [
             // Header
             Container(
@@ -173,10 +177,7 @@ class _WarehouseFormDialogState extends State<WarehouseFormDialog> {
                     theme.colorScheme.primary.withValues(alpha: 0.8),
                   ],
                 ),
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(20),
-                  topRight: Radius.circular(20),
-                ),
+                borderRadius: BorderRadius.zero,
               ),
               child: Row(
                 children: [
@@ -205,7 +206,7 @@ class _WarehouseFormDialogState extends State<WarehouseFormDialog> {
             ),
 
             // Form
-            Flexible(
+            Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(24),
                 child: Form(
@@ -214,19 +215,19 @@ class _WarehouseFormDialogState extends State<WarehouseFormDialog> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       // کد انبار با سویچ تولید خودکار/دستی
-                      _buildCodeSection(theme),
+                      _buildCodeSection(theme, isDesktop),
                       const SizedBox(height: 20),
 
                       // اطلاعات پایه
-                      _buildBasicInfoSection(theme),
+                      _buildBasicInfoSection(theme, isDesktop),
                       const SizedBox(height: 20),
 
                       // اطلاعات تماس
-                      _buildContactInfoSection(theme),
+                      _buildContactInfoSection(theme, isDesktop),
                       const SizedBox(height: 20),
 
                       // تنظیمات
-                      _buildSettingsSection(theme),
+                      _buildSettingsSection(theme, isDesktop),
 
                       if (_errorMessage != null) ...[
                         const SizedBox(height: 16),
@@ -262,10 +263,7 @@ class _WarehouseFormDialogState extends State<WarehouseFormDialog> {
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: theme.colorScheme.surfaceVariant.withValues(alpha: 0.3),
-                borderRadius: const BorderRadius.only(
-                  bottomLeft: Radius.circular(20),
-                  bottomRight: Radius.circular(20),
-                ),
+                borderRadius: BorderRadius.zero,
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.end,
@@ -290,11 +288,79 @@ class _WarehouseFormDialogState extends State<WarehouseFormDialog> {
             ),
           ],
         ),
+        ),
       ),
     );
   }
 
-  Widget _buildCodeSection(ThemeData theme) {
+  Widget _buildCodeSection(ThemeData theme, bool isDesktop) {
+    if (isDesktop) {
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            flex: 2,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'کد انبار',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SwitchListTile(
+                  value: _autoGenerateCode,
+                  onChanged: widget.warehouse != null
+                      ? null
+                      : (value) {
+                          setState(() {
+                            _autoGenerateCode = value;
+                            if (value) {
+                              _codeController.clear();
+                            }
+                          });
+                        },
+                  title: const Text('تولید خودکار کد'),
+                  subtitle: const Text('کد به صورت خودکار تولید می‌شود'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            flex: 3,
+            child: TextFormField(
+              controller: _codeController,
+              enabled: !_autoGenerateCode || widget.warehouse != null,
+              decoration: InputDecoration(
+                labelText: 'کد',
+                hintText: _autoGenerateCode ? 'کد به صورت خودکار تولید می‌شود' : 'کد انبار را وارد کنید',
+                prefixIcon: const Icon(Icons.qr_code),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                filled: _autoGenerateCode,
+                fillColor: theme.colorScheme.surfaceVariant.withValues(alpha: 0.3),
+              ),
+              keyboardType: TextInputType.number,
+              inputFormatters: [
+                FilteringTextInputFormatter.digitsOnly,
+              ],
+              validator: (value) {
+                if (!_autoGenerateCode && (value == null || value.trim().isEmpty)) {
+                  return 'لطفاً کد انبار را وارد کنید';
+                }
+                return null;
+              },
+            ),
+          ),
+        ],
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -358,7 +424,59 @@ class _WarehouseFormDialogState extends State<WarehouseFormDialog> {
     );
   }
 
-  Widget _buildBasicInfoSection(ThemeData theme) {
+  Widget _buildBasicInfoSection(ThemeData theme, bool isDesktop) {
+    if (isDesktop) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'اطلاعات پایه',
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: TextFormField(
+                  controller: _nameController,
+                  decoration: InputDecoration(
+                    labelText: 'نام انبار *',
+                    prefixIcon: const Icon(Icons.warehouse),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'لطفاً نام انبار را وارد کنید';
+                    }
+                    return null;
+                  },
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: TextFormField(
+                  controller: _descriptionController,
+                  decoration: InputDecoration(
+                    labelText: 'توضیحات',
+                    prefixIcon: const Icon(Icons.description),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  maxLines: 3,
+                ),
+              ),
+            ],
+          ),
+        ],
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -401,7 +519,95 @@ class _WarehouseFormDialogState extends State<WarehouseFormDialog> {
     );
   }
 
-  Widget _buildContactInfoSection(ThemeData theme) {
+  Widget _buildContactInfoSection(ThemeData theme, bool isDesktop) {
+    if (isDesktop) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'اطلاعات تماس',
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 12),
+          // ردیف اول: انباردار و تلفن
+          Row(
+            children: [
+              Expanded(
+                child: TextFormField(
+                  controller: _warehouseKeeperController,
+                  decoration: InputDecoration(
+                    labelText: 'انباردار',
+                    prefixIcon: const Icon(Icons.person),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: TextFormField(
+                  controller: _phoneController,
+                  decoration: InputDecoration(
+                    labelText: 'تلفن',
+                    prefixIcon: const Icon(Icons.phone),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  keyboardType: TextInputType.phone,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          // ردیف دوم: آدرس و کد پستی
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                flex: 2,
+                child: TextFormField(
+                  controller: _addressController,
+                  decoration: InputDecoration(
+                    labelText: 'آدرس',
+                    prefixIcon: const Icon(Icons.location_on),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  maxLines: 3,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: TextFormField(
+                  controller: _postalCodeController,
+                  decoration: InputDecoration(
+                    labelText: 'کد پستی',
+                    prefixIcon: const Icon(Icons.markunread_mailbox),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(10),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -469,7 +675,7 @@ class _WarehouseFormDialogState extends State<WarehouseFormDialog> {
     );
   }
 
-  Widget _buildSettingsSection(ThemeData theme) {
+  Widget _buildSettingsSection(ThemeData theme, bool isDesktop) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [

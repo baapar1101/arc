@@ -4,6 +4,7 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/services/support_service.dart';
 import 'package:hesabix_ui/models/support_models.dart';
+import '../../utils/responsive_helper.dart';
 
 class CreateTicketPage extends StatefulWidget {
   const CreateTicketPage({super.key});
@@ -170,17 +171,15 @@ class _CreateTicketPageState extends State<CreateTicketPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final t = AppLocalizations.of(context);
-    final isDesktop = MediaQuery.of(context).size.width > 768;
+    final isMobile = ResponsiveHelper.isMobile(context);
 
     return Dialog(
+      insetPadding: ResponsiveHelper.getDialogPadding(context),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
       ),
       child: Container(
-        constraints: BoxConstraints(
-          maxWidth: isDesktop ? 600 : double.infinity,
-          maxHeight: MediaQuery.of(context).size.height * 0.9,
-        ),
+        constraints: ResponsiveHelper.getDialogConstraints(context),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -248,7 +247,7 @@ class _CreateTicketPageState extends State<CreateTicketPage> {
             ),
             // Form content
             Flexible(
-              child: _buildBody(theme, isDesktop, t),
+              child: _buildBody(theme, !isMobile, t, isMobile),
             ),
           ],
         ),
@@ -256,7 +255,7 @@ class _CreateTicketPageState extends State<CreateTicketPage> {
     );
   }
 
-  Widget _buildBody(ThemeData theme, bool isDesktop, AppLocalizations t) {
+  Widget _buildBody(ThemeData theme, bool isDesktop, AppLocalizations t, bool isMobile) {
     if (_isLoading) {
       return Center(
         child: Column(
@@ -337,7 +336,7 @@ class _CreateTicketPageState extends State<CreateTicketPage> {
           children: [
                       
                       // Form Fields
-                      if (isDesktop) ...[
+                      if (!isMobile) ...[
                         // Desktop Layout - Title full width, Category and Priority in one row
                         _buildTitleField(theme, t),
                         const SizedBox(height: 20),
@@ -370,7 +369,7 @@ class _CreateTicketPageState extends State<CreateTicketPage> {
                       const SizedBox(height: 32),
                       
             // Submit Button
-            _buildSubmitButton(theme, isDesktop, t),
+            _buildSubmitButton(theme, !isMobile, t),
           ],
         ),
       ),

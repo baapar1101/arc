@@ -28,6 +28,7 @@ import '../../utils/number_formatters.dart';
 import '../../utils/number_normalizer.dart';
 import '../../services/currency_service.dart';
 import '../../core/api_client.dart';
+import '../../utils/responsive_helper.dart';
 import '../../services/business_api_service.dart';
 import '../../services/person_service.dart';
 import '../../services/report_template_service.dart';
@@ -1208,15 +1209,18 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
       padding: const EdgeInsets.all(16),
       child: Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 1600),
+          constraints: BoxConstraints(
+            maxWidth: ResponsiveHelper.isDesktop(context) ? 1600 : double.infinity,
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               // فیلدهای اصلی - responsive layout
               LayoutBuilder(
                 builder: (context, constraints) {
+                  final isMobile = ResponsiveHelper.isMobile(context);
                   // اگر عرض صفحه کمتر از 768 پیکسل باشد، تک ستونه
-                  if (constraints.maxWidth < 768) {
+                  if (isMobile) {
                     return Column(
                       children: [
                         // نوع فاکتور

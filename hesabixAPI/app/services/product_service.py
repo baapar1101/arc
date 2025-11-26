@@ -231,6 +231,9 @@ def create_product(db: Session, business_id: int, payload: ProductCreateRequest)
                 reorder_point=payload.reorder_point,
                 min_order_qty=payload.min_order_qty,
                 lead_time_days=payload.lead_time_days,
+                inventory_mode=payload.inventory_mode or "bulk",
+                track_serial=payload.track_serial if payload.track_serial is not None else False,
+                track_barcode=payload.track_barcode if payload.track_barcode is not None else False,
                 is_sales_taxable=payload.is_sales_taxable,
                 is_purchase_taxable=payload.is_purchase_taxable,
                 sales_tax_rate=payload.sales_tax_rate,
@@ -251,7 +254,7 @@ def create_product(db: Session, business_id: int, payload: ProductCreateRequest)
             db.commit()
             db.refresh(obj)  # Refresh برای دریافت اطلاعات کامل
 
-            data = _to_dict(obj)
+            data = _to_dict(obj, db)
             # enrich titles from payload if provided
             if getattr(payload, 'main_unit_title', None):
                 data["main_unit_title"] = str(getattr(payload, 'main_unit_title'))
@@ -315,7 +318,7 @@ def get_product(db: Session, product_id: int, business_id: int) -> Optional[Dict
     obj = db.get(Product, product_id)
     if not obj or obj.business_id != business_id:
         return None
-    return _to_dict(obj)
+    return _to_dict(obj, db)
 
 
 def update_product(db: Session, product_id: int, business_id: int, payload: ProductUpdateRequest) -> Optional[Dict[str, Any]]:
@@ -356,6 +359,40 @@ def update_product(db: Session, product_id: int, business_id: int, payload: Prod
     # اگر code در fields_set نیست یا None است، مقدار قبلی را نگه می‌داریم
     code_to_update = code_value if 'code' in fields_set else None
 
+    # بررسی تغییر inventory_mode از bulk به unique
+    old_inventory_mode = obj.inventory_mode or "bulk"
+    new_inventory_mode = payload.inventory_mode if 'inventory_mode' in fields_set else old_inventory_mode
+    converting_to_unique = (old_inventory_mode != "unique" and new_inventory_mode == "unique")
+    
+    # اگر در حال تبدیل به unique هستیم و موجودی داریم، باید instance ها ایجاد شوند
+    if converting_to_unique and obj.track_inventory:
+        from app.services.warehouse_service import get_warehouse_stock_report
+        from datetime import date as date_type
+        from adapters.db.models.product_instance import ProductInstance
+        from decimal import Decimal
+        
+        # محاسبه موجودی فعلی
+        stock_report = get_warehouse_stock_report(
+            db=db,
+            business_id=business_id,
+            query={
+                "product_ids": [str(product_id)],
+                "as_of_date": date_type.today().isoformat(),
+                "include_zero": False,
+            },
+        )
+        
+        total_stock = sum(item.get("quantity", 0) for item in stock_report.get("items", []))
+        
+        if total_stock > 0:
+            # اگر موجودی داریم، باید هشدار بدهیم یا instance ها را ایجاد کنیم
+            # در اینجا فقط هشدار می‌دهیم و از کاربر می‌خواهیم که از endpoint تبدیل استفاده کند
+            raise ApiError(
+                "CONVERSION_REQUIRES_INSTANCES",
+                f"برای تبدیل کالا به حالت یونیک، باید برای {int(total_stock)} واحد موجودی instance ایجاد شود. لطفاً از endpoint تبدیل استفاده کنید: POST /api/v1/product-instances/business/{business_id}/product/{product_id}/convert-to-unique",
+                http_status=400
+            )
+
     updated = repo.update(
         product_id,
         item_type=payload.item_type if payload.item_type is not None else None,
@@ -374,6 +411,9 @@ def update_product(db: Session, product_id: int, business_id: int, payload: Prod
         reorder_point=payload.reorder_point,
         min_order_qty=payload.min_order_qty,
         lead_time_days=payload.lead_time_days,
+        inventory_mode=payload.inventory_mode if 'inventory_mode' in fields_set else None,
+        track_serial=payload.track_serial if 'track_serial' in fields_set else None,
+        track_barcode=payload.track_barcode if 'track_barcode' in fields_set else None,
         is_sales_taxable=payload.is_sales_taxable,
         is_purchase_taxable=payload.is_purchase_taxable,
         sales_tax_rate=payload.sales_tax_rate,
@@ -395,7 +435,7 @@ def update_product(db: Session, product_id: int, business_id: int, payload: Prod
         return None
 
     _upsert_attributes(db, product_id, business_id, payload.attribute_ids)
-    data = _to_dict(updated)
+    data = _to_dict(updated, db)
     return {"message": "PRODUCT_UPDATED", "data": data}
 
 
@@ -415,7 +455,13 @@ def _get_image_url(obj: Product) -> str | None:
     return f"/api/v1/business/{obj.business_id}/storage/files/{obj.image_file_id}/download"
 
 
-def _to_dict(obj: Product) -> Dict[str, Any]:
+def _to_dict(obj: Product, db: Optional[Session] = None) -> Dict[str, Any]:
+    # دریافت attribute_ids از ProductAttributeLink
+    attribute_ids = []
+    if db is not None:
+        links = db.query(ProductAttributeLink).filter(ProductAttributeLink.product_id == obj.id).all()
+        attribute_ids = [link.attribute_id for link in links]
+    
     return {
         "id": obj.id,
         "business_id": obj.business_id,
@@ -435,6 +481,9 @@ def _to_dict(obj: Product) -> Dict[str, Any]:
         "reorder_point": obj.reorder_point,
         "min_order_qty": obj.min_order_qty,
         "lead_time_days": obj.lead_time_days,
+        "inventory_mode": obj.inventory_mode or "bulk",
+        "track_serial": obj.track_serial,
+        "track_barcode": obj.track_barcode,
         "is_sales_taxable": obj.is_sales_taxable,
         "is_purchase_taxable": obj.is_purchase_taxable,
         "sales_tax_rate": obj.sales_tax_rate,
@@ -442,6 +491,7 @@ def _to_dict(obj: Product) -> Dict[str, Any]:
         "tax_type_id": obj.tax_type_id,
         "tax_code": obj.tax_code,
         "tax_unit_id": obj.tax_unit_id,
+        "attribute_ids": attribute_ids,
         "image_file_id": obj.image_file_id,
         "image_url": _get_image_url(obj) if obj.image_file_id else None,
         "default_warehouse_id": obj.default_warehouse_id,
