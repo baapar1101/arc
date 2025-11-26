@@ -62,16 +62,57 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    # Add back integer columns
-    op.add_column('products', sa.Column('main_unit_id', sa.Integer(), nullable=True))
-    op.add_column('products', sa.Column('secondary_unit_id', sa.Integer(), nullable=True))
+    from sqlalchemy import inspect
+    bind = op.get_bind()
+    inspector = inspect(bind)
+    tables = set(inspector.get_table_names())
     
-    # Create indexes for integer columns
-    op.create_index('ix_products_main_unit_id', 'products', ['main_unit_id'])
-    op.create_index('ix_products_secondary_unit_id', 'products', ['secondary_unit_id'])
-    
-    # Drop string columns and their indexes
-    op.drop_index('ix_products_main_unit', table_name='products')
-    op.drop_index('ix_products_secondary_unit', table_name='products')
-    op.drop_column('products', 'main_unit')
-    op.drop_column('products', 'secondary_unit')
+    if 'products' in tables:
+        columns = {col['name'] for col in inspector.get_columns('products')}
+        existing_indexes = {idx['name'] for idx in inspector.get_indexes('products')}
+        
+        # Add back integer columns (if they don't exist)
+        if 'main_unit_id' not in columns:
+            try:
+                op.add_column('products', sa.Column('main_unit_id', sa.Integer(), nullable=True))
+            except Exception:
+                pass
+        if 'secondary_unit_id' not in columns:
+            try:
+                op.add_column('products', sa.Column('secondary_unit_id', sa.Integer(), nullable=True))
+            except Exception:
+                pass
+        
+        # Create indexes for integer columns (if they don't exist)
+        if 'ix_products_main_unit_id' not in existing_indexes:
+            try:
+                op.create_index('ix_products_main_unit_id', 'products', ['main_unit_id'])
+            except Exception:
+                pass
+        if 'ix_products_secondary_unit_id' not in existing_indexes:
+            try:
+                op.create_index('ix_products_secondary_unit_id', 'products', ['secondary_unit_id'])
+            except Exception:
+                pass
+        
+        # Drop string columns and their indexes
+        if 'ix_products_main_unit' in existing_indexes:
+            try:
+                op.drop_index('ix_products_main_unit', table_name='products')
+            except Exception:
+                pass
+        if 'ix_products_secondary_unit' in existing_indexes:
+            try:
+                op.drop_index('ix_products_secondary_unit', table_name='products')
+            except Exception:
+                pass
+        if 'main_unit' in columns:
+            try:
+                op.drop_column('products', 'main_unit')
+            except Exception:
+                pass
+        if 'secondary_unit' in columns:
+            try:
+                op.drop_column('products', 'secondary_unit')
+            except Exception:
+                pass

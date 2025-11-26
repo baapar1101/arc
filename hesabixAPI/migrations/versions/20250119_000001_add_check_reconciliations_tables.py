@@ -1,3 +1,13 @@
+"""add check reconciliations tables
+
+Revision ID: 20250119_000001_add_check_reconciliations_tables
+Revises: 20251119_000001_add_person_share_links
+Create Date: 2025-01-19 00:00:01.000000
+
+Note: This migration was created on 2025-01-19 but depends on a later migration (20251119).
+This is intentional as it was merged after the later migration was created.
+
+"""
 from typing import Sequence, Union
 from alembic import op
 import sqlalchemy as sa
@@ -49,13 +59,44 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    # Drop indices
-    op.drop_index('ix_check_reconciliation_items_check', table_name='check_reconciliation_items')
-    op.drop_index('ix_check_reconciliation_items_reconciliation', table_name='check_reconciliation_items')
-    op.drop_index('ix_check_reconciliations_created_at', table_name='check_reconciliations')
-    op.drop_index('ix_check_reconciliations_business', table_name='check_reconciliations')
+    from sqlalchemy import inspect
+    bind = op.get_bind()
+    inspector = inspect(bind)
+    tables = set(inspector.get_table_names())
     
-    # Drop tables
-    op.drop_table('check_reconciliation_items')
-    op.drop_table('check_reconciliations')
+    # Drop indices and tables for check_reconciliation_items
+    if 'check_reconciliation_items' in tables:
+        existing_indexes = {idx['name'] for idx in inspector.get_indexes('check_reconciliation_items')}
+        if 'ix_check_reconciliation_items_check' in existing_indexes:
+            try:
+                op.drop_index('ix_check_reconciliation_items_check', table_name='check_reconciliation_items')
+            except Exception:
+                pass
+        if 'ix_check_reconciliation_items_reconciliation' in existing_indexes:
+            try:
+                op.drop_index('ix_check_reconciliation_items_reconciliation', table_name='check_reconciliation_items')
+            except Exception:
+                pass
+        try:
+            op.drop_table('check_reconciliation_items')
+        except Exception:
+            pass
+    
+    # Drop indices and tables for check_reconciliations
+    if 'check_reconciliations' in tables:
+        existing_indexes = {idx['name'] for idx in inspector.get_indexes('check_reconciliations')}
+        if 'ix_check_reconciliations_created_at' in existing_indexes:
+            try:
+                op.drop_index('ix_check_reconciliations_created_at', table_name='check_reconciliations')
+            except Exception:
+                pass
+        if 'ix_check_reconciliations_business' in existing_indexes:
+            try:
+                op.drop_index('ix_check_reconciliations_business', table_name='check_reconciliations')
+            except Exception:
+                pass
+        try:
+            op.drop_table('check_reconciliations')
+        except Exception:
+            pass
 

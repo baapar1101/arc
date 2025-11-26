@@ -7364,6 +7364,18 @@ abstract class AppLocalizations {
   /// **'Per-item movement details (FIFO/LIFO/average)'**
   String get reportsInventoryKardexSubtitle;
 
+  /// No description provided for @reportsInventoryStockTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Inventory stock report'**
+  String get reportsInventoryStockTitle;
+
+  /// No description provided for @reportsInventoryStockSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Product inventory by warehouse and date'**
+  String get reportsInventoryStockSubtitle;
+
   /// No description provided for @reportsSalesByProductTitle.
   ///
   /// In en, this message translates to:

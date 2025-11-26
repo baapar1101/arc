@@ -69,18 +69,66 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-	op.drop_index("ix_password_resets_user_id", table_name="password_resets")
-	op.drop_index("ix_password_resets_token_hash", table_name="password_resets")
-	op.drop_table("password_resets")
+	from sqlalchemy import inspect
+	bind = op.get_bind()
+	inspector = inspect(bind)
+	tables = set(inspector.get_table_names())
+	
+	if "password_resets" in tables:
+		existing_indexes = {idx["name"] for idx in inspector.get_indexes("password_resets")}
+		if "ix_password_resets_user_id" in existing_indexes:
+			try:
+				op.drop_index("ix_password_resets_user_id", table_name="password_resets")
+			except Exception:
+				pass
+		if "ix_password_resets_token_hash" in existing_indexes:
+			try:
+				op.drop_index("ix_password_resets_token_hash", table_name="password_resets")
+			except Exception:
+				pass
+		try:
+			op.drop_table("password_resets")
+		except Exception:
+			pass
 
-	op.drop_table("captchas")
+	if "captchas" in tables:
+		try:
+			op.drop_table("captchas")
+		except Exception:
+			pass
 
-	op.drop_index("ix_api_keys_user_id", table_name="api_keys")
-	op.drop_index("ix_api_keys_key_hash", table_name="api_keys")
-	op.drop_table("api_keys")
+	if "api_keys" in tables:
+		existing_indexes = {idx["name"] for idx in inspector.get_indexes("api_keys")}
+		if "ix_api_keys_user_id" in existing_indexes:
+			try:
+				op.drop_index("ix_api_keys_user_id", table_name="api_keys")
+			except Exception:
+				pass
+		if "ix_api_keys_key_hash" in existing_indexes:
+			try:
+				op.drop_index("ix_api_keys_key_hash", table_name="api_keys")
+			except Exception:
+				pass
+		try:
+			op.drop_table("api_keys")
+		except Exception:
+			pass
 
-	op.drop_index("ix_users_mobile", table_name="users")
-	op.drop_index("ix_users_email", table_name="users")
-	op.drop_table("users")
+	if "users" in tables:
+		existing_indexes = {idx["name"] for idx in inspector.get_indexes("users")}
+		if "ix_users_mobile" in existing_indexes:
+			try:
+				op.drop_index("ix_users_mobile", table_name="users")
+			except Exception:
+				pass
+		if "ix_users_email" in existing_indexes:
+			try:
+				op.drop_index("ix_users_email", table_name="users")
+			except Exception:
+				pass
+		try:
+			op.drop_table("users")
+		except Exception:
+			pass
 
 

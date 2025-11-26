@@ -25,6 +25,7 @@ from app.services.product_service import (
     get_item_movements_report,
     get_sales_by_product_report,
     get_inventory_kardex_report,
+    get_inventory_stock_report,
 )
 from app.services.bulk_price_update_service import (
     preview_bulk_price_update,
@@ -1803,6 +1804,111 @@ async def inventory_kardex_report_endpoint(
     return success_response(
         data=result,
         message="Inventory kardex report retrieved successfully" if locale != 'fa' else "گزارش کاردکس موجودی با موفقیت دریافت شد",
+        request=request
+    )
+
+
+@router.post("/businesses/{business_id}/reports/inventory-stock",
+    summary="گزارش موجودی انبار",
+    description="گزارش موجودی محصولات به تفکیک انبار با فیلترهای مختلف (کنترل موجودی، موجودی منفی، فاقد حواله)",
+)
+@require_business_access("business_id")
+async def inventory_stock_report_endpoint(
+    request: Request,
+    business_id: int,
+    body: Dict[str, Any] = Body(default={}),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("reports", "view")),
+) -> Dict[str, Any]:
+    """گزارش موجودی انبار"""
+    # بررسی دسترسی
+    if not ctx.can_read_section("reports"):
+        raise ApiError("FORBIDDEN", "Missing business permission: reports.read", http_status=403)
+    
+    # دریافت سال مالی از header یا body
+    fiscal_year_id = None
+    fy_header = request.headers.get('X-Fiscal-Year-ID')
+    if fy_header:
+        try:
+            fiscal_year_id = int(fy_header)
+        except (ValueError, TypeError):
+            pass
+    
+    if body.get('fiscal_year_id'):
+        try:
+            fiscal_year_id = int(body['fiscal_year_id'])
+        except (ValueError, TypeError):
+            pass
+    
+    # استخراج پارامترها از body
+    product_ids = body.get('product_ids')
+    if product_ids is not None and not isinstance(product_ids, list):
+        product_ids = None
+    
+    warehouse_ids = body.get('warehouse_ids')
+    if warehouse_ids is not None and not isinstance(warehouse_ids, list):
+        warehouse_ids = None
+    
+    category_ids = body.get('category_ids')
+    if category_ids is not None and not isinstance(category_ids, list):
+        category_ids = None
+    
+    as_of_date = body.get('as_of_date')
+    track_inventory = body.get('track_inventory')
+    if track_inventory is not None:
+        try:
+            track_inventory = bool(track_inventory)
+        except (ValueError, TypeError):
+            track_inventory = None
+    
+    only_negative_stock = bool(body.get('only_negative_stock', False))
+    only_without_movements = bool(body.get('only_without_movements', False))
+    include_zero = bool(body.get('include_zero', False))
+    search = body.get('search')
+    
+    # Pagination
+    skip = body.get('skip', 0)
+    take = body.get('take', 50)
+    try:
+        skip = int(skip)
+        take = int(take)
+        if take > 500:
+            take = 500
+        if take < 1:
+            take = 50
+        if skip < 0:
+            skip = 0
+    except (ValueError, TypeError):
+        skip = 0
+        take = 50
+    
+    result = get_inventory_stock_report(
+        db=db,
+        business_id=business_id,
+        fiscal_year_id=fiscal_year_id,
+        product_ids=product_ids,
+        warehouse_ids=warehouse_ids,
+        category_ids=category_ids,
+        as_of_date=as_of_date,
+        track_inventory=track_inventory,
+        only_negative_stock=only_negative_stock,
+        only_without_movements=only_without_movements,
+        include_zero=include_zero,
+        search=search,
+        skip=skip,
+        take=take,
+    )
+    
+    items = result.get('items', [])
+    items = [format_datetime_fields(item, request) for item in items]
+    
+    result['items'] = items
+    
+    locale = negotiate_locale(request.headers.get("Accept-Language"))
+    return success_response(
+        data=result,
+        message="Inventory stock report retrieved successfully" if locale != 'fa' else "گزارش موجودی انبار با موفقیت دریافت شد",
         request=request
     )
 

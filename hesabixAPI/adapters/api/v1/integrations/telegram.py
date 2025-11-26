@@ -167,8 +167,22 @@ def telegram_webhook(
 			from app.services.telegram_ai_chat_handler import handle_telegram_message
 			import asyncio
 			try:
-				loop = asyncio.get_event_loop()
-				loop.run_until_complete(handle_telegram_message(message, db, provider))
+				# استفاده از asyncio.run برای ایجاد event loop جدید
+				asyncio.run(handle_telegram_message(message, db, provider))
+			except RuntimeError:
+				# اگر event loop از قبل وجود دارد، از get_event_loop استفاده می‌کنیم
+				try:
+					loop = asyncio.get_event_loop()
+					if loop.is_running():
+						# اگر loop در حال اجرا است، از create_task استفاده می‌کنیم
+						import concurrent.futures
+						with concurrent.futures.ThreadPoolExecutor() as executor:
+							future = executor.submit(asyncio.run, handle_telegram_message(message, db, provider))
+							future.result(timeout=60)
+					else:
+						loop.run_until_complete(handle_telegram_message(message, db, provider))
+				except Exception as e:
+					logger.error(f"Error handling telegram message: {e}", exc_info=True)
 			except Exception as e:
 				logger.error(f"Error handling telegram message: {e}", exc_info=True)
 	
@@ -178,8 +192,22 @@ def telegram_webhook(
 		from app.services.telegram_ai_chat_handler import handle_telegram_callback_query
 		import asyncio
 		try:
-			loop = asyncio.get_event_loop()
-			loop.run_until_complete(handle_telegram_callback_query(callback_query, db, provider))
+			# استفاده از asyncio.run برای ایجاد event loop جدید
+			asyncio.run(handle_telegram_callback_query(callback_query, db, provider))
+		except RuntimeError:
+			# اگر event loop از قبل وجود دارد، از get_event_loop استفاده می‌کنیم
+			try:
+				loop = asyncio.get_event_loop()
+				if loop.is_running():
+					# اگر loop در حال اجرا است، از create_task استفاده می‌کنیم
+					import concurrent.futures
+					with concurrent.futures.ThreadPoolExecutor() as executor:
+						future = executor.submit(asyncio.run, handle_telegram_callback_query(callback_query, db, provider))
+						future.result(timeout=60)
+				else:
+					loop.run_until_complete(handle_telegram_callback_query(callback_query, db, provider))
+			except Exception as e:
+				logger.error(f"Error handling callback query: {e}", exc_info=True)
 		except Exception as e:
 			logger.error(f"Error handling callback query: {e}", exc_info=True)
 	

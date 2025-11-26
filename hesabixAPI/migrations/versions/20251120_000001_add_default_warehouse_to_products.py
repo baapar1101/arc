@@ -52,7 +52,15 @@ def downgrade() -> None:
 
     if table_name in inspector.get_table_names():
         columns = {col["name"] for col in inspector.get_columns(table_name)}
+        indexes = {idx["name"] for idx in inspector.get_indexes(table_name)}
         if "default_warehouse_id" in columns:
-            op.drop_index("ix_products_default_warehouse_id", table_name=table_name)
-            op.drop_column(table_name, "default_warehouse_id")
+            if "ix_products_default_warehouse_id" in indexes:
+                try:
+                    op.drop_index("ix_products_default_warehouse_id", table_name=table_name)
+                except Exception:
+                    pass
+            try:
+                op.drop_column(table_name, "default_warehouse_id")
+            except Exception:
+                pass
 

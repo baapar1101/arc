@@ -86,6 +86,21 @@ class FileStorageService:
                 from app.services.storage_subscription_service import check_storage_limit, get_active_subscriptions
                 limit_info = check_storage_limit(self.db, business_id, file_size)
                 
+                # بررسی اینکه آیا پکیج فعالی وجود دارد یا نه
+                if limit_info["total_limit_gb"] <= 0:
+                    raise HTTPException(
+                        status_code=400,
+                        detail={
+                            "error": "NO_ACTIVE_STORAGE_PLAN",
+                            "message": "هیچ پکیج ذخیره‌سازی فعالی برای این کسب‌وکار وجود ندارد. لطفاً ابتدا یک پکیج ذخیره‌سازی فعال کنید.",
+                            "total_limit_gb": 0,
+                            "current_usage_gb": limit_info["current_usage_gb"],
+                            "available_gb": 0,
+                            "required_gb": limit_info["additional_gb"],
+                            "over_usage_gb": limit_info["additional_gb"],
+                        }
+                    )
+                
                 if limit_info["over_limit"]:
                     # اگر از محدودیت تجاوز کرد، خطا برمی‌گردانیم
                     # Frontend باید از کاربر بپرسد آیا می‌خواهد صورتحساب برای حجم اضافی ایجاد شود

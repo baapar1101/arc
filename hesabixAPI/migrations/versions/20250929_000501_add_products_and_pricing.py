@@ -228,17 +228,58 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    from sqlalchemy import inspect
+    bind = op.get_bind()
+    inspector = inspect(bind)
+    tables = set(inspector.get_table_names())
+    
     # Drop links and pricing first due to FKs
-    op.drop_constraint('uq_product_attribute_links_unique', 'product_attribute_links', type_='unique')
-    op.drop_table('product_attribute_links')
+    if 'product_attribute_links' in tables:
+        try:
+            existing_constraints = {uc['name'] for uc in inspector.get_unique_constraints('product_attribute_links')}
+            if 'uq_product_attribute_links_unique' in existing_constraints:
+                op.drop_constraint('uq_product_attribute_links_unique', 'product_attribute_links', type_='unique')
+        except Exception:
+            pass
+        try:
+            op.drop_table('product_attribute_links')
+        except Exception:
+            pass
 
-    op.drop_constraint('uq_price_items_unique_tier', 'price_items', type_='unique')
-    op.drop_table('price_items')
+    if 'price_items' in tables:
+        try:
+            existing_constraints = {uc['name'] for uc in inspector.get_unique_constraints('price_items')}
+            if 'uq_price_items_unique_tier' in existing_constraints:
+                op.drop_constraint('uq_price_items_unique_tier', 'price_items', type_='unique')
+        except Exception:
+            pass
+        try:
+            op.drop_table('price_items')
+        except Exception:
+            pass
 
-    op.drop_constraint('uq_price_lists_business_name', 'price_lists', type_='unique')
-    op.drop_table('price_lists')
+    if 'price_lists' in tables:
+        try:
+            existing_constraints = {uc['name'] for uc in inspector.get_unique_constraints('price_lists')}
+            if 'uq_price_lists_business_name' in existing_constraints:
+                op.drop_constraint('uq_price_lists_business_name', 'price_lists', type_='unique')
+        except Exception:
+            pass
+        try:
+            op.drop_table('price_lists')
+        except Exception:
+            pass
 
-    op.drop_constraint('uq_products_business_code', 'products', type_='unique')
-    op.drop_table('products')
+    if 'products' in tables:
+        try:
+            existing_constraints = {uc['name'] for uc in inspector.get_unique_constraints('products')}
+            if 'uq_products_business_code' in existing_constraints:
+                op.drop_constraint('uq_products_business_code', 'products', type_='unique')
+        except Exception:
+            pass
+        try:
+            op.drop_table('products')
+        except Exception:
+            pass
 
 

@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/services/backup_service.dart';
 import 'package:file_saver/file_saver.dart';
+import 'package:dio/dio.dart';
 
 class BusinessBackupPage extends StatefulWidget {
   final int businessId;
@@ -68,7 +69,11 @@ class _BusinessBackupPageState extends State<BusinessBackupPage> {
         _showSnackBar(AppLocalizations.of(ctx).inProgress);
       }
     } catch (e) {
-      _showSnackBar('$e');
+      if (e is DioException) {
+        await _handleBackupError(e);
+      } else {
+        _showSnackBar('$e');
+      }
     } finally {
       if (mounted) {
         setState(() {
@@ -109,6 +114,15 @@ class _BusinessBackupPageState extends State<BusinessBackupPage> {
           });
           if (!ctx.mounted) return;
           final err = (st['error'] as String?) ?? AppLocalizations.of(ctx).error;
+          // بررسی اینکه آیا خطا مربوط به فضای ذخیره‌سازی است
+          final errorData = st['error_data'];
+          if (errorData is Map) {
+            final errorCode = errorData['error'] as String?;
+            if (errorCode == 'STORAGE_LIMIT_EXCEEDED' || errorCode == 'NO_ACTIVE_STORAGE_PLAN') {
+              await _showStorageLimitDialog(Map<String, dynamic>.from(errorData));
+              return;
+            }
+          }
           _showSnackBar(err);
         }
       } catch (_) {}
@@ -415,6 +429,168 @@ class _BusinessBackupPageState extends State<BusinessBackupPage> {
     
     // اگر پیام ترجمه نشده، همان پیام اصلی را برمی‌گردانیم
     return message;
+  }
+
+  Future<void> _handleBackupError(DioException e) async {
+    final response = e.response;
+    if (response != null && response.data is Map) {
+      final data = response.data as Map<String, dynamic>;
+      final error = data['error'] ?? data['detail'];
+      
+      if (error is Map) {
+        final errorCode = error['error'] as String?;
+        if (errorCode == 'STORAGE_LIMIT_EXCEEDED' || errorCode == 'NO_ACTIVE_STORAGE_PLAN') {
+          await _showStorageLimitDialog(Map<String, dynamic>.from(error));
+          return;
+        }
+      }
+    }
+    
+    String errorMessage = 'خطا در ایجاد پشتیبان';
+    if (response?.data is Map) {
+      final data = response!.data as Map<String, dynamic>;
+      if (data.containsKey('message')) {
+        errorMessage = data['message'] as String;
+      } else if (data.containsKey('error')) {
+        final errorMap = data['error'];
+        if (errorMap is Map && errorMap.containsKey('message')) {
+          errorMessage = errorMap['message'] as String;
+        } else if (errorMap is String) {
+          errorMessage = errorMap;
+        }
+      } else if (data.containsKey('detail')) {
+        final detail = data['detail'];
+        if (detail is Map && detail.containsKey('message')) {
+          errorMessage = detail['message'] as String;
+        } else if (detail is String) {
+          errorMessage = detail;
+        }
+      }
+    }
+    
+    _showSnackBar(errorMessage);
+  }
+
+  Future<void> _showStorageLimitDialog(Map<String, dynamic> error) async {
+    final errorCode = error['error'] as String?;
+    final totalLimit = (error['total_limit_gb'] as num?)?.toDouble() ?? 0.0;
+    final currentUsage = (error['current_usage_gb'] as num?)?.toDouble() ?? 0.0;
+    final available = (error['available_gb'] as num?)?.toDouble() ?? 0.0;
+    final overUsage = (error['over_usage_gb'] as num?)?.toDouble() ?? 0.0;
+    final required = (error['required_gb'] as num?)?.toDouble() ?? 0.0;
+    
+    final theme = Theme.of(context);
+    final t = AppLocalizations.of(context);
+    final isNoPlan = errorCode == 'NO_ACTIVE_STORAGE_PLAN';
+    
+    if (!mounted) return;
+    await showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(
+              isNoPlan ? Icons.info_outline : Icons.warning_amber_rounded,
+              color: isNoPlan ? Colors.blue : Colors.orange,
+              size: 28,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                isNoPlan ? 'پکیج ذخیره‌سازی فعال نیست' : 'محدودیت ذخیره‌سازی',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                error['message'] as String? ?? 
+                (isNoPlan 
+                  ? 'هیچ پکیج ذخیره‌سازی فعالی برای این کسب‌وکار وجود ندارد. لطفاً ابتدا یک پکیج ذخیره‌سازی فعال کنید.'
+                  : 'حجم فایل از محدودیت ذخیره‌سازی تجاوز می‌کند'),
+                style: theme.textTheme.bodyLarge,
+              ),
+              if (!isNoPlan) ...[
+                const SizedBox(height: 20),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildStorageInfoRow('محدودیت کل:', '${totalLimit.toStringAsFixed(3)} GB', theme),
+                      _buildStorageInfoRow('استفاده شده:', '${currentUsage.toStringAsFixed(3)} GB', theme),
+                      _buildStorageInfoRow('موجود:', '${available.toStringAsFixed(3)} GB', theme),
+                      const Divider(height: 24),
+                      _buildStorageInfoRow('حجم مورد نیاز:', '${required.toStringAsFixed(3)} GB', theme, isHighlight: true),
+                      _buildStorageInfoRow('حجم اضافی:', '${overUsage.toStringAsFixed(3)} GB', theme, isHighlight: true, isError: true),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'برای ایجاد پشتیبان، لطفاً پلن ذخیره‌سازی خود را ارتقا دهید.',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(t.dialogClose),
+          ),
+          FilledButton.icon(
+            onPressed: () {
+              Navigator.pop(ctx);
+              // رفتن به صفحه مدیریت پلن‌های ذخیره‌سازی
+              context.go('/business/${widget.businessId}/storage-files');
+            },
+            icon: const Icon(Icons.storage_outlined),
+            label: const Text('مشاهده پلن‌ها'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStorageInfoRow(String label, String value, ThemeData theme, {bool isHighlight = false, bool isError = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+            ),
+          ),
+          Text(
+            value,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              fontWeight: isHighlight ? FontWeight.bold : FontWeight.normal,
+              color: isError 
+                  ? Colors.red 
+                  : isHighlight 
+                      ? theme.colorScheme.primary 
+                      : theme.colorScheme.onSurface,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

@@ -1674,6 +1674,7 @@ class _BusinessShellState extends State<BusinessShell> {
     if (label == t.openingBalance) return 'opening_balance';
     if (label == t.reports) return 'reports';
     if (label == t.warehouses) return 'warehouses';
+    if (label == 'حواله‌های انبار') return 'warehouse_transfers';
     if (label == t.storageSpace) return 'storage';
     if (label == t.taxpayers) return 'settings';
     if (label == t.settings) return 'settings';

@@ -59,7 +59,20 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_index("ix_product_tax_codes_code", table_name="product_tax_codes")
-    op.drop_table("product_tax_codes")
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    tables = set(inspector.get_table_names())
+    
+    if "product_tax_codes" in tables:
+        existing_indexes = {index["name"] for index in inspector.get_indexes("product_tax_codes")}
+        if "ix_product_tax_codes_code" in existing_indexes:
+            try:
+                op.drop_index("ix_product_tax_codes_code", table_name="product_tax_codes")
+            except Exception:
+                pass
+        try:
+            op.drop_table("product_tax_codes")
+        except Exception:
+            pass
 
 

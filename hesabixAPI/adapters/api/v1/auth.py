@@ -13,7 +13,7 @@ from app.services.email_verification_service import verify_email_token, resend_v
 from app.services.pdf import PDFService
 from .schemas import (
 	RegisterRequest, LoginRequest, ForgotPasswordRequest, ResetPasswordRequest, 
-	ChangePasswordRequest, CreateApiKeyRequest, QueryInfo, FilterItem,
+	ChangePasswordRequest, CreateApiKeyRequest, UpdateApiKeyRequest, QueryInfo, FilterItem,
 	SuccessResponse, CaptchaResponse, LoginResponse, ApiKeyResponse, 
 	ReferralStatsResponse, UserResponse
 )
@@ -467,8 +467,30 @@ def list_keys(request: Request, ctx: AuthContext = Depends(get_current_user), db
 	}
 )
 def create_key(request: Request, payload: CreateApiKeyRequest, ctx: AuthContext = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
-	id_, api_key = create_personal_key(db, ctx.user.id, payload.name, payload.scopes, None)
-	return success_response({"id": id_, "api_key": api_key})
+	from datetime import datetime
+	
+	expires_at = None
+	if payload.expires_at:
+		try:
+			# پارس کردن تاریخ ISO format (مثال: 2024-12-31T23:59:59)
+			date_str = payload.expires_at.strip()
+			# تبدیل Z به +00:00 برای timezone
+			if date_str.endswith('Z'):
+				date_str = date_str[:-1] + '+00:00'
+			expires_at = datetime.fromisoformat(date_str)
+		except (ValueError, AttributeError) as e:
+			from app.core.responses import ApiError
+			raise ApiError("INVALID_INPUT", f"Invalid expires_at format. Use ISO format: YYYY-MM-DDTHH:MM:SS. Error: {str(e)}", http_status=400)
+	
+	id_, api_key = create_personal_key(
+		db, 
+		ctx.user.id, 
+		payload.name, 
+		payload.scopes, 
+		expires_at,
+		payload.ip_whitelist
+	)
+	return success_response({"id": id_, "api_key": api_key, "message": "کلید API با موفقیت ایجاد شد. لطفاً آن را ذخیره کنید زیرا فقط یک بار نمایش داده می‌شود."})
 
 
 @router.post("/change-password", 
@@ -561,6 +583,71 @@ def change_password_endpoint(request: Request, payload: ChangePasswordRequest, c
 def delete_key(request: Request, key_id: int, ctx: AuthContext = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
 	revoke_key(db, ctx.user.id, key_id)
 	return success_response({"ok": True})
+
+
+@router.get("/api-keys/{key_id}",
+	summary="دریافت جزئیات کلید API",
+	description="دریافت اطلاعات کامل یک کلید API",
+	response_model=SuccessResponse,
+)
+def get_key(request: Request, key_id: int, ctx: AuthContext = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
+	from adapters.db.models.api_key import ApiKey
+	from app.core.responses import ApiError
+	obj = db.get(ApiKey, key_id)
+	if not obj or obj.user_id != ctx.user.id or obj.key_type != "personal":
+		raise ApiError("NOT_FOUND", "Key not found", http_status=404)
+	
+	from datetime import datetime
+	data = {
+		"id": obj.id,
+		"name": obj.name,
+		"scopes": obj.scopes,
+		"ip": obj.ip,
+		"user_agent": obj.user_agent,
+		"created_at": obj.created_at.isoformat() if obj.created_at else None,
+		"expires_at": obj.expires_at.isoformat() if obj.expires_at else None,
+		"last_used_at": obj.last_used_at.isoformat() if obj.last_used_at else None,
+		"revoked_at": obj.revoked_at.isoformat() if obj.revoked_at else None,
+		"is_active": obj.revoked_at is None and (obj.expires_at is None or obj.expires_at > datetime.utcnow()),
+	}
+	return success_response(data)
+
+
+@router.put("/api-keys/{key_id}",
+	summary="ویرایش کلید API",
+	description="ویرایش اطلاعات یک کلید API (نام، محدوده دسترسی، تاریخ انقضا، IP whitelist)",
+	response_model=SuccessResponse,
+)
+def update_key(request: Request, key_id: int, payload: UpdateApiKeyRequest, ctx: AuthContext = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
+	from datetime import datetime
+	from app.services.api_key_service import update_api_key
+	
+	expires_at = None
+	if payload.expires_at is not None:
+		if payload.expires_at == "":
+			expires_at = None
+		else:
+			try:
+				# پارس کردن تاریخ ISO format
+				date_str = payload.expires_at.strip()
+				# تبدیل Z به +00:00 برای timezone
+				if date_str.endswith('Z'):
+					date_str = date_str[:-1] + '+00:00'
+				expires_at = datetime.fromisoformat(date_str)
+			except (ValueError, AttributeError) as e:
+				from app.core.responses import ApiError
+				raise ApiError("INVALID_INPUT", f"Invalid expires_at format. Use ISO format: YYYY-MM-DDTHH:MM:SS. Error: {str(e)}", http_status=400)
+	
+	update_api_key(
+		db,
+		ctx.user.id,
+		key_id,
+		payload.name,
+		payload.scopes,
+		expires_at,
+		payload.ip_whitelist
+	)
+	return success_response({"ok": True, "message": "کلید API با موفقیت به‌روزرسانی شد"})
 
 
 @router.get("/referrals/stats", 

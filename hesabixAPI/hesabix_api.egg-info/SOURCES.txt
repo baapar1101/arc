@@ -37,6 +37,7 @@ adapters/api/v1/petty_cash.py
 adapters/api/v1/ping_pong.py
 adapters/api/v1/price_lists.py
 adapters/api/v1/product_attributes.py
+adapters/api/v1/product_instances.py
 adapters/api/v1/products.py
 adapters/api/v1/profile_dashboard.py
 adapters/api/v1/public_share_links.py
@@ -143,6 +144,7 @@ adapters/db/models/product.py
 adapters/db/models/product_attribute.py
 adapters/db/models/product_attribute_link.py
 adapters/db/models/product_bom.py
+adapters/db/models/product_instance.py
 adapters/db/models/product_tax_code.py
 adapters/db/models/report_template.py
 adapters/db/models/storage_plan.py
@@ -276,6 +278,8 @@ app/services/tax_product_code_service.py
 app/services/tax_setting_service.py
 app/services/tax_submission_service.py
 app/services/tax_validation_service.py
+app/services/telegram_ai_chat_handler.py
+app/services/telegram_ai_chat_service.py
 app/services/template_builder_compiler.py
 app/services/transfer_service.py
 app/services/trial_balance_service.py
@@ -330,9 +334,11 @@ migrations/versions/20250120_000002_add_join_permission.py
 migrations/versions/20250121_000001_add_ai_expense_account.py
 migrations/versions/20250122_000001_add_last_reset_at_and_expires_at_to_ai_subscriptions.py
 migrations/versions/20250123_000001_add_description_to_categories.py
+migrations/versions/20250125_000001_add_telegram_ai_sessions.py
 migrations/versions/20250126_000001_add_gift_credit_account.py
 migrations/versions/20250130_000001_create_tax_settings_table.py
 migrations/versions/20250205_000001_create_document_number_counters.py
+migrations/versions/20250206_000001_add_product_instances_and_unique_inventory.py
 migrations/versions/20250915_000001_init_auth_tables.py
 migrations/versions/20250916_000002_add_referral_fields.py
 migrations/versions/20250926_000010_add_person_code.py
@@ -408,8 +414,10 @@ migrations/versions/a1443c153b47_merge_heads.py
 migrations/versions/a3a3a1b6669f_merge_heads_and_add_user_signature.py
 migrations/versions/ac9e4b3dcffc_add_fiscal_year_to_documents.py
 migrations/versions/b2b68cf299a3_convert_unit_fields_to_string.py
+migrations/versions/bce59a9d4fc4_merge_telegram_ai_sessions.py
 migrations/versions/c302bc2f2cb8_remove_person_type_column.py
 migrations/versions/caf3f4ef4b76_add_tax_units_table.py
+migrations/versions/cc07f77111f2_merge_product_instances_with_telegram_ai.py
 migrations/versions/d3e84892c1c2_sync_person_type_enum_values_callable_.py
 migrations/versions/eb9be5452535_merge_all_final_heads.py
 migrations/versions/f876bfa36805_merge_multiple_heads.py

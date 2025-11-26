@@ -47,6 +47,8 @@
   "reportsItemMovementsSubtitle": "ورود، خروج و مانده کالا به تفکیک بازه",
   "reportsInventoryKardexTitle": "کارتکس انبار",
   "reportsInventoryKardexSubtitle": "ریز گردش هر کالا (FIFO/LIFO/میانگین)",
+  "reportsInventoryStockTitle": "گزارش موجودی انبار",
+  "reportsInventoryStockSubtitle": "موجودی محصولات به تفکیک انبار و تاریخ",
   "reportsSalesByProductTitle": "فروش به تفکیک کالا",
   "reportsSalesByProductSubtitle": "عملکرد فروش هر کالا در بازه زمانی",
   "reportsBankAccountsTurnoverTitle": "گردش حساب‌های بانکی",

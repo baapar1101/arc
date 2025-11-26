@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Dict, Any, Optional, List, Tuple
 from datetime import datetime, date, timedelta
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, load_only
 from sqlalchemy import select, and_, or_, func, case
 from sqlalchemy.types import Numeric
 from decimal import Decimal
@@ -546,7 +546,17 @@ def get_item_movements_report(
     
     # Query پایه: فقط کالاهای با کنترل موجودی
     # Join با Category برای دریافت نام دسته‌بندی
-    query = db.query(Product).outerjoin(
+    # استفاده از load_only برای بارگذاری فقط فیلدهای مورد نیاز (برای جلوگیری از خطای فیلدهای جدید)
+    query = db.query(Product).options(
+        load_only(
+            Product.id,
+            Product.code,
+            Product.name,
+            Product.category_id,
+            Product.main_unit,
+            Product.track_inventory,
+        )
+    ).outerjoin(
         BusinessCategory, Product.category_id == BusinessCategory.id
     ).filter(
         Product.business_id == business_id,
@@ -1398,6 +1408,272 @@ def get_inventory_kardex_report(
             'total_pages': total_pages,
             'has_next': current_page < total_pages,
             'has_prev': current_page > 1,
+        }
+    }
+
+
+def get_inventory_stock_report(
+    db: Session,
+    business_id: int,
+    fiscal_year_id: Optional[int] = None,
+    product_ids: Optional[List[int]] = None,
+    warehouse_ids: Optional[List[int]] = None,
+    category_ids: Optional[List[int]] = None,
+    as_of_date: Optional[str] = None,
+    track_inventory: Optional[bool] = None,
+    only_negative_stock: bool = False,
+    only_without_movements: bool = False,
+    include_zero: bool = False,
+    search: Optional[str] = None,
+    skip: int = 0,
+    take: int = 50,
+) -> Dict[str, Any]:
+    """
+    گزارش موجودی انبار (موجودی کالا)
+    
+    نمایش موجودی محصولات به تفکیک انبار با فیلترهای مختلف
+    
+    Args:
+        db: نشست پایگاه داده
+        business_id: شناسه کسب‌وکار
+        fiscal_year_id: شناسه سال مالی (اختیاری)
+        product_ids: لیست شناسه‌های کالاها (اختیاری)
+        warehouse_ids: لیست شناسه‌های انبارها (اختیاری)
+        category_ids: لیست شناسه‌های دسته‌بندی‌ها (اختیاری)
+        as_of_date: تاریخ گزارش (اختیاری، فرمت YYYY-MM-DD، پیش‌فرض: امروز)
+        track_inventory: فیلتر کنترل موجودی (None=همه، True=فقط با کنترل، False=فقط بدون کنترل)
+        only_negative_stock: فقط موجودی‌های منفی
+        only_without_movements: فقط محصولات فاقد حواله/حرکت
+        include_zero: نمایش موجودی صفر
+        search: جستجو در کد یا نام کالا (اختیاری)
+        skip: تعداد رکوردهای رد شده برای pagination
+        take: تعداد رکوردهای برگشتی
+    
+    Returns:
+        dict: {
+            'items': لیست موجودی‌ها,
+            'as_of_date': تاریخ گزارش,
+            'total_items': تعداد کل,
+            'summary': خلاصه آمار
+        }
+    """
+    from app.services.invoice_service import _compute_available_stock, _iter_product_movements
+    from adapters.db.models.warehouse import Warehouse
+    from adapters.db.models.warehouse_document import WarehouseDocument
+    from adapters.db.models.warehouse_document_line import WarehouseDocumentLine
+    from datetime import date as date_type
+    
+    # تبدیل تاریخ
+    as_of_date_obj = date.today()
+    if as_of_date:
+        try:
+            as_of_date_obj = date_type.fromisoformat(as_of_date) if isinstance(as_of_date, str) else as_of_date
+        except Exception:
+            pass
+    
+    # Query محصولات
+    query = db.query(Product).filter(Product.business_id == business_id)
+    
+    # فیلتر کنترل موجودی
+    if track_inventory is True:
+        query = query.filter(Product.track_inventory == True)
+    elif track_inventory is False:
+        query = query.filter(Product.track_inventory == False)
+    # اگر None باشد، همه محصولات
+    
+    # فیلتر کالاها
+    if product_ids:
+        query = query.filter(Product.id.in_(product_ids))
+    
+    # فیلتر دسته‌بندی
+    if category_ids:
+        query = query.filter(Product.category_id.in_(category_ids))
+    
+    # فیلتر جستجو
+    if search and search.strip():
+        search_filter = or_(
+            Product.code.ilike(f'%{search}%'),
+            Product.name.ilike(f'%{search}%'),
+        )
+        query = query.filter(search_filter)
+    
+    # دریافت لیست محصولات
+    products = query.all()
+    
+    if not products:
+        return {
+            "items": [],
+            "as_of_date": as_of_date_obj.isoformat(),
+            "total_items": 0,
+            "summary": {
+                "total_products": 0,
+                "total_with_stock": 0,
+                "total_zero_stock": 0,
+                "total_negative_stock": 0,
+                "total_without_movements": 0,
+            }
+        }
+    
+    product_id_list = [p.id for p in products]
+    
+    # دریافت لیست انبارها
+    if warehouse_ids:
+        warehouses = db.query(Warehouse).filter(
+            and_(
+                Warehouse.business_id == business_id,
+                Warehouse.id.in_([int(w) for w in warehouse_ids]),
+            )
+        ).all()
+    else:
+        warehouses = db.query(Warehouse).filter(Warehouse.business_id == business_id).all()
+    
+    # بررسی حرکات برای فیلتر فاقد حواله
+    products_with_movements = set()
+    if only_without_movements:
+        # بررسی حرکات از DocumentLine
+        movements_doc = _iter_product_movements(
+            db,
+            business_id,
+            product_id_list,
+            warehouse_ids,
+            as_of_date_obj,
+        )
+        for mv in movements_doc:
+            products_with_movements.add(mv['product_id'])
+        
+        # بررسی حرکات از WarehouseDocumentLine
+        movements_wh_query = db.query(WarehouseDocumentLine.product_id).distinct().join(
+            WarehouseDocument,
+            WarehouseDocument.id == WarehouseDocumentLine.warehouse_document_id
+        ).filter(
+            and_(
+                WarehouseDocument.business_id == business_id,
+                WarehouseDocument.status == "posted",
+                WarehouseDocument.document_date <= as_of_date_obj,
+                WarehouseDocumentLine.product_id.in_(product_id_list),
+            )
+        )
+        if warehouse_ids:
+            movements_wh_query = movements_wh_query.filter(
+                WarehouseDocumentLine.warehouse_id.in_([int(w) for w in warehouse_ids])
+            )
+        movements_wh = movements_wh_query.all()
+        for mv_line in movements_wh:
+            products_with_movements.add(mv_line.product_id)
+    
+    # ساخت لیست آیتم‌ها
+    items = []
+    
+    for product in products:
+        # اگر فیلتر فاقد حواله فعال است و این محصول حرکت دارد، رد کن
+        if only_without_movements and product.id in products_with_movements:
+            continue
+        
+        # تعیین لیست انبارها برای این محصول
+        if warehouse_ids:
+            wh_list = [w for w in warehouses if w.id in [int(wid) for wid in warehouse_ids]]
+        else:
+            wh_list = warehouses
+        
+        # اگر انباری انتخاب نشده، موجودی کل را محاسبه کن
+        if not wh_list:
+            stock = _compute_available_stock(db, business_id, product.id, None, as_of_date_obj)
+            
+            # بررسی فیلتر موجودی صفر
+            if not include_zero and stock == 0:
+                continue
+            
+            # بررسی فیلتر موجودی منفی
+            if only_negative_stock and stock >= 0:
+                continue
+            
+            # بررسی اینکه آیا این محصول حرکت دارد یا نه
+            has_movements = product.id in products_with_movements if only_without_movements else True
+            
+            items.append({
+                "product_id": product.id,
+                "product_code": product.code or "",
+                "product_name": product.name,
+                "category_id": product.category_id,
+                "category_name": None,  # می‌توان بعداً join کرد
+                "warehouse_id": None,
+                "warehouse_code": None,
+                "warehouse_name": "بدون انبار / کل",
+                "quantity": float(stock),
+                "unit": product.unit or "",
+                "track_inventory": product.track_inventory,
+                "has_movements": has_movements,
+            })
+        else:
+            # موجودی به تفکیک انبار
+            for warehouse in wh_list:
+                stock = _compute_available_stock(db, business_id, product.id, warehouse.id, as_of_date_obj)
+                
+                # بررسی فیلتر موجودی صفر
+                if not include_zero and stock == 0:
+                    continue
+                
+                # بررسی فیلتر موجودی منفی
+                if only_negative_stock and stock >= 0:
+                    continue
+                
+                # بررسی اینکه آیا این محصول حرکت دارد یا نه
+                has_movements = product.id in products_with_movements if only_without_movements else True
+                
+                items.append({
+                    "product_id": product.id,
+                    "product_code": product.code or "",
+                    "product_name": product.name,
+                    "category_id": product.category_id,
+                    "category_name": None,
+                    "warehouse_id": warehouse.id,
+                    "warehouse_code": warehouse.code or "",
+                    "warehouse_name": warehouse.name,
+                    "quantity": float(stock),
+                    "unit": product.unit or "",
+                    "track_inventory": product.track_inventory,
+                    "has_movements": has_movements,
+                })
+    
+    # محاسبه خلاصه آمار
+    total_products = len(set(item['product_id'] for item in items))
+    total_with_stock = len([item for item in items if item['quantity'] > 0])
+    total_zero_stock = len([item for item in items if item['quantity'] == 0])
+    total_negative_stock = len([item for item in items if item['quantity'] < 0])
+    total_without_movements = len([item for item in items if not item.get('has_movements', True)])
+    
+    # Pagination
+    total = len(items)
+    if take > 500:
+        take = 500
+    if take < 1:
+        take = 50
+    if skip < 0:
+        skip = 0
+    
+    paginated_items = items[skip:skip + take]
+    
+    # دریافت نام دسته‌بندی‌ها
+    category_ids_set = set(item['category_id'] for item in paginated_items if item['category_id'])
+    if category_ids_set:
+        categories = db.query(BusinessCategory).filter(
+            BusinessCategory.id.in_(list(category_ids_set))
+        ).all()
+        category_dict = {cat.id: cat.name for cat in categories}
+        for item in paginated_items:
+            if item['category_id']:
+                item['category_name'] = category_dict.get(item['category_id'])
+    
+    return {
+        "items": paginated_items,
+        "as_of_date": as_of_date_obj.isoformat(),
+        "total_items": total,
+        "summary": {
+            "total_products": total_products,
+            "total_with_stock": total_with_stock,
+            "total_zero_stock": total_zero_stock,
+            "total_negative_stock": total_negative_stock,
+            "total_without_movements": total_without_movements,
         }
     }
 

@@ -4,6 +4,9 @@ Revision ID: 20250125_000001
 Revises: 20251124_200001
 Create Date: 2025-01-25 00:00:01.000000
 
+Note: This migration was created on 2025-01-25 but depends on a later migration (20251124).
+This is intentional as it was merged after the later migration was created.
+
 """
 from __future__ import annotations
 
@@ -67,13 +70,43 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    # حذف ایندکس‌ها
-    op.drop_index('ix_telegram_ai_sessions_user_chat_active', table_name='telegram_ai_sessions')
-    op.drop_index(op.f('ix_telegram_ai_sessions_business_id'), table_name='telegram_ai_sessions')
-    op.drop_index(op.f('ix_telegram_ai_sessions_session_id'), table_name='telegram_ai_sessions')
-    op.drop_index(op.f('ix_telegram_ai_sessions_chat_id'), table_name='telegram_ai_sessions')
-    op.drop_index(op.f('ix_telegram_ai_sessions_user_id'), table_name='telegram_ai_sessions')
+    from sqlalchemy import inspect
+    conn = op.get_bind()
+    inspector = inspect(conn)
+    tables = inspector.get_table_names()
     
-    # حذف جدول
-    op.drop_table('telegram_ai_sessions')
+    if 'telegram_ai_sessions' in tables:
+        # حذف ایندکس‌ها
+        existing_indexes = {idx['name'] for idx in inspector.get_indexes('telegram_ai_sessions')}
+        if 'ix_telegram_ai_sessions_user_chat_active' in existing_indexes:
+            try:
+                op.drop_index('ix_telegram_ai_sessions_user_chat_active', table_name='telegram_ai_sessions')
+            except Exception:
+                pass
+        if 'ix_telegram_ai_sessions_business_id' in existing_indexes:
+            try:
+                op.drop_index(op.f('ix_telegram_ai_sessions_business_id'), table_name='telegram_ai_sessions')
+            except Exception:
+                pass
+        if 'ix_telegram_ai_sessions_session_id' in existing_indexes:
+            try:
+                op.drop_index(op.f('ix_telegram_ai_sessions_session_id'), table_name='telegram_ai_sessions')
+            except Exception:
+                pass
+        if 'ix_telegram_ai_sessions_chat_id' in existing_indexes:
+            try:
+                op.drop_index(op.f('ix_telegram_ai_sessions_chat_id'), table_name='telegram_ai_sessions')
+            except Exception:
+                pass
+        if 'ix_telegram_ai_sessions_user_id' in existing_indexes:
+            try:
+                op.drop_index(op.f('ix_telegram_ai_sessions_user_id'), table_name='telegram_ai_sessions')
+            except Exception:
+                pass
+        
+        # حذف جدول
+        try:
+            op.drop_table('telegram_ai_sessions')
+        except Exception:
+            pass
 

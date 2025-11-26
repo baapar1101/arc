@@ -63,13 +63,39 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-	# Drop indices
-	op.drop_index('ix_checks_business_due_date', table_name='checks')
-	op.drop_index('ix_checks_business_issue_date', table_name='checks')
-	op.drop_index('ix_checks_business_person', table_name='checks')
-	op.drop_index('ix_checks_business_type', table_name='checks')
-	# Drop table
-	op.drop_table('checks')
+	bind = op.get_bind()
+	inspector = sa.inspect(bind)
+	tables = set(inspector.get_table_names())
+	
+	if 'checks' in tables:
+		# Drop indices
+		existing_indexes = {idx['name'] for idx in inspector.get_indexes('checks')}
+		if 'ix_checks_business_due_date' in existing_indexes:
+			try:
+				op.drop_index('ix_checks_business_due_date', table_name='checks')
+			except Exception:
+				pass
+		if 'ix_checks_business_issue_date' in existing_indexes:
+			try:
+				op.drop_index('ix_checks_business_issue_date', table_name='checks')
+			except Exception:
+				pass
+		if 'ix_checks_business_person' in existing_indexes:
+			try:
+				op.drop_index('ix_checks_business_person', table_name='checks')
+			except Exception:
+				pass
+		if 'ix_checks_business_type' in existing_indexes:
+			try:
+				op.drop_index('ix_checks_business_type', table_name='checks')
+			except Exception:
+				pass
+		# Drop table
+		try:
+			op.drop_table('checks')
+		except Exception:
+			pass
+	
 	# Drop enum type (if supported)
 	try:
 		op.execute("DROP TYPE check_type")

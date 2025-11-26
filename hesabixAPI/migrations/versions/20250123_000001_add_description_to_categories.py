@@ -1,7 +1,7 @@
 """add description to categories table
 
 Revision ID: 20250123_000001_add_description_to_categories
-Revises: 20250122_000001_add_last_reset_at_and_expires_at_to_ai_subscriptions
+Revises: 023c8d2d2222
 Create Date: 2025-01-23 00:00:01.000001
 
 """
@@ -45,5 +45,8 @@ def downgrade() -> None:
     if table_name in inspector.get_table_names():
         columns = {col["name"] for col in inspector.get_columns(table_name)}
         if "description" in columns:
-            op.drop_column(table_name, "description")
+            try:
+                op.drop_column(table_name, "description")
+            except Exception:
+                pass
 

@@ -15,7 +15,9 @@ import 'pages/profile/businesses_page.dart';
 import 'pages/profile/user_signature_page.dart';
 import 'pages/profile/support_page.dart';
 import 'pages/profile/change_password_page.dart';
+import 'pages/profile/api_keys_page.dart';
 import 'pages/profile/marketing_page.dart';
+import 'pages/profile/account_settings_page.dart';
 import 'pages/profile/operator/operator_tickets_page.dart';
 import 'pages/profile/announcements_page.dart';
 import 'pages/system_settings_page.dart';
@@ -52,6 +54,7 @@ import 'pages/business/people_transactions_report_page.dart';
 import 'pages/business/item_movements_report_page.dart';
 import 'pages/business/sales_by_product_report_page.dart';
 import 'pages/business/inventory_kardex_report_page.dart';
+import 'pages/business/inventory_stock_report_page.dart';
 import 'pages/business/bank_accounts_turnover_report_page.dart';
 import 'pages/business/cash_petty_turnover_report_page.dart';
 import 'pages/business/daily_sales_report_page.dart';
@@ -830,6 +833,14 @@ class _MyAppState extends State<MyApp> {
               builder: (context, state) => SupportPage(calendarController: _calendarController),
             ),
             GoRoute(
+              path: '/user/profile/account-settings',
+              name: 'profile_account_settings',
+              builder: (context, state) => AccountSettingsPage(
+                calendarController: _calendarController!,
+                authStore: _authStore!,
+              ),
+            ),
+            GoRoute(
               path: '/user/profile/marketing',
               name: 'profile_marketing',
               builder: (context, state) => MarketingPage(calendarController: _calendarController!),
@@ -843,6 +854,11 @@ class _MyAppState extends State<MyApp> {
               path: '/user/profile/change-password',
               name: 'profile_change_password',
               builder: (context, state) => const ChangePasswordPage(),
+            ),
+            GoRoute(
+              path: '/user/profile/api-keys',
+              name: 'profile_api_keys',
+              builder: (context, state) => ApiKeysPage(calendarController: _calendarController!),
             ),
             GoRoute(
               path: '/user/profile/notifications',
@@ -1469,6 +1485,19 @@ class _MyAppState extends State<MyApp> {
                 final businessId = int.parse(state.pathParameters['business_id']!);
                 return NoTransitionPage(
                   child: InventoryKardexReportPage(
+                    businessId: businessId,
+                    calendarController: _calendarController!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/reports/inventory-stock',
+              name: 'business_reports_inventory_stock',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return NoTransitionPage(
+                  child: InventoryStockReportPage(
                     businessId: businessId,
                     calendarController: _calendarController!,
                   ),

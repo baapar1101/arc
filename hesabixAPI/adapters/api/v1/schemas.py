@@ -61,9 +61,10 @@ class ChangePasswordRequest(BaseModel):
 
 
 class CreateApiKeyRequest(BaseModel):
-	name: Optional[str] = Field(default=None, max_length=100)
-	scopes: Optional[str] = Field(default=None, max_length=500)
-	expires_at: Optional[str] = None  # ISO string; parse server-side if provided
+	name: Optional[str] = Field(default=None, max_length=100, description="نام کلید API")
+	scopes: Optional[str] = Field(default=None, max_length=500, description="محدوده دسترسی (JSON string)")
+	expires_at: Optional[str] = Field(default=None, description="تاریخ انقضا (ISO format)")
+	ip_whitelist: Optional[str] = Field(default=None, max_length=1000, description="لیست IP های مجاز (جدا شده با کاما)")
 
 
 # Response Models
@@ -111,12 +112,20 @@ class ApiKeyResponse(BaseModel):
 	id: int = Field(..., description="شناسه کلید")
 	name: Optional[str] = Field(default=None, description="نام کلید")
 	scopes: Optional[str] = Field(default=None, description="محدوده دسترسی")
-	device_id: Optional[str] = Field(default=None, description="شناسه دستگاه")
+	ip: Optional[str] = Field(default=None, description="لیست IP های مجاز")
 	user_agent: Optional[str] = Field(default=None, description="اطلاعات مرورگر")
-	ip: Optional[str] = Field(default=None, description="آدرس IP")
 	expires_at: Optional[str] = Field(default=None, description="تاریخ انقضا")
 	last_used_at: Optional[str] = Field(default=None, description="آخرین استفاده")
 	created_at: str = Field(..., description="تاریخ ایجاد")
+	revoked_at: Optional[str] = Field(default=None, description="تاریخ لغو")
+	is_active: bool = Field(..., description="وضعیت فعال بودن")
+
+
+class UpdateApiKeyRequest(BaseModel):
+	name: Optional[str] = Field(default=None, max_length=100, description="نام کلید API")
+	scopes: Optional[str] = Field(default=None, max_length=500, description="محدوده دسترسی (JSON string)")
+	expires_at: Optional[str] = Field(default=None, description="تاریخ انقضا (ISO format)")
+	ip_whitelist: Optional[str] = Field(default=None, max_length=1000, description="لیست IP های مجاز (جدا شده با کاما)")
 
 
 class ReferralStatsResponse(BaseModel):

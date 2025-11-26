@@ -3742,6 +3742,13 @@ class AppLocalizationsFa extends AppLocalizations {
       'ریز گردش هر کالا (FIFO/LIFO/میانگین)';
 
   @override
+  String get reportsInventoryStockTitle => 'گزارش موجودی انبار';
+
+  @override
+  String get reportsInventoryStockSubtitle =>
+      'موجودی محصولات به تفکیک انبار و تاریخ';
+
+  @override
   String get reportsSalesByProductTitle => 'فروش به تفکیک کالا';
 
   @override

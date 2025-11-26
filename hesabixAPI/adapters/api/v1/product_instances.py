@@ -316,6 +316,66 @@ def create_bulk_product_instances(
     )
 
 
+@router.get("/business/{business_id}/search-by-code")
+@require_business_access("business_id")
+def search_instance_by_code(
+	request: Request,
+	business_id: int,
+	code: str = Query(..., description="بارکد یا سریال نامبر"),
+	ctx: AuthContext = Depends(get_current_user),
+	db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+	"""جستجوی کالای یونیک با بارکد یا سریال نامبر."""
+	if not ctx.has_business_permission("inventory", "read"):
+		raise ApiError("FORBIDDEN", "Missing business permission: inventory.read", http_status=403)
+	
+	if not code or not code.strip():
+		raise ApiError("CODE_REQUIRED", "Barcode or serial number is required", http_status=400)
+	
+	code_trimmed = code.strip()
+	
+	# جستجو در بارکد و سریال نامبر
+	query = db.query(ProductInstance).filter(
+		and_(
+			ProductInstance.business_id == business_id,
+			ProductInstance.status == "available",
+			or_(
+				ProductInstance.barcode == code_trimmed,
+				ProductInstance.serial_number == code_trimmed,
+			),
+		)
+	)
+	
+	instance = query.first()
+	
+	if not instance:
+		raise ApiError("NOT_FOUND", "Product instance not found", http_status=404)
+	
+	warehouse_name = None
+	if instance.warehouse_id and instance.warehouse:
+		warehouse_name = instance.warehouse.name
+	
+	product_name = None
+	if instance.product:
+		product_name = instance.product.name
+	
+	return success_response(
+		data={
+			"id": instance.id,
+			"product_id": instance.product_id,
+			"product_name": product_name,
+			"serial_number": instance.serial_number,
+			"barcode": instance.barcode,
+			"warehouse_id": instance.warehouse_id,
+			"warehouse_name": warehouse_name,
+			"status": instance.status,
+			"custom_attributes": instance.custom_attributes or {},
+			"entry_date": instance.entry_date.isoformat() if instance.entry_date else None,
+		},
+		request=request,
+	)
+
+
 @router.get("/business/{business_id}/{instance_id}")
 @require_business_access("business_id")
 def get_product_instance(
@@ -439,66 +499,6 @@ def update_product_instance(
         },
         request=request,
     )
-
-
-@router.get("/business/{business_id}/search-by-code")
-@require_business_access("business_id")
-def search_instance_by_code(
-	request: Request,
-	business_id: int,
-	code: str = Query(..., description="بارکد یا سریال نامبر"),
-	ctx: AuthContext = Depends(get_current_user),
-	db: Session = Depends(get_db),
-) -> Dict[str, Any]:
-	"""جستجوی کالای یونیک با بارکد یا سریال نامبر."""
-	if not ctx.has_business_permission("inventory", "read"):
-		raise ApiError("FORBIDDEN", "Missing business permission: inventory.read", http_status=403)
-	
-	if not code or not code.strip():
-		raise ApiError("CODE_REQUIRED", "Barcode or serial number is required", http_status=400)
-	
-	code_trimmed = code.strip()
-	
-	# جستجو در بارکد و سریال نامبر
-	query = db.query(ProductInstance).filter(
-		and_(
-			ProductInstance.business_id == business_id,
-			ProductInstance.status == "available",
-			or_(
-				ProductInstance.barcode == code_trimmed,
-				ProductInstance.serial_number == code_trimmed,
-			),
-		)
-	)
-	
-	instance = query.first()
-	
-	if not instance:
-		raise ApiError("NOT_FOUND", "Product instance not found", http_status=404)
-	
-	warehouse_name = None
-	if instance.warehouse_id and instance.warehouse:
-		warehouse_name = instance.warehouse.name
-	
-	product_name = None
-	if instance.product:
-		product_name = instance.product.name
-	
-	return success_response(
-		data={
-			"id": instance.id,
-			"product_id": instance.product_id,
-			"product_name": product_name,
-			"serial_number": instance.serial_number,
-			"barcode": instance.barcode,
-			"warehouse_id": instance.warehouse_id,
-			"warehouse_name": warehouse_name,
-			"status": instance.status,
-			"custom_attributes": instance.custom_attributes or {},
-			"entry_date": instance.entry_date.isoformat() if instance.entry_date else None,
-		},
-		request=request,
-	)
 
 
 @router.delete("/business/{business_id}/{instance_id}")

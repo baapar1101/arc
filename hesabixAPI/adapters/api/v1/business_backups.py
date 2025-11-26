@@ -301,6 +301,8 @@ async def create_backup(
                         },
                         is_temporary=False,
                         expires_in_days=3650,
+                        business_id=business_id,
+                        check_storage_limit=True,
                     )
                     return saved
                 saved = anyio.run(_upload)
@@ -325,6 +327,8 @@ async def create_backup(
             },
             is_temporary=False,
             expires_in_days=3650,
+            business_id=business_id,
+            check_storage_limit=True,
         )
         return success_response({"file": saved, "metadata": data["metadata"]}, request=request, message="Backup created")
 

@@ -123,77 +123,104 @@ class _ProductPricingInventorySectionState extends State<ProductPricingInventory
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // انتخاب حالت موجودی (فله‌ای/یونیک) - همیشه نمایش داده می‌شود
+        Card(
+          elevation: 1,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'حالت موجودی',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SegmentedButton<String>(
+                  segments: const [
+                    ButtonSegment(
+                      value: 'bulk',
+                      label: Text('فله‌ای'),
+                      icon: Icon(Icons.inventory_2_outlined),
+                    ),
+                    ButtonSegment(
+                      value: 'unique',
+                      label: Text('یونیک'),
+                      icon: Icon(Icons.qr_code_scanner),
+                    ),
+                  ],
+                  selected: {widget.formData.inventoryMode ?? 'bulk'},
+                  onSelectionChanged: (Set<String> newSelection) {
+                    final mode = newSelection.first;
+                    _updateFormData(
+                      widget.formData.copyWith(
+                        inventoryMode: mode,
+                        // اگر به حالت فله‌ای تغییر کرد، track_serial و track_barcode را false کن
+                        trackSerial: mode == 'unique' ? widget.formData.trackSerial : false,
+                        trackBarcode: mode == 'unique' ? widget.formData.trackBarcode : false,
+                      ),
+                    );
+                  },
+                ),
+                // گزینه‌های ردیابی برای حالت یونیک
+                if (widget.formData.inventoryMode == 'unique') ...[
+                  const SizedBox(height: 16),
+                  SwitchListTile(
+                    value: widget.formData.trackSerial,
+                    onChanged: (value) => _updateFormData(widget.formData.copyWith(trackSerial: value)),
+                    title: const Text('ردیابی سریال نامبر'),
+                    subtitle: const Text('هر واحد کالا دارای شماره سریال یکتا خواهد بود'),
+                  ),
+                  SwitchListTile(
+                    value: widget.formData.trackBarcode,
+                    onChanged: (value) => _updateFormData(widget.formData.copyWith(trackBarcode: value)),
+                    title: const Text('ردیابی بارکد'),
+                    subtitle: const Text('هر واحد کالا دارای بارکد یکتا خواهد بود'),
+                  ),
+                ],
+                // هشدار اگر trackInventory غیرفعال باشد
+                if (!widget.formData.trackInventory) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.shade50,
+                      border: Border.all(color: Colors.blue.shade200),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.info_outline, color: Colors.blue.shade700, size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'برای استفاده از حالت یونیک، باید "کنترل موجودی" را فعال کنید',
+                            style: TextStyle(
+                              color: Colors.blue.shade800,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                // هشدار تبدیل از bulk به unique
+                if (widget.productId != null && widget.controller != null) 
+                  _buildConversionWarning(),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
         SwitchListTile(
           value: widget.formData.trackInventory,
           onChanged: (value) => _updateFormData(widget.formData.copyWith(trackInventory: value)),
           title: Text(t.inventoryControl),
         ),
         if (widget.formData.trackInventory) ...[
-          const SizedBox(height: 16),
-          // انتخاب حالت موجودی (فله‌ای/یونیک)
-          Card(
-            elevation: 1,
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'حالت موجودی',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  SegmentedButton<String>(
-                    segments: const [
-                      ButtonSegment(
-                        value: 'bulk',
-                        label: Text('فله‌ای'),
-                        icon: Icon(Icons.inventory_2_outlined),
-                      ),
-                      ButtonSegment(
-                        value: 'unique',
-                        label: Text('یونیک'),
-                        icon: Icon(Icons.qr_code_scanner),
-                      ),
-                    ],
-                    selected: {widget.formData.inventoryMode ?? 'bulk'},
-                    onSelectionChanged: (Set<String> newSelection) {
-                      final mode = newSelection.first;
-                      _updateFormData(
-                        widget.formData.copyWith(
-                          inventoryMode: mode,
-                          // اگر به حالت فله‌ای تغییر کرد، track_serial و track_barcode را false کن
-                          trackSerial: mode == 'unique' ? widget.formData.trackSerial : false,
-                          trackBarcode: mode == 'unique' ? widget.formData.trackBarcode : false,
-                        ),
-                      );
-                    },
-                  ),
-                  // گزینه‌های ردیابی برای حالت یونیک
-                  if (widget.formData.inventoryMode == 'unique') ...[
-                    const SizedBox(height: 16),
-                    SwitchListTile(
-                      value: widget.formData.trackSerial,
-                      onChanged: (value) => _updateFormData(widget.formData.copyWith(trackSerial: value)),
-                      title: const Text('ردیابی سریال نامبر'),
-                      subtitle: const Text('هر واحد کالا دارای شماره سریال یکتا خواهد بود'),
-                    ),
-                    SwitchListTile(
-                      value: widget.formData.trackBarcode,
-                      onChanged: (value) => _updateFormData(widget.formData.copyWith(trackBarcode: value)),
-                      title: const Text('ردیابی بارکد'),
-                      subtitle: const Text('هر واحد کالا دارای بارکد یکتا خواهد بود'),
-                    ),
-                  ],
-                  // هشدار تبدیل از bulk به unique
-                  if (widget.productId != null && widget.controller != null) 
-                    _buildConversionWarning(),
-                ],
-              ),
-            ),
-          ),
           const SizedBox(height: 16),
           WarehouseComboboxWidget(
             businessId: widget.businessId,

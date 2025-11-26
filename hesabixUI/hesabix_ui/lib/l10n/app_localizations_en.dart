@@ -3763,6 +3763,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Per-item movement details (FIFO/LIFO/average)';
 
   @override
+  String get reportsInventoryStockTitle => 'Inventory stock report';
+
+  @override
+  String get reportsInventoryStockSubtitle =>
+      'Product inventory by warehouse and date';
+
+  @override
   String get reportsSalesByProductTitle => 'Sales by product';
 
   @override

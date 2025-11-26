@@ -236,7 +236,7 @@ class TelegramAIChatService:
 			reply_markup=keyboard
 		)
 	
-	def process_message(self, text: str, user_context: AuthContext) -> bool:
+	async def process_message(self, text: str, user_context: AuthContext) -> bool:
 		"""پردازش پیام متنی و ارسال به AI"""
 		# دریافت جلسه فعال
 		active_session = self.session_repo.get_active_session(self.user_id, self.chat_id)
@@ -250,7 +250,7 @@ class TelegramAIChatService:
 			)
 		
 		# ارسال پیام "در حال پردازش..."
-		processing_msg = self.telegram_provider.send_text(
+		self.telegram_provider.send_text(
 			chat_id=self.chat_id,
 			text="⏳ در حال پردازش..."
 		)
@@ -291,14 +291,12 @@ class TelegramAIChatService:
 			self.db.commit()
 			self.db.refresh(user_message)
 			
-			# ارسال به AI (non-streaming برای تلگرام)
-			import asyncio
-			loop = asyncio.get_event_loop()
-			response = loop.run_until_complete(ai_service.chat_completion(
+			# ارسال به AI (async)
+			response = await ai_service.chat_completion(
 				messages=messages,
 				use_function_calling=True,
 				session_business_id=active_session.business_id
-			))
+			)
 			
 			# بررسی سهمیه و شارژ
 			usage = response.get("usage", {})
@@ -334,9 +332,7 @@ class TelegramAIChatService:
 				ai_session.updated_at = datetime.utcnow()
 				# اگر عنوان پیش‌فرض است و این اولین پیام است، عنوان هوشمند بساز
 				if ai_session.title == "گفت‌وگوی جدید" or ai_session.title == "جلسه چت جدید":
-					import asyncio
-					loop = asyncio.get_event_loop()
-					generated_title = loop.run_until_complete(ai_service.generate_chat_title(text))
+					generated_title = await ai_service.generate_chat_title(text)
 					if generated_title:
 						ai_session.title = generated_title[:80]
 			

@@ -55,7 +55,7 @@ async def handle_telegram_message(
 		return telegram_provider.send_text(chat_id=chat_id, text=help_text)
 	
 	# پردازش پیام متنی به عنوان سوال از AI
-	return service.process_message(text, user_context)
+	return await service.process_message(text, user_context)
 
 
 async def handle_telegram_callback_query(
@@ -423,9 +423,7 @@ async def handle_suggest_reply(
 			{"role": "user", "content": f"لطفاً برای این تیکت پاسخ مناسبی پیشنهاد دهید:\n\n{ticket.description}"}
 		]
 		
-		import asyncio
-		loop = asyncio.get_event_loop()
-		response = loop.run_until_complete(ai_service.chat_completion(ai_messages, use_function_calling=True))
+		response = await ai_service.chat_completion(ai_messages, use_function_calling=True)
 		
 		# بررسی سهمیه و شارژ
 		usage = response.get("usage", {})
@@ -539,9 +537,7 @@ async def handle_auto_reply(
 			{"role": "user", "content": f"لطفاً برای این تیکت پاسخ مناسبی پیشنهاد دهید:\n\n{ticket.description}"}
 		]
 		
-		import asyncio
-		loop = asyncio.get_event_loop()
-		response = loop.run_until_complete(ai_service.chat_completion(ai_messages, use_function_calling=True))
+		response = await ai_service.chat_completion(ai_messages, use_function_calling=True)
 		
 		# بررسی سهمیه و شارژ
 		usage = response.get("usage", {})

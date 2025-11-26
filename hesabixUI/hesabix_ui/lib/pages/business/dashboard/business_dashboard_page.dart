@@ -11,12 +11,14 @@ import '../../../widgets/fiscal_year_switcher.dart';
 import '../../../core/auth_store.dart';
 import '../../../utils/date_formatters.dart';
 import '../../../utils/number_formatters.dart';
+import '../../../core/date_utils.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:shamsi_date/shamsi_date.dart';
 import 'package:hesabix_ui/widgets/jalali_date_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../services/currency_service.dart';
 import '../../../utils/snackbar_helper.dart';
+import '../../../widgets/document/document_details_dialog.dart';
 
 typedef DashboardWidgetBuilder = Widget Function(BuildContext, dynamic, DashboardLayoutItem, {VoidCallback? onRefresh});
 
@@ -930,6 +932,9 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
   Widget _latestSalesInvoicesWidget(BuildContext context, dynamic data, DashboardLayoutItem item, {VoidCallback? onRefresh}) {
     final theme = Theme.of(context);
     final items = (data is Map && data['items'] is List) ? List<Map<String, dynamic>>.from(data['items'] as List) : const <Map<String, dynamic>>[];
+    final calendarController = widget.calendarController;
+    final isJalali = calendarController?.isJalali ?? true;
+    
     return items.isEmpty
           ? Padding(
               padding: const EdgeInsets.all(16.0),
@@ -937,38 +942,61 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
                 child: Text('داده‌ای یافت نشد', style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
               ),
             )
-          : ListView.separated(
-              physics: const NeverScrollableScrollPhysics(),
-              shrinkWrap: true,
-              itemCount: items.length,
-              separatorBuilder: (_, __) => const Divider(height: 1),
-              itemBuilder: (context, index) {
-                final it = items[index];
-                final code = '${it['code'] ?? '-'}';
-                final date = DateFormatters.formatServerDateOnly(it['document_date']);
-                final net = formatWithThousands(it['net_amount']);
-                final currency = (it['currency_code'] ?? '').toString();
-                final itemsCount = (it['items_count'] ?? 0) as int;
-                final subtitle = StringBuffer()
-                  ..write(date)
-                  ..write(' • ')
-                  ..write(currency.isNotEmpty ? currency : '—')
-                  ..write(' • ')
-                  ..write('اقلام: $itemsCount');
-                return ListTile(
-                  dense: true,
-                  leading: const Icon(Icons.receipt_long),
-                  title: Text(code),
-                  subtitle: Text(subtitle.toString()),
-                  trailing: Text(
-                    currency.isNotEmpty ? '$net $currency' : net,
-                    style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
-                  ),
-                  onTap: () {
-                    // TODO: ناوبری به صفحه فاکتور در صورت نیاز
-                  },
-                );
-              },
+          : Container(
+              height: 300, // ارتفاع فیکس
+              child: ListView.separated(
+                itemCount: items.length,
+                separatorBuilder: (_, __) => const Divider(height: 1),
+                itemBuilder: (context, index) {
+                  final it = items[index];
+                  final code = '${it['code'] ?? '-'}';
+                  // Parse تاریخ از ISO format و فرمت بر اساس تقویم کاربر
+                  DateTime? dateTime;
+                  try {
+                    final dateStr = it['document_date']?.toString();
+                    if (dateStr != null && dateStr.isNotEmpty) {
+                      // Try parsing as ISO format (supports both YYYY-MM-DD and full ISO)
+                      dateTime = DateTime.parse(dateStr);
+                    }
+                  } catch (e) {
+                    // در صورت خطا، از فرمت قبلی استفاده می‌کنیم
+                  }
+                  final date = dateTime != null 
+                      ? HesabixDateUtils.formatForDisplay(dateTime, isJalali)
+                      : DateFormatters.formatServerDateOnly(it['document_date']);
+                  final net = formatWithThousands(it['net_amount']);
+                  final currency = (it['currency_code'] ?? '').toString();
+                  final itemsCount = (it['items_count'] ?? 0) as int;
+                  final subtitle = StringBuffer()
+                    ..write(date)
+                    ..write(' • ')
+                    ..write(currency.isNotEmpty ? currency : '—')
+                    ..write(' • ')
+                    ..write('اقلام: $itemsCount');
+                  return ListTile(
+                    dense: true,
+                    leading: const Icon(Icons.receipt_long),
+                    title: Text(code),
+                    subtitle: Text(subtitle.toString()),
+                    trailing: Text(
+                      currency.isNotEmpty ? '$net $currency' : net,
+                      style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
+                    ),
+                    onTap: () {
+                      final invoiceId = it['id'] as int?;
+                      if (invoiceId != null && calendarController != null) {
+                        showDialog(
+                          context: context,
+                          builder: (_) => DocumentDetailsDialog(
+                            documentId: invoiceId,
+                            calendarController: calendarController,
+                          ),
+                        );
+                      }
+                    },
+                  );
+                },
+              ),
             );
   }
 

@@ -103,6 +103,13 @@ class ReportsPage extends StatelessWidget {
                 ),
                 _buildReportItem(
                   context,
+                  title: t.reportsInventoryStockTitle,
+                  subtitle: t.reportsInventoryStockSubtitle,
+                  icon: Icons.inventory_2_outlined,
+                  onTap: () => context.go('/business/$businessId/reports/inventory-stock'),
+                ),
+                _buildReportItem(
+                  context,
                   title: t.reportsSalesByProductTitle,
                   subtitle: t.reportsSalesByProductSubtitle,
                   icon: Icons.shopping_cart_checkout,

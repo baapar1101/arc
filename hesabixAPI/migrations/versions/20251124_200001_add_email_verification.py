@@ -57,14 +57,47 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    from sqlalchemy import inspect
+    conn = op.get_bind()
+    inspector = inspect(conn)
+    tables = inspector.get_table_names()
+    
     # حذف جدول email_verification_tokens
-    op.drop_index(op.f('ix_email_verification_tokens_token_hash'), table_name='email_verification_tokens')
-    op.drop_index(op.f('ix_email_verification_tokens_email'), table_name='email_verification_tokens')
-    op.drop_index(op.f('ix_email_verification_tokens_user_id'), table_name='email_verification_tokens')
-    op.drop_table('email_verification_tokens')
+    if 'email_verification_tokens' in tables:
+        existing_indexes = {idx['name'] for idx in inspector.get_indexes('email_verification_tokens')}
+        if 'ix_email_verification_tokens_token_hash' in existing_indexes:
+            try:
+                op.drop_index(op.f('ix_email_verification_tokens_token_hash'), table_name='email_verification_tokens')
+            except Exception:
+                pass
+        if 'ix_email_verification_tokens_email' in existing_indexes:
+            try:
+                op.drop_index(op.f('ix_email_verification_tokens_email'), table_name='email_verification_tokens')
+            except Exception:
+                pass
+        if 'ix_email_verification_tokens_user_id' in existing_indexes:
+            try:
+                op.drop_index(op.f('ix_email_verification_tokens_user_id'), table_name='email_verification_tokens')
+            except Exception:
+                pass
+        try:
+            op.drop_table('email_verification_tokens')
+        except Exception:
+            pass
     
     # حذف فیلد email_verified از جدول users
-    op.drop_index(op.f('ix_users_email_verified'), table_name='users')
-    op.drop_column('users', 'email_verified')
+    if 'users' in tables:
+        columns = {col['name'] for col in inspector.get_columns('users')}
+        if 'email_verified' in columns:
+            existing_indexes = {idx['name'] for idx in inspector.get_indexes('users')}
+            if 'ix_users_email_verified' in existing_indexes:
+                try:
+                    op.drop_index(op.f('ix_users_email_verified'), table_name='users')
+                except Exception:
+                    pass
+            try:
+                op.drop_column('users', 'email_verified')
+            except Exception:
+                pass
 
 

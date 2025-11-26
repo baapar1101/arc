@@ -4,6 +4,9 @@ Revision ID: 20250130_000001_create_tax_settings_table
 Revises: 20251120_053716_add_ai_tables
 Create Date: 2025-01-30 10:00:00.000000
 
+Note: This migration was created on 2025-01-30 but depends on a later migration (20251120).
+This is intentional as it was merged after the later migration was created.
+
 """
 from alembic import op
 import sqlalchemy as sa

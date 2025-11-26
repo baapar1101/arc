@@ -39,9 +39,32 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    with op.batch_alter_table('warehouses') as batch_op:
-        batch_op.drop_column('postal_code')
-        batch_op.drop_column('address')
-        batch_op.drop_column('phone')
-        batch_op.drop_column('warehouse_keeper')
+    bind = op.get_bind()
+    inspector = inspect(bind)
+    
+    # Check if warehouses table exists
+    if inspector.has_table('warehouses'):
+        cols = {c['name'] for c in inspector.get_columns('warehouses')}
+        
+        with op.batch_alter_table('warehouses') as batch_op:
+            if 'postal_code' in cols:
+                try:
+                    batch_op.drop_column('postal_code')
+                except Exception:
+                    pass
+            if 'address' in cols:
+                try:
+                    batch_op.drop_column('address')
+                except Exception:
+                    pass
+            if 'phone' in cols:
+                try:
+                    batch_op.drop_column('phone')
+                except Exception:
+                    pass
+            if 'warehouse_keeper' in cols:
+                try:
+                    batch_op.drop_column('warehouse_keeper')
+                except Exception:
+                    pass
 

@@ -1389,6 +1389,8 @@
   "reportsItemMovementsSubtitle": "In, out and balance over a period",
   "reportsInventoryKardexTitle": "Inventory kardex",
   "reportsInventoryKardexSubtitle": "Per-item movement details (FIFO/LIFO/average)",
+  "reportsInventoryStockTitle": "Inventory stock report",
+  "reportsInventoryStockSubtitle": "Product inventory by warehouse and date",
   "reportsSalesByProductTitle": "Sales by product",
   "reportsSalesByProductSubtitle": "Performance of each product in time range",
   "reportsBankAccountsTurnoverTitle": "Bank accounts turnover",

@@ -1,7 +1,7 @@
 """add business_document_numbering_settings table
 
 Revision ID: 20241120_000001_add_document_numbering_settings
-Revises: 20251120_000001_add_default_warehouse_to_products
+Revises: eb9be5452535
 Create Date: 2024-11-20 00:00:01.000001
 
 """

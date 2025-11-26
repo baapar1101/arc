@@ -461,11 +461,42 @@ def get_current_user(
 	obj = repo.get_by_hash(key_hash)
 	if not obj or obj.revoked_at is not None:
 		raise ApiError("UNAUTHORIZED", "Invalid API key", http_status=401)
+	
+	# بررسی انقضا
+	from datetime import datetime
+	if obj.expires_at and obj.expires_at < datetime.utcnow():
+		raise ApiError("UNAUTHORIZED", "API key has expired", http_status=401)
+
+	# بررسی IP Whitelist (فقط برای personal keys)
+	if obj.key_type == "personal" and obj.ip:
+		client_ip = request.client.host if request.client else None
+		# بررسی IP از headers (برای proxy)
+		if not client_ip:
+			x_forwarded_for = request.headers.get("X-Forwarded-For")
+			if x_forwarded_for:
+				client_ip = x_forwarded_for.split(",")[0].strip()
+			else:
+				x_real_ip = request.headers.get("X-Real-IP")
+				if x_real_ip:
+					client_ip = x_real_ip
+		
+		if client_ip:
+			# لیست IP های مجاز را parse کن
+			allowed_ips = [ip.strip() for ip in obj.ip.split(",") if ip.strip()]
+			if allowed_ips and client_ip not in allowed_ips:
+				logger.warning(f"IP {client_ip} not in whitelist for API key {obj.id}")
+				raise ApiError("FORBIDDEN", "IP address not allowed", http_status=403)
 
 	from adapters.db.models.user import User
 	user = db.get(User, obj.user_id)
 	if not user or not user.is_active:
 		raise ApiError("UNAUTHORIZED", "Invalid API key", http_status=401)
+	
+	# به‌روزرسانی last_used_at (هر 60 ثانیه یکبار)
+	if obj.last_used_at is None or (datetime.utcnow() - obj.last_used_at).total_seconds() > 60:
+		obj.last_used_at = datetime.utcnow()
+		db.add(obj)
+		db.commit()
 
 	# تشخیص زبان از هدر Accept-Language با fallback به تنظیمات سیستم
 	language = _detect_language(request, db)
