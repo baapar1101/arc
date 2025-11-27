@@ -254,7 +254,10 @@ class _GeneralLedgerReportPageState extends State<GeneralLedgerReportPage> {
       searchFields: const ['document_code', 'description', 'counterpart_name'],
       defaultPageSize: 50,
       additionalParams: _additionalParams(),
-      showExportButtons: false, // Excel export can be added later if needed
+      showExportButtons: true,
+      excelEndpoint: '/api/v1/businesses/${widget.businessId}/reports/general-ledger/export/excel',
+      pdfEndpoint: '/api/v1/businesses/${widget.businessId}/reports/general-ledger/export/pdf',
+      getExportParams: () => _additionalParams(),
       footerTotals: {
         'debit': 'جمع بدهکار',
         'credit': 'جمع بستانکار',

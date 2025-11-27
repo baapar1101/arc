@@ -161,6 +161,8 @@ class _MonthlySalesReportPageState extends State<MonthlySalesReportPage> {
       showActiveFilters: true,
       showClearFiltersButton: false,
       showExportButtons: true,
+      excelEndpoint: '/api/v1/businesses/${widget.businessId}/reports/monthly-sales/export/excel',
+      pdfEndpoint: '/api/v1/businesses/${widget.businessId}/reports/monthly-sales/export/pdf',
       additionalParams: _additionalParams(),
       columns: [
         TextColumn(

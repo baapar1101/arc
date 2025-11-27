@@ -1159,7 +1159,7 @@ async def export_single_invoice_pdf(
 async def search_invoices_endpoint(
     request: Request,
     business_id: int,
-    query_info: QueryInfo = Body(...),
+    body_data: Dict[str, Any] = Body(...),
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
@@ -1170,6 +1170,12 @@ async def search_invoices_endpoint(
     locale = negotiate_locale(request.headers.get("Accept-Language"))
     is_fa = locale == "fa"
 
+    # Parse QueryInfo from body_data
+    query_info = QueryInfo(**{k: v for k, v in body_data.items() if k in ['take', 'skip', 'sort_by', 'sort_desc', 'search', 'search_fields', 'filters', 'include_inventory', 'inventory_as_of_date']})
+    
+    # Extract additional fields for filtering
+    body = body_data
+
     # Base query
     q = db.query(Document).filter(
         and_(
@@ -1177,15 +1183,6 @@ async def search_invoices_endpoint(
             Document.document_type.in_(list(SUPPORTED_INVOICE_TYPES)),
         )
     )
-
-    # Merge flat body extras similar to other list endpoints
-    body: Dict[str, Any] = {}
-    try:
-        body_json = await request.json()
-        if isinstance(body_json, dict):
-            body = body_json
-    except Exception:
-        body = {}
 
     # Simple search on code/description
     search: Optional[str] = getattr(query_info, 'search', None)

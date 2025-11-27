@@ -866,22 +866,29 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
     final taxAmount = e.taxAmount;
     final lineTotal = e.total;
 
+    // اضافه کردن warehouse_id به extra_info اگر وجود دارد
+    final extraInfoMap = <String, dynamic>{
+      'unit_price': e.unitPrice,
+      'line_discount': lineDiscount,
+      'tax_amount': taxAmount,
+      'line_total': lineTotal,
+      if (movement != null) 'movement': movement,
+      'unit': e.selectedUnit ?? e.mainUnit,
+      'unit_price_source': e.unitPriceSource,
+      'discount_type': e.discountType,
+      'discount_value': e.discountValue,
+      'tax_rate': e.taxRate,
+    };
+    
+    if (e.warehouseId != null) {
+      extraInfoMap['warehouse_id'] = e.warehouseId;
+    }
+
     return <String, dynamic>{
       'product_id': e.productId,
       'quantity': e.quantity,
       if ((e.description ?? '').isNotEmpty) 'description': e.description,
-      'extra_info': {
-        'unit_price': e.unitPrice,
-        'line_discount': lineDiscount,
-        'tax_amount': taxAmount,
-        'line_total': lineTotal,
-        if (movement != null) 'movement': movement,
-        'unit': e.selectedUnit ?? e.mainUnit,
-        'unit_price_source': e.unitPriceSource,
-        'discount_type': e.discountType,
-        'discount_value': e.discountValue,
-        'tax_rate': e.taxRate,
-      },
+      'extra_info': extraInfoMap,
     };
   }
 }

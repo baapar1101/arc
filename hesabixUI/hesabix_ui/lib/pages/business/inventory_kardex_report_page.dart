@@ -247,6 +247,7 @@ class _InventoryKardexReportPageState extends State<InventoryKardexReportPage> {
       additionalParams: _additionalParams(),
       showExportButtons: true,
       excelEndpoint: '/api/v1/products/businesses/${widget.businessId}/reports/inventory-kardex/export/excel',
+      pdfEndpoint: '/api/v1/products/businesses/${widget.businessId}/reports/inventory-kardex/export/pdf',
       getExportParams: () => _additionalParams(),
     );
   }

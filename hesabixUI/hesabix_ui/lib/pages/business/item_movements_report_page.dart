@@ -217,6 +217,7 @@ class _ItemMovementsReportPageState extends State<ItemMovementsReportPage> {
       additionalParams: _additionalParams(),
       showExportButtons: true,
       excelEndpoint: '/api/v1/products/businesses/${widget.businessId}/reports/item-movements/export/excel',
+      pdfEndpoint: '/api/v1/products/businesses/${widget.businessId}/reports/item-movements/export/pdf',
       getExportParams: () => _additionalParams(),
       footerTotals: {
         'opening_balance': 'جمع مانده ابتدای دوره',

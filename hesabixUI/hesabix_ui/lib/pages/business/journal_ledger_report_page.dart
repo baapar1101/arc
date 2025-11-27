@@ -273,6 +273,7 @@ class _JournalLedgerReportPageState extends State<JournalLedgerReportPage> {
       additionalParams: _additionalParams(),
       showExportButtons: true,
       excelEndpoint: '/api/v1/businesses/${widget.businessId}/reports/journal-ledger/export/excel',
+      pdfEndpoint: '/api/v1/businesses/${widget.businessId}/reports/journal-ledger/export/pdf',
       getExportParams: () => _additionalParams(),
       footerTotals: {
         'debit_amount': 'جمع بدهکار',

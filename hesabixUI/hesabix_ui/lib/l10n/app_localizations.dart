@@ -10249,6 +10249,120 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'0 = Unlimited'**
   String get zeroMeansUnlimited;
+
+  /// No description provided for @otpLogin.
+  ///
+  /// In en, this message translates to:
+  /// **'OTP Login'**
+  String get otpLogin;
+
+  /// No description provided for @otpLoginTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Login with OTP'**
+  String get otpLoginTitle;
+
+  /// No description provided for @otpLoginSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Login code will be sent to your email, mobile number or Telegram'**
+  String get otpLoginSubtitle;
+
+  /// No description provided for @otpLoginIdentifierHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your email or mobile number'**
+  String get otpLoginIdentifierHint;
+
+  /// No description provided for @otpLoginIdentifierRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Email or mobile number is required'**
+  String get otpLoginIdentifierRequired;
+
+  /// No description provided for @otpCodeSent.
+  ///
+  /// In en, this message translates to:
+  /// **'Code sent'**
+  String get otpCodeSent;
+
+  /// No description provided for @otpChannelSelectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Receive code via:'**
+  String get otpChannelSelectionTitle;
+
+  /// No description provided for @otpChannelSms.
+  ///
+  /// In en, this message translates to:
+  /// **'SMS'**
+  String get otpChannelSms;
+
+  /// No description provided for @otpChannelEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'Email'**
+  String get otpChannelEmail;
+
+  /// No description provided for @otpChannelTelegram.
+  ///
+  /// In en, this message translates to:
+  /// **'Telegram'**
+  String get otpChannelTelegram;
+
+  /// No description provided for @otpSendCodeButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Send login code'**
+  String get otpSendCodeButton;
+
+  /// No description provided for @otpChangeChannelTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Change delivery method:'**
+  String get otpChangeChannelTitle;
+
+  /// No description provided for @otpChangeIdentifier.
+  ///
+  /// In en, this message translates to:
+  /// **'Change identifier'**
+  String get otpChangeIdentifier;
+
+  /// No description provided for @otpSelectChannelError.
+  ///
+  /// In en, this message translates to:
+  /// **'Please select a delivery channel'**
+  String get otpSelectChannelError;
+
+  /// No description provided for @otpCaptchaError.
+  ///
+  /// In en, this message translates to:
+  /// **'Error loading captcha'**
+  String get otpCaptchaError;
+
+  /// No description provided for @otpCodeSentMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Login code sent to your {channel}'**
+  String otpCodeSentMessage(String channel);
+
+  /// No description provided for @otpCodeResentMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Login code resent'**
+  String get otpCodeResentMessage;
+
+  /// No description provided for @otpSendError.
+  ///
+  /// In en, this message translates to:
+  /// **'Error sending login code'**
+  String get otpSendError;
+
+  /// No description provided for @otpEnterCaptchaError.
+  ///
+  /// In en, this message translates to:
+  /// **'Please enter captcha code'**
+  String get otpEnterCaptchaError;
 }
 
 class _AppLocalizationsDelegate

@@ -24,6 +24,7 @@ import '../../models/person_model.dart';
 import '../../widgets/invoice/line_items_table.dart';
 import '../../widgets/invoice/invoice_transactions_widget.dart';
 import '../../widgets/invoice/bom_explosion_widget.dart';
+import '../../widgets/invoice/warehouse_combobox_widget.dart';
 import '../../utils/number_formatters.dart';
 import '../../utils/number_normalizer.dart';
 import '../../services/currency_service.dart';
@@ -57,6 +58,7 @@ class NewInvoicePage extends StatefulWidget {
 class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProviderStateMixin {
   // تنظیمات انبار
   bool _postInventory = true; // ثبت اسناد انبار
+  int? _documentWarehouseId; // انبار کلی در سطح سند (برای استفاده در حواله‌های انبار)
   late TabController _tabController;
   // نادیده گرفتن اعتبار مشتری برای این فاکتور
   bool _ignoreCreditCheck = false;
@@ -358,6 +360,10 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
         if (postInventory != null) {
           _postInventory = postInventory;
         }
+        final documentWarehouseId = data['document_warehouse_id'];
+        if (documentWarehouseId != null) {
+          _documentWarehouseId = (documentWarehouseId is num) ? documentWarehouseId.toInt() : int.tryParse(documentWarehouseId.toString());
+        }
         final ignoreCredit = _parseBool(data['ignore_credit_check']);
         if (ignoreCredit != null) {
           _ignoreCreditCheck = ignoreCredit;
@@ -383,6 +389,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
       'show_stamp': _showStampOnPrint,
       'send_to_tax_folder': _sendToTaxFolder,
       'post_inventory': _postInventory,
+      'document_warehouse_id': _documentWarehouseId,
       'ignore_credit_check': _ignoreCreditCheck,
       'use_installments': _useInstallments,
     });
@@ -2129,6 +2136,10 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
     };
     // سوییچ ثبت اسناد انبار
     extraInfo['post_inventory'] = _postInventory;
+    // انبار کلی در سطح سند (برای استفاده در حواله‌های انبار)
+    if (_documentWarehouseId != null) {
+      extraInfo['warehouse_id'] = _documentWarehouseId;
+    }
     // نادیده گرفتن اعتبار مشتری (فقط در فروش معنادار است؛ اما در payload همیشه ارسال می‌شود)
     extraInfo['ignore_credit_check'] = _ignoreCreditCheck;
     
@@ -2283,6 +2294,11 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
     // اضافه کردن اطلاعات از extra_info InvoiceLineItem (مانند bom_id)
     if (e.extraInfo != null) {
       extraInfo.addAll(_stripLocalExtraInfo(e.extraInfo!));
+    }
+    
+    // اضافه کردن warehouse_id به extra_info اگر وجود دارد
+    if (e.warehouseId != null) {
+      extraInfo['warehouse_id'] = e.warehouseId;
     }
     
     return <String, dynamic>{
@@ -2534,6 +2550,34 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                           _saveLocalSettings();
                         },
                       ),
+                      // فیلد انتخاب انبار کلی در سطح سند (برای استفاده در حواله‌های انبار)
+                      if (_postInventory) ...[
+                        const SizedBox(height: 8),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: WarehouseComboboxWidget(
+                            businessId: widget.businessId,
+                            selectedWarehouseId: _documentWarehouseId,
+                            onChanged: (id) {
+                              setState(() {
+                                _documentWarehouseId = id;
+                              });
+                            },
+                            label: 'انبار کلی (سطح سند)',
+                            hintText: 'انتخاب انبار (اختیاری)',
+                            isRequired: false,
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                          child: Text(
+                            'این انبار در سطح سند حواله انبار استفاده می‌شود. اگر ردیف‌ها انبار نداشته باشند، از این انبار استفاده می‌شود.',
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        ),
+                      ],
                       const Divider(),
                       // نادیده گرفتن اعتبار مشتری (فقط برای فاکتور فروش)
                       if (_selectedInvoiceType == InvoiceType.sales)

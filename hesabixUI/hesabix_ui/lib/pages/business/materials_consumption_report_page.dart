@@ -213,6 +213,7 @@ class _MaterialsConsumptionReportPageState extends State<MaterialsConsumptionRep
       additionalParams: _additionalParams(),
       showExportButtons: true,
       excelEndpoint: '/api/v1/businesses/${widget.businessId}/reports/materials-consumption/export/excel',
+      pdfEndpoint: '/api/v1/businesses/${widget.businessId}/reports/materials-consumption/export/pdf',
       getExportParams: () => _additionalParams(),
       footerTotals: {
         'quantity': 'جمع مقدار',

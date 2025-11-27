@@ -197,6 +197,7 @@ class _BankAccountsTurnoverReportPageState extends State<BankAccountsTurnoverRep
       additionalParams: _additionalParams(),
       showExportButtons: true,
       excelEndpoint: '/api/v1/bank-accounts/businesses/${widget.businessId}/reports/bank-accounts-turnover/export/excel',
+      pdfEndpoint: '/api/v1/bank-accounts/businesses/${widget.businessId}/reports/bank-accounts-turnover/export/pdf',
       getExportParams: () => _additionalParams(),
       footerTotals: {
         'deposit': 'جمع واریز',

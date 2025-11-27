@@ -6,6 +6,8 @@ from .api_key import ApiKey  # noqa: F401
 from .captcha import Captcha  # noqa: F401
 from .password_reset import PasswordReset  # noqa: F401
 from .email_verification import EmailVerificationToken  # noqa: F401
+from .mobile_verification import MobileVerificationToken  # noqa: F401
+from .otp_login_session import OtpLoginSession  # noqa: F401
 from .business import Business  # noqa: F401
 from .business_print_settings import BusinessPrintSettings  # noqa: F401
 from .business_permission import BusinessPermission  # noqa: F401
@@ -48,6 +50,8 @@ from .cash_register import CashRegister  # noqa: F401
 from .petty_cash import PettyCash  # noqa: F401
 from .check import Check  # noqa: F401
 from .warehouse import Warehouse  # noqa: F401
+from .warehouse_document import WarehouseDocument  # noqa: F401
+from .warehouse_document_line import WarehouseDocumentLine  # noqa: F401
 from .product_bom import ProductBOM, ProductBOMItem, ProductBOMOutput, ProductBOMOperation  # noqa: F401
 from .ping_pong_score import PingPongScore  # noqa: F401
 from .storage_plan import StoragePlan, BusinessStorageSubscription, StorageInvoice, StorageUsageTransaction  # noqa: F401
@@ -59,6 +63,8 @@ from .document_monetization import (  # noqa: F401
 	DocumentUsagePeriod,
 	DocumentUsageCursor,
 )
+# Wallet models
+from .wallet import WalletAccount, WalletTransaction, WalletPayout, WalletSetting  # noqa: F401
 # AI models
 from .ai_config import AIConfig, AIProvider  # noqa: F401
 from .ai_plan import AIPlan, AIPlanType  # noqa: F401
@@ -68,3 +74,5 @@ from .ai_usage_log import AIUsageLog, PaymentMethod  # noqa: F401
 from .ai_chat_session import AIChatSession  # noqa: F401
 from .ai_chat_message import AIChatMessage, MessageRole  # noqa: F401
 from .ai_prompt import AIPrompt, PromptRole, PromptType  # noqa: F401
+# Activity Log models
+from .activity_log import ActivityLog  # noqa: F401

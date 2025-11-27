@@ -135,6 +135,8 @@ class _DailySalesReportPageState extends State<DailySalesReportPage> {
       showActiveFilters: true,
       showClearFiltersButton: false,
       showExportButtons: true,
+      excelEndpoint: '/api/v1/businesses/${widget.businessId}/reports/daily-sales/export/excel',
+      pdfEndpoint: '/api/v1/businesses/${widget.businessId}/reports/daily-sales/export/pdf',
       additionalParams: _additionalParams(),
       columns: [
         DateColumn(

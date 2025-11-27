@@ -189,6 +189,7 @@ class _PeopleTransactionsReportPageState extends State<PeopleTransactionsReportP
       additionalParams: _additionalParams(),
       showExportButtons: true,
       excelEndpoint: '/api/v1/persons/businesses/${widget.businessId}/reports/people-transactions/export/excel',
+      pdfEndpoint: '/api/v1/persons/businesses/${widget.businessId}/reports/people-transactions/export/pdf',
       getExportParams: () => _additionalParams(),
       footerTotals: {
         'debit': 'جمع بدهکار',

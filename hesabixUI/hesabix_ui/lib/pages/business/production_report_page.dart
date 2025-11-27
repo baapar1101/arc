@@ -213,6 +213,7 @@ class _ProductionReportPageState extends State<ProductionReportPage> {
       additionalParams: _additionalParams(),
       showExportButtons: true,
       excelEndpoint: '/api/v1/businesses/${widget.businessId}/reports/production/export/excel',
+      pdfEndpoint: '/api/v1/businesses/${widget.businessId}/reports/production/export/pdf',
       getExportParams: () => _additionalParams(),
       footerTotals: {
         'quantity': 'جمع مقدار',

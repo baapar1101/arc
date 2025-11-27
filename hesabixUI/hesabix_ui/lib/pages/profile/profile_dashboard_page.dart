@@ -7,9 +7,12 @@ import '../../services/announcements_service.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../utils/snackbar_helper.dart';
+import '../../core/calendar_controller.dart';
+import '../../core/date_utils.dart';
 
 class ProfileDashboardPage extends StatefulWidget {
-  const ProfileDashboardPage({super.key});
+  final CalendarController calendarController;
+  const ProfileDashboardPage({super.key, required this.calendarController});
 
   @override
   State<ProfileDashboardPage> createState() => _ProfileDashboardPageState();
@@ -584,7 +587,8 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> {
             final body = '${it['body'] ?? ''}';
             final pinned = (it['is_pinned'] ?? false) == true;
             final isRead = (it['is_read'] ?? false) == true;
-            final time = '${it['updated_at'] ?? it['time'] ?? ''}';
+            final timeRaw = it['updated_at'] ?? it['time'];
+            final time = timeRaw is Map ? (timeRaw['formatted'] ?? timeRaw['date_only'] ?? timeRaw.toString()) : '${timeRaw ?? ''}';
             final annId = (id is int) ? id : int.tryParse('$id');
             final busy = annId != null && _annBusyIds.contains(annId);
             return ListTile(
@@ -605,7 +609,7 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> {
                     Padding(
                       padding: const EdgeInsetsDirectional.only(end: 8),
                       child: Text(
-                        DateFormatters.formatServerDateTime(time),
+                        _formatNotificationTime(time),
                         style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                       ),
                     ),
@@ -622,27 +626,6 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> {
                               await _reloadAnnouncements(onlyUnread: _annOnlyUnread);
                               if (!context.mounted) return;
                               ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('به‌عنوان خوانده‌شده علامت خورد')));
-                            } catch (e) {
-                              if (!context.mounted) return;
-                              SnackBarHelper.showError(context, message: 'خطا: $e');
-                            } finally {
-                              if (mounted && annId != null) setState(() => _annBusyIds.remove(annId));
-                            }
-                          },
-                  ),
-                  IconButton(
-                    tooltip: 'پنهان کردن',
-                    icon: busy ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.close, size: 20),
-                    onPressed: busy
-                        ? null
-                        : () async {
-                            try {
-                              if (annId == null) return;
-                              setState(() => _annBusyIds.add(annId));
-                              await _dismissAnnouncement(annId);
-                              await _reloadAnnouncements(onlyUnread: _annOnlyUnread);
-                              if (!context.mounted) return;
-                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('اعلان پنهان شد')));
                             } catch (e) {
                               if (!context.mounted) return;
                               SnackBarHelper.showError(context, message: 'خطا: $e');
@@ -720,10 +703,41 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> {
     } catch (_) {}
   }
 
-  Future<void> _dismissAnnouncement(int id) async {
+  String _formatNotificationTime(dynamic timeData) {
+    if (timeData == null) return '-';
+    
+    // اگر object است (Map)، از فیلد formatted استفاده کن
+    if (timeData is Map) {
+      final formatted = timeData['formatted'];
+      if (formatted != null) {
+        return formatted.toString();
+      }
+      final dateOnly = timeData['date_only'];
+      if (dateOnly != null) {
+        return dateOnly.toString();
+      }
+      // اگر formatted وجود ندارد، سعی کن از raw date استفاده کنی
+      final raw = timeData['raw'] ?? timeData['updated_at'] ?? timeData['time'];
+      if (raw != null) {
+        return _formatNotificationTime(raw);
+      }
+    }
+    
+    // تبدیل به string
+    final timeStr = timeData.toString();
+    if (timeStr.isEmpty) return '-';
+    
     try {
-      await AnnouncementsService(ApiClient()).dismiss(id);
-    } catch (_) {}
+      // تلاش برای parse کردن تاریخ از سرور (ISO format)
+      final dateTime = DateTime.tryParse(timeStr);
+      if (dateTime != null) {
+        return HesabixDateUtils.formatDateTime(dateTime, widget.calendarController.isJalali);
+      }
+      // اگر parse نشد، از formatter قدیمی استفاده کن
+      return DateFormatters.formatServerDateTime(timeStr);
+    } catch (_) {
+      return DateFormatters.formatServerDateTime(timeStr);
+    }
   }
 }
 

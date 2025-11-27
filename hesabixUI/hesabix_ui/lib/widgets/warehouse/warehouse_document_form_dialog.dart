@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart' show debugPrint;
 import '../../services/warehouse_service.dart';
 import '../../services/product_service.dart';
 import '../../services/product_attribute_service.dart';
+import '../../services/invoice_service.dart';
 import '../../widgets/invoice/product_combobox_widget.dart';
 import '../../widgets/invoice/warehouse_combobox_widget.dart';
 import '../../widgets/date_input_field.dart';
@@ -48,6 +49,7 @@ class _WarehouseDocumentFormDialogState extends State<WarehouseDocumentFormDialo
   final _svc = WarehouseService();
   final _productService = ProductService();
   final _attributeService = ProductAttributeService();
+  final _invoiceService = InvoiceService();
   CalendarController? _calendarController;
   
   // اطلاعات کالاها برای بررسی یونیک بودن
@@ -92,16 +94,98 @@ class _WarehouseDocumentFormDialogState extends State<WarehouseDocumentFormDialo
     }
   }
 
+  /// تعیین انبار پیش‌فرض بر اساس نوع حرکت
+  /// 
+  /// این تابع انبار پیش‌فرض را از سطح سند برمی‌گرداند:
+  /// - برای حرکت 'out': انبار مبدا (_warehouseIdFrom)
+  /// - برای حرکت 'in': انبار مقصد (_warehouseIdTo)
+  /// - در غیر این صورت: null
   int? _defaultWarehouseForMovement(String? movement) {
     if (movement == 'out') return _warehouseIdFrom;
     if (movement == 'in') return _warehouseIdTo;
     return null;
   }
 
+  /// تعیین انبار نهایی برای یک ردیف با استفاده از منطق fallback
+  /// 
+  /// منطق fallback:
+  /// 1. اگر انبار در سطح ردیف مشخص شده باشد، از آن استفاده می‌شود
+  /// 2. در غیر این صورت، از انبار پیش‌فرض سطح سند استفاده می‌شود
+  /// 
+  /// برای حواله انتقال (transfer):
+  /// - انبار مبدا: line['warehouse_id_from'] ?? _warehouseIdFrom
+  /// - انبار مقصد: line['warehouse_id_to'] ?? _warehouseIdTo
+  /// 
+  /// برای سایر انواع حواله:
+  /// - انبار: line['warehouse_id'] ?? _defaultWarehouseForMovement(movement)
+  /// 
+  /// Returns: Map شامل warehouse_id (یا warehouse_id_from و warehouse_id_to برای transfer)
+  /// و isFromDocumentLevel که نشان می‌دهد انبار از سطح سند آمده یا ردیف
+  Map<String, dynamic> _resolveLineWarehouse(Map<String, dynamic> line, String? movement) {
+    if (_docType == 'transfer') {
+      final whFrom = line['warehouse_id_from'] as int?;
+      final whTo = line['warehouse_id_to'] as int?;
+      return {
+        'warehouse_id_from': whFrom ?? _warehouseIdFrom,
+        'warehouse_id_to': whTo ?? _warehouseIdTo,
+        'is_from_document_level_from': whFrom == null,
+        'is_from_document_level_to': whTo == null,
+      };
+    }
+    
+    final lineWarehouse = line['warehouse_id'] as int?;
+    final resolvedWarehouse = lineWarehouse ?? _defaultWarehouseForMovement(movement);
+    return {
+      'warehouse_id': resolvedWarehouse,
+      'is_from_document_level': lineWarehouse == null,
+    };
+  }
+
+  /// بررسی اعتبارسنجی انبار برای یک ردیف
+  /// 
+  /// Returns: null اگر معتبر باشد، در غیر این صورت پیام خطا
+  String? _validateLineWarehouse(Map<String, dynamic> line, int index) {
+    final movement = (line['movement'] as String?) ?? _movementForDocType(_docType);
+    
+    if (_docType == 'transfer') {
+      final resolved = _resolveLineWarehouse(line, movement);
+      final whFrom = resolved['warehouse_id_from'] as int?;
+      final whTo = resolved['warehouse_id_to'] as int?;
+      
+      if (whFrom == null) {
+        return 'خط ${index + 1}: انبار مبدا الزامی است (در سطح سند یا ردیف)';
+      }
+      if (whTo == null) {
+        return 'خط ${index + 1}: انبار مقصد الزامی است (در سطح سند یا ردیف)';
+      }
+      if (whFrom == whTo) {
+        return 'خط ${index + 1}: انبار مبدا و مقصد نمی‌توانند یکسان باشند';
+      }
+      return null;
+    }
+    
+    if (_docType == 'adjustment') {
+      // برای adjustment، انبار باید حتماً در سطح ردیف مشخص شود
+      if (line['warehouse_id'] == null) {
+        return 'خط ${index + 1}: لطفاً انبار را انتخاب کنید';
+      }
+      return null;
+    }
+    
+    // برای سایر انواع، بررسی می‌کنیم که یا در سطح سند یا ردیف انبار مشخص شده باشد
+    final resolved = _resolveLineWarehouse(line, movement);
+    final warehouseId = resolved['warehouse_id'] as int?;
+    
+    if (warehouseId == null) {
+      return 'خط ${index + 1}: انبار الزامی است (در سطح سند یا ردیف)';
+    }
+    
+    return null;
+  }
+
   List<Map<String, dynamic>> _buildLinePayloads() {
     return _lines.map((line) {
       final movement = (line['movement'] as String?) ?? _movementForDocType(_docType);
-      final lineWarehouse = line['warehouse_id'] ?? _defaultWarehouseForMovement(movement);
       final extra = Map<String, dynamic>.from(line['extra_info'] ?? const {});
       if (!extra.containsKey('movement')) {
         extra['movement'] = movement;
@@ -111,12 +195,15 @@ class _WarehouseDocumentFormDialogState extends State<WarehouseDocumentFormDialo
       final instanceData = line['instance_data'] as List<dynamic>?;
       final instanceIds = line['instance_ids'] as List<dynamic>?;
       
+      // استفاده از تابع مرکزی برای تعیین انبار
+      final warehouseResolved = _resolveLineWarehouse(line, movement);
+      
       // برای transfer، از انبار سطح حواله استفاده می‌کنیم
       if (_docType == 'transfer') {
         return {
           'product_id': line['product_id'],
-          'warehouse_id_from': line['warehouse_id_from'] ?? _warehouseIdFrom,
-          'warehouse_id_to': line['warehouse_id_to'] ?? _warehouseIdTo,
+          'warehouse_id_from': warehouseResolved['warehouse_id_from'],
+          'warehouse_id_to': warehouseResolved['warehouse_id_to'],
           'quantity': line['quantity'],
           'instance_data': instanceData, // برای حواله ورود
           'instance_ids': instanceIds, // برای حواله خروج
@@ -126,7 +213,7 @@ class _WarehouseDocumentFormDialogState extends State<WarehouseDocumentFormDialo
       
       return {
         'product_id': line['product_id'],
-        'warehouse_id': lineWarehouse,
+        'warehouse_id': warehouseResolved['warehouse_id'],
         'movement': movement,
         'quantity': line['quantity'],
         'instance_data': instanceData, // برای حواله ورود (receipt/production_in)
@@ -193,7 +280,7 @@ class _WarehouseDocumentFormDialogState extends State<WarehouseDocumentFormDialo
       }
       // تکمیل خودکار انبار از فاکتور (فقط برای حواله‌های از فاکتور)
       if (_isFromInvoice) {
-        _autoFillWarehouseFromInvoice();
+        _autoFillWarehouseFromInvoice(); // async - در پس‌زمینه اجرا می‌شود
       }
     }
     // بارگذاری اطلاعات مقادیر خطوط فاکتور
@@ -204,7 +291,7 @@ class _WarehouseDocumentFormDialogState extends State<WarehouseDocumentFormDialo
     // این فیلدها از extra_info در صورت ویرایش حواله موجود می‌آیند
   }
 
-  void _autoFillWarehouseFromInvoice() {
+  Future<void> _autoFillWarehouseFromInvoice() async {
     // اگر انبار از قبل انتخاب شده، نیازی به تکمیل خودکار نیست
     if (_docType == 'transfer') {
       if (_warehouseIdFrom != null && _warehouseIdTo != null) return;
@@ -214,34 +301,63 @@ class _WarehouseDocumentFormDialogState extends State<WarehouseDocumentFormDialo
       if (_warehouseIdTo != null) return;
     }
     
-    // استخراج انبار از خطوط فاکتور
+    // اولویت 1: خواندن انبار از سطح سند فاکتور (extra_info.warehouse_id)
+    int? invoiceDocumentWarehouseId;
+    if (widget.sourceInvoiceId != null) {
+      try {
+        final invoiceData = await _invoiceService.getInvoice(
+          businessId: widget.businessId,
+          invoiceId: widget.sourceInvoiceId!,
+        );
+        final invoiceItem = invoiceData['item'] as Map<String, dynamic>?;
+        if (invoiceItem != null) {
+          final extraInfo = invoiceItem['extra_info'] as Map<String, dynamic>?;
+          if (extraInfo != null) {
+            final whId = extraInfo['warehouse_id'];
+            if (whId != null) {
+              invoiceDocumentWarehouseId = (whId is num) ? whId.toInt() : int.tryParse(whId.toString());
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('Error loading invoice warehouse: $e');
+      }
+    }
+    
+    // اولویت 2: استخراج انبار از خطوط فاکتور
     int? foundWarehouseId;
-    for (final line in _lines) {
-      final warehouseId = line['warehouse_id'] as int?;
-      if (warehouseId != null) {
-        foundWarehouseId = warehouseId;
-        break; // اولین انبار غیر null را می‌گیریم
+    if (invoiceDocumentWarehouseId != null) {
+      foundWarehouseId = invoiceDocumentWarehouseId;
+    } else {
+      for (final line in _lines) {
+        final warehouseId = line['warehouse_id'] as int?;
+        if (warehouseId != null) {
+          foundWarehouseId = warehouseId;
+          break; // اولین انبار غیر null را می‌گیریم
+        }
       }
     }
     
     if (foundWarehouseId == null) return;
     
     // تنظیم انبار بر اساس نوع حواله
-    setState(() {
-      if (_docType == 'transfer') {
-        // برای انتقال، از انبار خط به عنوان مبدا استفاده می‌کنیم
-        // مقصد باید توسط کاربر انتخاب شود
-        if (_warehouseIdFrom == null) {
+    if (mounted) {
+      setState(() {
+        if (_docType == 'transfer') {
+          // برای انتقال، از انبار خط به عنوان مبدا استفاده می‌کنیم
+          // مقصد باید توسط کاربر انتخاب شود
+          if (_warehouseIdFrom == null) {
+            _warehouseIdFrom = foundWarehouseId;
+          }
+        } else if (_docType == 'issue' || _docType == 'production_out') {
+          // برای خروج: از انبار خط استفاده می‌کنیم
           _warehouseIdFrom = foundWarehouseId;
+        } else if (_docType == 'receipt' || _docType == 'production_in') {
+          // برای ورود: از انبار خط استفاده می‌کنیم
+          _warehouseIdTo = foundWarehouseId;
         }
-      } else if (_docType == 'issue' || _docType == 'production_out') {
-        // برای خروج: از انبار خط استفاده می‌کنیم
-        _warehouseIdFrom = foundWarehouseId;
-      } else if (_docType == 'receipt' || _docType == 'production_in') {
-        // برای ورود: از انبار خط استفاده می‌کنیم
-        _warehouseIdTo = foundWarehouseId;
-      }
-    });
+      });
+    }
   }
 
   Future<void> _loadLineQuantities() async {
@@ -548,14 +664,13 @@ class _WarehouseDocumentFormDialogState extends State<WarehouseDocumentFormDialo
         );
         return;
       }
-      // اعتبارسنجی انبار در خط (فقط برای adjustment)
-      if (_docType == 'adjustment') {
-        if (line['warehouse_id'] == null) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('خط ${i + 1}: لطفاً انبار را انتخاب کنید')),
-          );
-          return;
-        }
+      // اعتبارسنجی انبار با استفاده از تابع مرکزی
+      final warehouseError = _validateLineWarehouse(line, i);
+      if (warehouseError != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(warehouseError)),
+        );
+        return;
       }
     }
 
@@ -1140,6 +1255,255 @@ class _WarehouseDocumentFormDialogState extends State<WarehouseDocumentFormDialo
                                       ),
                                   ],
                                 ),
+                              ),
+                            ],
+                            // نمایش اطلاعات انبار (برای انواع غیر از adjustment و transfer)
+                            if (_docType != 'adjustment' && _docType != 'transfer') ...[
+                              const SizedBox(height: 8),
+                              Builder(
+                                builder: (context) {
+                                  final movement = (line['movement'] as String?) ?? _movementForDocType(_docType);
+                                  final resolved = _resolveLineWarehouse(line, movement);
+                                  final warehouseId = resolved['warehouse_id'] as int?;
+                                  final isFromDocumentLevel = resolved['is_from_document_level'] as bool? ?? false;
+                                  
+                                  if (warehouseId == null) {
+                                    return Container(
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(
+                                        color: Theme.of(context).colorScheme.errorContainer.withOpacity(0.3),
+                                        borderRadius: BorderRadius.circular(6),
+                                        border: Border.all(
+                                          color: Theme.of(context).colorScheme.error.withOpacity(0.5),
+                                        ),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          Icon(
+                                            Icons.warning_amber_rounded,
+                                            size: 16,
+                                            color: Theme.of(context).colorScheme.error,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(
+                                              'انبار مشخص نشده (در سطح سند یا ردیف)',
+                                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                                color: Theme.of(context).colorScheme.error,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  }
+                                  
+                                  return Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: isFromDocumentLevel
+                                          ? Theme.of(context).colorScheme.primaryContainer.withOpacity(0.3)
+                                          : Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.5),
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(
+                                        color: isFromDocumentLevel
+                                            ? Theme.of(context).colorScheme.primary.withOpacity(0.3)
+                                            : Theme.of(context).colorScheme.outline.withOpacity(0.3),
+                                      ),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          isFromDocumentLevel ? Icons.description : Icons.inventory_2,
+                                          size: 16,
+                                          color: isFromDocumentLevel
+                                              ? Theme.of(context).colorScheme.primary
+                                              : Theme.of(context).colorScheme.onSurface,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            'انبار: #$warehouseId',
+                                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                        ),
+                                        Chip(
+                                          label: Text(
+                                            isFromDocumentLevel ? 'سطح سند' : 'سطح ردیف',
+                                            style: TextStyle(
+                                              fontSize: 10,
+                                              color: isFromDocumentLevel
+                                                  ? Theme.of(context).colorScheme.onPrimaryContainer
+                                                  : Theme.of(context).colorScheme.onSurface,
+                                            ),
+                                          ),
+                                          backgroundColor: isFromDocumentLevel
+                                              ? Theme.of(context).colorScheme.primaryContainer
+                                              : Theme.of(context).colorScheme.surfaceContainerHighest,
+                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                },
+                              ),
+                            ],
+                            // نمایش اطلاعات انبار برای transfer
+                            if (_docType == 'transfer') ...[
+                              const SizedBox(height: 8),
+                              Builder(
+                                builder: (context) {
+                                  final movement = (line['movement'] as String?) ?? _movementForDocType(_docType);
+                                  final resolved = _resolveLineWarehouse(line, movement);
+                                  final whFrom = resolved['warehouse_id_from'] as int?;
+                                  final whTo = resolved['warehouse_id_to'] as int?;
+                                  final isFromDocLevelFrom = resolved['is_from_document_level_from'] as bool? ?? false;
+                                  final isFromDocLevelTo = resolved['is_from_document_level_to'] as bool? ?? false;
+                                  
+                                  return Column(
+                                    children: [
+                                      if (whFrom != null)
+                                        Container(
+                                          padding: const EdgeInsets.all(8),
+                                          decoration: BoxDecoration(
+                                            color: isFromDocLevelFrom
+                                                ? Theme.of(context).colorScheme.primaryContainer.withOpacity(0.3)
+                                                : Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.5),
+                                            borderRadius: BorderRadius.circular(6),
+                                            border: Border.all(
+                                              color: isFromDocLevelFrom
+                                                  ? Theme.of(context).colorScheme.primary.withOpacity(0.3)
+                                                  : Theme.of(context).colorScheme.outline.withOpacity(0.3),
+                                            ),
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              Icon(
+                                                isFromDocLevelFrom ? Icons.description : Icons.inventory_2,
+                                                size: 16,
+                                                color: isFromDocLevelFrom
+                                                    ? Theme.of(context).colorScheme.primary
+                                                    : Theme.of(context).colorScheme.onSurface,
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Expanded(
+                                                child: Text(
+                                                  'انبار مبدا: #$whFrom',
+                                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                                    fontWeight: FontWeight.w500,
+                                                  ),
+                                                ),
+                                              ),
+                                              Chip(
+                                                label: Text(
+                                                  isFromDocLevelFrom ? 'سطح سند' : 'سطح ردیف',
+                                                  style: TextStyle(
+                                                    fontSize: 10,
+                                                    color: isFromDocLevelFrom
+                                                        ? Theme.of(context).colorScheme.onPrimaryContainer
+                                                        : Theme.of(context).colorScheme.onSurface,
+                                                  ),
+                                                ),
+                                                backgroundColor: isFromDocLevelFrom
+                                                    ? Theme.of(context).colorScheme.primaryContainer
+                                                    : Theme.of(context).colorScheme.surfaceContainerHighest,
+                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      if (whFrom != null && whTo != null) const SizedBox(height: 4),
+                                      if (whTo != null)
+                                        Container(
+                                          padding: const EdgeInsets.all(8),
+                                          decoration: BoxDecoration(
+                                            color: isFromDocLevelTo
+                                                ? Theme.of(context).colorScheme.primaryContainer.withOpacity(0.3)
+                                                : Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.5),
+                                            borderRadius: BorderRadius.circular(6),
+                                            border: Border.all(
+                                              color: isFromDocLevelTo
+                                                  ? Theme.of(context).colorScheme.primary.withOpacity(0.3)
+                                                  : Theme.of(context).colorScheme.outline.withOpacity(0.3),
+                                            ),
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              Icon(
+                                                isFromDocLevelTo ? Icons.description : Icons.inventory_2,
+                                                size: 16,
+                                                color: isFromDocLevelTo
+                                                    ? Theme.of(context).colorScheme.primary
+                                                    : Theme.of(context).colorScheme.onSurface,
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Expanded(
+                                                child: Text(
+                                                  'انبار مقصد: #$whTo',
+                                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                                    fontWeight: FontWeight.w500,
+                                                  ),
+                                                ),
+                                              ),
+                                              Chip(
+                                                label: Text(
+                                                  isFromDocLevelTo ? 'سطح سند' : 'سطح ردیف',
+                                                  style: TextStyle(
+                                                    fontSize: 10,
+                                                    color: isFromDocLevelTo
+                                                        ? Theme.of(context).colorScheme.onPrimaryContainer
+                                                        : Theme.of(context).colorScheme.onSurface,
+                                                  ),
+                                                ),
+                                                backgroundColor: isFromDocLevelTo
+                                                    ? Theme.of(context).colorScheme.primaryContainer
+                                                    : Theme.of(context).colorScheme.surfaceContainerHighest,
+                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      if (whFrom == null || whTo == null)
+                                        Container(
+                                          padding: const EdgeInsets.all(8),
+                                          decoration: BoxDecoration(
+                                            color: Theme.of(context).colorScheme.errorContainer.withOpacity(0.3),
+                                            borderRadius: BorderRadius.circular(6),
+                                            border: Border.all(
+                                              color: Theme.of(context).colorScheme.error.withOpacity(0.5),
+                                            ),
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              Icon(
+                                                Icons.warning_amber_rounded,
+                                                size: 16,
+                                                color: Theme.of(context).colorScheme.error,
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Expanded(
+                                                child: Text(
+                                                  whFrom == null && whTo == null
+                                                      ? 'انبار مبدا و مقصد مشخص نشده'
+                                                      : whFrom == null
+                                                          ? 'انبار مبدا مشخص نشده'
+                                                          : 'انبار مقصد مشخص نشده',
+                                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                                    color: Theme.of(context).colorScheme.error,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                    ],
+                                  );
+                                },
                               ),
                             ],
                             const SizedBox(height: 8),

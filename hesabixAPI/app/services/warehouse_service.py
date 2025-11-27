@@ -75,6 +75,26 @@ def create_from_invoice(
 	fy = _get_current_fiscal_year(db, business_id)
 	code = _build_wh_code("WH")
 	
+	# خواندن انبار کلی از سطح سند فاکتور (extra_info.warehouse_id)
+	# این انبار به سطح سند حواله منتقل می‌شود
+	invoice_extra_info = invoice.extra_info or {}
+	invoice_warehouse_id = invoice_extra_info.get("warehouse_id")
+	warehouse_id_from = None
+	warehouse_id_to = None
+	
+	# تعیین انبار سطح سند حواله بر اساس نوع حواله و انبار فاکتور
+	if invoice_warehouse_id:
+		try:
+			invoice_warehouse_id = int(invoice_warehouse_id)
+			if wh_doc_type in ("issue", "production_out"):
+				# برای حواله خروج: انبار فاکتور به warehouse_id_from منتقل می‌شود
+				warehouse_id_from = invoice_warehouse_id
+			elif wh_doc_type in ("receipt", "production_in"):
+				# برای حواله ورود: انبار فاکتور به warehouse_id_to منتقل می‌شود
+				warehouse_id_to = invoice_warehouse_id
+		except (ValueError, TypeError):
+			pass  # اگر تبدیل به int ناموفق بود، نادیده می‌گیریم
+	
 	# آماده‌سازی extra_info با فیلدهای ارسال
 	extra_data = extra_data or {}
 	delivery_fields = {
@@ -96,6 +116,8 @@ def create_from_invoice(
 		document_date=invoice.document_date,
 		status="draft",
 		doc_type=wh_doc_type,
+		warehouse_id_from=warehouse_id_from,
+		warehouse_id_to=warehouse_id_to,
 		source_type="invoice",
 		source_document_id=invoice.id,
 		created_by_user_id=created_by_user_id,
@@ -113,11 +135,21 @@ def create_from_invoice(
 		movement_override = ln.get("movement")
 		mv = movement_override or extra.get("movement") or ("out" if wh_doc_type in ("issue", "production_out") else "in")
 
-		warehouse_id = ln.get("warehouse_id")
+		# دریافت warehouse_id از سطح ردیف خط یا از extra_info
+		# منطق fallback: اگر انبار در سطح ردیف مشخص نشده باشد، از انبار سطح سند حواله استفاده می‌شود
+		# (که خود از extra_info.warehouse_id فاکتور آمده است)
+		warehouse_id = ln.get("warehouse_id") or extra.get("warehouse_id")
 		try:
 			warehouse_id = int(warehouse_id) if warehouse_id is not None else None
 		except Exception:
 			warehouse_id = None
+		
+		# اگر انبار در سطح ردیف مشخص نشده، از انبار سطح سند حواله استفاده کن
+		if not warehouse_id:
+			if mv == "out":
+				warehouse_id = warehouse_id_from
+			elif mv == "in":
+				warehouse_id = warehouse_id_to
 
 		wline = WarehouseDocumentLine(
 			warehouse_document_id=wh.id,
@@ -339,14 +371,15 @@ def create_manual_warehouse_document(
 					instance.status = "sold"  # یا می‌توانیم status دیگری استفاده کنیم
 					instance.last_movement_date = document_date
 		
-		# تعیین movement و warehouse_id بر اساس نوع حواله
+		# تعیین movement و warehouse_id بر اساس نوع حواله با استفاده از منطق fallback
+		# منطق fallback: اگر انبار در سطح ردیف مشخص نشده باشد، از انبار سطح سند استفاده می‌شود
 		if doc_type == "transfer":
 			# برای انتقال: یک خط out از مبدا و یک خط in به مقصد
-			# در اینجا فقط یک خط ایجاد می‌کنیم که movement آن بر اساس warehouse_id در خط مشخص می‌شود
+			# منطق fallback: line['warehouse_id_from'] ?? warehouse_id_from (سطح سند)
 			line_wh_from = ln.get("warehouse_id_from") or warehouse_id_from
 			line_wh_to = ln.get("warehouse_id_to") or warehouse_id_to
 			if not line_wh_from or not line_wh_to:
-				raise ApiError("WAREHOUSES_REQUIRED", f"خط {i}: برای انتقال، انبار مبدا و مقصد باید مشخص باشد", http_status=400)
+				raise ApiError("WAREHOUSES_REQUIRED", f"خط {i}: برای انتقال، انبار مبدا و مقصد باید مشخص باشد (در سطح سند یا ردیف)", http_status=400)
 			
 			# اضافه کردن instance_ids به extra_info برای transfer
 			extra_info_transfer = ln.get("extra_info") or {}
@@ -378,6 +411,10 @@ def create_manual_warehouse_document(
 			db.add(wline_in)
 		else:
 			# برای سایر انواع: movement بر اساس doc_type
+			# منطق fallback برای انبار:
+			# - issue/production_out: line['warehouse_id'] ?? warehouse_id_from (سطح سند)
+			# - receipt/production_in: line['warehouse_id'] ?? warehouse_id_to (سطح سند)
+			# - adjustment: line['warehouse_id'] ?? warehouse_id_to ?? warehouse_id_from (سطح سند)
 			if doc_type in ("issue", "production_out"):
 				movement = "out"
 				line_wh = ln.get("warehouse_id") or warehouse_id_from
@@ -389,13 +426,14 @@ def create_manual_warehouse_document(
 				movement = ln.get("movement", "in")
 				if movement not in ("in", "out"):
 					raise ApiError("INVALID_MOVEMENT", f"خط {i}: movement باید 'in' یا 'out' باشد", http_status=400)
+				# برای adjustment، انبار باید حتماً در سطح ردیف مشخص شود (fallback به سطح سند فقط برای سازگاری)
 				line_wh = ln.get("warehouse_id") or warehouse_id_to or warehouse_id_from
 			else:
 				movement = "in"
 				line_wh = ln.get("warehouse_id") or warehouse_id_to
 			
 			if not line_wh:
-				raise ApiError("WAREHOUSE_REQUIRED", f"خط {i}: انبار الزامی است", http_status=400)
+				raise ApiError("WAREHOUSE_REQUIRED", f"خط {i}: انبار الزامی است (در سطح سند یا ردیف)", http_status=400)
 			
 			# بررسی انبار
 			wh_check = db.query(Warehouse).filter(and_(Warehouse.id == int(line_wh), Warehouse.business_id == business_id)).first()
@@ -530,13 +568,16 @@ def update_warehouse_document(
 				if movement not in ("in", "out"):
 					raise ApiError("INVALID_MOVEMENT", f"خط {i}: movement باید 'in' یا 'out' باشد", http_status=400)
 				
+				# منطق fallback برای انبار: اگر انبار در سطح ردیف مشخص نشده باشد، از انبار سطح سند استفاده می‌شود
+				# - برای movement="in": line['warehouse_id'] ?? wh.warehouse_id_to (سطح سند)
+				# - برای movement="out": line['warehouse_id'] ?? wh.warehouse_id_from (سطح سند)
 				line_wh = ln.get("warehouse_id")
 				if not line_wh:
-					# اگر انبار در خط مشخص نشده، از حواله استفاده کن
+					# اگر انبار در خط مشخص نشده، از حواله استفاده کن (fallback به سطح سند)
 					line_wh = wh.warehouse_id_to if movement == "in" else wh.warehouse_id_from
 				
 				if not line_wh:
-					raise ApiError("WAREHOUSE_REQUIRED", f"خط {i}: انبار الزامی است", http_status=400)
+					raise ApiError("WAREHOUSE_REQUIRED", f"خط {i}: انبار الزامی است (در سطح سند یا ردیف)", http_status=400)
 				
 				# بررسی انبار
 				wh_check = db.query(Warehouse).filter(and_(Warehouse.id == int(line_wh), Warehouse.business_id == business_id)).first()

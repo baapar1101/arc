@@ -121,6 +121,8 @@ class _TopCustomersReportPageState extends State<TopCustomersReportPage> {
       showActiveFilters: true,
       showClearFiltersButton: false,
       showExportButtons: true,
+      excelEndpoint: '/api/v1/businesses/${widget.businessId}/reports/top-customers/export/excel',
+      pdfEndpoint: '/api/v1/businesses/${widget.businessId}/reports/top-customers/export/pdf',
       additionalParams: _additionalParams(),
       columns: [
         NumberColumn(

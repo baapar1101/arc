@@ -13,7 +13,7 @@ from app.services.email_verification_service import verify_email_token, resend_v
 from app.services.pdf import PDFService
 from .schemas import (
 	RegisterRequest, LoginRequest, ForgotPasswordRequest, ResetPasswordRequest, 
-	ChangePasswordRequest, CreateApiKeyRequest, UpdateApiKeyRequest, QueryInfo, FilterItem,
+	SendLoginOtpRequest, ChangePasswordRequest, CreateApiKeyRequest, UpdateApiKeyRequest, QueryInfo, FilterItem,
 	SuccessResponse, CaptchaResponse, LoginResponse, ApiKeyResponse, 
 	ReferralStatsResponse, UserResponse
 )
@@ -400,6 +400,111 @@ def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(get_db
 def reset_password_endpoint(payload: ResetPasswordRequest, db: Session = Depends(get_db)) -> dict:
 	reset_password(db=db, token=payload.token, new_password=payload.new_password, captcha_id=payload.captcha_id, captcha_code=payload.captcha_code)
 	return success_response({"ok": True})
+
+
+@router.post(
+	"/password-reset/send-otp",
+	summary="ارسال OTP برای بازیابی رمز عبور",
+	description="ارسال کد OTP 6 رقمی به شماره موبایل برای بازیابی رمز عبور",
+	response_model=SuccessResponse,
+	responses={
+		200: {
+			"description": "کد OTP با موفقیت ارسال شد",
+			"content": {
+				"application/json": {
+					"example": {
+						"success": True,
+						"message": "کد بازیابی رمز عبور به شماره موبایل ارسال شد"
+					}
+				}
+			}
+		},
+		400: {
+			"description": "شناسه نامعتبر یا کاربر موبایل ندارد",
+		},
+		429: {
+			"description": "تعداد درخواست‌ها بیش از حد مجاز",
+		},
+		503: {
+			"description": "سرویس پیامک پیکربندی نشده است",
+		}
+	}
+)
+def send_password_reset_otp(
+	request: Request,
+	payload: ForgotPasswordRequest,
+	db: Session = Depends(get_db)
+) -> dict:
+	"""ارسال OTP برای بازیابی رمز عبور"""
+	from app.services.password_reset_otp_service import PasswordResetOtpService
+	from app.services.captcha_service import validate_captcha
+	from app.core.responses import ApiError
+	
+	# تایید کپچا
+	if not validate_captcha(db, payload.captcha_id, payload.captcha_code):
+		raise ApiError("INVALID_CAPTCHA", "Invalid captcha code")
+	
+	service = PasswordResetOtpService(db)
+	
+	try:
+		# در production نباید OTP برگردانده شود
+		otp_code = service.send_reset_otp(payload.identifier)
+		return success_response({
+			"ok": True,
+			"message": "کد بازیابی رمز عبور به شماره موبایل ارسال شد",
+			"otp_code": otp_code  # فقط برای تست - حذف در production
+		}, request)
+	except ApiError as e:
+		raise e
+	except Exception as e:
+		raise ApiError("SMS_SEND_FAILED", f"خطا در ارسال پیامک: {str(e)}", http_status=500)
+
+
+@router.post(
+	"/password-reset/verify-otp",
+	summary="تایید OTP بازیابی رمز عبور",
+	description="تایید کد OTP و دریافت token برای تغییر رمز عبور",
+	response_model=SuccessResponse,
+	responses={
+		200: {
+			"description": "OTP تایید شد و token دریافت شد",
+			"content": {
+				"application/json": {
+					"example": {
+						"success": True,
+						"data": {
+							"reset_token": "token_here"
+						}
+					}
+				}
+			}
+		},
+		400: {
+			"description": "کد OTP نامعتبر",
+		}
+	}
+)
+def verify_password_reset_otp(
+	request: Request,
+	identifier: str = Query(..., description="ایمیل یا شماره موبایل"),
+	otp_code: str = Query(..., description="کد OTP 6 رقمی"),
+	db: Session = Depends(get_db)
+) -> dict:
+	"""تایید OTP و دریافت reset token"""
+	from app.services.password_reset_otp_service import PasswordResetOtpService
+	
+	service = PasswordResetOtpService(db)
+	
+	success, reset_token = service.verify_reset_otp(identifier, otp_code)
+	
+	if not success:
+		from app.core.responses import ApiError
+		raise ApiError("OTP_VERIFICATION_FAILED", "تایید OTP ناموفق بود", http_status=400)
+	
+	return success_response({
+		"reset_token": reset_token,
+		"message": "OTP تایید شد. اکنون می‌توانید رمز عبور جدید تنظیم کنید"
+	}, request)
 
 
 @router.get("/api-keys", 
@@ -1167,4 +1272,339 @@ def resend_verification(
 	resend_verification_email(db, user_id, base_url)
 	
 	return success_response({}, request, message="VERIFICATION_EMAIL_SENT")
+
+
+@router.post(
+	"/send-mobile-verification",
+	summary="ارسال کد تایید به شماره موبایل",
+	description="ارسال کد OTP 6 رقمی به شماره موبایل کاربر برای تایید",
+	response_model=SuccessResponse,
+	responses={
+		200: {
+			"description": "کد تایید با موفقیت ارسال شد",
+			"content": {
+				"application/json": {
+					"example": {
+						"success": True,
+						"message": "کد تایید به شماره موبایل ارسال شد"
+					}
+				}
+			}
+		},
+		400: {
+			"description": "شماره موبایل نامعتبر یا SMS Provider پیکربندی نشده",
+		},
+		429: {
+			"description": "تعداد درخواست‌ها بیش از حد مجاز",
+		},
+		503: {
+			"description": "سرویس پیامک پیکربندی نشده است",
+		}
+	}
+)
+def send_mobile_verification(
+	request: Request,
+	mobile: str = Query(..., description="شماره موبایل برای تایید"),
+	ctx: AuthContext = Depends(get_current_user),
+	db: Session = Depends(get_db)
+) -> dict:
+	"""ارسال کد OTP به شماره موبایل کاربر"""
+	from app.services.mobile_verification_service import MobileVerificationService
+	from app.core.responses import ApiError
+	
+	service = MobileVerificationService(db)
+	user_id = ctx.get_user_id()
+	
+	try:
+		# در production نباید OTP برگردانده شود
+		otp_code = service.create_mobile_verification(user_id, mobile)
+		# فقط برای تست - در production باید حذف شود
+		return success_response({
+			"message": "کد تایید به شماره موبایل ارسال شد",
+			"otp_code": otp_code  # فقط برای تست - حذف در production
+		}, request)
+	except ApiError as e:
+		raise e
+	except Exception as e:
+		raise ApiError("SMS_SEND_FAILED", f"خطا در ارسال پیامک: {str(e)}", http_status=500)
+
+
+@router.post(
+	"/verify-mobile",
+	summary="تایید شماره موبایل با کد OTP",
+	description="تایید شماره موبایل کاربر با استفاده از کد OTP ارسال شده",
+	response_model=SuccessResponse,
+	responses={
+		200: {
+			"description": "شماره موبایل با موفقیت تایید شد",
+			"content": {
+				"application/json": {
+					"example": {
+						"success": True,
+						"message": "شماره موبایل با موفقیت تایید شد",
+						"data": {
+							"user_id": 1,
+							"mobile_verified": True
+						}
+					}
+				}
+			}
+		},
+		400: {
+			"description": "کد OTP نامعتبر",
+		},
+		404: {
+			"description": "کد تایید یافت نشد یا منقضی شده است",
+		},
+		429: {
+			"description": "تعداد تلاش‌های مجاز به پایان رسیده است",
+		}
+	}
+)
+def verify_mobile(
+	request: Request,
+	otp_code: str = Query(..., description="کد OTP 6 رقمی"),
+	ctx: AuthContext = Depends(get_current_user),
+	db: Session = Depends(get_db)
+) -> dict:
+	"""تایید شماره موبایل با کد OTP"""
+	from app.services.mobile_verification_service import MobileVerificationService
+	from adapters.db.models.user import User
+	
+	service = MobileVerificationService(db)
+	user_id = ctx.get_user_id()
+	
+	service.verify_mobile_otp(user_id, otp_code)
+	
+	# به‌روزرسانی اطلاعات کاربر
+	user = db.get(User, user_id)
+	
+	response_data = {
+		"user_id": user_id,
+		"mobile_verified": user.mobile_verified if user else False
+	}
+	
+	return success_response(response_data, request, message="MOBILE_VERIFIED")
+
+
+@router.post(
+	"/resend-mobile-verification",
+	summary="ارسال مجدد کد تایید موبایل",
+	description="ارسال مجدد کد OTP به شماره موبایل کاربر",
+	response_model=SuccessResponse,
+	responses={
+		200: {
+			"description": "کد تایید مجدداً ارسال شد",
+		},
+		400: {
+			"description": "کاربر شماره موبایل ثبت نکرده است",
+		},
+		429: {
+			"description": "تعداد درخواست‌ها بیش از حد مجاز",
+		}
+	}
+)
+def resend_mobile_verification(
+	request: Request,
+	ctx: AuthContext = Depends(get_current_user),
+	db: Session = Depends(get_db)
+) -> dict:
+	"""ارسال مجدد کد تایید موبایل"""
+	from app.services.mobile_verification_service import MobileVerificationService
+	
+	service = MobileVerificationService(db)
+	user_id = ctx.get_user_id()
+	
+	# در production نباید OTP برگردانده شود
+	otp_code = service.resend_otp(user_id)
+	
+	return success_response({
+		"message": "کد تایید مجدداً ارسال شد",
+		"otp_code": otp_code  # فقط برای تست - حذف در production
+	}, request)
+
+
+@router.get(
+	"/login/available-channels",
+	summary="دریافت کانال‌های در دسترس برای ورود با OTP",
+	description="دریافت لیست کانال‌های در دسترس (SMS, Email, Telegram) برای یک identifier",
+	response_model=SuccessResponse,
+)
+def get_available_channels(
+	request: Request,
+	identifier: str = Query(..., description="ایمیل یا شماره موبایل"),
+	db: Session = Depends(get_db)
+) -> dict:
+	"""دریافت کانال‌های در دسترس"""
+	from app.services.otp_login_service import OtpLoginService
+	
+	service = OtpLoginService(db)
+	channels_info = service.get_available_channels(identifier)
+	
+	return success_response(channels_info, request)
+
+
+@router.post(
+	"/login/send-otp",
+	summary="ارسال OTP برای ورود",
+	description="ارسال کد OTP 6 رقمی به ایمیل، شماره موبایل یا تلگرام برای ورود بدون نیاز به رمز عبور",
+	response_model=SuccessResponse,
+	responses={
+		200: {
+			"description": "کد OTP با موفقیت ارسال شد",
+			"content": {
+				"application/json": {
+					"example": {
+						"success": True,
+						"data": {
+							"session_id": "session_id_here",
+							"message": "کد ورود ارسال شد",
+							"available_channels": ["sms", "email", "telegram"]
+						}
+					}
+				}
+			}
+		},
+		400: {
+			"description": "شناسه، کانال یا کپتچا نامعتبر",
+		},
+		429: {
+			"description": "تعداد درخواست‌ها بیش از حد مجاز",
+		},
+		503: {
+			"description": "سرویس مورد نظر پیکربندی نشده است",
+		}
+	}
+)
+def send_login_otp(
+	request: Request,
+	payload: SendLoginOtpRequest,
+	db: Session = Depends(get_db)
+) -> dict:
+	"""ارسال OTP برای ورود"""
+	from app.services.otp_login_service import OtpLoginService
+	from app.services.captcha_service import validate_captcha
+	from app.core.responses import ApiError
+	
+	# تایید کپتچا
+	if not validate_captcha(db, payload.captcha_id, payload.captcha_code):
+		raise ApiError("INVALID_CAPTCHA", "کد کپتچا نامعتبر است", http_status=400)
+	
+	service = OtpLoginService(db)
+	
+	# دریافت IP و User Agent
+	ip_address = request.client.host if request.client else None
+	user_agent = request.headers.get("User-Agent")
+	
+	try:
+		success, new_session_id, channels_info = service.send_login_otp(
+			identifier=payload.identifier,
+			channel=payload.channel,
+			ip_address=ip_address,
+			user_agent=user_agent,
+			session_id=payload.session_id
+		)
+		
+		if not success:
+			channel_names = {"sms": "پیامک", "email": "ایمیل", "telegram": "تلگرام"}
+			channel_name = channel_names.get(payload.channel, payload.channel)
+			raise ApiError("SEND_FAILED", f"خطا در ارسال {channel_name}", http_status=500)
+		
+		channel_messages = {
+			"sms": "کد ورود به شماره موبایل ارسال شد",
+			"email": "کد ورود به ایمیل ارسال شد",
+			"telegram": "کد ورود به تلگرام ارسال شد"
+		}
+		
+		return success_response({
+			"session_id": new_session_id,
+			"message": channel_messages.get(payload.channel, "کد ورود ارسال شد"),
+			"available_channels": channels_info.get("available_channels", [])
+		}, request)
+	except ApiError as e:
+		raise e
+	except Exception as e:
+		raise ApiError("OTP_SEND_FAILED", f"خطا در ارسال OTP: {str(e)}", http_status=500)
+
+
+@router.post(
+	"/login/verify-otp",
+	summary="تایید OTP و ورود",
+	description="تایید کد OTP و ورود کاربر به سیستم",
+	response_model=SuccessResponse,
+	responses={
+		200: {
+			"description": "ورود با موفقیت انجام شد",
+			"content": {
+				"application/json": {
+					"example": {
+						"success": True,
+						"message": "ورود با موفقیت انجام شد",
+						"data": {
+							"api_key": "sk_1234567890abcdef",
+							"expires_at": "2024-01-02T00:00:00Z",
+							"user": {
+								"id": 1,
+								"first_name": "احمد",
+								"last_name": "احمدی",
+								"email": "ahmad@example.com",
+								"mobile": "09123456789"
+							}
+						}
+					}
+				}
+			}
+		},
+		400: {
+			"description": "کد OTP نامعتبر",
+		},
+		404: {
+			"description": "Session یا کاربر یافت نشد",
+		},
+		429: {
+			"description": "تعداد تلاش‌های مجاز به پایان رسیده است",
+		}
+	}
+)
+def verify_login_otp(
+	request: Request,
+	session_id: str = Query(..., description="شناسه session"),
+	otp_code: str = Query(..., description="کد OTP 6 رقمی"),
+	device_id: str = Query(None, description="شناسه دستگاه (اختیاری)"),
+	db: Session = Depends(get_db)
+) -> dict:
+	"""تایید OTP و ورود"""
+	from app.services.otp_login_service import OtpLoginService
+	from app.core.responses import ApiError
+	
+	service = OtpLoginService(db)
+	
+	# دریافت IP و User Agent
+	ip_address = request.client.host if request.client else None
+	user_agent = request.headers.get("User-Agent")
+	
+	try:
+		success, user_data, api_key = service.verify_login_otp(
+			session_id=session_id,
+			otp_code=otp_code,
+			device_id=device_id,
+			user_agent=user_agent,
+			ip=ip_address
+		)
+		
+		if not success or not user_data or not api_key:
+			raise ApiError("OTP_VERIFICATION_FAILED", "تایید OTP ناموفق بود", http_status=400)
+		
+		response_data = {
+			"api_key": api_key,
+			"expires_at": None,  # اگر expires_at نیاز باشد، باید از service برگردانده شود
+			"user": user_data
+		}
+		
+		formatted_data = format_datetime_fields(response_data, request)
+		return success_response(formatted_data, request, message="LOGIN_SUCCESS")
+	except ApiError as e:
+		raise e
+	except Exception as e:
+		raise ApiError("LOGIN_FAILED", f"خطا در ورود: {str(e)}", http_status=500)
 

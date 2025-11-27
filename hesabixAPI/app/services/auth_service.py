@@ -148,20 +148,13 @@ def login_user(*, db: Session, identifier: str, password: str, captcha_id: str, 
 		from app.core.responses import ApiError
 		raise ApiError("ACCOUNT_DISABLED", "Your account is disabled")
 
-	from app.services.system_settings_service import get_session_timeout
-	from datetime import timedelta
-	
 	settings = get_settings()
 	api_key, key_hash = generate_api_key()
 	
-	# تنظیم زمان انقضای نشست
-	session_timeout = get_session_timeout(db)
-	expires_at = None
-	if session_timeout > 0:  # 0 به معنی نامحدود است
-		expires_at = datetime.utcnow() + timedelta(minutes=session_timeout)
-	
+	# Session keys برای کاربران فرانت‌اند نامحدود هستند (expires_at=None)
+	# فقط personal API keys می‌توانند expires_at داشته باشند
 	api_repo = ApiKeyRepository(db)
-	api_repo.create_session_key(user_id=user.id, key_hash=key_hash, device_id=device_id, user_agent=user_agent, ip=ip, expires_at=expires_at)
+	api_repo.create_session_key(user_id=user.id, key_hash=key_hash, device_id=device_id, user_agent=user_agent, ip=ip, expires_at=None)
 
 	user_data = {
 		"id": user.id,
@@ -172,7 +165,8 @@ def login_user(*, db: Session, identifier: str, password: str, captcha_id: str, 
 		"referral_code": getattr(user, "referral_code", None),
 		"email_verified": getattr(user, "email_verified", False),
 	}
-	return api_key, expires_at, user_data
+	# Session keys نامحدود هستند، پس expires_at=None برمی‌گردانیم
+	return api_key, None, user_data
 
 
 def _hash_reset_token(token: str) -> str:
@@ -268,6 +262,31 @@ def change_password(*, db: Session, user_id: int, current_password: str, new_pas
 	user.password_hash = hash_password(new_password)
 	db.add(user)
 	db.commit()
+	
+	# لاگ‌گیری تغییر رمز عبور
+	try:
+		from app.services.activity_log_service import log_user_activity
+		from fastapi import Request
+		# اگر request در scope باشد، از آن استفاده کن
+		request = None
+		import contextvars
+		try:
+			# تلاش برای دریافت request از context (اگر در FastAPI باشد)
+			pass
+		except:
+			pass
+		log_user_activity(
+			db=db,
+			user_id=user_id,
+			action="password_change",
+			description="رمز عبور تغییر کرد",
+			request=request
+		)
+	except Exception as e:
+		# اگر خطا در لاگ‌گیری بود، لاگ کن اما ادامه بده
+		import logging
+		logger = logging.getLogger(__name__)
+		logger.warning(f"Failed to log password change activity: {e}")
 
 
 def referral_stats(*, db: Session, user_id: int, start: datetime | None = None, end: datetime | None = None) -> dict:

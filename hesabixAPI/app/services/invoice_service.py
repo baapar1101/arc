@@ -1711,10 +1711,17 @@ def create_invoice(
                 links["warehouse_document_ids"] = created_wh_ids
                 extra["links"] = links
                 document.extra_info = extra
+                flag_modified(document, "extra_info")
                 db.commit()
-    except Exception:
+    except Exception as ex:
         # عدم موفقیت در ساخت حواله نباید مانع بازگشت فاکتور شود
-        db.rollback()
+        # فاکتور قبلاً commit شده است، پس فقط exception را log می‌کنیم
+        logger.exception(f"Failed to create warehouse document for invoice {document.id}: {ex}")
+        # فقط تغییرات uncommitted را rollback می‌کنیم (نه فاکتور commit شده)
+        try:
+            db.rollback()
+        except Exception:
+            pass
 
     return invoice_document_to_dict(db, document)
 

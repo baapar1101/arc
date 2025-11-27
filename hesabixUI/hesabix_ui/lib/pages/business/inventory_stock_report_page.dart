@@ -164,6 +164,8 @@ class _InventoryStockReportPageState extends State<InventoryStockReportPage> {
       showActiveFilters: true,
       showClearFiltersButton: false,
       showExportButtons: true,
+      excelEndpoint: '/api/v1/products/businesses/${widget.businessId}/reports/inventory-stock/export/excel',
+      pdfEndpoint: '/api/v1/products/businesses/${widget.businessId}/reports/inventory-stock/export/pdf',
       additionalParams: _additionalParams(),
       columns: [
         TextColumn(

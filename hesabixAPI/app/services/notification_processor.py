@@ -43,14 +43,22 @@ class NotificationProcessor:
 
 async def background_loop(interval_seconds: int = 30) -> None:
 	import asyncio
+
+	def _process_due_notifications() -> None:
+		"""
+		Run the potentially blocking notification resend logic in a worker thread
+		so the main event loop stays responsive (SMTP sends are fully blocking).
+		"""
+		db = SessionLocal()
+		try:
+			processor = NotificationProcessor(db)
+			processor.process_once()
+		finally:
+			db.close()
+
 	while True:
 		try:
-			db = SessionLocal()
-			try:
-				processor = NotificationProcessor(db)
-				processor.process_once()
-			finally:
-				db.close()
+			await asyncio.to_thread(_process_due_notifications)
 		except Exception:
 			# swallow errors to keep loop alive
 			pass

@@ -5342,4 +5342,64 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get zeroMeansUnlimited => '0 = نامحدود';
+
+  @override
+  String get otpLogin => 'ورود با OTP';
+
+  @override
+  String get otpLoginTitle => 'ورود با کد یکبار مصرف';
+
+  @override
+  String get otpLoginSubtitle =>
+      'کد ورود به ایمیل، شماره موبایل یا تلگرام شما ارسال می‌شود';
+
+  @override
+  String get otpLoginIdentifierHint => 'ایمیل یا شماره موبایل خود را وارد کنید';
+
+  @override
+  String get otpLoginIdentifierRequired => 'ایمیل یا شماره موبایل الزامی است';
+
+  @override
+  String get otpCodeSent => 'کد ارسال شد';
+
+  @override
+  String get otpChannelSelectionTitle => 'روش دریافت کد:';
+
+  @override
+  String get otpChannelSms => 'پیامک';
+
+  @override
+  String get otpChannelEmail => 'ایمیل';
+
+  @override
+  String get otpChannelTelegram => 'تلگرام';
+
+  @override
+  String get otpSendCodeButton => 'ارسال کد ورود';
+
+  @override
+  String get otpChangeChannelTitle => 'تغییر روش دریافت:';
+
+  @override
+  String get otpChangeIdentifier => 'تغییر شناسه';
+
+  @override
+  String get otpSelectChannelError => 'لطفاً کانال ارسال را انتخاب کنید';
+
+  @override
+  String get otpCaptchaError => 'خطا در دریافت کپتچا';
+
+  @override
+  String otpCodeSentMessage(String channel) {
+    return 'کد ورود به $channel شما ارسال شد';
+  }
+
+  @override
+  String get otpCodeResentMessage => 'کد ورود مجدداً ارسال شد';
+
+  @override
+  String get otpSendError => 'خطا در ارسال کد ورود';
+
+  @override
+  String get otpEnterCaptchaError => 'لطفاً کد کپتچا را وارد کنید';
 }

@@ -22,6 +22,9 @@ NOTIFY_TG_SECRET_HEADER = "telegram_secret_header"
 NOTIFY_SMS_PROVIDER = "sms_provider_name"
 NOTIFY_SMS_API_KEY = "sms_api_key"
 NOTIFY_SMS_SENDER = "sms_sender"
+NOTIFY_SMS_PROVIDER_USERNAME = "sms_provider_username"
+NOTIFY_SMS_PROVIDER_PASSWORD = "sms_provider_password"
+NOTIFY_SMS_IS_FLASH = "sms_is_flash"
 NOTIFY_TG_PROXY_ENABLED = "telegram_proxy_enabled"
 NOTIFY_TG_PROXY_BASE_URL = "telegram_proxy_base_url"
 NOTIFY_TG_PROXY_API_KEY = "telegram_proxy_api_key"
@@ -167,6 +170,9 @@ def get_notifications_settings(db: Session) -> Dict[str, Any]:
 	sms_provider = _get_setting(db, NOTIFY_SMS_PROVIDER)
 	sms_api_key = _get_setting(db, NOTIFY_SMS_API_KEY)
 	sms_sender = _get_setting(db, NOTIFY_SMS_SENDER)
+	sms_username = _get_setting(db, NOTIFY_SMS_PROVIDER_USERNAME)
+	sms_password = _get_setting(db, NOTIFY_SMS_PROVIDER_PASSWORD)
+	sms_is_flash = _get_setting_bool(db, NOTIFY_SMS_IS_FLASH)
 	tg_proxy_enabled = _get_setting_bool(db, NOTIFY_TG_PROXY_ENABLED)
 	tg_proxy_base = _get_setting(db, NOTIFY_TG_PROXY_BASE_URL)
 	tg_proxy_api_key = _get_setting(db, NOTIFY_TG_PROXY_API_KEY)
@@ -178,6 +184,9 @@ def get_notifications_settings(db: Session) -> Dict[str, Any]:
 		"sms_provider_name": (sms_provider.value_string if sms_provider and sms_provider.value_string else None),
 		"sms_api_key": (sms_api_key.value_string if sms_api_key and sms_api_key.value_string else None),
 		"sms_sender": (sms_sender.value_string if sms_sender and sms_sender.value_string else None),
+		"sms_provider_username": (sms_username.value_string if sms_username and sms_username.value_string else None),
+		"sms_provider_password": (sms_password.value_string if sms_password and sms_password.value_string else None),
+		"sms_is_flash": sms_is_flash if sms_is_flash is not None else False,
 		"telegram_proxy_enabled": tg_proxy_enabled,
 		"telegram_proxy_base_url": (tg_proxy_base.value_string if tg_proxy_base and tg_proxy_base.value_string else None),
 		"telegram_proxy_api_key": (tg_proxy_api_key.value_string if tg_proxy_api_key and tg_proxy_api_key.value_string else None),
@@ -198,6 +207,9 @@ def get_effective_notifications_settings(db: Session) -> Dict[str, Any]:
 		"sms_provider_name": db_values.get("sms_provider_name") or env.sms_provider_name,
 		"sms_api_key": db_values.get("sms_api_key") or env.sms_api_key,
 		"sms_sender": db_values.get("sms_sender") or env.sms_sender,
+		"sms_provider_username": db_values.get("sms_provider_username"),
+		"sms_provider_password": db_values.get("sms_provider_password"),
+		"sms_is_flash": db_values.get("sms_is_flash", False),
 		"telegram_proxy": {
 			"enabled": (
 				db_values.get("telegram_proxy_enabled")
@@ -218,6 +230,9 @@ def set_notifications_settings(
 	sms_provider_name: str | None = None,
 	sms_api_key: str | None = None,
 	sms_sender: str | None = None,
+	sms_provider_username: str | None = None,
+	sms_provider_password: str | None = None,
+	sms_is_flash: bool | None = None,
 	telegram_proxy_enabled: bool | None = None,
 	telegram_proxy_base_url: str | None = None,
 	telegram_proxy_api_key: str | None = None,
@@ -236,6 +251,12 @@ def set_notifications_settings(
 		_upsert_setting_string(db, NOTIFY_SMS_API_KEY, sms_api_key)
 	if sms_sender is not None:
 		_upsert_setting_string(db, NOTIFY_SMS_SENDER, sms_sender)
+	if sms_provider_username is not None:
+		_upsert_setting_string(db, NOTIFY_SMS_PROVIDER_USERNAME, sms_provider_username)
+	if sms_provider_password is not None:
+		_upsert_setting_string(db, NOTIFY_SMS_PROVIDER_PASSWORD, sms_provider_password)
+	if sms_is_flash is not None:
+		_upsert_setting_bool(db, NOTIFY_SMS_IS_FLASH, sms_is_flash)
 	if telegram_proxy_enabled is not None:
 		_upsert_setting_bool(db, NOTIFY_TG_PROXY_ENABLED, telegram_proxy_enabled)
 	if telegram_proxy_base_url is not None:

@@ -18,6 +18,7 @@ import 'pages/profile/change_password_page.dart';
 import 'pages/profile/api_keys_page.dart';
 import 'pages/profile/marketing_page.dart';
 import 'pages/profile/account_settings_page.dart';
+import 'pages/profile/mobile_verification_page.dart';
 import 'pages/profile/operator/operator_tickets_page.dart';
 import 'pages/profile/announcements_page.dart';
 import 'pages/system_settings_page.dart';
@@ -279,7 +280,7 @@ class _MyAppState extends State<MyApp> {
       WalletPaymentResultPage(authStore: authStore);
       
       // Preload صفحات Profile
-      const ProfileDashboardPage();
+      ProfileDashboardPage(calendarController: calendarController);
       const AnnouncementsPage();
       NewBusinessPage(calendarController: calendarController);
       const BusinessesPage();
@@ -808,8 +809,8 @@ class _MyAppState extends State<MyApp> {
               name: 'profile_dashboard',
               builder: (context, state) {
                 // ثبت صفحه برای preload خودکار
-                registerRoutePage(() => const ProfileDashboardPage());
-                return const ProfileDashboardPage();
+                registerRoutePage(() => ProfileDashboardPage(calendarController: _calendarController!));
+                return ProfileDashboardPage(calendarController: _calendarController!);
               },
             ),
             GoRoute(
@@ -854,6 +855,11 @@ class _MyAppState extends State<MyApp> {
               path: '/user/profile/change-password',
               name: 'profile_change_password',
               builder: (context, state) => const ChangePasswordPage(),
+            ),
+            GoRoute(
+              path: '/user/profile/mobile-verification',
+              name: 'profile_mobile_verification',
+              builder: (context, state) => const MobileVerificationPage(),
             ),
             GoRoute(
               path: '/user/profile/api-keys',

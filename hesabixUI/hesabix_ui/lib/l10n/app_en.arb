@@ -2132,6 +2132,32 @@
   "system": "System",
   "light": "Light",
   "dark": "Dark",
-  "zeroMeansUnlimited": "0 = Unlimited"
+  "zeroMeansUnlimited": "0 = Unlimited",
+  "otpLogin": "OTP Login",
+  "otpLoginTitle": "Login with OTP",
+  "otpLoginSubtitle": "Login code will be sent to your email, mobile number or Telegram",
+  "otpLoginIdentifierHint": "Enter your email or mobile number",
+  "otpLoginIdentifierRequired": "Email or mobile number is required",
+  "otpCodeSent": "Code sent",
+  "otpChannelSelectionTitle": "Receive code via:",
+  "otpChannelSms": "SMS",
+  "otpChannelEmail": "Email",
+  "otpChannelTelegram": "Telegram",
+  "otpSendCodeButton": "Send login code",
+  "otpChangeChannelTitle": "Change delivery method:",
+  "otpChangeIdentifier": "Change identifier",
+  "otpSelectChannelError": "Please select a delivery channel",
+  "otpCaptchaError": "Error loading captcha",
+  "otpCodeSentMessage": "Login code sent to your {channel}",
+  "@otpCodeSentMessage": {
+    "placeholders": {
+      "channel": {
+        "type": "String"
+      }
+    }
+  },
+  "otpCodeResentMessage": "Login code resent",
+  "otpSendError": "Error sending login code",
+  "otpEnterCaptchaError": "Please enter captcha code"
 }
 

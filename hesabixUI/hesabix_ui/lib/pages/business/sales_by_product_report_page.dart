@@ -237,6 +237,7 @@ class _SalesByProductReportPageState extends State<SalesByProductReportPage> {
       additionalParams: _additionalParams(),
       showExportButtons: true,
       excelEndpoint: '/api/v1/products/businesses/${widget.businessId}/reports/sales-by-product/export/excel',
+      pdfEndpoint: '/api/v1/products/businesses/${widget.businessId}/reports/sales-by-product/export/pdf',
       getExportParams: () => _additionalParams(),
       footerTotals: {
         'total_quantity': 'جمع تعداد فروش',

@@ -178,6 +178,7 @@ class _TopSuppliersReportPageState extends State<TopSuppliersReportPage> {
       defaultSortBy: 'total_purchases',
       defaultSortDesc: true,
       excelEndpoint: '/api/v1/businesses/${widget.businessId}/reports/top-suppliers/export/excel',
+      pdfEndpoint: '/api/v1/businesses/${widget.businessId}/reports/top-suppliers/export/pdf',
     );
   }
 

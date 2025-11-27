@@ -524,7 +524,18 @@ class _CategoryTreeDialogState extends State<CategoryTreeDialog> {
                             subtitle: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text('کد: $code'),
+                                Row(
+                                  children: [
+                                    const Text('کد: '),
+                                    Directionality(
+                                      textDirection: TextDirection.ltr,
+                                      child: Text(
+                                        code,
+                                        style: const TextStyle(fontFamily: 'monospace'),
+                                      ),
+                                    ),
+                                  ],
+                                ),
                                 if (categoryName != null && categoryName.isNotEmpty)
                                   Text('دسته‌بندی: $categoryName'),
                                 Text('نوع: $itemType'),

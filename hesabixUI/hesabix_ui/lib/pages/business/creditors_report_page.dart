@@ -213,6 +213,7 @@ class _CreditorsReportPageState extends State<CreditorsReportPage> {
       additionalParams: _additionalParams(),
       showExportButtons: true,
       excelEndpoint: '/api/v1/persons/businesses/${widget.businessId}/reports/creditors/export/excel',
+      pdfEndpoint: '/api/v1/persons/businesses/${widget.businessId}/reports/creditors/export/pdf',
       getExportParams: () => _additionalParams(),
       rowColorBuilder: (item, index) {
         try {

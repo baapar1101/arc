@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
+import 'package:dio/dio.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/core/api_client.dart';
@@ -7,6 +9,7 @@ import 'package:hesabix_ui/widgets/date_input_field.dart';
 import 'package:hesabix_ui/services/business_dashboard_service.dart';
 import 'package:hesabix_ui/services/currency_service.dart';
 import 'package:hesabix_ui/widgets/data_table/helpers/data_table_utils.dart';
+import 'package:hesabix_ui/utils/web/web_utils.dart' as web_utils;
 
 class PnlPeriodReportPage extends StatefulWidget {
   final int businessId;
@@ -143,6 +146,92 @@ class _PnlPeriodReportPageState extends State<PnlPeriodReportPage> {
     _fetchData();
   }
 
+  Future<void> _exportExcel() async {
+    setState(() => _loading = true);
+    try {
+      final api = ApiClient();
+      final requestData = <String, dynamic>{
+        if (_fromDate != null) 'date_from': _fromDate!.toIso8601String().split('T').first,
+        if (_toDate != null) 'date_to': _toDate!.toIso8601String().split('T').first,
+        if (_selectedFiscalYearId != null) 'fiscal_year_id': _selectedFiscalYearId,
+        if (_selectedCurrencyId != null) 'currency_id': _selectedCurrencyId,
+      };
+
+      final bytes = await api.post<List<int>>(
+        '/api/v1/businesses/${widget.businessId}/reports/pnl-period/export/excel',
+        data: requestData,
+        responseType: ResponseType.bytes,
+        options: Options(
+          headers: {'Accept': 'application/octet-stream'},
+        ),
+      );
+      final data = bytes.data ?? <int>[];
+      if (kIsWeb) {
+        await web_utils.saveBytesAsFileWeb(
+          data,
+          'pnl_period_${widget.businessId}.xlsx',
+          mimeType: 'application/octet-stream',
+        );
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Export only available on web')),
+          );
+        }
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Export error: ${e.toString()}'), backgroundColor: Colors.red),
+      );
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _exportPdf() async {
+    setState(() => _loading = true);
+    try {
+      final api = ApiClient();
+      final requestData = <String, dynamic>{
+        if (_fromDate != null) 'date_from': _fromDate!.toIso8601String().split('T').first,
+        if (_toDate != null) 'date_to': _toDate!.toIso8601String().split('T').first,
+        if (_selectedFiscalYearId != null) 'fiscal_year_id': _selectedFiscalYearId,
+        if (_selectedCurrencyId != null) 'currency_id': _selectedCurrencyId,
+      };
+
+      final bytes = await api.post<List<int>>(
+        '/api/v1/businesses/${widget.businessId}/reports/pnl-period/export/pdf',
+        data: requestData,
+        responseType: ResponseType.bytes,
+        options: Options(
+          headers: {'Accept': 'application/pdf'},
+        ),
+      );
+      final data = bytes.data ?? <int>[];
+      if (kIsWeb) {
+        await web_utils.saveBytesAsFileWeb(
+          data,
+          'pnl_period_${widget.businessId}.pdf',
+          mimeType: 'application/pdf',
+        );
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Export only available on web')),
+          );
+        }
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Export error: ${e.toString()}'), backgroundColor: Colors.red),
+      );
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
@@ -157,6 +246,39 @@ class _PnlPeriodReportPageState extends State<PnlPeriodReportPage> {
         ),
         title: Text(t.reportsPnlPeriodTitle),
         actions: [
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.download),
+            tooltip: t.export,
+            onSelected: (value) {
+              if (value == 'excel') {
+                _exportExcel();
+              } else if (value == 'pdf') {
+                _exportPdf();
+              }
+            },
+            itemBuilder: (context) => [
+              PopupMenuItem(
+                value: 'excel',
+                child: Row(
+                  children: [
+                    Icon(Icons.table_chart, color: Colors.green[600]),
+                    const SizedBox(width: 8),
+                    Text(t.exportToExcel),
+                  ],
+                ),
+              ),
+              PopupMenuItem(
+                value: 'pdf',
+                child: Row(
+                  children: [
+                    Icon(Icons.picture_as_pdf, color: Colors.red[600]),
+                    const SizedBox(width: 8),
+                    Text(t.exportToPdf),
+                  ],
+                ),
+              ),
+            ],
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: t.refresh,

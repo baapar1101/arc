@@ -136,6 +136,7 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
         categories: _controller.categories,
         attributes: _controller.attributes,
         controller: _controller,
+        authStore: widget.authStore,
       ),
     );
   }

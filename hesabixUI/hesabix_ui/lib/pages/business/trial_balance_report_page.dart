@@ -236,7 +236,10 @@ class _TrialBalanceReportPageState extends State<TrialBalanceReportPage> {
       searchFields: const ['account_code', 'account_name'],
       defaultPageSize: 50,
       additionalParams: _additionalParams(),
-      showExportButtons: false, // Excel export can be added later if needed
+      showExportButtons: true,
+      excelEndpoint: '/api/v1/businesses/${widget.businessId}/reports/trial-balance/export/excel',
+      pdfEndpoint: '/api/v1/businesses/${widget.businessId}/reports/trial-balance/export/pdf',
+      getExportParams: () => _additionalParams(),
       footerTotals: {
         'opening_debit': 'جمع مانده ابتدای دوره (بدهکار)',
         'opening_credit': 'جمع مانده ابتدای دوره (بستانکار)',

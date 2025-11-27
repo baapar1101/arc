@@ -5371,4 +5371,64 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get zeroMeansUnlimited => '0 = Unlimited';
+
+  @override
+  String get otpLogin => 'OTP Login';
+
+  @override
+  String get otpLoginTitle => 'Login with OTP';
+
+  @override
+  String get otpLoginSubtitle =>
+      'Login code will be sent to your email, mobile number or Telegram';
+
+  @override
+  String get otpLoginIdentifierHint => 'Enter your email or mobile number';
+
+  @override
+  String get otpLoginIdentifierRequired => 'Email or mobile number is required';
+
+  @override
+  String get otpCodeSent => 'Code sent';
+
+  @override
+  String get otpChannelSelectionTitle => 'Receive code via:';
+
+  @override
+  String get otpChannelSms => 'SMS';
+
+  @override
+  String get otpChannelEmail => 'Email';
+
+  @override
+  String get otpChannelTelegram => 'Telegram';
+
+  @override
+  String get otpSendCodeButton => 'Send login code';
+
+  @override
+  String get otpChangeChannelTitle => 'Change delivery method:';
+
+  @override
+  String get otpChangeIdentifier => 'Change identifier';
+
+  @override
+  String get otpSelectChannelError => 'Please select a delivery channel';
+
+  @override
+  String get otpCaptchaError => 'Error loading captcha';
+
+  @override
+  String otpCodeSentMessage(String channel) {
+    return 'Login code sent to your $channel';
+  }
+
+  @override
+  String get otpCodeResentMessage => 'Login code resent';
+
+  @override
+  String get otpSendError => 'Error sending login code';
+
+  @override
+  String get otpEnterCaptchaError => 'Please enter captcha code';
 }

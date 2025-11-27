@@ -235,6 +235,7 @@ class _CashPettyTurnoverReportPageState extends State<CashPettyTurnoverReportPag
       additionalParams: _additionalParams(),
       showExportButtons: true,
       excelEndpoint: '/api/v1/cash-registers/businesses/${widget.businessId}/reports/cash-petty-turnover/export/excel',
+      pdfEndpoint: '/api/v1/cash-registers/businesses/${widget.businessId}/reports/cash-petty-turnover/export/pdf',
       getExportParams: () => _additionalParams(),
       footerTotals: {
         'deposit': 'جمع واریز',

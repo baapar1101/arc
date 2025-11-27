@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../services/category_service.dart';
 import '../../core/api_client.dart';
+import '../../core/auth_store.dart';
 
 class CategoryPickerField extends FormField<int?> {
   CategoryPickerField({
@@ -13,6 +14,8 @@ class CategoryPickerField extends FormField<int?> {
     super.initialValue,
     String? label,
     super.validator,
+    this.authStore,
+    this.onCategoriesUpdated,
   }) : super(
           builder: (state) {
             final context = state.context;
@@ -29,6 +32,8 @@ class CategoryPickerField extends FormField<int?> {
                     businessId: businessId,
                     categoriesTree: categoriesTree,
                     initialCategoryId: state.value,
+                    authStore: authStore,
+                    onCategoriesUpdated: onCategoriesUpdated,
                   ),
                 );
                 if (picked != null) {
@@ -50,6 +55,8 @@ class CategoryPickerField extends FormField<int?> {
           },
         );
   final int businessId;
+  final AuthStore? authStore;
+  final ValueChanged<List<Map<String, dynamic>>>? onCategoriesUpdated;
 }
 
 class _BreadcrumbChips extends StatelessWidget {
@@ -105,11 +112,15 @@ class _CategoryPickerDialog extends StatefulWidget {
   final List<Map<String, dynamic>> categoriesTree;
   final int? initialCategoryId;
   final int businessId;
+  final AuthStore? authStore;
+  final ValueChanged<List<Map<String, dynamic>>>? onCategoriesUpdated;
 
   const _CategoryPickerDialog({
     required this.categoriesTree,
     required this.initialCategoryId,
     required this.businessId,
+    this.authStore,
+    this.onCategoriesUpdated,
   });
 
   @override
@@ -123,12 +134,18 @@ class _CategoryPickerDialogState extends State<_CategoryPickerDialog> {
   List<Map<String, dynamic>> _serverResults = const <Map<String, dynamic>>[];
   late final CategoryService _service;
   Timer? _debounce;
+  List<Map<String, dynamic>> _currentTree = const <Map<String, dynamic>>[];
+
+  bool get _canAdd => widget.authStore?.hasBusinessPermission('categories', 'add') ?? false;
+  bool get _canEdit => widget.authStore?.hasBusinessPermission('categories', 'edit') ?? false;
+  bool get _canDelete => widget.authStore?.hasBusinessPermission('categories', 'delete') ?? false;
 
   @override
   void initState() {
     super.initState();
     _selectedId = widget.initialCategoryId;
     _service = CategoryService(ApiClient());
+    _currentTree = widget.categoriesTree;
   }
 
   @override
@@ -140,12 +157,23 @@ class _CategoryPickerDialogState extends State<_CategoryPickerDialog> {
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
-    final useServer = _query.trim().length >= 3 || _countNodes(widget.categoriesTree) > 500;
+    final useServer = _query.trim().length >= 3 || _countNodes(_currentTree) > 500;
     final filteredTree = useServer
         ? _resultsToTree(_serverResults)
-        : (_query.isEmpty ? widget.categoriesTree : _filterTree(widget.categoriesTree, _query));
+        : (_query.isEmpty ? _currentTree : _filterTree(_currentTree, _query));
     return AlertDialog(
-      title: Text(t.categories),
+      title: Row(
+        children: [
+          Text(t.categories),
+          const Spacer(),
+          if (_canAdd)
+            IconButton(
+              icon: const Icon(Icons.add_circle_outline),
+              tooltip: t.addCategory,
+              onPressed: () => _showAddCategoryDialog(context, null),
+            ),
+        ],
+      ),
       content: SizedBox(
         width: 520,
         height: 460,
@@ -169,6 +197,12 @@ class _CategoryPickerDialogState extends State<_CategoryPickerDialog> {
                 tree: filteredTree,
                 selectedId: _selectedId,
                 onSelect: (id) => setState(() => _selectedId = id),
+                canAdd: _canAdd,
+                canEdit: _canEdit,
+                canDelete: _canDelete,
+                onAdd: (parentId) => _showAddCategoryDialog(context, parentId),
+                onEdit: (categoryId) => _showEditCategoryDialog(context, categoryId),
+                onDelete: (categoryId) => _showDeleteCategoryDialog(context, categoryId),
               ),
             ),
           ],
@@ -272,17 +306,298 @@ class _CategoryPickerDialogState extends State<_CategoryPickerDialog> {
     }
     return roots;
   }
+
+  Future<void> _refreshCategories() async {
+    try {
+      final items = await _service.getTree(businessId: widget.businessId);
+      if (mounted) {
+        setState(() {
+          _currentTree = items;
+        });
+        widget.onCategoriesUpdated?.call(items);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('خطا در به‌روزرسانی لیست: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _showAddCategoryDialog(BuildContext context, int? parentId) async {
+    final t = AppLocalizations.of(context);
+    final formKey = GlobalKey<FormState>();
+    final labelCtrl = TextEditingController();
+    final descriptionCtrl = TextEditingController();
+    
+    final result = await showDialog<Map<String, dynamic>?>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(t.addCategory),
+        content: Form(
+          key: formKey,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  controller: labelCtrl,
+                  decoration: InputDecoration(
+                    labelText: t.categoryName,
+                    hintText: t.categoryNameHint,
+                    prefixIcon: const Icon(Icons.category_outlined),
+                  ),
+                  autofocus: true,
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return t.categoryNameRequired;
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: descriptionCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'توضیحات',
+                    hintText: 'توضیحات اختیاری',
+                    prefixIcon: Icon(Icons.description_outlined),
+                  ),
+                  maxLines: 3,
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, null),
+            child: Text(t.cancel),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (formKey.currentState!.validate()) {
+                Navigator.pop(ctx, {
+                  'label': labelCtrl.text.trim(),
+                  'description': descriptionCtrl.text.trim().isEmpty ? null : descriptionCtrl.text.trim(),
+                });
+              }
+            },
+            child: Text(t.addCategory),
+          ),
+        ],
+      ),
+    );
+
+    if (result == null) return;
+
+    final label = result['label'] as String?;
+    if (label == null || label.isEmpty) return;
+    final description = result['description'] as String?;
+
+    try {
+      await _service.create(
+        businessId: widget.businessId,
+        parentId: parentId,
+        type: 'global',
+        label: label,
+        description: description,
+      );
+      await _refreshCategories();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${t.addCategory} با موفقیت انجام شد')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('خطا: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _showEditCategoryDialog(BuildContext context, int categoryId) async {
+    final t = AppLocalizations.of(context);
+    final category = _findCategoryById(_currentTree, categoryId);
+    if (category == null) return;
+
+    final formKey = GlobalKey<FormState>();
+    final labelCtrl = TextEditingController(text: (category['label'] ?? category['title'] ?? '').toString());
+    final descriptionCtrl = TextEditingController(text: (category['description'] as String?) ?? '');
+    
+    final result = await showDialog<Map<String, dynamic>?>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(t.updateCategory),
+        content: Form(
+          key: formKey,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  controller: labelCtrl,
+                  decoration: InputDecoration(
+                    labelText: t.categoryName,
+                    hintText: t.categoryNameHint,
+                    prefixIcon: const Icon(Icons.category_outlined),
+                  ),
+                  autofocus: true,
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return t.categoryNameRequired;
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: descriptionCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'توضیحات',
+                    hintText: 'توضیحات اختیاری',
+                    prefixIcon: Icon(Icons.description_outlined),
+                  ),
+                  maxLines: 3,
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, null),
+            child: Text(t.cancel),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (formKey.currentState!.validate()) {
+                Navigator.pop(ctx, {
+                  'label': labelCtrl.text.trim(),
+                  'description': descriptionCtrl.text.trim().isEmpty ? null : descriptionCtrl.text.trim(),
+                });
+              }
+            },
+            child: Text(t.updateCategory),
+          ),
+        ],
+      ),
+    );
+
+    if (result == null) return;
+
+    final label = result['label'] as String?;
+    if (label == null || label.isEmpty) return;
+    final description = result['description'] as String?;
+
+    try {
+      await _service.update(
+        businessId: widget.businessId,
+        categoryId: categoryId,
+        type: 'global',
+        label: label,
+        description: description,
+      );
+      await _refreshCategories();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${t.updateCategory} با موفقیت انجام شد')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('خطا: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _showDeleteCategoryDialog(BuildContext context, int categoryId) async {
+    final t = AppLocalizations.of(context);
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(t.deleteCategory),
+        content: Text(t.deleteCategoryConfirm),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(t.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(t.delete),
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (ok != true) return;
+
+    try {
+      await _service.delete(businessId: widget.businessId, categoryId: categoryId);
+      await _refreshCategories();
+      if (_selectedId == categoryId) {
+        setState(() => _selectedId = null);
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(t.deleteCategorySuccess)),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('خطا: $e')),
+        );
+      }
+    }
+  }
+
+  Map<String, dynamic>? _findCategoryById(List<Map<String, dynamic>> nodes, int id) {
+    for (final n in nodes) {
+      final current = Map<String, dynamic>.from(n);
+      if ((current['id'] as num?)?.toInt() == id) {
+        return current;
+      }
+      final children = (current['children'] as List?)?.cast<dynamic>()
+              .map((e) => Map<String, dynamic>.from(e as Map))
+              .toList() ?? const <Map<String, dynamic>>[];
+      final found = _findCategoryById(children, id);
+      if (found != null) return found;
+    }
+    return null;
+  }
 }
 
 class _CategoryList extends StatelessWidget {
   final List<Map<String, dynamic>> tree;
   final int? selectedId;
   final ValueChanged<int?> onSelect;
+  final bool canAdd;
+  final bool canEdit;
+  final bool canDelete;
+  final ValueChanged<int?>? onAdd;
+  final ValueChanged<int>? onEdit;
+  final ValueChanged<int>? onDelete;
 
   const _CategoryList({
     required this.tree,
     required this.selectedId,
     required this.onSelect,
+    this.canAdd = false,
+    this.canEdit = false,
+    this.canDelete = false,
+    this.onAdd,
+    this.onEdit,
+    this.onDelete,
   });
 
   @override
@@ -298,6 +613,7 @@ class _CategoryList extends StatelessWidget {
     final children = (node['children'] as List?)?.cast<dynamic>()
             .map((e) => Map<String, dynamic>.from(e as Map))
             .toList() ?? const <Map<String, dynamic>>[];
+    final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -311,6 +627,37 @@ class _CategoryList extends StatelessWidget {
           ),
           title: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
           onTap: () => onSelect(id),
+          trailing: (canAdd || canEdit || canDelete) && id != null
+              ? Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (canAdd)
+                      IconButton(
+                        icon: const Icon(Icons.add_circle_outline, size: 18),
+                        tooltip: 'افزودن زیردسته',
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        onPressed: () => onAdd?.call(id),
+                      ),
+                    if (canEdit)
+                      IconButton(
+                        icon: const Icon(Icons.edit_outlined, size: 18),
+                        tooltip: 'ویرایش',
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        onPressed: () => onEdit?.call(id),
+                      ),
+                    if (canDelete)
+                      IconButton(
+                        icon: Icon(Icons.delete_outline, size: 18, color: theme.colorScheme.error),
+                        tooltip: 'حذف',
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        onPressed: () => onDelete?.call(id),
+                      ),
+                  ],
+                )
+              : null,
         ),
         if (children.isNotEmpty)
           ...children.map((c) => _buildNode(context, c, depth + 1)),

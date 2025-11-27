@@ -10,7 +10,6 @@ import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/widgets/date_input_field.dart';
 import 'package:hesabix_ui/services/invoice_service.dart';
-import '../../utils/snackbar_helper.dart';
 
 class InstallmentsReportPage extends StatefulWidget {
   final int businessId;
@@ -545,8 +544,14 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
                   const SizedBox(width: 12),
                   FilledButton.icon(
                     onPressed: _loading ? null : _exportExcel,
-                    icon: const Icon(Icons.download),
+                    icon: const Icon(Icons.table_chart),
                     label: Text(t.exportToExcel),
+                  ),
+                  const SizedBox(width: 12),
+                  FilledButton.icon(
+                    onPressed: _loading ? null : _exportPdf,
+                    icon: const Icon(Icons.picture_as_pdf),
+                    label: Text(t.exportToPdf),
                   ),
                 ],
               ),
@@ -583,6 +588,52 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
           data,
           'installments_${widget.businessId}.xlsx',
           mimeType: 'application/octet-stream',
+        );
+      } else {
+        if (mounted) {
+          final t = AppLocalizations.of(context);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(t.installmentsExportWebOnly)),
+          );
+        }
+      }
+    } catch (e) {
+      if (!mounted) return;
+      final t = AppLocalizations.of(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${t.installmentsExportError}: ${e.toString()}'), backgroundColor: Colors.red),
+      );
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _exportPdf() async {
+    setState(() => _loading = true);
+    try {
+      final body = <String, dynamic>{
+        if (_status != null && _status!.isNotEmpty) 'status': _status,
+        if (_fromDate != null) 'due_from': _fromDate!.toIso8601String().split('T').first,
+        if (_toDate != null) 'due_to': _toDate!.toIso8601String().split('T').first,
+        if (_selectedFiscalYearId != null) 'fiscal_year_id': _selectedFiscalYearId,
+        if (_selectedPerson != null) 'person_id': _selectedPerson!.id,
+        if (_selectedInvoiceId != null) 'invoice_id': _selectedInvoiceId,
+      };
+
+      final bytes = await widget.apiClient.post<List<int>>(
+        '/api/v1/invoices/business/${widget.businessId}/installments/export/pdf',
+        data: body,
+        responseType: ResponseType.bytes,
+        options: Options(
+          headers: {'Accept': 'application/pdf'},
+        ),
+      );
+      final data = bytes.data ?? <int>[];
+      if (kIsWeb) {
+        await web_utils.saveBytesAsFileWeb(
+          data,
+          'installments_${widget.businessId}.pdf',
+          mimeType: 'application/pdf',
         );
       } else {
         if (mounted) {

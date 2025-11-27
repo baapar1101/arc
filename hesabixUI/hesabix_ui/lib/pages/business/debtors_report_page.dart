@@ -214,6 +214,7 @@ class _DebtorsReportPageState extends State<DebtorsReportPage> {
       additionalParams: _additionalParams(),
       showExportButtons: true,
       excelEndpoint: '/api/v1/persons/businesses/${widget.businessId}/reports/debtors/export/excel',
+      pdfEndpoint: '/api/v1/persons/businesses/${widget.businessId}/reports/debtors/export/pdf',
       getExportParams: () => _additionalParams(),
       rowColorBuilder: (item, index) {
         try {

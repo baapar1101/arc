@@ -11,7 +11,6 @@ import '../../../utils/product_form_validator.dart';
 import '../../../controllers/product_form_controller.dart';
 import '../../../config/app_config.dart';
 import '../../../core/auth_store.dart';
-import '../../../../utils/snackbar_helper.dart';
 
 class ProductBasicInfoSection extends StatefulWidget {
   final int businessId;
@@ -20,6 +19,7 @@ class ProductBasicInfoSection extends StatefulWidget {
   final List<Map<String, dynamic>> categories;
   final List<Map<String, dynamic>> attributes;
   final ProductFormController? controller;
+  final AuthStore? authStore;
   
   const ProductBasicInfoSection({
     super.key,
@@ -29,6 +29,7 @@ class ProductBasicInfoSection extends StatefulWidget {
     required this.categories,
     required this.attributes,
     this.controller,
+    this.authStore,
   });
 
   @override
@@ -167,7 +168,11 @@ class _ProductBasicInfoSectionState extends State<ProductBasicInfoSection> {
                       categoriesTree: widget.categories,
                       initialValue: widget.formData.categoryId,
                       label: t.categories,
+                      authStore: widget.authStore,
                       onChanged: (value) => _updateFormData(widget.formData.copyWith(categoryId: value)),
+                      onCategoriesUpdated: (updatedCategories) {
+                        widget.controller?.refreshCategories();
+                      },
                     ),
                   ],
                 ),
@@ -211,7 +216,11 @@ class _ProductBasicInfoSectionState extends State<ProductBasicInfoSection> {
             categoriesTree: widget.categories,
             initialValue: widget.formData.categoryId,
             label: t.categories,
+            authStore: widget.authStore,
             onChanged: (value) => _updateFormData(widget.formData.copyWith(categoryId: value)),
+            onCategoriesUpdated: (updatedCategories) {
+              widget.controller?.refreshCategories();
+            },
           ),
           const SizedBox(height: 20),
           _buildUnitsSection(context),

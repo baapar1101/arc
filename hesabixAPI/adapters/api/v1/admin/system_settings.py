@@ -71,6 +71,9 @@ class NotificationsConfigPayload(BaseModel):
 	sms_provider_name: str | None = None
 	sms_api_key: str | None = None
 	sms_sender: str | None = None
+	sms_provider_username: str | None = None
+	sms_provider_password: str | None = None
+	sms_is_flash: bool | None = None
 	telegram_proxy_enabled: bool | None = None
 	telegram_proxy_base_url: str | None = None
 	telegram_proxy_api_key: str | None = None
@@ -151,6 +154,9 @@ def put_notifications_settings_endpoint(
 		sms_provider_name=payload.sms_provider_name,
 		sms_api_key=payload.sms_api_key,
 		sms_sender=payload.sms_sender,
+		sms_provider_username=payload.sms_provider_username,
+		sms_provider_password=payload.sms_provider_password,
+		sms_is_flash=payload.sms_is_flash,
 		telegram_proxy_enabled=payload.telegram_proxy_enabled,
 		telegram_proxy_base_url=payload.telegram_proxy_base_url,
 		telegram_proxy_api_key=payload.telegram_proxy_api_key,

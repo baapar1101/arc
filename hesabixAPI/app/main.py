@@ -68,6 +68,7 @@ from adapters.api.v1.public_share_links import router as public_share_links_rout
 from adapters.api.v1.business_backups import router as business_backups_router
 from adapters.api.v1.business.document_monetization import router as business_document_monetization_router
 from adapters.api.v1.jobs import router as jobs_router
+from adapters.api.v1.activity_logs import router as activity_logs_router
 from app.services.notification_processor import background_loop as notifications_background_loop
 from app.services.storage_background_jobs import storage_cleanup_loop, storage_subscription_check_loop
 from app.services.document_monetization_jobs import document_monetization_loop
@@ -75,6 +76,9 @@ from app.core.i18n import negotiate_locale, Translator
 from app.core.error_handlers import register_error_handlers
 from app.core.smart_normalizer import smart_normalize_json, SmartNormalizerConfig
 from app.core.calendar_middleware import add_calendar_type
+
+# Import activity log hooks برای ثبت event handlers
+import adapters.db.activity_log_hooks  # noqa: F401
 
 
 def create_app() -> FastAPI:
@@ -429,6 +433,7 @@ def create_app() -> FastAPI:
     application.include_router(expense_income_router, prefix=settings.api_v1_prefix)
     application.include_router(documents_router, prefix=settings.api_v1_prefix)
     application.include_router(fiscal_years_router, prefix=settings.api_v1_prefix)
+    application.include_router(activity_logs_router, prefix=settings.api_v1_prefix)
     application.include_router(kardex_router, prefix=settings.api_v1_prefix)
     application.include_router(opening_balance_router, prefix=settings.api_v1_prefix)
     application.include_router(report_templates_router, prefix=settings.api_v1_prefix)

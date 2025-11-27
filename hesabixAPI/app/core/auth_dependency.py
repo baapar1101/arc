@@ -462,7 +462,7 @@ def get_current_user(
 	if not obj or obj.revoked_at is not None:
 		raise ApiError("UNAUTHORIZED", "Invalid API key", http_status=401)
 	
-	# بررسی انقضا
+	# بررسی انقضا (فقط برای personal API keys - session keys همیشه expires_at=None دارند)
 	from datetime import datetime
 	if obj.expires_at and obj.expires_at < datetime.utcnow():
 		raise ApiError("UNAUTHORIZED", "API key has expired", http_status=401)
@@ -531,6 +531,19 @@ def get_current_user(
 		fiscal_year_id=fiscal_year_id,
 		db=db
 	)
+	
+	# تنظیم context برای لاگ‌گیری خودکار
+	try:
+		from adapters.db.activity_log_hooks import ActivityLogContext
+		ActivityLogContext.set_context(
+			session=db,
+			user_id=user.id,
+			business_id=business_id,
+			request=request
+		)
+	except Exception as e:
+		# اگر خطا در تنظیم context بود، لاگ کن اما ادامه بده
+		logger.warning(f"Failed to set activity log context: {e}")
 	
 	logger.info(f"AuthContext created successfully")
 	return auth_context

@@ -251,12 +251,22 @@ def preview_template(
 ) -> Dict[str, Any]:
 	from jinja2.sandbox import SandboxedEnvironment
 	from jinja2 import StrictUndefined, BaseLoader, TemplateSyntaxError, UndefinedError
-	channel = str((body or {}).get("channel") or "")
+	channel_raw = (body or {}).get("channel") or ""
 	subject = (body or {}).get("subject") or ""
 	text = (body or {}).get("body") or ""
 	context = (body or {}).get("context") or {}
-	# اعتبارسنجی کانال
-	TemplatePayload.validate_channel(channel)
+	
+	# اگر channel خالی است، از یک کانال پیش‌فرض استفاده می‌کنیم
+	channel = str(channel_raw).strip() if channel_raw else "email"
+	
+	# اعتبارسنجی کانال (اگر channel وجود دارد)
+	if channel:
+		try:
+			TemplatePayload.validate_channel(channel)
+		except HTTPException:
+			# اگر کانال نامعتبر است، از email به عنوان پیش‌فرض استفاده می‌کنیم
+			channel = "email"
+	
 	try:
 		env = SandboxedEnvironment(loader=BaseLoader(), autoescape=True, undefined=StrictUndefined, enable_async=False)
 		subj = ""

@@ -2176,6 +2176,32 @@
   "system": "سیستم",
   "light": "روشن",
   "dark": "تاریک",
-  "zeroMeansUnlimited": "0 = نامحدود"
+  "zeroMeansUnlimited": "0 = نامحدود",
+  "otpLogin": "ورود با OTP",
+  "otpLoginTitle": "ورود با کد یکبار مصرف",
+  "otpLoginSubtitle": "کد ورود به ایمیل، شماره موبایل یا تلگرام شما ارسال می‌شود",
+  "otpLoginIdentifierHint": "ایمیل یا شماره موبایل خود را وارد کنید",
+  "otpLoginIdentifierRequired": "ایمیل یا شماره موبایل الزامی است",
+  "otpCodeSent": "کد ارسال شد",
+  "otpChannelSelectionTitle": "روش دریافت کد:",
+  "otpChannelSms": "پیامک",
+  "otpChannelEmail": "ایمیل",
+  "otpChannelTelegram": "تلگرام",
+  "otpSendCodeButton": "ارسال کد ورود",
+  "otpChangeChannelTitle": "تغییر روش دریافت:",
+  "otpChangeIdentifier": "تغییر شناسه",
+  "otpSelectChannelError": "لطفاً کانال ارسال را انتخاب کنید",
+  "otpCaptchaError": "خطا در دریافت کپتچا",
+  "otpCodeSentMessage": "کد ورود به {channel} شما ارسال شد",
+  "@otpCodeSentMessage": {
+    "placeholders": {
+      "channel": {
+        "type": "String"
+      }
+    }
+  },
+  "otpCodeResentMessage": "کد ورود مجدداً ارسال شد",
+  "otpSendError": "خطا در ارسال کد ورود",
+  "otpEnterCaptchaError": "لطفاً کد کپتچا را وارد کنید"
 }
 

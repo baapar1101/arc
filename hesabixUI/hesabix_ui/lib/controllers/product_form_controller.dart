@@ -174,6 +174,16 @@ class ProductFormController extends ChangeNotifier {
     }
   }
 
+  // Refresh categories (for use after adding/editing/deleting categories)
+  Future<void> refreshCategories() async {
+    try {
+      _categories = await _categoryService.getTree(businessId: businessId);
+      notifyListeners();
+    } catch (e) {
+      // Silently fail - categories will be refreshed on next form load
+    }
+  }
+
   Future<void> _loadPriceListsAndCurrencies() async {
     try {
       // Price lists (first page only for selection)

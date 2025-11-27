@@ -185,6 +185,7 @@ class _DailyPurchasesReportPageState extends State<DailyPurchasesReportPage> {
       defaultSortBy: 'date',
       defaultSortDesc: true,
       excelEndpoint: '/api/v1/businesses/${widget.businessId}/reports/daily-purchases/export/excel',
+      pdfEndpoint: '/api/v1/businesses/${widget.businessId}/reports/daily-purchases/export/pdf',
     );
   }
 

@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timedelta
 from typing import Any, Dict, Iterable, Optional, List
 
 from sqlalchemy.orm import Session
+from jinja2.sandbox import SandboxedEnvironment
+from jinja2 import StrictUndefined, BaseLoader, TemplateSyntaxError, UndefinedError
 
 from adapters.db.models.notification import NotificationOutbox, NotificationDeliveryAttempt
 from adapters.db.repositories.user_repo import UserRepository
@@ -17,6 +20,8 @@ from adapters.db.repositories.notification_repo import (
 )
 from adapters.db.models.announcement import Announcement, UserAnnouncement
 from app.services.system_settings_service import get_effective_notifications_settings
+
+logger = logging.getLogger(__name__)
 
 
 class NotificationService:
@@ -33,6 +38,9 @@ class NotificationService:
 			provider_name=notify_cfg.get("sms_provider_name"),
 			api_key=notify_cfg.get("sms_api_key"),
 			sender=notify_cfg.get("sms_sender"),
+			username=notify_cfg.get("sms_provider_username"),
+			password=notify_cfg.get("sms_provider_password"),
+			is_flash=notify_cfg.get("sms_is_flash", False),
 		)
 		self.inapp = InAppProvider(db)
 		self.user_settings = UserNotificationSettingRepository(db)
@@ -64,6 +72,38 @@ class NotificationService:
 		self.db.add(attempt)
 		self.db.commit()
 
+	def _render_template(self, template_text: str, context: Dict[str, Any]) -> str:
+		"""
+		رندر کردن قالب Jinja2 با جایگزینی پارامترها
+		
+		Args:
+			template_text: متن قالب (مثلاً "کد ورود شما {{ code }} است")
+			context: پارامترهای context برای جایگزینی
+		
+		Returns:
+			متن رندر شده با پارامترهای جایگزین شده
+		"""
+		if not template_text:
+			return ""
+		
+		try:
+			env = SandboxedEnvironment(
+				loader=BaseLoader(),
+				autoescape=True,
+				undefined=StrictUndefined,
+				enable_async=False
+			)
+			template = env.from_string(template_text)
+			return template.render(**context)
+		except (TemplateSyntaxError, UndefinedError) as e:
+			logger.warning(f"خطا در رندر قالب: {e}. متن قالب بدون رندر استفاده می‌شود.")
+			# در صورت خطا، متن خام برمی‌گردانیم
+			return template_text
+		except Exception as e:
+			logger.error(f"خطای غیرمنتظره در رندر قالب: {e}", exc_info=True)
+			# در صورت خطا، متن خام برمی‌گردانیم
+			return template_text
+
 	def send(self, *, user_id: int, event_key: str, context: Dict[str, Any], preferred_channels: Optional[Iterable[str]] = None, locale: Optional[str] = None) -> None:
 		"""
 		Minimal synchronous sender with basic fallback:
@@ -71,6 +111,13 @@ class NotificationService:
 		- Else Email
 		- Else InApp
 		Also records outbox + attempts.
+		
+		Args:
+			user_id: شناسه کاربر
+			event_key: کلید رویداد (مثلاً "auth.password_reset")
+			context: پارامترهای context برای جایگزینی در قالب (مثلاً {"code": "123456"})
+			preferred_channels: لیست کانال‌های ترجیحی برای ارسال
+			locale: زبان مورد نظر (اختیاری)
 		"""
 		user = self.user_repo.db.get(self.user_repo.model_class, user_id)
 		if user is None:
@@ -78,15 +125,23 @@ class NotificationService:
 
 		channels = list(preferred_channels) if preferred_channels else ["telegram", "sms", "email", "inapp"]
 
-		# Render templates (fallback به متن ساده)
+		# Render templates با جایگزینی پارامترها (fallback به متن ساده)
 		def render_for(channel: str) -> tuple[str, str]:
 			tpl = self.templates.get(event_key=event_key, channel=channel, locale=locale or None)
 			if tpl:
-				subj = tpl.subject or (context.get("subject") or "پیام سیستم")
-				body = tpl.body
+				# استفاده از قالب با رندر پارامترها
+				subj_raw = tpl.subject or (context.get("subject") or "پیام سیستم")
+				body_raw = tpl.body
+				# رندر کردن subject و body با پارامترهای context
+				subj = self._render_template(subj_raw, context)
+				body = self._render_template(body_raw, context)
 			else:
-				subj = context.get("subject", "پیام سیستم")
-				body = context.get("message", "")
+				# اگر قالب پیدا نشد، از context استفاده می‌کنیم
+				subj_raw = context.get("subject", "پیام سیستم")
+				body_raw = context.get("message", "")
+				# حتی اگر قالب نباشد، می‌توانیم پارامترها را جایگزین کنیم
+				subj = self._render_template(subj_raw, context)
+				body = self._render_template(body_raw, context)
 			return subj, body
 
 		subject_email, body_email = render_for("email")

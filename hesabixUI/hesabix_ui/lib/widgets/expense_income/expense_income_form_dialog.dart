@@ -51,6 +51,7 @@ class _ExpenseIncomeFormDialogState extends State<ExpenseIncomeFormDialog> {
   final TextEditingController _descriptionController = TextEditingController();
   final List<_ItemLine> _itemLines = <_ItemLine>[];
   final List<_CounterpartyLine> _counterpartyLines = <_CounterpartyLine>[];
+  bool _isSaving = false;
 
   @override
   void initState() {
@@ -232,16 +233,25 @@ class _ExpenseIncomeFormDialogState extends State<ExpenseIncomeFormDialog> {
                       ),
                     ),
                     TextButton(
-                      onPressed: () => Navigator.pop(context),
+                      onPressed: _isSaving ? null : () => Navigator.pop(context),
                       child: Text(t.cancel),
                     ),
                     const SizedBox(width: 8),
                     FilledButton.icon(
-                      onPressed: diff == 0 && _itemLines.isNotEmpty && _counterpartyLines.isNotEmpty
-                          ? _onSave
-                          : null,
-                      icon: const Icon(Icons.save),
-                      label: Text(t.save),
+                      onPressed: _isSaving || diff != 0 || _itemLines.isEmpty || _counterpartyLines.isEmpty
+                          ? null
+                          : _onSave,
+                      icon: _isSaving
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Icon(Icons.save),
+                      label: Text(_isSaving ? 'در حال ذخیره...' : t.save),
                     ),
                   ],
                 ),
@@ -256,12 +266,9 @@ class _ExpenseIncomeFormDialogState extends State<ExpenseIncomeFormDialog> {
   Future<void> _onSave() async {
     if (!mounted) return;
     
-    // نمایش loading
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => const Center(child: CircularProgressIndicator()),
-    );
+    setState(() {
+      _isSaving = true;
+    });
     
     try {
       final service = ExpenseIncomeService(widget.apiClient);
@@ -371,9 +378,6 @@ class _ExpenseIncomeFormDialogState extends State<ExpenseIncomeFormDialog> {
       
       if (!mounted) return;
       
-      // بستن dialog loading
-      Navigator.pop(context);
-      
       // بستن dialog اصلی با موفقیت
       Navigator.pop(context, true);
       
@@ -387,11 +391,14 @@ class _ExpenseIncomeFormDialogState extends State<ExpenseIncomeFormDialog> {
     } catch (e) {
       if (!mounted) return;
       
-      // بستن dialog loading
-      Navigator.pop(context);
-      
       // نمایش خطا
       SnackBarHelper.showError(context, message: 'خطا: ${e.toString()}');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSaving = false;
+        });
+      }
     }
   }
 }
