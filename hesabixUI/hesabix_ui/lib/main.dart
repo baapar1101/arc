@@ -16,6 +16,7 @@ import 'pages/profile/user_signature_page.dart';
 import 'pages/profile/support_page.dart';
 import 'pages/profile/change_password_page.dart';
 import 'pages/profile/api_keys_page.dart';
+import 'pages/profile/sessions_page.dart';
 import 'pages/profile/marketing_page.dart';
 import 'pages/profile/account_settings_page.dart';
 import 'pages/profile/mobile_verification_page.dart';
@@ -865,6 +866,11 @@ class _MyAppState extends State<MyApp> {
               path: '/user/profile/api-keys',
               name: 'profile_api_keys',
               builder: (context, state) => ApiKeysPage(calendarController: _calendarController!),
+            ),
+            GoRoute(
+              path: '/user/profile/sessions',
+              name: 'profile_sessions',
+              builder: (context, state) => const SessionsPage(),
             ),
             GoRoute(
               path: '/user/profile/notifications',

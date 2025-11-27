@@ -72,27 +72,74 @@ class OtpLoginService:
 			dict با کلیدهای available_channels و user_info
 		"""
 		from app.services.auth_service import _detect_identifier
+		import structlog
+		logger = structlog.get_logger()
 		
 		kind, email, mobile = _detect_identifier(identifier)
-		if kind == "invalid":
+		logger.info(f"get_available_channels - identifier: {identifier}, kind: {kind}, email: {email}, mobile: {mobile}")
+		
+		# اگر _detect_identifier شماره را تشخیص نداد یا mobile None است، سعی می‌کنیم با normalize_phone_number
+		# این برای مواردی است که phonenumbers کتابخانه مشکل دارد یا تنظیمات درست نیست
+		if (kind == "invalid" or (kind == "mobile" and mobile is None)) and "@" not in identifier:
+			try:
+				normalized_fallback = normalize_phone_number(identifier)
+				mobile = normalized_fallback
+				kind = "mobile"
+				logger.info(f"get_available_channels - fallback to normalize_phone_number: {normalized_fallback}")
+			except ValueError as e:
+				logger.warning(f"get_available_channels - normalize_phone_number failed: {e}")
+				return {"available_channels": [], "user_info": None}
+		
+		if kind == "invalid" or (kind == "mobile" and mobile is None):
+			logger.warning(f"get_available_channels - invalid identifier: {identifier}")
 			return {"available_channels": [], "user_info": None}
 		
 		# دریافت کاربر (برای بررسی telegram_chat_id)
+		# توجه: mobile ممکن است در فرمت E164 باشد (+989...) یا در فرمت 09183282405
 		user = None
 		if email:
 			user = self.user_repo.get_by_email(email)
+			logger.info(f"get_available_channels - searched user by email {email}, found: {user is not None}")
 		elif mobile:
-			try:
-				normalized_mobile = normalize_phone_number(mobile)
-				user = self.user_repo.get_by_mobile(normalized_mobile)
-			except ValueError:
-				pass
+			# لیست فرمت‌های ممکن برای جستجو
+			search_formats = [mobile]  # فرمت اصلی
+			
+			# اگر در فرمت E164 است، فرمت نرمال‌سازی شده را هم اضافه کن
+			if mobile.startswith('+'):
+				try:
+					normalized_for_search = normalize_phone_number(mobile)
+					search_formats.append(normalized_for_search)
+				except ValueError:
+					pass
+			# اگر در فرمت 0918... است، فرمت E164 را هم اضافه کن
+			else:
+				try:
+					from app.services.auth_service import _normalize_mobile
+					e164_mobile = _normalize_mobile(mobile)
+					if e164_mobile:
+						search_formats.append(e164_mobile)
+				except Exception:
+					pass
+			
+			# جستجو با همه فرمت‌های ممکن
+			for search_format in search_formats:
+				user = self.user_repo.get_by_mobile(search_format)
+				if user:
+					logger.info(f"get_available_channels - found user with format {search_format}, user_id: {user.id}, telegram_chat_id: {user.telegram_chat_id}")
+					break
+			
+			if not user:
+				logger.warning(f"get_available_channels - user not found with any format. Tried: {search_formats}")
 		
 		available_channels = []
 		
-		# بررسی SMS
-		if mobile and self.sms_provider.is_configured():
+		# بررسی SMS - اگر mobile وجود دارد (حتی اگر user پیدا نشده باشد)
+		# چون ممکن است کاربر جدید باشد و بخواهد ثبت‌نام کند
+		sms_configured = self.sms_provider.is_configured()
+		logger.info(f"get_available_channels - SMS provider configured: {sms_configured}")
+		if (mobile or (identifier and not email)) and sms_configured:
 			available_channels.append("sms")
+			logger.info(f"get_available_channels - SMS channel added")
 		
 		# بررسی Email
 		if email:
@@ -100,11 +147,23 @@ class OtpLoginService:
 			# EmailProvider نیاز به user_id دارد، پس باید کاربر وجود داشته باشد
 			if user:
 				available_channels.append("email")
+				logger.info(f"get_available_channels - Email channel added for user_id: {user.id}")
 		
 		# بررسی Telegram
-		if user and user.telegram_chat_id:
-			if self.telegram_provider.is_configured():
-				available_channels.append("telegram")
+		telegram_configured = self.telegram_provider.is_configured()
+		logger.info(f"get_available_channels - Telegram provider configured: {telegram_configured}")
+		if user:
+			logger.info(f"get_available_channels - user found: id={user.id}, telegram_chat_id={user.telegram_chat_id}")
+			if user.telegram_chat_id:
+				if telegram_configured:
+					available_channels.append("telegram")
+					logger.info(f"get_available_channels - Telegram channel added for user_id: {user.id}, chat_id: {user.telegram_chat_id}")
+				else:
+					logger.warning(f"get_available_channels - user has telegram_chat_id but telegram_provider not configured")
+			else:
+				logger.warning(f"get_available_channels - user found but no telegram_chat_id - user_id: {user.id}")
+		else:
+			logger.warning(f"get_available_channels - user not found, cannot add telegram channel")
 		
 		return {
 			"available_channels": available_channels,
@@ -145,10 +204,62 @@ class OtpLoginService:
 		
 		# تشخیص نوع identifier
 		kind, email, mobile = _detect_identifier(identifier)
-		if kind == "invalid":
+		logger.info(f"send_login_otp - identifier: {identifier}, kind: {kind}, email: {email}, mobile: {mobile}")
+		
+		# اگر _detect_identifier شماره را تشخیص نداد یا mobile None است، سعی می‌کنیم با normalize_phone_number
+		if (kind == "invalid" or (kind == "mobile" and mobile is None)) and "@" not in identifier:
+			try:
+				normalized_fallback = normalize_phone_number(identifier)
+				mobile = normalized_fallback
+				kind = "mobile"
+				logger.info(f"send_login_otp - fallback to normalize_phone_number: {normalized_fallback}")
+			except ValueError as e:
+				logger.warning(f"send_login_otp - normalize_phone_number failed: {e}")
+				raise ApiError("INVALID_IDENTIFIER", "شناسه باید یک ایمیل یا شماره موبایل معتبر باشد", http_status=400)
+		
+		if kind == "invalid" or (kind == "mobile" and mobile is None):
 			raise ApiError("INVALID_IDENTIFIER", "شناسه باید یک ایمیل یا شماره موبایل معتبر باشد", http_status=400)
 		
-		# نرمال‌سازی
+		# دریافت کاربر (برای بررسی telegram_chat_id و email)
+		# توجه: mobile ممکن است در فرمت E164 باشد (+989...) یا در فرمت 09183282405
+		user = None
+		if email:
+			user = self.user_repo.get_by_email(email)
+			logger.info(f"send_login_otp - searched user by email {email}, found: {user is not None}")
+		elif mobile:
+			# لیست فرمت‌های ممکن برای جستجو
+			search_formats = [mobile]  # فرمت اصلی
+			
+			# اگر در فرمت E164 است، فرمت نرمال‌سازی شده را هم اضافه کن
+			if mobile.startswith('+'):
+				try:
+					normalized_for_search = normalize_phone_number(mobile)
+					search_formats.append(normalized_for_search)
+				except ValueError:
+					pass
+			# اگر در فرمت 0918... است، فرمت E164 را هم اضافه کن
+			else:
+				try:
+					from app.services.auth_service import _normalize_mobile
+					e164_mobile = _normalize_mobile(mobile)
+					if e164_mobile:
+						search_formats.append(e164_mobile)
+				except Exception:
+					pass
+			
+			# جستجو با همه فرمت‌های ممکن
+			for search_format in search_formats:
+				user = self.user_repo.get_by_mobile(search_format)
+				if user:
+					logger.info(f"send_login_otp - found user with format {search_format}, user_id: {user.id}, telegram_chat_id: {user.telegram_chat_id}")
+					break
+			
+			if not user:
+				logger.warning(f"send_login_otp - user not found with any format. Tried: {search_formats}")
+		
+		# نرمال‌سازی برای SMS و ذخیره در session
+		# normalize_phone_number فرمت E164 را به 09183282405 تبدیل می‌کند
+		# که برای ارسال SMS و ذخیره در session نیاز است
 		normalized_mobile = None
 		if mobile:
 			try:
@@ -178,13 +289,6 @@ class OtpLoginService:
 					remaining = int(30 - time_since_last)
 					raise ApiError("RATE_LIMIT_EXCEEDED", f"لطفاً {remaining} ثانیه صبر کنید قبل از ارسال مجدد", http_status=429)
 		
-		# دریافت کاربر (برای بررسی telegram_chat_id و email)
-		user = None
-		if email:
-			user = self.user_repo.get_by_email(email)
-		elif normalized_mobile:
-			user = self.user_repo.get_by_mobile(normalized_mobile)
-		
 		# بررسی کانال انتخابی
 		available_channels_info = self.get_available_channels(identifier)
 		if channel not in available_channels_info["available_channels"]:
@@ -198,10 +302,17 @@ class OtpLoginService:
 				# برای جلوگیری از user enumeration، همان خطای کانال را برمی‌گردانیم
 				raise ApiError("CHANNEL_NOT_AVAILABLE", "کانال ایمیل برای این شناسه در دسترس نیست", http_status=400)
 		if channel == "telegram":
-			if not user or not user.telegram_chat_id:
-				# برای جلوگیری از user enumeration، همان خطای کانال را برمی‌گردانیم
+			# بررسی دقیق‌تر: اگر user پیدا نشد یا telegram_chat_id ندارد
+			logger.info(f"send_login_otp - checking telegram channel - user: {user is not None}, user_id: {user.id if user else None}, telegram_chat_id: {user.telegram_chat_id if user else None}")
+			if not user:
+				logger.error(f"send_login_otp - User not found for telegram channel - identifier: {identifier}, mobile: {mobile}, email: {email}")
 				raise ApiError("CHANNEL_NOT_AVAILABLE", "کانال تلگرام برای این شناسه در دسترس نیست", http_status=400)
-			if not self.telegram_provider.is_configured():
+			if not user.telegram_chat_id:
+				logger.error(f"send_login_otp - User found but telegram_chat_id is None - user_id: {user.id}, identifier: {identifier}, mobile_in_db: {user.mobile}")
+				raise ApiError("CHANNEL_NOT_AVAILABLE", "کانال تلگرام برای این شناسه در دسترس نیست", http_status=400)
+			telegram_configured = self.telegram_provider.is_configured()
+			logger.info(f"send_login_otp - telegram_provider configured: {telegram_configured}")
+			if not telegram_configured:
 				raise ApiError("TELEGRAM_NOT_CONFIGURED", "سرویس تلگرام پیکربندی نشده است", http_status=503)
 		
 		# تولید OTP
@@ -338,9 +449,16 @@ class OtpLoginService:
 			raise ApiError("INVALID_OTP", f"کد تایید اشتباه است. {remaining} تلاش باقی مانده است", http_status=400)
 		
 		# دریافت کاربر از identifier (mobile یا email)
+		# توجه: session.mobile در فرمت 09183282405 ذخیره شده است
+		# اما دیتابیس users شماره را در فرمت E164 (+989183282405) ذخیره می‌کند
+		# پس باید آن را به E164 تبدیل کنیم
 		user = None
 		if session.mobile:
-			user = self.user_repo.get_by_mobile(session.mobile)
+			from app.services.auth_service import _normalize_mobile
+			# تبدیل فرمت 09183282405 به +989183282405
+			mobile_e164 = _normalize_mobile(session.mobile)
+			if mobile_e164:
+				user = self.user_repo.get_by_mobile(mobile_e164)
 		elif session.email:
 			user = self.user_repo.get_by_email(session.email)
 		

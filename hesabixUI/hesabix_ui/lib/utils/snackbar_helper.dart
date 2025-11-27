@@ -187,6 +187,20 @@ class SnackBarHelper {
     );
   }
 
+  /// Shows an info SnackBar
+  static void showInfo(
+    BuildContext context, {
+    required String message,
+    Duration? duration,
+  }) {
+    show(
+      context,
+      message: message,
+      backgroundColor: Colors.blue,
+      duration: duration,
+    );
+  }
+
   /// Finds the root ScaffoldMessenger by using the global navigatorKey.
   /// This ensures SnackBar appears above all dialogs and bottom sheets.
   static ScaffoldMessengerState _findRootScaffoldMessenger(BuildContext context) {

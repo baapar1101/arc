@@ -19,6 +19,7 @@ from .schemas import (
 )
 from app.core.auth_dependency import get_current_user, AuthContext
 from app.services.api_key_service import list_personal_keys, create_personal_key, revoke_key
+from app.services.session_service import list_user_sessions, revoke_session, revoke_other_sessions
 
 
 router = APIRouter(prefix="/auth", tags=["auth"]) 
@@ -755,6 +756,150 @@ def update_key(request: Request, key_id: int, payload: UpdateApiKeyRequest, ctx:
 	return success_response({"ok": True, "message": "کلید API با موفقیت به‌روزرسانی شد"})
 
 
+@router.get("/sessions",
+	summary="لیست سشن‌های ورود",
+	description="دریافت لیست تمام session های فعال کاربر",
+	response_model=SuccessResponse,
+	responses={
+		200: {
+			"description": "لیست session ها با موفقیت دریافت شد",
+			"content": {
+				"application/json": {
+					"example": {
+						"success": True,
+						"data": [
+							{
+								"id": 123,
+								"device_name": "Chrome on Windows",
+								"device_id": "device-uuid-123",
+								"user_agent": "Mozilla/5.0...",
+								"ip": "192.168.1.100",
+								"is_current": True,
+								"created_at": "2024-01-15T10:30:00Z",
+								"last_used_at": "2024-01-20T14:25:00Z",
+								"last_used_relative": "2 ساعت پیش",
+								"browser": "Chrome",
+								"os": "Windows",
+								"device_type": "desktop"
+							}
+						]
+					}
+				}
+			}
+		},
+		401: {
+			"description": "کاربر احراز هویت نشده است"
+		}
+	}
+)
+def list_sessions(
+	request: Request,
+	ctx: AuthContext = Depends(get_current_user),
+	db: Session = Depends(get_db)
+) -> dict:
+	"""لیست تمام session های فعال کاربر"""
+	# دریافت hash کلید API فعلی
+	from adapters.db.models.api_key import ApiKey
+	current_key = db.get(ApiKey, ctx.api_key_id)
+	if not current_key:
+		from app.core.responses import ApiError
+		raise ApiError("INTERNAL_ERROR", "API key not found", http_status=500)
+	
+	current_key_hash = current_key.key_hash
+	sessions = list_user_sessions(db, ctx.user.id, current_key_hash)
+	return success_response(sessions, request)
+
+
+@router.delete("/sessions/others",
+	summary="حذف همه سشن‌های دیگر",
+	description="حذف تمام session های کاربر به جز session فعلی",
+	response_model=SuccessResponse,
+	responses={
+		200: {
+			"description": "تمام session های دیگر حذف شدند",
+			"content": {
+				"application/json": {
+					"example": {
+						"success": True,
+						"message": "تمام سشن‌های دیگر حذف شدند",
+						"data": {"deleted_count": 5}
+					}
+				}
+			}
+		},
+		401: {
+			"description": "کاربر احراز هویت نشده است"
+		}
+	}
+)
+def revoke_other_sessions_endpoint(
+	request: Request,
+	ctx: AuthContext = Depends(get_current_user),
+	db: Session = Depends(get_db)
+) -> dict:
+	"""حذف تمام session های دیگر (به جز فعلی)"""
+	# دریافت hash کلید API فعلی
+	from adapters.db.models.api_key import ApiKey
+	current_key = db.get(ApiKey, ctx.api_key_id)
+	if not current_key:
+		from app.core.responses import ApiError
+		raise ApiError("INTERNAL_ERROR", "API key not found", http_status=500)
+	
+	current_key_hash = current_key.key_hash
+	deleted_count = revoke_other_sessions(db, ctx.user.id, current_key_hash)
+	return success_response(
+		{"deleted_count": deleted_count, "message": f"{deleted_count} سشن حذف شد"},
+		request
+	)
+
+
+@router.delete("/sessions/{session_id}",
+	summary="حذف سشن ورود",
+	description="حذف یک session خاص. کاربر نمی‌تواند session فعلی را حذف کند.",
+	response_model=SuccessResponse,
+	responses={
+		200: {
+			"description": "Session با موفقیت حذف شد",
+			"content": {
+				"application/json": {
+					"example": {
+						"success": True,
+						"message": "سشن با موفقیت حذف شد",
+						"data": {"ok": True}
+					}
+				}
+			}
+		},
+		400: {
+			"description": "نمی‌توانید session فعلی را حذف کنید"
+		},
+		404: {
+			"description": "Session یافت نشد"
+		},
+		401: {
+			"description": "کاربر احراز هویت نشده است"
+		}
+	}
+)
+def revoke_session_endpoint(
+	session_id: int,
+	request: Request,
+	ctx: AuthContext = Depends(get_current_user),
+	db: Session = Depends(get_db)
+) -> dict:
+	"""حذف یک session"""
+	# دریافت hash کلید API فعلی
+	from adapters.db.models.api_key import ApiKey
+	current_key = db.get(ApiKey, ctx.api_key_id)
+	if not current_key:
+		from app.core.responses import ApiError
+		raise ApiError("INTERNAL_ERROR", "API key not found", http_status=500)
+	
+	current_key_hash = current_key.key_hash
+	revoke_session(db, ctx.user.id, session_id, current_key_hash)
+	return success_response({"ok": True, "message": "سشن با موفقیت حذف شد"}, request)
+
+
 @router.get("/referrals/stats", 
 	summary="آمار معرفی‌ها", 
 	description="دریافت آمار معرفی‌های کاربر فعلی",
@@ -1294,6 +1439,9 @@ def resend_verification(
 		400: {
 			"description": "شماره موبایل نامعتبر یا SMS Provider پیکربندی نشده",
 		},
+		404: {
+			"description": "کاربر با این شماره موبایل یافت نشد",
+		},
 		429: {
 			"description": "تعداد درخواست‌ها بیش از حد مجاز",
 		},
@@ -1305,19 +1453,32 @@ def resend_verification(
 def send_mobile_verification(
 	request: Request,
 	mobile: str = Query(..., description="شماره موبایل برای تایید"),
-	ctx: AuthContext = Depends(get_current_user),
 	db: Session = Depends(get_db)
 ) -> dict:
 	"""ارسال کد OTP به شماره موبایل کاربر"""
 	from app.services.mobile_verification_service import MobileVerificationService
+	from adapters.db.repositories.user_repo import UserRepository
+	from app.services.auth_service import _normalize_mobile
 	from app.core.responses import ApiError
 	
-	service = MobileVerificationService(db)
-	user_id = ctx.get_user_id()
+	# نرمال‌سازی شماره موبایل (استفاده از همان تابعی که در ثبت‌نام استفاده می‌شود)
+	normalized_mobile = _normalize_mobile(mobile)
+	if not normalized_mobile:
+		raise ApiError("INVALID_MOBILE", "شماره موبایل نامعتبر است", http_status=400)
 	
+	# پیدا کردن کاربر از شماره موبایل
+	user_repo = UserRepository(db)
+	user = user_repo.get_by_mobile(normalized_mobile)
+	if not user:
+		raise ApiError("USER_NOT_FOUND", "کاربری با این شماره موبایل یافت نشد", http_status=404)
+	
+	service = MobileVerificationService(db)
+	
+	# برای ارسال SMS، service خودش شماره را نرمال‌سازی می‌کند
+	# می‌توانیم شماره اصلی را به آن بدهیم
 	try:
 		# در production نباید OTP برگردانده شود
-		otp_code = service.create_mobile_verification(user_id, mobile)
+		otp_code = service.create_mobile_verification(user.id, mobile)
 		# فقط برای تست - در production باید حذف شود
 		return success_response({
 			"message": "کد تایید به شماره موبایل ارسال شد",

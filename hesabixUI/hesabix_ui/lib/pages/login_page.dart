@@ -967,7 +967,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                               Tab(text: t.login),
                               Tab(text: t.register),
                               Tab(text: t.forgotPassword),
-                              Tab(text: t.otpLogin, icon: const Icon(Icons.message)),
+                              Tab(text: t.otpLogin),
                             ]),
                             const SizedBox(height: 16),
                             Builder(builder: (innerContext) {

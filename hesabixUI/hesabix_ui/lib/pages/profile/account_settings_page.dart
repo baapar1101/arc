@@ -83,6 +83,13 @@ class AccountSettingsPage extends StatelessWidget {
                       onTap: () => context.go('/user/profile/api-keys'),
                     ),
                     _SettingsCard(
+                      title: 'سشن‌های ورود',
+                      description: 'مشاهده و مدیریت دستگاه‌های متصل به حساب کاربری',
+                      icon: Icons.devices,
+                      color: Colors.indigo,
+                      onTap: () => context.go('/user/profile/sessions'),
+                    ),
+                    _SettingsCard(
                       title: t.changePassword,
                       description: 'تغییر کلمه عبور حساب کاربری',
                       icon: Icons.password,
