@@ -4,7 +4,7 @@ from typing import Callable, Any
 import time
 import logging
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.exc import OperationalError, TimeoutError as SQLTimeoutError
 from sqlalchemy.orm import sessionmaker, DeclarativeBase, Session
 
@@ -59,19 +59,16 @@ def get_db_session(retries: int = 3, delay: float = 1.0):
 	last_exception = None
 	
 	for attempt in range(retries):
+		db = None
 		try:
 			db = SessionLocal()
+			# تست اتصال قبل از yield
 			try:
-				yield db
-				db.commit()
-				return
+				# یک query ساده برای تست اتصال
+				db.execute(text("SELECT 1"))
 			except (OperationalError, SQLTimeoutError) as e:
-				# در صورت خطای اتصال، rollback و دوباره تلاش می‌کنیم
+				# اگر اتصال برقرار نشد، retry می‌کنیم
 				if db:
-					try:
-						db.rollback()
-					except Exception:
-						pass
 					try:
 						db.close()
 					except Exception:
@@ -90,17 +87,75 @@ def get_db_session(retries: int = 3, delay: float = 1.0):
 				else:
 					logger.error(f"Database connection failed after {retries} attempts: {e}")
 					raise
-			except Exception:
+			
+			# اگر اتصال برقرار شد، yield می‌کنیم
+			try:
+				yield db
+				# اگر به اینجا رسیدیم، همه چیز خوب است
+				db.commit()
+				return
+			except (OperationalError, SQLTimeoutError) as e:
+				# در صورت خطای اتصال در حین اجرا، rollback و retry می‌کنیم
 				if db:
-					db.rollback()
+					try:
+						db.rollback()
+					except Exception:
+						pass
+					try:
+						db.close()
+					except Exception:
+						pass
+					db = None
+				
+				last_exception = e
+				if attempt < retries - 1:
+					wait_time = delay * (2 ** attempt)
+					logger.warning(
+						f"Database operation error (attempt {attempt + 1}/{retries}): {e}. "
+						f"Retrying in {wait_time:.2f}s..."
+					)
+					time.sleep(wait_time)
+					continue
+				else:
+					logger.error(f"Database operation failed after {retries} attempts: {e}")
+					raise
+			except Exception as e:
+				# برای سایر exception ها، rollback و raise می‌کنیم
+				if db:
+					try:
+						db.rollback()
+					except Exception:
+						pass
 				raise
-		except Exception as e:
+		except (OperationalError, SQLTimeoutError):
+			# این exception ها قبلاً handle شده‌اند
+			if attempt == retries - 1:
+				# آخرین تلاش ناموفق بود
+				if db:
+					try:
+						db.close()
+					except Exception:
+						pass
+				raise
+			# برای تلاش‌های بعدی، continue می‌کنیم
+			continue
+		except Exception:
+			# برای سایر exception ها، session را بسته و raise می‌کنیم
 			if db:
 				try:
 					db.close()
 				except Exception:
 					pass
 			raise
+		finally:
+			# اطمینان از بسته شدن session در صورت عدم موفقیت
+			if db:
+				try:
+					# اگر session هنوز باز است و commit نشده، بسته می‌شود
+					if not db.is_active:
+						db.close()
+				except Exception:
+					pass
 	
 	# اگر به اینجا رسیدیم، همه تلاش‌ها ناموفق بودند
 	if last_exception:

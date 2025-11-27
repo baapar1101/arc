@@ -119,35 +119,39 @@ class _AIUsagePageState extends State<AIUsagePage> {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          TabBar(
-            tabs: const [
-              Tab(text: 'آمار کلی', icon: Icon(Icons.bar_chart)),
-              Tab(text: 'لاگ استفاده', icon: Icon(Icons.list)),
-            ],
-            onTap: (index) => setState(() => _selectedTab = index),
-          ),
-          Expanded(
-            child: _error != null && _stats == null
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text('خطا: $_error'),
-                        const SizedBox(height: 16),
-                        ElevatedButton(
-                          onPressed: _load,
-                          child: const Text('تلاش مجدد'),
-                        ),
-                      ],
-                    ),
-                  )
-                : _selectedTab == 0
-                    ? _buildStatsTab(theme, numberFormat)
-                    : _buildLogsTab(theme, numberFormat),
-          ),
-        ],
+      body: DefaultTabController(
+        length: 2,
+        initialIndex: _selectedTab,
+        child: Column(
+          children: [
+            TabBar(
+              tabs: const [
+                Tab(text: 'آمار کلی', icon: Icon(Icons.bar_chart)),
+                Tab(text: 'لاگ استفاده', icon: Icon(Icons.list)),
+              ],
+              onTap: (index) => setState(() => _selectedTab = index),
+            ),
+            Expanded(
+              child: _error != null && _stats == null
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text('خطا: $_error'),
+                          const SizedBox(height: 16),
+                          ElevatedButton(
+                            onPressed: _load,
+                            child: const Text('تلاش مجدد'),
+                          ),
+                        ],
+                      ),
+                    )
+                  : _selectedTab == 0
+                      ? _buildStatsTab(theme, numberFormat)
+                      : _buildLogsTab(theme, numberFormat),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -234,7 +238,7 @@ class _AIUsagePageState extends State<AIUsagePage> {
                 children: [
                   Text(
                     'آمار روزانه',
-                    style: theme.textTheme.titleLarge ?? theme.textTheme.titleMedium,
+                    style: theme.textTheme.titleLarge ?? theme.textTheme.titleMedium ?? const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 16),
                   if (stats.daily.isEmpty)
@@ -311,7 +315,7 @@ class _AIUsagePageState extends State<AIUsagePage> {
                 children: [
                   Text(
                     'بر اساس مدل',
-                    style: theme.textTheme.titleLarge ?? theme.textTheme.titleMedium,
+                    style: theme.textTheme.titleLarge ?? theme.textTheme.titleMedium ?? const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 16),
                   if (stats.byModel.isEmpty)
