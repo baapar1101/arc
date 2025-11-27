@@ -20,9 +20,11 @@ class Settings(BaseSettings):
 	db_name: str = "hesabix"
 	sqlalchemy_echo: bool = False
 	# DB Pooling
-	db_pool_size: int = 10
-	db_max_overflow: int = 20
-	db_pool_timeout: int = 10
+	# با 4 worker، هر worker نیاز به حدود 10-15 اتصال دارد
+	# بنابراین pool_size را به 25 و max_overflow را به 40 افزایش می‌دهیم
+	db_pool_size: int = 25
+	db_max_overflow: int = 40
+	db_pool_timeout: int = 30  # افزایش timeout برای جلوگیری از خطاهای زودرس
 
 	# Logging
 	log_level: str = "INFO"

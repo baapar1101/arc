@@ -15,7 +15,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from adapters.db.models.product_tax_code import ProductTaxCode
-from adapters.db.session import SessionLocal
+from adapters.db.session import get_db_session
 from app.core.smart_normalizer import smart_normalize_numbers
 from app.services.job_manager import JobManager
 
@@ -101,54 +101,55 @@ def process_tax_product_code_import(
     checksum: str | None = None,
 ) -> None:
     jm = JobManager.instance()
-    session = SessionLocal()
     total = 0
     inserted = 0
     skipped = 0
     batch: List[Dict[str, str | None]] = []
     extracted_dir: str | None = None
+    
     try:
         jm.start(job_id, "شروع پردازش فایل")
         xml_files, extracted_dir = _collect_xml_sources(file_path)
         if not xml_files:
             raise ValueError("NO_XML_FILES_FOUND")
 
-        for index, xml_path in enumerate(xml_files, start=1):
-            jm.update(
-                job_id,
-                min(10 + index * 5, 40),
-                f"پردازش فایل {index}/{len(xml_files)}",
-            )
+        with get_db_session() as session:
+            for index, xml_path in enumerate(xml_files, start=1):
+                jm.update(
+                    job_id,
+                    min(10 + index * 5, 40),
+                    f"پردازش فایل {index}/{len(xml_files)}",
+                )
 
-            display_name = (
-                f"{source_filename}::{os.path.basename(xml_path)}"
-                if len(xml_files) > 1
-                else source_filename
-            )
+                display_name = (
+                    f"{source_filename}::{os.path.basename(xml_path)}"
+                    if len(xml_files) > 1
+                    else source_filename
+                )
 
-            for record in _stream_tax_codes(xml_path):
-                total += 1
-                payload = record.to_dict()
-                payload["source_filename"] = display_name[:255]
-                payload["source_checksum"] = checksum
-                batch.append(payload)
+                for record in _stream_tax_codes(xml_path):
+                    total += 1
+                    payload = record.to_dict()
+                    payload["source_filename"] = display_name[:255]
+                    payload["source_checksum"] = checksum
+                    batch.append(payload)
 
-                if len(batch) >= BATCH_SIZE:
-                    batch_inserted, batch_skipped = _flush_batch(session, batch)
-                    inserted += batch_inserted
-                    skipped += batch_skipped
-                    batch.clear()
-                    if total % (BATCH_SIZE * 4) == 0:
-                        jm.update(
-                            job_id,
-                            min(95, 40 + total // 1000),
-                            f"پردازش {total:,} رکورد",
-                        )
+                    if len(batch) >= BATCH_SIZE:
+                        batch_inserted, batch_skipped = _flush_batch(session, batch)
+                        inserted += batch_inserted
+                        skipped += batch_skipped
+                        batch.clear()
+                        if total % (BATCH_SIZE * 4) == 0:
+                            jm.update(
+                                job_id,
+                                min(95, 40 + total // 1000),
+                                f"پردازش {total:,} رکورد",
+                            )
 
-        if batch:
-            batch_inserted, batch_skipped = _flush_batch(session, batch)
-            inserted += batch_inserted
-            skipped += batch_skipped
+            if batch:
+                batch_inserted, batch_skipped = _flush_batch(session, batch)
+                inserted += batch_inserted
+                skipped += batch_skipped
 
         jm.succeed(
             job_id,
@@ -167,7 +168,6 @@ def process_tax_product_code_import(
         jm.fail(job_id, str(exc), "ایمپورت کدهای مالیاتی ناموفق بود")
         raise
     finally:
-        session.close()
         try:
             os.remove(file_path)
         except OSError:

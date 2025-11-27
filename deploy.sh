@@ -87,7 +87,10 @@ prompt_vars() {
   : "${UI_DOMAIN:=}"
   : "${BRANCH:=main}"
   : "${DB_PASSWORD:=}"
-  : "${UVICORN_WORKERS:=2}"
+  # بهینه‌سازی تعداد workers: با pool_size=25 و max_overflow=40
+  # هر worker می‌تواند تا 65 اتصال داشته باشد
+  # با 3 worker، حداکثر 195 اتصال خواهیم داشت که کافی است
+  : "${UVICORN_WORKERS:=3}"
   : "${FLUTTER_VERSION:=3.24.0}"
   
   if [[ -z "${API_DOMAIN}" ]]; then

@@ -8,7 +8,7 @@ import asyncio
 import logging
 from datetime import datetime
 
-from adapters.db.session import SessionLocal
+from adapters.db.session import get_db_session
 from app.services.storage_cleanup_service import (
 	mark_files_for_deletion,
 	delete_marked_files,
@@ -27,8 +27,7 @@ Background loop برای پاک‌سازی فایل‌های منقضی شده
 	
 	while True:
 		try:
-			db = SessionLocal()
-			try:
+			with get_db_session() as db:
 				# بررسی اشتراک‌های منقضی شده
 				expired = check_expired_subscriptions(db)
 				if expired:
@@ -46,13 +45,8 @@ Background loop برای پاک‌سازی فایل‌های منقضی شده
 						logger.info(f"Deleted {delete_result['deleted_count']} files, {delete_result['failed_count']} failed")
 				except Exception as e:
 					logger.error(f"Error deleting marked files: {str(e)}", exc_info=True)
-				
-			except Exception as e:
-				logger.error(f"Error in storage cleanup loop: {str(e)}", exc_info=True)
-			finally:
-				db.close()
 		except Exception as e:
-			logger.error(f"Error creating database session in storage cleanup loop: {str(e)}", exc_info=True)
+			logger.error(f"Error in storage cleanup loop: {str(e)}", exc_info=True)
 		
 		await asyncio.sleep(interval_seconds)
 
@@ -66,18 +60,13 @@ Background loop برای بررسی انقضای اشتراک‌ها
 	
 	while True:
 		try:
-			db = SessionLocal()
-			try:
+			with get_db_session() as db:
 				# بررسی اشتراک‌های منقضی شده
 				expired = check_expired_subscriptions(db)
 				if expired:
 					logger.info(f"Checked subscriptions: {len(expired)} expired subscriptions updated")
-			except Exception as e:
-				logger.error(f"Error in subscription check loop: {str(e)}", exc_info=True)
-			finally:
-				db.close()
 		except Exception as e:
-			logger.error(f"Error creating database session in subscription check loop: {str(e)}", exc_info=True)
+			logger.error(f"Error in subscription check loop: {str(e)}", exc_info=True)
 		
 		await asyncio.sleep(interval_seconds)
 

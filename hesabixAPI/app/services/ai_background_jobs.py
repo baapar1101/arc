@@ -9,7 +9,7 @@ import logging
 from datetime import datetime, timedelta
 from typing import List
 
-from adapters.db.session import SessionLocal
+from adapters.db.session import get_db_session
 from adapters.db.repositories.ai_subscription_repository import AISubscriptionRepository
 from adapters.db.repositories.ai_chat_repository import AIChatSessionRepository
 from adapters.db.models.ai_subscription import UserAISubscription
@@ -27,8 +27,7 @@ async def ai_quota_reset_loop(interval_hours: int = 24) -> None:
     
     while True:
         try:
-            db = SessionLocal()
-            try:
+            with get_db_session() as db:
                 repo = AISubscriptionRepository(db)
                 
                 # پیدا کردن اشتراک‌هایی که باید reset شوند
@@ -65,25 +64,12 @@ async def ai_quota_reset_loop(interval_hours: int = 24) -> None:
                             f"Error resetting subscription {subscription.id}: {e}",
                             exc_info=True
                         )
-                        db.rollback()
                         continue
                 
                 if reset_count > 0:
-                    db.commit()
                     logger.info(f"Reset {reset_count} AI subscriptions")
-                else:
-                    db.rollback()
-                    
-            except Exception as e:
-                logger.error(f"Error in AI quota reset loop: {e}", exc_info=True)
-                db.rollback()
-            finally:
-                db.close()
         except Exception as e:
-            logger.error(
-                f"Error creating database session in AI quota reset loop: {e}",
-                exc_info=True
-            )
+            logger.error(f"Error in AI quota reset loop: {e}", exc_info=True)
         
         await asyncio.sleep(interval_seconds)
 
@@ -97,8 +83,7 @@ async def ai_chat_cleanup_loop(interval_hours: int = 24) -> None:
     
     while True:
         try:
-            db = SessionLocal()
-            try:
+            with get_db_session() as db:
                 repo = AIChatSessionRepository(db)
                 
                 # حذف جلسات قدیمی‌تر از 90 روز که هیچ پیامی ندارند
@@ -113,24 +98,12 @@ async def ai_chat_cleanup_loop(interval_hours: int = 24) -> None:
                 total_deleted = deleted_count + old_deleted
                 
                 if total_deleted > 0:
-                    db.commit()
                     logger.info(
                         f"Deleted {deleted_count} empty and {old_deleted} old chat sessions "
                         f"(total: {total_deleted})"
                     )
-                else:
-                    db.rollback()
-                    
-            except Exception as e:
-                logger.error(f"Error in AI chat cleanup loop: {e}", exc_info=True)
-                db.rollback()
-            finally:
-                db.close()
         except Exception as e:
-            logger.error(
-                f"Error creating database session in AI chat cleanup loop: {e}",
-                exc_info=True
-            )
+            logger.error(f"Error in AI chat cleanup loop: {e}", exc_info=True)
         
         await asyncio.sleep(interval_seconds)
 
@@ -144,8 +117,7 @@ async def ai_subscription_check_loop(interval_hours: int = 6) -> None:
     
     while True:
         try:
-            db = SessionLocal()
-            try:
+            with get_db_session() as db:
                 repo = AISubscriptionRepository(db)
                 
                 # پیدا کردن اشتراک‌های در حال انقضا (7 روز آینده)
@@ -189,21 +161,9 @@ async def ai_subscription_check_loop(interval_hours: int = 6) -> None:
                         )
                 
                 if expired:
-                    db.commit()
                     logger.info(f"Processed {len(expired)} expired subscriptions")
-                else:
-                    db.rollback()
-                    
-            except Exception as e:
-                logger.error(f"Error in AI subscription check loop: {e}", exc_info=True)
-                db.rollback()
-            finally:
-                db.close()
         except Exception as e:
-            logger.error(
-                f"Error creating database session in AI subscription check loop: {e}",
-                exc_info=True
-            )
+            logger.error(f"Error in AI subscription check loop: {e}", exc_info=True)
         
         await asyncio.sleep(interval_seconds)
 

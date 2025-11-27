@@ -49,12 +49,10 @@ async def background_loop(interval_seconds: int = 30) -> None:
 		Run the potentially blocking notification resend logic in a worker thread
 		so the main event loop stays responsive (SMTP sends are fully blocking).
 		"""
-		db = SessionLocal()
-		try:
+		from adapters.db.session import get_db_session
+		with get_db_session() as db:
 			processor = NotificationProcessor(db)
 			processor.process_once()
-		finally:
-			db.close()
 
 	while True:
 		try:
