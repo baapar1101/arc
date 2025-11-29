@@ -59,6 +59,7 @@ MIGRATION_FILES = [
     '40_quick_sales_settings',  # quick_sales_settings (بعد از businesses, persons, warehouses, cash_registers, currencies)
     '19_seed_data',  # اطلاعات پایه: پشتیبانی، ارزها، مالیات، تنظیمات
     '20_accounts_chart',  # چارت حساب‌های حسابداری استاندارد
+    '43_fix_zohal_account_code',  # اصلاح کد حساب هزینه سرویس‌های استعلامات از 70903 به 70509
 ]
 
 

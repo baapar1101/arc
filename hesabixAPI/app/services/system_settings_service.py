@@ -48,6 +48,7 @@ SYSTEM_CONFIG_ENABLE_MAINTENANCE_MODE = "system_config_enable_maintenance_mode"
 SYSTEM_CONFIG_SESSION_TIMEOUT = "system_config_session_timeout"
 SYSTEM_CONFIG_MAX_FILE_SIZE = "system_config_max_file_size"
 SYSTEM_CONFIG_MAX_USERS = "system_config_max_users"
+SYSTEM_CONFIG_BUSINESS_CREATION_VERIFICATION_REQUIREMENT = "system_config_business_creation_verification_requirement"
 
 # Redis Cache Configuration Keys
 REDIS_CONFIG_ENABLED = "redis_config_enabled"
@@ -424,6 +425,42 @@ def is_email_verification_enabled(db: Session) -> bool:
 	return (enable_email_verification if enable_email_verification is not None else True)
 
 
+def get_business_creation_verification_requirement(db: Session) -> str:
+	"""
+	دریافت تنظیمات کنترل دسترسی ایجاد کسب و کار
+	
+	Returns:
+		str: یکی از مقادیر: "none", "email_only", "mobile_only", "both", "either"
+		پیش‌فرض: "none" (اگر هیچ مقداری تنظیم نشده باشد)
+	"""
+	requirement = _get_setting(db, SYSTEM_CONFIG_BUSINESS_CREATION_VERIFICATION_REQUIREMENT)
+	if requirement and requirement.value_string:
+		value = requirement.value_string.strip()
+		if value:
+			valid_values = ["none", "email_only", "mobile_only", "both", "either"]
+			if value in valid_values:
+				return value
+	# اگر هیچ مقداری تنظیم نشده باشد یا مقدار نامعتبر باشد، "none" (بدون محدودیت) برمی‌گرداند
+	return "none"
+
+
+def set_business_creation_verification_requirement(db: Session, requirement: str) -> None:
+	"""
+	تنظیم کنترل دسترسی ایجاد کسب و کار
+	
+	Args:
+		db: Database session
+		requirement: یکی از مقادیر: "none", "email_only", "mobile_only", "both", "either"
+	"""
+	valid_values = ["none", "email_only", "mobile_only", "both", "either"]
+	if requirement not in valid_values:
+		raise ApiError("INVALID_REQUIREMENT", f"مقدار نامعتبر. باید یکی از این موارد باشد: {', '.join(valid_values)}", http_status=400)
+	
+	_upsert_setting_string(db, SYSTEM_CONFIG_BUSINESS_CREATION_VERIFICATION_REQUIREMENT, requirement)
+	cache = get_cache()
+	cache.delete("system:business_creation_verification_requirement")
+
+
 def is_maintenance_mode_enabled(db: Session) -> bool:
 	"""بررسی فعال بودن حالت تعمیرات"""
 	cache = get_cache()
@@ -492,6 +529,7 @@ def get_system_configuration(db: Session) -> Dict[str, Any]:
 	session_timeout = _get_setting_int(db, SYSTEM_CONFIG_SESSION_TIMEOUT)
 	max_file_size = _get_setting_int(db, SYSTEM_CONFIG_MAX_FILE_SIZE)
 	max_users = _get_setting_int(db, SYSTEM_CONFIG_MAX_USERS)
+	business_creation_requirement = get_business_creation_verification_requirement(db)
 	
 	return {
 		"app_name": (app_name.value_string if app_name and app_name.value_string else env.app_name),
@@ -504,6 +542,7 @@ def get_system_configuration(db: Session) -> Dict[str, Any]:
 		"session_timeout": (session_timeout if session_timeout is not None else 30),
 		"max_file_size": (max_file_size if max_file_size is not None else 10),
 		"max_users": (max_users if max_users is not None else 1000),
+		"business_creation_verification_requirement": business_creation_requirement,
 	}
 
 
@@ -520,6 +559,7 @@ def set_system_configuration(
 	session_timeout: int | None = None,
 	max_file_size: int | None = None,
 	max_users: int | None = None,
+	business_creation_verification_requirement: str | None = None,
 ) -> Dict[str, Any]:
 	"""
 	تنظیم پیکربندی سیستم با اعتبارسنجی
@@ -578,6 +618,13 @@ def set_system_configuration(
 		if max_users < 0 or (max_users > 0 and max_users > 10000):
 			raise ApiError("INVALID_MAX_USERS", "حداکثر تعداد کاربران باید 0 (نامحدود) یا بین 1 تا 10000 باشد", http_status=400)
 		_upsert_setting_int(db, SYSTEM_CONFIG_MAX_USERS, max_users)
+	
+	if business_creation_verification_requirement is not None:
+		# اگر مقدار خالی یا null باشد، به "none" تنظیم می‌شود
+		req_value = business_creation_verification_requirement.strip() if isinstance(business_creation_verification_requirement, str) else "none"
+		if not req_value:
+			req_value = "none"
+		set_business_creation_verification_requirement(db, req_value)
 	
 	db.commit()
 	return get_system_configuration(db)

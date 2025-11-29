@@ -420,6 +420,7 @@ class AuthContext:
 				"referral_code": getattr(self.user, "referral_code", None),
 				"is_active": self.user.is_active,
 				"email_verified": getattr(self.user, "email_verified", False),
+				"mobile_verified": getattr(self.user, "mobile_verified", False),
 				"app_permissions": self.app_permissions,
 				"created_at": self.user.created_at.isoformat() if self.user.created_at else None,
 				"updated_at": self.user.updated_at.isoformat() if self.user.updated_at else None,

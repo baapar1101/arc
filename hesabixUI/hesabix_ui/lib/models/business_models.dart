@@ -348,6 +348,12 @@ class BusinessResponse {
   final bool checkCreditEnabledByDefault;
   final DateTime createdAt;
   final DateTime updatedAt;
+  // Soft Delete fields
+  final String? deletedAt;
+  final String? deletionRequestedAt;
+  final String? autoDeleteAt;
+  final bool isDeleted;
+  final bool isDeletionPending;
 
   BusinessResponse({
     required this.id,
@@ -371,6 +377,11 @@ class BusinessResponse {
     this.checkCreditEnabledByDefault = false,
     required this.createdAt,
     required this.updatedAt,
+    this.deletedAt,
+    this.deletionRequestedAt,
+    this.autoDeleteAt,
+    this.isDeleted = false,
+    this.isDeletionPending = false,
   });
 
   factory BusinessResponse.fromJson(Map<String, dynamic> json) {
@@ -396,6 +407,11 @@ class BusinessResponse {
       checkCreditEnabledByDefault: (json['check_credit_enabled_by_default'] as bool?) ?? false,
       createdAt: _parseDateTime(json['created_at'] ?? json['created_at_raw']),
       updatedAt: _parseDateTime(json['updated_at'] ?? json['updated_at_raw']),
+      deletedAt: json['deleted_at'] as String?,
+      deletionRequestedAt: json['deletion_requested_at'] as String?,
+      autoDeleteAt: json['auto_delete_at'] as String?,
+      isDeleted: (json['is_deleted'] as bool?) ?? false,
+      isDeletionPending: (json['is_deletion_pending'] as bool?) ?? false,
     );
   }
 

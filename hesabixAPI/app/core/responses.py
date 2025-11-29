@@ -38,8 +38,8 @@ def format_datetime_fields(data: Any, request: Request) -> Any:
 	
 	calendar_type = request.state.calendar_type
 	
-	# Fields that should show only date (no time)
-	DATE_ONLY_FIELDS = {'issue_date', 'due_date'}
+	# Fields that should show only date (no time) and return as string (not object)
+	DATE_ONLY_FIELDS = {'issue_date', 'due_date', 'start_date', 'end_date', 'document_date'}
 	
 	if isinstance(data, dict):
 		formatted_data = {}
@@ -79,19 +79,25 @@ def format_datetime_fields(data: Any, request: Request) -> Any:
 			elif isinstance(value, date):
 				# Convert date to datetime for processing
 				dt_value = datetime.combine(value, datetime.min.time())
+				# Check if this is a date-only field
+				is_date_only = key in DATE_ONLY_FIELDS
+				
 				# Format the main date field based on calendar type
 				if calendar_type == "jalali":
 					formatted_data[key] = CalendarConverter.to_jalali(dt_value)["date_only"]
 				else:
 					formatted_data[key] = value.isoformat()
 				
-				# Add formatted date as additional field
-				formatted_data[f"{key}_formatted"] = CalendarConverter.format_datetime(dt_value, calendar_type)
-				# Convert raw date to the same calendar type as the formatted date
-				if calendar_type == "jalali":
-					formatted_data[f"{key}_raw"] = CalendarConverter.to_jalali(dt_value)["date_only"]
-				else:
-					formatted_data[f"{key}_raw"] = value.isoformat()
+				# Only add formatted and raw fields if not in DATE_ONLY_FIELDS
+				# For DATE_ONLY_FIELDS, we only return the string date, not the full object
+				if not is_date_only:
+					# Add formatted date as additional field
+					formatted_data[f"{key}_formatted"] = CalendarConverter.format_datetime(dt_value, calendar_type)
+					# Convert raw date to the same calendar type as the formatted date
+					if calendar_type == "jalali":
+						formatted_data[f"{key}_raw"] = CalendarConverter.to_jalali(dt_value)["date_only"]
+					else:
+						formatted_data[f"{key}_raw"] = value.isoformat()
 			elif isinstance(value, (dict, list)):
 				formatted_data[key] = format_datetime_fields(value, request)
 			else:

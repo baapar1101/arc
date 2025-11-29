@@ -50,21 +50,28 @@ class WorkflowEditorState extends ChangeNotifier {
       _connections.clear();
       _nodesMap.clear();
 
-      final nodesJson = workflowData['nodes'] as List<dynamic>? ?? [];
-      final connectionsJson = workflowData['connections'] as List<dynamic>? ?? [];
+      final nodesRaw = workflowData['nodes'];
+      final connectionsRaw = workflowData['connections'];
+      
+      final nodesJson = nodesRaw is List ? List<dynamic>.from(nodesRaw) : <dynamic>[];
+      final connectionsJson = connectionsRaw is List ? List<dynamic>.from(connectionsRaw) : <dynamic>[];
 
       // تبدیل nodes
       final List<WorkflowNodeModel> loadedNodes = [];
       for (final nodeJson in nodesJson) {
         try {
-          final node = WorkflowNodeModel.fromJson(nodeJson as Map<String, dynamic>);
-          // اطمینان از اینکه node معتبر است
-          if (node.id.isNotEmpty && node.label.isNotEmpty) {
-            loadedNodes.add(node);
-            _nodesMap[node.id] = node;
+          if (nodeJson is Map) {
+            final nodeMap = Map<String, dynamic>.from(nodeJson.map((k, v) => MapEntry(k.toString(), v)));
+            final node = WorkflowNodeModel.fromJson(nodeMap);
+            // اطمینان از اینکه node معتبر است
+            if (node.id.isNotEmpty && node.label.isNotEmpty) {
+              loadedNodes.add(node);
+              _nodesMap[node.id] = node;
+            }
           }
-        } catch (e) {
+        } catch (e, stackTrace) {
           debugPrint('خطا در بارگذاری node: $e');
+          debugPrint('StackTrace: $stackTrace');
         }
       }
       _nodes.addAll(loadedNodes);
@@ -72,14 +79,18 @@ class WorkflowEditorState extends ChangeNotifier {
       // تبدیل connections
       for (final connJson in connectionsJson) {
         try {
-          final conn = WorkflowConnectionModel.fromJson(connJson as Map<String, dynamic>);
-          // بررسی اینکه node های مربوط به connection وجود دارند
-          if (_nodesMap.containsKey(conn.sourceNodeId) && 
-              _nodesMap.containsKey(conn.targetNodeId)) {
-            _connections.add(conn);
+          if (connJson is Map) {
+            final connMap = Map<String, dynamic>.from(connJson.map((k, v) => MapEntry(k.toString(), v)));
+            final conn = WorkflowConnectionModel.fromJson(connMap);
+            // بررسی اینکه node های مربوط به connection وجود دارند
+            if (_nodesMap.containsKey(conn.sourceNodeId) && 
+                _nodesMap.containsKey(conn.targetNodeId)) {
+              _connections.add(conn);
+            }
           }
-        } catch (e) {
+        } catch (e, stackTrace) {
           debugPrint('خطا در بارگذاری connection: $e');
+          debugPrint('StackTrace: $stackTrace');
         }
       }
 

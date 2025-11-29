@@ -5,7 +5,6 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/utils/number_normalizer.dart';
 import '../../core/api_client.dart';
 import '../../services/admin_system_settings_service.dart';
-import '../../utils/snackbar_helper.dart';
 
 class SystemConfigurationPage extends StatefulWidget {
   const SystemConfigurationPage({super.key});
@@ -32,6 +31,7 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
   int _sessionTimeout = 30;
   int _maxFileSize = 10;
   int _maxUsers = 1000;
+  String _businessCreationRequirement = 'none';
 
   @override
   void initState() {
@@ -59,6 +59,15 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
           _sessionTimeout = data['session_timeout'] as int? ?? 30;
           _maxFileSize = data['max_file_size'] as int? ?? 10;
           _maxUsers = data['max_users'] as int? ?? 1000;
+          final reqValueRaw = data['business_creation_verification_requirement'];
+          String? reqValue;
+          if (reqValueRaw != null) {
+            reqValue = reqValueRaw.toString().trim();
+          }
+          _businessCreationRequirement = (reqValue != null && reqValue.isNotEmpty && 
+              const ['none', 'email_only', 'mobile_only', 'both', 'either'].contains(reqValue))
+              ? reqValue
+              : 'none';
         });
       }
     } catch (e) {
@@ -257,6 +266,42 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
                       max: 1440,
                       allowUnlimited: true,
                       unlimitedLabel: t.unlimited,
+                    ),
+                    _buildDropdownField(
+                      label: 'محدودیت ایجاد کسب و کار',
+                      value: _businessCreationRequirement,
+                      items: [
+                        const DropdownMenuItem(
+                          value: 'none',
+                          child: Text('بدون محدودیت (همه کاربران)'),
+                        ),
+                        const DropdownMenuItem(
+                          value: 'email_only',
+                          child: Text('فقط ایمیل تایید شده'),
+                        ),
+                        const DropdownMenuItem(
+                          value: 'mobile_only',
+                          child: Text('فقط شماره موبایل تایید شده'),
+                        ),
+                        const DropdownMenuItem(
+                          value: 'both',
+                          child: Text('هر دو (ایمیل و موبایل)'),
+                        ),
+                        const DropdownMenuItem(
+                          value: 'either',
+                          child: Text('هر کدام (ایمیل یا موبایل)'),
+                        ),
+                      ],
+                      onChanged: (value) => setState(() => _businessCreationRequirement = value!),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Text(
+                        'این تنظیم تعیین می‌کند که چه کاربرانی می‌توانند کسب و کار جدید ایجاد کنند.',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
                     ),
                   ],
                 ),

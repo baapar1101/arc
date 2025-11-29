@@ -97,11 +97,11 @@ class AccountSettingsPage extends StatelessWidget {
                       onTap: () => context.go('/user/profile/change-password'),
                     ),
                     _SettingsCard(
-                      title: 'تایید شماره موبایل',
-                      description: 'تایید شماره موبایل برای امنیت بیشتر',
-                      icon: Icons.phone_android,
+                      title: 'تایید شماره موبایل و ایمیل',
+                      description: 'تایید شماره موبایل و ایمیل برای امنیت بیشتر',
+                      icon: Icons.verified_user,
                       color: Colors.teal,
-                      onTap: () => context.go('/user/profile/mobile-verification'),
+                      onTap: () => context.go('/user/profile/verification'),
                     ),
                   ],
                 );

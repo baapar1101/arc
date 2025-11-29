@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from typing import List, Optional
+from datetime import datetime
 from sqlalchemy.orm import Session
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, or_
 
 from .base_repo import BaseRepository
 from ..models.business import Business, BusinessType, BusinessField
@@ -14,9 +15,36 @@ class BusinessRepository(BaseRepository[Business]):
     def __init__(self, db: Session) -> None:
         super().__init__(db, Business)
     
-    def get_by_owner_id(self, owner_id: int) -> List[Business]:
-        """دریافت تمام کسب و کارهای یک مالک"""
+    def get_by_owner_id(self, owner_id: int, include_deleted: bool = True) -> List[Business]:
+        """
+        دریافت تمام کسب و کارهای یک مالک
+        
+        Args:
+            owner_id: شناسه مالک
+            include_deleted: اگر True باشد، کسب و کارهای حذف شده را هم شامل می‌شود
+                            (فقط برای مالک - اگر auto_delete_at نگذشته باشد)
+        """
         stmt = select(Business).where(Business.owner_id == owner_id)
+        
+        if not include_deleted:
+            # فیلتر کردن حذف شده‌ها
+            stmt = stmt.where(Business.deleted_at.is_(None))
+        else:
+            # برای مالک: شامل کسب و کارهای حذف شده که هنوز auto_delete_at نگذشته
+            now = datetime.utcnow()
+            stmt = stmt.where(
+                or_(
+                    Business.deleted_at.is_(None),  # حذف نشده
+                    and_(
+                        Business.deleted_at.isnot(None),  # حذف شده
+                        or_(
+                            Business.auto_delete_at.is_(None),  # auto_delete_at تنظیم نشده
+                            Business.auto_delete_at > now  # هنوز مهلت نگذشته
+                        )
+                    )
+                )
+            )
+        
         return list(self.db.execute(stmt).scalars().all())
     
     def get_by_business_type(self, business_type: BusinessType) -> List[Business]:

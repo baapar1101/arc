@@ -13,7 +13,8 @@ from app.services.email_verification_service import verify_email_token, resend_v
 from app.services.pdf import PDFService
 from .schemas import (
 	RegisterRequest, LoginRequest, ForgotPasswordRequest, ResetPasswordRequest, 
-	SendLoginOtpRequest, ChangePasswordRequest, CreateApiKeyRequest, UpdateApiKeyRequest, QueryInfo, FilterItem,
+	SendLoginOtpRequest, ChangePasswordRequest, UpdateMobileRequest, UpdateEmailRequest,
+	CreateApiKeyRequest, UpdateApiKeyRequest, QueryInfo, FilterItem,
 	SuccessResponse, CaptchaResponse, LoginResponse, ApiKeyResponse, 
 	ReferralStatsResponse, UserResponse
 )
@@ -1609,6 +1610,144 @@ def resend_mobile_verification(
 		"message": "کد تایید مجدداً ارسال شد",
 		"otp_code": otp_code  # فقط برای تست - حذف در production
 	}, request)
+
+
+@router.post(
+	"/update-mobile",
+	summary="تغییر شماره موبایل کاربر",
+	description="تغییر شماره موبایل کاربر با تایید کپچا و بررسی تایید شده بودن توسط کاربر دیگر",
+	response_model=SuccessResponse,
+	responses={
+		200: {
+			"description": "شماره موبایل با موفقیت به‌روزرسانی شد",
+			"content": {
+				"application/json": {
+					"example": {
+						"success": True,
+						"message": "شماره موبایل با موفقیت به‌روزرسانی شد",
+						"data": {
+							"mobile": "09123456789",
+							"mobile_verified": False
+						}
+					}
+				}
+			}
+		},
+		400: {
+			"description": "خطا در اعتبارسنجی یا تایید شده بودن توسط کاربر دیگر",
+			"content": {
+				"application/json": {
+					"example": {
+						"success": False,
+						"error_code": "MOBILE_IN_USE_VERIFIED",
+						"message": "این شماره موبایل قبلاً توسط کاربر دیگری ثبت و تایید شده است"
+					}
+				}
+			}
+		},
+		429: {
+			"description": "تعداد درخواست‌ها بیش از حد مجاز"
+		}
+	}
+)
+def update_mobile(
+	request: Request,
+	payload: UpdateMobileRequest,
+	ctx: AuthContext = Depends(get_current_user),
+	db: Session = Depends(get_db)
+) -> dict:
+	"""تغییر شماره موبایل کاربر"""
+	from app.services.auth_service import update_user_mobile
+	
+	user_id = ctx.get_user_id()
+	
+	try:
+		result = update_user_mobile(
+			db=db,
+			user_id=user_id,
+			mobile=payload.mobile,
+			captcha_id=payload.captcha_id,
+			captcha_code=payload.captcha_code,
+			force_unverified=payload.force_unverified
+		)
+		
+		return success_response(
+			result,
+			request,
+			message="شماره موبایل با موفقیت به‌روزرسانی شد"
+		)
+	except Exception as e:
+		# خطاها از طریق ApiError برمی‌گردند
+		raise
+
+
+@router.post(
+	"/update-email",
+	summary="تغییر ایمیل کاربر",
+	description="تغییر ایمیل کاربر با تایید کپچا و بررسی تایید شده بودن توسط کاربر دیگر",
+	response_model=SuccessResponse,
+	responses={
+		200: {
+			"description": "ایمیل با موفقیت به‌روزرسانی شد",
+			"content": {
+				"application/json": {
+					"example": {
+						"success": True,
+						"message": "ایمیل با موفقیت به‌روزرسانی شد",
+						"data": {
+							"email": "newemail@example.com",
+							"email_verified": False
+						}
+					}
+				}
+			}
+		},
+		400: {
+			"description": "خطا در اعتبارسنجی یا تایید شده بودن توسط کاربر دیگر",
+			"content": {
+				"application/json": {
+					"example": {
+						"success": False,
+						"error_code": "EMAIL_IN_USE_VERIFIED",
+						"message": "این ایمیل قبلاً توسط کاربر دیگری ثبت و تایید شده است"
+					}
+				}
+			}
+		},
+		429: {
+			"description": "تعداد درخواست‌ها بیش از حد مجاز"
+		}
+	}
+)
+def update_email(
+	request: Request,
+	payload: UpdateEmailRequest,
+	ctx: AuthContext = Depends(get_current_user),
+	db: Session = Depends(get_db)
+) -> dict:
+	"""تغییر ایمیل کاربر"""
+	from app.services.auth_service import update_user_email
+	
+	user_id = ctx.get_user_id()
+	
+	try:
+		result = update_user_email(
+			db=db,
+			user_id=user_id,
+			email=payload.email,
+			captcha_id=payload.captcha_id,
+			captcha_code=payload.captcha_code,
+			force_unverified=payload.force_unverified
+		)
+		
+		return success_response(
+			result,
+			request,
+			message="ایمیل با موفقیت به‌روزرسانی شد"
+		)
+	except Exception as e:
+		# خطاها از طریق ApiError برمی‌گردند
+		raise
 
 
 @router.get(

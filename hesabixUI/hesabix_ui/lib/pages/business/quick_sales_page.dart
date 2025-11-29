@@ -80,6 +80,9 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
   int? _defaultPriceListId;
   bool _autoPrint = false;
   bool _autoPostWarehouse = true;
+  bool _showInventory = true;
+  bool _showPurchasePrice = false;
+  int? _printTemplateId;
   
   // جستجوی محصول
   final TextEditingController _barcodeController = TextEditingController();
@@ -174,6 +177,8 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
       final settings = await _quickSalesService.getSettings(businessId: widget.businessId);
       final customer = await _quickSalesService.getAnonymousCustomer(businessId: widget.businessId);
       
+      final previousShowInventory = _showInventory;
+      
       setState(() {
         _settings = settings;
         _anonymousCustomer = Customer(
@@ -182,12 +187,21 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
         );
         _selectedCustomer = _anonymousCustomer;
         _defaultWarehouseId = settings['default_warehouse_id'];
-        _defaultCurrencyId = settings['default_currency_id'] ?? widget.authStore.selectedCurrencyId;
+        // اگر ارز پیش‌فرض در تنظیمات فروش سریع تنظیم نشده باشد، از ارز پیش‌فرض کسب‌وکار استفاده می‌کنیم
+        _defaultCurrencyId = settings['default_currency_id'] ?? widget.authStore.currentBusiness?.defaultCurrency?.id;
         _defaultPriceListId = settings['default_price_list_id'];
         _selectedCashRegisterId = settings['default_cash_register_id']?.toString();
         _autoPrint = settings['auto_print'] ?? false;
         _autoPostWarehouse = settings['auto_post_warehouse'] ?? true;
+        _showInventory = settings['show_inventory'] ?? true;
+        _showPurchasePrice = settings['show_purchase_price'] ?? false;
+        _printTemplateId = settings['print_template_id'];
       });
+      
+      // اگر نمایش موجودی فعال شد و قبلاً غیرفعال بود، موجودی‌ها را بارگذاری کن
+      if (_showInventory && !previousShowInventory && _cartItems.isNotEmpty) {
+        _refreshAllStocks();
+      }
     } catch (e) {
       if (mounted) {
         SnackBarHelper.show(context, message: 'خطا در بارگذاری تنظیمات: $e', isError: true);
@@ -384,8 +398,8 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
             quantity: existingItem.quantity + 1,
           );
         });
-        // بارگذاری موجودی اگر لازم باشد
-        if (trackInventory) {
+        // بارگذاری موجودی اگر لازم باشد و نمایش موجودی فعال باشد
+        if (trackInventory && _showInventory) {
           _loadProductStock(productId);
         }
         return;
@@ -422,6 +436,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
       taxRate: _toNum(product['sales_tax_rate'] ?? product['tax_rate']),
       trackInventory: trackInventory,
       warehouseId: _defaultWarehouseId,
+      basePurchasePriceMainUnit: _toNum(product['base_purchase_price']),
       extraInfo: instanceId != null ? {'instance_id': instanceId} : null,
     );
     
@@ -429,13 +444,18 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
       _cartItems.add(lineItem);
     });
     
-    // بارگذاری موجودی اگر لازم باشد
-    if (trackInventory && instanceId == null) {
+    // بارگذاری موجودی اگر لازم باشد و نمایش موجودی فعال باشد
+    if (trackInventory && instanceId == null && _showInventory) {
       _loadProductStock(productId);
     }
   }
   
   Future<void> _loadProductStock(int productId) async {
+    // اگر نمایش موجودی غیرفعال باشد، موجودی را بارگذاری نکن
+    if (!_showInventory) {
+      return;
+    }
+    
     // جلوگیری از درخواست‌های تکراری
     if (_productStocks.containsKey(productId) || _loadingStocks) {
       return;
@@ -487,6 +507,11 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
   }
   
   Future<void> _refreshAllStocks() async {
+    // اگر نمایش موجودی غیرفعال باشد، موجودی را به‌روزرسانی نکن
+    if (!_showInventory) {
+      return;
+    }
+    
     final trackInventoryProductIds = _cartItems
         .where((item) => item.trackInventory && item.productId != null && item.extraInfo?['instance_id'] == null)
         .map((item) => item.productId!)
@@ -610,8 +635,8 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
       _cartItems[index] = item;
     });
     
-    // به‌روزرسانی موجودی در صورت تغییر تعداد
-    if (item.trackInventory && item.productId != null && item.extraInfo?['instance_id'] == null) {
+    // به‌روزرسانی موجودی در صورت تغییر تعداد (اگر نمایش موجودی فعال باشد)
+    if (item.trackInventory && item.productId != null && item.extraInfo?['instance_id'] == null && _showInventory) {
       _loadProductStock(item.productId!);
     }
   }
@@ -733,12 +758,16 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
         return;
       }
       
+      // دریافت تنظیمات auto_create_payment_document
+      final autoCreatePaymentDoc = _settings?['auto_create_payment_document'] ?? true;
+      
       // ساخت extra_info با person_id
       final extraInfo = <String, dynamic>{
         'quick_sale': true,
         'person_id': personId, // همیشه person_id را اضافه می‌کنیم
         'post_inventory': true,
         'auto_post_warehouse': _autoPostWarehouse,
+        'auto_create_payment_document': autoCreatePaymentDoc,
       };
       
       if (_defaultWarehouseId != null) {
@@ -817,10 +846,16 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
   
   Future<void> _printInvoice({required int invoiceId, String? invoiceCode}) async {
     try {
+      // استفاده از قالب چاپ پیش‌فرض اگر تنظیم شده باشد
+      final query = <String, dynamic>{};
+      if (_printTemplateId != null) {
+        query['template_id'] = _printTemplateId;
+      }
+      
       final bytes = await _invoiceService.downloadInvoicePdf(
         businessId: widget.businessId,
         invoiceId: invoiceId,
-        query: null, // می‌توان تنظیمات چاپ را از settings خواند
+        query: query.isNotEmpty ? query : null,
       );
       
       if (!mounted) return;
@@ -1048,8 +1083,8 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
                   color: cs.surfaceContainerHighest,
                   child: Row(
                     children: [
-                      // دکمه refresh موجودی
-                      if (_cartItems.any((item) => item.trackInventory && item.productId != null))
+                      // دکمه refresh موجودی (فقط اگر نمایش موجودی فعال باشد)
+                      if (_showInventory && _cartItems.any((item) => item.trackInventory && item.productId != null))
                         IconButton(
                           icon: _loadingStocks 
                             ? SizedBox(
@@ -1241,8 +1276,8 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      // هشدار موجودی ناکافی
-                                      if (hasInsufficientStock)
+                                      // هشدار موجودی ناکافی (فقط اگر نمایش موجودی فعال باشد)
+                                      if (_showInventory && hasInsufficientStock)
                                         Container(
                                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                           margin: const EdgeInsets.only(bottom: 8),
@@ -1288,11 +1323,32 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
                                                     fontSize: 12,
                                                   ),
                                                 ),
-                                                // نمایش موجودی
-                                                if (item.trackInventory && item.productId != null && item.extraInfo?['instance_id'] == null)
+                                                // نمایش قیمت خرید (فقط اگر تنظیمات نمایش قیمت خرید فعال باشد)
+                                                if (_showPurchasePrice && item.basePurchasePriceMainUnit != null)
+                                                  Padding(
+                                                    padding: const EdgeInsets.only(top: 4),
+                                                    child: Text(
+                                                      'قیمت خرید: ${_formatNumber(item.basePurchasePriceMainUnit!)}',
+                                                      style: TextStyle(
+                                                        fontSize: 11,
+                                                        color: cs.onSurface.withOpacity(0.6),
+                                                        fontStyle: FontStyle.italic,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                // نمایش موجودی (فقط اگر تنظیمات نمایش موجودی فعال باشد)
+                                                if (_showInventory && item.trackInventory && item.productId != null && item.extraInfo?['instance_id'] == null)
                                                   Builder(
                                                     builder: (context) {
                                                       final stock = _getProductStock(item.productId);
+                                                      // اگر موجودی null است و در حال بارگذاری نیست، سعی کن بارگذاری کن
+                                                      if (stock == null && !_loadingStocks && _defaultWarehouseId != null) {
+                                                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                                                          if (mounted && _showInventory) {
+                                                            _loadProductStock(item.productId!);
+                                                          }
+                                                        });
+                                                      }
                                                       final hasInsufficientStock = stock != null && stock < item.quantity;
                                                       return Padding(
                                                         padding: const EdgeInsets.only(top: 4),

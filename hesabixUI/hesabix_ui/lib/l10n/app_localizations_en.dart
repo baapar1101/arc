@@ -254,6 +254,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get businesses => 'Businesses';
 
   @override
+  String get deleteBusiness => 'Delete Business';
+
+  @override
   String get support => 'Support';
 
   @override

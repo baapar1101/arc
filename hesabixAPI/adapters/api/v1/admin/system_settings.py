@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from adapters.db.session import get_db
 from app.core.auth_dependency import get_current_user, AuthContext
 from app.core.responses import success_response, ApiError
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from app.services.system_settings_service import (
 	get_wallet_settings,
 	set_wallet_base_currency_code,
@@ -267,6 +267,10 @@ class SystemConfigurationPayload(BaseModel):
 	session_timeout: int | None = None
 	max_file_size: int | None = None
 	max_users: int | None = None
+	business_creation_verification_requirement: str | None = Field(
+		default=None,
+		description="کنترل دسترسی ایجاد کسب و کار: none, email_only, mobile_only, both, either"
+	)
 
 
 @router.get(
@@ -310,6 +314,7 @@ def set_system_configuration_endpoint(
 		session_timeout=payload.session_timeout,
 		max_file_size=payload.max_file_size,
 		max_users=payload.max_users,
+		business_creation_verification_requirement=payload.business_creation_verification_requirement,
 	)
 	return success_response(data, request, message="SYSTEM_CONFIGURATION_UPDATED")
 

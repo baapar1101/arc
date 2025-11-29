@@ -134,27 +134,58 @@
   </div>
   
   <script>
-    // Configure Flutter to use path-based routing instead of hash routing
+    // Configure Flutter to use local CanvasKit instead of CDN
     window.flutterConfiguration = {
       canvasKitBaseUrl: "canvaskit/",
       renderer: "canvaskit",
-      usePathUrlStrategy: true
+      usePathUrlStrategy: true,
+      useLocalCanvasKit: true
     };
     
-    // Prefetch strategy for Flutter Web - helps with navigation performance
-    // This ensures all routes are available when needed
-    window._flutterLoader = {
-      loadEntrypoint: function() {
-        return Promise.resolve();
-      }
-    };
+    // Intercept _flutter object to override loader.load() before it's called
+    window._flutter = window._flutter || {};
+    
+    // Override loader property setter to intercept and wrap the load method
+    let flutterLoader = null;
+    Object.defineProperty(window._flutter, 'loader', {
+      get: function() { return flutterLoader; },
+      set: function(loader) {
+        if (loader && typeof loader.load === 'function') {
+          const originalLoad = loader.load.bind(loader);
+          loader.load = function(options) {
+            options = options || {};
+            options.config = options.config || {};
+            // Force local CanvasKit configuration - never use CDN
+            options.config.canvasKitBaseUrl = "canvaskit/";
+            options.config.renderer = "canvaskit";
+            options.config.useLocalCanvasKit = true;
+            console.log('[Flutter] Using local CanvasKit from: canvaskit/');
+            return originalLoad(options);
+          };
+        }
+        flutterLoader = loader;
+      },
+      configurable: true
+    });
+    
+    // Override buildConfig to set useLocalCanvasKit
+    let flutterBuildConfig = null;
+    Object.defineProperty(window._flutter, 'buildConfig', {
+      get: function() { return flutterBuildConfig; },
+      set: function(config) {
+        if (config) {
+          config.useLocalCanvasKit = true;
+        }
+        flutterBuildConfig = config;
+      },
+      configurable: true
+    });
     
     // پنهان کردن loading screen وقتی Flutter آماده شد
     function hideLoadingScreen() {
       const loadingScreen = document.getElementById('flutter-loading-screen');
       if (loadingScreen) {
         loadingScreen.classList.add('hidden');
-        // حذف کامل از DOM بعد از انیمیشن
         setTimeout(function() {
           loadingScreen.remove();
           document.body.classList.add('flutter-ready');
@@ -165,13 +196,9 @@
     // گوش دادن به رویداد flutter-first-frame
     window.addEventListener('flutter-first-frame', function() {
       hideLoadingScreen();
-      
-      // After first frame, prefetch remaining routes
       setTimeout(function() {
-        // Trigger prefetch for common routes
         const router = window._flutterNavigationState?.router;
         if (router) {
-          // Routes will be prefetched by GoRouter automatically in production builds
           console.log('Flutter app loaded, routes are available');
         }
       }, 1000);
@@ -186,6 +213,6 @@
       }
     }, 10000);
   </script>
-  <script src="flutter_bootstrap.js" async></script>
+  <script src="flutter_bootstrap.js"></script>
 </body>
 </html>

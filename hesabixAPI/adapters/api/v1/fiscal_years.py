@@ -1,7 +1,7 @@
-from typing import Dict, Any
+from typing import Dict, Any, Optional, List
 from fastapi import APIRouter, Depends, Request, Body
 from sqlalchemy.orm import Session
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator
 from datetime import date
 
 from adapters.db.session import get_db
@@ -16,9 +16,62 @@ from app.services.year_end_closing_service import preview_year_end_closing, clos
 router = APIRouter(prefix="/business", tags=["fiscal-years"])
 
 
+class ShareholderDistributionItem(BaseModel):
+    """آیتم توزیع سود بین سهامدار"""
+    person_id: int = Field(..., description="شناسه سهامدار")
+    profit_amount: float = Field(..., description="مبلغ سود تخصیص یافته به این سهامدار")
+
+
 class YearEndClosingRequest(BaseModel):
     new_fiscal_year_title: str = Field(..., min_length=1, max_length=255, description="عنوان سال مالی جدید")
     auto_create_opening_balance: bool = Field(default=True, description="ایجاد خودکار تراز افتتاحیه سال جدید")
+    
+    # مالیات
+    tax_percentage: Optional[float] = Field(None, ge=0, le=100, description="درصد مالیات بر درآمد")
+    tax_amount: Optional[float] = Field(None, ge=0, description="مبلغ مالیات بر درآمد")
+    
+    # تقسیم سود
+    profit_distribution_percentage: Optional[float] = Field(None, ge=0, le=100, description="درصد سود تقسیم شده")
+    profit_distribution_amount: Optional[float] = Field(None, ge=0, description="مبلغ سود تقسیم شده")
+    shareholder_profit_account_id: Optional[int] = Field(None, description="شناسه حساب برای ثبت سود سهامداران")
+    
+    # سود انباشته سنواتی
+    retained_earnings_from_previous_years: Optional[float] = Field(None, ge=0, description="سود یا زیان انباشته سنواتی")
+    
+    # تنظیمات
+    auto_issue_person_balance_document: bool = Field(default=False, description="صدور خودکار سند توازن اشخاص")
+    
+    # تنظیمات سال مالی جدید
+    new_fiscal_year_start_date: Optional[date] = Field(None, description="تاریخ شروع سال مالی جدید (در صورت عدم ارسال، به صورت خودکار محاسبه می‌شود)")
+    new_fiscal_year_end_date: Optional[date] = Field(None, description="تاریخ پایان سال مالی جدید (در صورت عدم ارسال، به صورت خودکار محاسبه می‌شود)")
+    inventory_valuation_method: str = Field(default="FIFO", description="روش ارزیابی انبار: FIFO, LIFO, WeightedAverage")
+    
+    # تقسیم سود بین سهامداران (اختیاری - اگر نباشد بر اساس درصد سهام محاسبه می‌شود)
+    shareholder_distributions: Optional[List[ShareholderDistributionItem]] = Field(None, description="لیست توزیع سود بین سهامداران")
+    
+    @validator('tax_percentage', 'tax_amount')
+    def validate_tax(cls, v, values):
+        """بررسی اینکه فقط یکی از درصد یا مبلغ مالیات وارد شود"""
+        if 'tax_percentage' in values and 'tax_amount' in values:
+            if values.get('tax_percentage') is not None and values.get('tax_amount') is not None:
+                raise ValueError('فقط یکی از درصد یا مبلغ مالیات باید وارد شود')
+        return v
+    
+    @validator('profit_distribution_percentage', 'profit_distribution_amount')
+    def validate_profit_distribution(cls, v, values):
+        """بررسی اینکه فقط یکی از درصد یا مبلغ تقسیم سود وارد شود"""
+        if 'profit_distribution_percentage' in values and 'profit_distribution_amount' in values:
+            if values.get('profit_distribution_percentage') is not None and values.get('profit_distribution_amount') is not None:
+                raise ValueError('فقط یکی از درصد یا مبلغ تقسیم سود باید وارد شود')
+        return v
+    
+    @validator('inventory_valuation_method')
+    def validate_inventory_method(cls, v):
+        """بررسی اعتبار روش ارزیابی انبار"""
+        valid_methods = ['FIFO', 'LIFO', 'WeightedAverage']
+        if v not in valid_methods:
+            raise ValueError(f'روش ارزیابی انبار باید یکی از {valid_methods} باشد')
+        return v
 
 
 @router.get("/{business_id}/fiscal-years")
@@ -117,6 +170,26 @@ def close_fiscal_year_endpoint(
             user_id=ctx.get_user_id(),
             new_fiscal_year_title=payload.new_fiscal_year_title,
             auto_create_opening_balance=payload.auto_create_opening_balance,
+            # مالیات
+            tax_percentage=payload.tax_percentage,
+            tax_amount=payload.tax_amount,
+            # تقسیم سود
+            profit_distribution_percentage=payload.profit_distribution_percentage,
+            profit_distribution_amount=payload.profit_distribution_amount,
+            shareholder_profit_account_id=payload.shareholder_profit_account_id,
+            # سود انباشته سنواتی
+            retained_earnings_from_previous_years=payload.retained_earnings_from_previous_years,
+            # تنظیمات
+            auto_issue_person_balance_document=payload.auto_issue_person_balance_document,
+            # تنظیمات سال مالی جدید
+            new_fiscal_year_start_date=payload.new_fiscal_year_start_date,
+            new_fiscal_year_end_date=payload.new_fiscal_year_end_date,
+            inventory_valuation_method=payload.inventory_valuation_method,
+            # تقسیم سود بین سهامداران (تبدیل از Pydantic model به dict)
+            shareholder_distributions=[
+                {"person_id": item.person_id, "profit_amount": item.profit_amount}
+                for item in payload.shareholder_distributions
+            ] if payload.shareholder_distributions else None,
         )
         return success_response(
             data=format_datetime_fields(result, request),

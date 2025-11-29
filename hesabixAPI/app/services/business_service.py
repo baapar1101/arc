@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from typing import List, Optional, Dict, Any
+from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
-from sqlalchemy import select, and_, func
+from sqlalchemy import select, and_, func, or_
+import logging
 
 from adapters.db.repositories.business_repo import BusinessRepository
 from adapters.db.repositories.fiscal_year_repo import FiscalYearRepository
@@ -10,16 +12,92 @@ from adapters.db.models.currency import Currency, BusinessCurrency
 from adapters.db.repositories.business_permission_repo import BusinessPermissionRepository
 from adapters.db.models.business import Business, BusinessType, BusinessField
 from adapters.db.models.business_print_settings import BusinessPrintSettings
+from adapters.db.models.document import Document
+from adapters.db.models.person import Person
+from adapters.db.models.product import Product
 from adapters.api.v1.schemas import (
     BusinessCreateRequest, BusinessUpdateRequest, BusinessResponse,
     BusinessListResponse, BusinessSummaryResponse, PaginationInfo
 )
-from app.core.responses import format_datetime_fields
+from app.core.responses import format_datetime_fields, ApiError
 from app.services.document_monetization_service import apply_default_policies_to_business
+
+logger = logging.getLogger(__name__)
+
+
+def check_business_creation_permission(db: Session, user_id: int) -> tuple[bool, str | None]:
+    """
+    بررسی اینکه آیا کاربر می‌تواند کسب و کار ایجاد کند یا نه
+    
+    Args:
+        db: Database session
+        user_id: شناسه کاربر
+        
+    Returns:
+        Tuple[bool, str | None]:
+        - (True, None): اجازه ایجاد دارد
+        - (False, "پیام خطا"): اجازه ایجاد ندارد
+    """
+    from app.services.system_settings_service import get_business_creation_verification_requirement
+    from adapters.db.models.user import User
+    
+    requirement = get_business_creation_verification_requirement(db)
+    
+    # بدون محدودیت
+    if requirement == "none":
+        return True, None
+    
+    # دریافت اطلاعات کاربر
+    user = db.get(User, user_id)
+    if not user:
+        return False, "کاربر یافت نشد"
+    
+    email_verified = getattr(user, "email_verified", False)
+    mobile_verified = getattr(user, "mobile_verified", False)
+    
+    # بررسی بر اساس requirement
+    if requirement == "email_only":
+        if not email_verified:
+            return False, "برای ایجاد کسب و کار، شما باید ایمیل خود را تایید کنید. لطفاً به بخش 'تایید شماره موبایل و ایمیل' در تنظیمات حساب کاربری بروید."
+        return True, None
+    
+    elif requirement == "mobile_only":
+        if not mobile_verified:
+            return False, "برای ایجاد کسب و کار، شما باید شماره موبایل خود را تایید کنید. لطفاً به بخش 'تایید شماره موبایل و ایمیل' در تنظیمات حساب کاربری بروید."
+        return True, None
+    
+    elif requirement == "both":
+        if not email_verified or not mobile_verified:
+            missing = []
+            if not email_verified:
+                missing.append("ایمیل")
+            if not mobile_verified:
+                missing.append("شماره موبایل")
+            return False, f"برای ایجاد کسب و کار، شما باید {' و '.join(missing)} خود را تایید کنید. لطفاً به بخش 'تایید شماره موبایل و ایمیل' در تنظیمات حساب کاربری بروید."
+        return True, None
+    
+    elif requirement == "either":
+        if not email_verified and not mobile_verified:
+            return False, "برای ایجاد کسب و کار، شما باید حداقل ایمیل یا شماره موبایل خود را تایید کنید. لطفاً به بخش 'تایید شماره موبایل و ایمیل' در تنظیمات حساب کاربری بروید."
+        return True, None
+    
+    # حالت پیش‌فرض: بدون محدودیت
+    return True, None
 
 
 def create_business(db: Session, business_data: BusinessCreateRequest, owner_id: int) -> Dict[str, Any]:
     """ایجاد کسب و کار جدید"""
+    from app.core.responses import ApiError
+    
+    # بررسی دسترسی ایجاد کسب و کار
+    can_create, error_message = check_business_creation_permission(db, owner_id)
+    if not can_create:
+        raise ApiError(
+            "BUSINESS_CREATION_NOT_ALLOWED",
+            error_message or "شما اجازه ایجاد کسب و کار را ندارید",
+            http_status=403
+        )
+    
     business_repo = BusinessRepository(db)
     fiscal_repo = FiscalYearRepository(db)
     
@@ -167,21 +245,30 @@ def get_businesses_by_owner(db: Session, owner_id: int, query_info: Dict[str, An
 
 
 def get_user_businesses(db: Session, user_id: int, query_info: Dict[str, Any]) -> Dict[str, Any]:
-    """دریافت لیست کسب و کارهای کاربر (مالک + عضو)"""
+    """
+    دریافت لیست کسب و کارهای کاربر (مالک + عضو)
+    
+    قوانین نمایش:
+    - برای مالک: کسب و کارهای حذف شده را نشان می‌دهد (اگر auto_delete_at نگذشته باشد)
+    - برای سایر کاربران: کسب و کارهای حذف شده را نشان نمی‌دهد
+    """
     business_repo = BusinessRepository(db)
     permission_repo = BusinessPermissionRepository(db)
     
-    # دریافت کسب و کارهای مالک
-    owned_businesses = business_repo.get_by_owner_id(user_id)
+    # دریافت کسب و کارهای مالک (شامل حذف شده‌ها که هنوز مهلت دارند)
+    owned_businesses = business_repo.get_by_owner_id(user_id, include_deleted=True)
     
-    # دریافت کسب و کارهای عضو
+    # دریافت کسب و کارهای عضو (فقط غیرحذف شده‌ها)
     member_permissions = permission_repo.get_user_member_businesses(user_id)
     member_business_ids = [perm.business_id for perm in member_permissions]
     member_businesses = []
     for business_id in member_business_ids:
         business = business_repo.get_by_id(business_id)
         if business:
-            member_businesses.append(business)
+            # فیلتر کردن حذف شده‌ها برای اعضا
+            if business.deleted_at is None:
+                member_businesses.append(business)
+            # یا اگر حذف شده اما auto_delete_at نگذشته (فقط برای مالک - که قبلاً در owned_businesses است)
     
     # ترکیب لیست‌ها
     all_businesses = []
@@ -292,15 +379,268 @@ def update_business(db: Session, business_id: int, business_data: BusinessUpdate
 
 
 def delete_business(db: Session, business_id: int, owner_id: int) -> bool:
-    """حذف کسب و کار"""
+    """حذف کسب و کار (قدیمی - برای سازگاری با backward compatibility)"""
+    return delete_business_soft(db, business_id, owner_id, None, owner_id) is not None
+
+
+def _check_deletion_restrictions(db: Session, business_id: int) -> Dict[str, Any]:
+    """بررسی محدودیت‌های حذف کسب و کار"""
+    restrictions = {
+        "can_delete": True,
+        "has_finalized_invoices": False,
+        "finalized_invoices_count": 0,
+        "has_tax_workspace_invoices": False,
+        "tax_workspace_invoices_count": 0,
+        "has_locked_documents": False,
+        "locked_documents_count": 0,
+    }
+    
+    # بررسی فاکتورهای نهایی شده
+    finalized_docs = db.query(Document).filter(
+        Document.business_id == business_id,
+        Document.document_type.in_(['invoice', 'invoice_return', 'proforma'])
+    ).all()
+    
+    finalized_count = 0
+    for doc in finalized_docs:
+        extra_info = doc.extra_info or {}
+        if isinstance(extra_info, dict):
+            tax_status = extra_info.get("tax_status", "")
+            if isinstance(tax_status, str) and tax_status.strip() == "finalized":
+                finalized_count += 1
+    
+    restrictions["finalized_invoices_count"] = finalized_count
+    restrictions["has_finalized_invoices"] = finalized_count > 0
+    
+    # بررسی فاکتورهای در کارپوشه مودیان
+    tax_workspace_count = 0
+    for doc in finalized_docs:
+        extra_info = doc.extra_info or {}
+        if isinstance(extra_info, dict):
+            tax_workspace = extra_info.get("tax_workspace", False)
+            if tax_workspace:
+                tax_workspace_count += 1
+    
+    restrictions["tax_workspace_invoices_count"] = tax_workspace_count
+    restrictions["has_tax_workspace_invoices"] = tax_workspace_count > 0
+    
+    # بررسی اسناد قفل شده
+    locked_count = 0
+    all_docs = db.query(Document).filter(Document.business_id == business_id).all()
+    for doc in all_docs:
+        extra_info = doc.extra_info or {}
+        developer_settings = doc.developer_settings or {}
+        if isinstance(extra_info, dict):
+            if extra_info.get("locked") or extra_info.get("is_locked"):
+                locked_count += 1
+        elif isinstance(developer_settings, dict):
+            if developer_settings.get("locked") or developer_settings.get("is_locked"):
+                locked_count += 1
+    
+    restrictions["locked_documents_count"] = locked_count
+    restrictions["has_locked_documents"] = locked_count > 0
+    
+    # بررسی نهایی
+    restrictions["can_delete"] = (
+        not restrictions["has_finalized_invoices"] and
+        not restrictions["has_tax_workspace_invoices"] and
+        not restrictions["has_locked_documents"]
+    )
+    
+    return restrictions
+
+
+def _format_restriction_error(restrictions: Dict[str, Any]) -> str:
+    """فرمت کردن پیام خطای محدودیت‌ها"""
+    errors = []
+    if restrictions["has_finalized_invoices"]:
+        errors.append(f"{restrictions['finalized_invoices_count']} فاکتور نهایی شده وجود دارد")
+    if restrictions["has_tax_workspace_invoices"]:
+        errors.append(f"{restrictions['tax_workspace_invoices_count']} فاکتور در کارپوشه مودیان وجود دارد")
+    if restrictions["has_locked_documents"]:
+        errors.append(f"{restrictions['locked_documents_count']} سند قفل شده وجود دارد")
+    
+    return "نمی‌توان کسب و کار را حذف کرد: " + "، ".join(errors)
+
+
+def get_business_delete_info(db: Session, business_id: int, owner_id: int) -> Dict[str, Any]:
+    """دریافت اطلاعات مرتبط با حذف کسب و کار"""
+    business = db.query(Business).filter(Business.id == business_id).first()
+    if not business:
+        raise ApiError("BUSINESS_NOT_FOUND", "کسب و کار یافت نشد", http_status=404)
+    
+    # بررسی مالکیت
+    if business.owner_id != owner_id:
+        raise ApiError("FORBIDDEN", "فقط مالک کسب و کار می‌تواند آن را حذف کند", http_status=403)
+    
+    # بررسی محدودیت‌ها
+    restrictions = _check_deletion_restrictions(db, business_id)
+    
+    # آمار کلی
+    total_documents = db.query(Document).filter(Document.business_id == business_id).count()
+    total_persons = db.query(Person).filter(Person.business_id == business_id).count()
+    total_products = db.query(Product).filter(Product.business_id == business_id).count()
+    
+    return {
+        "business": {
+            "id": business.id,
+            "name": business.name,
+        },
+        "restrictions": restrictions,
+        "statistics": {
+            "total_documents": total_documents,
+            "total_persons": total_persons,
+            "total_products": total_products,
+        }
+    }
+
+
+def delete_business_soft(
+    db: Session,
+    business_id: int,
+    owner_id: int,
+    deletion_reason: str | None = None,
+    requested_by: int | None = None
+) -> Dict[str, Any] | None:
+    """
+    حذف نرم کسب و کار با بررسی‌های امنیتی و ایجاد بکاپ خودکار
+    """
     business_repo = BusinessRepository(db)
     business = business_repo.get_by_id(business_id)
     
     if not business or business.owner_id != owner_id:
-        return False
+        raise ApiError("BUSINESS_NOT_FOUND", "کسب و کار یافت نشد", http_status=404)
     
-    business_repo.delete(business_id)
-    return True
+    # بررسی اینکه قبلاً حذف نشده باشد
+    if business.deleted_at is not None:
+        raise ApiError("ALREADY_DELETED", "کسب و کار قبلاً حذف شده است", http_status=400)
+    
+    # بررسی محدودیت‌ها
+    restrictions = _check_deletion_restrictions(db, business_id)
+    if not restrictions["can_delete"]:
+        error_msg = _format_restriction_error(restrictions)
+        raise ApiError("CANNOT_DELETE_BUSINESS", error_msg, http_status=409)
+    
+    # ایجاد بکاپ خودکار قبل از حذف
+    backup_result = None
+    try:
+        from adapters.api.v1.business_backups import _perform_backup
+        
+        # ساخت AuthContext موقت برای بکاپ
+        class TempAuthContext:
+            def get_user_id(self):
+                return owner_id
+        
+        temp_ctx = TempAuthContext()
+        backup_data = _perform_backup(db, temp_ctx, business_id)
+        
+        # ذخیره بکاپ
+        from app.services.file_storage_service import FileStorageService
+        storage = FileStorageService(db)
+        import anyio
+        from fastapi import UploadFile
+        import io
+        
+        async def _upload_backup():
+            filename = f"business_{business_id}_auto_backup_before_deletion_{datetime.utcnow().strftime('%Y%m%dT%H%M%SZ')}.hbx"
+            faux_upload = UploadFile(
+                filename=filename,
+                file=io.BytesIO(backup_data["zip_bytes"])
+            )
+            saved = await storage.upload_file(
+                faux_upload,
+                user_id=owner_id,
+                module_context="business_auto_backup",
+                developer_data={
+                    "business_id": business_id,
+                    "backup_type": "auto_before_deletion",
+                    "schema_version": backup_data["metadata"]["schema_version"],
+                },
+                is_temporary=False,
+                expires_in_days=3650,  # 10 سال
+                business_id=business_id,
+                check_storage_limit=False,  # بکاپ خودکار محدودیت ندارد
+            )
+            return saved
+        
+        backup_result = anyio.run(_upload_backup)
+        logger.info(f"Auto backup created for business {business_id}: {backup_result.get('id')}")
+    except Exception as e:
+        logger.error(f"Failed to create auto backup for business {business_id}: {e}")
+        # اگر بکاپ ناموفق بود، حذف را ادامه می‌دهیم اما هشدار می‌دهیم
+    
+    # انجام Soft Delete
+    now = datetime.utcnow()
+    business.deleted_at = now
+    business.deletion_requested_at = now
+    business.deletion_requested_by = requested_by or owner_id
+    business.deletion_reason = deletion_reason
+    business.auto_delete_at = now + timedelta(days=30)  # 30 روز بعد
+    
+    db.commit()
+    db.refresh(business)
+    
+    # لاگ عملیات
+    logger.info(
+        f"Business {business_id} soft deleted by user {owner_id}",
+        extra={
+            "business_id": business_id,
+            "deleted_by": owner_id,
+            "deleted_at": now.isoformat(),
+            "auto_delete_at": business.auto_delete_at.isoformat(),
+            "backup_created": backup_result is not None,
+        }
+    )
+    
+    return {
+        "business_id": business_id,
+        "deleted_at": business.deleted_at.isoformat(),
+        "auto_delete_at": business.auto_delete_at.isoformat(),
+        "restore_deadline_days": 30,
+        "backup_created": backup_result is not None,
+        "backup_id": backup_result.get("id") if backup_result else None,
+    }
+
+
+def restore_business(db: Session, business_id: int, owner_id: int) -> Dict[str, Any]:
+    """بازیابی کسب و کار حذف شده (فقط در 30 روز اول)"""
+    business = db.query(Business).filter(Business.id == business_id).first()
+    
+    if not business:
+        raise ApiError("BUSINESS_NOT_FOUND", "کسب و کار یافت نشد", http_status=404)
+    
+    # بررسی مالکیت
+    if business.owner_id != owner_id:
+        raise ApiError("FORBIDDEN", "فقط مالک می‌تواند کسب و کار را بازیابی کند", http_status=403)
+    
+    # بررسی اینکه حذف شده باشد
+    if business.deleted_at is None:
+        raise ApiError("NOT_DELETED", "کسب و کار حذف نشده است", http_status=400)
+    
+    # بررسی مهلت بازیابی
+    if business.auto_delete_at and datetime.utcnow() > business.auto_delete_at:
+        raise ApiError(
+            "RESTORE_EXPIRED",
+            "مهلت بازیابی کسب و کار به پایان رسیده است. امکان بازیابی وجود ندارد.",
+            http_status=410
+        )
+    
+    # بازیابی
+    business.deleted_at = None
+    business.deletion_requested_at = None
+    business.deletion_requested_by = None
+    business.deletion_reason = None
+    business.auto_delete_at = None
+    
+    db.commit()
+    db.refresh(business)
+    
+    logger.info(f"Business {business_id} restored by user {owner_id}")
+    
+    return {
+        "business_id": business_id,
+        "restored_at": datetime.utcnow().isoformat()
+    }
 
 
 def get_business_summary(db: Session, owner_id: int) -> Dict[str, Any]:
@@ -633,7 +973,17 @@ def _business_to_dict(business: Business) -> Dict[str, Any]:
         "default_credit_limit": float(business.default_credit_limit) if getattr(business, "default_credit_limit", None) is not None else None,
         "check_credit_enabled_by_default": bool(getattr(business, "check_credit_enabled_by_default", False)),
         "created_at": business.created_at,  # datetime object بماند
-        "updated_at": business.updated_at   # datetime object بماند
+        "updated_at": business.updated_at,   # datetime object بماند
+        # Soft Delete fields
+        "deleted_at": business.deleted_at.isoformat() if getattr(business, "deleted_at", None) else None,
+        "deletion_requested_at": business.deletion_requested_at.isoformat() if getattr(business, "deletion_requested_at", None) else None,
+        "auto_delete_at": business.auto_delete_at.isoformat() if getattr(business, "auto_delete_at", None) else None,
+        "is_deleted": getattr(business, "deleted_at", None) is not None,
+        "is_deletion_pending": (
+            getattr(business, "deleted_at", None) is not None and
+            getattr(business, "auto_delete_at", None) is not None and
+            datetime.utcnow() < business.auto_delete_at
+        ),
     }
 
     # ارز پیشفرض

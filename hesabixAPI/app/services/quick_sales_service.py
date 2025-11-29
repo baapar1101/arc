@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Dict
 import json
+import logging
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, func
 
@@ -12,6 +13,8 @@ from adapters.api.v1.schema_models.person import PersonCreateRequest
 from app.core.responses import ApiError
 from app.services.person_service import create_person
 
+logger = logging.getLogger(__name__)
+
 
 def get_quick_sales_settings(db: Session, business_id: int) -> Dict[str, Any]:
     """دریافت تنظیمات فروش سریع یک کسب‌وکار"""
@@ -21,11 +24,12 @@ def get_quick_sales_settings(db: Session, business_id: int) -> Dict[str, Any]:
         .first()
     )
     
+    # دریافت کسب‌وکار برای دسترسی به ارز پیش‌فرض
+    business = db.query(Business).filter(Business.id == int(business_id)).first()
+    business_default_currency_id = business.default_currency_id if business else None
+    
     if not obj:
         # بازگشت مقادیر پیش‌فرض
-        business = db.query(Business).filter(Business.id == int(business_id)).first()
-        default_currency_id = business.default_currency_id if business else None
-        
         return {
             "business_id": int(business_id),
             "default_anonymous_customer_id": None,
@@ -33,7 +37,7 @@ def get_quick_sales_settings(db: Session, business_id: int) -> Dict[str, Any]:
             "anonymous_customer_name": "مشتری ناشناس",
             "default_warehouse_id": None,
             "default_cash_register_id": None,
-            "default_currency_id": default_currency_id,
+            "default_currency_id": business_default_currency_id,
             "default_price_list_id": None,
             "auto_print": False,
             "print_template_id": None,
@@ -43,6 +47,9 @@ def get_quick_sales_settings(db: Session, business_id: int) -> Dict[str, Any]:
             "show_purchase_price": False,
         }
     
+    # اگر ارز پیش‌فرض در تنظیمات تنظیم نشده باشد، از ارز پیش‌فرض کسب‌وکار استفاده می‌کنیم
+    currency_id = int(obj.default_currency_id) if obj.default_currency_id else business_default_currency_id
+    
     return {
         "business_id": int(business_id),
         "default_anonymous_customer_id": int(obj.default_anonymous_customer_id) if obj.default_anonymous_customer_id else None,
@@ -50,7 +57,7 @@ def get_quick_sales_settings(db: Session, business_id: int) -> Dict[str, Any]:
         "anonymous_customer_name": obj.anonymous_customer_name if obj.anonymous_customer_name else "مشتری ناشناس",
         "default_warehouse_id": int(obj.default_warehouse_id) if obj.default_warehouse_id else None,
         "default_cash_register_id": int(obj.default_cash_register_id) if obj.default_cash_register_id else None,
-        "default_currency_id": int(obj.default_currency_id) if obj.default_currency_id else None,
+        "default_currency_id": currency_id,
         "default_price_list_id": int(obj.default_price_list_id) if obj.default_price_list_id else None,
         "auto_print": bool(obj.auto_print),
         "print_template_id": int(obj.print_template_id) if obj.print_template_id else None,
@@ -246,9 +253,11 @@ def get_or_create_anonymous_customer(
         )
         
         result = create_person(db, int(business_id), person_data)
+        logger.debug(f"create_person result: {result}")
         customer_id = result.get("data", {}).get("id")
         
         if not customer_id:
+            logger.error(f"Failed to get customer_id from create_person result: {result}")
             raise ApiError(
                 "FAILED_TO_CREATE_ANONYMOUS_CUSTOMER",
                 "خطا در ایجاد مشتری ناشناس",

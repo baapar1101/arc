@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/services/business_dashboard_service.dart';
 import 'package:hesabix_ui/core/api_client.dart';
-import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../core/calendar_controller.dart';
 import '../../widgets/date_input_field.dart';
@@ -99,22 +98,33 @@ class _FiscalYearSettingsPageState extends State<FiscalYearSettingsPage> {
           return;
         }
 
-        _currentFiscalYear = current;
-        _titleController.text = current['title'] as String? ?? '';
-        
-        // پارس کردن تاریخ شروع
+        // پارس کردن تاریخ‌ها
+        // اولویت: start_date_formatted (Map) > start_date_raw (string Jalali) > start_date
+        final startDateFormatted = current['start_date_formatted'];
+        final startDateRaw = current['start_date_raw'];
         final startDateStr = current['start_date'];
-        if (startDateStr != null) {
-          _startDate = _parseDate(startDateStr);
-        }
         
-        // پارس کردن تاریخ پایان
+        final endDateFormatted = current['end_date_formatted'];
+        final endDateRaw = current['end_date_raw'];
         final endDateStr = current['end_date'];
-        if (endDateStr != null) {
-          _endDate = _parseDate(endDateStr);
-        }
+        
+        final DateTime? parsedStartDate = startDateFormatted != null 
+            ? _parseDate(startDateFormatted) 
+            : (startDateRaw != null 
+                ? _parseDate(startDateRaw) 
+                : (startDateStr != null ? _parseDate(startDateStr) : null));
+        
+        final DateTime? parsedEndDate = endDateFormatted != null 
+            ? _parseDate(endDateFormatted) 
+            : (endDateRaw != null 
+                ? _parseDate(endDateRaw) 
+                : (endDateStr != null ? _parseDate(endDateStr) : null));
 
         setState(() {
+          _currentFiscalYear = current;
+          _titleController.text = current['title'] as String? ?? '';
+          _startDate = parsedStartDate;
+          _endDate = parsedEndDate;
           _loading = false;
         });
       }
@@ -131,16 +141,58 @@ class _FiscalYearSettingsPageState extends State<FiscalYearSettingsPage> {
   DateTime? _parseDate(dynamic date) {
     if (date == null) return null;
     try {
-      if (date is String) {
-        return DateTime.parse(date);
-      } else if (date is Map) {
+      // اگر Map است (مثل start_date_formatted)، سال‌ها Jalali هستند
+      if (date is Map) {
         final year = date['year'] as int?;
         final month = date['month'] as int?;
         final day = date['day'] as int?;
         if (year != null && month != null && day != null) {
-          return DateTime(year, month, day);
+          // اگر سال بزرگتر از 1500 است، Jalali است
+          if (year > 1500) {
+            final jalali = Jalali(year, month, day);
+            return jalali.toDateTime();
+          } else {
+            // سال میلادی است
+            return DateTime(year, month, day);
+          }
+        }
+        return null;
+      }
+      
+      // اگر String است
+      if (date is String) {
+        // بررسی فرمت Jalali: YYYY/MM/DD (مثل "1404/08/30")
+        if (date.contains('/') && !date.contains('-')) {
+          final parts = date.split('/');
+          if (parts.length == 3) {
+            try {
+              final year = int.parse(parts[0]);
+              final month = int.parse(parts[1]);
+              final day = int.parse(parts[2]);
+              
+              // اگر سال بزرگتر از 1500 است، Jalali است
+              if (year > 1500) {
+                // استفاده از parseFromDisplay برای پارس Jalali
+                final parsed = HesabixDateUtils.parseFromDisplay(date, true);
+                if (parsed != null) return parsed;
+              } else {
+                // سال میلادی است
+                return DateTime(year, month, day);
+              }
+            } catch (e) {
+              // اگر پارس ناموفق بود، ادامه بده
+            }
+          }
+        }
+        
+        // تلاش برای پارس کردن به عنوان ISO format (Gregorian)
+        try {
+          return DateTime.parse(date);
+        } catch (e) {
+          return null;
         }
       }
+      
       return null;
     } catch (e) {
       return null;
@@ -197,7 +249,6 @@ class _FiscalYearSettingsPageState extends State<FiscalYearSettingsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final t = AppLocalizations.of(context);
     final cs = Theme.of(context).colorScheme;
 
     if (_calendarController == null) {
@@ -286,7 +337,7 @@ class _FiscalYearSettingsPageState extends State<FiscalYearSettingsPage> {
                             color: cs.surface,
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
-                              color: cs.dividerColor.withOpacity(0.3),
+                              color: cs.outline.withOpacity(0.3),
                             ),
                           ),
                           child: Column(

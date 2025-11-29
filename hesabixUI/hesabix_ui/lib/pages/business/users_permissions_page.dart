@@ -7,7 +7,6 @@ import '../../core/calendar_controller.dart';
 import '../../services/business_user_service.dart';
 import '../../models/business_user_model.dart';
 import '../../utils/number_normalizer.dart';
-import '../../utils/snackbar_helper.dart';
 import '../../utils/responsive_helper.dart';
 
 class UsersPermissionsPage extends StatefulWidget {
@@ -32,6 +31,7 @@ class _UsersPermissionsPageState extends State<UsersPermissionsPage> {
   
   List<BusinessUser> _users = [];
   bool _loading = true;
+  bool _isLeaving = false;
   String? _error;
 
   @override
@@ -337,6 +337,11 @@ class _UsersPermissionsPageState extends State<UsersPermissionsPage> {
                       ),
                     ),
                   ),
+                  // Leave button for members (non-owners)
+                  if (_isCurrentUserMember()) ...[
+                    const SizedBox(width: 8),
+                    _buildLeaveButton(context, theme, colorScheme),
+                  ],
                 ],
               ),
             ),
@@ -786,6 +791,117 @@ class _UsersPermissionsPageState extends State<UsersPermissionsPage> {
     } catch (e) {
       if (mounted) {
         _showErrorSnackBar('خطا در بارگذاری دسترسی‌ها: $e');
+      }
+    }
+  }
+
+  bool _isCurrentUserMember() {
+    final currentUserId = widget.authStore.currentUserId;
+    if (currentUserId == null) return false;
+    
+    // Check if current user is in the list and is not the owner
+    final currentUser = _users.firstWhere(
+      (user) => user.userId == currentUserId,
+      orElse: () => BusinessUser(
+        id: 0,
+        businessId: 0,
+        userId: 0,
+        userName: '',
+        userEmail: '',
+        userPhone: null,
+        role: '',
+        status: '',
+        addedAt: DateTime.now(),
+        lastActive: null,
+        permissions: {},
+      ),
+    );
+    
+    return currentUser.userId != 0 && currentUser.role != 'owner';
+  }
+
+  Widget _buildLeaveButton(BuildContext context, ThemeData theme, ColorScheme colorScheme) {
+    return IconButton(
+      icon: _isLeaving
+          ? SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                valueColor: AlwaysStoppedAnimation<Color>(colorScheme.error),
+              ),
+            )
+          : Icon(
+              Icons.exit_to_app,
+              color: colorScheme.error,
+            ),
+      tooltip: 'خروج از کسب و کار',
+      onPressed: _isLeaving ? null : () => _handleLeave(context),
+    );
+  }
+
+  Future<void> _handleLeave(BuildContext context) async {
+    final t = AppLocalizations.of(context);
+    
+    // Show confirmation dialog
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('خروج از کسب و کار'),
+        content: const Text(
+          'آیا مطمئن هستید که می‌خواهید از این کسب و کار خارج شوید؟\n\n'
+          'پس از خروج، دسترسی شما به این کسب و کار حذف خواهد شد.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(t.cancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(context).colorScheme.error,
+            ),
+            child: const Text('خروج'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() {
+      _isLeaving = true;
+    });
+
+    try {
+      final request = LeaveBusinessRequest(businessId: int.parse(widget.businessId));
+      final response = await _userService.leaveBusiness(request);
+
+      if (response.success && mounted) {
+        _showSuccessSnackBar(response.message);
+        
+        // Clear current business if it's the one we're leaving
+        if (widget.authStore.currentBusiness?.id == int.parse(widget.businessId)) {
+          await widget.authStore.clearCurrentBusiness();
+        }
+        
+        // Navigate to businesses list
+        if (mounted) {
+          context.go('/user/profile/businesses');
+        }
+      } else if (mounted) {
+        _showErrorSnackBar(response.message);
+      }
+    } catch (e) {
+      if (mounted) {
+        _showErrorSnackBar('خطا در خروج از کسب و کار: $e');
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLeaving = false;
+        });
       }
     }
   }

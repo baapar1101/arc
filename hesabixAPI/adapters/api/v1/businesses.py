@@ -2,7 +2,7 @@
 
 from typing import Dict, Any
 
-from fastapi import APIRouter, Depends, Request, Query, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, Request, Query, HTTPException, UploadFile, File, Body
 from sqlalchemy.orm import Session
 from uuid import UUID
 import io
@@ -22,6 +22,9 @@ from app.services.business_service import (
     get_user_businesses,
     update_business,
     delete_business,
+    delete_business_soft,
+    get_business_delete_info,
+    restore_business,
     get_business_summary,
     get_business_print_settings,
     update_business_print_settings,
@@ -332,9 +335,27 @@ def update_business_info(
     return success_response(formatted_data, request, "کسب و کار با موفقیت ویرایش شد")
 
 
+@router.get("/{business_id}/delete-info",
+    summary="دریافت اطلاعات حذف کسب و کار",
+    description="بررسی و دریافت اطلاعات مرتبط با حذف کسب و کار",
+    response_model=SuccessResponse,
+)
+@require_business_access("business_id")
+def get_business_delete_info_endpoint(
+    request: Request,
+    business_id: int,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    """دریافت اطلاعات مرتبط با حذف کسب و کار"""
+    owner_id = ctx.get_user_id()
+    info = get_business_delete_info(db, business_id, owner_id)
+    return success_response(info, request, "اطلاعات حذف کسب و کار")
+
+
 @router.delete("/{business_id}", 
     summary="حذف کسب و کار", 
-    description="حذف یک کسب و کار",
+    description="حذف نرم یک کسب و کار (30 روز قابل بازیابی)",
     response_model=SuccessResponse,
     responses={
         200: {
@@ -343,8 +364,14 @@ def update_business_info(
                 "application/json": {
                     "example": {
                         "success": True,
-                        "message": "کسب و کار با موفقیت حذف شد",
-                        "data": {"ok": True}
+                        "message": "کسب و کار با موفقیت حذف شد. شما 30 روز فرصت دارید آن را بازیابی کنید.",
+                        "data": {
+                            "business_id": 1,
+                            "deleted_at": "2024-01-01T12:00:00Z",
+                            "auto_delete_at": "2024-01-31T12:00:00Z",
+                            "restore_deadline_days": 30,
+                            "backup_created": True
+                        }
                     }
                 }
             }
@@ -352,25 +379,132 @@ def update_business_info(
         401: {
             "description": "کاربر احراز هویت نشده است"
         },
+        403: {
+            "description": "فقط مالک کسب و کار می‌تواند آن را حذف کند"
+        },
         404: {
             "description": "کسب و کار یافت نشد"
+        },
+        409: {
+            "description": "نمی‌توان کسب و کار را حذف کرد (محدودیت‌ها وجود دارد)"
         }
     }
 )
+@require_business_access("business_id")
 def delete_business_info(
     request: Request,
     business_id: int,
+    deletion_reason: str | None = Body(None, embed=True),
     ctx: AuthContext = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("settings", "business")),
 ) -> dict:
-    """حذف کسب و کار"""
+    """
+    حذف نرم کسب و کار (Soft Delete)
+    - فقط مالک می‌تواند حذف کند
+    - قبل از حذف، بکاپ خودکار ایجاد می‌شود
+    - اطلاع‌رسانی به مالک ارسال می‌شود
+    - کسب و کار 30 روز قابل بازیابی است
+    """
+    from app.services.notification_service import NotificationService
+    
     owner_id = ctx.get_user_id()
-    success = delete_business(db, business_id, owner_id)
+    result = delete_business_soft(
+        db=db,
+        business_id=business_id,
+        owner_id=owner_id,
+        deletion_reason=deletion_reason,
+        requested_by=owner_id
+    )
     
-    if not success:
-        raise HTTPException(status_code=404, detail="کسب و کار یافت نشد")
+    # ارسال اطلاع‌رسانی
+    try:
+        notification_service = NotificationService(db)
+        business = db.query(Business).filter(Business.id == business_id).first()
+        if business:
+            notification_service.send(
+                user_id=owner_id,
+                event_key="business.deleted",
+                context={
+                    "business_name": business.name,
+                    "business_id": business_id,
+                    "deletion_date": result["deleted_at"],
+                    "restore_deadline": result["auto_delete_at"],
+                    "restore_days": 30,
+                },
+                preferred_channels=["email", "telegram", "inapp"]
+            )
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.warning(f"Failed to send deletion notification: {e}")
     
-    return success_response({"ok": True}, request, "کسب و کار با موفقیت حذف شد")
+    return success_response(
+        result, 
+        request, 
+        "کسب و کار با موفقیت حذف شد. شما 30 روز فرصت دارید آن را بازیابی کنید."
+    )
+
+
+@router.post("/{business_id}/restore",
+    summary="بازیابی کسب و کار",
+    description="بازیابی کسب و کار حذف شده (فقط در 30 روز اول)",
+    response_model=SuccessResponse,
+    responses={
+        200: {
+            "description": "کسب و کار با موفقیت بازیابی شد"
+        },
+        400: {
+            "description": "کسب و کار حذف نشده است"
+        },
+        403: {
+            "description": "فقط مالک می‌تواند کسب و کار را بازیابی کند"
+        },
+        404: {
+            "description": "کسب و کار یافت نشد"
+        },
+        410: {
+            "description": "مهلت بازیابی به پایان رسیده است"
+        }
+    }
+)
+@require_business_access("business_id")
+def restore_business_endpoint(
+    request: Request,
+    business_id: int,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    """بازیابی کسب و کار حذف شده (فقط در 30 روز اول)"""
+    from app.services.notification_service import NotificationService
+    
+    owner_id = ctx.get_user_id()
+    result = restore_business(db, business_id, owner_id)
+    
+    # اطلاع‌رسانی
+    try:
+        notification_service = NotificationService(db)
+        business = db.query(Business).filter(Business.id == business_id).first()
+        if business:
+            notification_service.send(
+                user_id=owner_id,
+                event_key="business.restored",
+                context={
+                    "business_name": business.name,
+                    "business_id": business_id,
+                },
+                preferred_channels=["email", "telegram", "inapp"]
+            )
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.warning(f"Failed to send restoration notification: {e}")
+    
+    return success_response(
+        result,
+        request,
+        "کسب و کار با موفقیت بازیابی شد"
+    )
 
 
 @router.post(

@@ -4,10 +4,15 @@ import 'package:hesabix_ui/core/auth_store.dart';
 import 'package:hesabix_ui/core/permission_guard.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/core/date_utils.dart';
-import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/services/year_end_closing_service.dart';
 import 'package:hesabix_ui/services/business_dashboard_service.dart';
 import 'package:hesabix_ui/utils/number_formatters.dart';
+import 'package:hesabix_ui/widgets/invoice/account_combobox_widget.dart';
+import 'package:shamsi_date/shamsi_date.dart';
+import 'package:hesabix_ui/models/account_model.dart';
+import 'package:hesabix_ui/services/person_service.dart';
+import 'package:hesabix_ui/models/person_model.dart';
+import 'package:hesabix_ui/widgets/date_input_field.dart';
 
 class YearEndClosingPage extends StatefulWidget {
   final int businessId;
@@ -36,6 +41,32 @@ class _YearEndClosingPageState extends State<YearEndClosingPage> {
   int? _currentFiscalYearId;
   final TextEditingController _newFiscalYearTitleController = TextEditingController();
   bool _autoCreateOpeningBalance = true;
+  
+  // مالیات
+  bool _taxModePercentage = true;
+  final TextEditingController _taxPercentageController = TextEditingController();
+  final TextEditingController _taxAmountController = TextEditingController();
+  
+  // تقسیم سود
+  bool _profitDistributionModePercentage = true;
+  final TextEditingController _profitDistributionPercentageController = TextEditingController();
+  final TextEditingController _profitDistributionAmountController = TextEditingController();
+  Account? _selectedShareholderProfitAccount;
+  
+  // سود انباشته سنواتی
+  final TextEditingController _retainedEarningsFromPreviousYearsController = TextEditingController();
+  
+  // تنظیمات
+  bool _autoIssuePersonBalanceDocument = false;
+  
+  // تنظیمات سال مالی جدید
+  DateTime? _newFiscalYearStartDate;
+  DateTime? _newFiscalYearEndDate;
+  String _inventoryValuationMethod = 'FIFO';
+  
+  // سهامداران
+  List<Person> _shareholders = [];
+  Map<int, double> _shareholderDistributions = {}; // person_id -> profit_amount
 
   @override
   void initState() {
@@ -58,6 +89,11 @@ class _YearEndClosingPageState extends State<YearEndClosingPage> {
   @override
   void dispose() {
     _newFiscalYearTitleController.dispose();
+    _taxPercentageController.dispose();
+    _taxAmountController.dispose();
+    _profitDistributionPercentageController.dispose();
+    _profitDistributionAmountController.dispose();
+    _retainedEarningsFromPreviousYearsController.dispose();
     super.dispose();
   }
 
@@ -116,6 +152,73 @@ class _YearEndClosingPageState extends State<YearEndClosingPage> {
     }
   }
 
+  Future<void> _loadShareholders() async {
+    try {
+      final personService = PersonService();
+      final response = await personService.getPersons(
+        businessId: widget.businessId,
+        filters: {
+          'person_types': ['سهامدار'],
+        },
+        limit: 1000,
+      );
+      
+      final shareholders = personService.parsePersonsList(response);
+      
+      // بررسی و لاگ کردن share_count برای دیباگ
+      for (final shareholder in shareholders) {
+        if (shareholder.shareCount == null || shareholder.shareCount == 0) {
+          print('Warning: Shareholder ${shareholder.id} (${shareholder.aliasName}) has shareCount: ${shareholder.shareCount}');
+        }
+      }
+      
+      if (mounted) {
+        setState(() {
+          _shareholders = shareholders;
+        });
+        
+        // محاسبه خودکار توزیع سود بر اساس درصد سهام
+        _calculateAutoDistribution();
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _shareholders = [];
+        });
+      }
+    }
+  }
+  
+  void _calculateAutoDistribution() {
+    if (_shareholders.isEmpty) return;
+    
+    final totalShares = _shareholders.fold<int>(
+      0,
+      (sum, shareholder) => sum + (shareholder.shareCount ?? 0),
+    );
+    
+    if (totalShares == 0) return;
+    
+    final netProfit = _previewData?['summary']?['net_profit_loss'] as double? ?? 0.0;
+    if (netProfit <= 0) return;
+    
+    final distributionAmount = _profitDistributionModePercentage
+        ? (double.tryParse(_profitDistributionPercentageController.text) ?? 0) / 100 * netProfit
+        : (double.tryParse(_profitDistributionAmountController.text) ?? 0);
+    
+    final distributions = <int, double>{};
+    for (final shareholder in _shareholders) {
+      if (shareholder.shareCount != null && shareholder.shareCount! > 0) {
+        final shareRatio = shareholder.shareCount! / totalShares;
+        distributions[shareholder.id!] = distributionAmount * shareRatio;
+      }
+    }
+    
+    setState(() {
+      _shareholderDistributions = distributions;
+    });
+  }
+
   Future<void> _loadPreview() async {
     if (_currentFiscalYearId == null) return;
     
@@ -135,6 +238,38 @@ class _YearEndClosingPageState extends State<YearEndClosingPage> {
           _previewData = preview;
           _loading = false;
         });
+        
+        // بارگذاری سهامداران
+        await _loadShareholders();
+        
+        // تنظیم تاریخ‌های پیش‌فرض سال مالی جدید
+        final fiscalYear = preview['fiscal_year'] as Map<String, dynamic>?;
+        if (fiscalYear != null && _calendarController != null) {
+          final endDateStr = fiscalYear['end_date'];
+          if (endDateStr != null) {
+            final endDate = DateTime.tryParse(endDateStr.toString());
+            if (endDate != null) {
+              // تاریخ شروع: یک روز بعد از پایان سال مالی فعلی
+              final newStartDate = endDate.add(const Duration(days: 1));
+              // تاریخ پایان: یک سال بعد از تاریخ شروع
+              DateTime newEndDate;
+              if (_calendarController!.isJalali) {
+                // برای تقویم شمسی
+                final jStart = Jalali.fromDateTime(newStartDate);
+                final jEnd = Jalali(jStart.year + 1, jStart.month, jStart.day);
+                newEndDate = jEnd.toDateTime();
+              } else {
+                // برای تقویم میلادی
+                newEndDate = DateTime(newStartDate.year + 1, newStartDate.month, newStartDate.day);
+              }
+              
+              setState(() {
+                _newFiscalYearStartDate = newStartDate;
+                _newFiscalYearEndDate = newEndDate;
+              });
+            }
+          }
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -247,11 +382,48 @@ class _YearEndClosingPageState extends State<YearEndClosingPage> {
     });
 
     try {
+      // آماده‌سازی تقسیم سود سهامداران
+      List<Map<String, dynamic>>? shareholderDistributions;
+      if (_shareholderDistributions.isNotEmpty) {
+        shareholderDistributions = _shareholderDistributions.entries
+            .map((entry) => {
+                  'person_id': entry.key,
+                  'profit_amount': entry.value,
+                })
+            .toList();
+      }
+      
       final result = await _service.close(
         businessId: widget.businessId,
         fiscalYearId: _currentFiscalYearId!,
         newFiscalYearTitle: _newFiscalYearTitleController.text.trim(),
         autoCreateOpeningBalance: _autoCreateOpeningBalance,
+        // مالیات
+        taxPercentage: _taxModePercentage
+            ? (double.tryParse(_taxPercentageController.text))
+            : null,
+        taxAmount: !_taxModePercentage
+            ? (double.tryParse(_taxAmountController.text))
+            : null,
+        // تقسیم سود
+        profitDistributionPercentage: _profitDistributionModePercentage
+            ? (double.tryParse(_profitDistributionPercentageController.text))
+            : null,
+        profitDistributionAmount: !_profitDistributionModePercentage
+            ? (double.tryParse(_profitDistributionAmountController.text))
+            : null,
+        shareholderProfitAccountId: _selectedShareholderProfitAccount?.id,
+        // سود انباشته سنواتی
+        retainedEarningsFromPreviousYears:
+            double.tryParse(_retainedEarningsFromPreviousYearsController.text),
+        // تنظیمات
+        autoIssuePersonBalanceDocument: _autoIssuePersonBalanceDocument,
+        // تنظیمات سال مالی جدید
+        newFiscalYearStartDate: _newFiscalYearStartDate,
+        newFiscalYearEndDate: _newFiscalYearEndDate,
+        inventoryValuationMethod: _inventoryValuationMethod,
+        // تقسیم سود بین سهامداران
+        shareholderDistributions: shareholderDistributions,
       );
 
       if (mounted) {
@@ -535,7 +707,6 @@ class _YearEndClosingPageState extends State<YearEndClosingPage> {
 
   @override
   Widget build(BuildContext context) {
-    final t = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
@@ -614,6 +785,32 @@ class _YearEndClosingPageState extends State<YearEndClosingPage> {
                                   Colors.red,
                                 ),
                               
+                              const SizedBox(height: 24),
+                              
+                              // هشدار پشتیبان‌گیری
+                              Card(
+                                color: Colors.orange.shade50,
+                                child: Padding(
+                                  padding: const EdgeInsets.all(16),
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.backup,
+                                        color: Colors.orange.shade700,
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Text(
+                                          'قبل از بستن دوره مالی، سیستم به طور خودکار از دیتابیس شما یک نسخه پشتیبان تهیه می‌کند. در صورتی که ثبتی را فراموش کرده باشید، می‌توانید دیتابیس خود را به قبل از بستن سال مالی برگردانید.',
+                                          style: TextStyle(
+                                            color: Colors.orange.shade900,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
                               const SizedBox(height: 24),
                             ],
                             
@@ -892,6 +1089,43 @@ class _YearEndClosingPageState extends State<YearEndClosingPage> {
   }
 
   Widget _buildClosingForm() {
+    final netProfit = _previewData?['summary']?['net_profit_loss'] as double? ?? 0.0;
+    final taxAmount = _taxModePercentage
+        ? (double.tryParse(_taxPercentageController.text) ?? 0) / 100 * netProfit
+        : (double.tryParse(_taxAmountController.text) ?? 0);
+    final netProfitAfterTax = netProfit - taxAmount;
+    
+    return Column(
+      children: [
+        // فرم مالیات
+        _buildTaxSection(netProfit, netProfitAfterTax),
+        const SizedBox(height: 16),
+        
+        // فرم تقسیم سود
+        _buildProfitDistributionSection(netProfitAfterTax),
+        const SizedBox(height: 16),
+        
+        // لیست سهامداران
+        if (_shareholders.isNotEmpty) ...[
+          _buildShareholdersSection(),
+          const SizedBox(height: 16),
+        ],
+        
+        // تنظیمات ثبت
+        _buildAccountingSettingsSection(),
+        const SizedBox(height: 16),
+        
+        // تنظیمات سال مالی جدید
+        _buildNewFiscalYearSettingsSection(),
+        const SizedBox(height: 16),
+        
+        // تنظیمات پایه
+        _buildBasicSettingsSection(),
+      ],
+    );
+  }
+  
+  Widget _buildTaxSection(double netProfit, double netProfitAfterTax) {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -899,19 +1133,440 @@ class _YearEndClosingPageState extends State<YearEndClosingPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'تنظیمات بستن سال مالی',
+              'مالیات',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'سود خالص قبل از مالیات: ${formatWithThousands(netProfit)} ریال',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Radio<bool>(
+                  value: true,
+                  groupValue: _taxModePercentage,
+                  onChanged: (value) {
+                    setState(() {
+                      _taxModePercentage = value ?? true;
+                      if (value == false) {
+                        _taxPercentageController.clear();
+                      } else {
+                        _taxAmountController.clear();
+                      }
+                    });
+                  },
+                ),
+                const Text('درصد'),
+                const SizedBox(width: 24),
+                Radio<bool>(
+                  value: false,
+                  groupValue: _taxModePercentage,
+                  onChanged: (value) {
+                    setState(() {
+                      _taxModePercentage = value ?? false;
+                      if (value == true) {
+                        _taxAmountController.clear();
+                      } else {
+                        _taxPercentageController.clear();
+                      }
+                    });
+                  },
+                ),
+                const Text('مبلغ'),
+              ],
+            ),
+            const SizedBox(height: 12),
+            if (_taxModePercentage)
+              TextField(
+                controller: _taxPercentageController,
+                decoration: const InputDecoration(
+                  labelText: 'درصد مالیات',
+                  hintText: '0',
+                  border: OutlineInputBorder(),
+                  suffixText: '%',
+                ),
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                onChanged: (_) => setState(() {}),
+              )
+            else
+              TextField(
+                controller: _taxAmountController,
+                decoration: const InputDecoration(
+                  labelText: 'مبلغ مالیات',
+                  hintText: '0',
+                  border: OutlineInputBorder(),
+                  suffixText: 'ریال',
+                ),
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                onChanged: (_) => setState(() {}),
+              ),
+            const SizedBox(height: 12),
+            Text(
+              'سود خالص پس از کسر مالیات: ${formatWithThousands(netProfitAfterTax)} ریال',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+  
+  Widget _buildProfitDistributionSection(double netProfitAfterTax) {
+    final distributionAmount = _profitDistributionModePercentage
+        ? (double.tryParse(_profitDistributionPercentageController.text) ?? 0) / 100 * netProfitAfterTax
+        : (double.tryParse(_profitDistributionAmountController.text) ?? 0);
+    final retainedAmount = netProfitAfterTax - distributionAmount;
+    
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'تقسیم سود',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'سود خالص پس از مالیات: ${formatWithThousands(netProfitAfterTax)} ریال',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Radio<bool>(
+                  value: true,
+                  groupValue: _profitDistributionModePercentage,
+                  onChanged: (value) {
+                    setState(() {
+                      _profitDistributionModePercentage = value ?? true;
+                      if (value == false) {
+                        _profitDistributionPercentageController.clear();
+                      } else {
+                        _profitDistributionAmountController.clear();
+                      }
+                      _calculateAutoDistribution();
+                    });
+                  },
+                ),
+                const Text('درصد'),
+                const SizedBox(width: 24),
+                Radio<bool>(
+                  value: false,
+                  groupValue: _profitDistributionModePercentage,
+                  onChanged: (value) {
+                    setState(() {
+                      _profitDistributionModePercentage = value ?? false;
+                      if (value == true) {
+                        _profitDistributionAmountController.clear();
+                      } else {
+                        _profitDistributionPercentageController.clear();
+                      }
+                      _calculateAutoDistribution();
+                    });
+                  },
+                ),
+                const Text('مبلغ'),
+              ],
+            ),
+            const SizedBox(height: 12),
+            if (_profitDistributionModePercentage)
+              TextField(
+                controller: _profitDistributionPercentageController,
+                decoration: const InputDecoration(
+                  labelText: 'درصد تقسیم',
+                  hintText: '0',
+                  border: OutlineInputBorder(),
+                  suffixText: '%',
+                ),
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                onChanged: (_) {
+                  setState(() {});
+                  _calculateAutoDistribution();
+                },
+              )
+            else
+              TextField(
+                controller: _profitDistributionAmountController,
+                decoration: const InputDecoration(
+                  labelText: 'مبلغ تقسیم',
+                  hintText: '0',
+                  border: OutlineInputBorder(),
+                  suffixText: 'ریال',
+                ),
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                onChanged: (_) {
+                  setState(() {});
+                  _calculateAutoDistribution();
+                },
+              ),
+            const SizedBox(height: 12),
+            Text(
+              'سود انباشته: ${formatWithThousands(retainedAmount)} ریال',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+  
+  Widget _buildShareholdersSection() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'سهامداران',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 16),
+            ...(_shareholders.map((shareholder) {
+              final profit = _shareholderDistributions[shareholder.id] ?? 0.0;
+              final totalShares = _shareholders.fold<int>(
+                0,
+                (sum, sh) => sum + (sh.shareCount ?? 0),
+              );
+              final sharePercentage = totalShares > 0
+                  ? ((shareholder.shareCount ?? 0) / totalShares * 100)
+                  : 0.0;
+              
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            '${shareholder.code ?? ''} - ${shareholder.aliasName}',
+                            style: const TextStyle(fontWeight: FontWeight.w500),
+                          ),
+                        ),
+                        Text(
+                          '${shareholder.shareCount ?? 0} سهم',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: (shareholder.shareCount ?? 0) == 0 
+                                ? Theme.of(context).colorScheme.error 
+                                : Theme.of(context).colorScheme.primary,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'درصد سهام: ${sharePercentage.toStringAsFixed(1)}%',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                          ),
+                        ),
+                        Text(
+                          'سود: ${formatWithThousands(profit)}',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              );
+            }).toList()),
+          ],
+        ),
+      ),
+    );
+  }
+  
+  Widget _buildAccountingSettingsSection() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'تنظیمات ثبت',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 16),
+            AccountComboboxWidget(
+              businessId: widget.businessId,
+              selectedAccount: _selectedShareholderProfitAccount,
+              onChanged: (account) {
+                setState(() {
+                  _selectedShareholderProfitAccount = account;
+                });
+              },
+              label: 'حساب ثبت سود/زیان سهامداران',
+              hintText: 'انتخاب حساب',
+            ),
+            const SizedBox(height: 16),
+            CheckboxListTile(
+              title: const Text('صدور خودکار سند توازن اشخاص'),
+              value: _autoIssuePersonBalanceDocument,
+              onChanged: (value) {
+                setState(() {
+                  _autoIssuePersonBalanceDocument = value ?? false;
+                });
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+  
+  Widget _buildNewFiscalYearSettingsSection() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'اطلاعات سال مالی جدید',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 16),
+            if (_calendarController != null) ...[
+              Row(
+                children: [
+                  Expanded(
+                    child: DateInputField(
+                      value: _newFiscalYearStartDate,
+                      labelText: 'تاریخ شروع',
+                      firstDate: _previewData?['fiscal_year']?['end_date'] != null
+                          ? DateTime.tryParse(_previewData!['fiscal_year']['end_date'].toString())
+                          : null,
+                      calendarController: _calendarController!,
+                      onChanged: (date) {
+                        setState(() {
+                          _newFiscalYearStartDate = date;
+                          // تنظیم خودکار تاریخ پایان (یک سال بعد)
+                          if (date != null) {
+                            if (_calendarController!.isJalali) {
+                              final j = Jalali.fromDateTime(date);
+                              final jNext = Jalali(j.year + 1, j.month, j.day);
+                              _newFiscalYearEndDate = jNext.toDateTime();
+                            } else {
+                              _newFiscalYearEndDate = DateTime(date.year + 1, date.month, date.day);
+                            }
+                          }
+                        });
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: DateInputField(
+                      value: _newFiscalYearEndDate,
+                      labelText: 'تاریخ پایان',
+                      firstDate: _newFiscalYearStartDate,
+                      calendarController: _calendarController!,
+                      onChanged: (date) {
+                        setState(() {
+                          _newFiscalYearEndDate = date;
+                        });
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ],
+            const SizedBox(height: 16),
+            TextField(
+              controller: _newFiscalYearTitleController,
+              decoration: const InputDecoration(
+                labelText: 'عنوان سال مالی',
+                hintText: 'سال مالی منتهی به 1406/1/1',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<String>(
+              value: _inventoryValuationMethod,
+              decoration: const InputDecoration(
+                labelText: 'روش ارزیابی انبار',
+                border: OutlineInputBorder(),
+              ),
+              items: const [
+                DropdownMenuItem(value: 'FIFO', child: Text('FIFO')),
+                DropdownMenuItem(value: 'LIFO', child: Text('LIFO')),
+                DropdownMenuItem(value: 'WeightedAverage', child: Text('میانگین موزون')),
+              ],
+              onChanged: (value) {
+                setState(() {
+                  _inventoryValuationMethod = value ?? 'FIFO';
+                });
+              },
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'اگر انواع روش‌های ارزیابی انبار را نمی‌شناسید مقدار پیش‌فرض را تغییر ندهید.',
+              style: TextStyle(
+                fontSize: 12,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+  
+  Widget _buildBasicSettingsSection() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'تنظیمات پایه',
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.bold,
               ),
             ),
             const SizedBox(height: 16),
             TextField(
-              controller: _newFiscalYearTitleController,
+              controller: _retainedEarningsFromPreviousYearsController,
               decoration: const InputDecoration(
-                labelText: 'عنوان سال مالی جدید',
-                hintText: 'مثال: سال مالی 1404',
+                labelText: 'سود یا زیان انباشته (سنواتی)',
+                hintText: '0',
                 border: OutlineInputBorder(),
+                suffixText: 'ریال',
               ),
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
             ),
             const SizedBox(height: 16),
             CheckboxListTile(

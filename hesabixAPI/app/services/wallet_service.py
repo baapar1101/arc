@@ -757,13 +757,13 @@ def _post_gift_credit_document(db: Session, business_id: int, user_id: int, amou
 
 def _ensure_zohal_expense_account(db: Session) -> Account:
 	"""
-	بررسی و ایجاد/به‌روزرسانی حساب هزینه سرویس‌های استعلامات (70903)
-	این تابع اطمینان می‌دهد که حساب 70903 با نام صحیح "هزینه سرویس‌های استعلامات" وجود دارد
-	در صورتی که حساب موجود باشد اما نام آن متفاوت باشد، نام را به‌روزرسانی می‌کند
+	بررسی و ایجاد/به‌روزرسانی حساب هزینه سرویس‌های استعلامات (70509)
+	این تابع اطمینان می‌دهد که حساب 70509 با نام صحیح "هزینه سرویس‌های استعلامات" وجود دارد
+	حساب در گروه هزینه‌های عمومی (705) قرار دارد که مناسب هزینه‌های عملیاتی است
 	"""
 	account = db.query(Account).filter(
 		and_(
-			Account.code == "70903",
+			Account.code == "70509",
 			Account.business_id.is_(None)
 		)
 	).first()
@@ -771,28 +771,30 @@ def _ensure_zohal_expense_account(db: Session) -> Account:
 	expected_name = "هزینه سرویس‌های استعلامات"
 	
 	if not account:
+		# دریافت حساب والد (705 - هزینه‌های عمومی)
+		parent_account = _get_fixed_account_by_code(db, "705")
+		
 		# ایجاد حساب هزینه سرویس‌های استعلامات
 		account = Account(
 			name=expected_name,
-			code="70903",
-			account_type="expense",
-			business_id=None  # حساب عمومی
+			code="70509",
+			account_type="accounting_document",
+			business_id=None,  # حساب عمومی
+			parent_id=parent_account.id if parent_account else None
 		)
 		db.add(account)
 		db.flush()
 	else:
 		# بررسی و به‌روزرسانی نام حساب در صورت نیاز
-		# اگر حساب با نام متفاوت وجود داشته باشد (مثلاً "جرائم دیرکرد بانکی")
-		# نام آن را به نام صحیح تغییر می‌دهیم
 		if account.name != expected_name:
 			import logging
 			logger = logging.getLogger(__name__)
-			logger.info(f"به‌روزرسانی نام حساب 70903 از '{account.name}' به '{expected_name}'")
+			logger.info(f"به‌روزرسانی نام حساب 70509 از '{account.name}' به '{expected_name}'")
 			account.name = expected_name
 			# اطمینان از نوع حساب
-			if account.account_type != "expense":
-				account.account_type = "expense"
-			db.flush()
+			if account.account_type != "accounting_document":
+				account.account_type = "accounting_document"
+				db.flush()
 	
 	return account
 

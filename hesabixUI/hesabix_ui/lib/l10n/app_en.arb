@@ -87,6 +87,7 @@
   ,
   "newBusiness": "New business",
   "businesses": "Businesses",
+  "deleteBusiness": "Delete Business",
   "support": "Support",
   "changePassword": "Change password",
   "marketing": "Marketing"

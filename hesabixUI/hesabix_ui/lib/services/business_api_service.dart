@@ -96,12 +96,47 @@ class BusinessApiService {
     }
   }
 
-  // حذف کسب و کار
-  static Future<void> deleteBusiness(int businessId) async {
-    final response = await _apiClient.delete('$_basePath/$businessId');
+  // دریافت اطلاعات حذف کسب و کار
+  static Future<Map<String, dynamic>> getBusinessDeleteInfo(int businessId) async {
+    final response = await _apiClient.get('$_basePath/$businessId/delete-info');
 
-    if (response.data['success'] != true) {
-      throw Exception(response.data['message'] ?? 'خطا در حذف کسب و کار');
+    if (response.data['success'] == true) {
+      return response.data['data'] as Map<String, dynamic>;
+    } else {
+      throw Exception(response.data['message'] ?? 'خطا در دریافت اطلاعات حذف');
+    }
+  }
+
+  // حذف کسب و کار (soft delete)
+  static Future<Map<String, dynamic>> deleteBusiness({
+    required int businessId,
+    String? deletionReason,
+  }) async {
+    final data = <String, dynamic>{};
+    if (deletionReason != null && deletionReason.isNotEmpty) {
+      data['deletion_reason'] = deletionReason;
+    }
+    
+    final response = await _apiClient.delete<Map<String, dynamic>>(
+      '$_basePath/$businessId',
+      data: data.isNotEmpty ? data : null,
+    );
+
+    if (response.data != null && response.data!['success'] == true) {
+      return response.data!['data'] as Map<String, dynamic>;
+    } else {
+      throw Exception(response.data?['message'] ?? 'خطا در حذف کسب و کار');
+    }
+  }
+
+  // بازیابی کسب و کار
+  static Future<Map<String, dynamic>> restoreBusiness(int businessId) async {
+    final response = await _apiClient.post<Map<String, dynamic>>('$_basePath/$businessId/restore');
+
+    if (response.data != null && response.data!['success'] == true) {
+      return response.data!['data'] as Map<String, dynamic>;
+    } else {
+      throw Exception(response.data?['message'] ?? 'خطا در بازیابی کسب و کار');
     }
   }
 

@@ -202,6 +202,32 @@ echo ""
 
 flutter build web --"$MODE" "${BUILD_FLAGS[@]}" "${DART_DEFINE_ARGS[@]}"
 
+# اصلاح flutter_bootstrap.js برای استفاده از CanvasKit محلی به جای CDN
+echo ""
+echo "اصلاح flutter_bootstrap.js برای استفاده از CanvasKit محلی..."
+FIX_SCRIPT="$APP_DIR/scripts/fix_canvaskit_local.sh"
+if [ -f "$FIX_SCRIPT" ]; then
+  if [ -x "$FIX_SCRIPT" ]; then
+    "$FIX_SCRIPT" "$BUILD_DIR" || warn "خطا در اجرای اسکریپت اصلاح CanvasKit (ممکن است مشکلی نباشد)"
+  else
+    warn "اسکریپت fix_canvaskit_local.sh قابل اجرا نیست. در حال تنظیم مجوز..."
+    chmod +x "$FIX_SCRIPT" && "$FIX_SCRIPT" "$BUILD_DIR" || warn "خطا در اجرای اسکریپت اصلاح CanvasKit"
+  fi
+else
+  warn "اسکریپت fix_canvaskit_local.sh یافت نشد. در حال ایجاد..."
+  mkdir -p "$APP_DIR/scripts"
+  cat > "$FIX_SCRIPT" << 'EOF'
+#!/usr/bin/env bash
+BUILD_DIR="${1:-build/web}"
+if [ -f "$BUILD_DIR/flutter_bootstrap.js" ]; then
+  sed -i 's/_flutter\.loader\.load();/_flutter.loader.load({config: {canvasKitBaseUrl: "canvaskit\/", renderer: "canvaskit", useLocalCanvasKit: true}});/g' "$BUILD_DIR/flutter_bootstrap.js"
+  echo "✓ flutter_bootstrap.js اصلاح شد"
+fi
+EOF
+  chmod +x "$FIX_SCRIPT"
+  "$FIX_SCRIPT" "$BUILD_DIR"
+fi
+
 # بررسی وجود فایل‌های آیکون
 echo ""
 echo "بررسی فایل‌های آیکون..."

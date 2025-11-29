@@ -225,6 +225,11 @@ class BusinessWithPermission {
   final Map<String, dynamic> permissions;
   final CurrencyLite? defaultCurrency;
   final List<CurrencyLite> currencies;
+  // Soft Delete fields
+  final String? deletedAt;
+  final String? autoDeleteAt;
+  final bool isDeleted;
+  final bool isDeletionPending;
 
   BusinessWithPermission({
     required this.id,
@@ -241,6 +246,10 @@ class BusinessWithPermission {
     required this.permissions,
     this.defaultCurrency,
     this.currencies = const <CurrencyLite>[],
+    this.deletedAt,
+    this.autoDeleteAt,
+    this.isDeleted = false,
+    this.isDeletionPending = false,
   });
 
   factory BusinessWithPermission.fromJson(Map<String, dynamic> json) {
@@ -273,6 +282,10 @@ class BusinessWithPermission {
       currencies: (json['currencies'] as List<dynamic>? ?? const [])
           .map((c) => CurrencyLite.fromJson(Map<String, dynamic>.from(c)))
           .toList(),
+      deletedAt: json['deleted_at'] as String?,
+      autoDeleteAt: json['auto_delete_at'] as String?,
+      isDeleted: (json['is_deleted'] as bool?) ?? false,
+      isDeletionPending: (json['is_deletion_pending'] as bool?) ?? false,
     );
   }
 }

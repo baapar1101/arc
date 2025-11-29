@@ -578,6 +578,12 @@ abstract class AppLocalizations {
   /// **'Businesses'**
   String get businesses;
 
+  /// No description provided for @deleteBusiness.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Business'**
+  String get deleteBusiness;
+
   /// No description provided for @support.
   ///
   /// In en, this message translates to:

@@ -71,24 +71,28 @@ class WorkflowNodeModel {
   }
 
   factory WorkflowNodeModel.fromJson(Map<String, dynamic> json) {
-    final typeStr = json['type'] as String? ?? 'action';
+    final typeStr = json['type']?.toString() ?? 'action';
     final type = WorkflowNodeType.values.firstWhere(
       (e) => e.name == typeStr,
       orElse: () => WorkflowNodeType.action,
     );
 
-    final config = json['config'] as Map<String, dynamic>? ?? {};
+    final configRaw = json['config'];
+    final config = configRaw is Map
+        ? Map<String, dynamic>.from(configRaw.map((k, v) => MapEntry(k.toString(), v)))
+        : <String, dynamic>{};
+    
     String? key;
     if (type == WorkflowNodeType.trigger) {
-      key = config['trigger_type'] as String?;
+      key = config['trigger_type']?.toString();
     } else if (type == WorkflowNodeType.action) {
-      key = config['action_type'] as String?;
+      key = config['action_type']?.toString();
     }
 
     return WorkflowNodeModel(
-      id: json['id'] as String? ?? '',
+      id: json['id']?.toString() ?? '',
       type: type,
-      label: json['label'] as String? ?? '',
+      label: json['label']?.toString() ?? '',
       position: Offset.zero, // موقعیت در backend ذخیره نمی‌شود
       config: config,
       key: key,
@@ -139,8 +143,8 @@ class WorkflowConnectionModel {
   factory WorkflowConnectionModel.fromJson(Map<String, dynamic> json) {
     return WorkflowConnectionModel(
       id: '${json['source']}_${json['target']}',
-      sourceNodeId: json['source'] as String? ?? '',
-      targetNodeId: json['target'] as String? ?? '',
+      sourceNodeId: json['source']?.toString() ?? '',
+      targetNodeId: json['target']?.toString() ?? '',
     );
   }
 }
@@ -184,12 +188,17 @@ class WorkflowNodeMetadata {
     Map<String, dynamic> json,
     WorkflowNodeType type,
   ) {
+    final configSchemaRaw = json['config_schema'];
+    final configSchema = configSchemaRaw is Map
+        ? Map<String, dynamic>.from(configSchemaRaw.map((k, v) => MapEntry(k.toString(), v)))
+        : null;
+    
     return WorkflowNodeMetadata(
-      key: json['key'] as String? ?? '',
-      name: json['name'] as String? ?? '',
-      description: json['description'] as String?,
+      key: json['key']?.toString() ?? '',
+      name: json['name']?.toString() ?? '',
+      description: json['description']?.toString(),
       type: type,
-      configSchema: json['config_schema'] as Map<String, dynamic>?,
+      configSchema: configSchema,
     );
   }
 }

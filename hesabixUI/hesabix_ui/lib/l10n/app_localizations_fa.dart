@@ -254,6 +254,9 @@ class AppLocalizationsFa extends AppLocalizations {
   String get businesses => 'کسب‌وکارها';
 
   @override
+  String get deleteBusiness => 'حذف کسب و کار';
+
+  @override
   String get support => 'پشتیبانی';
 
   @override

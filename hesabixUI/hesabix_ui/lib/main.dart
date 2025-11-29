@@ -19,7 +19,7 @@ import 'pages/profile/api_keys_page.dart';
 import 'pages/profile/sessions_page.dart';
 import 'pages/profile/marketing_page.dart';
 import 'pages/profile/account_settings_page.dart';
-import 'pages/profile/mobile_verification_page.dart';
+import 'pages/profile/verification_page.dart';
 import 'pages/profile/operator/operator_tickets_page.dart';
 import 'pages/profile/announcements_page.dart';
 import 'pages/system_settings_page.dart';
@@ -124,6 +124,7 @@ import 'pages/business/storage_file_manager_page.dart';
 import 'pages/business/document_monetization_page.dart';
 import 'pages/business/backup/backup_page.dart';
 import 'pages/business/backup/restore_page.dart';
+import 'pages/profile/delete_business_page.dart';
 import 'pages/public/public_person_share_link_page.dart';
 import 'pages/admin/ai_settings_page.dart';
 import 'pages/admin/ai_plans_admin_page.dart';
@@ -879,9 +880,9 @@ class _MyAppState extends State<MyApp> {
               builder: (context, state) => const ChangePasswordPage(),
             ),
             GoRoute(
-              path: '/user/profile/mobile-verification',
-              name: 'profile_mobile_verification',
-              builder: (context, state) => const MobileVerificationPage(),
+              path: '/user/profile/verification',
+              name: 'profile_verification',
+              builder: (context, state) => const VerificationPage(),
             ),
             GoRoute(
               path: '/user/profile/api-keys',
@@ -1941,6 +1942,18 @@ class _MyAppState extends State<MyApp> {
                   return NoTransitionPage(child: PermissionGuard.buildAccessDeniedPage());
                 }
                 return NoTransitionPage(child: BusinessRestorePage(businessId: businessId));
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/settings/delete',
+              name: 'business_settings_delete',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                // فقط مالک می‌تواند حذف کند
+                if (_authStore!.currentBusiness?.isOwner != true) {
+                  return NoTransitionPage(child: PermissionGuard.buildAccessDeniedPage());
+                }
+                return NoTransitionPage(child: DeleteBusinessPage(businessId: businessId));
               },
             ),
             GoRoute(

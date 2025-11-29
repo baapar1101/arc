@@ -7,7 +7,8 @@ import re
 from adapters.db.session import get_db
 from adapters.api.v1.schemas import (
     BusinessUsersListResponse, AddUserRequest, AddUserResponse,
-    UpdatePermissionsRequest, UpdatePermissionsResponse, RemoveUserResponse
+    UpdatePermissionsRequest, UpdatePermissionsResponse, RemoveUserResponse,
+    LeaveBusinessResponse
 )
 from app.core.responses import success_response, format_datetime_fields, ApiError
 from app.core.auth_dependency import get_current_user, AuthContext
@@ -577,4 +578,92 @@ def remove_user(
         data={},
         request=request,
         message="کاربر با موفقیت حذف شد"
+    )
+
+
+@router.delete("/{business_id}/leave", 
+    summary="خروج از کسب و کار", 
+    description="خروج خودکار کاربر از کسب و کار (فقط برای اعضای غیر از مالک)",
+    response_model=LeaveBusinessResponse,
+    responses={
+        200: {
+            "description": "کاربر با موفقیت از کسب و کار خارج شد",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "success": True,
+                        "message": "شما با موفقیت از کسب و کار خارج شدید"
+                    }
+                }
+            }
+        },
+        400: {
+            "description": "خطا: کاربر مالک کسب و کار است یا عضو نیست"
+        },
+        401: {
+            "description": "کاربر احراز هویت نشده است"
+        },
+        403: {
+            "description": "دسترسی غیرمجاز"
+        },
+        404: {
+            "description": "کسب و کار یافت نشد"
+        }
+    }
+)
+@require_business_access("business_id")
+def leave_business(
+    request: Request,
+    business_id: int,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    """خروج خودکار کاربر از کسب و کار"""
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    current_user_id = ctx.get_user_id()
+    logger.info(f"User {current_user_id} attempting to leave business {business_id}")
+    
+    # بررسی وجود کسب‌وکار
+    business = db.get(Business, business_id)
+    if not business:
+        logger.error(f"Business {business_id} not found")
+        raise HTTPException(status_code=404, detail="کسب و کار یافت نشد")
+    
+    # بررسی اینکه کاربر مالک کسب و کار نباشد
+    if business.owner_id == current_user_id:
+        logger.warning(f"User {current_user_id} is business owner, cannot leave")
+        raise HTTPException(
+            status_code=400, 
+            detail="مالک کسب و کار نمی‌تواند از کسب و کار خارج شود. برای حذف کسب و کار از بخش تنظیمات استفاده کنید."
+        )
+    
+    # بررسی اینکه کاربر عضو کسب و کار باشد
+    permission_repo = BusinessPermissionRepository(db)
+    permission_obj = permission_repo.get_by_user_and_business(current_user_id, business_id)
+    
+    if not permission_obj:
+        logger.warning(f"User {current_user_id} is not a member of business {business_id}")
+        raise HTTPException(
+            status_code=400, 
+            detail="شما عضو این کسب و کار نیستید"
+        )
+    
+    # حذف دسترسی‌های کاربر
+    logger.info(f"Removing user {current_user_id} from business {business_id}")
+    success = permission_repo.delete_by_user_and_business(current_user_id, business_id)
+    
+    if not success:
+        logger.error(f"Failed to remove user {current_user_id} from business {business_id}")
+        raise HTTPException(
+            status_code=500, 
+            detail="خطا در خروج از کسب و کار"
+        )
+    
+    logger.info(f"User {current_user_id} successfully left business {business_id}")
+    return success_response(
+        data={},
+        request=request,
+        message="شما با موفقیت از کسب و کار خارج شدید"
     )

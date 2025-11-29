@@ -11,7 +11,6 @@ import '../../widgets/loading_indicator.dart';
 import '../../widgets/permission/permission_widgets.dart';
 import '../../utils/workflow_validator.dart';
 import '../../utils/workflow_auto_layout.dart';
-import '../../utils/workflow_constants.dart';
 import '../../widgets/workflow/workflow_canvas.dart';
 import '../../widgets/workflow/workflow_minimap.dart';
 import '../../widgets/workflow/workflow_node_config_dialog.dart';
@@ -73,25 +72,47 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
         _workflowService.listActions(),
       ]);
 
-      final triggers = (results[0] as List<Map<String, dynamic>>)
-          .map((item) => WorkflowNodeMetadata(
-                key: item['key'] as String,
-                name: item['name'] as String? ?? item['key'] as String,
-                description: item['description'] as String?,
-                type: WorkflowNodeType.trigger,
-                configSchema: item['config_schema'] as Map<String, dynamic>?,
-              ))
-          .toList();
+      final triggersList = results[0] as List? ?? <dynamic>[];
+      final triggers = <WorkflowNodeMetadata>[];
+      for (final item in triggersList) {
+        if (item is! Map) continue;
+        try {
+          final itemMap = Map<String, dynamic>.from(item.map((k, v) => MapEntry(k.toString(), v)));
+          final configSchema = itemMap['config_schema'];
+          triggers.add(WorkflowNodeMetadata(
+            key: itemMap['key']?.toString() ?? '',
+            name: itemMap['name']?.toString() ?? itemMap['key']?.toString() ?? '',
+            description: itemMap['description']?.toString(),
+            type: WorkflowNodeType.trigger,
+            configSchema: configSchema is Map 
+                ? Map<String, dynamic>.from(configSchema.map((k, v) => MapEntry(k.toString(), v)))
+                : null,
+          ));
+        } catch (e) {
+          debugPrint('خطا در پردازش trigger: $e');
+        }
+      }
 
-      final actions = (results[1] as List<Map<String, dynamic>>)
-          .map((item) => WorkflowNodeMetadata(
-                key: item['key'] as String,
-                name: item['name'] as String? ?? item['key'] as String,
-                description: item['description'] as String?,
-                type: WorkflowNodeType.action,
-                configSchema: item['config_schema'] as Map<String, dynamic>?,
-              ))
-          .toList();
+      final actionsList = results[1] as List? ?? <dynamic>[];
+      final actions = <WorkflowNodeMetadata>[];
+      for (final item in actionsList) {
+        if (item is! Map) continue;
+        try {
+          final itemMap = Map<String, dynamic>.from(item.map((k, v) => MapEntry(k.toString(), v)));
+          final configSchema = itemMap['config_schema'];
+          actions.add(WorkflowNodeMetadata(
+            key: itemMap['key']?.toString() ?? '',
+            name: itemMap['name']?.toString() ?? itemMap['key']?.toString() ?? '',
+            description: itemMap['description']?.toString(),
+            type: WorkflowNodeType.action,
+            configSchema: configSchema is Map
+                ? Map<String, dynamic>.from(configSchema.map((k, v) => MapEntry(k.toString(), v)))
+                : null,
+          ));
+        } catch (e) {
+          debugPrint('خطا در پردازش action: $e');
+        }
+      }
 
       _triggers = triggers;
       _actions = actions;
@@ -100,10 +121,21 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
       if (_workflow != null) {
         final workflowData = _workflow?['workflow_data'];
         if (workflowData is String) {
-          final decoded = jsonDecode(workflowData) as Map<String, dynamic>;
-          _editorState.loadWorkflow(decoded);
-        } else if (workflowData is Map<String, dynamic>) {
-          _editorState.loadWorkflow(workflowData);
+          try {
+            final decoded = jsonDecode(workflowData);
+            if (decoded is Map) {
+              final decodedMap = Map<String, dynamic>.from(decoded.map((k, v) => MapEntry(k.toString(), v)));
+              _editorState.loadWorkflow(decodedMap);
+            } else {
+              _editorState.loadWorkflow({'nodes': [], 'connections': []});
+            }
+          } catch (e) {
+            debugPrint('خطا در decode کردن workflow_data: $e');
+            _editorState.loadWorkflow({'nodes': [], 'connections': []});
+          }
+        } else if (workflowData is Map) {
+          final workflowMap = Map<String, dynamic>.from(workflowData.map((k, v) => MapEntry(k.toString(), v)));
+          _editorState.loadWorkflow(workflowMap);
         } else {
           _editorState.loadWorkflow({'nodes': [], 'connections': []});
         }

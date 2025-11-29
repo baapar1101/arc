@@ -506,6 +506,25 @@ def get_user(
 	
 	user_dict["sessions"] = sessions
 	
+	# دریافت آخرین فعالیت‌های کاربر
+	from adapters.db.repositories.activity_log_repo import ActivityLogRepository
+	activity_repo = ActivityLogRepository(db)
+	activity_logs_list = activity_repo.get_by_user(user_id, limit=50, offset=0)
+	
+	audit_logs = []
+	for log in activity_logs_list:
+		audit_logs.append({
+			"id": log.id,
+			"action": log.action,
+			"description": log.description,
+			"category": log.category,
+			"entity_type": log.entity_type,
+			"entity_id": log.entity_id,
+			"created_at": log.created_at,
+		})
+	
+	user_dict["audit_logs"] = audit_logs
+	
 	formatted_user = format_datetime_fields(user_dict, request)
 	
 	return success_response(formatted_user, request)

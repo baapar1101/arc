@@ -66,6 +66,16 @@ class ChangePasswordRequest(BaseModel):
 	confirm_password: str = Field(..., min_length=8, max_length=128)
 
 
+class UpdateMobileRequest(CaptchaSolve):
+	mobile: str = Field(..., min_length=10, max_length=32, description="شماره موبایل جدید")
+	force_unverified: bool = Field(default=False, description="اجازه تغییر شماره ثبت شده اما تایید نشده")
+
+
+class UpdateEmailRequest(CaptchaSolve):
+	email: EmailStr = Field(..., description="ایمیل جدید")
+	force_unverified: bool = Field(default=False, description="اجازه تغییر ایمیل ثبت شده اما تایید نشده")
+
+
 class CreateApiKeyRequest(BaseModel):
 	name: Optional[str] = Field(default=None, max_length=100, description="نام کلید API")
 	scopes: Optional[str] = Field(default=None, max_length=500, description="محدوده دسترسی (JSON string)")
@@ -355,6 +365,11 @@ class UpdatePermissionsResponse(BaseModel):
 
 
 class RemoveUserResponse(BaseModel):
+    success: bool
+    message: str
+
+
+class LeaveBusinessResponse(BaseModel):
     success: bool
     message: str
 

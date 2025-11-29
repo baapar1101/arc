@@ -1,7 +1,7 @@
 """جداول zohal_services و zohal_service_logs"""
 from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects import postgresql
+from sqlalchemy.dialects import mysql
 
 
 def upgrade():
@@ -17,8 +17,8 @@ def upgrade():
         sa.Column('is_active', sa.Boolean(), nullable=False, server_default='true'),
         sa.Column('base_price', sa.Numeric(precision=18, scale=2), nullable=False),
         sa.Column('currency_id', sa.Integer(), nullable=False),
-        sa.Column('request_schema', postgresql.JSON(astext_type=sa.Text()), nullable=True),
-        sa.Column('response_schema', postgresql.JSON(astext_type=sa.Text()), nullable=True),
+        sa.Column('request_schema', sa.JSON(), nullable=True),
+        sa.Column('response_schema', sa.JSON(), nullable=True),
         sa.Column('created_at', sa.DateTime(), nullable=False),
         sa.Column('updated_at', sa.DateTime(), nullable=False),
         sa.ForeignKeyConstraint(['currency_id'], ['currencies.id'], ondelete='RESTRICT'),
@@ -36,8 +36,8 @@ def upgrade():
         sa.Column('business_id', sa.Integer(), nullable=False),
         sa.Column('service_id', sa.Integer(), nullable=False),
         sa.Column('user_id', sa.Integer(), nullable=False),
-        sa.Column('request_data', postgresql.JSON(astext_type=sa.Text()), nullable=False),
-        sa.Column('response_data', postgresql.JSON(astext_type=sa.Text()), nullable=False),
+        sa.Column('request_data', sa.JSON(), nullable=False),
+        sa.Column('response_data', sa.JSON(), nullable=False),
         sa.Column('status', sa.String(length=20), nullable=False, server_default='pending'),
         sa.Column('error_message', sa.Text(), nullable=True),
         sa.Column('amount_charged', sa.Numeric(precision=18, scale=2), nullable=False),

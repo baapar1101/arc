@@ -57,6 +57,7 @@ adapters/api/v1/wallet_webhook.py
 adapters/api/v1/warehouse_docs.py
 adapters/api/v1/warehouses.py
 adapters/api/v1/workflows.py
+adapters/api/v1/zohal.py
 adapters/api/v1/admin/ai_plans.py
 adapters/api/v1/admin/ai_prompts.py
 adapters/api/v1/admin/ai_settings.py
@@ -69,8 +70,10 @@ adapters/api/v1/admin/monitoring.py
 adapters/api/v1/admin/notification_templates.py
 adapters/api/v1/admin/payment_gateways.py
 adapters/api/v1/admin/storage_plans.py
+adapters/api/v1/admin/system_services.py
 adapters/api/v1/admin/system_settings.py
 adapters/api/v1/admin/wallet_admin.py
+adapters/api/v1/admin/zohal.py
 adapters/api/v1/ai/chat.py
 adapters/api/v1/ai/prompts.py
 adapters/api/v1/ai/subscription.py
@@ -169,6 +172,7 @@ adapters/db/models/warehouse.py
 adapters/db/models/warehouse_document.py
 adapters/db/models/warehouse_document_line.py
 adapters/db/models/workflow.py
+adapters/db/models/zohal.py
 adapters/db/models/support/__init__.py
 adapters/db/models/support/category.py
 adapters/db/models/support/message.py
@@ -221,6 +225,7 @@ app/core/batch_operations.py
 app/core/cache.py
 app/core/calendar.py
 app/core/calendar_middleware.py
+app/core/db_pool_monitor.py
 app/core/error_handlers.py
 app/core/i18n.py
 app/core/i18n_catalog.py
@@ -250,6 +255,7 @@ app/services/auth_service.py
 app/services/bank_account_service.py
 app/services/bom_service.py
 app/services/bulk_price_update_service.py
+app/services/business_background_jobs.py
 app/services/business_dashboard_service.py
 app/services/business_service.py
 app/services/captcha_service.py
@@ -317,6 +323,8 @@ app/services/transfer_service.py
 app/services/trial_balance_service.py
 app/services/wallet_service.py
 app/services/warehouse_service.py
+app/services/year_end_closing_service.py
+app/services/zohal_service.py
 app/services/ai/__init__.py
 app/services/ai/ai_helpers.py
 app/services/ai/ai_invoice_service.py
@@ -368,11 +376,20 @@ hesabix_api.egg-info/dependency_links.txt
 hesabix_api.egg-info/requires.txt
 hesabix_api.egg-info/top_level.txt
 migrations/env.py
+migrations/versions/010e36975a45_merge_inventory_valuation_method_and_.py
 migrations/versions/20250101_000000_init_schema.py
+migrations/versions/20250115_000001_fix_zohal_account_code.py
+migrations/versions/20250116_000001_delete_account_codes.py
+migrations/versions/20250116_000002_create_activity_logs.py
+migrations/versions/20250117_000001_add_soft_delete_to_businesses.py
+migrations/versions/449131e7b816_create_missing_monitoring_and_zohal_.py
 migrations/versions/483a0bf37370_add_mobile_verified_column.py
 migrations/versions/48f89768a316_merge_heads.py
 migrations/versions/9cc424e46c07_add_quick_sales_settings.py
+migrations/versions/add_default_price_list_to_quick_sales.py
+migrations/versions/add_inventory_valuation_method.py
 migrations/versions/add_workflow_tables.py
+migrations/versions/b8c9286db6bd_merge_all_heads_final.py
 migrations/versions/optimize_indexes_phase3.py
 migrations/versions/init_schema/00_auth_tables.py
 migrations/versions/init_schema/01_users.py
@@ -417,6 +434,8 @@ migrations/versions/init_schema/38_payment_gateway.py
 migrations/versions/init_schema/39_ping_pong.py
 migrations/versions/init_schema/40_quick_sales_settings.py
 migrations/versions/init_schema/41_monitoring.py
+migrations/versions/init_schema/42_zohal.py
+migrations/versions/init_schema/43_fix_zohal_account_code.py
 migrations/versions/init_schema/__init__.py
 tests/__init__.py
 tests/test_health.py

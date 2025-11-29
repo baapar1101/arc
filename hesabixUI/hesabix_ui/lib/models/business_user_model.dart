@@ -280,6 +280,37 @@ class RemoveUserResponse {
   }
 }
 
+class LeaveBusinessRequest {
+  final int businessId;
+
+  const LeaveBusinessRequest({
+    required this.businessId,
+  });
+
+  Map<String, dynamic> toJson() {
+    return {
+      'business_id': businessId,
+    };
+  }
+}
+
+class LeaveBusinessResponse {
+  final bool success;
+  final String message;
+
+  const LeaveBusinessResponse({
+    required this.success,
+    required this.message,
+  });
+
+  factory LeaveBusinessResponse.fromJson(Map<String, dynamic> json) {
+    return LeaveBusinessResponse(
+      success: json['success'] as bool? ?? false,
+      message: json['message'] as String? ?? '',
+    );
+  }
+}
+
 class BusinessUsersResponse {
   final bool success;
   final String message;

@@ -4,6 +4,11 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../core/locale_controller.dart';
 import '../../core/calendar_controller.dart';
 import '../../theme/theme_controller.dart';
+import '../../core/auth_store.dart';
+import '../../services/business_user_service.dart';
+import '../../models/business_user_model.dart';
+import '../../core/api_client.dart';
+import '../../utils/snackbar_helper.dart';
 import '../../widgets/calendar_switcher.dart';
 import '../../widgets/language_switcher.dart';
 import '../../widgets/theme_mode_switcher.dart';
@@ -27,10 +32,54 @@ class SettingsPage extends StatefulWidget {
 }
 
 class _SettingsPageState extends State<SettingsPage> {
+  final BusinessUserService _userService = BusinessUserService(ApiClient());
+  bool _isLeaving = false;
+  
+  AuthStore? get _authStore => ApiClient.getAuthStore();
+  
+  @override
+  void initState() {
+    super.initState();
+    // اضافه کردن listener برای rebuild صفحه وقتی currentBusiness تغییر کرد
+    final authStore = _authStore;
+    if (authStore != null) {
+      authStore.addListener(_onAuthStoreChanged);
+    }
+  }
+  
+  @override
+  void dispose() {
+    final authStore = _authStore;
+    if (authStore != null) {
+      authStore.removeListener(_onAuthStoreChanged);
+    }
+    super.dispose();
+  }
+  
+  void _onAuthStoreChanged() {
+    if (mounted) {
+      setState(() {});
+    }
+  }
+  
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
     final cs = Theme.of(context).colorScheme;
+    final authStore = _authStore;
+    // بررسی دقیق‌تر: آیا کاربر مالک این کسب و کار است؟
+    // باید مطمئن شویم که currentBusiness برای همین businessId است و کاربر مالک است
+    final currentBusiness = authStore?.currentBusiness;
+    final isOwner = currentBusiness != null && 
+                   currentBusiness.id == widget.businessId &&
+                   (currentBusiness.isOwner == true);
+    
+    // اگر currentBusiness null است یا برای کسب و کار دیگری است، 
+    // نمی‌توانیم مطمئن شویم که کاربر مالک است یا نه
+    // در این حالت، دکمه خروج را نمایش نمی‌دهیم (برای امنیت)
+    final canShowLeaveButton = currentBusiness != null && 
+                              currentBusiness.id == widget.businessId &&
+                              !isOwner;
 
     return Scaffold(
       appBar: AppBar(
@@ -200,6 +249,55 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
               ],
             ),
+            
+            // بخش خروج از کسب و کار (فقط برای اعضای غیر از مالک)
+            if (canShowLeaveButton) ...[
+              const SizedBox(height: 24),
+              _buildSection(
+                context,
+                title: 'عضویت در کسب و کار',
+                icon: Icons.business_outlined,
+                children: [
+                  _buildSettingItem(
+                    context,
+                    title: 'خروج از کسب و کار',
+                    subtitle: 'خروج از این کسب و کار و حذف دسترسی‌های شما',
+                    icon: Icons.exit_to_app,
+                    trailing: _isLeaving
+                        ? SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.red),
+                            ),
+                          )
+                        : Icon(Icons.arrow_forward_ios, size: 16, color: Colors.red),
+                    onTap: _isLeaving ? null : () => _handleLeave(context),
+                  ),
+                ],
+              ),
+            ],
+            
+            // بخش عملیات خطرناک (فقط برای مالک)
+            if (isOwner) ...[
+              const SizedBox(height: 24),
+              _buildSection(
+                context,
+                title: 'عملیات خطرناک',
+                icon: Icons.warning_amber_rounded,
+                children: [
+                  _buildSettingItem(
+                    context,
+                    title: 'حذف کسب و کار',
+                    subtitle: 'حذف دائمی کسب و کار (30 روز قابل بازیابی)',
+                    icon: Icons.delete_forever,
+                    trailing: Icon(Icons.arrow_forward_ios, size: 16, color: Colors.red),
+                    onTap: () => context.go('/business/${widget.businessId}/settings/delete'),
+                  ),
+                ],
+              ),
+            ],
           ],
         ),
       ),
@@ -269,6 +367,82 @@ class _SettingsPageState extends State<SettingsPage> {
         onTap: onTap,
       ),
     );
+  }
+
+  Future<void> _handleLeave(BuildContext context) async {
+    final t = AppLocalizations.of(context);
+    
+    // Show confirmation dialog
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('خروج از کسب و کار'),
+        content: const Text(
+          'آیا مطمئن هستید که می‌خواهید از این کسب و کار خارج شوید؟\n\n'
+          'پس از خروج، دسترسی شما به این کسب و کار حذف خواهد شد.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(t.cancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(context).colorScheme.error,
+            ),
+            child: const Text('خروج'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() {
+      _isLeaving = true;
+    });
+
+    try {
+      final request = LeaveBusinessRequest(businessId: widget.businessId);
+      final response = await _userService.leaveBusiness(request);
+
+      if (response.success && mounted) {
+        SnackBarHelper.showSuccess(
+          context,
+          message: response.message,
+        );
+        
+        // Clear current business if it's the one we're leaving
+        final authStore = _authStore;
+        if (authStore != null && authStore.currentBusiness?.id == widget.businessId) {
+          await authStore.clearCurrentBusiness();
+        }
+        
+        // Navigate to businesses list
+        if (mounted) {
+          context.go('/user/profile/businesses');
+        }
+      } else if (mounted) {
+        SnackBarHelper.showError(
+          context,
+          message: response.message,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        SnackBarHelper.showError(
+          context,
+          message: 'خطا در خروج از کسب و کار: $e',
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLeaving = false;
+        });
+      }
+    }
   }
 
   // دیالوگ‌های تنظیمات

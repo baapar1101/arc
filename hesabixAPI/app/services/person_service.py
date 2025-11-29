@@ -76,7 +76,8 @@ def create_person(db: Session, business_id: int, person_data: PersonCreateReques
         first_name=person_data.first_name,
         last_name=person_data.last_name,
         # ذخیره مقدار Enum با مقدار فارسی (values_callable در مدل مقادیر فارسی را می‌نویسد)
-        person_types=json.dumps(types_list, ensure_ascii=False) if types_list else None,
+        # person_types نباید None باشد (nullable=False در مدل)
+        person_types=json.dumps(types_list, ensure_ascii=False) if types_list else "[]",
         company_name=person_data.company_name,
         payment_id=person_data.payment_id,
         national_id=person_data.national_id,

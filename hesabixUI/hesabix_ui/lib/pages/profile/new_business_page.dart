@@ -10,6 +10,8 @@ import '../../widgets/date_input_field.dart';
 import '../../core/date_utils.dart';
 import '../../utils/number_normalizer.dart';
 import '../../utils/responsive_helper.dart';
+import 'package:dio/dio.dart';
+import '../../services/errors/api_error.dart';
 
 class NewBusinessPage extends StatefulWidget {
   final CalendarController calendarController;
@@ -299,6 +301,50 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
     }
   }
 
+  Future<void> _showVerificationRequiredDialog(String message) async {
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.info_outline, color: Colors.orange),
+            SizedBox(width: 8),
+            Text('تایید مورد نیاز'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(message),
+            const SizedBox(height: 16),
+            const Text(
+              'برای تایید ایمیل و شماره موبایل، به بخش تنظیمات حساب کاربری بروید.',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('بعداً'),
+          ),
+          FilledButton.icon(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            icon: const Icon(Icons.verified_user),
+            label: const Text('رفتن به تایید'),
+          ),
+        ],
+      ),
+    );
+    
+    if (result == true && mounted) {
+      // هدایت به صفحه تایید
+      context.go('/user/profile/verification');
+    }
+  }
+
   Future<void> _submitBusiness() async {
     final t = Localizations.of<AppLocalizations>(context, AppLocalizations)!;
     if (!_businessData.isFormValid()) {
@@ -333,6 +379,42 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
         );
         context.goNamed('profile_businesses');
       }
+    } on DioException catch (e) {
+      if (!mounted) return;
+      
+      // بررسی خطای BUSINESS_CREATION_NOT_ALLOWED
+      String? errorCode;
+      String? errorMessage;
+      
+      if (e.error is ApiErrorDetails) {
+        final apiError = e.error as ApiErrorDetails;
+        errorCode = apiError.code;
+        errorMessage = apiError.message;
+      } else if (e.response?.data is Map<String, dynamic>) {
+        final data = e.response!.data as Map<String, dynamic>;
+        final errorObj = data['error'];
+        if (errorObj is Map<String, dynamic>) {
+          errorCode = errorObj['code']?.toString();
+          errorMessage = errorObj['message']?.toString();
+        }
+      }
+      
+      if (errorCode == 'BUSINESS_CREATION_NOT_ALLOWED') {
+        // نمایش Dialog راهنما
+        await _showVerificationRequiredDialog(errorMessage ?? 'شما اجازه ایجاد کسب و کار را ندارید');
+        return;
+      }
+      
+      // سایر خطاها
+      ScaffoldMessenger.of(Navigator.of(context, rootNavigator: true).context).showSnackBar(
+        SnackBar(
+          content: Text(errorMessage ?? '${t.businessCreationFailed}: $e'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.all(16),
+          duration: const Duration(seconds: 5),
+        ),
+      );
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(Navigator.of(context, rootNavigator: true).context).showSnackBar(

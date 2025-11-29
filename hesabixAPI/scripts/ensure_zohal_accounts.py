@@ -18,23 +18,34 @@ from sqlalchemy import and_
 
 def ensure_zohal_expense_account(db: Session) -> Account:
 	"""
-	بررسی و ایجاد حساب هزینه سرویس‌های استعلامات (70903)
+	بررسی و ایجاد حساب هزینه سرویس‌های استعلامات (70509)
+	حساب در گروه هزینه‌های عمومی (705) قرار دارد
 	"""
+	from app.services.wallet_service import _get_fixed_account_by_code
+	
 	account = db.query(Account).filter(
 		and_(
-			Account.code == "70903",
+			Account.code == "70509",
 			Account.business_id.is_(None)
 		)
 	).first()
 	
 	if not account:
+		# دریافت حساب والد (705 - هزینه‌های عمومی)
+		try:
+			parent_account = _get_fixed_account_by_code(db, "705")
+			parent_id = parent_account.id if parent_account else None
+		except Exception:
+			parent_id = None
+		
 		# ایجاد حساب هزینه سرویس‌های استعلامات
-		print("📝 ایجاد حساب هزینه سرویس‌های استعلامات (70903)...")
+		print("📝 ایجاد حساب هزینه سرویس‌های استعلامات (70509)...")
 		account = Account(
 			name="هزینه سرویس‌های استعلامات",
-			code="70903",
-			account_type="expense",
-			business_id=None  # حساب عمومی
+			code="70509",
+			account_type="accounting_document",
+			business_id=None,  # حساب عمومی
+			parent_id=parent_id
 		)
 		db.add(account)
 		db.commit()

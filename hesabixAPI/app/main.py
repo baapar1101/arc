@@ -80,6 +80,7 @@ from app.services.monitoring_background_jobs import (
 	monitoring_metrics_collection_loop,
 	monitoring_service_status_check_loop,
 )
+from app.services.business_background_jobs import check_expired_deleted_businesses_loop
 from app.core.i18n import negotiate_locale, Translator
 from app.core.error_handlers import register_error_handlers
 from app.core.smart_normalizer import smart_normalize_json, SmartNormalizerConfig
@@ -643,6 +644,8 @@ def create_app() -> FastAPI:
         asyncio.create_task(monitoring_metrics_collection_loop(10))
         # Service status check: هر 30 ثانیه
         asyncio.create_task(monitoring_service_status_check_loop(30))
+        # Business deletion check: هر 24 ساعت یکبار (فقط لاگ - حذف نمی‌کند)
+        asyncio.create_task(check_expired_deleted_businesses_loop(24))
 
     @application.middleware("http")
     async def global_rate_limit_middleware(request: Request, call_next):

@@ -197,6 +197,7 @@ def upgrade():
         {"id":2615,"level":4,"code":"10205","name":"کیف پول","parentId":2454,"accountType":0},
         {"id":2616,"level":4,"code":"70507","name":"هزینه جدید","parentId":2566,"accountType":0},
         {"id":2617,"level":4,"code":"70508","name":"هزینه هوش مصنوعی","parentId":2566,"accountType":0},
+        {"id":2618,"level":4,"code":"70509","name":"هزینه سرویس‌های استعلامات","parentId":2566,"accountType":0},
     ]
     
     # تبدیل parentId های 2452 و 2453 به 0 (چون اینها حساب‌های ریشه هستند)

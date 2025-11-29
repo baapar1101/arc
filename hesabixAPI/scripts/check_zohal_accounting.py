@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-اسکریپت بررسی حساب 70903 و اسناد حسابداری تولید شده برای استعلام
+اسکریپت بررسی حساب 70509 و اسناد حسابداری تولید شده برای استعلام
 """
 import sys
 from pathlib import Path
@@ -18,25 +18,25 @@ from adapters.db.models.document_line import DocumentLine
 from adapters.db.models.zohal import ZohalServiceLog
 
 
-def check_account_70903(db: Session):
-    """بررسی حساب 70903"""
+def check_account_70509(db: Session):
+    """بررسی حساب 70509"""
     print("="*80)
-    print("📊 بررسی حساب 70903")
+    print("📊 بررسی حساب 70509 (هزینه سرویس‌های استعلامات)")
     print("="*80)
     
     account = db.query(Account).filter(
         and_(
-            Account.code == "70903",
+            Account.code == "70509",
             Account.business_id.is_(None)
         )
     ).first()
     
     if not account:
-        print("❌ حساب 70903 یافت نشد!")
+        print("❌ حساب 70509 یافت نشد!")
         print("💡 باید حساب با نام 'هزینه سرویس‌های استعلامات' ایجاد شود.")
         return None
     else:
-        print(f"✅ حساب 70903 یافت شد:")
+        print(f"✅ حساب 70509 یافت شد:")
         print(f"   - ID: {account.id}")
         print(f"   - نام: {account.name}")
         print(f"   - کد: {account.code}")
@@ -52,6 +52,16 @@ def check_account_70903(db: Session):
             print(f"⚠️  هشدار: نوع حساب '{account.account_type}' است، اما باید 'expense' باشد.")
         else:
             print("✅ نوع حساب صحیح است.")
+        
+        # بررسی اینکه حساب در گروه هزینه‌های عمومی (705) قرار دارد
+        if account.parent_id:
+            parent = db.query(Account).filter(Account.id == account.parent_id).first()
+            if parent:
+                print(f"   - حساب والد: {parent.code} ({parent.name})")
+                if parent.code != "705":
+                    print(f"⚠️  هشدار: حساب والد باید 705 (هزینه‌های عمومی) باشد.")
+                else:
+                    print("✅ حساب در گروه صحیح قرار دارد (705 - هزینه‌های عمومی).")
         
         return account
 
@@ -93,7 +103,7 @@ def check_zohal_documents(db: Session, account_id: int):
             DocumentLine.document_id == document.id
         ).all()
         
-        # بررسی اینکه آیا در سطرها از حساب 70903 استفاده شده است
+        # بررسی اینکه آیا در سطرها از حساب 70509 استفاده شده است
         has_expense_account = False
         expense_line = None
         
@@ -113,7 +123,7 @@ def check_zohal_documents(db: Session, account_id: int):
             incorrect_count += 1
             print(f"❌ سند {document.code} (ID: {document.id})")
             print(f"   - تاریخ: {document.document_date}")
-            print(f"   - هشدار: از حساب 70903 استفاده نشده است!")
+            print(f"   - هشدار: از حساب 70509 استفاده نشده است!")
             
             # نمایش حساب‌های استفاده شده
             account_codes = []
@@ -170,8 +180,8 @@ def main():
     
     db: Session = SessionLocal()
     try:
-        # بررسی حساب 70903
-        account = check_account_70903(db)
+        # بررسی حساب 70509
+        account = check_account_70509(db)
         
         if account:
             # بررسی اسناد حسابداری

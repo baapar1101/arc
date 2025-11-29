@@ -64,4 +64,16 @@ class BusinessUserService {
       throw Exception('Failed to fetch user details: $e');
     }
   }
+
+  /// Leave business (self-removal)
+  Future<LeaveBusinessResponse> leaveBusiness(LeaveBusinessRequest request) async {
+    try {
+      final response = await _apiClient.delete(
+        '/api/v1/business/${request.businessId}/leave',
+      );
+      return LeaveBusinessResponse.fromJson(response.data);
+    } catch (e) {
+      throw Exception('Failed to leave business: $e');
+    }
+  }
 }

@@ -45,6 +45,8 @@ class _AccountComboboxWidgetState extends State<AccountComboboxWidget> {
   }
 
   Future<void> _loadAccounts() async {
+    if (!mounted) return;
+    
     setState(() {
       _isLoading = true;
     });
@@ -55,17 +57,23 @@ class _AccountComboboxWidgetState extends State<AccountComboboxWidget> {
           ?.map((item) => Account.fromJson(item as Map<String, dynamic>))
           .toList() ?? [];
       
-      setState(() {
-        _accounts = items;
-      });
+      if (mounted) {
+        setState(() {
+          _accounts = items;
+        });
+      }
     } catch (e) {
-      setState(() {
-        _accounts = [];
-      });
+      if (mounted) {
+        setState(() {
+          _accounts = [];
+        });
+      }
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 

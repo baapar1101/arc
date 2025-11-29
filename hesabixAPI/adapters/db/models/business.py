@@ -63,6 +63,13 @@ class Business(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     
+    # Soft Delete fields
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
+    deletion_requested_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    deletion_requested_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
+    deletion_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    auto_delete_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)  # 30 days after deleted_at
+    
     # Relationships
     persons: Mapped[list["Person"]] = relationship("Person", back_populates="business", cascade="all, delete-orphan")
     fiscal_years = relationship("FiscalYear", back_populates="business", cascade="all, delete-orphan")

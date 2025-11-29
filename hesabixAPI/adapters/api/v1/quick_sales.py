@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from typing import Dict, Any
 
 from fastapi import APIRouter, Depends, Request, Body
@@ -16,6 +17,8 @@ from app.services.quick_sales_service import (
     update_quick_sales_settings,
     get_or_create_anonymous_customer,
 )
+
+logger = logging.getLogger(__name__)
 
 
 router = APIRouter(prefix="/businesses/{business_id}/quick-sales", tags=["quick-sales"])
@@ -69,19 +72,24 @@ def get_anonymous_customer_endpoint(
     ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
     """دریافت یا ایجاد مشتری ناشناس"""
-    customer = get_or_create_anonymous_customer(db, business_id)
-    # بررسی اینکه آیا مشتری است یا نه
-    person_types = []
-    if customer.person_types:
-        try:
-            parsed_types = json.loads(customer.person_types)
-            person_types = parsed_types if isinstance(parsed_types, list) else []
-        except (json.JSONDecodeError, TypeError):
-            person_types = []
-    is_customer = PersonType.CUSTOMER.value in person_types
-    return success_response({
-        "id": customer.id,
-        "name": customer.alias_name,
-        "is_customer": is_customer,
-    }, request)
+    try:
+        customer = get_or_create_anonymous_customer(db, business_id)
+        # بررسی اینکه آیا مشتری است یا نه
+        person_types = []
+        if customer.person_types:
+            try:
+                parsed_types = json.loads(customer.person_types)
+                person_types = parsed_types if isinstance(parsed_types, list) else []
+            except (json.JSONDecodeError, TypeError) as e:
+                logger.warning(f"Failed to parse person_types for customer {customer.id}: {e}")
+                person_types = []
+        is_customer = PersonType.CUSTOMER.value in person_types
+        return success_response({
+            "id": customer.id,
+            "name": customer.alias_name,
+            "is_customer": is_customer,
+        }, request)
+    except Exception as e:
+        logger.error(f"Error in get_anonymous_customer_endpoint for business {business_id}: {type(e).__name__}: {str(e)}", exc_info=True)
+        raise
 

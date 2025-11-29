@@ -17,6 +17,7 @@ class FiscalYear(Base):
 	start_date: Mapped[date] = mapped_column(Date, nullable=False)
 	end_date: Mapped[date] = mapped_column(Date, nullable=False)
 	is_last: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+	inventory_valuation_method: Mapped[str | None] = mapped_column(String(20), nullable=True, default="FIFO", comment="روش ارزیابی انبار: FIFO, LIFO, WeightedAverage")
 	created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 	updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 

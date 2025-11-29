@@ -1529,6 +1529,12 @@ def create_invoice(
     # Optional: create receipt/payment document(s)
     payment_docs: List[int] = []
     payments = data.get("payments") or []
+    
+    # بررسی تنظیمات auto_create_payment_document برای فروش سریع
+    extra_info_all = data.get("extra_info") or {}
+    auto_create_payment_doc = extra_info_all.get("auto_create_payment_document", True)
+    is_quick_sale = extra_info_all.get("quick_sale", False)
+    
     if payments and isinstance(payments, list):
         try:
             # Only when person is present
@@ -1617,37 +1623,41 @@ def create_invoice(
                     account_lines.append(account_line)
 
                 if total_amount > 0 and account_lines:
-                    is_receipt = invoice_type in {INVOICE_SALES, INVOICE_PURCHASE_RETURN}
-                    # نوع حساب طرف‌شخص برای سند دریافت/پرداخت متناسب با نوع فاکتور:
-                    # فروش و برگشت از فروش → دریافتنی‌ها (10401)
-                    # خرید و برگشت از خرید → پرداختنی‌ها (20201)
-                    person_is_receivable = invoice_type in {INVOICE_SALES, INVOICE_SALES_RETURN}
-                    rp_data = {
-                        "document_type": "receipt" if is_receipt else "payment",
-                        "document_date": document.document_date.isoformat(),
-                        "currency_id": document.currency_id,
-                        "description": f"تسویه مرتبط با فاکتور {document.code}",
-                        "person_lines": [{
-                            "person_id": person_id,
-                            "amount": float(total_amount),
-                            "description": f"طرف حساب فاکتور {document.code}",
-                        }],
-                        "account_lines": account_lines,
-                        "extra_info": {
-                            "source": "invoice",
-                            "invoice_id": document.id,
-                            # هدایت نوع حساب طرف‌شخص در سند دریافت/پرداخت
-                            "person_is_receivable": person_is_receivable,
-                        },
-                    }
-                    rp_doc = create_receipt_payment(db=db, business_id=business_id, user_id=user_id, data=rp_data)
-                    logger.info(f"create_receipt_payment returned: type={type(rp_doc)}, value={rp_doc}")
-                    if isinstance(rp_doc, dict) and rp_doc.get("id"):
-                        rp_id = int(rp_doc["id"])
-                        payment_docs.append(rp_id)
-                        logger.info(f"Added receipt/payment document ID {rp_id} to payment_docs. Current list: {payment_docs}")
+                    # اگر auto_create_payment_document غیرفعال باشد و فروش سریع باشد، سند پرداخت جداگانه ایجاد نکن
+                    if is_quick_sale and not auto_create_payment_doc:
+                        logger.info(f"Skipping auto-create payment document for quick sale invoice {document.id} (auto_create_payment_document is False)")
                     else:
-                        logger.warning(f"create_receipt_payment did not return valid document with id. Returned: {rp_doc}")
+                        is_receipt = invoice_type in {INVOICE_SALES, INVOICE_PURCHASE_RETURN}
+                        # نوع حساب طرف‌شخص برای سند دریافت/پرداخت متناسب با نوع فاکتور:
+                        # فروش و برگشت از فروش → دریافتنی‌ها (10401)
+                        # خرید و برگشت از خرید → پرداختنی‌ها (20201)
+                        person_is_receivable = invoice_type in {INVOICE_SALES, INVOICE_SALES_RETURN}
+                        rp_data = {
+                            "document_type": "receipt" if is_receipt else "payment",
+                            "document_date": document.document_date.isoformat(),
+                            "currency_id": document.currency_id,
+                            "description": f"تسویه مرتبط با فاکتور {document.code}",
+                            "person_lines": [{
+                                "person_id": person_id,
+                                "amount": float(total_amount),
+                                "description": f"طرف حساب فاکتور {document.code}",
+                            }],
+                            "account_lines": account_lines,
+                            "extra_info": {
+                                "source": "invoice",
+                                "invoice_id": document.id,
+                                # هدایت نوع حساب طرف‌شخص در سند دریافت/پرداخت
+                                "person_is_receivable": person_is_receivable,
+                            },
+                        }
+                        rp_doc = create_receipt_payment(db=db, business_id=business_id, user_id=user_id, data=rp_data)
+                        logger.info(f"create_receipt_payment returned: type={type(rp_doc)}, value={rp_doc}")
+                        if isinstance(rp_doc, dict) and rp_doc.get("id"):
+                            rp_id = int(rp_doc["id"])
+                            payment_docs.append(rp_id)
+                            logger.info(f"Added receipt/payment document ID {rp_id} to payment_docs. Current list: {payment_docs}")
+                        else:
+                            logger.warning(f"create_receipt_payment did not return valid document with id. Returned: {rp_doc}")
         except Exception as ex:
             logger.exception("could not create receipt/payment for invoice: %s", ex)
             # حتی در صورت خطا، اگر payment_docs پر شده باشد، لینک را ذخیره کن
