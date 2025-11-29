@@ -757,7 +757,9 @@ def _post_gift_credit_document(db: Session, business_id: int, user_id: int, amou
 
 def _ensure_zohal_expense_account(db: Session) -> Account:
 	"""
-	بررسی و ایجاد حساب هزینه سرویس‌های استعلامات (70903)
+	بررسی و ایجاد/به‌روزرسانی حساب هزینه سرویس‌های استعلامات (70903)
+	این تابع اطمینان می‌دهد که حساب 70903 با نام صحیح "هزینه سرویس‌های استعلامات" وجود دارد
+	در صورتی که حساب موجود باشد اما نام آن متفاوت باشد، نام را به‌روزرسانی می‌کند
 	"""
 	account = db.query(Account).filter(
 		and_(
@@ -766,16 +768,31 @@ def _ensure_zohal_expense_account(db: Session) -> Account:
 		)
 	).first()
 	
+	expected_name = "هزینه سرویس‌های استعلامات"
+	
 	if not account:
 		# ایجاد حساب هزینه سرویس‌های استعلامات
 		account = Account(
-			name="هزینه سرویس‌های استعلامات",
+			name=expected_name,
 			code="70903",
 			account_type="expense",
 			business_id=None  # حساب عمومی
 		)
 		db.add(account)
 		db.flush()
+	else:
+		# بررسی و به‌روزرسانی نام حساب در صورت نیاز
+		# اگر حساب با نام متفاوت وجود داشته باشد (مثلاً "جرائم دیرکرد بانکی")
+		# نام آن را به نام صحیح تغییر می‌دهیم
+		if account.name != expected_name:
+			import logging
+			logger = logging.getLogger(__name__)
+			logger.info(f"به‌روزرسانی نام حساب 70903 از '{account.name}' به '{expected_name}'")
+			account.name = expected_name
+			# اطمینان از نوع حساب
+			if account.account_type != "expense":
+				account.account_type = "expense"
+			db.flush()
 	
 	return account
 

@@ -3,7 +3,10 @@ import 'package:hesabix_ui/services/business_dashboard_service.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../utils/snackbar_helper.dart';
-import 'package:intl/intl.dart';
+import '../../core/calendar_controller.dart';
+import '../../widgets/date_input_field.dart';
+import '../../core/date_utils.dart';
+import 'package:shamsi_date/shamsi_date.dart';
 
 class FiscalYearSettingsPage extends StatefulWidget {
   final int businessId;
@@ -27,17 +30,51 @@ class _FiscalYearSettingsPageState extends State<FiscalYearSettingsPage> {
   DateTime? _endDate;
 
   late final BusinessDashboardService _dashboardService;
+  CalendarController? _calendarController;
 
   @override
   void initState() {
     super.initState();
     _dashboardService = BusinessDashboardService(ApiClient());
+    _loadCalendarController();
     _loadData();
+  }
+
+  Future<void> _loadCalendarController() async {
+    final controller = await CalendarController.load();
+    if (mounted) {
+      setState(() {
+        _calendarController = controller;
+      });
+      // اضافه کردن listener برای تغییرات تقویم
+      _calendarController!.addListener(_onCalendarChanged);
+    }
+  }
+
+  void _onCalendarChanged() {
+    if (mounted && _endDate != null) {
+      // اگر عنوان به صورت خودکار تولید شده، آن را به‌روزرسانی کن
+      const autoPrefix = 'سال مالی منتهی به';
+      final currentTitle = _titleController.text.trim();
+      if (currentTitle.isEmpty || currentTitle.startsWith(autoPrefix)) {
+        setState(() {
+          _titleController.text = _autoTitle();
+        });
+      }
+    }
+  }
+
+  String _autoTitle() {
+    if (_endDate == null || _calendarController == null) return '';
+    final isJalali = _calendarController!.isJalali;
+    final endStr = HesabixDateUtils.formatForDisplay(_endDate, isJalali);
+    return 'سال مالی منتهی به $endStr';
   }
 
   @override
   void dispose() {
     _titleController.dispose();
+    _calendarController?.removeListener(_onCalendarChanged);
     super.dispose();
   }
 
@@ -110,50 +147,6 @@ class _FiscalYearSettingsPageState extends State<FiscalYearSettingsPage> {
     }
   }
 
-  String _formatDate(DateTime? date) {
-    if (date == null) return '';
-    return DateFormat('yyyy/MM/dd', 'fa').format(date);
-  }
-
-  Future<void> _selectStartDate() async {
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: _startDate ?? DateTime.now(),
-      firstDate: DateTime(2000),
-      lastDate: DateTime(2100),
-      locale: const Locale('fa', 'IR'),
-    );
-    if (picked != null) {
-      setState(() {
-        _startDate = picked;
-        // اگر تاریخ پایان قبل از تاریخ شروع جدید باشد، آن را تنظیم کن
-        if (_endDate != null && _endDate!.isBefore(picked)) {
-          _endDate = DateTime(picked.year + 1, picked.month, picked.day);
-        }
-      });
-    }
-  }
-
-  Future<void> _selectEndDate() async {
-    if (_startDate == null) {
-      SnackBarHelper.show(context, message: 'لطفاً ابتدا تاریخ شروع را انتخاب کنید', isError: true);
-      return;
-    }
-
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: _endDate ?? _startDate!.add(const Duration(days: 365)),
-      firstDate: _startDate!.add(const Duration(days: 1)),
-      lastDate: DateTime(2100),
-      locale: const Locale('fa', 'IR'),
-    );
-    if (picked != null) {
-      setState(() {
-        _endDate = picked;
-      });
-    }
-  }
-
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -206,6 +199,17 @@ class _FiscalYearSettingsPageState extends State<FiscalYearSettingsPage> {
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
     final cs = Theme.of(context).colorScheme;
+
+    if (_calendarController == null) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('ویرایش سال مالی جاری'),
+          backgroundColor: cs.surface,
+          foregroundColor: cs.onSurface,
+        ),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -268,7 +272,7 @@ class _FiscalYearSettingsPageState extends State<FiscalYearSettingsPage> {
                         ),
                         const SizedBox(height: 24),
                         Text(
-                          'اطلاعات سال مالی جاری',
+                          'سال مالی',
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.w600,
@@ -276,66 +280,98 @@ class _FiscalYearSettingsPageState extends State<FiscalYearSettingsPage> {
                           ),
                         ),
                         const SizedBox(height: 16),
-                        TextFormField(
-                          controller: _titleController,
-                          decoration: InputDecoration(
-                            labelText: 'عنوان سال مالی',
-                            hintText: 'مثال: سال مالی 1403',
-                            prefixIcon: const Icon(Icons.title),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: cs.surface,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: cs.dividerColor.withOpacity(0.3),
                             ),
                           ),
-                          validator: (value) {
-                            if (value == null || value.trim().isEmpty) {
-                              return 'لطفاً عنوان سال مالی را وارد کنید';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 16),
-                        InkWell(
-                          onTap: _selectStartDate,
-                          child: InputDecorator(
-                            decoration: InputDecoration(
-                              labelText: 'تاریخ شروع',
-                              prefixIcon: const Icon(Icons.calendar_today),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
+                          child: Column(
+                            children: [
+                              // تاریخ‌ها کنار هم
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: DateInputField(
+                                      value: _startDate,
+                                      labelText: 'تاریخ شروع *',
+                                      lastDate: _endDate,
+                                      calendarController: _calendarController!,
+                                      onChanged: (d) {
+                                        setState(() {
+                                          _startDate = d;
+                                          if (_startDate != null) {
+                                            // تنظیم خودکار تاریخ پایان (یک سال بعد)
+                                            if (_calendarController!.isJalali) {
+                                              final j = Jalali.fromDateTime(_startDate!);
+                                              final jNext = Jalali(j.year + 1, j.month, j.day);
+                                              _endDate = jNext.toDateTime();
+                                            } else {
+                                              final s = _startDate!;
+                                              _endDate = DateTime(s.year + 1, s.month, s.day);
+                                            }
+                                            // تولید خودکار عنوان
+                                            const autoPrefix = 'سال مالی منتهی به';
+                                            if (_titleController.text.trim().isEmpty || 
+                                                _titleController.text.trim().startsWith(autoPrefix)) {
+                                              _titleController.text = _autoTitle();
+                                            }
+                                          }
+                                        });
+                                      },
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: DateInputField(
+                                      value: _endDate,
+                                      labelText: 'تاریخ پایان *',
+                                      firstDate: _startDate,
+                                      calendarController: _calendarController!,
+                                      onChanged: (d) {
+                                        setState(() {
+                                          _endDate = d;
+                                          // تولید خودکار عنوان اگر خالی باشد یا قبلاً خودکار بوده
+                                          const autoPrefix = 'سال مالی منتهی به';
+                                          if (_titleController.text.trim().isEmpty || 
+                                              _titleController.text.trim().startsWith(autoPrefix)) {
+                                            _titleController.text = _autoTitle();
+                                          }
+                                        });
+                                      },
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ),
-                            child: Text(
-                              _startDate != null
-                                  ? _formatDate(_startDate)
-                                  : 'انتخاب تاریخ شروع',
-                              style: TextStyle(
-                                color: _startDate != null
-                                    ? cs.onSurface
-                                    : cs.onSurfaceVariant,
+                              const SizedBox(height: 16),
+                              // فیلد عنوان
+                              TextFormField(
+                                controller: _titleController,
+                                decoration: const InputDecoration(
+                                  labelText: 'عنوان سال مالی *',
+                                  border: OutlineInputBorder(),
+                                ),
+                                validator: (value) {
+                                  if (value == null || value.trim().isEmpty) {
+                                    return 'لطفاً عنوان سال مالی را وارد کنید';
+                                  }
+                                  return null;
+                                },
                               ),
-                            ),
+                            ],
                           ),
                         ),
                         const SizedBox(height: 16),
-                        InkWell(
-                          onTap: _selectEndDate,
-                          child: InputDecorator(
-                            decoration: InputDecoration(
-                              labelText: 'تاریخ پایان',
-                              prefixIcon: const Icon(Icons.event),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            child: Text(
-                              _endDate != null
-                                  ? _formatDate(_endDate)
-                                  : 'انتخاب تاریخ پایان',
-                              style: TextStyle(
-                                color: _endDate != null
-                                    ? cs.onSurface
-                                    : cs.onSurfaceVariant,
-                              ),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: Text(
+                            'پرکردن عنوان، تاریخ شروع و پایان الزامی است.',
+                            style: TextStyle(
+                              color: cs.onSurface.withOpacity(0.7),
+                              fontSize: 12,
                             ),
                           ),
                         ),

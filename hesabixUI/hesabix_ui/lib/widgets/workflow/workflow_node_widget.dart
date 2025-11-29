@@ -33,12 +33,23 @@ class WorkflowNodeWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final color = _getNodeColor(node.type, theme);
+    try {
+      final theme = Theme.of(context);
+      final color = _getNodeColor(node.type, theme);
 
-    return Positioned(
-      left: node.position.dx,
-      top: node.position.dy,
+      // بررسی اعتبار موقعیت
+      final validPosition = _isValidPosition(node.position) 
+          ? node.position 
+          : const Offset(200, 200);
+      
+      // بررسی اعتبار zoomLevel
+      final validZoomLevel = (zoomLevel > 0 && zoomLevel.isFinite && !zoomLevel.isNaN) 
+          ? zoomLevel 
+          : 1.0;
+
+      return Positioned(
+        left: validPosition.dx,
+        top: validPosition.dy,
       child: RepaintBoundary(
         child: GestureDetector(
           onTap: onTap,
@@ -63,8 +74,12 @@ class WorkflowNodeWidget extends StatelessWidget {
               }
             } else {
               // Fallback: استفاده از delta با zoom adjustment
-              final adjustedDelta = details.delta / zoomLevel;
-              onPositionChanged?.call(node.position + adjustedDelta);
+              final validZoom = (zoomLevel > 0 && zoomLevel.isFinite) ? zoomLevel : 1.0;
+              final adjustedDelta = details.delta / validZoom;
+              final newPosition = node.position + adjustedDelta;
+              if (_isValidPosition(newPosition)) {
+                onPositionChanged?.call(newPosition);
+              }
             }
           },
           child: Stack(
@@ -188,6 +203,31 @@ class WorkflowNodeWidget extends StatelessWidget {
         ),
       ),
     );
+    } catch (e, stackTrace) {
+      // در صورت خطا، یک widget placeholder برگردان
+      debugPrint('خطا در ساخت WorkflowNodeWidget برای node ${node.id}: $e');
+      debugPrint('StackTrace: $stackTrace');
+      return Positioned(
+        left: _isValidPosition(node.position) ? node.position.dx : 200,
+        top: _isValidPosition(node.position) ? node.position.dy : 200,
+        child: Container(
+          width: 180,
+          height: 100,
+          color: Colors.red.withOpacity(0.2),
+          child: const Center(
+            child: Icon(Icons.error, color: Colors.red),
+          ),
+        ),
+      );
+    }
+  }
+
+  /// بررسی اعتبار یک موقعیت
+  bool _isValidPosition(Offset position) {
+    return position.dx.isFinite && 
+           position.dy.isFinite &&
+           !position.dx.isNaN && 
+           !position.dy.isNaN;
   }
 
   Widget _buildConnectionPoint(

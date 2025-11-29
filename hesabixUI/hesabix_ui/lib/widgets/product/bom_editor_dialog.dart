@@ -539,10 +539,13 @@ class _BomEditorDialogState extends State<BomEditorDialog> with SingleTickerProv
                   final newIndex = _items.length;
                   final newLineNo = _items.isEmpty ? 1 : (_items.length + 1);
                   final newItem = BomItem(lineNo: newLineNo, componentProductId: -1, qtyPer: 1);
+                  
+                  // افزودن به لیست‌ها
                   _items = [..._items, newItem];
                   _itemSelectedProducts = [..._itemSelectedProducts, null];
+                  
+                  // افزودن کنترلرها بعد از افزودن به لیست
                   _addItemController(newIndex, newItem);
-                  _itemsListKey++; // به‌روزرسانی key برای rebuild ListView
                   
                   // به‌روزرسانی line_no همه سطرها
                   for (var i = 0; i < _items.length; i++) {
@@ -559,6 +562,9 @@ class _BomEditorDialogState extends State<BomEditorDialog> with SingleTickerProv
                       );
                     }
                   }
+                  
+                  // به‌روزرسانی key برای rebuild ListView
+                  _itemsListKey++;
                 });
               },
               icon: const Icon(Icons.add),
@@ -911,9 +917,12 @@ class _BomEditorDialogState extends State<BomEditorDialog> with SingleTickerProv
                   final newIndex = _operations.length;
                   final newLineNo = _operations.isEmpty ? 1 : (_operations.length + 1);
                   final newOperation = BomOperation(lineNo: newLineNo, operationName: '');
+                  
+                  // افزودن به لیست
                   _operations = [..._operations, newOperation];
+                  
+                  // افزودن کنترلرها بعد از افزودن به لیست
                   _addOperationController(newIndex, newOperation);
-                  _operationsListKey++; // به‌روزرسانی key برای rebuild ListView
                   
                   // به‌روزرسانی line_no همه سطرها
                   for (var i = 0; i < _operations.length; i++) {
@@ -928,6 +937,9 @@ class _BomEditorDialogState extends State<BomEditorDialog> with SingleTickerProv
                       );
                     }
                   }
+                  
+                  // به‌روزرسانی key برای rebuild ListView
+                  _operationsListKey++;
                 });
               },
               icon: const Icon(Icons.add),

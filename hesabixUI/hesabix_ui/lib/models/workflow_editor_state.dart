@@ -45,31 +45,54 @@ class WorkflowEditorState extends ChangeNotifier {
 
   /// بارگذاری workflow از backend format
   void loadWorkflow(Map<String, dynamic> workflowData) {
-    _nodes.clear();
-    _connections.clear();
+    try {
+      _nodes.clear();
+      _connections.clear();
+      _nodesMap.clear();
 
-    final nodesJson = workflowData['nodes'] as List<dynamic>? ?? [];
-    final connectionsJson = workflowData['connections'] as List<dynamic>? ?? [];
+      final nodesJson = workflowData['nodes'] as List<dynamic>? ?? [];
+      final connectionsJson = workflowData['connections'] as List<dynamic>? ?? [];
 
-    // تبدیل nodes
-    final List<WorkflowNodeModel> loadedNodes = [];
-    for (final nodeJson in nodesJson) {
-      final node = WorkflowNodeModel.fromJson(nodeJson as Map<String, dynamic>);
-      loadedNodes.add(node);
-      _nodesMap[node.id] = node;
+      // تبدیل nodes
+      final List<WorkflowNodeModel> loadedNodes = [];
+      for (final nodeJson in nodesJson) {
+        try {
+          final node = WorkflowNodeModel.fromJson(nodeJson as Map<String, dynamic>);
+          // اطمینان از اینکه node معتبر است
+          if (node.id.isNotEmpty && node.label.isNotEmpty) {
+            loadedNodes.add(node);
+            _nodesMap[node.id] = node;
+          }
+        } catch (e) {
+          debugPrint('خطا در بارگذاری node: $e');
+        }
+      }
+      _nodes.addAll(loadedNodes);
+
+      // تبدیل connections
+      for (final connJson in connectionsJson) {
+        try {
+          final conn = WorkflowConnectionModel.fromJson(connJson as Map<String, dynamic>);
+          // بررسی اینکه node های مربوط به connection وجود دارند
+          if (_nodesMap.containsKey(conn.sourceNodeId) && 
+              _nodesMap.containsKey(conn.targetNodeId)) {
+            _connections.add(conn);
+          }
+        } catch (e) {
+          debugPrint('خطا در بارگذاری connection: $e');
+        }
+      }
+
+      // اعمال auto-layout اگر node ها موقعیت ندارند
+      _applyAutoLayoutIfNeeded();
+
+      notifyListeners();
+    } catch (e, stackTrace) {
+      debugPrint('خطا در loadWorkflow: $e');
+      debugPrint('StackTrace: $stackTrace');
+      notifyListeners();
+      rethrow;
     }
-    _nodes.addAll(loadedNodes);
-
-    // تبدیل connections
-    for (final connJson in connectionsJson) {
-      final conn = WorkflowConnectionModel.fromJson(connJson as Map<String, dynamic>);
-      _connections.add(conn);
-    }
-
-    // اعمال auto-layout اگر node ها موقعیت ندارند
-    _applyAutoLayoutIfNeeded();
-
-    notifyListeners();
   }
 
   /// اعمال auto-layout اگر لازم باشد
@@ -130,25 +153,44 @@ class WorkflowEditorState extends ChangeNotifier {
   /// افزودن node جدید
   void addNode(WorkflowNodeType type, String key, String name) {
     try {
+      // بررسی اعتبار ورودی‌ها
+      if (key.isEmpty || name.isEmpty) {
+        throw ArgumentError('key و name باید غیر خالی باشند');
+      }
+      
       final position = _calculateNextNodePosition();
+      
+      // اطمینان از اینکه موقعیت معتبر است
+      final validPosition = _isValidPosition(position) 
+          ? position 
+          : const Offset(200, 200);
+      
       final node = WorkflowNodeModel(
         id: _uuid.v4(),
         type: type,
         label: name,
-        position: position,
+        position: validPosition,
         key: key,
         config: {},
       );
+      
       _nodes.add(node);
       _nodesMap[node.id] = node;
       
       // اضافه کردن به history
-      final command = AddNodeCommand(this, node);
-      command.execute();
-      _history.addCommand(command);
+      try {
+        final command = AddNodeCommand(this, node);
+        command.execute();
+        _history.addCommand(command);
+      } catch (e) {
+        debugPrint('خطا در اضافه کردن به history: $e');
+        // ادامه دادن حتی اگر history خطا داشته باشد
+      }
       
       notifyListeners();
-    } catch (e) {
+    } catch (e, stackTrace) {
+      debugPrint('خطا در addNode: $e');
+      debugPrint('StackTrace: $stackTrace');
       // در صورت خطا، listeners را اطلاع بده تا UI به‌روزرسانی شود
       notifyListeners();
       rethrow;
@@ -242,47 +284,75 @@ class WorkflowEditorState extends ChangeNotifier {
 
   /// به‌روزرسانی موقعیت node
   void updateNodePosition(String nodeId, Offset newPosition, {bool trackHistory = false}) {
-    final index = _nodes.indexWhere((n) => n.id == nodeId);
-    if (index != -1) {
-      // اعمال snap to grid
-      Offset finalPosition = _snapToGrid ? _snapToGridPosition(newPosition) : newPosition;
-      
-      final oldPosition = _nodes[index].position;
-      if (trackHistory && oldPosition != finalPosition) {
-        final command = MoveNodeCommand(this, nodeId, oldPosition, finalPosition);
-        command.execute();
-        _history.addCommand(command);
-      } else {
-        _nodes[index] = _nodes[index].copyWith(position: finalPosition);
+    try {
+      // بررسی اعتبار موقعیت جدید
+      if (!_isValidPosition(newPosition)) {
+        debugPrint('موقعیت نامعتبر برای node $nodeId: $newPosition');
+        return;
       }
-      notifyListeners();
+      
+      final index = _nodes.indexWhere((n) => n.id == nodeId);
+      if (index != -1) {
+        // اعمال snap to grid
+        Offset finalPosition = _snapToGrid ? _snapToGridPosition(newPosition) : newPosition;
+        
+        // بررسی مجدد اعتبار موقعیت پس از snap
+        if (!_isValidPosition(finalPosition)) {
+          debugPrint('موقعیت نامعتبر پس از snap برای node $nodeId: $finalPosition');
+          return;
+        }
+        
+        final oldPosition = _nodes[index].position;
+        if (trackHistory && oldPosition != finalPosition) {
+          final command = MoveNodeCommand(this, nodeId, oldPosition, finalPosition);
+          command.execute();
+          _history.addCommand(command);
+        } else {
+          _nodes[index] = _nodes[index].copyWith(position: finalPosition);
+          _nodesMap[nodeId] = _nodes[index]; // به‌روزرسانی map
+        }
+        notifyListeners();
+      }
+    } catch (e, stackTrace) {
+      debugPrint('خطا در updateNodePosition: $e');
+      debugPrint('StackTrace: $stackTrace');
     }
+  }
+
+  /// بررسی اعتبار یک موقعیت
+  bool _isValidPosition(Offset position) {
+    return position.dx.isFinite && 
+           position.dy.isFinite &&
+           !position.dx.isNaN && 
+           !position.dy.isNaN;
   }
 
   /// Snap کردن موقعیت به grid
   Offset _snapToGridPosition(Offset position) {
     try {
-      if (!_snapToGrid || _gridSize <= 0 || !_gridSize.isFinite) {
-        return position;
+      // بررسی اعتبار موقعیت ورودی
+      if (!_isValidPosition(position)) {
+        return const Offset(200, 200);
       }
       
-      // اطمینان از اینکه موقعیت معتبر است
-      if (!position.dx.isFinite || !position.dy.isFinite) {
-        return const Offset(200, 200);
+      if (!_snapToGrid || _gridSize <= 0 || !_gridSize.isFinite || _gridSize.isNaN) {
+        return position;
       }
       
       final snappedX = (position.dx / _gridSize).round() * _gridSize;
       final snappedY = (position.dy / _gridSize).round() * _gridSize;
       
-      // اطمینان از اینکه موقعیت snapped معتبر است
-      if (!snappedX.isFinite || !snappedY.isFinite) {
-        return position;
+      // بررسی اعتبار موقعیت snapped
+      final result = Offset(snappedX, snappedY);
+      if (!_isValidPosition(result)) {
+        return position; // در صورت خطا، موقعیت اصلی را برگردان
       }
       
-      return Offset(snappedX, snappedY);
+      return result;
     } catch (e) {
-      // در صورت خطا، موقعیت اصلی را برگردان
-      return position;
+      debugPrint('خطا در _snapToGridPosition: $e');
+      // در صورت خطا، موقعیت اصلی را برگردان (اگر معتبر است)
+      return _isValidPosition(position) ? position : const Offset(200, 200);
     }
   }
 

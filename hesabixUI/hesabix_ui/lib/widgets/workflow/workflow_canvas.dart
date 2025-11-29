@@ -54,23 +54,34 @@ class _WorkflowCanvasState extends State<WorkflowCanvas> {
 
   @override
   Widget build(BuildContext context) {
-    // محاسبه موقعیت node ها (با در نظر گیری zoom و pan)
-    final nodePositions = <String, Offset>{};
-    for (final node in widget.state.nodes) {
-      nodePositions[node.id] = node.position;
-    }
-
-    // محاسبه موقعیت اتصال موقتی
-    Offset? connectingFrom;
-    Offset? connectingTo;
-    if (widget.state.isConnecting) {
-      final fromNode = widget.state.getNodeById(widget.state.connectingFromNodeId ?? '');
-      if (fromNode != null) {
-        // استفاده از connection point در پایین node
-        connectingFrom = WorkflowConstants.getConnectionPoint(fromNode.position, 'bottom');
+    try {
+      // محاسبه موقعیت node ها (با در نظر گیری zoom و pan)
+      final nodePositions = <String, Offset>{};
+      for (final node in widget.state.nodes) {
+        // بررسی اعتبار موقعیت
+        if (_isValidPosition(node.position)) {
+          nodePositions[node.id] = node.position;
+        } else {
+          // اگر موقعیت نامعتبر است، از موقعیت پیش‌فرض استفاده کن
+          debugPrint('موقعیت نامعتبر برای node ${node.id}: ${node.position}');
+          nodePositions[node.id] = const Offset(200, 200);
+        }
       }
-      connectingTo = widget.state.connectingPosition ?? _connectingToPosition;
-    }
+
+      // محاسبه موقعیت اتصال موقتی
+      Offset? connectingFrom;
+      Offset? connectingTo;
+      if (widget.state.isConnecting) {
+        final fromNode = widget.state.getNodeById(widget.state.connectingFromNodeId ?? '');
+        if (fromNode != null && _isValidPosition(fromNode.position)) {
+          // استفاده از connection point در پایین node
+          connectingFrom = WorkflowConstants.getConnectionPoint(fromNode.position, 'bottom');
+        }
+        final connectingPos = widget.state.connectingPosition ?? _connectingToPosition;
+        if (connectingPos != null && _isValidPosition(connectingPos)) {
+          connectingTo = connectingPos;
+        }
+      }
 
     return InteractiveViewer(
       key: _interactiveViewerKey,
@@ -153,67 +164,147 @@ class _WorkflowCanvasState extends State<WorkflowCanvas> {
                 ),
               ),
               // Nodes (بالاتر از connections)
-              ...widget.state.nodes.map((node) {
+              ...widget.state.nodes.where((node) {
+                // فیلتر کردن نودهایی با موقعیت نامعتبر
+                if (!_isValidPosition(node.position)) {
+                  debugPrint('نود با موقعیت نامعتبر نادیده گرفته شد: ${node.id}');
+                  return false;
+                }
+                return true;
+              }).map((node) {
+                try {
                   final isSelected = widget.state.selectedNodeId == node.id;
                   // بررسی اینکه آیا این node قابل اتصال است (برای highlight)
                   final canConnect = _canConnectToNode(node);
+                  
+                  // اطمینان از اینکه موقعیت معتبر است
+                  final validPosition = _isValidPosition(node.position) 
+                      ? node.position 
+                      : const Offset(200, 200);
+                  
+                  final nodeToDisplay = node.position != validPosition
+                      ? node.copyWith(position: validPosition)
+                      : node;
+                  
                   return RepaintBoundary(
                     key: ValueKey(node.id),
                     child: WorkflowNodeWidget(
-                    node: node,
-                    isSelected: isSelected,
-                    zoomLevel: widget.state.zoomLevel, // پاس دادن zoom level
-                    highlightConnectionPoints: widget.state.isConnecting && canConnect,
-                    onTap: () {
-                      widget.state.selectNode(node.id);
-                      widget.onNodeTap?.call(node);
-                    },
-                    onLongPress: () {
-                      widget.state.selectNode(node.id);
-                      if (widget.onNodeLongPress != null) {
-                        // استفاده از موقعیت node برای نمایش context menu
-                        final position = WorkflowConstants.getNodeCenter(node.position);
-                        widget.onNodeLongPress!.call(node, position);
-                      }
-                    },
-                    onDeltaChanged: (globalPosition) {
-                      // تبدیل global position به canvas coordinates
-                      final canvasPosition = _globalToCanvasCoordinates(globalPosition);
-                      
-                      if (_draggingNodeId != node.id) {
-                        // شروع drag جدید - ذخیره موقعیت نسبی
-                        _draggingNodeId = node.id;
-                        // ذخیره موقعیت نسبی (فاصله از گوشه بالا چپ نود)
-                        _dragStartPosition = canvasPosition - node.position;
-                      } else if (_dragStartPosition != null) {
-                        // محاسبه موقعیت جدید: موقعیت موس منهای فاصله نسبی
-                        final newPosition = canvasPosition - _dragStartPosition!;
-                        widget.state.updateNodePosition(node.id, newPosition);
-                      }
-                    },
-                    onPositionChanged: (newPosition) {
-                      widget.state.updateNodePosition(node.id, newPosition);
-                    },
-                    onStartConnection: () {
-                      widget.state.startConnection(node.id);
-                    },
-                    onEndConnection: () {
-                      widget.state.endConnection(node.id);
-                    },
+                      node: nodeToDisplay,
+                      isSelected: isSelected,
+                      zoomLevel: widget.state.zoomLevel > 0 ? widget.state.zoomLevel : 1.0,
+                      highlightConnectionPoints: widget.state.isConnecting && canConnect,
+                      onTap: () {
+                        widget.state.selectNode(node.id);
+                        widget.onNodeTap?.call(node);
+                      },
+                      onLongPress: () {
+                        widget.state.selectNode(node.id);
+                        if (widget.onNodeLongPress != null) {
+                          try {
+                            // استفاده از موقعیت node برای نمایش context menu
+                            final position = WorkflowConstants.getNodeCenter(validPosition);
+                            widget.onNodeLongPress!.call(node, position);
+                          } catch (e) {
+                            debugPrint('خطا در onLongPress: $e');
+                          }
+                        }
+                      },
+                      onDeltaChanged: (globalPosition) {
+                        try {
+                          // تبدیل global position به canvas coordinates
+                          final canvasPosition = _globalToCanvasCoordinates(globalPosition);
+                          
+                          if (!_isValidPosition(canvasPosition)) {
+                            return;
+                          }
+                          
+                          if (_draggingNodeId != node.id) {
+                            // شروع drag جدید - ذخیره موقعیت نسبی
+                            _draggingNodeId = node.id;
+                            // ذخیره موقعیت نسبی (فاصله از گوشه بالا چپ نود)
+                            _dragStartPosition = canvasPosition - validPosition;
+                          } else if (_dragStartPosition != null) {
+                            // محاسبه موقعیت جدید: موقعیت موس منهای فاصله نسبی
+                            final newPosition = canvasPosition - _dragStartPosition!;
+                            if (_isValidPosition(newPosition)) {
+                              widget.state.updateNodePosition(node.id, newPosition);
+                            }
+                          }
+                        } catch (e) {
+                          debugPrint('خطا در onDeltaChanged: $e');
+                        }
+                      },
+                      onPositionChanged: (newPosition) {
+                        if (_isValidPosition(newPosition)) {
+                          widget.state.updateNodePosition(node.id, newPosition);
+                        }
+                      },
+                      onStartConnection: () {
+                        widget.state.startConnection(node.id);
+                      },
+                      onEndConnection: () {
+                        widget.state.endConnection(node.id);
+                      },
                       onConnectionDragUpdate: (globalPosition) {
-                      // تبدیل موقعیت global به canvas coordinates
-                      final canvasPosition = _globalToCanvasCoordinates(globalPosition);
-                      widget.state.updateConnectingPosition(canvasPosition);
-                      setState(() {}); // Force rebuild
-                    },
+                        try {
+                          // تبدیل موقعیت global به canvas coordinates
+                          final canvasPosition = _globalToCanvasCoordinates(globalPosition);
+                          if (_isValidPosition(canvasPosition)) {
+                            widget.state.updateConnectingPosition(canvasPosition);
+                            setState(() {}); // Force rebuild
+                          }
+                        } catch (e) {
+                          debugPrint('خطا در onConnectionDragUpdate: $e');
+                        }
+                      },
                     ),
                   );
-                }),
+                } catch (e, stackTrace) {
+                  debugPrint('خطا در ساخت widget برای node ${node.id}: $e');
+                  debugPrint('StackTrace: $stackTrace');
+                  // برگرداندن یک placeholder widget برای جلوگیری از crash
+                  return SizedBox(
+                    key: ValueKey('error_${node.id}'),
+                    width: 0,
+                    height: 0,
+                  );
+                }
+              }),
             ],
           ),
         ),
       ),
     );
+    } catch (e, stackTrace) {
+      debugPrint('خطا در ساخت WorkflowCanvas: $e');
+      debugPrint('StackTrace: $stackTrace');
+      // برگرداندن یک widget خطا برای جلوگیری از صفحه سفید
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline, size: 48, color: Colors.red),
+            const SizedBox(height: 16),
+            Text('خطا در نمایش workflow: ${e.toString()}'),
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: () {
+                setState(() {});
+              },
+              child: const Text('تلاش مجدد'),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+
+  /// بررسی اعتبار یک موقعیت (نه NaN و نه Infinity)
+  bool _isValidPosition(Offset position) {
+    return position.dx.isFinite && 
+           position.dy.isFinite &&
+           !position.dx.isNaN && 
+           !position.dy.isNaN;
   }
 
   Widget _buildGrid(double gridSize) {
@@ -227,11 +318,22 @@ class _WorkflowCanvasState extends State<WorkflowCanvas> {
   }
 
   WorkflowNodeModel? _findNodeAtPosition(Offset position) {
-    for (final node in widget.state.nodes) {
-      final nodeRect = WorkflowConstants.getNodeRect(node.position);
-      if (nodeRect.contains(position)) {
-        return node;
+    if (!_isValidPosition(position)) {
+      return null;
+    }
+    
+    try {
+      for (final node in widget.state.nodes) {
+        if (!_isValidPosition(node.position)) {
+          continue;
+        }
+        final nodeRect = WorkflowConstants.getNodeRect(node.position);
+        if (nodeRect.contains(position)) {
+          return node;
+        }
       }
+    } catch (e) {
+      debugPrint('خطا در _findNodeAtPosition: $e');
     }
     return null;
   }
@@ -242,38 +344,66 @@ class _WorkflowCanvasState extends State<WorkflowCanvas> {
 
   /// تبدیل موقعیت local (نسبت به InteractiveViewer) به canvas coordinates
   Offset _localToCanvasCoordinates(Offset localPosition) {
-    final matrix = _transformationController.value;
-    
-    // استفاده از getMaxScaleOnAxis برای دقت بیشتر
-    final scale = matrix.getMaxScaleOnAxis();
-    final translation = matrix.getTranslation();
-    
-    // اگر scale صفر یا NaN باشد، فقط translation را اعمال کن
-    if (scale.isNaN || scale <= 0) {
-      return Offset(localPosition.dx - translation.x, localPosition.dy - translation.y);
+    try {
+      final matrix = _transformationController.value;
+      
+      // استفاده از getMaxScaleOnAxis برای دقت بیشتر
+      final scale = matrix.getMaxScaleOnAxis();
+      final translation = matrix.getTranslation();
+      
+      // بررسی اعتبار مقادیر
+      if (!scale.isFinite || scale.isNaN || scale <= 0) {
+        final result = Offset(
+          localPosition.dx - (translation.x.isFinite ? translation.x : 0), 
+          localPosition.dy - (translation.y.isFinite ? translation.y : 0)
+        );
+        return _isValidPosition(result) ? result : const Offset(0, 0);
+      }
+      
+      if (!translation.x.isFinite || !translation.y.isFinite || 
+          !localPosition.dx.isFinite || !localPosition.dy.isFinite) {
+        return const Offset(0, 0);
+      }
+      
+      // تبدیل معکوس: از viewport coordinates به canvas coordinates
+      // canvas = (viewport - translation) / scale
+      final canvasX = (localPosition.dx - translation.x) / scale;
+      final canvasY = (localPosition.dy - translation.y) / scale;
+      
+      final result = Offset(canvasX, canvasY);
+      return _isValidPosition(result) ? result : const Offset(0, 0);
+    } catch (e) {
+      debugPrint('خطا در _localToCanvasCoordinates: $e');
+      return const Offset(0, 0);
     }
-    
-    // تبدیل معکوس: از viewport coordinates به canvas coordinates
-    // canvas = (viewport - translation) / scale
-    final canvasX = (localPosition.dx - translation.x) / scale;
-    final canvasY = (localPosition.dy - translation.y) / scale;
-    
-    return Offset(canvasX, canvasY);
   }
 
   /// تبدیل موقعیت global به canvas coordinates
   Offset _globalToCanvasCoordinates(Offset globalPosition) {
-    // پیدا کردن RenderBox برای InteractiveViewer child (Container)
-    final RenderBox? canvasBox = _canvasKey.currentContext?.findRenderObject() as RenderBox?;
-    if (canvasBox == null) {
-      return globalPosition;
+    try {
+      if (!_isValidPosition(globalPosition)) {
+        return const Offset(0, 0);
+      }
+      
+      // پیدا کردن RenderBox برای InteractiveViewer child (Container)
+      final RenderBox? canvasBox = _canvasKey.currentContext?.findRenderObject() as RenderBox?;
+      if (canvasBox == null) {
+        return const Offset(0, 0);
+      }
+      
+      // تبدیل global به local نسبت به canvas container
+      final localPosition = canvasBox.globalToLocal(globalPosition);
+      
+      if (!_isValidPosition(localPosition)) {
+        return const Offset(0, 0);
+      }
+      
+      // سپس تبدیل با transformation matrix
+      return _localToCanvasCoordinates(localPosition);
+    } catch (e) {
+      debugPrint('خطا در _globalToCanvasCoordinates: $e');
+      return const Offset(0, 0);
     }
-    
-    // تبدیل global به local نسبت به canvas container
-    final localPosition = canvasBox.globalToLocal(globalPosition);
-    
-    // سپس تبدیل با transformation matrix
-    return _localToCanvasCoordinates(localPosition);
   }
 
   /// بررسی اینکه آیا می‌توان به یک node اتصال داد
