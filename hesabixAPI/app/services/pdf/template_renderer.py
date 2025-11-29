@@ -42,6 +42,19 @@ def _filter_format_date(value: Any, fmt: str = "%Y/%m/%d %H:%M") -> str:
 		return str(value if value is not None else "")
 
 
+def _filter_money(value: Any, decimals: int = 0, sep: str = ",") -> str:
+	"""فیلتر فرمت مبلغ - مشابه ReportTemplateService"""
+	try:
+		n = float(value if value is not None else 0)
+		if decimals <= 0:
+			s = f"{int(round(n)):,}"
+		else:
+			s = f"{n:,.{decimals}f}"
+		return s.replace(",", sep)
+	except Exception:
+		return str(value if value is not None else "")
+
+
 def _create_env() -> Environment:
 	env = Environment(
 		loader=FileSystemLoader(str(_get_templates_dir())),
@@ -50,6 +63,7 @@ def _create_env() -> Environment:
 	)
 	# Common filters
 	env.filters["format_amount"] = _filter_format_amount
+	env.filters["money"] = _filter_money  # فیلتر money برای استفاده در قالب‌ها
 	env.filters["ltr"] = _filter_ltr
 	env.filters["format_date"] = _filter_format_date
 	return env

@@ -879,7 +879,7 @@ async def delete_person_endpoint(
     if not success:
         raise HTTPException(status_code=404, detail="شخص یافت نشد")
     
-    return success_response(message="شخص با موفقیت حذف شد", request=request)
+    return success_response(data=None, message="شخص با موفقیت حذف شد", request=request)
 
 
 @router.get(

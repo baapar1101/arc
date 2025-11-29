@@ -28,6 +28,9 @@ import 'pages/admin/system_configuration_page.dart';
 import 'pages/admin/user_management_page.dart';
 import 'pages/admin/system_logs_page.dart';
 import 'pages/admin/email_settings_page.dart';
+import 'pages/admin/redis_settings_page.dart';
+import 'pages/admin/system_monitoring_page.dart';
+import 'pages/admin/service_logs_page.dart';
 import 'pages/admin/announcements_admin_page.dart';
 import 'pages/admin/businesses_list_page.dart';
 import 'pages/business/business_shell.dart';
@@ -59,6 +62,7 @@ import 'pages/business/inventory_kardex_report_page.dart';
 import 'pages/business/inventory_stock_report_page.dart';
 import 'pages/business/bank_accounts_turnover_report_page.dart';
 import 'pages/business/cash_petty_turnover_report_page.dart';
+import 'pages/business/activity_logs_page.dart';
 import 'pages/business/daily_sales_report_page.dart';
 import 'pages/business/monthly_sales_report_page.dart';
 import 'pages/business/top_customers_report_page.dart';
@@ -92,9 +96,12 @@ import 'pages/business/warehouses_page.dart';
 import 'pages/warehouse/warehouse_docs_page.dart';
 import 'pages/business/installments_report_page.dart';
 import 'pages/business/credit_settings_page.dart';
+import 'pages/business/quick_sales_settings_page.dart';
+import 'pages/business/quick_sales_page.dart';
 import 'pages/business/document_numbering_settings_page.dart';
 import 'pages/business/print_settings_page.dart';
 import 'pages/business/tax_settings_page.dart';
+import 'pages/business/fiscal_year_settings_page.dart';
 import 'pages/business/installment_plans_page.dart';
 import 'pages/error_404_page.dart';
 import 'core/locale_controller.dart';
@@ -110,6 +117,7 @@ import 'widgets/simple_splash_screen.dart';
 import 'widgets/url_tracker.dart';
 import 'utils/route_prefetcher.dart';
 import 'pages/business/opening_balance_page.dart';
+import 'pages/business/year_end_closing_page.dart';
 import 'pages/business/report_templates_page.dart';
 import 'pages/business/storage_files_page.dart';
 import 'pages/business/storage_file_manager_page.dart';
@@ -121,8 +129,14 @@ import 'pages/admin/ai_settings_page.dart';
 import 'pages/admin/ai_plans_admin_page.dart';
 import 'pages/admin/ai_prompts_admin_page.dart';
 import 'pages/admin/tax_product_codes_page.dart';
+import 'pages/admin/zohal_settings_page.dart';
+import 'pages/admin/zohal_services_admin_page.dart';
+import 'pages/admin/zohal_statistics_page.dart';
 import 'pages/business/ai_subscription_page.dart';
 import 'pages/business/ai_usage_page.dart';
+import 'pages/business/zohal_inquiries_page.dart';
+import 'pages/business/workflows_page.dart';
+import 'pages/business/workflow_visual_editor_page.dart';
 
 void main() {
   // Use path-based routing instead of hash routing
@@ -309,6 +323,9 @@ class _MyAppState extends State<MyApp> {
       const StoragePlansAdminPage();
       const DocumentMonetizationAdminPage();
       const BusinessesListPage();
+      ZohalSettingsPage();
+      ZohalServicesAdminPage();
+      ZohalStatisticsPage();
       
       // Preload صفحات Business (با dummy businessId)
       const dummyBusinessId = 0;
@@ -351,6 +368,10 @@ class _MyAppState extends State<MyApp> {
         authStore: authStore,
       );
       AIUsagePage(
+        businessId: dummyBusinessId,
+        authStore: authStore,
+      );
+      ZohalInquiriesPage(
         businessId: dummyBusinessId,
         authStore: authStore,
       );
@@ -1146,6 +1167,48 @@ class _MyAppState extends State<MyApp> {
                   },
                 ),
                 GoRoute(
+                  path: 'zohal-settings',
+                  name: 'system_settings_zohal_settings',
+                  builder: (context, state) {
+                    if (_authStore == null) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    final allowed = _authStore!.isSuperAdmin || _authStore!.hasAppPermission('system_settings');
+                    if (!allowed) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    return ZohalSettingsPage();
+                  },
+                ),
+                GoRoute(
+                  path: 'zohal-services',
+                  name: 'system_settings_zohal_services',
+                  builder: (context, state) {
+                    if (_authStore == null) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    final allowed = _authStore!.isSuperAdmin || _authStore!.hasAppPermission('system_settings');
+                    if (!allowed) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    return ZohalServicesAdminPage();
+                  },
+                ),
+                GoRoute(
+                  path: 'zohal-statistics',
+                  name: 'system_settings_zohal_statistics',
+                  builder: (context, state) {
+                    if (_authStore == null) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    final allowed = _authStore!.isSuperAdmin || _authStore!.hasAppPermission('system_settings');
+                    if (!allowed) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    return ZohalStatisticsPage();
+                  },
+                ),
+                GoRoute(
                   path: 'businesses',
                   name: 'system_settings_businesses',
                   builder: (context, state) {
@@ -1157,6 +1220,48 @@ class _MyAppState extends State<MyApp> {
                       return PermissionGuard.buildAccessDeniedPage();
                     }
                     return const BusinessesListPage();
+                  },
+                ),
+                GoRoute(
+                  path: 'redis',
+                  name: 'system_settings_redis',
+                  builder: (context, state) {
+                    if (_authStore == null) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    final allowed = _authStore!.isSuperAdmin || _authStore!.hasAppPermission('system_settings');
+                    if (!allowed) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    return const RedisSettingsPage();
+                  },
+                ),
+                GoRoute(
+                  path: 'monitoring',
+                  name: 'system_settings_monitoring',
+                  builder: (context, state) {
+                    if (_authStore == null) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    final allowed = _authStore!.isSuperAdmin || _authStore!.hasAppPermission('system_settings');
+                    if (!allowed) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    return const SystemMonitoringPage();
+                  },
+                ),
+                GoRoute(
+                  path: 'service-logs',
+                  name: 'system_settings_service_logs',
+                  builder: (context, state) {
+                    if (_authStore == null) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    final allowed = _authStore!.isSuperAdmin || _authStore!.hasAppPermission('system_settings');
+                    if (!allowed) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    return const ServiceLogsPage();
                   },
                 ),
               ],
@@ -1208,6 +1313,19 @@ class _MyAppState extends State<MyApp> {
                 final businessId = int.parse(state.pathParameters['business_id']!);
                 return NoTransitionPage(
                   child: OpeningBalancePage(
+                    businessId: businessId,
+                    authStore: _authStore!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/year-end-closing',
+              name: 'business_year_end_closing',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return NoTransitionPage(
+                  child: YearEndClosingPage(
                     businessId: businessId,
                     authStore: _authStore!,
                   ),
@@ -1296,6 +1414,64 @@ class _MyAppState extends State<MyApp> {
                 final businessId = int.parse(state.pathParameters['business_id']!);
                 return NoTransitionPage(
                   child: AIUsagePage(
+                    businessId: businessId,
+                    authStore: _authStore!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/zohal/inquiries',
+              name: 'business_zohal_inquiries',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return NoTransitionPage(
+                  child: ZohalInquiriesPage(
+                    businessId: businessId,
+                    authStore: _authStore!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/workflows/new',
+              name: 'business_new_workflow',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                // workflow از extra می‌آید یا null است برای افزودن جدید
+                final workflow = state.extra as Map<String, dynamic>?;
+                return NoTransitionPage(
+                  child: WorkflowVisualEditorPage(
+                    businessId: businessId,
+                    authStore: _authStore!,
+                    workflow: workflow,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/workflows/:workflow_id/edit',
+              name: 'business_edit_workflow',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                // workflow از extra می‌آید
+                final workflow = state.extra as Map<String, dynamic>?;
+                return NoTransitionPage(
+                  child: WorkflowVisualEditorPage(
+                    businessId: businessId,
+                    authStore: _authStore!,
+                    workflow: workflow,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/workflows',
+              name: 'business_workflows',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return NoTransitionPage(
+                  child: WorkflowsPage(
                     businessId: businessId,
                     authStore: _authStore!,
                   ),
@@ -1712,6 +1888,19 @@ class _MyAppState extends State<MyApp> {
               },
             ),
             GoRoute(
+              path: '/business/:business_id/reports/activity-logs',
+              name: 'business_reports_activity_logs',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return NoTransitionPage(
+                  child: ActivityLogsPage(
+                    businessId: businessId,
+                    calendarController: _calendarController!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
               path: '/business/:business_id/settings',
               name: 'business_settings',
               pageBuilder: (context, state) {
@@ -1770,6 +1959,43 @@ class _MyAppState extends State<MyApp> {
               },
             ),
             GoRoute(
+              path: '/business/:business_id/settings/quick-sales',
+              name: 'business_settings_quick_sales',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                if (!_authStore!.hasBusinessPermission('settings', 'business')) {
+                  return NoTransitionPage(
+                    child: PermissionGuard.buildAccessDeniedPage(),
+                  );
+                }
+                return NoTransitionPage(
+                  child: QuickSalesSettingsPage(
+                    businessId: businessId,
+                    authStore: _authStore!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/quick-sales',
+              name: 'business_quick_sales',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                if (!_authStore!.hasBusinessPermission('invoices', 'add')) {
+                  return NoTransitionPage(
+                    child: PermissionGuard.buildAccessDeniedPage(),
+                  );
+                }
+                return NoTransitionPage(
+                  child: QuickSalesPage(
+                    businessId: businessId,
+                    authStore: _authStore!,
+                    calendarController: _calendarController!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
               path: '/business/:business_id/settings/credit',
               name: 'business_settings_credit',
               pageBuilder: (context, state) {
@@ -1811,6 +2037,21 @@ class _MyAppState extends State<MyApp> {
                 }
                 return NoTransitionPage(
                   child: TaxSettingsPage(businessId: businessId),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/settings/fiscal-year',
+              name: 'business_settings_fiscal_year',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                if (!_authStore!.hasBusinessPermission('fiscal_years', 'edit')) {
+                  return NoTransitionPage(
+                    child: PermissionGuard.buildAccessDeniedPage(),
+                  );
+                }
+                return NoTransitionPage(
+                  child: FiscalYearSettingsPage(businessId: businessId),
                 );
               },
             ),

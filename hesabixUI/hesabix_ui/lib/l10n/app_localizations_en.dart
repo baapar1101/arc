@@ -5431,4 +5431,173 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get otpEnterCaptchaError => 'Please enter captcha code';
+
+  @override
+  String get workflows => 'Automations';
+
+  @override
+  String get workflow => 'Automation';
+
+  @override
+  String get newWorkflow => 'New Workflow';
+
+  @override
+  String get editWorkflow => 'Edit Workflow';
+
+  @override
+  String get workflowSaved => 'Workflow saved';
+
+  @override
+  String get workflowDeleted => 'Node deleted';
+
+  @override
+  String get workflowDuplicated => 'Node duplicated';
+
+  @override
+  String get workflowCopy => 'Copy';
+
+  @override
+  String get workflowUndo => 'Undo';
+
+  @override
+  String get workflowSave => 'Save';
+
+  @override
+  String get workflowCancel => 'Cancel';
+
+  @override
+  String get workflowClose => 'Close';
+
+  @override
+  String get workflowValidationError => 'Validation Error';
+
+  @override
+  String get workflowErrorLoading => 'Error loading data';
+
+  @override
+  String get workflowErrorSaving => 'Error saving';
+
+  @override
+  String get workflowStatusUpdated => 'Workflow status updated';
+
+  @override
+  String get workflowExecuted => 'Workflow executed';
+
+  @override
+  String get workflowErrorExecuting => 'Error executing workflow';
+
+  @override
+  String get workflowNoAccess => 'You do not have access to workflows.';
+
+  @override
+  String get workflowNoAccessEditor =>
+      'You do not have access to workflow editor.';
+
+  @override
+  String get workflowNoWorkflows => 'No workflows yet.';
+
+  @override
+  String get workflowCreateFirst =>
+      'Use the button below to create your first automation.';
+
+  @override
+  String get workflowCreate => 'Create Workflow';
+
+  @override
+  String get workflowRefresh => 'Refresh';
+
+  @override
+  String get workflowRunNow => 'Run now';
+
+  @override
+  String get workflowExecutionHistory => 'Execution history';
+
+  @override
+  String get workflowEdit => 'Edit';
+
+  @override
+  String get workflowLastUpdate => 'Last update';
+
+  @override
+  String get workflowAvailableTriggers => 'Available triggers';
+
+  @override
+  String get workflowAvailableActions => 'Available actions';
+
+  @override
+  String get workflowFilters => 'Filters';
+
+  @override
+  String get workflowStatus => 'Status';
+
+  @override
+  String get workflowSearch => 'Search';
+
+  @override
+  String get workflowAllStatuses => 'All statuses';
+
+  @override
+  String get workflowOnlyActive => 'Only active';
+
+  @override
+  String get workflowInactive => 'Inactive';
+
+  @override
+  String get workflowDraft => 'Draft';
+
+  @override
+  String get workflowActive => 'Active';
+
+  @override
+  String get workflowNodeDeleted => 'Node deleted';
+
+  @override
+  String get workflowNodeDuplicated => 'Node duplicated';
+
+  @override
+  String get workflowNodeSettings => 'Settings';
+
+  @override
+  String get workflowNodeNoSettings =>
+      'This node does not require any special settings.';
+
+  @override
+  String get workflowNodeFieldRequired => 'This field is required';
+
+  @override
+  String get workflowNodeArrayType => 'Array (needs more complex UI)';
+
+  @override
+  String get workflowNodeObjectType => 'Object (needs more complex UI)';
+
+  @override
+  String get workflowExecutionLogs => 'Execution logs';
+
+  @override
+  String get workflowNoLogs => 'No logs found';
+
+  @override
+  String get workflowNoExecutions => 'No executions yet';
+
+  @override
+  String get workflowStarted => 'Started';
+
+  @override
+  String get workflowCompleted => 'Completed';
+
+  @override
+  String get workflowLogs => 'Logs';
+
+  @override
+  String get workflowErrorLoadingLogs => 'Error loading logs';
+
+  @override
+  String get workflowErrorUpdatingStatus => 'Error updating status';
+
+  @override
+  String get workflowHierarchicalLayoutApplied => 'Hierarchical layout applied';
+
+  @override
+  String get workflowForceDirectedLayoutApplied =>
+      'Force-directed layout applied';
 }

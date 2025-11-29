@@ -5402,4 +5402,173 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get otpEnterCaptchaError => 'لطفاً کد کپتچا را وارد کنید';
+
+  @override
+  String get workflows => 'اتوماسیون‌ها';
+
+  @override
+  String get workflow => 'اتوماسیون';
+
+  @override
+  String get newWorkflow => 'Workflow جدید';
+
+  @override
+  String get editWorkflow => 'ویرایش Workflow';
+
+  @override
+  String get workflowSaved => 'Workflow ذخیره شد';
+
+  @override
+  String get workflowDeleted => 'Node حذف شد';
+
+  @override
+  String get workflowDuplicated => 'Node کپی شد';
+
+  @override
+  String get workflowCopy => 'کپی';
+
+  @override
+  String get workflowUndo => 'بازگردانی';
+
+  @override
+  String get workflowSave => 'ذخیره';
+
+  @override
+  String get workflowCancel => 'انصراف';
+
+  @override
+  String get workflowClose => 'بستن';
+
+  @override
+  String get workflowValidationError => 'خطا در اعتبارسنجی';
+
+  @override
+  String get workflowErrorLoading => 'خطا در بارگذاری داده‌ها';
+
+  @override
+  String get workflowErrorSaving => 'خطا در ذخیره‌سازی';
+
+  @override
+  String get workflowStatusUpdated => 'وضعیت Workflow بروزرسانی شد';
+
+  @override
+  String get workflowExecuted => 'Workflow اجرا شد';
+
+  @override
+  String get workflowErrorExecuting => 'خطا در اجرای Workflow';
+
+  @override
+  String get workflowNoAccess => 'دسترسی به اتوماسیون‌ها برای شما فراهم نیست';
+
+  @override
+  String get workflowNoAccessEditor =>
+      'دسترسی به ویرایش اتوماسیون برای شما فراهم نیست';
+
+  @override
+  String get workflowNoWorkflows => 'هنوز workflow‌ای ایجاد نشده است.';
+
+  @override
+  String get workflowCreateFirst =>
+      'با دکمه پایین صفحه نخستین اتوماسیون را بسازید.';
+
+  @override
+  String get workflowCreate => 'افزودن Workflow';
+
+  @override
+  String get workflowRefresh => 'بازخوانی';
+
+  @override
+  String get workflowRunNow => 'اجرای فوری';
+
+  @override
+  String get workflowExecutionHistory => 'تاریخچه اجرا';
+
+  @override
+  String get workflowEdit => 'ویرایش';
+
+  @override
+  String get workflowLastUpdate => 'آخرین بروزرسانی';
+
+  @override
+  String get workflowAvailableTriggers => 'Trigger های در دسترس';
+
+  @override
+  String get workflowAvailableActions => 'Action های در دسترس';
+
+  @override
+  String get workflowFilters => 'فیلترها';
+
+  @override
+  String get workflowStatus => 'وضعیت';
+
+  @override
+  String get workflowSearch => 'جستجو';
+
+  @override
+  String get workflowAllStatuses => 'همه وضعیت‌ها';
+
+  @override
+  String get workflowOnlyActive => 'فقط فعال';
+
+  @override
+  String get workflowInactive => 'غیرفعال';
+
+  @override
+  String get workflowDraft => 'پیش‌نویس';
+
+  @override
+  String get workflowActive => 'فعال';
+
+  @override
+  String get workflowNodeDeleted => 'Node حذف شد';
+
+  @override
+  String get workflowNodeDuplicated => 'Node کپی شد';
+
+  @override
+  String get workflowNodeSettings => 'تنظیمات';
+
+  @override
+  String get workflowNodeNoSettings => 'این node نیاز به تنظیمات خاصی ندارد.';
+
+  @override
+  String get workflowNodeFieldRequired => 'این فیلد الزامی است';
+
+  @override
+  String get workflowNodeArrayType => 'Array (نیاز به UI پیچیده‌تر)';
+
+  @override
+  String get workflowNodeObjectType => 'Object (نیاز به UI پیچیده‌تر)';
+
+  @override
+  String get workflowExecutionLogs => 'لاگ اجرا';
+
+  @override
+  String get workflowNoLogs => 'لاگی یافت نشد';
+
+  @override
+  String get workflowNoExecutions => 'هنوز اجرایی وجود ندارد';
+
+  @override
+  String get workflowStarted => 'شروع';
+
+  @override
+  String get workflowCompleted => 'پایان';
+
+  @override
+  String get workflowLogs => 'لاگ';
+
+  @override
+  String get workflowErrorLoadingLogs => 'خطا در دریافت لاگ‌ها';
+
+  @override
+  String get workflowErrorUpdatingStatus => 'خطا در تغییر وضعیت';
+
+  @override
+  String get workflowHierarchicalLayoutApplied =>
+      'چیدمان Hierarchical اعمال شد';
+
+  @override
+  String get workflowForceDirectedLayoutApplied =>
+      'چیدمان Force-directed اعمال شد';
 }

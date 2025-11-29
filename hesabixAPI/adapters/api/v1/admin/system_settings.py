@@ -21,6 +21,10 @@ from app.services.system_settings_service import (
 	get_effective_notifications_settings,
 	get_system_configuration,
 	set_system_configuration,
+	get_redis_configuration,
+	set_redis_configuration,
+	get_zohal_settings,
+	set_zohal_settings,
 )
 from app.services.providers.telegram_provider import TelegramProvider
 
@@ -308,3 +312,181 @@ def set_system_configuration_endpoint(
 		max_users=payload.max_users,
 	)
 	return success_response(data, request, message="SYSTEM_CONFIGURATION_UPDATED")
+
+
+class RedisConfigurationPayload(BaseModel):
+	"""Payload برای تنظیمات Redis"""
+	enabled: bool | None = None
+	host: str | None = None
+	port: int | None = None
+	db: int | None = None
+	password: str | None = None
+
+
+@router.get(
+	"/redis",
+	summary="دریافت تنظیمات Redis Cache",
+	description="خواندن تنظیمات Redis شامل فعال/غیرفعال بودن، آدرس، پورت، شماره دیتابیس و رمز عبور.",
+)
+def get_redis_configuration_endpoint(
+	request: Request,
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	if not ctx.has_any_permission("system_settings", "superadmin"):
+		raise ApiError("FORBIDDEN", "Missing permission: system_settings", http_status=403)
+	
+	data = get_redis_configuration(db)
+	# برای امنیت، password را نشان نمی‌دهیم (فقط وجود یا عدم وجود)
+	if data.get("password"):
+		data["password"] = "***"  # نشان دادن وجود password بدون نمایش آن
+	
+	return success_response(data, request)
+
+
+@router.put(
+	"/redis",
+	summary="به‌روزرسانی تنظیمات Redis Cache",
+	description="ذخیره تنظیمات Redis. توجه: تغییرات نیاز به راه‌اندازی مجدد سرویس ندارد و به صورت خودکار اعمال می‌شود.",
+)
+def set_redis_configuration_endpoint(
+	payload: RedisConfigurationPayload,
+	request: Request,
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	if not ctx.has_any_permission("system_settings", "superadmin"):
+		raise ApiError("FORBIDDEN", "Missing permission: system_settings", http_status=403)
+	
+	# اگر password خالی ارسال شده (برای حذف password)
+	password_value = payload.password if payload.password is not None else None
+	if password_value == "":
+		password_value = None
+	
+	data = set_redis_configuration(
+		db,
+		enabled=payload.enabled,
+		host=payload.host,
+		port=payload.port,
+		db_num=payload.db,
+		password=password_value,
+	)
+	
+	# تست اتصال Redis بعد از تغییرات
+	from app.core.cache import get_redis_client
+	redis_client = get_redis_client(force_reconnect=True)
+	
+	connection_status = "connected" if redis_client else "disconnected"
+	if redis_client:
+		try:
+			redis_client.ping()
+			connection_status = "connected"
+		except Exception:
+			connection_status = "connection_failed"
+	
+	# برای امنیت، password را نشان نمی‌دهیم
+	if data.get("password"):
+		data["password"] = "***"
+	
+	data["connection_status"] = connection_status
+	
+	return success_response(data, request, message="REDIS_CONFIGURATION_UPDATED")
+
+
+@router.post(
+	"/redis/test",
+	summary="تست اتصال Redis",
+	description="تست اتصال به Redis با تنظیمات فعلی و برگرداندن وضعیت اتصال.",
+)
+def test_redis_connection_endpoint(
+	request: Request,
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	if not ctx.has_any_permission("system_settings", "superadmin"):
+		raise ApiError("FORBIDDEN", "Missing permission: system_settings", http_status=403)
+	
+	from app.core.cache import get_redis_client
+	redis_client = get_redis_client(force_reconnect=True)
+	
+	if not redis_client:
+		return success_response({
+			"connected": False,
+			"message": "Redis is disabled or connection failed"
+		}, request)
+	
+	try:
+		# تست ping
+		redis_client.ping()
+		
+		# تست set/get
+		test_key = "hesabix:test:connection"
+		test_value = "test_value"
+		redis_client.setex(test_key, 10, test_value)
+		retrieved_value = redis_client.get(test_key)
+		redis_client.delete(test_key)
+		
+		# دریافت اطلاعات سرور
+		info = redis_client.info("server")
+		redis_version = info.get("redis_version", "unknown")
+		
+		# دریافت اطلاعات حافظه
+		memory_info = redis_client.info("memory")
+		used_memory = memory_info.get("used_memory_human", "unknown")
+		
+		return success_response({
+			"connected": True,
+			"message": "Redis connection successful",
+			"redis_version": redis_version,
+			"used_memory": used_memory,
+			"test_passed": retrieved_value == test_value
+		}, request)
+	except Exception as e:
+		return success_response({
+			"connected": False,
+			"message": f"Redis connection test failed: {str(e)}"
+		}, request)
+
+
+class ZohalSettingsPayload(BaseModel):
+	api_key: str | None = None
+	base_url: str | None = None
+	low_balance_threshold: float | None = None
+
+
+@router.get(
+	"/zohal",
+	summary="دریافت تنظیمات سرویس زحل",
+	description="خواندن تنظیمات API Key و پیکربندی سرویس زحل",
+)
+def get_zohal_settings_endpoint(
+	request: Request,
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	if not ctx.has_any_permission("system_settings", "superadmin"):
+		raise ApiError("FORBIDDEN", "Missing permission: system_settings", http_status=403)
+	data = get_zohal_settings(db)
+	return success_response(data, request)
+
+
+@router.put(
+	"/zohal",
+	summary="تنظیم پیکربندی سرویس زحل",
+	description="تنظیم API Key، آدرس پایه و آستانه موجودی کم برای سرویس زحل",
+)
+def set_zohal_settings_endpoint(
+	request: Request,
+	payload: ZohalSettingsPayload,
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	if not ctx.has_any_permission("system_settings", "superadmin"):
+		raise ApiError("FORBIDDEN", "Missing permission: system_settings", http_status=403)
+	data = set_zohal_settings(
+		db,
+		api_key=payload.api_key,
+		base_url=payload.base_url,
+		low_balance_threshold=payload.low_balance_threshold,
+	)
+	return success_response(data, request, message="ZOHAL_SETTINGS_UPDATED")

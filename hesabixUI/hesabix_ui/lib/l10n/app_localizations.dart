@@ -10363,6 +10363,336 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Please enter captcha code'**
   String get otpEnterCaptchaError;
+
+  /// No description provided for @workflows.
+  ///
+  /// In en, this message translates to:
+  /// **'Automations'**
+  String get workflows;
+
+  /// No description provided for @workflow.
+  ///
+  /// In en, this message translates to:
+  /// **'Automation'**
+  String get workflow;
+
+  /// No description provided for @newWorkflow.
+  ///
+  /// In en, this message translates to:
+  /// **'New Workflow'**
+  String get newWorkflow;
+
+  /// No description provided for @editWorkflow.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Workflow'**
+  String get editWorkflow;
+
+  /// No description provided for @workflowSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Workflow saved'**
+  String get workflowSaved;
+
+  /// No description provided for @workflowDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Node deleted'**
+  String get workflowDeleted;
+
+  /// No description provided for @workflowDuplicated.
+  ///
+  /// In en, this message translates to:
+  /// **'Node duplicated'**
+  String get workflowDuplicated;
+
+  /// No description provided for @workflowCopy.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy'**
+  String get workflowCopy;
+
+  /// No description provided for @workflowUndo.
+  ///
+  /// In en, this message translates to:
+  /// **'Undo'**
+  String get workflowUndo;
+
+  /// No description provided for @workflowSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get workflowSave;
+
+  /// No description provided for @workflowCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get workflowCancel;
+
+  /// No description provided for @workflowClose.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get workflowClose;
+
+  /// No description provided for @workflowValidationError.
+  ///
+  /// In en, this message translates to:
+  /// **'Validation Error'**
+  String get workflowValidationError;
+
+  /// No description provided for @workflowErrorLoading.
+  ///
+  /// In en, this message translates to:
+  /// **'Error loading data'**
+  String get workflowErrorLoading;
+
+  /// No description provided for @workflowErrorSaving.
+  ///
+  /// In en, this message translates to:
+  /// **'Error saving'**
+  String get workflowErrorSaving;
+
+  /// No description provided for @workflowStatusUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'Workflow status updated'**
+  String get workflowStatusUpdated;
+
+  /// No description provided for @workflowExecuted.
+  ///
+  /// In en, this message translates to:
+  /// **'Workflow executed'**
+  String get workflowExecuted;
+
+  /// No description provided for @workflowErrorExecuting.
+  ///
+  /// In en, this message translates to:
+  /// **'Error executing workflow'**
+  String get workflowErrorExecuting;
+
+  /// No description provided for @workflowNoAccess.
+  ///
+  /// In en, this message translates to:
+  /// **'You do not have access to workflows.'**
+  String get workflowNoAccess;
+
+  /// No description provided for @workflowNoAccessEditor.
+  ///
+  /// In en, this message translates to:
+  /// **'You do not have access to workflow editor.'**
+  String get workflowNoAccessEditor;
+
+  /// No description provided for @workflowNoWorkflows.
+  ///
+  /// In en, this message translates to:
+  /// **'No workflows yet.'**
+  String get workflowNoWorkflows;
+
+  /// No description provided for @workflowCreateFirst.
+  ///
+  /// In en, this message translates to:
+  /// **'Use the button below to create your first automation.'**
+  String get workflowCreateFirst;
+
+  /// No description provided for @workflowCreate.
+  ///
+  /// In en, this message translates to:
+  /// **'Create Workflow'**
+  String get workflowCreate;
+
+  /// No description provided for @workflowRefresh.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh'**
+  String get workflowRefresh;
+
+  /// No description provided for @workflowRunNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Run now'**
+  String get workflowRunNow;
+
+  /// No description provided for @workflowExecutionHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'Execution history'**
+  String get workflowExecutionHistory;
+
+  /// No description provided for @workflowEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit'**
+  String get workflowEdit;
+
+  /// No description provided for @workflowLastUpdate.
+  ///
+  /// In en, this message translates to:
+  /// **'Last update'**
+  String get workflowLastUpdate;
+
+  /// No description provided for @workflowAvailableTriggers.
+  ///
+  /// In en, this message translates to:
+  /// **'Available triggers'**
+  String get workflowAvailableTriggers;
+
+  /// No description provided for @workflowAvailableActions.
+  ///
+  /// In en, this message translates to:
+  /// **'Available actions'**
+  String get workflowAvailableActions;
+
+  /// No description provided for @workflowFilters.
+  ///
+  /// In en, this message translates to:
+  /// **'Filters'**
+  String get workflowFilters;
+
+  /// No description provided for @workflowStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Status'**
+  String get workflowStatus;
+
+  /// No description provided for @workflowSearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Search'**
+  String get workflowSearch;
+
+  /// No description provided for @workflowAllStatuses.
+  ///
+  /// In en, this message translates to:
+  /// **'All statuses'**
+  String get workflowAllStatuses;
+
+  /// No description provided for @workflowOnlyActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Only active'**
+  String get workflowOnlyActive;
+
+  /// No description provided for @workflowInactive.
+  ///
+  /// In en, this message translates to:
+  /// **'Inactive'**
+  String get workflowInactive;
+
+  /// No description provided for @workflowDraft.
+  ///
+  /// In en, this message translates to:
+  /// **'Draft'**
+  String get workflowDraft;
+
+  /// No description provided for @workflowActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Active'**
+  String get workflowActive;
+
+  /// No description provided for @workflowNodeDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Node deleted'**
+  String get workflowNodeDeleted;
+
+  /// No description provided for @workflowNodeDuplicated.
+  ///
+  /// In en, this message translates to:
+  /// **'Node duplicated'**
+  String get workflowNodeDuplicated;
+
+  /// No description provided for @workflowNodeSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get workflowNodeSettings;
+
+  /// No description provided for @workflowNodeNoSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'This node does not require any special settings.'**
+  String get workflowNodeNoSettings;
+
+  /// No description provided for @workflowNodeFieldRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'This field is required'**
+  String get workflowNodeFieldRequired;
+
+  /// No description provided for @workflowNodeArrayType.
+  ///
+  /// In en, this message translates to:
+  /// **'Array (needs more complex UI)'**
+  String get workflowNodeArrayType;
+
+  /// No description provided for @workflowNodeObjectType.
+  ///
+  /// In en, this message translates to:
+  /// **'Object (needs more complex UI)'**
+  String get workflowNodeObjectType;
+
+  /// No description provided for @workflowExecutionLogs.
+  ///
+  /// In en, this message translates to:
+  /// **'Execution logs'**
+  String get workflowExecutionLogs;
+
+  /// No description provided for @workflowNoLogs.
+  ///
+  /// In en, this message translates to:
+  /// **'No logs found'**
+  String get workflowNoLogs;
+
+  /// No description provided for @workflowNoExecutions.
+  ///
+  /// In en, this message translates to:
+  /// **'No executions yet'**
+  String get workflowNoExecutions;
+
+  /// No description provided for @workflowStarted.
+  ///
+  /// In en, this message translates to:
+  /// **'Started'**
+  String get workflowStarted;
+
+  /// No description provided for @workflowCompleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Completed'**
+  String get workflowCompleted;
+
+  /// No description provided for @workflowLogs.
+  ///
+  /// In en, this message translates to:
+  /// **'Logs'**
+  String get workflowLogs;
+
+  /// No description provided for @workflowErrorLoadingLogs.
+  ///
+  /// In en, this message translates to:
+  /// **'Error loading logs'**
+  String get workflowErrorLoadingLogs;
+
+  /// No description provided for @workflowErrorUpdatingStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Error updating status'**
+  String get workflowErrorUpdatingStatus;
+
+  /// No description provided for @workflowHierarchicalLayoutApplied.
+  ///
+  /// In en, this message translates to:
+  /// **'Hierarchical layout applied'**
+  String get workflowHierarchicalLayoutApplied;
+
+  /// No description provided for @workflowForceDirectedLayoutApplied.
+  ///
+  /// In en, this message translates to:
+  /// **'Force-directed layout applied'**
+  String get workflowForceDirectedLayoutApplied;
 }
 
 class _AppLocalizationsDelegate

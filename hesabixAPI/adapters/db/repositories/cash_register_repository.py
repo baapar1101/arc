@@ -75,13 +75,14 @@ class CashRegisterRepository:
 			conditions = []
 			for f in search_fields:
 				if f == "name":
-					conditions.append(CashRegister.name.ilike(term))
-				if f == "code":
-					conditions.append(CashRegister.code.ilike(term))
+					conditions.append(func.lower(CashRegister.name).like(func.lower(term)))
+				elif f == "code":
+					conditions.append(func.lower(CashRegister.code).like(func.lower(term)))
 				elif f == "description":
-					conditions.append(CashRegister.description.ilike(term))
+					conditions.append(func.lower(CashRegister.description).like(func.lower(term)))
 				elif f in {"payment_switch_number","payment_terminal_number","merchant_id"}:
-					conditions.append(getattr(CashRegister, f).ilike(term))
+					col = getattr(CashRegister, f)
+					conditions.append(func.lower(col).like(func.lower(term)))
 			if conditions:
 				q = q.filter(or_(*conditions))
 

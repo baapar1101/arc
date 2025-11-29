@@ -100,27 +100,151 @@ class _ProductBomSectionState extends State<ProductBomSection> {
                   separatorBuilder: (_, separatorIndex) => const Divider(height: 1),
                   itemBuilder: (ctx, idx) {
                     final bom = _items[idx];
-                    return ListTile(
-                      leading: Icon(bom.isDefault ? Icons.star : Icons.blur_on, color: bom.isDefault ? Colors.orange : null),
-                      title: Text('${bom.name} (v${bom.version})'),
-                      subtitle: Text('وضعیت: ${bom.status} | بازده: ${bom.yieldPercent ?? 0}٪ | پرت: ${bom.wastagePercent ?? 0}٪'),
-                      trailing: Wrap(spacing: 8, children: [
-                        IconButton(
-                          tooltip: 'ویرایش جزئیات',
-                          icon: const Icon(Icons.tune),
-                          onPressed: () => _openEditor(bom),
+                    final itemsCount = bom.items.length;
+                    final outputsCount = bom.outputs.length;
+                    final operationsCount = bom.operations.length;
+                    return Card(
+                      margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                      child: ListTile(
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        leading: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: bom.isDefault 
+                                ? Colors.orange.withValues(alpha: 0.2)
+                                : Theme.of(context).colorScheme.surfaceContainerHighest,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(
+                            bom.isDefault ? Icons.star : Icons.blur_on,
+                            color: bom.isDefault ? Colors.orange : Theme.of(context).colorScheme.onSurfaceVariant,
+                            size: 24,
+                          ),
                         ),
-                        IconButton(
-                          tooltip: 'ویرایش',
-                          icon: const Icon(Icons.edit),
-                          onPressed: () => _showEditDialog(bom),
+                        title: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                bom.name,
+                                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                            if (bom.isDefault)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: Colors.orange.withValues(alpha: 0.2),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.star, size: 14, color: Colors.orange.shade700),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      'پیش‌فرض',
+                                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                        color: Colors.orange.shade700,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                          ],
                         ),
-                        IconButton(
-                          tooltip: 'حذف',
-                          icon: const Icon(Icons.delete_outline),
-                          onPressed: () => _delete(bom),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                Chip(
+                                  label: Text('v${bom.version}'),
+                                  labelStyle: Theme.of(context).textTheme.bodySmall,
+                                  padding: EdgeInsets.zero,
+                                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                  visualDensity: VisualDensity.compact,
+                                ),
+                                const SizedBox(width: 8),
+                                Chip(
+                                  label: Text(_getStatusText(bom.status)),
+                                  labelStyle: Theme.of(context).textTheme.bodySmall,
+                                  padding: EdgeInsets.zero,
+                                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                  visualDensity: VisualDensity.compact,
+                                  backgroundColor: _getStatusColor(bom.status).withValues(alpha: 0.2),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Wrap(
+                              spacing: 12,
+                              runSpacing: 4,
+                              children: [
+                                if (bom.yieldPercent != null)
+                                  _buildInfoChip(
+                                    context,
+                                    Icons.trending_up,
+                                    'بازده: ${bom.yieldPercent}٪',
+                                  ),
+                                if (bom.wastagePercent != null)
+                                  _buildInfoChip(
+                                    context,
+                                    Icons.trending_down,
+                                    'پرت: ${bom.wastagePercent}٪',
+                                  ),
+                                _buildInfoChip(
+                                  context,
+                                  Icons.inventory_2,
+                                  'مواد: $itemsCount',
+                                ),
+                                _buildInfoChip(
+                                  context,
+                                  Icons.output,
+                                  'خروجی: $outputsCount',
+                                ),
+                                if (operationsCount > 0)
+                                  _buildInfoChip(
+                                    context,
+                                    Icons.build,
+                                    'عملیات: $operationsCount',
+                                  ),
+                              ],
+                            ),
+                            if (bom.createdAt != null || bom.updatedAt != null) ...[
+                              const SizedBox(height: 8),
+                              Text(
+                                _getDateInfo(bom),
+                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
-                      ]),
+                        trailing: Wrap(spacing: 4, children: [
+                          IconButton(
+                            tooltip: 'ویرایش جزئیات (مواد، خروجی‌ها، عملیات)',
+                            icon: const Icon(Icons.tune),
+                            onPressed: () => _openEditor(bom),
+                          ),
+                          IconButton(
+                            tooltip: 'ویرایش اطلاعات کلی (نام، نسخه، پیش‌فرض)',
+                            icon: const Icon(Icons.edit),
+                            onPressed: () => _showEditDialog(bom),
+                          ),
+                          IconButton(
+                            tooltip: 'حذف فرمول',
+                            icon: const Icon(Icons.delete_outline),
+                            color: Colors.red.shade700,
+                            onPressed: () => _delete(bom),
+                          ),
+                        ]),
+                        isThreeLine: true,
+                      ),
                     );
                   },
                 ),
@@ -140,15 +264,346 @@ class _ProductBomSectionState extends State<ProductBomSection> {
     );
   }
 
+  Widget _buildInfoChip(BuildContext context, IconData icon, String label) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
+        const SizedBox(width: 4),
+        Text(
+          label,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _getStatusText(String status) {
+    switch (status.toLowerCase()) {
+      case 'draft':
+        return 'پیش‌نویس';
+      case 'active':
+        return 'فعال';
+      case 'inactive':
+        return 'غیرفعال';
+      case 'archived':
+        return 'بایگانی';
+      default:
+        return status;
+    }
+  }
+
+  Color _getStatusColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'draft':
+        return Colors.grey;
+      case 'active':
+        return Colors.green;
+      case 'inactive':
+        return Colors.orange;
+      case 'archived':
+        return Colors.blueGrey;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  String _getDateInfo(ProductBOM bom) {
+    final parts = <String>[];
+    if (bom.createdAt != null) {
+      final created = bom.createdAt!;
+      parts.add('ایجاد: ${created.year}/${created.month}/${created.day}');
+    }
+    if (bom.updatedAt != null && bom.updatedAt != bom.createdAt) {
+      final updated = bom.updatedAt!;
+      parts.add('ویرایش: ${updated.year}/${updated.month}/${updated.day}');
+    }
+    return parts.join(' | ');
+  }
+
 
   Future<void> _showCreateDialog() async {
-    final controller = TextEditingController();
-    final nameController = TextEditingController();
-    bool isDefault = false;
-    final theme = Theme.of(context);
+    final result = await showDialog<ProductBOM>(
+      context: context,
+      builder: (_) => _CreateBomDialog(
+        businessId: widget.businessId,
+        productId: widget.productId!,
+        service: _service,
+      ),
+    );
+    if (result != null && mounted) {
+      setState(() {
+        _items = [result, ..._items];
+      });
+    }
+  }
+
+  Future<void> _showEditDialog(ProductBOM bom) async {
+    final result = await showDialog<ProductBOM>(
+      context: context,
+      builder: (_) => _EditBomDialog(
+        businessId: widget.businessId,
+        bom: bom,
+        service: _service,
+      ),
+    );
+    if (result != null && mounted) {
+      setState(() {
+        _items = _items.map((e) => e.id == result.id ? result : e).toList();
+      });
+    }
+  }
+
+  Future<void> _openEditor(ProductBOM bom) async {
+    final updated = await showDialog<ProductBOM>(
+      context: context,
+      builder: (_) => BomEditorDialog(businessId: widget.businessId, bom: bom),
+    );
+    if (updated != null && mounted) {
+      setState(() {
+        _items = _items.map((e) => e.id == updated.id ? updated : e).toList();
+      });
+    }
+  }
+
+  Future<void> _delete(ProductBOM bom) async {
+    final itemsCount = bom.items.length;
+    final outputsCount = bom.outputs.length;
+    final operationsCount = bom.operations.length;
+    
     final ok = await showDialog<bool>(
       context: context,
-      builder: (_) => Dialog(
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Colors.red.shade700),
+            const SizedBox(width: 8),
+            const Expanded(child: Text('حذف فرمول تولید')),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'آیا از حذف فرمول «${bom.name} (v${bom.version})» مطمئن هستید؟',
+              style: Theme.of(context).textTheme.bodyLarge,
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.red.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.red.shade200),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'این فرمول شامل:',
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.red.shade900,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  if (itemsCount > 0)
+                    Row(
+                      children: [
+                        Icon(Icons.inventory_2, size: 16, color: Colors.red.shade700),
+                        const SizedBox(width: 8),
+                        Text('$itemsCount ماده اولیه', style: TextStyle(color: Colors.red.shade700)),
+                      ],
+                    ),
+                  if (outputsCount > 0) ...[
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Icon(Icons.output, size: 16, color: Colors.red.shade700),
+                        const SizedBox(width: 8),
+                        Text('$outputsCount محصول خروجی', style: TextStyle(color: Colors.red.shade700)),
+                      ],
+                    ),
+                  ],
+                  if (operationsCount > 0) ...[
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Icon(Icons.build, size: 16, color: Colors.red.shade700),
+                        const SizedBox(width: 8),
+                        Text('$operationsCount عملیات', style: TextStyle(color: Colors.red.shade700)),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'این عمل قابل بازگشت نیست.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Colors.red.shade700,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('انصراف'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.red.shade700,
+            ),
+            child: const Text('حذف'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await _service.delete(businessId: widget.businessId, bomId: bom.id!);
+      if (!mounted) return;
+      setState(() {
+        _items = _items.where((e) => e.id != bom.id).toList();
+      });
+      if (mounted) {
+        SnackBarHelper.show(context, message: 'فرمول با موفقیت حذف شد');
+      }
+    } catch (e) {
+      if (!mounted) return;
+      SnackBarHelper.showError(context, message: 'خطا در حذف فرمول: $e');
+    }
+  }
+}
+
+class _CreateBomDialog extends StatefulWidget {
+  final int businessId;
+  final int productId;
+  final BomService service;
+
+  const _CreateBomDialog({
+    required this.businessId,
+    required this.productId,
+    required this.service,
+  });
+
+  @override
+  State<_CreateBomDialog> createState() => _CreateBomDialogState();
+}
+
+class _CreateBomDialogState extends State<_CreateBomDialog> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _versionController;
+  late final TextEditingController _nameController;
+  bool _isDefault = false;
+  bool _isLoading = false;
+  String? _errorMessage;
+  bool _hasChanges = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _versionController = TextEditingController();
+    _nameController = TextEditingController();
+    
+    // Track changes
+    _versionController.addListener(_onFieldChanged);
+    _nameController.addListener(_onFieldChanged);
+  }
+
+  void _onFieldChanged() {
+    if (!mounted) return;
+    final hasChanges = _versionController.text.trim().isNotEmpty ||
+        _nameController.text.trim().isNotEmpty ||
+        _isDefault;
+    if (hasChanges != _hasChanges) {
+      setState(() {
+        _hasChanges = hasChanges;
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _versionController.dispose();
+    _nameController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _handleSave() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final created = await widget.service.create(
+        businessId: widget.businessId,
+        payload: {
+          'product_id': widget.productId,
+          'version': _versionController.text.trim().isEmpty ? 'v1' : _versionController.text.trim(),
+          'name': _nameController.text.trim().isEmpty ? 'BOM' : _nameController.text.trim(),
+          'is_default': _isDefault,
+          'items': <Map<String, dynamic>>[],
+          'outputs': <Map<String, dynamic>>[],
+          'operations': <Map<String, dynamic>>[],
+        },
+      );
+      if (!mounted) return;
+      Navigator.of(context).pop<ProductBOM>(created);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _errorMessage = 'خطا در ایجاد فرمول: $e';
+      });
+    }
+  }
+
+  Future<bool> _handleClose() async {
+    if (!_hasChanges || _isLoading) {
+      return true;
+    }
+    final shouldClose = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('تغییرات ذخیره نشده'),
+        content: const Text('آیا می‌خواهید بدون ذخیره تغییرات خارج شوید؟'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('بازگشت'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('خروج'),
+          ),
+        ],
+      ),
+    );
+    return shouldClose ?? false;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    
+    return WillPopScope(
+      onWillPop: () async {
+        if (_isLoading) return false;
+        return await _handleClose();
+      },
+      child: Dialog(
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
         ),
@@ -192,7 +647,11 @@ class _ProductBomSectionState extends State<ProductBomSection> {
                       ),
                     ),
                     IconButton(
-                      onPressed: () => Navigator.of(context).pop(false),
+                      onPressed: _isLoading ? null : () async {
+                        if (await _handleClose()) {
+                          Navigator.of(context).pop();
+                        }
+                      },
                       icon: const Icon(Icons.close),
                       color: theme.colorScheme.onPrimary,
                     ),
@@ -200,98 +659,131 @@ class _ProductBomSectionState extends State<ProductBomSection> {
                 ),
               ),
               // Form content
-              Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // Title field
-                    TextField(
-                      controller: nameController,
-                      decoration: InputDecoration(
-                        labelText: 'عنوان فرمول',
-                        hintText: 'مثال: فرمول اصلی تولید',
-                        prefixIcon: const Icon(Icons.title),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        filled: true,
-                        fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    // Version field
-                    TextField(
-                      controller: controller,
-                      decoration: InputDecoration(
-                        labelText: 'نسخه',
-                        hintText: 'مثال: v1, v2.0, 2024',
-                        prefixIcon: const Icon(Icons.tag),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        filled: true,
-                        fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-                        helperText: 'اگر خالی بماند، به صورت خودکار v1 تنظیم می‌شود',
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    // Default checkbox with better styling
-                    StatefulBuilder(
-                      builder: (ctx, setSt) {
-                        return Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+              Form(
+                key: _formKey,
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // Title field
+                      TextFormField(
+                        controller: _nameController,
+                        enabled: !_isLoading,
+                        decoration: InputDecoration(
+                          labelText: 'عنوان فرمول',
+                          hintText: 'مثال: فرمول اصلی تولید',
+                          prefixIcon: const Icon(Icons.title),
+                          border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: isDefault
-                                  ? theme.colorScheme.primary
-                                  : theme.colorScheme.outline.withValues(alpha: 0.3),
-                              width: isDefault ? 2 : 1,
+                          ),
+                          filled: true,
+                          fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return 'لطفاً عنوان فرمول را وارد کنید';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      // Version field
+                      TextFormField(
+                        controller: _versionController,
+                        enabled: !_isLoading,
+                        decoration: InputDecoration(
+                          labelText: 'نسخه',
+                          hintText: 'مثال: v1, v2.0, 2024',
+                          prefixIcon: const Icon(Icons.tag),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          filled: true,
+                          fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                          helperText: 'اگر خالی بماند، به صورت خودکار v1 تنظیم می‌شود',
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      // Default checkbox with better styling
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: _isDefault
+                                ? theme.colorScheme.primary
+                                : theme.colorScheme.outline.withValues(alpha: 0.3),
+                            width: _isDefault ? 2 : 1,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              _isDefault ? Icons.star : Icons.star_border,
+                              color: _isDefault
+                                  ? Colors.orange
+                                  : theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                              size: 28,
                             ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'تنظیم به عنوان پیش‌فرض',
+                                    style: theme.textTheme.titleSmall?.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'این فرمول به صورت پیش‌فرض برای تولید استفاده می‌شود',
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Switch(
+                              value: _isDefault,
+                              onChanged: _isLoading
+                                  ? null
+                                  : (v) => setState(() => _isDefault = v),
+                            ),
+                          ],
+                        ),
+                      ),
+                      // Error message
+                      if (_errorMessage != null) ...[
+                        const SizedBox(height: 16),
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.red.shade50,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.red.shade300),
                           ),
                           child: Row(
                             children: [
-                              Icon(
-                                isDefault ? Icons.star : Icons.star_border,
-                                color: isDefault
-                                    ? Colors.orange
-                                    : theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                                size: 28,
-                              ),
-                              const SizedBox(width: 12),
+                              Icon(Icons.error_outline, color: Colors.red.shade700),
+                              const SizedBox(width: 8),
                               Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'تنظیم به عنوان پیش‌فرض',
-                                      style: theme.textTheme.titleSmall?.copyWith(
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      'این فرمول به صورت پیش‌فرض برای تولید استفاده می‌شود',
-                                      style: theme.textTheme.bodySmall?.copyWith(
-                                        color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
-                                      ),
-                                    ),
-                                  ],
+                                child: Text(
+                                  _errorMessage!,
+                                  style: TextStyle(color: Colors.red.shade700),
                                 ),
-                              ),
-                              Switch(
-                                value: isDefault,
-                                onChanged: (v) => setSt(() => isDefault = v),
                               ),
                             ],
                           ),
-                        );
-                      },
-                    ),
-                  ],
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
               ),
               // Actions
@@ -308,7 +800,13 @@ class _ProductBomSectionState extends State<ProductBomSection> {
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
                     TextButton.icon(
-                      onPressed: () => Navigator.of(context).pop(false),
+                      onPressed: _isLoading
+                          ? null
+                          : () async {
+                              if (await _handleClose()) {
+                                Navigator.of(context).pop();
+                              }
+                            },
                       icon: const Icon(Icons.cancel_outlined),
                       label: const Text('انصراف'),
                       style: TextButton.styleFrom(
@@ -317,9 +815,15 @@ class _ProductBomSectionState extends State<ProductBomSection> {
                     ),
                     const SizedBox(width: 12),
                     FilledButton.icon(
-                      onPressed: () => Navigator.of(context).pop(true),
-                      icon: const Icon(Icons.save),
-                      label: const Text('ذخیره'),
+                      onPressed: _isLoading ? null : _handleSave,
+                      icon: _isLoading
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.save),
+                      label: Text(_isLoading ? 'در حال ایجاد...' : 'ذخیره'),
                       style: FilledButton.styleFrom(
                         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                       ),
@@ -332,81 +836,6 @@ class _ProductBomSectionState extends State<ProductBomSection> {
         ),
       ),
     );
-    if (ok != true) return;
-    try {
-      final created = await _service.create(
-        businessId: widget.businessId,
-        payload: {
-          'product_id': widget.productId,
-          'version': controller.text.trim().isEmpty ? 'v1' : controller.text.trim(),
-          'name': nameController.text.trim().isEmpty ? 'BOM' : nameController.text.trim(),
-          'is_default': isDefault,
-          'items': <Map<String, dynamic>>[],
-          'outputs': <Map<String, dynamic>>[],
-          'operations': <Map<String, dynamic>>[],
-        },
-      );
-      if (!mounted) return;
-      setState(() {
-        _items = [created, ..._items];
-      });
-    } catch (e) {
-      if (!mounted) return;
-      SnackBarHelper.showError(context, message: 'خطا: $e');
-    }
-  }
-
-  Future<void> _showEditDialog(ProductBOM bom) async {
-    final result = await showDialog<ProductBOM>(
-      context: context,
-      builder: (_) => _EditBomDialog(
-        businessId: widget.businessId,
-        bom: bom,
-        service: _service,
-      ),
-    );
-    if (result != null && mounted) {
-      setState(() {
-        _items = _items.map((e) => e.id == result.id ? result : e).toList();
-      });
-    }
-  }
-
-  Future<void> _openEditor(ProductBOM bom) async {
-    final updated = await showDialog<ProductBOM>(
-      context: context,
-      builder: (_) => BomEditorDialog(businessId: widget.businessId, bom: bom),
-    );
-    if (updated != null && mounted) {
-      setState(() {
-        _items = _items.map((e) => e.id == updated.id ? updated : e).toList();
-      });
-    }
-  }
-
-  Future<void> _delete(ProductBOM bom) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('حذف فرمول'),
-        content: Text('آیا از حذف «${bom.name}» مطمئن هستید؟'),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('انصراف')),
-          FilledButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('حذف')),
-        ],
-      ),
-    );
-    if (ok != true) return;
-    try {
-      await _service.delete(businessId: widget.businessId, bomId: bom.id!);
-      if (!mounted) return;
-      setState(() {
-        _items = _items.where((e) => e.id != bom.id).toList();
-      });
-    } catch (e) {
-      if (!mounted) return;
-      SnackBarHelper.showError(context, message: 'خطا: $e');
-    }
   }
 }
 

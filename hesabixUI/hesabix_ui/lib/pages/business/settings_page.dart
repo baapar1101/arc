@@ -58,10 +58,24 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
                 _buildSettingItem(
                   context,
+                  title: 'ویرایش سال مالی جاری',
+                  subtitle: 'ویرایش عنوان و تاریخ‌های سال مالی جاری',
+                  icon: Icons.calendar_today,
+                  onTap: () => context.go('/business/${widget.businessId}/settings/fiscal-year'),
+                ),
+                _buildSettingItem(
+                  context,
                   title: t.creditSettingsTitle,
                   subtitle: t.creditSettingsSubtitle,
                   icon: Icons.credit_score_outlined,
                   onTap: () => context.go('/business/${widget.businessId}/settings/credit'),
+                ),
+                _buildSettingItem(
+                  context,
+                  title: 'تنظیمات فروش سریع',
+                  subtitle: 'تنظیمات پیش‌فرض برای فروش سریع',
+                  icon: Icons.point_of_sale_outlined,
+                  onTap: () => context.go('/business/${widget.businessId}/settings/quick-sales'),
                 ),
                 _buildSettingItem(
                   context,
@@ -182,7 +196,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   title: t.systemLogs,
                   subtitle: t.systemLogsDescription,
                   icon: Icons.assignment,
-                  onTap: () => _showSystemLogsDialog(context),
+                  onTap: () => context.go('/business/${widget.businessId}/reports/activity-logs'),
                 ),
               ],
             ),
@@ -309,28 +323,4 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
-  void _showSystemLogsDialog(BuildContext context) {
-    final t = AppLocalizations.of(context);
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(t.systemLogs),
-        content: Text(t.systemLogsDialogContent),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(t.close),
-          ),
-          FilledButton(
-            onPressed: () {
-              Navigator.pop(context);
-              // Navigate to business dashboard for now (until system logs page is created)
-              context.go('/business/${widget.businessId}/dashboard');
-            },
-            child: Text(t.view),
-          ),
-        ],
-      ),
-    );
-  }
 }

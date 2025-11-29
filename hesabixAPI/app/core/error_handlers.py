@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Any
+import logging
 
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.exceptions import RequestValidationError
@@ -93,8 +94,41 @@ def _translate_http_exception(request: Request, exc: HTTPException) -> JSONRespo
 	return JSONResponse(status_code=status_code, content={"success": False, "error": {"code": "HTTP_ERROR", "message": message}})
 
 
+def _handle_generic_exception(request: Request, exc: Exception) -> JSONResponse:
+	"""Handler برای خطاهای عمومی و غیرمنتظره"""
+	logger = logging.getLogger(__name__)
+	
+	# لاگ خطا با جزئیات کامل
+	logger.error(
+		f"Unhandled exception: {type(exc).__name__}: {str(exc)}",
+		exc_info=True,
+		extra={
+			"path": request.url.path,
+			"method": request.method,
+			"query_params": dict(request.query_params),
+		}
+	)
+	
+	translator = getattr(request.state, "translator", None)
+	message = "خطای داخلی سرور رخ داد. لطفاً با پشتیبانی تماس بگیرید."
+	if translator is not None:
+		message = translator.t("INTERNAL_SERVER_ERROR", default=message)
+	
+	return JSONResponse(
+		status_code=500,
+		content={
+			"success": False,
+			"error": {
+				"code": "INTERNAL_SERVER_ERROR",
+				"message": message,
+			},
+		},
+	)
+
+
 def register_error_handlers(app: FastAPI) -> None:
 	app.add_exception_handler(RequestValidationError, _translate_validation_error)
 	app.add_exception_handler(HTTPException, _translate_http_exception)
+	app.add_exception_handler(Exception, _handle_generic_exception)
 
 

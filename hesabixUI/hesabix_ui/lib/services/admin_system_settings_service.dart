@@ -28,6 +28,21 @@ class AdminSystemSettingsService {
     final res = await _api.put<Map<String, dynamic>>('/api/v1/admin/system-settings/configuration', data: data);
     return Map<String, dynamic>.from(res.data?['data'] as Map? ?? const {});
   }
+
+  Future<Map<String, dynamic>> getRedisConfiguration() async {
+    final res = await _api.get<Map<String, dynamic>>('/api/v1/admin/system-settings/redis');
+    return Map<String, dynamic>.from(res.data?['data'] as Map? ?? const {});
+  }
+
+  Future<Map<String, dynamic>> updateRedisConfiguration(Map<String, dynamic> data) async {
+    final res = await _api.put<Map<String, dynamic>>('/api/v1/admin/system-settings/redis', data: data);
+    return Map<String, dynamic>.from(res.data?['data'] as Map? ?? const {});
+  }
+
+  Future<Map<String, dynamic>> testRedisConnection() async {
+    final res = await _api.post<Map<String, dynamic>>('/api/v1/admin/system-settings/redis/test');
+    return Map<String, dynamic>.from(res.data?['data'] as Map? ?? const {});
+  }
 }
 
 

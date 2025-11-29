@@ -45,8 +45,10 @@ MIGRATION_FILES = [
     '23_storage_plan',  # storage_plans, business_storage_subscriptions, storage_invoices, storage_usage_transactions
     '24_document_monetization',  # document_subscription_plans, business_document_subscriptions, document_usage_policies, document_usage_charges, document_usage_periods, document_usage_cursors
     '25_wallet',  # wallet_accounts, wallet_transactions, wallet_payouts, wallet_settings
+    '42_zohal',  # zohal_services, zohal_service_logs (بعد از wallet و currencies)
     '26_telegram',  # telegram_link_tokens, telegram_ai_sessions
-    '27_system_settings',  # system_settings
+    '27_system_settings',
+    '41_monitoring'  # monitoring_metrics, monitoring_service_status, monitoring_alerts,  # system_settings
     '28_notification',  # notification_templates, user_notification_settings, notification_outbox, notification_delivery_attempts
     '29_marketplace',  # marketplace_plugins, marketplace_plugin_plans, marketplace_orders, marketplace_invoices, business_plugins
     '30_credit',  # business_credit_settings, installment_plan_templates
@@ -54,6 +56,7 @@ MIGRATION_FILES = [
     '33_announcement',  # announcements, user_announcements
     '38_payment_gateway',  # payment_gateways, business_payment_gateways
     '39_ping_pong',  # ping_pong_scores
+    '40_quick_sales_settings',  # quick_sales_settings (بعد از businesses, persons, warehouses, cash_registers, currencies)
     '19_seed_data',  # اطلاعات پایه: پشتیبانی، ارزها، مالیات، تنظیمات
     '20_accounts_chart',  # چارت حساب‌های حسابداری استاندارد
 ]

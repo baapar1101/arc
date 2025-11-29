@@ -6,6 +6,7 @@ from sqlalchemy import event
 from sqlalchemy.orm import Session
 from datetime import datetime
 from typing import Dict, Any, Optional
+from decimal import Decimal
 from adapters.db.models.activity_log import ActivityLog
 
 # Import مدل‌ها برای mapping
@@ -230,6 +231,22 @@ def build_description(instance, action: str) -> str:
 
 
 # Helper function برای استخراج داده‌های مهم
+def _to_json_serializable(value: Any) -> Any:
+	"""تبدیل مقدار به نوع قابل JSON"""
+	if value is None:
+		return None
+	if hasattr(value, 'value'):  # Enum
+		return value.value
+	if isinstance(value, datetime):
+		return value.isoformat()
+	if isinstance(value, Decimal):
+		return float(value)
+	if isinstance(value, (int, float, str, bool)):
+		return value
+	# برای سایر انواع، به string تبدیل کن
+	return str(value)
+
+
 def extract_key_fields(instance) -> Dict[str, Any]:
 	"""استخراج فیلدهای مهم برای لاگ"""
 	key_fields = {}
@@ -452,22 +469,11 @@ def receive_after_flush(session: Session, flush_context):
 					# مقدار قبلی
 					if history.deleted:
 						old_val = history.deleted[0]
-						# تبدیل به نوع قابل JSON
-						if hasattr(old_val, 'value'):  # Enum
-							before_data[attr_name] = old_val.value
-						elif isinstance(old_val, datetime):
-							before_data[attr_name] = old_val.isoformat()
-						else:
-							before_data[attr_name] = old_val
+						before_data[attr_name] = _to_json_serializable(old_val)
 					# مقدار جدید
 					if history.added:
 						new_val = history.added[0]
-						if hasattr(new_val, 'value'):  # Enum
-							after_data[attr_name] = new_val.value
-						elif isinstance(new_val, datetime):
-							after_data[attr_name] = new_val.isoformat()
-						else:
-							after_data[attr_name] = new_val
+						after_data[attr_name] = _to_json_serializable(new_val)
 			except Exception:
 				# اگر خطا در get_history بود، skip کن
 				continue

@@ -755,6 +755,107 @@ def _post_gift_credit_document(db: Session, business_id: int, user_id: int, amou
 	return int(document.id)
 
 
+def _ensure_zohal_expense_account(db: Session) -> Account:
+	"""
+	بررسی و ایجاد حساب هزینه سرویس‌های استعلامات (70903)
+	"""
+	account = db.query(Account).filter(
+		and_(
+			Account.code == "70903",
+			Account.business_id.is_(None)
+		)
+	).first()
+	
+	if not account:
+		# ایجاد حساب هزینه سرویس‌های استعلامات
+		account = Account(
+			name="هزینه سرویس‌های استعلامات",
+			code="70903",
+			account_type="expense",
+			business_id=None  # حساب عمومی
+		)
+		db.add(account)
+		db.flush()
+	
+	return account
+
+
+def charge_wallet_for_zohal_service(
+	db: Session,
+	business_id: int,
+	user_id: int,
+	amount: Decimal,
+	service_id: int,
+	service_name: str,
+	description: str | None = None,
+) -> Dict[str, Any]:
+	"""
+	کسر مبلغ از کیف‌پول برای سرویس‌های زحل و ایجاد سند حسابداری
+	"""
+	amount = Decimal(str(amount or 0))
+	if amount <= 0:
+		raise ApiError("INVALID_AMOUNT", "مبلغ باید بزرگتر از صفر باشد", http_status=400)
+	
+	# بررسی موجودی
+	account = _get_wallet_account_for_update(db, business_id)
+	available = Decimal(str(account.available_balance or 0))
+	
+	if available < amount:
+		raise ApiError("INSUFFICIENT_FUNDS", "موجودی کیف پول کافی نیست", http_status=400)
+	
+	# کسر از موجودی
+	account.available_balance = available - amount
+	db.flush()
+	
+	# ایجاد سند حسابداری
+	currency_id = _resolve_wallet_currency_id(db)
+	wallet_acc = _get_fixed_account_by_code(db, "10205")  # حساب کیف پول
+	expense_acc = _ensure_zohal_expense_account(db)  # حساب هزینه سرویس‌های استعلامات
+	
+	lines = [
+		{"account_id": expense_acc.id, "debit": amount, "credit": 0, "description": description or f"هزینه سرویس {service_name}"},
+		{"account_id": wallet_acc.id, "debit": 0, "credit": amount, "description": f"کسر از کیف پول برای سرویس استعلامات"},
+	]
+	
+	document = _create_simple_document(
+		db=db,
+		business_id=business_id,
+		user_id=user_id,
+		document_type="payment",
+		currency_id=currency_id,
+		document_date=datetime.utcnow().date(),
+		description=description or f"هزینه سرویس {service_name}",
+		accounting_lines=lines,
+	)
+	
+	# ثبت تراکنش کیف پول
+	extra_info = {
+		"source": "zohal_service",
+		"service_id": service_id,
+		"service_name": service_name,
+	}
+	extra_info_json = json.dumps(extra_info)
+	
+	tx = WalletTransaction(
+		business_id=int(business_id),
+		type="zohal_service_charge",
+		status="succeeded",
+		amount=amount,
+		fee_amount=Decimal("0"),
+		description=description or f"هزینه سرویس {service_name}",
+		document_id=document.id,
+		extra_info=extra_info_json,
+	)
+	db.add(tx)
+	db.flush()
+	
+	return {
+		"wallet_transaction_id": tx.id,
+		"document_id": document.id,
+		"available_balance": float(account.available_balance or 0),
+	}
+
+
 def add_gift_balance_admin(
 	db: Session,
 	business_id: int,

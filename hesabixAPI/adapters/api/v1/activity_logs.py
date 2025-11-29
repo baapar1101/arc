@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Request, Query
+from fastapi import APIRouter, Depends, Request, Query, Body
 from sqlalchemy.orm import Session
 from typing import Optional
 from datetime import datetime
@@ -10,6 +10,122 @@ from adapters.db.repositories.activity_log_repo import ActivityLogRepository
 from adapters.db.models.activity_log import ActivityLog
 
 router = APIRouter(prefix="/activity-logs", tags=["activity-logs"])
+
+
+@router.post("/business/{business_id}/table")
+@require_business_access("business_id")
+def get_business_activity_logs_table(
+	request: Request,
+	business_id: int,
+	ctx: AuthContext = Depends(get_current_user),
+	db: Session = Depends(get_db),
+	body: dict = Body(...)
+) -> dict:
+	"""دریافت لاگ‌های فعالیت یک کسب و کار برای DataTable (POST)"""
+	# تبدیل skip/take به page/per_page
+	skip = body.get("skip", 0)
+	take = body.get("take", 50)
+	page = (skip // take) + 1 if take > 0 else 1
+	per_page = take
+	
+	# استخراج فیلترها از body
+	category = body.get("category")
+	entity_type = body.get("entity_type")
+	start_date_str = body.get("start_date")
+	end_date_str = body.get("end_date")
+	
+	start_date = None
+	if start_date_str:
+		try:
+			start_date = datetime.fromisoformat(start_date_str.replace('Z', '+00:00'))
+		except:
+			pass
+	
+	end_date = None
+	if end_date_str:
+		try:
+			end_date = datetime.fromisoformat(end_date_str.replace('Z', '+00:00'))
+		except:
+			pass
+	
+	# استخراج search و filters
+	search = body.get("search")
+	search_fields = body.get("search_fields", [])
+	filters = body.get("filters", [])
+	
+	# اعمال فیلترهای اضافی از filters
+	for filter_item in filters:
+		if isinstance(filter_item, dict):
+			prop = filter_item.get("property")
+			value = filter_item.get("value")
+			if prop == "category" and value:
+				category = value
+			elif prop == "entity_type" and value:
+				entity_type = value
+	
+	repo = ActivityLogRepository(db)
+	offset = (page - 1) * per_page
+	
+	logs = repo.get_by_business(
+		business_id=business_id,
+		category=category,
+		entity_type=entity_type,
+		start_date=start_date,
+		end_date=end_date,
+		limit=per_page,
+		offset=offset
+	)
+	
+	# شمارش کل
+	total = repo.count_by_business(
+		business_id=business_id,
+		category=category,
+		entity_type=entity_type,
+		start_date=start_date,
+		end_date=end_date
+	)
+	
+	# تبدیل به دیکشنری
+	logs_data = []
+	for log in logs:
+		logs_data.append({
+			"id": log.id,
+			"user_id": log.user_id,
+			"user_name": f"{log.user.first_name or ''} {log.user.last_name or ''}".strip() if log.user else None,
+			"category": log.category,
+			"action": log.action,
+			"entity_type": log.entity_type,
+			"entity_id": log.entity_id,
+			"description": log.description,
+			"before_data": log.before_data,
+			"after_data": log.after_data,
+			"extra_info": log.extra_info,
+			"created_at": log.created_at.isoformat()
+		})
+	
+	# فیلتر بر اساس search اگر وجود داشته باشد
+	if search and search_fields:
+		search_lower = search.lower()
+		logs_data = [
+			log for log in logs_data
+			if any(
+				search_lower in str(log.get(field, "")).lower()
+				for field in search_fields
+			)
+		]
+		total = len(logs_data)  # در صورت جستجو، total را به‌روزرسانی می‌کنیم
+	
+	return success_response(
+		data={
+			"items": logs_data,
+			"page": page,
+			"limit": per_page,
+			"per_page": per_page,  # برای سازگاری
+			"total": total,
+			"total_pages": (total + per_page - 1) // per_page if total > 0 else 0
+		},
+		request=request
+	)
 
 
 @router.get("/business/{business_id}")

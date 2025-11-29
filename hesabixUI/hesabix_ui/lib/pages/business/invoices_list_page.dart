@@ -12,6 +12,7 @@ import 'package:hesabix_ui/core/date_utils.dart' show HesabixDateUtils;
 import 'package:hesabix_ui/utils/number_formatters.dart' show formatWithThousands;
 import 'package:hesabix_ui/widgets/document/document_details_dialog.dart';
 import 'package:hesabix_ui/services/invoice_service.dart';
+import 'package:hesabix_ui/services/business_dashboard_service.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../widgets/invoice/invoice_import_dialog.dart';
 import '../../utils/responsive_helper.dart';
@@ -38,6 +39,7 @@ class InvoicesListPage extends StatefulWidget {
 class _InvoicesListPageState extends State<InvoicesListPage> {
   final GlobalKey _tableKey = GlobalKey();
   final InvoiceService _invoiceService = InvoiceService();
+  late final BusinessDashboardService _dashboardService = BusinessDashboardService(widget.apiClient);
 
   String? _selectedInvoiceType;
   bool _isInitialized = false;
@@ -45,6 +47,8 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
   DateTime? _toDate;
   bool? _isProforma; // null=همه، true=پیشفاکتور، false=قطعی
 
+  int? _selectedFiscalYearId;
+  List<Map<String, dynamic>> _fiscalYears = [];
   void _refreshData() {
     // استفاده از addPostFrameCallback تا بعد از rebuild اجرا شود
     // این باعث می‌شود که widget.config با مقادیر جدید فیلترها rebuild شده باشد
@@ -65,12 +69,33 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
   @override
   void initState() {
     super.initState();
+    _loadFiscalYears();
     // بعد از اولین build، flag را set کن
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         _isInitialized = true;
       }
     });
+  }
+
+  Future<void> _loadFiscalYears() async {
+    try {
+      final items = await _dashboardService.listFiscalYears(widget.businessId);
+      if (!mounted) return;
+      setState(() {
+        _fiscalYears = items;
+        // اگر سال مالی انتخاب نشده، سال مالی جاری را انتخاب کن
+        if (_selectedFiscalYearId == null && _fiscalYears.isNotEmpty) {
+          final current = _fiscalYears.firstWhere(
+            (fy) => fy['is_current'] == true,
+            orElse: () => _fiscalYears.first,
+          );
+          _selectedFiscalYearId = current['id'] as int?;
+        }
+      });
+    } catch (_) {
+      // ignore errors
+    }
   }
 
   @override
@@ -189,6 +214,42 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
             ),
           ),
           const SizedBox(height: 8),
+          // فیلتر سال مالی
+          if (_fiscalYears.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: SizedBox(
+                width: isMobile ? double.infinity : 280,
+                child: DropdownButtonFormField<int>(
+                  value: _selectedFiscalYearId,
+                  decoration: InputDecoration(
+                    labelText: t.fiscalYear,
+                    border: const OutlineInputBorder(),
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                  ),
+                  items: _fiscalYears.map<DropdownMenuItem<int>>((fy) {
+                    final id = fy['id'] as int?;
+                    final title = (fy['title'] ?? '').toString();
+                    return DropdownMenuItem<int>(
+                      value: id,
+                      child: Text(
+                        title.isNotEmpty ? title : 'FY ${id ?? ''}',
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                      ),
+                    );
+                  }).toList(),
+                  onChanged: (val) {
+                    setState(() {
+                      _selectedFiscalYearId = val;
+                    });
+                    _refreshData();
+                  },
+                ),
+              ),
+            ),
+          const SizedBox(height: 8),
           // فیلترهای تاریخ و وضعیت
           if (isMobile)
             // موبایل: Column layout
@@ -255,6 +316,38 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
             // دسکتاپ/تبلت: Row layout
             Row(
               children: [
+                if (_fiscalYears.isNotEmpty)
+                  SizedBox(
+                    width: 280,
+                    child: DropdownButtonFormField<int>(
+                      value: _selectedFiscalYearId,
+                      decoration: InputDecoration(
+                        labelText: t.fiscalYear,
+                        border: const OutlineInputBorder(),
+                        isDense: true,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                      ),
+                      items: _fiscalYears.map<DropdownMenuItem<int>>((fy) {
+                        final id = fy['id'] as int?;
+                        final title = (fy['title'] ?? '').toString();
+                        return DropdownMenuItem<int>(
+                          value: id,
+                          child: Text(
+                            title.isNotEmpty ? title : 'FY ${id ?? ''}',
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                          ),
+                        );
+                      }).toList(),
+                      onChanged: (val) {
+                        setState(() {
+                          _selectedFiscalYearId = val;
+                        });
+                        _refreshData();
+                      },
+                    ),
+                  ),
+                if (_fiscalYears.isNotEmpty) const SizedBox(width: 16),
                 Expanded(
                   flex: 3,
                   child: Row(
@@ -482,6 +575,7 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
         if (_fromDate != null) 'from_date': _fromDate!.toUtc().toIso8601String(),
         if (_toDate != null) 'to_date': _toDate!.toUtc().toIso8601String(),
         if (_isProforma != null) 'is_proforma': _isProforma,
+        if (_selectedFiscalYearId != null) 'fiscal_year_id': _selectedFiscalYearId,
       },
       onRowTap: (item) => _onView(item as InvoiceListItem),
       emptyStateMessage: t.noInvoicesFound,

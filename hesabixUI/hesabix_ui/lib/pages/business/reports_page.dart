@@ -289,6 +289,23 @@ class ReportsPage extends StatelessWidget {
                 ),
               ],
             ),
+
+            const SizedBox(height: 24),
+
+            _buildSection(
+              context,
+              title: 'گزارشات سیستم',
+              icon: Icons.assignment_outlined,
+              children: [
+                _buildReportItem(
+                  context,
+                  title: 'گزارش فعالیت‌های کاربران',
+                  subtitle: 'مشاهده تاریخچه فعالیت‌های کاربران در سیستم',
+                  icon: Icons.history,
+                  onTap: () => context.go('/business/$businessId/reports/activity-logs'),
+                ),
+              ],
+            ),
           ],
         ),
       ),

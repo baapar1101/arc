@@ -160,6 +160,40 @@ class ReportTemplateService {
     );
     return res.data ?? const <String, dynamic>{};
   }
+
+  Future<List<int>> previewPdf({
+    required int businessId,
+    String? contentHtml,
+    String? contentCss,
+    String? headerHtml,
+    String? footerHtml,
+    String? engine,
+    Map<String, dynamic>? design,
+    Map<String, dynamic>? assets,
+    Map<String, dynamic>? context,
+    String? paperSize,
+    String? orientation,
+    Map<String, dynamic>? margins,
+  }) async {
+    final res = await _api.downloadPdf(
+      '/report-templates/business/$businessId/preview-pdf',
+      query: null,
+      data: {
+        if (contentHtml != null) 'content_html': contentHtml,
+        if (contentCss != null) 'content_css': contentCss,
+        if (headerHtml != null) 'header_html': headerHtml,
+        if (footerHtml != null) 'footer_html': footerHtml,
+        if (engine != null) 'engine': engine,
+        if (design != null) 'design': design,
+        if (assets != null) 'assets': assets,
+        'context': context ?? const <String, dynamic>{},
+        if (paperSize != null) 'paper_size': paperSize,
+        if (orientation != null) 'orientation': orientation,
+        if (margins != null) 'margins': margins,
+      },
+    );
+    return res;
+  }
 }
 
 

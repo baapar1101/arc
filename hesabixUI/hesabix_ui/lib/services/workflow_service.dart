@@ -1,0 +1,151 @@
+import 'package:hesabix_ui/core/api_client.dart';
+import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
+
+class WorkflowService {
+  final ApiClient _apiClient;
+
+  WorkflowService({ApiClient? apiClient}) : _apiClient = apiClient ?? ApiClient();
+
+  Future<Map<String, dynamic>> listWorkflows({
+    required int businessId,
+    QueryInfo? queryInfo,
+  }) async {
+    final body = (queryInfo ?? const QueryInfo(take: 50, skip: 0, sortDesc: true, sortBy: 'created_at')).toJson();
+    final res = await _apiClient.post<Map<String, dynamic>>(
+      '/businesses/$businessId/workflows/list',
+      data: body,
+    );
+    final data = _asMap(res.data?['data']);
+    final items = (data['items'] as List?)
+            ?.map<Map<String, dynamic>>(
+              (item) => Map<String, dynamic>.from(item as Map),
+            )
+            .toList() ??
+        const <Map<String, dynamic>>[];
+    return {
+      'items': items,
+      'total': data['total'] ?? items.length,
+      'page': data['page'] ?? 1,
+      'page_size': data['page_size'] ?? body['take'] ?? 50,
+    };
+  }
+
+  Future<Map<String, dynamic>> createWorkflow({
+    required int businessId,
+    required Map<String, dynamic> payload,
+  }) async {
+    final res = await _apiClient.post<Map<String, dynamic>>(
+      '/businesses/$businessId/workflows/create',
+      data: payload,
+    );
+    return _asMap(res.data?['data']);
+  }
+
+  Future<Map<String, dynamic>> updateWorkflow({
+    required int businessId,
+    required int workflowId,
+    required Map<String, dynamic> payload,
+  }) async {
+    final res = await _apiClient.put<Map<String, dynamic>>(
+      '/businesses/$businessId/workflows/$workflowId/edit',
+      data: payload,
+    );
+    return _asMap(res.data?['data']);
+  }
+
+  Future<Map<String, dynamic>> executeWorkflow({
+    required int businessId,
+    required int workflowId,
+    Map<String, dynamic>? triggerData,
+  }) async {
+    final res = await _apiClient.post<Map<String, dynamic>>(
+      '/businesses/$businessId/workflows/$workflowId/execute',
+      data: triggerData ?? const <String, dynamic>{},
+    );
+    return _asMap(res.data?['data']);
+  }
+
+  Future<Map<String, dynamic>> listExecutions({
+    required int businessId,
+    required int workflowId,
+    int page = 1,
+    int pageSize = 20,
+  }) async {
+    final res = await _apiClient.get<Map<String, dynamic>>(
+      '/businesses/$businessId/workflows/$workflowId/executions',
+      query: {
+        'page': page,
+        'page_size': pageSize,
+      },
+    );
+    final data = _asMap(res.data?['data']);
+    final items = (data['items'] as List?)
+            ?.map<Map<String, dynamic>>(
+              (item) => Map<String, dynamic>.from(item as Map),
+            )
+            .toList() ??
+        const <Map<String, dynamic>>[];
+    return {
+      'items': items,
+      'total': data['total'] ?? items.length,
+      'page': data['page'] ?? page,
+      'page_size': data['page_size'] ?? pageSize,
+    };
+  }
+
+  Future<List<Map<String, dynamic>>> getExecutionLogs({
+    required int businessId,
+    required int workflowId,
+    required int executionId,
+  }) async {
+    final res = await _apiClient.get<Map<String, dynamic>>(
+      '/businesses/$businessId/workflows/$workflowId/executions/$executionId/logs',
+    );
+    final data = res.data?['data'];
+    final logs = (data as List?)
+            ?.map<Map<String, dynamic>>(
+              (item) => Map<String, dynamic>.from(item as Map),
+            )
+            .toList() ??
+        const <Map<String, dynamic>>[];
+    return logs;
+  }
+
+  Future<List<Map<String, dynamic>>> listTriggers() async {
+    return _listWorkflowItems('/workflows/triggers');
+  }
+
+  Future<List<Map<String, dynamic>>> listActions() async {
+    return _listWorkflowItems('/workflows/actions');
+  }
+
+  /// Helper method برای list کردن triggers و actions
+  Future<List<Map<String, dynamic>>> _listWorkflowItems(String endpoint) async {
+    final res = await _apiClient.get<Map<String, dynamic>>(endpoint);
+    final data = _asMap(res.data?['data']);
+    return data.entries
+        .map<Map<String, dynamic>>((entry) {
+          final meta = _asMap(entry.value);
+          return {
+            'key': entry.key,
+            'name': meta['name'] ?? entry.key,
+            'description': meta['description'] ?? '',
+            'config_schema': meta['config_schema'] ?? const <String, dynamic>{},
+          };
+        })
+        .toList()
+        .cast<Map<String, dynamic>>();
+  }
+
+  Map<String, dynamic> _asMap(dynamic value) {
+    if (value is Map<String, dynamic>) {
+      return value;
+    }
+    if (value is Map) {
+      return value.map((key, dynamic val) => MapEntry('$key', val));
+    }
+    return <String, dynamic>{};
+  }
+}
+
+

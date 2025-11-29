@@ -19,12 +19,15 @@ class Settings(BaseSettings):
 	db_port: int = 3306
 	db_name: str = "hesabix"
 	sqlalchemy_echo: bool = False
-	# DB Pooling
-	# با 4 worker، هر worker نیاز به حدود 10-15 اتصال دارد
-	# بنابراین pool_size را به 25 و max_overflow را به 40 افزایش می‌دهیم
-	db_pool_size: int = 25
-	db_max_overflow: int = 40
-	db_pool_timeout: int = 30  # افزایش timeout برای جلوگیری از خطاهای زودرس
+	# DB Pooling - بهینه‌سازی برای مقیاس‌پذیری بالا
+	# Phase 1 Optimization: افزایش Connection Pool برای پشتیبانی از بارهای بالا
+	# محاسبه: (تعداد Worker ها * اتصالات مورد نیاز per Worker) + Buffer
+	# مثال Production: 5 Workers * 100 اتصال = 500 + 300 buffer = 800
+	# برای Development: pool_size=50, max_overflow=50 = 100 max connections
+	db_pool_size: int = 50  # افزایش از 20 - اتصالات پایه در Pool
+	db_max_overflow: int = 50  # افزایش از 30 - اتصالات اضافی در صورت نیاز
+	db_pool_timeout: int = 30  # افزایش از 10 - timeout بیشتر برای Pool
+	db_pool_recycle: int = 3600  # Recycle اتصالات هر ساعت (پیش‌فرض)
 
 	# Logging
 	log_level: str = "INFO"
@@ -69,6 +72,20 @@ class Settings(BaseSettings):
 	tax_system_sandbox_base_url: str = "https://sandboxrc.tax.gov.ir"
 	tax_system_production_base_url: str = "https://tp.tax.gov.ir"
 	tax_system_user_agent: str = "HesabixTaxClient/1.0"
+
+	# Redis Cache
+	redis_enabled: bool = False
+	redis_host: str = "localhost"
+	redis_port: int = 6379
+	redis_db: int = 0
+	redis_password: str | None = None
+	
+	# Pagination
+	max_page_size: int = 100  # حداکثر تعداد آیتم در هر صفحه
+	default_page_size: int = 20  # اندازه پیش‌فرض صفحه
+	
+	# Query Timeout
+	query_timeout_seconds: int = 30  # Timeout برای query های طولانی
 
 	@property
 	def mysql_dsn(self) -> str:

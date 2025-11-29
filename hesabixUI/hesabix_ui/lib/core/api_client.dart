@@ -1,12 +1,14 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
+import 'package:go_router/go_router.dart';
 
 import '../config/app_config.dart';
 import '../utils/number_normalizer.dart';
 import 'auth_store.dart';
 import '../services/errors/api_error.dart';
 import 'calendar_controller.dart';
+import '../main.dart' show navigatorKey;
 
 class ApiClientOptions {
   final Duration connectTimeout;
@@ -49,6 +51,33 @@ class ApiClient {
   }
 
   ApiClient._(this._dio);
+
+  /// مدیریت خطاهای نامعتبر بودن سشن یا API key
+  static void _handleUnauthorizedError() {
+    if (_authStore == null) return;
+    
+    // حذف API key و اطلاعات ورود
+    _authStore!.saveApiKey(null);
+    
+    // هدایت به صفحه ورود
+    final context = navigatorKey.currentContext;
+    if (context != null) {
+      // استفاده از Future.microtask برای جلوگیری از خطا در حین پردازش خطا
+      Future.microtask(() {
+        try {
+          context.go('/login');
+        } catch (e) {
+          // اگر هدایت با خطا مواجه شد، از Navigator استفاده می‌کنیم
+          if (navigatorKey.currentState != null) {
+            navigatorKey.currentState!.pushNamedAndRemoveUntil(
+              '/login',
+              (route) => false,
+            );
+          }
+        }
+      });
+    }
+  }
 
   factory ApiClient({String? baseUrl, ApiClientOptions options = const ApiClientOptions()}) {
     final resolvedBaseUrl = (baseUrl ?? AppConfig.apiBaseUrl).replaceAll(RegExp(r'/+$'), '');
@@ -151,11 +180,24 @@ class ApiClient {
                 final success = data['success'];
                 final errorObj = data['error'];
                 if (success == false && errorObj is Map<String, dynamic>) {
+                  final errorCode = errorObj['code'] as String?;
                   final apiError = ApiErrorDetails(
-                    code: errorObj['code'] as String?,
+                    code: errorCode,
                     message: errorObj['message'] as String?,
                     details: errorObj,
                   );
+                  
+                  // بررسی خطاهای نامعتبر بودن سشن یا API key
+                  final isUnauthorized = response.statusCode == 401 || 
+                                       errorCode == 'UNAUTHORIZED' ||
+                                       errorCode == 'INVALID_API_KEY' ||
+                                       errorCode == 'INVALID_SESSION';
+                  
+                  if (isUnauthorized && _authStore != null) {
+                    // حذف اطلاعات ورود و هدایت به صفحه ورود
+                    _handleUnauthorizedError();
+                  }
+                  
                   handler.reject(DioException(
                     requestOptions: error.requestOptions,
                     error: apiError,
@@ -169,6 +211,12 @@ class ApiClient {
               // ignore parsing failures
             }
           }
+          
+          // بررسی status code 401 حتی اگر ساختار خطا متفاوت باشد
+          if (response != null && response.statusCode == 401 && _authStore != null) {
+            _handleUnauthorizedError();
+          }
+          
           if (kDebugMode) {
             // ignore: avoid_print
           }
@@ -245,18 +293,35 @@ class ApiClient {
   }
 
   // Download PDF API
-  Future<List<int>> downloadPdf(String path, {Map<String, dynamic>? query}) async {
-    final response = await get<List<int>>(
-      path,
-      query: query,
-      responseType: ResponseType.bytes,
-      options: Options(
-        headers: {
-          'Accept': 'application/pdf',
-        },
-      ),
-    );
-    return response.data ?? [];
+  Future<List<int>> downloadPdf(String path, {Map<String, dynamic>? query, Map<String, dynamic>? data}) async {
+    if (data != null) {
+      // POST request with data
+      final response = await post<List<int>>(
+        path,
+        data: data,
+        query: query,
+        responseType: ResponseType.bytes,
+        options: Options(
+          headers: {
+            'Accept': 'application/pdf',
+          },
+        ),
+      );
+      return response.data ?? [];
+    } else {
+      // GET request
+      final response = await get<List<int>>(
+        path,
+        query: query,
+        responseType: ResponseType.bytes,
+        options: Options(
+          headers: {
+            'Accept': 'application/pdf',
+          },
+        ),
+      );
+      return response.data ?? [];
+    }
   }
 
   // Download Excel API

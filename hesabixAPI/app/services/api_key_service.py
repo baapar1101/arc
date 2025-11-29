@@ -6,7 +6,8 @@ from typing import Optional
 from sqlalchemy.orm import Session
 
 from adapters.db.repositories.api_key_repo import ApiKeyRepository
-from app.core.security import generate_api_key
+from app.core.security import generate_api_key, hash_api_key
+from app.core.cache import get_cache
 
 
 def list_personal_keys(db: Session, user_id: int) -> list[dict]:
@@ -63,6 +64,11 @@ def update_api_key(db: Session, user_id: int, key_id: int, name: str | None = No
 	
 	db.add(obj)
 	db.commit()
+	
+	# Invalidate cache برای به‌روزرسانی
+	cache = get_cache()
+	cache_key = f"api_key:{obj.key_hash}"
+	cache.delete(cache_key)
 
 
 def revoke_key(db: Session, user_id: int, key_id: int) -> None:
@@ -74,5 +80,10 @@ def revoke_key(db: Session, user_id: int, key_id: int) -> None:
 	obj.revoked_at = datetime.utcnow()
 	db.add(obj)
 	db.commit()
+	
+	# Invalidate cache
+	cache = get_cache()
+	cache_key = f"api_key:{obj.key_hash}"
+	cache.delete(cache_key)
 
 

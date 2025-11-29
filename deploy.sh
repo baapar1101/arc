@@ -87,10 +87,12 @@ prompt_vars() {
   : "${UI_DOMAIN:=}"
   : "${BRANCH:=main}"
   : "${DB_PASSWORD:=}"
-  # بهینه‌سازی تعداد workers: با pool_size=25 و max_overflow=40
-  # هر worker می‌تواند تا 65 اتصال داشته باشد
-  # با 3 worker، حداکثر 195 اتصال خواهیم داشت که کافی است
-  : "${UVICORN_WORKERS:=3}"
+  # بهینه‌سازی تعداد workers برای مقیاس‌پذیری بالا:
+  # فرمول: (2 * CPU cores) + 1
+  # برای سرور 8 هسته: 17 worker
+  # با pool_size=20 و max_overflow=30، هر worker تا 50 اتصال دارد
+  # در مجموع: 17 * 50 = 850 اتصال حداکثر
+  : "${UVICORN_WORKERS:=17}"
   : "${FLUTTER_VERSION:=3.24.0}"
   
   if [[ -z "${API_DOMAIN}" ]]; then
@@ -362,6 +364,54 @@ UNIT
   else
     echo "$CROSS_MARK Backend failed to start. Check logs: journalctl -u hesabix-api"
     exit 1
+  fi
+
+  # RQ Worker service for background jobs
+  cat > /etc/systemd/system/hesabix-rq-worker.service <<UNIT
+[Unit]
+Description=Hesabix RQ Worker (Background Jobs)
+After=network.target redis.service mysql.service
+Wants=redis.service
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=${api_dir}
+Environment=PATH=${api_dir}/.venv/bin
+Environment=PYTHONUNBUFFERED=1
+ExecStart=${api_dir}/.venv/bin/python ${api_dir}/rq_worker.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+
+  systemctl daemon-reload
+  
+  # Stop service if running to avoid conflicts
+  if check_service hesabix-rq-worker; then
+    systemctl stop hesabix-rq-worker
+  fi
+  
+  systemctl enable hesabix-rq-worker
+  
+  # Start RQ worker only if Redis is available
+  if systemctl is-active --quiet redis || systemctl is-enabled --quiet redis 2>/dev/null; then
+    systemctl start hesabix-rq-worker
+    sleep 2
+    if check_service hesabix-rq-worker; then
+      echo "$CHECK_MARK RQ Worker started (service: hesabix-rq-worker)."
+    else
+      echo "$WARNING_MARK RQ Worker failed to start. Check logs: journalctl -u hesabix-rq-worker"
+      echo "$WARNING_MARK Background jobs will not work until Redis is configured and RQ worker is running."
+    fi
+  else
+    echo "$WARNING_MARK Redis service not found. RQ Worker not started."
+    echo "$WARNING_MARK To enable background jobs, install and configure Redis, then run: systemctl start hesabix-rq-worker"
   fi
 }
 

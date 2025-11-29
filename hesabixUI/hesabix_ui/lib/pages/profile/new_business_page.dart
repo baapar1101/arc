@@ -98,24 +98,43 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
       return 'سال مالی منتهی به $endStr';
     }
 
+    final padding = ResponsiveHelper.getPadding(context);
+    final spacing = ResponsiveHelper.responsiveValue(
+      context,
+      mobile: 16.0,
+      tablet: 20.0,
+      desktop: 24.0,
+    );
+
     return Center(
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 800),
+        constraints: BoxConstraints(
+          maxWidth: ResponsiveHelper.getCardMaxWidth(context),
+        ),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: EdgeInsets.all(padding),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'سال مالی',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: spacing),
               Container(
-                padding: const EdgeInsets.all(16),
+                padding: EdgeInsets.all(padding),
                 decoration: BoxDecoration(
                   color: Theme.of(context).colorScheme.surface,
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(
+                    ResponsiveHelper.responsiveValue(
+                      context,
+                      mobile: 12.0,
+                      tablet: 14.0,
+                      desktop: 16.0,
+                    ),
+                  ),
                   border: Border.all(
                     color: Theme.of(context).dividerColor.withValues(alpha: 0.3),
                   ),
@@ -185,7 +204,7 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
                   ],
                 ),
               ),
-              const SizedBox(height: 8),
+              SizedBox(height: spacing * 0.5),
               Align(
                 alignment: Alignment.centerRight,
                 child: Text(
@@ -253,6 +272,14 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
 
   bool _isMobile(BuildContext context) {
     return ResponsiveHelper.isMobile(context);
+  }
+
+  bool _isTablet(BuildContext context) {
+    return ResponsiveHelper.isTablet(context);
+  }
+
+  bool _isDesktop(BuildContext context) {
+    return ResponsiveHelper.isDesktop(context);
   }
 
   String _getCurrentStepTitle(AppLocalizations t) {
@@ -331,6 +358,9 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
   Widget build(BuildContext context) {
     final t = Localizations.of<AppLocalizations>(context, AppLocalizations)!;
     final isMobile = _isMobile(context);
+    final isTablet = _isTablet(context);
+    final isDesktop = _isDesktop(context);
+    final padding = ResponsiveHelper.getPadding(context);
     
     return Scaffold(
       appBar: isMobile ? AppBar(
@@ -342,12 +372,7 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
         children: [
           // Progress indicator
           Container(
-            padding: EdgeInsets.fromLTRB(
-              isMobile ? 16 : 24, 
-              isMobile ? 8 : 16, 
-              isMobile ? 16 : 24, 
-              isMobile ? 8 : 8
-            ),
+            padding: EdgeInsets.all(padding),
             child: Column(
               children: [
                 // Progress bar
@@ -356,18 +381,37 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
                     final isActive = index <= _currentStep;
                     final isCurrent = index == _currentStep;
                     
+                    final progressHeight = ResponsiveHelper.responsiveValue(
+                      context,
+                      mobile: 4.0,
+                      tablet: 5.0,
+                      desktop: 6.0,
+                    );
+                    final progressMargin = ResponsiveHelper.responsiveValue(
+                      context,
+                      mobile: 1.0,
+                      tablet: 1.5,
+                      desktop: 2.0,
+                    );
+                    final borderRadius = ResponsiveHelper.responsiveValue(
+                      context,
+                      mobile: 2.0,
+                      tablet: 2.5,
+                      desktop: 3.0,
+                    );
+                    
                     return Expanded(
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 300),
-                        margin: EdgeInsets.symmetric(horizontal: isMobile ? 1 : 2),
-                        height: isMobile ? 4 : 6,
+                        margin: EdgeInsets.symmetric(horizontal: progressMargin),
+                        height: progressHeight,
                         decoration: BoxDecoration(
                           color: isActive
                               ? Theme.of(context).colorScheme.primary
                               : Theme.of(context).brightness == Brightness.dark
                                   ? Theme.of(context).colorScheme.surfaceContainerHighest
                                   : Theme.of(context).colorScheme.outline.withValues(alpha: 0.4),
-                          borderRadius: BorderRadius.circular(isMobile ? 2 : 3),
+                          borderRadius: BorderRadius.circular(borderRadius),
                           boxShadow: isCurrent
                               ? [
                                   BoxShadow(
@@ -382,7 +426,7 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
                     );
                   }),
                 ),
-                const SizedBox(height: 8),
+                SizedBox(height: ResponsiveHelper.responsiveValue(context, mobile: 8.0, tablet: 10.0, desktop: 12.0)),
                 // Progress text
                 Text(
                   '${t.step} ${_currentStep + 1} ${t.ofText} 5',
@@ -395,18 +439,21 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
             ),
           ),
           
-          // Step indicator - فقط برای دسکتاپ
+          // Step indicator - برای تبلت و دسکتاپ
           if (!isMobile)
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding: EdgeInsets.symmetric(
+                horizontal: padding,
+                vertical: ResponsiveHelper.responsiveValue(context, mobile: 8.0, tablet: 10.0, desktop: 12.0),
+              ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  _buildStepIndicator(0, t.businessBasicInfo),
-                  _buildStepIndicator(1, t.businessContactInfo),
-                  _buildStepIndicator(2, t.businessLegalInfo),
-                  _buildStepIndicator(3, 'ارز و سال مالی'),
-                  _buildStepIndicator(4, t.businessConfirmation),
+                  _buildStepIndicator(0, t.businessBasicInfo, isTablet),
+                  _buildStepIndicator(1, t.businessContactInfo, isTablet),
+                  _buildStepIndicator(2, t.businessLegalInfo, isTablet),
+                  _buildStepIndicator(3, 'ارز و سال مالی', isTablet),
+                  _buildStepIndicator(4, t.businessConfirmation, isTablet),
                 ],
               ),
             ),
@@ -415,7 +462,7 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
           if (isMobile)
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              padding: EdgeInsets.symmetric(horizontal: padding, vertical: 12),
               decoration: BoxDecoration(
                 color: Theme.of(context).colorScheme.primaryContainer,
                 border: Border(
@@ -445,7 +492,7 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  SizedBox(width: ResponsiveHelper.responsiveValue(context, mobile: 12.0, tablet: 14.0, desktop: 16.0)),
                   Expanded(
                     child: Text(
                       _getCurrentStepTitle(t),
@@ -481,7 +528,7 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
           
           // Navigation buttons
           Container(
-            padding: EdgeInsets.all(isMobile ? 16 : 24),
+            padding: EdgeInsets.all(padding),
             decoration: BoxDecoration(
               color: Theme.of(context).scaffoldBackgroundColor,
               border: Border(
@@ -516,7 +563,7 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
                       ),
                       // Previous button - full width on mobile
                       if (_currentStep > 0) ...[
-                        const SizedBox(height: 12),
+                        SizedBox(height: ResponsiveHelper.responsiveValue(context, mobile: 12.0, tablet: 14.0, desktop: 16.0)),
                         SizedBox(
                           width: double.infinity,
                           child: _buildNavigationButton(
@@ -566,88 +613,124 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
     );
   }
 
-  Widget _buildStepIndicator(int step, String title) {
+  Widget _buildStepIndicator(int step, String title, bool isCompact) {
     final isActive = step <= _currentStep;
     final isCurrent = step == _currentStep;
     
+    final iconSize = ResponsiveHelper.responsiveValue(
+      context,
+      mobile: 20.0,
+      tablet: 22.0,
+      desktop: 24.0,
+    );
+    final fontSize = ResponsiveHelper.responsiveValue(
+      context,
+      mobile: 11.0,
+      tablet: 11.5,
+      desktop: 12.0,
+    );
+    final horizontalPadding = ResponsiveHelper.responsiveValue(
+      context,
+      mobile: 8.0,
+      tablet: 10.0,
+      desktop: 12.0,
+    );
+    
+    final isDesktop = _isDesktop(context);
+    
+    // برای تبلت، عنوان را کوتاه‌تر یا فقط آیکون نشان می‌دهیم
+    String displayTitle = title;
+    if (isCompact && !isDesktop && title.length > 12) {
+      // برای تبلت، عنوان‌های طولانی را کوتاه می‌کنیم
+      displayTitle = title.substring(0, 12) + '...';
+    }
+    
     return GestureDetector(
       onTap: () => _goToStep(step),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: isActive
-              ? Theme.of(context).colorScheme.primaryContainer
-              : Theme.of(context).colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isActive
-                ? Theme.of(context).colorScheme.primary
-                : Theme.of(context).colorScheme.outlineVariant,
-            width: 1.5,
+      child: Tooltip(
+        message: title,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 300),
+          padding: EdgeInsets.symmetric(
+            horizontal: horizontalPadding,
+            vertical: ResponsiveHelper.responsiveValue(context, mobile: 6.0, tablet: 8.0, desktop: 8.0),
           ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 300),
-              width: 24,
-              height: 24,
-              decoration: BoxDecoration(
-                color: isActive
-                    ? Theme.of(context).colorScheme.primary
-                    : Theme.of(context).colorScheme.outline,
-                shape: BoxShape.circle,
-                boxShadow: isCurrent
-                    ? [
-                        BoxShadow(
-                          color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.4),
-                          blurRadius: 6,
-                          spreadRadius: 2,
-                        ),
-                      ]
-                    : isActive
-                        ? [
-                            BoxShadow(
-                              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.2),
-                              blurRadius: 3,
-                              spreadRadius: 1,
-                            ),
-                          ]
-                        : null,
-              ),
-              child: Center(
-                child: isActive
-                    ? Icon(
-                        Icons.check,
-                        size: 16,
-                        color: Colors.white,
-                      )
-                    : Text(
-                        '${step + 1}',
-                        style: TextStyle(
-                          color: isActive
-                              ? Theme.of(context).colorScheme.onPrimary
-                              : Theme.of(context).colorScheme.onSurface,
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-              ),
+          decoration: BoxDecoration(
+            color: isActive
+                ? Theme.of(context).colorScheme.primaryContainer
+                : Theme.of(context).colorScheme.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: isActive
+                  ? Theme.of(context).colorScheme.primary
+                  : Theme.of(context).colorScheme.outlineVariant,
+              width: 1.5,
             ),
-            const SizedBox(width: 8),
-            Text(
-              title,
-              style: TextStyle(
-                color: isActive
-                    ? Theme.of(context).colorScheme.onPrimaryContainer
-                    : Theme.of(context).colorScheme.onSurface,
-                fontSize: 12,
-                fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
+                width: iconSize,
+                height: iconSize,
+                decoration: BoxDecoration(
+                  color: isActive
+                      ? Theme.of(context).colorScheme.primary
+                      : Theme.of(context).colorScheme.outline,
+                  shape: BoxShape.circle,
+                  boxShadow: isCurrent
+                      ? [
+                          BoxShadow(
+                            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.4),
+                            blurRadius: 6,
+                            spreadRadius: 2,
+                          ),
+                        ]
+                      : isActive
+                          ? [
+                              BoxShadow(
+                                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.2),
+                                blurRadius: 3,
+                                spreadRadius: 1,
+                              ),
+                            ]
+                          : null,
+                ),
+                child: Center(
+                  child: isActive
+                      ? Icon(
+                          Icons.check,
+                          size: iconSize * 0.65,
+                          color: Colors.white,
+                        )
+                      : Text(
+                          '${step + 1}',
+                          style: TextStyle(
+                            color: isActive
+                                ? Theme.of(context).colorScheme.onPrimary
+                                : Theme.of(context).colorScheme.onSurface,
+                            fontSize: fontSize,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                ),
               ),
-            ),
-          ],
+              if (!isCompact || isDesktop) ...[
+                SizedBox(width: ResponsiveHelper.responsiveValue(context, mobile: 6.0, tablet: 8.0, desktop: 8.0)),
+                Text(
+                  displayTitle,
+                  style: TextStyle(
+                    color: isActive
+                        ? Theme.of(context).colorScheme.onPrimaryContainer
+                        : Theme.of(context).colorScheme.onSurface,
+                    fontSize: fontSize,
+                    fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
+                  ),
+                ),
+              ],
+            ],
+          ),
         ),
       ),
     );
@@ -743,11 +826,21 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
 
   Widget _buildStep1() {
     final t = Localizations.of<AppLocalizations>(context, AppLocalizations)!;
+    final padding = ResponsiveHelper.getPadding(context);
+    final spacing = ResponsiveHelper.responsiveValue(
+      context,
+      mobile: 16.0,
+      tablet: 20.0,
+      desktop: 24.0,
+    );
+    
     return Center(
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 600),
+        constraints: BoxConstraints(
+          maxWidth: ResponsiveHelper.getCardMaxWidth(context),
+        ),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: EdgeInsets.all(padding),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -755,7 +848,7 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
                   t.businessBasicInfo,
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
-                const SizedBox(height: 24),
+                SizedBox(height: spacing),
                 
                 // نام کسب و کار
                 TextFormField(
@@ -790,7 +883,7 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
                     return null;
                   },
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: spacing),
                 
                 // نوع کسب و کار
                 DropdownButtonFormField<BusinessType>(
@@ -832,7 +925,7 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
                     return null;
                   },
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: spacing),
                 
                 // زمینه فعالیت
                 DropdownButtonFormField<BusinessField>(
@@ -883,11 +976,22 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
 
   Widget _buildStep2() {
     final t = Localizations.of<AppLocalizations>(context, AppLocalizations)!;
+    final padding = ResponsiveHelper.getPadding(context);
+    final spacing = ResponsiveHelper.responsiveValue(
+      context,
+      mobile: 16.0,
+      tablet: 20.0,
+      desktop: 24.0,
+    );
+    final isTablet = _isTablet(context);
+    
     return Center(
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 800),
+        constraints: BoxConstraints(
+          maxWidth: ResponsiveHelper.getCardMaxWidth(context),
+        ),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: EdgeInsets.all(padding),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -895,7 +999,7 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
                   t.businessContactInfo,
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
-                const SizedBox(height: 24),
+                SizedBox(height: spacing),
                 
                 // آدرس - تمام عرض
                 TextFormField(
@@ -930,7 +1034,8 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
                 // فیلدهای تماس در دو ستون
                 LayoutBuilder(
                   builder: (context, constraints) {
-                    if (constraints.maxWidth > 600) {
+                    final fieldSpacing = ResponsiveHelper.getGridSpacing(context);
+                    if (!_isMobile(context)) {
                       return Row(
                         children: [
                           Expanded(
@@ -965,7 +1070,7 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
                               },
                             ),
                           ),
-                          const SizedBox(width: 16),
+                          SizedBox(width: fieldSpacing),
                           Expanded(
                             child: TextFormField(
                               decoration: InputDecoration(
@@ -1033,7 +1138,7 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
                               });
                             },
                           ),
-                          const SizedBox(height: 16),
+                          SizedBox(height: spacing),
                           TextFormField(
                             decoration: InputDecoration(
                               labelText: t.mobile,
@@ -1069,7 +1174,7 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
                     }
                   },
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: spacing),
                 
                 // کد پستی
                 TextFormField(
@@ -1103,7 +1208,7 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
                     });
                   },
                 ),
-                const SizedBox(height: 24),
+                SizedBox(height: spacing * 1.5),
                 
                 // فیلدهای جغرافیایی
                 Text(
@@ -1113,12 +1218,13 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
                     color: Theme.of(context).colorScheme.primary,
                   ),
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: spacing),
                 
                 // فیلدهای جغرافیایی در دو ستون
                 LayoutBuilder(
                   builder: (context, constraints) {
-                    if (constraints.maxWidth > 600) {
+                    final fieldSpacing = ResponsiveHelper.getGridSpacing(context);
+                    if (!_isMobile(context)) {
                       return Column(
                         children: [
                           Row(
@@ -1151,7 +1257,7 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
                                   },
                                 ),
                               ),
-                              const SizedBox(width: 16),
+                              SizedBox(width: fieldSpacing),
                               Expanded(
                                 child: TextFormField(
                                   decoration: InputDecoration(
@@ -1182,7 +1288,7 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
                               ),
                             ],
                           ),
-                          const SizedBox(height: 16),
+                          SizedBox(height: spacing),
                           TextFormField(
                             decoration: InputDecoration(
                               labelText: t.city,
@@ -1240,7 +1346,7 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
                               });
                             },
                           ),
-                          const SizedBox(height: 16),
+                          SizedBox(height: spacing),
                           TextFormField(
                             decoration: InputDecoration(
                               labelText: t.province,
@@ -1267,7 +1373,7 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
                               });
                             },
                           ),
-                          const SizedBox(height: 16),
+                          SizedBox(height: spacing),
                           TextFormField(
                             decoration: InputDecoration(
                               labelText: t.city,
@@ -1308,11 +1414,21 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
 
   Widget _buildStep3() {
     final t = Localizations.of<AppLocalizations>(context, AppLocalizations)!;
+    final padding = ResponsiveHelper.getPadding(context);
+    final spacing = ResponsiveHelper.responsiveValue(
+      context,
+      mobile: 16.0,
+      tablet: 20.0,
+      desktop: 24.0,
+    );
+    
     return Center(
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 800),
+        constraints: BoxConstraints(
+          maxWidth: ResponsiveHelper.getCardMaxWidth(context),
+        ),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: EdgeInsets.all(padding),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -1320,12 +1436,13 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
                   t.businessLegalInfo,
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
-                const SizedBox(height: 24),
+                SizedBox(height: spacing),
                 
                 // فیلدهای قانونی در دو ستون
                 LayoutBuilder(
                   builder: (context, constraints) {
-                    if (constraints.maxWidth > 600) {
+                    final fieldSpacing = ResponsiveHelper.getGridSpacing(context);
+                    if (!_isMobile(context)) {
                       return Column(
                         children: [
                           Row(
@@ -1361,7 +1478,7 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
                                   },
                                 ),
                               ),
-                              const SizedBox(width: 16),
+                              SizedBox(width: fieldSpacing),
                               Expanded(
                                 child: TextFormField(
                                   decoration: InputDecoration(
@@ -1393,11 +1510,26 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
                               ),
                             ],
                           ),
-                          const SizedBox(height: 16),
+                          SizedBox(height: spacing),
                           TextFormField(
                             decoration: InputDecoration(
                               labelText: t.economicId,
-                              border: OutlineInputBorder(),
+                              border: OutlineInputBorder(
+                                borderSide: BorderSide(
+                                  color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
+                                ),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderSide: BorderSide(
+                                  color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderSide: BorderSide(
+                                  color: Theme.of(context).primaryColor,
+                                  width: 2,
+                                ),
+                              ),
                             ),
                             keyboardType: TextInputType.text,
                             onChanged: (value) {
@@ -1444,7 +1576,7 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
                               });
                             },
                           ),
-                          const SizedBox(height: 16),
+                          SizedBox(height: spacing),
                           TextFormField(
                             decoration: InputDecoration(
                               labelText: t.registrationNumber,
@@ -1472,7 +1604,7 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
                               });
                             },
                           ),
-                          const SizedBox(height: 16),
+                          SizedBox(height: spacing),
                           TextFormField(
                             decoration: InputDecoration(
                               labelText: t.economicId,
@@ -1513,24 +1645,43 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
   }
 
   Widget _buildCurrencyAndFiscalStep() {
+    final padding = ResponsiveHelper.getPadding(context);
+    final spacing = ResponsiveHelper.responsiveValue(
+      context,
+      mobile: 16.0,
+      tablet: 20.0,
+      desktop: 24.0,
+    );
+    
     return Center(
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 800),
+        constraints: BoxConstraints(
+          maxWidth: ResponsiveHelper.getCardMaxWidth(context),
+        ),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: EdgeInsets.all(padding),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'ارز و سال مالی',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: spacing),
               Container(
-                padding: const EdgeInsets.all(16),
+                padding: EdgeInsets.all(padding),
                 decoration: BoxDecoration(
                   color: Theme.of(context).colorScheme.surface,
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(
+                    ResponsiveHelper.responsiveValue(
+                      context,
+                      mobile: 12.0,
+                      tablet: 14.0,
+                      desktop: 16.0,
+                    ),
+                  ),
                   border: Border.all(
                     color: Theme.of(context).dividerColor.withValues(alpha: 0.3),
                   ),
@@ -1559,7 +1710,7 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
                         });
                       },
                     ),
-                    const SizedBox(height: 12),
+                    SizedBox(height: spacing * 0.75),
                     _CurrencyMultiSelect(
                       currencies: _currencies,
                       selectedIds: _businessData.currencyIds,
@@ -1577,7 +1728,7 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
                   ],
                 ),
               ),
-              const SizedBox(height: 24),
+              SizedBox(height: spacing * 1.5),
               _buildFiscalStep(),
             ],
           ),
@@ -1588,11 +1739,23 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
 
   Widget _buildStep4() {
     final t = Localizations.of<AppLocalizations>(context, AppLocalizations)!;
+    final padding = ResponsiveHelper.getPadding(context);
+    final spacing = ResponsiveHelper.responsiveValue(
+      context,
+      mobile: 16.0,
+      tablet: 20.0,
+      desktop: 24.0,
+    );
+    final isTablet = _isTablet(context);
+    final isDesktop = _isDesktop(context);
+    
     return Center(
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 600),
+        constraints: BoxConstraints(
+          maxWidth: ResponsiveHelper.getCardMaxWidth(context),
+        ),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: EdgeInsets.all(padding),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -1600,14 +1763,21 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
                   t.confirmInfo,
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
-                const SizedBox(height: 24),
+                SizedBox(height: spacing * 1.5),
                 
                 // نمایش خلاصه اطلاعات
                 Container(
-                  padding: const EdgeInsets.all(16),
+                  padding: EdgeInsets.all(padding),
                   decoration: BoxDecoration(
                     color: Theme.of(context).colorScheme.surface,
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(
+                      ResponsiveHelper.responsiveValue(
+                        context,
+                        mobile: 12.0,
+                        tablet: 14.0,
+                        desktop: 16.0,
+                      ),
+                    ),
                     border: Border.all(
                       color: Theme.of(context).dividerColor.withValues(alpha: 0.3),
                     ),
@@ -1619,38 +1789,91 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
                       ),
                     ],
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildSummaryItem(t.businessName, _businessData.name),
-                      _buildSummaryItem(t.businessType, _businessData.businessType?.displayName ?? ''),
-                      _buildSummaryItem(t.businessField, _businessData.businessField?.displayName ?? ''),
-                      if (_businessData.address?.isNotEmpty == true)
-                        _buildSummaryItem(t.address, _businessData.address!),
-                      if (_businessData.phone?.isNotEmpty == true)
-                        _buildSummaryItem(t.phone, _businessData.phone!),
-                      if (_businessData.mobile?.isNotEmpty == true)
-                        _buildSummaryItem(t.mobile, _businessData.mobile!),
-                      if (_businessData.nationalId?.isNotEmpty == true)
-                        _buildSummaryItem(t.nationalId, _businessData.nationalId!),
-                      if (_businessData.registrationNumber?.isNotEmpty == true)
-                        _buildSummaryItem(t.registrationNumber, _businessData.registrationNumber!),
-                      if (_businessData.economicId?.isNotEmpty == true)
-                        _buildSummaryItem(t.economicId, _businessData.economicId!),
-                      if (_businessData.country?.isNotEmpty == true)
-                        _buildSummaryItem(t.country, _businessData.country!),
-                      if (_businessData.province?.isNotEmpty == true)
-                        _buildSummaryItem(t.province, _businessData.province!),
-                      if (_businessData.city?.isNotEmpty == true)
-                        _buildSummaryItem(t.city, _businessData.city!),
-                      if (_businessData.postalCode?.isNotEmpty == true)
-                        _buildSummaryItem(t.postalCode, _businessData.postalCode!),
-                      if (_businessData.fiscalYears.isNotEmpty)
-                        _buildSummaryItem('سال مالی', _businessData.fiscalYears.first.title),
-                    ],
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      // برای دسکتاپ و تبلت بزرگ، از دو ستون استفاده می‌کنیم
+                      if (isDesktop) {
+                        return Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  _buildSummaryItem(t.businessName, _businessData.name),
+                                  _buildSummaryItem(t.businessType, _businessData.businessType?.displayName ?? ''),
+                                  _buildSummaryItem(t.businessField, _businessData.businessField?.displayName ?? ''),
+                                  if (_businessData.address?.isNotEmpty == true)
+                                    _buildSummaryItem(t.address, _businessData.address!),
+                                  if (_businessData.phone?.isNotEmpty == true)
+                                    _buildSummaryItem(t.phone, _businessData.phone!),
+                                  if (_businessData.mobile?.isNotEmpty == true)
+                                    _buildSummaryItem(t.mobile, _businessData.mobile!),
+                                  if (_businessData.postalCode?.isNotEmpty == true)
+                                    _buildSummaryItem(t.postalCode, _businessData.postalCode!),
+                                ],
+                              ),
+                            ),
+                            SizedBox(width: spacing),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  if (_businessData.nationalId?.isNotEmpty == true)
+                                    _buildSummaryItem(t.nationalId, _businessData.nationalId!),
+                                  if (_businessData.registrationNumber?.isNotEmpty == true)
+                                    _buildSummaryItem(t.registrationNumber, _businessData.registrationNumber!),
+                                  if (_businessData.economicId?.isNotEmpty == true)
+                                    _buildSummaryItem(t.economicId, _businessData.economicId!),
+                                  if (_businessData.country?.isNotEmpty == true)
+                                    _buildSummaryItem(t.country, _businessData.country!),
+                                  if (_businessData.province?.isNotEmpty == true)
+                                    _buildSummaryItem(t.province, _businessData.province!),
+                                  if (_businessData.city?.isNotEmpty == true)
+                                    _buildSummaryItem(t.city, _businessData.city!),
+                                  if (_businessData.fiscalYears.isNotEmpty)
+                                    _buildSummaryItem('سال مالی', _businessData.fiscalYears.first.title),
+                                ],
+                              ),
+                            ),
+                          ],
+                        );
+                      } else {
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildSummaryItem(t.businessName, _businessData.name),
+                            _buildSummaryItem(t.businessType, _businessData.businessType?.displayName ?? ''),
+                            _buildSummaryItem(t.businessField, _businessData.businessField?.displayName ?? ''),
+                            if (_businessData.address?.isNotEmpty == true)
+                              _buildSummaryItem(t.address, _businessData.address!),
+                            if (_businessData.phone?.isNotEmpty == true)
+                              _buildSummaryItem(t.phone, _businessData.phone!),
+                            if (_businessData.mobile?.isNotEmpty == true)
+                              _buildSummaryItem(t.mobile, _businessData.mobile!),
+                            if (_businessData.nationalId?.isNotEmpty == true)
+                              _buildSummaryItem(t.nationalId, _businessData.nationalId!),
+                            if (_businessData.registrationNumber?.isNotEmpty == true)
+                              _buildSummaryItem(t.registrationNumber, _businessData.registrationNumber!),
+                            if (_businessData.economicId?.isNotEmpty == true)
+                              _buildSummaryItem(t.economicId, _businessData.economicId!),
+                            if (_businessData.country?.isNotEmpty == true)
+                              _buildSummaryItem(t.country, _businessData.country!),
+                            if (_businessData.province?.isNotEmpty == true)
+                              _buildSummaryItem(t.province, _businessData.province!),
+                            if (_businessData.city?.isNotEmpty == true)
+                              _buildSummaryItem(t.city, _businessData.city!),
+                            if (_businessData.postalCode?.isNotEmpty == true)
+                              _buildSummaryItem(t.postalCode, _businessData.postalCode!),
+                            if (_businessData.fiscalYears.isNotEmpty)
+                              _buildSummaryItem('سال مالی', _businessData.fiscalYears.first.title),
+                          ],
+                        );
+                      }
+                    },
                   ),
                 ),
-                const SizedBox(height: 24),
+                SizedBox(height: spacing * 1.5),
                 
                 // پیام تأیید
                 Row(
@@ -1658,14 +1881,24 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
                     Icon(
                       Icons.info_outline,
                       color: Theme.of(context).primaryColor,
-                      size: 20,
+                      size: ResponsiveHelper.responsiveValue(
+                        context,
+                        mobile: 20.0,
+                        tablet: 22.0,
+                        desktop: 24.0,
+                      ),
                     ),
-                    const SizedBox(width: 8),
+                    SizedBox(width: spacing * 0.5),
                     Expanded(
                       child: Text(
                         t.confirmInfoMessage,
                         style: TextStyle(
-                          fontSize: 16, 
+                          fontSize: ResponsiveHelper.responsiveValue(
+                            context,
+                            mobile: 14.0,
+                            tablet: 15.0,
+                            desktop: 16.0,
+                          ),
                           fontWeight: FontWeight.bold,
                           color: Theme.of(context).colorScheme.onSurface,
                         ),
@@ -1681,26 +1914,52 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
   }
 
   Widget _buildSummaryItem(String label, String value) {
+    final spacing = ResponsiveHelper.responsiveValue(
+      context,
+      mobile: 8.0,
+      tablet: 10.0,
+      desktop: 12.0,
+    );
+    final labelWidth = ResponsiveHelper.responsiveValue(
+      context,
+      mobile: 100.0,
+      tablet: 120.0,
+      desktop: 140.0,
+    );
+    
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: EdgeInsets.only(bottom: spacing * 0.75),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
-            width: 120,
+            width: labelWidth,
             child: Text(
               '$label:',
               style: TextStyle(
                 fontWeight: FontWeight.w500,
+                fontSize: ResponsiveHelper.responsiveValue(
+                  context,
+                  mobile: 13.0,
+                  tablet: 14.0,
+                  desktop: 14.0,
+                ),
                 color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
               ),
             ),
           ),
+          SizedBox(width: spacing * 0.5),
           Expanded(
             child: Text(
               value,
               style: TextStyle(
                 fontWeight: FontWeight.w400,
+                fontSize: ResponsiveHelper.responsiveValue(
+                  context,
+                  mobile: 13.0,
+                  tablet: 14.0,
+                  desktop: 14.0,
+                ),
                 color: Theme.of(context).colorScheme.onSurface,
               ),
             ),

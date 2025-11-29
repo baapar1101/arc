@@ -4,6 +4,8 @@ import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/services/ai_service.dart';
 import 'package:hesabix_ui/models/ai_models.dart';
 import 'package:hesabix_ui/core/auth_store.dart';
+import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
+import 'package:hesabix_ui/widgets/data_table/data_table_widget.dart';
 import 'package:intl/intl.dart';
 
 class AIUsagePage extends StatefulWidget {
@@ -22,6 +24,11 @@ class AIUsagePage extends StatefulWidget {
 
 class _AIUsagePageState extends State<AIUsagePage> {
   late final AIService _aiService;
+  final GlobalKey _logsTableKey = GlobalKey();
+  final GlobalKey _dailyTableKey = GlobalKey();
+  late final NumberFormat _numberFormatter;
+  late final DateFormat _logDateFormat;
+  late final DateFormat _dailyDateFormat;
   bool _loading = true;
   String? _error;
   AIUsageStats? _stats;
@@ -32,6 +39,9 @@ class _AIUsagePageState extends State<AIUsagePage> {
     super.initState();
     final api = ApiClient();
     _aiService = AIService(api);
+    _numberFormatter = NumberFormat.decimalPattern('fa');
+    _logDateFormat = DateFormat('yyyy/MM/dd HH:mm', 'fa');
+    _dailyDateFormat = DateFormat('yyyy/MM/dd', 'fa');
     _load();
   }
 
@@ -72,13 +82,33 @@ class _AIUsagePageState extends State<AIUsagePage> {
         _error = '$e';
         _loading = false;
       });
+    } finally {
+      _refreshLogsTable();
+      _refreshDailyTable();
+    }
+  }
+
+  void _refreshLogsTable() {
+    try {
+      final current = _logsTableKey.currentState as dynamic;
+      current?.refresh();
+    } catch (e) {
+      debugPrint('[AIUsagePage] refresh logs table failed: $e');
+    }
+  }
+
+  void _refreshDailyTable() {
+    try {
+      final current = _dailyTableKey.currentState as dynamic;
+      current?.refresh();
+    } catch (e) {
+      debugPrint('[AIUsagePage] refresh daily table failed: $e');
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final numberFormat = NumberFormat.decimalPattern('fa');
 
     if (_loading) {
       return Scaffold(
@@ -147,8 +177,8 @@ class _AIUsagePageState extends State<AIUsagePage> {
                       ),
                     )
                   : _selectedTab == 0
-                      ? _buildStatsTab(theme, numberFormat)
-                      : _buildLogsTab(theme, numberFormat),
+                      ? _buildStatsTab(theme)
+                      : _buildLogsTab(),
             ),
           ],
         ),
@@ -156,7 +186,7 @@ class _AIUsagePageState extends State<AIUsagePage> {
     );
   }
 
-  Widget _buildStatsTab(ThemeData theme, NumberFormat numberFormat) {
+  Widget _buildStatsTab(ThemeData theme) {
     final stats = _stats;
     debugPrint('[AIUsagePage] _buildStatsTab - stats: ${stats != null}');
     
@@ -190,7 +220,7 @@ class _AIUsagePageState extends State<AIUsagePage> {
               Expanded(
                 child: _StatCard(
                   label: 'کل توکن',
-                  value: numberFormat.format(totalTokens),
+                  value: _numberFormatter.format(totalTokens),
                   icon: Icons.token_outlined,
                   color: Colors.blue,
                 ),
@@ -199,7 +229,7 @@ class _AIUsagePageState extends State<AIUsagePage> {
               Expanded(
                 child: _StatCard(
                   label: 'کل هزینه',
-                  value: '${numberFormat.format(totalCost)} تومان',
+                  value: '${_numberFormatter.format(totalCost)} تومان',
                   icon: Icons.attach_money,
                   color: Colors.green,
                 ),
@@ -212,7 +242,7 @@ class _AIUsagePageState extends State<AIUsagePage> {
               Expanded(
                 child: _StatCard(
                   label: 'کل درخواست‌ها',
-                  value: numberFormat.format(totalRequests),
+                  value: _numberFormatter.format(totalRequests),
                   icon: Icons.request_quote_outlined,
                   color: Colors.orange,
                 ),
@@ -221,7 +251,7 @@ class _AIUsagePageState extends State<AIUsagePage> {
               Expanded(
                 child: _StatCard(
                   label: 'توکن ورودی',
-                  value: numberFormat.format(inputTokens),
+                  value: _numberFormatter.format(inputTokens),
                   icon: Icons.input_outlined,
                   color: Colors.purple,
                 ),
@@ -229,80 +259,13 @@ class _AIUsagePageState extends State<AIUsagePage> {
             ],
           ),
           const SizedBox(height: 24),
-          // Daily Stats Table
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    'آمار روزانه',
-                    style: theme.textTheme.titleLarge ?? theme.textTheme.titleMedium ?? const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 16),
-                  if (stats.daily.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.all(32.0),
-                      child: Center(child: Text('داده‌ای وجود ندارد')),
-                    )
-                  else
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: DataTable(
-                        columns: const [
-                          DataColumn(label: Text('تاریخ')),
-                          DataColumn(label: Text('توکن'), numeric: true),
-                          DataColumn(label: Text('هزینه'), numeric: true),
-                          DataColumn(label: Text('درخواست'), numeric: true),
-                        ],
-                        rows: stats.daily.map((day) {
-                          try {
-                            final dateStr = day['date'];
-                            DateTime date;
-                            String dateFormatted = '';
-                            if (dateStr is String) {
-                              try {
-                                date = DateTime.parse(dateStr);
-                                dateFormatted = DateFormat('yyyy/MM/dd', 'fa').format(date);
-                              } catch (e) {
-                                dateFormatted = dateStr.toString();
-                              }
-                            } else if (dateStr is DateTime) {
-                              date = dateStr;
-                              dateFormatted = DateFormat('yyyy/MM/dd', 'fa').format(date);
-                            } else {
-                              dateFormatted = dateStr?.toString() ?? '';
-                            }
-                            
-                            final tokens = (day['tokens'] as num?)?.toInt() ?? 0;
-                            final cost = (day['cost'] as num?)?.toDouble() ?? 0.0;
-                            final requests = (day['requests'] as num?)?.toInt() ?? 0;
-                            
-                            return DataRow(
-                              cells: [
-                                DataCell(Text(dateFormatted)),
-                                DataCell(Text(numberFormat.format(tokens))),
-                                DataCell(Text('${numberFormat.format(cost)} تومان')),
-                                DataCell(Text(numberFormat.format(requests))),
-                              ],
-                            );
-                          } catch (e) {
-                            debugPrint('[AIUsagePage] خطا در پردازش daily entry: $e');
-                            return DataRow(
-                              cells: [
-                                const DataCell(Text('خطا')),
-                                const DataCell(Text('-')),
-                                const DataCell(Text('-')),
-                                const DataCell(Text('-')),
-                              ],
-                            );
-                          }
-                        }).toList(),
-                      ),
-                    ),
-                ],
-              ),
+          // Daily Stats Table (DataTableWidget)
+          SizedBox(
+            height: 420,
+            child: DataTableWidget<Map<String, dynamic>>(
+              key: _dailyTableKey,
+              config: _buildDailyTableConfig(),
+              fromJson: (json) => Map<String, dynamic>.from(json as Map),
             ),
           ),
           const SizedBox(height: 24),
@@ -343,9 +306,9 @@ class _AIUsagePageState extends State<AIUsagePage> {
                             return DataRow(
                               cells: [
                                 DataCell(Text(modelName)),
-                                DataCell(Text(numberFormat.format(tokens))),
-                                DataCell(Text('${numberFormat.format(cost)} تومان')),
-                                DataCell(Text(numberFormat.format(requests))),
+                                DataCell(Text(_numberFormatter.format(tokens))),
+                                DataCell(Text('${_numberFormatter.format(cost)} تومان')),
+                                DataCell(Text(_numberFormatter.format(requests))),
                               ],
                             );
                           } catch (e) {
@@ -390,82 +353,217 @@ class _AIUsagePageState extends State<AIUsagePage> {
     }
   }
 
-  Widget _buildLogsTab(ThemeData theme, NumberFormat numberFormat) {
-    return FutureBuilder<List<AIUsageLog>>(
-      future: _aiService.getUsageLogs(
-        businessId: widget.businessId,
-        limit: 100,
-        skip: 0,
+  Widget _buildLogsTab() {
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: DataTableWidget<AIUsageLog>(
+        key: _logsTableKey,
+        config: _buildLogsTableConfig(),
+        fromJson: AIUsageLog.fromJson,
       ),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        
-        if (snapshot.hasError) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text('خطا: ${snapshot.error}'),
-                const SizedBox(height: 16),
-                ElevatedButton(
-                  onPressed: _load,
-                  child: const Text('تلاش مجدد'),
-                ),
-              ],
-            ),
-          );
-        }
-        
-        final logs = snapshot.data ?? [];
-        
-        if (logs.isEmpty) {
-          return const Center(child: Text('لاگی وجود ندارد'));
-        }
-        
-        return SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: SingleChildScrollView(
-            child: DataTable(
-              columns: const [
-                DataColumn(label: Text('مدل')),
-                DataColumn(label: Text('ارائه‌دهنده')),
-                DataColumn(label: Text('توکن ورودی'), numeric: true),
-                DataColumn(label: Text('توکن خروجی'), numeric: true),
-                DataColumn(label: Text('کل توکن'), numeric: true),
-                DataColumn(label: Text('هزینه'), numeric: true),
-                DataColumn(label: Text('روش پرداخت')),
-                DataColumn(label: Text('تاریخ')),
-              ],
-              rows: logs.map((log) {
-                String dateFormatted = '';
-                if (log.createdAt != null) {
-                  try {
-                    dateFormatted = DateFormat('yyyy/MM/dd HH:mm', 'fa').format(log.createdAt as DateTime);
-                  } catch (e) {
-                    dateFormatted = log.createdAt.toString();
-                  }
-                }
-                
-                return DataRow(
-                  cells: [
-                    DataCell(Text(log.model)),
-                    DataCell(Text(log.provider)),
-                    DataCell(Text(numberFormat.format(log.inputTokens))),
-                    DataCell(Text(numberFormat.format(log.outputTokens))),
-                    DataCell(Text(numberFormat.format(log.totalTokens))),
-                    DataCell(Text('${numberFormat.format(log.cost)} تومان')),
-                    DataCell(Text(log.paymentMethod)),
-                    DataCell(Text(dateFormatted)),
-                  ],
-                );
-              }).toList(),
-            ),
-          ),
-        );
-      },
     );
+  }
+
+  DataTableConfig<AIUsageLog> _buildLogsTableConfig() {
+    final params = <String, dynamic>{};
+    if (widget.businessId != null) {
+      params['business_id'] = widget.businessId;
+    }
+
+    return DataTableConfig<AIUsageLog>(
+      endpoint: '/api/v1/ai/usage/logs/table',
+      title: 'لاگ استفاده',
+      tableId: 'ai_usage_logs',
+      showTableIcon: false,
+      showSearch: true,
+      showFilters: true,
+      showColumnSearch: true,
+      showPagination: true,
+      enableSorting: true,
+      defaultSortBy: 'created_at',
+      defaultSortDesc: true,
+      searchFields: const ['model', 'provider', 'payment_method'],
+      additionalParams: params.isEmpty ? null : params,
+      emptyStateMessage: 'هیچ لاگی ثبت نشده است',
+      columns: [
+        TextColumn(
+          'provider',
+          'ارائه‌دهنده',
+          width: ColumnWidth.small,
+          filterType: ColumnFilterType.multiSelect,
+          filterOptions: const [
+            FilterOption(value: 'openai', label: 'OpenAI'),
+            FilterOption(value: 'azure', label: 'Azure OpenAI'),
+            FilterOption(value: 'anthropic', label: 'Anthropic'),
+            FilterOption(value: 'local', label: 'Local'),
+            FilterOption(value: 'hesabix', label: 'Hesabix'),
+          ],
+          formatter: (item) => _providerLabel((item as AIUsageLog).provider),
+        ),
+        TextColumn(
+          'model',
+          'مدل',
+          width: ColumnWidth.medium,
+          formatter: (item) => (item as AIUsageLog).model,
+        ),
+        NumberColumn(
+          'input_tokens',
+          'توکن ورودی',
+          width: ColumnWidth.medium,
+          formatter: (item) => _numberFormatter.format((item as AIUsageLog).inputTokens),
+        ),
+        NumberColumn(
+          'output_tokens',
+          'توکن خروجی',
+          width: ColumnWidth.medium,
+          formatter: (item) => _numberFormatter.format((item as AIUsageLog).outputTokens),
+        ),
+        NumberColumn(
+          'total_tokens',
+          'کل توکن',
+          width: ColumnWidth.medium,
+          formatter: (item) => _numberFormatter.format((item as AIUsageLog).totalTokens),
+        ),
+        NumberColumn(
+          'cost',
+          'هزینه',
+          width: ColumnWidth.medium,
+          decimalPlaces: 2,
+          formatter: (item) => '${_numberFormatter.format((item as AIUsageLog).cost)} تومان',
+        ),
+        TextColumn(
+          'payment_method',
+          'روش پرداخت',
+          width: ColumnWidth.medium,
+          filterType: ColumnFilterType.multiSelect,
+          filterOptions: const [
+            FilterOption(value: 'free', label: 'رایگان'),
+            FilterOption(value: 'subscription', label: 'اشتراک'),
+            FilterOption(value: 'wallet', label: 'کیف پول'),
+          ],
+          formatter: (item) => _paymentMethodLabel((item as AIUsageLog).paymentMethod),
+        ),
+        DateColumn(
+          'created_at',
+          'تاریخ',
+          width: ColumnWidth.large,
+          showTime: true,
+          filterType: ColumnFilterType.dateRange,
+          formatter: (item) => _formatLogDate((item as AIUsageLog).createdAt),
+        ),
+      ],
+    );
+  }
+
+  DataTableConfig<Map<String, dynamic>> _buildDailyTableConfig() {
+    final params = <String, dynamic>{};
+    if (widget.businessId != null) {
+      params['business_id'] = widget.businessId;
+    }
+
+    return DataTableConfig<Map<String, dynamic>>(
+      endpoint: '/api/v1/ai/usage/daily/table',
+      title: 'آمار روزانه',
+      tableId: 'ai_usage_daily',
+      showTableIcon: false,
+      showSearch: true,
+      showFilters: true,
+      showColumnSearch: false,
+      showPagination: true,
+      enableSorting: true,
+      defaultSortBy: 'date',
+      defaultSortDesc: true,
+      additionalParams: params.isEmpty ? null : params,
+      columns: [
+        DateColumn(
+          'date',
+          'تاریخ',
+          showTime: false,
+          filterType: ColumnFilterType.dateRange,
+          formatter: (item) => _formatDailyDate((item as Map<String, dynamic>)['date']),
+        ),
+        NumberColumn(
+          'tokens',
+          'کل توکن',
+          width: ColumnWidth.medium,
+          formatter: (item) => _formatNumberField(item as Map<String, dynamic>, 'tokens'),
+        ),
+        NumberColumn(
+          'cost',
+          'هزینه',
+          width: ColumnWidth.medium,
+          decimalPlaces: 2,
+          formatter: (item) => _formatCurrencyField(item as Map<String, dynamic>, 'cost'),
+        ),
+        NumberColumn(
+          'requests',
+          'درخواست',
+          width: ColumnWidth.medium,
+          formatter: (item) => _formatNumberField(item as Map<String, dynamic>, 'requests'),
+        ),
+      ],
+    );
+  }
+
+  String _formatNumberField(Map<String, dynamic> item, String key) {
+    final value = item[key] ?? 0;
+    return _numberFormatter.format(value);
+  }
+
+  String _formatCurrencyField(Map<String, dynamic> item, String key) {
+    final value = item[key] ?? 0;
+    return '${_numberFormatter.format(value)} تومان';
+  }
+
+  String _formatDailyDate(dynamic value) {
+    if (value == null) return '-';
+    try {
+      final date = value is DateTime ? value : DateTime.parse(value.toString());
+      return _dailyDateFormat.format(date.toLocal());
+    } catch (_) {
+      return value.toString();
+    }
+  }
+
+  String _providerLabel(String? provider) {
+    final value = provider?.toLowerCase() ?? '';
+    switch (value) {
+      case 'openai':
+        return 'OpenAI';
+      case 'azure':
+        return 'Azure OpenAI';
+      case 'anthropic':
+        return 'Anthropic';
+      case 'local':
+        return 'مدل محلی';
+      case 'hesabix':
+        return 'Hesabix';
+      default:
+        return provider ?? '-';
+    }
+  }
+
+  String _paymentMethodLabel(String? method) {
+    final value = method?.toLowerCase() ?? '';
+    switch (value) {
+      case 'free':
+        return 'رایگان';
+      case 'subscription':
+        return 'اشتراک';
+      case 'wallet':
+        return 'کیف پول';
+      default:
+        return method ?? '-';
+    }
+  }
+
+  String _formatLogDate(DateTime? date) {
+    if (date == null) return '-';
+    try {
+      return _logDateFormat.format(date.toLocal());
+    } catch (_) {
+      return date.toString();
+    }
   }
 }
 

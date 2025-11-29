@@ -40,10 +40,13 @@ from adapters.api.v1.support.statuses import router as support_statuses_router
 from adapters.api.v1.admin.file_storage import router as admin_file_storage_router
 from adapters.api.v1.admin.email_config import router as admin_email_config_router
 from adapters.api.v1.admin.system_settings import router as admin_system_settings_router
+from adapters.api.v1.admin.monitoring import router as admin_monitoring_router
+from adapters.api.v1.admin.system_services import router as admin_system_services_router
 from adapters.api.v1.admin.wallet_admin import router as admin_wallet_router
 from adapters.api.v1.admin.storage_plans import router as admin_storage_plans_router
 from adapters.api.v1.admin.businesses_admin import router as admin_businesses_router
 from adapters.api.v1.admin.document_monetization import router as admin_document_monetization_router
+from adapters.api.v1.admin.zohal import router as admin_zohal_router
 from adapters.api.v1.announcements import router as announcements_router
 from adapters.api.v1.admin.announcements import router as admin_announcements_router
 from adapters.api.v1.receipts_payments import router as receipts_payments_router
@@ -55,6 +58,7 @@ from adapters.api.v1.kardex import router as kardex_router
 from adapters.api.v1.opening_balance import router as opening_balance_router
 from adapters.api.v1.report_templates import router as report_templates_router
 from adapters.api.v1.wallet import router as wallet_router
+from adapters.api.v1.zohal import router as zohal_router
 from adapters.api.v1.wallet_webhook import router as wallet_webhook_router
 from adapters.api.v1.credit import router as credit_router
 from adapters.api.v1.document_numbering import router as document_numbering_router
@@ -72,6 +76,10 @@ from adapters.api.v1.activity_logs import router as activity_logs_router
 from app.services.notification_processor import background_loop as notifications_background_loop
 from app.services.storage_background_jobs import storage_cleanup_loop, storage_subscription_check_loop
 from app.services.document_monetization_jobs import document_monetization_loop
+from app.services.monitoring_background_jobs import (
+	monitoring_metrics_collection_loop,
+	monitoring_service_status_check_loop,
+)
 from app.core.i18n import negotiate_locale, Translator
 from app.core.error_handlers import register_error_handlers
 from app.core.smart_normalizer import smart_normalize_json, SmartNormalizerConfig
@@ -305,6 +313,10 @@ def create_app() -> FastAPI:
         ],
     )
 
+    # Response Cache Middleware (بعد از CORS و قبل از authentication)
+    from app.core.response_cache import ResponseCacheMiddleware
+    application.add_middleware(ResponseCacheMiddleware)
+    
     application.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_allowed_origins,
@@ -316,21 +328,91 @@ def create_app() -> FastAPI:
     @application.middleware("http")
     async def smart_number_normalizer(request: Request, call_next):
         """Middleware هوشمند برای تبدیل اعداد فارسی/عربی به انگلیسی"""
-        if SmartNormalizerConfig.ENABLED and request.method in ["POST", "PUT", "PATCH"]:
-            # فقط برای درخواست‌های JSON اعمال شود تا فایل‌های باینری/چندبخشی خراب نشوند
-            content_type = request.headers.get("Content-Type", "").lower()
-            if content_type.startswith("application/json"):
-                # خواندن body درخواست
-                body = await request.body()
-                if body:
-                    # تبدیل اعداد در JSON
-                    normalized_body = smart_normalize_json(body)
-                    if normalized_body != body:
-                        # ایجاد request جدید با body تبدیل شده
-                        request._body = normalized_body
+        # فقط برای درخواست‌های POST/PUT/PATCH با Content-Type JSON اعمال شود
+        if not SmartNormalizerConfig.ENABLED or request.method not in ["POST", "PUT", "PATCH"]:
+            return await call_next(request)
         
-        response = await call_next(request)
-        return response
+        content_type = request.headers.get("Content-Type", "").lower()
+        if not content_type.startswith("application/json"):
+            return await call_next(request)
+        
+        # استثنا برای endpoint های خاص که نباید normalize شوند
+        # endpoint های zohal که ممکن است JSON پیچیده یا داده‌های خاص داشته باشند
+        path = request.url.path
+        
+        # اگر path مربوط به zohal است، از normalize کردن صرف نظر کن
+        if "/zohal/" in path:
+            return await call_next(request)
+        
+        # استفاده از receive wrapper برای خواندن و normalize کردن body
+        original_receive = request._receive
+        body_chunks = []
+        normalized_body = None
+        body_processed = False
+        
+        async def receive():
+            nonlocal body_chunks, normalized_body, body_processed
+            
+            try:
+                # اگر body قبلاً پردازش شده، از cache استفاده کن
+                if body_processed:
+                    if normalized_body is not None:
+                        return {"type": "http.request", "body": normalized_body, "more_body": False}
+                    return {"type": "http.request", "body": b"", "more_body": False}
+                
+                # خواندن body از stream
+                message = await original_receive()
+                
+                if message["type"] == "http.request":
+                    body_chunk = message.get("body", b"")
+                    body_chunks.append(body_chunk)
+                    
+                    # اگر body کامل خوانده شد
+                    if not message.get("more_body", False):
+                        body_processed = True
+                        body = b"".join(body_chunks)
+                        
+                        if body:
+                            try:
+                                # تبدیل اعداد در JSON
+                                normalized_body = smart_normalize_json(body)
+                            except Exception as e:
+                                # در صورت خطا، body اصلی را استفاده کن
+                                import logging
+                                logger = logging.getLogger(__name__)
+                                logger.warning(f"Error normalizing JSON body: {e}")
+                                normalized_body = body
+                        else:
+                            normalized_body = b""
+                        
+                        return {"type": "http.request", "body": normalized_body, "more_body": False}
+                
+                return message
+            except Exception as e:
+                # در صورت خطا در receive، body اصلی را برگردان
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(f"Error in receive wrapper: {e}")
+                # اگر body قبلاً خوانده شده، آن را برگردان
+                if body_processed and body_chunks:
+                    body = b"".join(body_chunks)
+                    return {"type": "http.request", "body": body, "more_body": False}
+                # در غیر این صورت، message خالی برگردان
+                return {"type": "http.request", "body": b"", "more_body": False}
+        
+        # جایگزینی receive فقط برای درخواست‌های JSON
+        request._receive = receive
+        
+        try:
+            response = await call_next(request)
+            return response
+        except Exception as e:
+            # در صورت خطا، receive اصلی را برگردان و خطا را propagate کن
+            request._receive = original_receive
+            raise
+        finally:
+            # همیشه receive اصلی را برگردان
+            request._receive = original_receive
 
     @application.middleware("http")
     async def maintenance_mode_middleware(request: Request, call_next):
@@ -341,27 +423,38 @@ def create_app() -> FastAPI:
             response = await call_next(request)
             return response
         
-        # بررسی maintenance mode
-        db_gen = get_db()
-        db = next(db_gen)
-        try:
-            if is_maintenance_mode_enabled(db):
-                # اجازه دسترسی به admin endpoints برای مدیریت maintenance mode
-                if request.url.path.startswith("/api/v1/admin/system-settings"):
-                    response = await call_next(request)
-                    return response
-                # برای سایر درخواست‌ها خطا برگردان
-                from fastapi.responses import JSONResponse
-                return JSONResponse(
-                    status_code=503,
-                    content={
-                        "success": False,
-                        "error_code": "MAINTENANCE_MODE",
-                        "message": "سیستم در حال تعمیرات است. لطفاً بعداً تلاش کنید."
-                    }
-                )
-        finally:
-            db.close()
+        # بررسی maintenance mode با cache
+        from app.core.cache import get_cache
+        cache = get_cache()
+        cache_key = "system:maintenance_mode"
+        cached_value = cache.get(cache_key)
+        
+        if cached_value is not None:
+            maintenance_enabled = cached_value
+        else:
+            # اگر در cache نبود، از دیتابیس بخوان
+            db_gen = get_db()
+            db = next(db_gen)
+            try:
+                maintenance_enabled = is_maintenance_mode_enabled(db)
+            finally:
+                db.close()
+        
+        if maintenance_enabled:
+            # اجازه دسترسی به admin endpoints برای مدیریت maintenance mode
+            if request.url.path.startswith("/api/v1/admin/system-settings"):
+                response = await call_next(request)
+                return response
+            # برای سایر درخواست‌ها خطا برگردان
+            from fastapi.responses import JSONResponse
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "success": False,
+                    "error_code": "MAINTENANCE_MODE",
+                    "message": "سیستم در حال تعمیرات است. لطفاً بعداً تلاش کنید."
+                }
+            )
         
         response = await call_next(request)
         return response
@@ -372,18 +465,26 @@ def create_app() -> FastAPI:
         accept_language = request.headers.get("Accept-Language")
         lang = negotiate_locale(accept_language)
         
-        # اگر زبان تشخیص داده نشد، از تنظیمات سیستم استفاده کن
+        # اگر زبان تشخیص داده نشد، از تنظیمات سیستم استفاده کن (با cache)
         if not accept_language:
-            db_gen = get_db()
-            db = next(db_gen)
-            try:
-                from app.services.system_settings_service import get_default_language
-                default_lang = get_default_language(db)
-                lang = default_lang
-            except Exception:
-                pass
-            finally:
-                db.close()
+            from app.core.cache import get_cache
+            from app.services.system_settings_service import get_default_language
+            cache = get_cache()
+            cache_key = "system:default_language"
+            cached_value = cache.get(cache_key)
+            
+            if cached_value is not None:
+                lang = cached_value
+            else:
+                # اگر در cache نبود، از دیتابیس بخوان
+                db_gen = get_db()
+                db = next(db_gen)
+                try:
+                    lang = get_default_language(db)
+                except Exception:
+                    pass
+                finally:
+                    db.close()
         
         request.state.locale = lang
         request.state.translator = Translator(lang)
@@ -438,8 +539,11 @@ def create_app() -> FastAPI:
     application.include_router(opening_balance_router, prefix=settings.api_v1_prefix)
     application.include_router(report_templates_router, prefix=settings.api_v1_prefix)
     application.include_router(wallet_router, prefix=settings.api_v1_prefix)
+    application.include_router(zohal_router, prefix=settings.api_v1_prefix)
     application.include_router(wallet_webhook_router, prefix=settings.api_v1_prefix)
     application.include_router(credit_router, prefix=settings.api_v1_prefix)
+    from adapters.api.v1.quick_sales import router as quick_sales_router
+    application.include_router(quick_sales_router, prefix=settings.api_v1_prefix)
     application.include_router(document_numbering_router, prefix=settings.api_v1_prefix)
     application.include_router(marketplace_router, prefix=settings.api_v1_prefix)
     # Ping Pong Game
@@ -457,6 +561,9 @@ def create_app() -> FastAPI:
     application.include_router(business_document_monetization_router, prefix=settings.api_v1_prefix)
     # Jobs
     application.include_router(jobs_router, prefix=settings.api_v1_prefix)
+    # Workflows
+    from adapters.api.v1.workflows import router as workflows_router
+    application.include_router(workflows_router, prefix=settings.api_v1_prefix)
     from adapters.api.v1.payment_gateways import router as payment_gateways_router
     application.include_router(payment_gateways_router, prefix=settings.api_v1_prefix)
     from adapters.api.v1.payment_callbacks import router as payment_callbacks_router
@@ -479,6 +586,8 @@ def create_app() -> FastAPI:
     application.include_router(admin_file_storage_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_email_config_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_system_settings_router, prefix=settings.api_v1_prefix)
+    application.include_router(admin_monitoring_router, prefix=settings.api_v1_prefix)
+    application.include_router(admin_system_services_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_wallet_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_storage_plans_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_businesses_router, prefix=settings.api_v1_prefix)
@@ -487,6 +596,7 @@ def create_app() -> FastAPI:
     application.include_router(admin_announcements_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_notification_templates_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_document_monetization_router, prefix=settings.api_v1_prefix)
+    application.include_router(admin_zohal_router, prefix=settings.api_v1_prefix)
     # AI endpoints
     from adapters.api.v1.admin.ai_settings import router as admin_ai_settings_router
     from adapters.api.v1.admin.ai_plans import router as admin_ai_plans_router
@@ -529,17 +639,97 @@ def create_app() -> FastAPI:
         asyncio.create_task(ai_chat_cleanup_loop(24))
         # AI subscription check: هر 6 ساعت یکبار
         asyncio.create_task(ai_subscription_check_loop(6))
+        # Monitoring metrics collection: هر 10 ثانیه
+        asyncio.create_task(monitoring_metrics_collection_loop(10))
+        # Service status check: هر 30 ثانیه
+        asyncio.create_task(monitoring_service_status_check_loop(30))
+
+    @application.middleware("http")
+    async def global_rate_limit_middleware(request: Request, call_next):
+        import time
+        """Rate limiting عمومی برای تمام endpoint ها"""
+        # استثنا برای health check و static files
+        if request.url.path in ["/", "/health", "/api/v1/health"] or \
+           request.url.path.startswith("/docs") or \
+           request.url.path.startswith("/redoc") or \
+           request.url.path.startswith("/openapi.json"):
+            return await call_next(request)
+        
+        from app.core.rate_limiter import get_rate_limiter, get_client_ip
+        
+        # Rate limiting عمومی: 100 request در دقیقه برای هر IP
+        client_ip = get_client_ip(request)
+        rate_limit_key = f"global:{client_ip}"
+        
+        limiter = get_rate_limiter()
+        allowed, remaining, reset_after = limiter.check_rate_limit(
+            rate_limit_key,
+            max_requests=100,
+            window_seconds=60,
+        )
+        
+        if not allowed:
+            from fastapi.responses import JSONResponse
+            return JSONResponse(
+                status_code=429,
+                content={
+                    "success": False,
+                    "error_code": "RATE_LIMIT_EXCEEDED",
+                    "message": "تعداد درخواست‌های شما بیش از حد مجاز است. لطفاً کمی صبر کنید."
+                },
+                headers={
+                    "X-RateLimit-Limit": "100",
+                    "X-RateLimit-Remaining": "0",
+                    "X-RateLimit-Reset": str(int(time.time()) + reset_after),
+                    "Retry-After": str(reset_after),
+                }
+            )
+        
+        response = await call_next(request)
+        
+        # اضافه کردن rate limit headers
+        if hasattr(response, 'headers'):
+            response.headers["X-RateLimit-Limit"] = "100"
+            response.headers["X-RateLimit-Remaining"] = str(remaining)
+            response.headers["X-RateLimit-Reset"] = str(int(time.time()) + reset_after)
+        
+        return response
 
     @application.middleware("http")
     async def log_slow_requests(request: Request, call_next):
         import time
         import structlog
+        from app.core.monitoring import get_performance_monitor
+        
         start = time.perf_counter()
+        status_code = 200
+        user_id = None
+        
         try:
             response = await call_next(request)
+            
+            # تلاش برای دریافت status code از response
+            if hasattr(response, 'status_code'):
+                status_code = response.status_code
+            
             return response
+        except Exception as e:
+            status_code = getattr(e, 'http_status', 500) if hasattr(e, 'http_status') else 500
+            raise
         finally:
-            duration_ms = int((time.perf_counter() - start) * 1000)
+            duration_ms = (time.perf_counter() - start) * 1000
+            
+            # ثبت در monitoring
+            monitor = get_performance_monitor()
+            monitor.record_request(
+                method=request.method,
+                path=str(request.url.path),
+                duration_ms=duration_ms,
+                status_code=status_code,
+                user_id=user_id,
+            )
+            
+            # Log slow requests
             if duration_ms > 2000:
                 logger = structlog.get_logger()
                 logger.warning(
@@ -547,6 +737,7 @@ def create_app() -> FastAPI:
                     path=str(request.url.path),
                     method=request.method,
                     duration_ms=duration_ms,
+                    status_code=status_code,
                 )
 
     @application.get("/", 

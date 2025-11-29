@@ -12,6 +12,8 @@ services:
       - "3306:3306"
     volumes:
       - db_data:/var/lib/mysql
+      - ./mysql.conf:/etc/mysql/conf.d/custom.cnf:ro  # Phase 1: MySQL Configuration
+      - ./mysql-logs:/var/log/mysql  # برای Log Files
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 10s

@@ -730,7 +730,10 @@ async def get_warehouse_doc_pdf(
 			from app.core.calendar import CalendarConverter
 			dt = datetime.datetime.fromisoformat(str(doc_data.get("document_date")).replace("Z", "+00:00"))
 			formatted = CalendarConverter.format_datetime(dt, "jalali")
-			document_date_jalali = formatted if formatted else None
+			if isinstance(formatted, dict):
+				document_date_jalali = formatted.get("formatted") or formatted.get("date_only")
+			elif formatted:
+				document_date_jalali = str(formatted)
 		except Exception:
 			document_date_jalali = None
 	
@@ -815,6 +818,19 @@ async def get_warehouse_doc_pdf(
 			return f'<h3>اطلاعات ارسال:</h3><table class="info-table">{"".join(rows)}</table>'
 		return ''
 	
+	def _to_display_str(value: Any, default: str = "-") -> str:
+		if value in (None, ""):
+			return default
+		if isinstance(value, dict):
+			for key in ("formatted", "date_only", "value", "gregorian"):
+				date_value = value.get(key)
+				if date_value:
+					return str(date_value)
+			return default
+		return str(value)
+	
+	document_date_display = _to_display_str(document_date_jalali or doc_data.get("document_date"))
+	
 	# اطلاعات محصولات در خطوط
 	lines_data = doc_data.get("lines", [])
 	lines_html = ""
@@ -886,7 +902,7 @@ async def get_warehouse_doc_pdf(
 			</tr>
 			<tr>
 				<td>تاریخ:</td>
-				<td>{escape(document_date_jalali or doc_data.get('document_date', '-'))}</td>
+				<td>{escape(document_date_display)}</td>
 			</tr>
 			<tr>
 				<td>وضعیت:</td>

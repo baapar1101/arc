@@ -278,6 +278,8 @@ class _WarehouseDocumentFormDialogState extends State<WarehouseDocumentFormDialo
         normalized['movement'] ??= _movementForDocType(_docType);
         _lines.add(normalized);
       }
+      // بارگذاری اطلاعات کامل کالاها برای نمایش در کامبوباکس
+      _loadInitialLinesProductInfo();
       // تکمیل خودکار انبار از فاکتور (فقط برای حواله‌های از فاکتور)
       if (_isFromInvoice) {
         _autoFillWarehouseFromInvoice(); // async - در پس‌زمینه اجرا می‌شود
@@ -289,6 +291,38 @@ class _WarehouseDocumentFormDialogState extends State<WarehouseDocumentFormDialo
     }
     // مقداردهی اولیه فیلدهای ارسال (در صورت ویرایش)
     // این فیلدها از extra_info در صورت ویرایش حواله موجود می‌آیند
+  }
+
+  /// بارگذاری اطلاعات کامل کالاها برای خطوط اولیه
+  Future<void> _loadInitialLinesProductInfo() async {
+    for (var i = 0; i < _lines.length; i++) {
+      final line = _lines[i];
+      final productId = line['product_id'] as int?;
+      if (productId != null) {
+        // بررسی اینکه آیا اطلاعات کامل (name و code) موجود است یا نه
+        final hasName = line['product_name'] != null;
+        final hasCode = line['product_code'] != null;
+        
+        // اگر اطلاعات کامل موجود نیست، از API بارگذاری کن
+        if (!hasName || !hasCode) {
+          try {
+            await _loadProductInfo(productId);
+            if (_productCache.containsKey(productId)) {
+              final product = _productCache[productId]!;
+              _updateLine(i, {
+                'product_name': product['name'],
+                'product_code': product['code'],
+              });
+            }
+          } catch (e) {
+            debugPrint('Error loading product info for line $i: $e');
+          }
+        }
+      }
+    }
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   Future<void> _autoFillWarehouseFromInvoice() async {
@@ -406,6 +440,268 @@ class _WarehouseDocumentFormDialogState extends State<WarehouseDocumentFormDialo
     }
   }
 
+  List<Widget> _buildWarehouseFields({required bool isMobile}) {
+    if (_docType == 'transfer') {
+      if (isMobile) {
+        return [
+          WarehouseComboboxWidget(
+            businessId: widget.businessId,
+            selectedWarehouseId: _warehouseIdFrom,
+            onChanged: (id) => setState(() => _warehouseIdFrom = id),
+            label: 'انبار مبدا *',
+          ),
+          const SizedBox(height: 12),
+          WarehouseComboboxWidget(
+            businessId: widget.businessId,
+            selectedWarehouseId: _warehouseIdTo,
+            onChanged: (id) => setState(() => _warehouseIdTo = id),
+            label: 'انبار مقصد *',
+          ),
+        ];
+      }
+      return [
+        Row(
+          children: [
+            Expanded(
+              child: WarehouseComboboxWidget(
+                businessId: widget.businessId,
+                selectedWarehouseId: _warehouseIdFrom,
+                onChanged: (id) => setState(() => _warehouseIdFrom = id),
+                label: 'انبار مبدا *',
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: WarehouseComboboxWidget(
+                businessId: widget.businessId,
+                selectedWarehouseId: _warehouseIdTo,
+                onChanged: (id) => setState(() => _warehouseIdTo = id),
+                label: 'انبار مقصد *',
+              ),
+            ),
+          ],
+        ),
+      ];
+    } else if (_docType == 'issue' || _docType == 'production_out') {
+      return [
+        WarehouseComboboxWidget(
+          businessId: widget.businessId,
+          selectedWarehouseId: _warehouseIdFrom,
+          onChanged: (id) => setState(() => _warehouseIdFrom = id),
+          label: 'انبار *',
+        ),
+      ];
+    } else if (_docType == 'receipt' || _docType == 'production_in') {
+      return [
+        WarehouseComboboxWidget(
+          businessId: widget.businessId,
+          selectedWarehouseId: _warehouseIdTo,
+          onChanged: (id) => setState(() => _warehouseIdTo = id),
+          label: 'انبار *',
+        ),
+      ];
+    }
+    return [];
+  }
+
+  Widget _buildShippingInfoSection() {
+    return ExpansionTile(
+      initiallyExpanded: false,
+      tilePadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+      leading: Icon(Icons.local_shipping, size: 20, color: Theme.of(context).colorScheme.primary),
+      title: Text(
+        'اطلاعات ارسال (اختیاری)',
+        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      children: [
+        // شرح حواله
+        TextFormField(
+          initialValue: _description,
+          decoration: const InputDecoration(
+            labelText: 'شرح/توضیحات',
+            border: OutlineInputBorder(),
+            hintText: 'توضیحات اختیاری',
+            isDense: true,
+            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          ),
+          maxLines: 2,
+          onChanged: (value) => setState(() => _description = value.isEmpty ? null : value),
+        ),
+        const SizedBox(height: 12),
+        // روش ارسال و نام باربری
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final isMobile = constraints.maxWidth < 600;
+            if (isMobile) {
+              return Column(
+                children: [
+                  DropdownButtonFormField<String>(
+                    value: _deliveryMethod,
+                    decoration: const InputDecoration(
+                      labelText: 'روش ارسال',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    ),
+                    items: const [
+                      DropdownMenuItem(value: 'warehouse_door', child: Text('تحویل درب انبار')),
+                      DropdownMenuItem(value: 'post_regular', child: Text('پست عادی')),
+                      DropdownMenuItem(value: 'post_express', child: Text('پست پیشتاز')),
+                      DropdownMenuItem(value: 'freight', child: Text('باربری')),
+                      DropdownMenuItem(value: 'bus', child: Text('اتوبوس')),
+                      DropdownMenuItem(value: 'tipax', child: Text('تیپاکس')),
+                      DropdownMenuItem(value: 'courier', child: Text('پیک')),
+                    ],
+                    onChanged: (value) => setState(() => _deliveryMethod = value),
+                  ),
+                  if (_showCarrierName) ...[
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      initialValue: _carrierName,
+                      decoration: const InputDecoration(
+                        labelText: 'نام باربری',
+                        border: OutlineInputBorder(),
+                        hintText: 'مثال: باربری تهران',
+                        isDense: true,
+                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                      ),
+                      onChanged: (value) => setState(() => _carrierName = value.isEmpty ? null : value),
+                    ),
+                  ],
+                ],
+              );
+            }
+            return Row(
+              children: [
+                Expanded(
+                  flex: 2,
+                  child: DropdownButtonFormField<String>(
+                    value: _deliveryMethod,
+                    decoration: const InputDecoration(
+                      labelText: 'روش ارسال',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    ),
+                    items: const [
+                      DropdownMenuItem(value: 'warehouse_door', child: Text('تحویل درب انبار')),
+                      DropdownMenuItem(value: 'post_regular', child: Text('پست عادی')),
+                      DropdownMenuItem(value: 'post_express', child: Text('پست پیشتاز')),
+                      DropdownMenuItem(value: 'freight', child: Text('باربری')),
+                      DropdownMenuItem(value: 'bus', child: Text('اتوبوس')),
+                      DropdownMenuItem(value: 'tipax', child: Text('تیپاکس')),
+                      DropdownMenuItem(value: 'courier', child: Text('پیک')),
+                    ],
+                    onChanged: (value) => setState(() => _deliveryMethod = value),
+                  ),
+                ),
+                if (_showCarrierName) ...[
+                  const SizedBox(width: 12),
+                  Expanded(
+                    flex: 2,
+                    child: TextFormField(
+                      initialValue: _carrierName,
+                      decoration: const InputDecoration(
+                        labelText: 'نام باربری',
+                        border: OutlineInputBorder(),
+                        hintText: 'مثال: باربری تهران',
+                        isDense: true,
+                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                      ),
+                      onChanged: (value) => setState(() => _carrierName = value.isEmpty ? null : value),
+                    ),
+                  ),
+                ],
+              ],
+            );
+          },
+        ),
+        const SizedBox(height: 12),
+        // تحویل گیرنده و تلفن
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final isMobile = constraints.maxWidth < 600;
+            if (isMobile) {
+              return Column(
+                children: [
+                  TextFormField(
+                    initialValue: _recipientName,
+                    decoration: const InputDecoration(
+                      labelText: 'تحویل گیرنده',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    ),
+                    onChanged: (value) => setState(() => _recipientName = value.isEmpty ? null : value),
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    initialValue: _recipientPhone,
+                    decoration: const InputDecoration(
+                      labelText: 'تلفن',
+                      border: OutlineInputBorder(),
+                      hintText: '09123456789',
+                      isDense: true,
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    ),
+                    keyboardType: TextInputType.phone,
+                    onChanged: (value) => setState(() => _recipientPhone = value.isEmpty ? null : value),
+                  ),
+                ],
+              );
+            }
+            return Row(
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    initialValue: _recipientName,
+                    decoration: const InputDecoration(
+                      labelText: 'تحویل گیرنده',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    ),
+                    onChanged: (value) => setState(() => _recipientName = value.isEmpty ? null : value),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextFormField(
+                    initialValue: _recipientPhone,
+                    decoration: const InputDecoration(
+                      labelText: 'تلفن',
+                      border: OutlineInputBorder(),
+                      hintText: '09123456789',
+                      isDense: true,
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    ),
+                    keyboardType: TextInputType.phone,
+                    onChanged: (value) => setState(() => _recipientPhone = value.isEmpty ? null : value),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+        const SizedBox(height: 12),
+        // شماره پیگیری
+        TextFormField(
+          initialValue: _trackingNumber,
+          decoration: const InputDecoration(
+            labelText: 'شماره پیگیری/بارنامه',
+            border: OutlineInputBorder(),
+            hintText: 'شماره پیگیری ارسال',
+            isDense: true,
+            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          ),
+          onChanged: (value) => setState(() => _trackingNumber = value.isEmpty ? null : value),
+        ),
+      ],
+    );
+  }
 
   void _addLine() {
     setState(() {
@@ -829,217 +1125,128 @@ class _WarehouseDocumentFormDialogState extends State<WarehouseDocumentFormDialo
                       children: [
                 if (_isFromInvoice) ...[
                   _buildSourceBanner(),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 12),
                 ],
-                // نوع حواله
-                DropdownButtonFormField<String>(
-                  value: _docType,
-                  decoration: const InputDecoration(
-                    labelText: 'نوع حواله *',
-                    border: OutlineInputBorder(),
-                  ),
-                  items: const [
-                    DropdownMenuItem(value: 'receipt', child: Text('حواله ورود')),
-                    DropdownMenuItem(value: 'issue', child: Text('حواله خروج')),
-                    DropdownMenuItem(value: 'transfer', child: Text('انتقال بین انبارها')),
-                    DropdownMenuItem(value: 'adjustment', child: Text('تعدیل موجودی')),
-                    DropdownMenuItem(value: 'production_in', child: Text('ورود تولید')),
-                    DropdownMenuItem(value: 'production_out', child: Text('خروج تولید')),
-                  ],
-                  onChanged: _isDocTypeLocked
-                      ? null
-                      : (value) {
-                          setState(() {
-                            _docType = value;
-                            _syncLineMovementsForDocType();
-                          });
-                        },
-                  validator: (value) => value == null ? 'لطفاً نوع حواله را انتخاب کنید' : null,
-                ),
-                const SizedBox(height: 16),
-                // تاریخ
-                if (_calendarController != null)
-                  DateInputField(
-                    value: _documentDate,
-                    calendarController: _calendarController!,
-                    onChanged: (date) => setState(() => _documentDate = date),
-                    labelText: 'تاریخ *',
-                    firstDate: DateTime(2000),
-                    lastDate: DateTime(2100),
-                  )
-                else
-                  const Center(child: CircularProgressIndicator()),
-                const SizedBox(height: 16),
-                // انبارها بر اساس نوع حواله
-                if (_docType == 'transfer') ...[
-                  WarehouseComboboxWidget(
-                    businessId: widget.businessId,
-                    selectedWarehouseId: _warehouseIdFrom,
-                    onChanged: (id) => setState(() => _warehouseIdFrom = id),
-                    label: 'انبار مبدا *',
-                  ),
-                  const SizedBox(height: 16),
-                  WarehouseComboboxWidget(
-                    businessId: widget.businessId,
-                    selectedWarehouseId: _warehouseIdTo,
-                    onChanged: (id) => setState(() => _warehouseIdTo = id),
-                    label: 'انبار مقصد *',
-                  ),
-                ] else if (_docType == 'issue' || _docType == 'production_out') ...[
-                  WarehouseComboboxWidget(
-                    businessId: widget.businessId,
-                    selectedWarehouseId: _warehouseIdFrom,
-                    onChanged: (id) => setState(() => _warehouseIdFrom = id),
-                    label: 'انبار *',
-                  ),
-                ] else if (_docType == 'receipt' || _docType == 'production_in') ...[
-                  WarehouseComboboxWidget(
-                    businessId: widget.businessId,
-                    selectedWarehouseId: _warehouseIdTo,
-                    onChanged: (id) => setState(() => _warehouseIdTo = id),
-                    label: 'انبار *',
-                  ),
-                ],
-                const SizedBox(height: 16),
-                // بخش اطلاعات ارسال
+                // Card تجمیعی برای اطلاعات اصلی
                 Card(
                   elevation: 1,
                   child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(Icons.local_shipping, size: 20, color: Theme.of(context).colorScheme.primary),
-                            const SizedBox(width: 8),
-                            Text(
-                              'اطلاعات ارسال',
-                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        // شرح حواله
-                        TextFormField(
-                          initialValue: _description,
-                          decoration: const InputDecoration(
-                            labelText: 'شرح/توضیحات حواله',
-                            border: OutlineInputBorder(),
-                            hintText: 'توضیحات اختیاری درباره حواله',
-                          ),
-                          maxLines: 2,
-                          onChanged: (value) => setState(() => _description = value.isEmpty ? null : value),
-                        ),
-                        const SizedBox(height: 16),
-                        // روش ارسال
-                        DropdownButtonFormField<String>(
-                          value: _deliveryMethod,
-                          decoration: const InputDecoration(
-                            labelText: 'روش ارسال',
-                            border: OutlineInputBorder(),
-                          ),
-                          items: const [
-                            DropdownMenuItem(value: 'warehouse_door', child: Text('تحویل درب انبار')),
-                            DropdownMenuItem(value: 'post_regular', child: Text('پست عادی')),
-                            DropdownMenuItem(value: 'post_express', child: Text('پست پیشتاز')),
-                            DropdownMenuItem(value: 'freight', child: Text('باربری')),
-                            DropdownMenuItem(value: 'bus', child: Text('اتوبوس')),
-                            DropdownMenuItem(value: 'tipax', child: Text('تیپاکس')),
-                            DropdownMenuItem(value: 'courier', child: Text('پیک')),
-                          ],
-                          onChanged: (value) => setState(() => _deliveryMethod = value),
-                        ),
-                        // نام باربری (فقط برای روش‌های خاص)
-                        if (_showCarrierName) ...[
-                          const SizedBox(height: 16),
-                          TextFormField(
-                            initialValue: _carrierName,
-                            decoration: const InputDecoration(
-                              labelText: 'نام باربری/حمل و نقل',
-                              border: OutlineInputBorder(),
-                              hintText: 'مثال: باربری تهران',
-                            ),
-                            onChanged: (value) => setState(() => _carrierName = value.isEmpty ? null : value),
-                          ),
-                        ],
-                        const SizedBox(height: 16),
-                        // تحویل گیرنده و تلفن در یک ردیف (در دسکتاپ)
-                        LayoutBuilder(
-                          builder: (context, constraints) {
-                            final isMobile = constraints.maxWidth < 600;
-                            if (isMobile) {
-                              return Column(
-                                children: [
-                                  TextFormField(
-                                    initialValue: _recipientName,
-                                    decoration: const InputDecoration(
-                                      labelText: 'تحویل گیرنده',
-                                      border: OutlineInputBorder(),
-                                    ),
-                                    onChanged: (value) => setState(() => _recipientName = value.isEmpty ? null : value),
-                                  ),
-                                  const SizedBox(height: 16),
-                                  TextFormField(
-                                    initialValue: _recipientPhone,
-                                    decoration: const InputDecoration(
-                                      labelText: 'تلفن تحویل گیرنده',
-                                      border: OutlineInputBorder(),
-                                      hintText: '09123456789',
-                                    ),
-                                    keyboardType: TextInputType.phone,
-                                    onChanged: (value) => setState(() => _recipientPhone = value.isEmpty ? null : value),
-                                  ),
+                    padding: const EdgeInsets.all(12),
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final isMobile = constraints.maxWidth < 600;
+                        if (isMobile) {
+                          return Column(
+                            children: [
+                              // نوع حواله
+                              DropdownButtonFormField<String>(
+                                value: _docType,
+                                decoration: const InputDecoration(
+                                  labelText: 'نوع حواله *',
+                                  border: OutlineInputBorder(),
+                                  isDense: true,
+                                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                ),
+                                items: const [
+                                  DropdownMenuItem(value: 'receipt', child: Text('حواله ورود')),
+                                  DropdownMenuItem(value: 'issue', child: Text('حواله خروج')),
+                                  DropdownMenuItem(value: 'transfer', child: Text('انتقال بین انبارها')),
+                                  DropdownMenuItem(value: 'adjustment', child: Text('تعدیل موجودی')),
+                                  DropdownMenuItem(value: 'production_in', child: Text('ورود تولید')),
+                                  DropdownMenuItem(value: 'production_out', child: Text('خروج تولید')),
                                 ],
-                              );
-                            }
-                            return Row(
+                                onChanged: _isDocTypeLocked
+                                    ? null
+                                    : (value) {
+                                        setState(() {
+                                          _docType = value;
+                                          _syncLineMovementsForDocType();
+                                        });
+                                      },
+                                validator: (value) => value == null ? 'لطفاً نوع حواله را انتخاب کنید' : null,
+                              ),
+                              const SizedBox(height: 12),
+                              // تاریخ
+                              if (_calendarController != null)
+                                DateInputField(
+                                  value: _documentDate,
+                                  calendarController: _calendarController!,
+                                  onChanged: (date) => setState(() => _documentDate = date),
+                                  labelText: 'تاریخ *',
+                                  firstDate: DateTime(2000),
+                                  lastDate: DateTime(2100),
+                                )
+                              else
+                                const Center(child: CircularProgressIndicator()),
+                              const SizedBox(height: 12),
+                              // انبارها
+                              ..._buildWarehouseFields(isMobile: true),
+                            ],
+                          );
+                        }
+                        // دسکتاپ: چیدمان افقی
+                        return Column(
+                          children: [
+                            Row(
                               children: [
                                 Expanded(
-                                  child: TextFormField(
-                                    initialValue: _recipientName,
+                                  flex: 2,
+                                  child: DropdownButtonFormField<String>(
+                                    value: _docType,
                                     decoration: const InputDecoration(
-                                      labelText: 'تحویل گیرنده',
+                                      labelText: 'نوع حواله *',
                                       border: OutlineInputBorder(),
+                                      isDense: true,
+                                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                                     ),
-                                    onChanged: (value) => setState(() => _recipientName = value.isEmpty ? null : value),
+                                    items: const [
+                                      DropdownMenuItem(value: 'receipt', child: Text('حواله ورود')),
+                                      DropdownMenuItem(value: 'issue', child: Text('حواله خروج')),
+                                      DropdownMenuItem(value: 'transfer', child: Text('انتقال بین انبارها')),
+                                      DropdownMenuItem(value: 'adjustment', child: Text('تعدیل موجودی')),
+                                      DropdownMenuItem(value: 'production_in', child: Text('ورود تولید')),
+                                      DropdownMenuItem(value: 'production_out', child: Text('خروج تولید')),
+                                    ],
+                                    onChanged: _isDocTypeLocked
+                                        ? null
+                                        : (value) {
+                                            setState(() {
+                                              _docType = value;
+                                              _syncLineMovementsForDocType();
+                                            });
+                                          },
+                                    validator: (value) => value == null ? 'لطفاً نوع حواله را انتخاب کنید' : null,
                                   ),
                                 ),
-                                const SizedBox(width: 16),
+                                const SizedBox(width: 12),
                                 Expanded(
-                                  child: TextFormField(
-                                    initialValue: _recipientPhone,
-                                    decoration: const InputDecoration(
-                                      labelText: 'تلفن تحویل گیرنده',
-                                      border: OutlineInputBorder(),
-                                      hintText: '09123456789',
-                                    ),
-                                    keyboardType: TextInputType.phone,
-                                    onChanged: (value) => setState(() => _recipientPhone = value.isEmpty ? null : value),
-                                  ),
+                                  flex: 2,
+                                  child: _calendarController != null
+                                      ? DateInputField(
+                                          value: _documentDate,
+                                          calendarController: _calendarController!,
+                                          onChanged: (date) => setState(() => _documentDate = date),
+                                          labelText: 'تاریخ *',
+                                          firstDate: DateTime(2000),
+                                          lastDate: DateTime(2100),
+                                        )
+                                      : const Center(child: CircularProgressIndicator()),
                                 ),
                               ],
-                            );
-                          },
-                        ),
-                        const SizedBox(height: 16),
-                        // شماره پیگیری/بارنامه/قبض
-                        TextFormField(
-                          initialValue: _trackingNumber,
-                          decoration: const InputDecoration(
-                            labelText: 'شماره پیگیری/بارنامه/قبض',
-                            border: OutlineInputBorder(),
-                            hintText: 'شماره پیگیری ارسال',
-                          ),
-                          onChanged: (value) => setState(() => _trackingNumber = value.isEmpty ? null : value),
-                        ),
-                      ],
+                            ),
+                            const SizedBox(height: 12),
+                            // انبارها
+                            ..._buildWarehouseFields(isMobile: false),
+                          ],
+                        );
+                      },
                     ),
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 12),
+                // بخش اطلاعات ارسال (collapsible)
+                _buildShippingInfoSection(),
+                const SizedBox(height: 12),
                 // خطوط
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1096,18 +1303,35 @@ class _WarehouseDocumentFormDialogState extends State<WarehouseDocumentFormDialo
                                   child: ProductComboboxWidget(
                                     businessId: widget.businessId,
                                     selectedProduct: line['product_id'] != null
-                                        ? {'id': line['product_id']}
+                                        ? {
+                                            'id': line['product_id'],
+                                            'name': line['product_name'],
+                                            'code': line['product_code'],
+                                          }
                                         : null,
                                     onChanged: (product) async {
                                       final productId = product?['id'];
+                                      final productName = product?['name'];
+                                      final productCode = product?['code'];
+                                      
                                       _updateLine(index, {
                                         'product_id': productId,
+                                        'product_name': productName,
+                                        'product_code': productCode,
                                         'instance_data': null, // پاک کردن instance_data قبلی
                                       });
                                       
                                       // بارگذاری اطلاعات کالا برای بررسی یونیک بودن
                                       if (productId != null) {
                                         await _loadProductInfo(productId);
+                                        // به‌روزرسانی اطلاعات کامل کالا از cache در صورت نیاز
+                                        if (_productCache.containsKey(productId)) {
+                                          final cachedProduct = _productCache[productId]!;
+                                          _updateLine(index, {
+                                            'product_name': cachedProduct['name'],
+                                            'product_code': cachedProduct['code'],
+                                          });
+                                        }
                                         setState(() {}); // به‌روزرسانی UI
                                       }
                                     },

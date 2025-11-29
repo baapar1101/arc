@@ -9,6 +9,7 @@ import '../../l10n/app_localizations.dart';
 import '../../services/report_template_service.dart';
 import '../../utils/number_normalizer.dart';
 import '../../utils/snackbar_helper.dart';
+import 'report_template_visual_editor_page.dart';
 
 class ReportTemplatesPage extends StatefulWidget {
   final int businessId;
@@ -1385,14 +1386,22 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                     Padding(
                       padding: const EdgeInsets.only(bottom: 8.0),
                       child: OutlinedButton.icon(
-                        onPressed: () {
-                          final assets = (full['assets'] as Map?)?.cast<String, dynamic>() ?? const <String, dynamic>{};
-                          final design = (assets['builder_design'] as Map?)?.cast<String, dynamic>();
-                          _openBuilderDialogAdvanced(
-                            initialDesign: design ?? const <String, dynamic>{},
-                            initialAssets: assets,
-                            existingTemplateId: (item['id'] as num).toInt(),
+                        onPressed: () async {
+                          Navigator.pop(ctx); // Close current dialog
+                          final result = await Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (context) => ReportTemplateVisualEditorPage(
+                                businessId: widget.businessId,
+                                authStore: widget.authStore,
+                                template: item,
+                                moduleKey: _moduleCtrl.text.trim().isEmpty ? null : _moduleCtrl.text.trim(),
+                                subtype: _subtypeCtrl.text.trim().isEmpty ? null : _subtypeCtrl.text.trim(),
+                              ),
+                            ),
                           );
+                          if (result == true) {
+                            await _fetch();
+                          }
                         },
                         icon: const Icon(Icons.view_quilt),
                         label: const Text('ویرایش در سازنده بصری'),
@@ -1698,7 +1707,21 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8),
               child: OutlinedButton.icon(
-                onPressed: _openBuilderDialogAdvanced,
+                onPressed: () async {
+                  final result = await Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => ReportTemplateVisualEditorPage(
+                        businessId: widget.businessId,
+                        authStore: widget.authStore,
+                        moduleKey: _moduleCtrl.text.trim().isEmpty ? null : _moduleCtrl.text.trim(),
+                        subtype: _subtypeCtrl.text.trim().isEmpty ? null : _subtypeCtrl.text.trim(),
+                      ),
+                    ),
+                  );
+                  if (result == true) {
+                    await _fetch();
+                  }
+                },
                 icon: const Icon(Icons.view_quilt),
                 label: const Text('سازنده بصری'),
               ),

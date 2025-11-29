@@ -11,9 +11,12 @@ class ProductionSettingsDialog extends StatefulWidget {
 
 class _ProductionSettingsDialogState extends State<ProductionSettingsDialog> {
   final _service = ProductionSettingsService();
+  final _formKey = GlobalKey<FormState>();
   final _invCtrl = TextEditingController();
   final _wipCtrl = TextEditingController();
   bool _loading = true;
+  bool _saving = false;
+  String? _errorMessage;
 
   @override
   void initState() {
@@ -38,6 +41,31 @@ class _ProductionSettingsDialogState extends State<ProductionSettingsDialog> {
     super.dispose();
   }
 
+  Future<void> _handleSave() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() {
+      _saving = true;
+      _errorMessage = null;
+    });
+
+    try {
+      await _service.saveDefaultAccounts(
+        businessId: widget.businessId,
+        inventoryCode: _invCtrl.text.trim(),
+        wipCode: _wipCtrl.text.trim(),
+      );
+      if (!mounted) return;
+      Navigator.pop(context, true);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _saving = false;
+        _errorMessage = 'خطا در ذخیره تنظیمات: $e';
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Dialog(
@@ -52,40 +80,93 @@ class _ProductionSettingsDialogState extends State<ProductionSettingsDialog> {
               Text('تنظیمات حساب‌های تولید', style: Theme.of(context).textTheme.titleMedium),
               const SizedBox(height: 12),
               if (_loading) const Center(child: CircularProgressIndicator()) else ...[
-                TextField(
-                  controller: _invCtrl,
-                  decoration: const InputDecoration(
-                    border: OutlineInputBorder(),
-                    labelText: 'کد حساب موجودی کالا (مصرف مواد)'
-                  ),
-                ),
-                const SizedBox(height: 10),
-                TextField(
-                  controller: _wipCtrl,
-                  decoration: const InputDecoration(
-                    border: OutlineInputBorder(),
-                    labelText: 'کد حساب کالای در جریان ساخت/محصول تولیدی'
+                Form(
+                  key: _formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      TextFormField(
+                        controller: _invCtrl,
+                        enabled: !_saving,
+                        decoration: const InputDecoration(
+                          border: OutlineInputBorder(),
+                          labelText: 'کد حساب موجودی کالا (مصرف مواد)',
+                          helperText: 'کد حساب برای مصرف مواد اولیه در تولید',
+                        ),
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return 'لطفاً کد حساب را وارد کنید';
+                          }
+                          if (value.trim().length < 3) {
+                            return 'کد حساب باید حداقل 3 کاراکتر باشد';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 10),
+                      TextFormField(
+                        controller: _wipCtrl,
+                        enabled: !_saving,
+                        decoration: const InputDecoration(
+                          border: OutlineInputBorder(),
+                          labelText: 'کد حساب کالای در جریان ساخت/محصول تولیدی',
+                          helperText: 'کد حساب برای محصول در حال تولید',
+                        ),
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return 'لطفاً کد حساب را وارد کنید';
+                          }
+                          if (value.trim().length < 3) {
+                            return 'کد حساب باید حداقل 3 کاراکتر باشد';
+                          }
+                          return null;
+                        },
+                      ),
+                      if (_errorMessage != null) ...[
+                        const SizedBox(height: 12),
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.red.shade50,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.red.shade300),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.error_outline, color: Colors.red.shade700),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  _errorMessage!,
+                                  style: TextStyle(color: Colors.red.shade700),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
                 const SizedBox(height: 12),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
-                    TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('انصراف')),
+                    TextButton(
+                      onPressed: _saving ? null : () => Navigator.pop(context, false),
+                      child: const Text('انصراف'),
+                    ),
                     const SizedBox(width: 8),
                     FilledButton(
-                      onPressed: () async {
-                        if (!context.mounted) return;
-                        final ctx = context;
-                        await _service.saveDefaultAccounts(
-                          businessId: widget.businessId,
-                          inventoryCode: _invCtrl.text.trim(),
-                          wipCode: _wipCtrl.text.trim(),
-                        );
-                        if (!ctx.mounted) return;
-                        Navigator.pop(ctx, true);
-                      },
-                      child: const Text('ذخیره'),
+                      onPressed: _saving ? null : _handleSave,
+                      child: _saving
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Text('ذخیره'),
                     ),
                   ],
                 )

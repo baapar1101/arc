@@ -100,6 +100,45 @@ class BusinessDashboardService {
     return items.cast<Map<String, dynamic>>();
   }
 
+  /// ویرایش سال مالی جاری (فقط عنوان و تاریخ‌ها)
+  Future<Map<String, dynamic>> updateCurrentFiscalYear(
+    int businessId, {
+    required String title,
+    required DateTime startDate,
+    required DateTime endDate,
+  }) async {
+    try {
+      final response = await _apiClient.put<Map<String, dynamic>>(
+        '/api/v1/business/$businessId/fiscal-years/current',
+        data: {
+          'title': title,
+          'start_date': startDate.toIso8601String().split('T')[0],
+          'end_date': endDate.toIso8601String().split('T')[0],
+        },
+      );
+
+      if (response.data?['success'] == true) {
+        return response.data!['data'] as Map<String, dynamic>;
+      } else {
+        throw Exception('Failed to update current fiscal year: ${response.data?['message']}');
+      }
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 403) {
+        throw Exception('دسترسی غیرمجاز به این عملیات');
+      } else if (e.response?.statusCode == 404) {
+        throw Exception('سال مالی جاری یافت نشد');
+      } else if (e.response?.statusCode == 400) {
+        final errorData = e.response?.data;
+        final message = errorData?['message'] ?? 'خطا در به‌روزرسانی سال مالی جاری';
+        throw Exception(message);
+      } else {
+        throw Exception('خطا در به‌روزرسانی سال مالی جاری: ${e.message}');
+      }
+    } catch (e) {
+      throw Exception('خطا در به‌روزرسانی سال مالی جاری: $e');
+    }
+  }
+
   /// دریافت لیست کسب و کارهای کاربر (مالک + عضو)
   Future<List<BusinessWithPermission>> getUserBusinesses() async {
     try {

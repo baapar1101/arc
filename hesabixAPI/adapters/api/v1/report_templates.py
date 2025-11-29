@@ -264,6 +264,62 @@ async def preview_report_template(
 	except Exception as e:
 		raise ApiError("PDF_ERROR", f"PDF generation error: {e}", http_status=400)
 
+
+@router.post(
+	"/business/{business_id}/preview-pdf",
+	summary="پیش‌نمایش PDF قالب (فقط سازندگان)",
+	description="بدون ذخیره‌سازی؛ HTML/CSS ارسالی با داده نمونه رندر و به PDF تبدیل می‌شود. فایل PDF به صورت bytes برگردانده می‌شود.",
+)
+@require_business_access("business_id")
+async def preview_report_template_pdf(
+	request: Request,
+	business_id: int,
+	body: Dict[str, Any] = Body(...),
+	ctx: AuthContext = Depends(get_current_user),
+	db: Session = Depends(get_db),
+):
+	from weasyprint import HTML
+	from weasyprint.text.fonts import FontConfiguration
+	from fastapi.responses import Response
+	if not ctx.can_write_section("report_templates"):
+		raise ApiError("FORBIDDEN", "Missing permission: report_templates.write", http_status=403)
+	engine = str((body or {}).get("engine") or "").lower() or "jinja2"
+	content_html = (body or {}).get("content_html") or ""
+	content_css = (body or {}).get("content_css") or ""
+	context = (body or {}).get("context") or {}
+	# محدودیت ساده روی اندازه ورودی‌ها
+	max_len = 1_000_000  # 1MB
+	if len(content_html) > max_len or len(content_css) > max_len:
+		raise ApiError("PAYLOAD_TOO_LARGE", "HTML/CSS too large for preview", http_status=413)
+	temp = type("T", (), {
+		"engine": engine,
+		"content_html": content_html,
+		"content_css": content_css,
+		"header_html": (body or {}).get("header_html") or "",
+		"footer_html": (body or {}).get("footer_html") or "",
+		"paper_size": (body or {}).get("paper_size") or None,
+		"orientation": (body or {}).get("orientation") or None,
+		"margins": (body or {}).get("margins") or None,
+		"assets": (body or {}).get("assets") or ({"builder_design": (body or {}).get("design")} if engine == "builder" else None),
+	})()  # شیء موقت شبیه ReportTemplate
+	try:
+		html = ReportTemplateService.render_with_template(temp, context)
+	except Exception as e:
+		raise ApiError("TEMPLATE_ERROR", f"Render error: {e}", http_status=400)
+	try:
+		pdf_bytes = HTML(string=html).write_pdf(font_config=FontConfiguration())
+		return Response(
+			content=pdf_bytes,
+			media_type="application/pdf",
+			headers={
+				"Content-Disposition": "inline; filename=preview.pdf",
+				"Content-Length": str(len(pdf_bytes)),
+				"Access-Control-Expose-Headers": "Content-Disposition",
+			},
+		)
+	except Exception as e:
+		raise ApiError("PDF_ERROR", f"PDF generation error: {e}", http_status=400)
+
 @router.get(
 	"/business/{business_id}/schema",
 	summary="Schema متغیرهای قابل‌استفاده در قالب برای ماژول/زیرنوع",

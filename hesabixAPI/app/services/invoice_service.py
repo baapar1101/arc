@@ -1683,17 +1683,26 @@ def create_invoice(
     # ایجاد حواله انبار draft در صورت نیاز و جدا از فاکتور
     try:
         if bool(data.get("extra_info", {}).get("post_inventory", True)):
-            from app.services.warehouse_service import create_from_invoice
+            from app.services.warehouse_service import create_from_invoice, post_warehouse_document
+            from adapters.db.models.product_instance import ProductInstance
+            from adapters.db.models.warehouse_document import WarehouseDocument
+            
             created_wh_ids: List[int] = []
+            auto_post_warehouse = bool(data.get("extra_info", {}).get("auto_post_warehouse", False))
+            
             if invoice_type == INVOICE_PRODUCTION:
                 out_lines = [ln for ln in lines_input if (ln.get("extra_info") or {}).get("movement") == "out"]
                 in_lines = [ln for ln in lines_input if (ln.get("extra_info") or {}).get("movement") == "in"]
                 if out_lines:
                     wh_issue = create_from_invoice(db, business_id, document, out_lines, "issue", user_id)
                     created_wh_ids.append(int(wh_issue.id))
+                    if auto_post_warehouse:
+                        post_warehouse_document(db, int(wh_issue.id))
                 if in_lines:
                     wh_receipt = create_from_invoice(db, business_id, document, in_lines, "receipt", user_id)
                     created_wh_ids.append(int(wh_receipt.id))
+                    if auto_post_warehouse:
+                        post_warehouse_document(db, int(wh_receipt.id))
             else:
                 if invoice_type in {INVOICE_SALES, INVOICE_PURCHASE_RETURN, INVOICE_WASTE, INVOICE_DIRECT_CONSUMPTION}:
                     wh_type = "issue"
@@ -1703,6 +1712,26 @@ def create_invoice(
                     wh_type = "issue"
                 wh = create_from_invoice(db, business_id, document, lines_input, wh_type, user_id)
                 created_wh_ids.append(int(wh.id))
+                
+                # قطعی خودکار حواله در صورت فعال بودن
+                if auto_post_warehouse:
+                    post_warehouse_document(db, int(wh.id))
+                    
+                    # به‌روزرسانی وضعیت کالاهای یونیک برای فاکتورهای فروش
+                    if invoice_type == INVOICE_SALES:
+                        for line in lines_input:
+                            instance_id = (line.get("extra_info") or {}).get("instance_id")
+                            if instance_id:
+                                instance = db.query(ProductInstance).filter(
+                                    ProductInstance.id == int(instance_id),
+                                    ProductInstance.business_id == business_id,
+                                ).first()
+                                if instance:
+                                    instance.status = "sold"
+                                    instance.current_invoice_id = document.id
+                                    # انبار را null می‌کنیم چون کالا فروخته شده
+                                    instance.warehouse_id = None
+                                    db.flush()
 
             if created_wh_ids:
                 # ذخیره لینک حواله‌ها در extra_info.links

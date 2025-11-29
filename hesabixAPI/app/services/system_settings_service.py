@@ -11,6 +11,7 @@ from adapters.db.models.system_setting import SystemSetting
 from adapters.db.models.currency import Currency
 from app.core.responses import ApiError
 from app.core.settings import get_settings
+from app.core.cache import get_cache
 
 
 WALLET_BASE_CURRENCY_KEY = "wallet_base_currency_code"
@@ -31,6 +32,11 @@ NOTIFY_TG_PROXY_API_KEY = "telegram_proxy_api_key"
 DEFAULT_DOCUMENT_POLICIES_KEY = "default_document_monetization_policies"
 SHARE_LINK_PUBLIC_APP_URL_KEY = "share_link_public_app_url"
 
+# Zohal Service Configuration Keys
+ZOHAL_API_KEY = "zohal_api_key"
+ZOHAL_BASE_URL = "zohal_base_url"
+ZOHAL_LOW_BALANCE_THRESHOLD = "zohal_low_balance_threshold"
+
 # System Configuration Keys
 SYSTEM_CONFIG_APP_NAME = "system_config_app_name"
 SYSTEM_CONFIG_APP_VERSION = "system_config_app_version"
@@ -42,6 +48,13 @@ SYSTEM_CONFIG_ENABLE_MAINTENANCE_MODE = "system_config_enable_maintenance_mode"
 SYSTEM_CONFIG_SESSION_TIMEOUT = "system_config_session_timeout"
 SYSTEM_CONFIG_MAX_FILE_SIZE = "system_config_max_file_size"
 SYSTEM_CONFIG_MAX_USERS = "system_config_max_users"
+
+# Redis Cache Configuration Keys
+REDIS_CONFIG_ENABLED = "redis_config_enabled"
+REDIS_CONFIG_HOST = "redis_config_host"
+REDIS_CONFIG_PORT = "redis_config_port"
+REDIS_CONFIG_DB = "redis_config_db"
+REDIS_CONFIG_PASSWORD = "redis_config_password"
 
 
 def _default_share_link_base_url() -> str:
@@ -371,16 +384,32 @@ def set_default_document_policies(db: Session, policies: List[Dict[str, Any]]) -
 
 def get_app_name(db: Session) -> str:
 	"""خواندن نام اپلیکیشن از DB یا env"""
+	cache = get_cache()
+	cache_key = "system:app_name"
+	cached_value = cache.get(cache_key)
+	if cached_value is not None:
+		return cached_value
+	
 	env = get_settings()
 	app_name = _get_setting(db, SYSTEM_CONFIG_APP_NAME)
-	return (app_name.value_string if app_name and app_name.value_string else env.app_name)
+	result = (app_name.value_string if app_name and app_name.value_string else env.app_name)
+	cache.set(cache_key, result, ttl=300)  # 5 دقیقه
+	return result
 
 
 def get_app_version(db: Session) -> str:
 	"""خواندن نسخه اپلیکیشن از DB یا env"""
+	cache = get_cache()
+	cache_key = "system:app_version"
+	cached_value = cache.get(cache_key)
+	if cached_value is not None:
+		return cached_value
+	
 	env = get_settings()
 	app_version = _get_setting(db, SYSTEM_CONFIG_APP_VERSION)
-	return (app_version.value_string if app_version and app_version.value_string else env.app_version)
+	result = (app_version.value_string if app_version and app_version.value_string else env.app_version)
+	cache.set(cache_key, result, ttl=300)  # 5 دقیقه
+	return result
 
 
 def is_registration_enabled(db: Session) -> bool:
@@ -397,8 +426,16 @@ def is_email_verification_enabled(db: Session) -> bool:
 
 def is_maintenance_mode_enabled(db: Session) -> bool:
 	"""بررسی فعال بودن حالت تعمیرات"""
+	cache = get_cache()
+	cache_key = "system:maintenance_mode"
+	cached_value = cache.get(cache_key)
+	if cached_value is not None:
+		return cached_value
+	
 	enable_maintenance_mode = _get_setting_bool(db, SYSTEM_CONFIG_ENABLE_MAINTENANCE_MODE)
-	return (enable_maintenance_mode if enable_maintenance_mode is not None else False)
+	result = (enable_maintenance_mode if enable_maintenance_mode is not None else False)
+	cache.set(cache_key, result, ttl=30)  # 30 ثانیه (برای پاسخ سریع‌تر)
+	return result
 
 
 def get_session_timeout(db: Session) -> int:
@@ -421,8 +458,16 @@ def get_max_users(db: Session) -> int:
 
 def get_default_language(db: Session) -> str:
 	"""خواندن زبان پیش‌فرض"""
+	cache = get_cache()
+	cache_key = "system:default_language"
+	cached_value = cache.get(cache_key)
+	if cached_value is not None:
+		return cached_value
+	
 	default_language = _get_setting(db, SYSTEM_CONFIG_DEFAULT_LANGUAGE)
-	return (default_language.value_string if default_language and default_language.value_string else "fa")
+	result = (default_language.value_string if default_language and default_language.value_string else "fa")
+	cache.set(cache_key, result, ttl=300)  # 5 دقیقه
+	return result
 
 
 def get_default_theme(db: Session) -> str:
@@ -479,23 +524,27 @@ def set_system_configuration(
 	"""
 	تنظیم پیکربندی سیستم با اعتبارسنجی
 	"""
+	cache = get_cache()
 	if app_name is not None:
 		app_name = str(app_name).strip()
 		if not app_name:
 			raise ApiError("APP_NAME_REQUIRED", "نام اپلیکیشن الزامی است", http_status=400)
 		_upsert_setting_string(db, SYSTEM_CONFIG_APP_NAME, app_name)
+		cache.delete("system:app_name")  # Invalidate cache
 	
 	if app_version is not None:
 		app_version = str(app_version).strip()
 		if not app_version:
 			raise ApiError("APP_VERSION_REQUIRED", "نسخه اپلیکیشن الزامی است", http_status=400)
 		_upsert_setting_string(db, SYSTEM_CONFIG_APP_VERSION, app_version)
+		cache.delete("system:app_version")  # Invalidate cache
 	
 	if default_language is not None:
 		default_language = str(default_language).strip().lower()
 		if default_language not in {"fa", "en"}:
 			raise ApiError("INVALID_LANGUAGE", "زبان باید fa یا en باشد", http_status=400)
 		_upsert_setting_string(db, SYSTEM_CONFIG_DEFAULT_LANGUAGE, default_language)
+		cache.delete("system:default_language")  # Invalidate cache
 	
 	if default_theme is not None:
 		default_theme = str(default_theme).strip().lower()
@@ -511,6 +560,7 @@ def set_system_configuration(
 	
 	if enable_maintenance_mode is not None:
 		_upsert_setting_bool(db, SYSTEM_CONFIG_ENABLE_MAINTENANCE_MODE, enable_maintenance_mode)
+		cache.delete("system:maintenance_mode")  # Invalidate cache
 	
 	if session_timeout is not None:
 		# 0 به معنی نامحدود است
@@ -531,3 +581,142 @@ def set_system_configuration(
 	
 	db.commit()
 	return get_system_configuration(db)
+
+
+def get_redis_configuration(db: Session) -> Dict[str, Any]:
+	"""
+	خواندن تنظیمات Redis از DB یا env
+	"""
+	env = get_settings()
+	
+	redis_enabled = _get_setting_bool(db, REDIS_CONFIG_ENABLED)
+	redis_host = _get_setting(db, REDIS_CONFIG_HOST)
+	redis_port = _get_setting_int(db, REDIS_CONFIG_PORT)
+	redis_db = _get_setting_int(db, REDIS_CONFIG_DB)
+	redis_password = _get_setting(db, REDIS_CONFIG_PASSWORD)
+	
+	return {
+		"enabled": (redis_enabled if redis_enabled is not None else getattr(env, 'redis_enabled', False)),
+		"host": (redis_host.value_string if redis_host and redis_host.value_string else getattr(env, 'redis_host', 'localhost')),
+		"port": (redis_port if redis_port is not None else getattr(env, 'redis_port', 6379)),
+		"db": (redis_db if redis_db is not None else getattr(env, 'redis_db', 0)),
+		"password": (redis_password.value_string if redis_password and redis_password.value_string else getattr(env, 'redis_password', None)),
+	}
+
+
+def set_redis_configuration(
+	db: Session,
+	*,
+	enabled: bool | None = None,
+	host: str | None = None,
+	port: int | None = None,
+	db_num: int | None = None,
+	password: str | None = None,
+) -> Dict[str, Any]:
+	"""
+	تنظیم پیکربندی Redis با اعتبارسنجی
+	"""
+	if enabled is not None:
+		_upsert_setting_bool(db, REDIS_CONFIG_ENABLED, enabled)
+	
+	if host is not None:
+		host = str(host).strip()
+		if not host:
+			raise ApiError("REDIS_HOST_REQUIRED", "آدرس سرور Redis الزامی است", http_status=400)
+		_upsert_setting_string(db, REDIS_CONFIG_HOST, host)
+	
+	if port is not None:
+		if port < 1 or port > 65535:
+			raise ApiError("INVALID_REDIS_PORT", "پورت Redis باید بین 1 تا 65535 باشد", http_status=400)
+		_upsert_setting_int(db, REDIS_CONFIG_PORT, port)
+	
+	if db_num is not None:
+		if db_num < 0 or db_num > 15:
+			raise ApiError("INVALID_REDIS_DB", "شماره دیتابیس Redis باید بین 0 تا 15 باشد", http_status=400)
+		_upsert_setting_int(db, REDIS_CONFIG_DB, db_num)
+	
+	if password is not None:
+		# اگر password خالی است، None ذخیره می‌کنیم
+		password = password.strip() if password else None
+		if password:
+			_upsert_setting_string(db, REDIS_CONFIG_PASSWORD, password)
+		else:
+			# حذف password
+			obj = _get_setting(db, REDIS_CONFIG_PASSWORD)
+			if obj:
+				obj.value_string = None
+				db.add(obj)
+	
+	db.commit()
+	
+	# Invalidate cache و reconnect Redis client
+	from app.core.cache import get_cache
+	import app.core.cache as cache_module
+	
+	# Force reconnect Redis client
+	cache_module._redis_client = None
+	
+	# Refresh cache service
+	cache = get_cache()
+	# حذف تمام cache برای reconnect
+	if cache.enabled:
+		cache.invalidate("system:*")
+		cache.invalidate("api_key:*")
+	
+	return get_redis_configuration(db)
+
+
+def get_zohal_settings(db: Session) -> Dict[str, Any]:
+	"""
+	خواندن تنظیمات سرویس زحل
+	"""
+	api_key = _get_setting(db, ZOHAL_API_KEY)
+	base_url = _get_setting(db, ZOHAL_BASE_URL)
+	low_balance_threshold = _get_setting(db, ZOHAL_LOW_BALANCE_THRESHOLD)
+	
+	return {
+		"api_key": (api_key.value_string if api_key and api_key.value_string else None),
+		"base_url": (base_url.value_string if base_url and base_url.value_string else "https://service.zohal.io/api/v0"),
+		"low_balance_threshold": (
+			float(low_balance_threshold.value_string) 
+			if low_balance_threshold and low_balance_threshold.value_string 
+			else 10000.0
+		),
+	}
+
+
+def set_zohal_settings(
+	db: Session,
+	*,
+	api_key: str | None = None,
+	base_url: str | None = None,
+	low_balance_threshold: float | None = None,
+) -> Dict[str, Any]:
+	"""
+	تنظیم پیکربندی سرویس زحل
+	"""
+	if api_key is not None:
+		api_key = str(api_key).strip()
+		if not api_key:
+			raise ApiError("ZOHAL_API_KEY_REQUIRED", "کلید API زحل الزامی است", http_status=400)
+		_upsert_setting_string(db, ZOHAL_API_KEY, api_key)
+	
+	if base_url is not None:
+		base_url = str(base_url).strip().rstrip("/")
+		if not base_url:
+			raise ApiError("ZOHAL_BASE_URL_REQUIRED", "آدرس پایه API زحل الزامی است", http_status=400)
+		_upsert_setting_string(db, ZOHAL_BASE_URL, base_url)
+	
+	if low_balance_threshold is not None:
+		if low_balance_threshold < 0:
+			raise ApiError("INVALID_THRESHOLD", "آستانه موجودی نمی‌تواند منفی باشد", http_status=400)
+		_upsert_setting_string(db, ZOHAL_LOW_BALANCE_THRESHOLD, str(low_balance_threshold))
+	
+	db.commit()
+	
+	# Invalidate cache
+	cache = get_cache()
+	if cache.enabled:
+		cache.invalidate("zohal:*")
+	
+	return get_zohal_settings(db)

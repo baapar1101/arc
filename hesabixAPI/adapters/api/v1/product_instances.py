@@ -321,11 +321,11 @@ def create_bulk_product_instances(
 def search_instance_by_code(
 	request: Request,
 	business_id: int,
-	code: str = Query(..., description="بارکد یا سریال نامبر"),
+	code: str = Query(..., description="بارکد یا سریال نامبر (می‌تواند جزئی باشد)"),
 	ctx: AuthContext = Depends(get_current_user),
 	db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
-	"""جستجوی کالای یونیک با بارکد یا سریال نامبر."""
+	"""جستجوی کالای یونیک با بارکد یا سریال نامبر (پشتیبانی از جستجوی جزئی)."""
 	if not ctx.has_business_permission("inventory", "read"):
 		raise ApiError("FORBIDDEN", "Missing business permission: inventory.read", http_status=403)
 	
@@ -334,11 +334,10 @@ def search_instance_by_code(
 	
 	code_trimmed = code.strip()
 	
-	# جستجو در بارکد و سریال نامبر
-	query = db.query(ProductInstance).filter(
+	# ابتدا سعی می‌کنیم تطابق دقیق پیدا کنیم (برای سازگاری با کد قبلی)
+	exact_query = db.query(ProductInstance).filter(
 		and_(
 			ProductInstance.business_id == business_id,
-			ProductInstance.status == "available",
 			or_(
 				ProductInstance.barcode == code_trimmed,
 				ProductInstance.serial_number == code_trimmed,
@@ -346,21 +345,89 @@ def search_instance_by_code(
 		)
 	)
 	
-	instance = query.first()
+	exact_instance = exact_query.first()
 	
-	if not instance:
+	# اگر تطابق دقیق پیدا شد، همان را برگردان
+	if exact_instance:
+		warehouse_name = None
+		if exact_instance.warehouse_id and exact_instance.warehouse:
+			warehouse_name = exact_instance.warehouse.name
+		
+		product_name = None
+		if exact_instance.product:
+			product_name = exact_instance.product.name
+		
+		return success_response(
+			data={
+				"id": exact_instance.id,
+				"product_id": exact_instance.product_id,
+				"product_name": product_name,
+				"serial_number": exact_instance.serial_number,
+				"barcode": exact_instance.barcode,
+				"warehouse_id": exact_instance.warehouse_id,
+				"warehouse_name": warehouse_name,
+				"status": exact_instance.status,
+				"custom_attributes": exact_instance.custom_attributes or {},
+				"entry_date": exact_instance.entry_date.isoformat() if exact_instance.entry_date else None,
+			},
+			request=request,
+		)
+	
+	# اگر تطابق دقیق پیدا نشد، جستجوی جزئی انجام می‌دهیم
+	partial_query = db.query(ProductInstance).filter(
+		and_(
+			ProductInstance.business_id == business_id,
+			or_(
+				ProductInstance.barcode.ilike(f"%{code_trimmed}%"),
+				ProductInstance.serial_number.ilike(f"%{code_trimmed}%"),
+			),
+		)
+	)
+	
+	instances = partial_query.order_by(ProductInstance.created_at.desc()).limit(20).all()
+	
+	if not instances:
 		raise ApiError("NOT_FOUND", "Product instance not found", http_status=404)
 	
-	warehouse_name = None
-	if instance.warehouse_id and instance.warehouse:
-		warehouse_name = instance.warehouse.name
+	# اگر فقط یک نتیجه پیدا شد، همان را برگردان (برای سازگاری با API قبلی)
+	if len(instances) == 1:
+		instance = instances[0]
+		warehouse_name = None
+		if instance.warehouse_id and instance.warehouse:
+			warehouse_name = instance.warehouse.name
+		
+		product_name = None
+		if instance.product:
+			product_name = instance.product.name
+		
+		return success_response(
+			data={
+				"id": instance.id,
+				"product_id": instance.product_id,
+				"product_name": product_name,
+				"serial_number": instance.serial_number,
+				"barcode": instance.barcode,
+				"warehouse_id": instance.warehouse_id,
+				"warehouse_name": warehouse_name,
+				"status": instance.status,
+				"custom_attributes": instance.custom_attributes or {},
+				"entry_date": instance.entry_date.isoformat() if instance.entry_date else None,
+			},
+			request=request,
+		)
 	
-	product_name = None
-	if instance.product:
-		product_name = instance.product.name
-	
-	return success_response(
-		data={
+	# اگر چند نتیجه پیدا شد، لیست را برگردان
+	items = []
+	for instance in instances:
+		warehouse_name = None
+		if instance.warehouse_id and instance.warehouse:
+			warehouse_name = instance.warehouse.name
+		
+		product_name = None
+		if instance.product:
+			product_name = instance.product.name
+		
+		items.append({
 			"id": instance.id,
 			"product_id": instance.product_id,
 			"product_name": product_name,
@@ -371,6 +438,13 @@ def search_instance_by_code(
 			"status": instance.status,
 			"custom_attributes": instance.custom_attributes or {},
 			"entry_date": instance.entry_date.isoformat() if instance.entry_date else None,
+		})
+	
+	return success_response(
+		data={
+			"items": items,
+			"total": len(items),
+			"multiple_results": True,
 		},
 		request=request,
 	)

@@ -80,6 +80,13 @@ class _SystemSettingsPageState extends State<SystemSettingsPage> {
         route: '/user/profile/system-settings/logs',
       ),
       SettingsItem(
+        title: 'لاگ‌های سرویس‌ها',
+        description: 'مشاهده لاگ‌های hesabix-api و hesabix-rq-worker و مدیریت سرویس‌ها',
+        icon: Icons.terminal_outlined,
+        color: const Color(0xFF607D8B),
+        route: '/user/profile/system-settings/service-logs',
+      ),
+      SettingsItem(
         title: 'emailSettings',
         description: 'emailSettingsDescription',
         icon: Icons.email_outlined,
@@ -129,6 +136,20 @@ class _SystemSettingsPageState extends State<SystemSettingsPage> {
         route: '/user/profile/system-settings/ai-plans',
       ),
       SettingsItem(
+        title: 'سرویس‌های زحل',
+        description: 'مدیریت سرویس‌های استعلامات زحل و تنظیمات API',
+        icon: Icons.search_outlined,
+        color: const Color(0xFF00ACC1),
+        route: '/user/profile/system-settings/zohal-services',
+      ),
+      SettingsItem(
+        title: 'تنظیمات زحل',
+        description: 'تنظیم API Key و پیکربندی سرویس زحل',
+        icon: Icons.settings_outlined,
+        color: const Color(0xFF00897B),
+        route: '/user/profile/system-settings/zohal-settings',
+      ),
+      SettingsItem(
         title: 'Prompt های AI',
         description: 'مدیریت Prompt های پیش‌فرض برای نقش‌های مختلف',
         icon: Icons.text_fields_outlined,
@@ -141,6 +162,20 @@ class _SystemSettingsPageState extends State<SystemSettingsPage> {
         icon: Icons.qr_code_2_outlined,
         color: const Color(0xFF00695C),
         route: '/user/profile/system-settings/tax-product-codes',
+      ),
+      SettingsItem(
+        title: 'تنظیمات Redis Cache',
+        description: 'پیکربندی Redis برای بهبود عملکرد و کاهش بار دیتابیس',
+        icon: Icons.memory_outlined,
+        color: const Color(0xFFDC143C),
+        route: '/user/profile/system-settings/redis',
+      ),
+      SettingsItem(
+        title: 'مانیتورینگ سیستم',
+        description: 'بررسی وضعیت سیستم، منابع سخت‌افزاری و سرویس‌ها',
+        icon: Icons.monitor_heart_outlined,
+        color: const Color(0xFFFF6B35),
+        route: '/user/profile/system-settings/monitoring',
       ),
     ];
   }

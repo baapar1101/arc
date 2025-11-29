@@ -40,10 +40,67 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
   @override
   void initState() {
     super.initState();
-    _searchCtrl.text = widget.selectedProduct != null
-        ? ('${widget.selectedProduct!['code']?.toString() ?? ''} - ${widget.selectedProduct!['name']?.toString() ?? ''}')
-        : '';
+    _initializeSelectedProduct();
     _loadRecent();
+  }
+
+  @override
+  void didUpdateWidget(ProductComboboxWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.selectedProduct?['id'] != widget.selectedProduct?['id']) {
+      _initializeSelectedProduct();
+    }
+  }
+
+  Future<void> _initializeSelectedProduct() async {
+    if (widget.selectedProduct == null) {
+      _searchCtrl.text = '';
+      return;
+    }
+
+    final productId = widget.selectedProduct!['id'] as int?;
+    final hasCode = widget.selectedProduct!['code'] != null;
+    final hasName = widget.selectedProduct!['name'] != null;
+
+    // اگر اطلاعات کامل (code و name) موجود است، از آن استفاده می‌کنیم
+    if (hasCode || hasName) {
+      final code = widget.selectedProduct!['code']?.toString() ?? '';
+      final name = widget.selectedProduct!['name']?.toString() ?? '';
+      _searchCtrl.text = code.isNotEmpty ? '$code - $name' : name;
+      return;
+    }
+
+    // اگر فقط id موجود است، باید اطلاعات کامل را از API دریافت کنیم
+    if (productId != null) {
+      try {
+        final product = await _service.getProduct(
+          businessId: widget.businessId,
+          productId: productId,
+        );
+        if (mounted && product.isNotEmpty) {
+          final code = product['code']?.toString() ?? '';
+          final name = product['name']?.toString() ?? '';
+          _searchCtrl.text = code.isNotEmpty ? '$code - $name' : name;
+          // اضافه کردن به لیست items اگر وجود نداشته باشد
+          if (mounted) {
+            final existsInList = _items.any((item) => (item['id'] as num?)?.toInt() == productId);
+            if (!existsInList) {
+              setState(() {
+                _items = [product, ..._items];
+              });
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('Error loading product info: $e');
+        // در صورت خطا، حداقل id را نمایش می‌دهیم
+        if (mounted) {
+          _searchCtrl.text = 'کالا #$productId';
+        }
+      }
+    } else {
+      _searchCtrl.text = '';
+    }
   }
 
   @override
@@ -223,7 +280,32 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
         code: code,
       );
       
-      final productId = instanceData['product_id'] as int?;
+      // بررسی اینکه آیا چند نتیجه برگردانده شده یا نه
+      final multipleResults = instanceData['multiple_results'] == true;
+      final items = instanceData['items'] as List?;
+      
+      Map<String, dynamic>? selectedInstance;
+      
+      if (multipleResults && items != null && items.isNotEmpty) {
+        // اگر چند نتیجه پیدا شد، دیالوگ انتخاب نمایش بده
+        if (!dialogContext.mounted) return;
+        selectedInstance = await showDialog<Map<String, dynamic>>(
+          context: dialogContext,
+          builder: (context) => _InstanceSelectionDialog(
+            instances: items,
+            searchCode: code,
+          ),
+        );
+        
+        if (selectedInstance == null) {
+          return; // کاربر انصراف داد
+        }
+      } else {
+        // اگر یک نتیجه یا نتیجه مستقیم برگردانده شد
+        selectedInstance = instanceData;
+      }
+      
+      final productId = selectedInstance['product_id'] as int?;
       if (productId == null) {
         if (dialogContext.mounted) {
           ScaffoldMessenger.of(dialogContext).showSnackBar(
@@ -426,6 +508,125 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
             Icon(Icons.arrow_drop_down, color: colorScheme.onSurface.withValues(alpha: 0.6), size: 20),
           ],
         ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Dialog برای انتخاب instance از بین چند نتیجه
+class _InstanceSelectionDialog extends StatelessWidget {
+  final List<dynamic> instances;
+  final String searchCode;
+
+  const _InstanceSelectionDialog({
+    required this.instances,
+    required this.searchCode,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    
+    return Dialog(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 600, maxHeight: 500),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // هدر
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: cs.primaryContainer,
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(16),
+                  topRight: Radius.circular(16),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.search, color: cs.onPrimaryContainer),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'چند نتیجه پیدا شد',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: cs.onPrimaryContainer,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'برای "$searchCode"',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: cs.onPrimaryContainer.withOpacity(0.8),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: Icon(Icons.close, color: cs.onPrimaryContainer),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ],
+              ),
+            ),
+            // لیست نتایج
+            Flexible(
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: instances.length,
+                itemBuilder: (context, index) {
+                  final instance = Map<String, dynamic>.from(instances[index] as Map);
+                  final serialNumber = instance['serial_number']?.toString() ?? '-';
+                  final barcode = instance['barcode']?.toString() ?? '-';
+                  final productName = instance['product_name']?.toString() ?? 'نامشخص';
+                  final warehouseName = instance['warehouse_name']?.toString();
+                  
+                  return ListTile(
+                    leading: const Icon(Icons.inventory_2),
+                    title: Text(productName),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (serialNumber != '-') 
+                          Text('سریال: $serialNumber'),
+                        if (barcode != '-') 
+                          Text('بارکد: $barcode'),
+                        if (warehouseName != null)
+                          Text('انبار: $warehouseName'),
+                      ],
+                    ),
+                    trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                    onTap: () {
+                      Navigator.of(context).pop(instance);
+                    },
+                  );
+                },
+              ),
+            ),
+            // دکمه انصراف
+            Container(
+              padding: const EdgeInsets.all(16),
+              child: SizedBox(
+                width: double.infinity,
+                child: OutlinedButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('انصراف'),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

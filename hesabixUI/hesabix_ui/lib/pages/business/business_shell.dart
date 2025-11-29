@@ -235,6 +235,7 @@ class _BusinessShellState extends State<BusinessShell> {
         : 'assets/images/logo-light.png';
 
     final t = AppLocalizations.of(context);
+    final workflowLabel = _workflowMenuLabel(t);
     
     // ساختار متمرکز منو
     final allMenuItems = <_MenuItem>[
@@ -340,6 +341,14 @@ class _BusinessShellState extends State<BusinessShell> {
         selectedIcon: Icons.calculate,
         path: null, // آیتم جداکننده
         type: _MenuItemType.separator,
+      ),
+      _MenuItem(
+        label: 'فروش سریع',
+        icon: Icons.point_of_sale,
+        selectedIcon: Icons.point_of_sale,
+        path: '/business/${widget.businessId}/quick-sales',
+        type: _MenuItemType.simple,
+        hasAddButton: false,
       ),
       _MenuItem(
         label: t.invoice,
@@ -502,6 +511,22 @@ class _BusinessShellState extends State<BusinessShell> {
             hasAddButton: false,
           ),
         ],
+      ),
+      _MenuItem(
+        label: workflowLabel,
+        icon: Icons.hub_outlined,
+        selectedIcon: Icons.hub,
+        path: '/business/${widget.businessId}/workflows',
+        type: _MenuItemType.simple,
+        hasAddButton: false,
+      ),
+      _MenuItem(
+        label: 'استعلامات',
+        icon: Icons.search_outlined,
+        selectedIcon: Icons.search,
+        path: '/business/${widget.businessId}/zohal/inquiries',
+        type: _MenuItemType.simple,
+        hasAddButton: false,
       ),
       _MenuItem(
         label: t.others,
@@ -1632,6 +1657,13 @@ class _BusinessShellState extends State<BusinessShell> {
       final hasJoin = widget.authStore.hasBusinessPermission('settings', 'join');
       return hasJoin;
     }
+    
+    // استعلامات: نیازمند دسترسی read برای settings
+    if (section == 'settings' && (item.label == 'استعلامات' || item.label == 'Inquiries')) {
+      final hasRead = widget.authStore.hasBusinessPermission('settings', 'read') || 
+                      widget.authStore.hasBusinessPermission('settings', 'join');
+      return hasRead;
+    }
 
     // سایر سکشن‌ها: بررسی دسترسی view
     final hasAccess = widget.authStore.canReadSection(section);
@@ -1665,6 +1697,7 @@ class _BusinessShellState extends State<BusinessShell> {
     if (label == t.cashBox) return 'cash';
     if (label == t.wallet) return 'wallet';
     if (label == t.checks) return 'checks';
+    if (label == 'فروش سریع') return 'invoices'; // فروش سریع نیازمند دسترسی invoices.add است
     if (label == t.invoice) return 'invoices';
     if (label == t.receiptsAndPayments) return 'people_transactions';
     if (label == t.expenseAndIncome) return 'expenses_income';
@@ -1683,7 +1716,13 @@ class _BusinessShellState extends State<BusinessShell> {
     if (label == 'چت با AI' || label == 'AI Chat') return 'ai';
     if (label == 'اشتراک AI' || label == 'AI Subscription') return 'ai';
     if (label == 'آمار استفاده' || label == 'AI Usage') return 'ai';
+    if (label == 'استعلامات' || label == 'Inquiries') return 'settings';
+    if (label == _workflowMenuLabel(t)) return 'settings';
     return null;
+  }
+
+  String _workflowMenuLabel(AppLocalizations t) {
+    return t.localeName.startsWith('fa') ? 'اتوماسیون‌ها' : 'Automations';
   }
 
   // ==== Notifications (shared simplified with profile) ====

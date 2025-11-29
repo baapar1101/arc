@@ -20,6 +20,7 @@ from .schemas import (
 from app.core.auth_dependency import get_current_user, AuthContext
 from app.services.api_key_service import list_personal_keys, create_personal_key, revoke_key
 from app.services.session_service import list_user_sessions, revoke_session, revoke_other_sessions
+from app.core.rate_limiter import rate_limit, get_client_ip
 
 
 router = APIRouter(prefix="/auth", tags=["auth"]) 
@@ -48,7 +49,8 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 		}
 	}
 )
-def generate_captcha(db: Session = Depends(get_db)) -> dict:
+@rate_limit(max_requests=20, window_seconds=60, error_message="تعداد درخواست‌های کپچا بیش از حد مجاز است. لطفاً کمی صبر کنید.")
+async def generate_captcha(request: Request, db: Session = Depends(get_db)) -> dict:
 	captcha_id, image_base64, ttl = create_captcha(db)
 	return success_response({
 		"captcha_id": captcha_id,
@@ -163,7 +165,13 @@ def get_current_user_info(
 		}
 	}
 )
-def register(request: Request, payload: RegisterRequest, db: Session = Depends(get_db)) -> dict:
+@rate_limit(
+	max_requests=5, 
+	window_seconds=3600,  # 1 ساعت
+	key_func=lambda req: f"register:{get_client_ip(req)}",
+	error_message="تعداد درخواست‌های ثبت‌نام بیش از حد مجاز است. لطفاً بعداً تلاش کنید."
+)
+async def register(request: Request, payload: RegisterRequest, db: Session = Depends(get_db)) -> dict:
 	# ساخت base_url از request برای verification email
 	base_url = None
 	if request.headers.get("X-Forwarded-Host"):
@@ -265,7 +273,13 @@ def register(request: Request, payload: RegisterRequest, db: Session = Depends(g
 		}
 	}
 )
-def login(request: Request, payload: LoginRequest, db: Session = Depends(get_db)) -> dict:
+@rate_limit(
+	max_requests=10, 
+	window_seconds=300,  # 5 دقیقه
+	key_func=lambda req: f"login:{get_client_ip(req)}",
+	error_message="تعداد درخواست‌های ورود بیش از حد مجاز است. لطفاً کمی صبر کنید."
+)
+async def login(request: Request, payload: LoginRequest, db: Session = Depends(get_db)) -> dict:
 	user_agent = request.headers.get("User-Agent")
 	ip = request.client.host if request.client else None
 	api_key, expires_at, user = login_user(
@@ -338,7 +352,13 @@ def login(request: Request, payload: LoginRequest, db: Session = Depends(get_db)
 		}
 	}
 )
-def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(get_db)) -> dict:
+@rate_limit(
+	max_requests=5, 
+	window_seconds=3600,  # 1 ساعت
+	key_func=lambda req: f"forgot_password:{get_client_ip(req)}",
+	error_message="تعداد درخواست‌های بازیابی رمز عبور بیش از حد مجاز است. لطفاً بعداً تلاش کنید."
+)
+async def forgot_password(request: Request, payload: ForgotPasswordRequest, db: Session = Depends(get_db)) -> dict:
 	# In production do not return token; send via email/SMS. Here we return for dev/testing.
 	token = create_password_reset(db=db, identifier=payload.identifier, captcha_id=payload.captcha_id, captcha_code=payload.captcha_code)
 	# Send notification via preferred channels
@@ -398,7 +418,13 @@ def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(get_db
 		}
 	}
 )
-def reset_password_endpoint(payload: ResetPasswordRequest, db: Session = Depends(get_db)) -> dict:
+@rate_limit(
+	max_requests=10, 
+	window_seconds=3600,  # 1 ساعت
+	key_func=lambda req: f"reset_password:{get_client_ip(req)}",
+	error_message="تعداد درخواست‌های بازنشانی رمز عبور بیش از حد مجاز است. لطفاً بعداً تلاش کنید."
+)
+async def reset_password_endpoint(request: Request, payload: ResetPasswordRequest, db: Session = Depends(get_db)) -> dict:
 	reset_password(db=db, token=payload.token, new_password=payload.new_password, captcha_id=payload.captcha_id, captcha_code=payload.captcha_code)
 	return success_response({"ok": True})
 

@@ -127,6 +127,23 @@ def create_person(db: Session, business_id: int, person_data: PersonCreateReques
         raise ApiError("DUPLICATE_PERSON_CODE", "کد شخص تکراری است", http_status=400)
     db.refresh(person)
     
+    # فراخوانی workflow triggers
+    try:
+        from app.services.workflow.workflow_trigger_service import trigger_person_created
+        person_types_list = json.loads(person.person_types) if person.person_types else []
+        trigger_person_created(
+            db=db,
+            business_id=business_id,
+            person_id=person.id,
+            person_types=person_types_list,
+            user_id=None  # می‌توان user_id را از context دریافت کرد
+        )
+    except Exception as e:
+        # عدم موفقیت در trigger نباید مانع بازگشت شخص شود
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.warning(f"Failed to trigger workflows for person {person.id}: {e}")
+    
     return success_response(
         message="شخص با موفقیت ایجاد شد",
         data=_person_to_dict(person)

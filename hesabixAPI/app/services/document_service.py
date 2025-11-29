@@ -438,7 +438,23 @@ def create_manual_document(
                 extra={"document_id": document.id, "error": str(monetization_error)},
             )
         
-        return result
+        result_data = result
+        
+        # فراخوانی workflow triggers
+        try:
+            from app.services.workflow.workflow_trigger_service import trigger_document_created
+            trigger_document_created(
+                db=db,
+                business_id=business_id,
+                document_id=document.id,
+                document_type=document_type,
+                user_id=user_id
+            )
+        except Exception as e:
+            # عدم موفقیت در trigger نباید مانع بازگشت سند شود
+            logger.warning(f"Failed to trigger workflows for document {document.id}: {e}")
+        
+        return result_data
         
     except Exception as e:
         logger.error(f"Error creating manual document: {str(e)}")
