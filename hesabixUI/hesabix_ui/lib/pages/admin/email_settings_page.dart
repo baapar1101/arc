@@ -141,13 +141,131 @@ class _EmailSettingsPageState extends State<EmailSettingsPage> {
       if (response.connected) {
         _showSuccessSnackBar(t.connectionSuccessful);
       } else {
-        _showErrorSnackBar(t.connectionFailed);
+        // نمایش Dialog با جزئیات خطا
+        _showConnectionErrorDialog(
+          response.errorMessage ?? t.connectionFailed,
+        );
       }
     } catch (e) {
-      _showErrorSnackBar(e.toString());
+      if (!mounted) return;
+      // نمایش Dialog با جزئیات خطا
+      _showConnectionErrorDialog(e.toString());
     } finally {
-      setState(() => _isTesting = false);
+      if (mounted) {
+        setState(() => _isTesting = false);
+      }
     }
+  }
+
+  Future<void> _showConnectionErrorDialog(String errorMessage) async {
+    if (!mounted) return;
+    final t = AppLocalizations.of(context);
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(
+              Icons.error_outline,
+              color: Theme.of(context).colorScheme.error,
+              size: 28,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                t.connectionFailed,
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'جزئیات خطا:',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.errorContainer,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: Theme.of(context).colorScheme.error.withOpacity(0.3),
+                  ),
+                ),
+                child: SelectableText(
+                  errorMessage,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onErrorContainer,
+                    fontFamily: 'monospace',
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'راهکارهای پیشنهادی:',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
+              ),
+              const SizedBox(height: 8),
+              _buildSuggestionItem('بررسی صحت آدرس میزبان SMTP'),
+              _buildSuggestionItem('بررسی صحت شماره پورت'),
+              _buildSuggestionItem('بررسی صحت نام کاربری و رمز عبور'),
+              _buildSuggestionItem('بررسی تنظیمات TLS/SSL'),
+              _buildSuggestionItem('بررسی فایروال و تنظیمات شبکه'),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('بستن'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              Clipboard.setData(ClipboardData(text: errorMessage));
+              _showSuccessSnackBar('جزئیات خطا در کلیپ‌بورد کپی شد');
+            },
+            child: const Text('کپی خطا'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSuggestionItem(String text) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            Icons.check_circle_outline,
+            size: 16,
+            color: Theme.of(context).colorScheme.primary,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(fontSize: 13),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _setAsDefault(EmailConfig config) async {

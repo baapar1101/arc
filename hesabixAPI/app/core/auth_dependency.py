@@ -329,6 +329,12 @@ class AuthContext:
 			business = self.db.get(Business, business_id)
 			logger.info(f"Business lookup result: {business}")
 			if business:
+				# بررسی حذف‌شدگی کسب و کار
+				if business.deleted_at is not None:
+					logger.warning(f"Business {business_id} is deleted (deleted_at: {business.deleted_at}), denying access")
+					logger.info(f"=== can_access_business END (deleted) ===")
+					return False
+				
 				logger.info(f"Business owner ID: {business.owner_id}")
 				if business.owner_id == self.user.id:
 					logger.info(f"User {self.user.id} is business owner of {business_id}, granting access")

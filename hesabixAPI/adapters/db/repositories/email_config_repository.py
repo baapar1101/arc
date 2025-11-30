@@ -63,23 +63,67 @@ class EmailConfigRepository(BaseRepository[EmailConfig]):
             self.db.rollback()
             return False
 
-    def test_connection(self, config: EmailConfig) -> bool:
-        """Test SMTP connection for a configuration"""
+    def test_connection(self, config: EmailConfig) -> dict:
+        """Test SMTP connection for a configuration
+        
+        Returns:
+            dict: {
+                'connected': bool,
+                'error_message': str | None
+            }
+        """
         try:
             import smtplib
             from email.mime.text import MIMEText
             
             # Create SMTP connection
             if config.use_ssl:
-                server = smtplib.SMTP_SSL(config.smtp_host, config.smtp_port)
+                server = smtplib.SMTP_SSL(config.smtp_host, config.smtp_port, timeout=10)
             else:
-                server = smtplib.SMTP(config.smtp_host, config.smtp_port)
+                server = smtplib.SMTP(config.smtp_host, config.smtp_port, timeout=10)
                 if config.use_tls:
                     server.starttls()
             
             # Login
             server.login(config.smtp_username, config.smtp_password)
             server.quit()
-            return True
-        except Exception:
-            return False
+            return {"connected": True, "error_message": None}
+        except smtplib.SMTPAuthenticationError as e:
+            return {
+                "connected": False,
+                "error_message": f"خطای احراز هویت: نام کاربری یا رمز عبور اشتباه است. ({str(e)})"
+            }
+        except smtplib.SMTPConnectError as e:
+            return {
+                "connected": False,
+                "error_message": f"خطا در اتصال به سرور SMTP: نمی‌توان به {config.smtp_host}:{config.smtp_port} متصل شد. ({str(e)})"
+            }
+        except smtplib.SMTPException as e:
+            return {
+                "connected": False,
+                "error_message": f"خطای SMTP: {str(e)}"
+            }
+        except TimeoutError as e:
+            return {
+                "connected": False,
+                "error_message": f"زمان اتصال به پایان رسید: سرور SMTP پاسخ نمی‌دهد. ({str(e)})"
+            }
+        except ConnectionRefusedError as e:
+            return {
+                "connected": False,
+                "error_message": f"اتصال رد شد: سرور SMTP در {config.smtp_host}:{config.smtp_port} در دسترس نیست. ({str(e)})"
+            }
+        except Exception as e:
+            error_msg = str(e)
+            # ترجمه خطاهای رایج به فارسی
+            if "certificate verify failed" in error_msg.lower():
+                error_msg = "خطای تأیید گواهینامه SSL: گواهینامه سرور معتبر نیست."
+            elif "name resolution" in error_msg.lower() or "getaddrinfo failed" in error_msg.lower():
+                error_msg = f"خطا در یافتن آدرس سرور: {config.smtp_host} یافت نشد."
+            elif "timed out" in error_msg.lower():
+                error_msg = "زمان اتصال به پایان رسید: سرور پاسخ نمی‌دهد."
+            
+            return {
+                "connected": False,
+                "error_message": f"خطا در تست اتصال: {error_msg}"
+            }

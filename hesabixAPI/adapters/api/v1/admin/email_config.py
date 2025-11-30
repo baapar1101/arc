@@ -232,10 +232,13 @@ async def test_email_config(
         if not config:
             raise HTTPException(status_code=404, detail=gettext("Email configuration not found", locale))
         
-        is_connected = email_repo.test_connection(config)
+        result = email_repo.test_connection(config)
         
         return success_response(
-            data={"connected": is_connected},
+            data={
+                "connected": result.get("connected", False),
+                "error_message": result.get("error_message")
+            },
             request=request
         )
     except HTTPException:

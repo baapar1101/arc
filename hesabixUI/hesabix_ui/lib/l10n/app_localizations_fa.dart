@@ -5574,4 +5574,217 @@ class AppLocalizationsFa extends AppLocalizations {
   @override
   String get workflowForceDirectedLayoutApplied =>
       'چیدمان Force-directed اعمال شد';
+
+  @override
+  String get settingsCategoriesCount => 'دسته‌بندی';
+
+  @override
+  String get settingsCount => 'تنظیمات';
+
+  @override
+  String get expandAllCategories => 'باز کردن همه';
+
+  @override
+  String get collapseAllCategories => 'بستن همه';
+
+  @override
+  String get noSettingsFound => 'هیچ تنظیماتی یافت نشد';
+
+  @override
+  String get searchResults => 'نتایج جستجو';
+
+  @override
+  String searchResultCount(int count) {
+    return '$count نتیجه';
+  }
+
+  @override
+  String noSearchResults(String query) {
+    return 'نتیجه‌ای برای \"$query\" یافت نشد';
+  }
+
+  @override
+  String get searchSettingsPlaceholder => 'جستجو در تنظیمات...';
+
+  @override
+  String get noSettingsInCategory => 'هیچ تنظیماتی در این دسته یافت نشد';
+
+  @override
+  String get settingsCategoryCoreConfiguration => 'پایه و پیکربندی';
+
+  @override
+  String get settingsCategoryCoreConfigurationDescription =>
+      'تنظیمات پایه و پیکربندی سیستم';
+
+  @override
+  String get settingsCategoryStorageFiles => 'ذخیره‌سازی و فایل‌ها';
+
+  @override
+  String get settingsCategoryStorageFilesDescription =>
+      'مدیریت ذخیره‌سازی و پلن‌های ذخیره‌سازی';
+
+  @override
+  String get settingsCategoryFinancialPayment => 'مالی و پرداخت';
+
+  @override
+  String get settingsCategoryFinancialPaymentDescription =>
+      'تنظیمات کیف‌پول و درگاه‌های پرداخت';
+
+  @override
+  String get settingsCategoryUsersBusinesses => 'کاربران و کسب و کارها';
+
+  @override
+  String get settingsCategoryUsersBusinessesDescription =>
+      'مدیریت کاربران و کسب و کارها';
+
+  @override
+  String get settingsCategoryCommunications => 'ارتباطات';
+
+  @override
+  String get settingsCategoryCommunicationsDescription =>
+      'ایمیل، اعلان‌ها و اعلان‌های سیستمی';
+
+  @override
+  String get settingsCategoryAI => 'هوش مصنوعی';
+
+  @override
+  String get settingsCategoryAIDescription => 'تنظیمات، پلن‌ها و Prompt های AI';
+
+  @override
+  String get settingsCategoryExternalServices => 'سرویس‌های خارجی';
+
+  @override
+  String get settingsCategoryExternalServicesDescription =>
+      'ادغام‌های سرویس‌های خارجی';
+
+  @override
+  String get settingsCategoryMonitoringLogs => 'مانیتورینگ و لاگ‌ها';
+
+  @override
+  String get settingsCategoryMonitoringLogsDescription =>
+      'مانیتورینگ سیستم و ثبت لاگ';
+
+  @override
+  String get settingsShareLinks => 'لینک‌های اشتراک';
+
+  @override
+  String get settingsShareLinksDescription =>
+      'تعیین آدرس مقصد نمایش کارت حساب در لینک‌های عمومی';
+
+  @override
+  String get settingsRedisCache => 'تنظیمات Redis Cache';
+
+  @override
+  String get settingsRedisCacheDescription =>
+      'پیکربندی Redis برای بهبود عملکرد و کاهش بار دیتابیس';
+
+  @override
+  String get settingsStoragePlans => 'پلن‌های ذخیره‌سازی';
+
+  @override
+  String get settingsStoragePlansDescription =>
+      'مدیریت پلن‌های ذخیره‌سازی و تعیین قیمت‌ها';
+
+  @override
+  String get settingsDocumentMonetization => 'تنظیمات پکیج‌ها';
+
+  @override
+  String get settingsDocumentMonetizationDescription =>
+      'مدیریت سناریوی درآمدزایی اسناد و پکیج‌ها';
+
+  @override
+  String get settingsWalletSettings => 'تنظیمات کیف‌پول';
+
+  @override
+  String get settingsWalletSettingsDescription => 'تعیین ارز پایه و سیاست‌ها';
+
+  @override
+  String get settingsPaymentGateways => 'درگاه‌های پرداخت';
+
+  @override
+  String get settingsPaymentGatewaysDescription => 'مدیریت و پیکربندی درگاه‌ها';
+
+  @override
+  String get settingsBusinessesManagement => 'مدیریت کسب و کارها';
+
+  @override
+  String get settingsBusinessesManagementDescription =>
+      'مشاهده و مدیریت لیست همه کسب و کارهای سیستم';
+
+  @override
+  String get settingsAnnouncements => 'مدیریت اعلان‌ها';
+
+  @override
+  String get settingsAnnouncementsDescription =>
+      'ایجاد/ویرایش/انتشار اعلان‌های سیستمی';
+
+  @override
+  String get settingsNotifications => 'تنظیمات نوتیفیکیشن';
+
+  @override
+  String get settingsNotificationsDescription =>
+      'فعال/غیرفعال‌سازی کانال‌ها و ارسال تست';
+
+  @override
+  String get settingsNotificationTemplates => 'قالب‌های نوتیفیکیشن';
+
+  @override
+  String get settingsNotificationTemplatesDescription =>
+      'مدیریت قالب‌ها برای کانال‌ها و زبان‌ها';
+
+  @override
+  String get settingsAISettings => 'تنظیمات AI';
+
+  @override
+  String get settingsAISettingsDescription =>
+      'پیکربندی Provider، مدل و API Key';
+
+  @override
+  String get settingsAIPlans => 'پلن‌های AI';
+
+  @override
+  String get settingsAIPlansDescription =>
+      'مدیریت پلن‌های استفاده از AI و تعیین قیمت‌ها';
+
+  @override
+  String get settingsAIPrompts => 'Prompt های AI';
+
+  @override
+  String get settingsAIPromptsDescription =>
+      'مدیریت Prompt های پیش‌فرض برای نقش‌های مختلف';
+
+  @override
+  String get settingsZohalServices => 'سرویس‌های زحل';
+
+  @override
+  String get settingsZohalServicesDescription =>
+      'مدیریت سرویس‌های استعلامات زحل و تنظیمات API';
+
+  @override
+  String get settingsZohalSettings => 'تنظیمات زحل';
+
+  @override
+  String get settingsZohalSettingsDescription =>
+      'تنظیم API Key و پیکربندی سرویس زحل';
+
+  @override
+  String get settingsTaxProductCodes => 'کدهای مالیاتی کالا';
+
+  @override
+  String get settingsTaxProductCodesDescription =>
+      'جستجو و ایمپورت لیست جدید از فایل XML';
+
+  @override
+  String get settingsSystemMonitoring => 'مانیتورینگ سیستم';
+
+  @override
+  String get settingsSystemMonitoringDescription =>
+      'بررسی وضعیت سیستم، منابع سخت‌افزاری و سرویس‌ها';
+
+  @override
+  String get settingsServiceLogs => 'لاگ‌های سرویس‌ها';
+
+  @override
+  String get settingsServiceLogsDescription =>
+      'مشاهده لاگ‌های hesabix-api و hesabix-rq-worker و مدیریت سرویس‌ها';
 }

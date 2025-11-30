@@ -10699,6 +10699,378 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Force-directed layout applied'**
   String get workflowForceDirectedLayoutApplied;
+
+  /// No description provided for @settingsCategoriesCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Categories'**
+  String get settingsCategoriesCount;
+
+  /// No description provided for @settingsCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get settingsCount;
+
+  /// No description provided for @expandAllCategories.
+  ///
+  /// In en, this message translates to:
+  /// **'Expand All'**
+  String get expandAllCategories;
+
+  /// No description provided for @collapseAllCategories.
+  ///
+  /// In en, this message translates to:
+  /// **'Collapse All'**
+  String get collapseAllCategories;
+
+  /// No description provided for @noSettingsFound.
+  ///
+  /// In en, this message translates to:
+  /// **'No settings found'**
+  String get noSettingsFound;
+
+  /// No description provided for @searchResults.
+  ///
+  /// In en, this message translates to:
+  /// **'Search Results'**
+  String get searchResults;
+
+  /// No description provided for @searchResultCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} result'**
+  String searchResultCount(int count);
+
+  /// No description provided for @noSearchResults.
+  ///
+  /// In en, this message translates to:
+  /// **'No results found for \"{query}\"'**
+  String noSearchResults(String query);
+
+  /// No description provided for @searchSettingsPlaceholder.
+  ///
+  /// In en, this message translates to:
+  /// **'Search settings...'**
+  String get searchSettingsPlaceholder;
+
+  /// No description provided for @noSettingsInCategory.
+  ///
+  /// In en, this message translates to:
+  /// **'No settings found in this category'**
+  String get noSettingsInCategory;
+
+  /// No description provided for @settingsCategoryCoreConfiguration.
+  ///
+  /// In en, this message translates to:
+  /// **'Core & Configuration'**
+  String get settingsCategoryCoreConfiguration;
+
+  /// No description provided for @settingsCategoryCoreConfigurationDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Basic system settings and configuration'**
+  String get settingsCategoryCoreConfigurationDescription;
+
+  /// No description provided for @settingsCategoryStorageFiles.
+  ///
+  /// In en, this message translates to:
+  /// **'Storage & Files'**
+  String get settingsCategoryStorageFiles;
+
+  /// No description provided for @settingsCategoryStorageFilesDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'File storage and storage plan management'**
+  String get settingsCategoryStorageFilesDescription;
+
+  /// No description provided for @settingsCategoryFinancialPayment.
+  ///
+  /// In en, this message translates to:
+  /// **'Financial & Payment'**
+  String get settingsCategoryFinancialPayment;
+
+  /// No description provided for @settingsCategoryFinancialPaymentDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Wallet and payment gateway settings'**
+  String get settingsCategoryFinancialPaymentDescription;
+
+  /// No description provided for @settingsCategoryUsersBusinesses.
+  ///
+  /// In en, this message translates to:
+  /// **'Users & Businesses'**
+  String get settingsCategoryUsersBusinesses;
+
+  /// No description provided for @settingsCategoryUsersBusinessesDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'User and business management'**
+  String get settingsCategoryUsersBusinessesDescription;
+
+  /// No description provided for @settingsCategoryCommunications.
+  ///
+  /// In en, this message translates to:
+  /// **'Communications'**
+  String get settingsCategoryCommunications;
+
+  /// No description provided for @settingsCategoryCommunicationsDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Email, notifications and announcements'**
+  String get settingsCategoryCommunicationsDescription;
+
+  /// No description provided for @settingsCategoryAI.
+  ///
+  /// In en, this message translates to:
+  /// **'Artificial Intelligence'**
+  String get settingsCategoryAI;
+
+  /// No description provided for @settingsCategoryAIDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'AI settings, plans and prompts'**
+  String get settingsCategoryAIDescription;
+
+  /// No description provided for @settingsCategoryExternalServices.
+  ///
+  /// In en, this message translates to:
+  /// **'External Services'**
+  String get settingsCategoryExternalServices;
+
+  /// No description provided for @settingsCategoryExternalServicesDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'External service integrations'**
+  String get settingsCategoryExternalServicesDescription;
+
+  /// No description provided for @settingsCategoryMonitoringLogs.
+  ///
+  /// In en, this message translates to:
+  /// **'Monitoring & Logs'**
+  String get settingsCategoryMonitoringLogs;
+
+  /// No description provided for @settingsCategoryMonitoringLogsDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'System monitoring and logging'**
+  String get settingsCategoryMonitoringLogsDescription;
+
+  /// No description provided for @settingsShareLinks.
+  ///
+  /// In en, this message translates to:
+  /// **'Share Links'**
+  String get settingsShareLinks;
+
+  /// No description provided for @settingsShareLinksDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Configure public share link destinations'**
+  String get settingsShareLinksDescription;
+
+  /// No description provided for @settingsRedisCache.
+  ///
+  /// In en, this message translates to:
+  /// **'Redis Cache'**
+  String get settingsRedisCache;
+
+  /// No description provided for @settingsRedisCacheDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Configure Redis cache for improved performance'**
+  String get settingsRedisCacheDescription;
+
+  /// No description provided for @settingsStoragePlans.
+  ///
+  /// In en, this message translates to:
+  /// **'Storage Plans'**
+  String get settingsStoragePlans;
+
+  /// No description provided for @settingsStoragePlansDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage storage plans and pricing'**
+  String get settingsStoragePlansDescription;
+
+  /// No description provided for @settingsDocumentMonetization.
+  ///
+  /// In en, this message translates to:
+  /// **'Document Monetization'**
+  String get settingsDocumentMonetization;
+
+  /// No description provided for @settingsDocumentMonetizationDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage document revenue scenarios and packages'**
+  String get settingsDocumentMonetizationDescription;
+
+  /// No description provided for @settingsWalletSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Wallet Settings'**
+  String get settingsWalletSettings;
+
+  /// No description provided for @settingsWalletSettingsDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Set base currency and policies'**
+  String get settingsWalletSettingsDescription;
+
+  /// No description provided for @settingsPaymentGateways.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment Gateways'**
+  String get settingsPaymentGateways;
+
+  /// No description provided for @settingsPaymentGatewaysDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage and configure payment gateways'**
+  String get settingsPaymentGatewaysDescription;
+
+  /// No description provided for @settingsBusinessesManagement.
+  ///
+  /// In en, this message translates to:
+  /// **'Businesses Management'**
+  String get settingsBusinessesManagement;
+
+  /// No description provided for @settingsBusinessesManagementDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'View and manage all system businesses'**
+  String get settingsBusinessesManagementDescription;
+
+  /// No description provided for @settingsAnnouncements.
+  ///
+  /// In en, this message translates to:
+  /// **'Announcements'**
+  String get settingsAnnouncements;
+
+  /// No description provided for @settingsAnnouncementsDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Create/edit/publish system announcements'**
+  String get settingsAnnouncementsDescription;
+
+  /// No description provided for @settingsNotifications.
+  ///
+  /// In en, this message translates to:
+  /// **'Notifications'**
+  String get settingsNotifications;
+
+  /// No description provided for @settingsNotificationsDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable/disable channels and send test messages'**
+  String get settingsNotificationsDescription;
+
+  /// No description provided for @settingsNotificationTemplates.
+  ///
+  /// In en, this message translates to:
+  /// **'Notification Templates'**
+  String get settingsNotificationTemplates;
+
+  /// No description provided for @settingsNotificationTemplatesDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage templates for channels and languages'**
+  String get settingsNotificationTemplatesDescription;
+
+  /// No description provided for @settingsAISettings.
+  ///
+  /// In en, this message translates to:
+  /// **'AI Settings'**
+  String get settingsAISettings;
+
+  /// No description provided for @settingsAISettingsDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Configure Provider, model and API Key'**
+  String get settingsAISettingsDescription;
+
+  /// No description provided for @settingsAIPlans.
+  ///
+  /// In en, this message translates to:
+  /// **'AI Plans'**
+  String get settingsAIPlans;
+
+  /// No description provided for @settingsAIPlansDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage AI usage plans and pricing'**
+  String get settingsAIPlansDescription;
+
+  /// No description provided for @settingsAIPrompts.
+  ///
+  /// In en, this message translates to:
+  /// **'AI Prompts'**
+  String get settingsAIPrompts;
+
+  /// No description provided for @settingsAIPromptsDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage default prompts for different roles'**
+  String get settingsAIPromptsDescription;
+
+  /// No description provided for @settingsZohalServices.
+  ///
+  /// In en, this message translates to:
+  /// **'Zohal Services'**
+  String get settingsZohalServices;
+
+  /// No description provided for @settingsZohalServicesDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage Zohal inquiry services and API settings'**
+  String get settingsZohalServicesDescription;
+
+  /// No description provided for @settingsZohalSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Zohal Settings'**
+  String get settingsZohalSettings;
+
+  /// No description provided for @settingsZohalSettingsDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Set API Key and configure Zohal service'**
+  String get settingsZohalSettingsDescription;
+
+  /// No description provided for @settingsTaxProductCodes.
+  ///
+  /// In en, this message translates to:
+  /// **'Tax Product Codes'**
+  String get settingsTaxProductCodes;
+
+  /// No description provided for @settingsTaxProductCodesDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Search and import new list from XML file'**
+  String get settingsTaxProductCodesDescription;
+
+  /// No description provided for @settingsSystemMonitoring.
+  ///
+  /// In en, this message translates to:
+  /// **'System Monitoring'**
+  String get settingsSystemMonitoring;
+
+  /// No description provided for @settingsSystemMonitoringDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Check system status, hardware resources and services'**
+  String get settingsSystemMonitoringDescription;
+
+  /// No description provided for @settingsServiceLogs.
+  ///
+  /// In en, this message translates to:
+  /// **'Service Logs'**
+  String get settingsServiceLogs;
+
+  /// No description provided for @settingsServiceLogsDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'View logs of hesabix-api and hesabix-rq-worker and manage services'**
+  String get settingsServiceLogsDescription;
 }
 
 class _AppLocalizationsDelegate

@@ -193,6 +193,55 @@ class _BusinessesListPageState extends State<BusinessesListPage> {
                 return province ?? city ?? '-';
               },
             ),
+            CustomColumn(
+              'status',
+              'وضعیت',
+              width: ColumnWidth.medium,
+              builder: (item, index) {
+                final isDeleted = item['is_deleted'] as bool? ?? false;
+                final isDeletionPending = item['is_deletion_pending'] as bool? ?? false;
+                
+                if (isDeleted || isDeletionPending) {
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8.0),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.shade100,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        'در حال حذف',
+                        style: TextStyle(
+                          color: Colors.orange.shade900,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  );
+                }
+                
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8.0),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.green.shade100,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      'فعال',
+                      style: TextStyle(
+                        color: Colors.green.shade900,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
             DateColumn(
               'created_at',
               'تاریخ ایجاد',
@@ -215,7 +264,20 @@ class _BusinessesListPageState extends State<BusinessesListPage> {
           showBackButton: false,
           emptyStateMessage: 'کسب و کاری یافت نشد',
           tableId: 'admin_businesses',
-          onRowTap: (item) => _showBusinessDetailsDialog(context, item),
+          onRowTap: (item) {
+            // جلوگیری از ورود به کسب و کار حذف شده
+            final isDeleted = item['is_deleted'] as bool? ?? false;
+            if (isDeleted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('این کسب و کار حذف شده است و نمی‌توان به آن دسترسی داشت. می‌توانید آن را بازیابی کنید.'),
+                  backgroundColor: Colors.orange,
+                ),
+              );
+              return;
+            }
+            _showBusinessDetailsDialog(context, item);
+          },
         ),
         fromJson: (json) => Map<String, dynamic>.from(json),
         calendarController: _calendarController,
@@ -231,15 +293,25 @@ class _BusinessesListPageState extends State<BusinessesListPage> {
   }
 }
 
-class _BusinessDetailsDialog extends StatelessWidget {
+class _BusinessDetailsDialog extends StatefulWidget {
   final Map<String, dynamic> business;
 
   const _BusinessDetailsDialog({required this.business});
 
   @override
+  State<_BusinessDetailsDialog> createState() => _BusinessDetailsDialogState();
+}
+
+class _BusinessDetailsDialogState extends State<_BusinessDetailsDialog> {
+  bool _isRestoring = false;
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final businessName = business['name'] as String? ?? 'نامشخص';
+    final businessName = widget.business['name'] as String? ?? 'نامشخص';
+    final isDeleted = widget.business['is_deleted'] as bool? ?? false;
+    final isDeletionPending = widget.business['is_deletion_pending'] as bool? ?? false;
+    final businessId = widget.business['id'] as int?;
 
     return Dialog(
       child: SizedBox(
@@ -265,14 +337,61 @@ class _BusinessDetailsDialog extends StatelessWidget {
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: Text(
-                      businessName,
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        color: theme.colorScheme.onPrimary,
-                        fontWeight: FontWeight.bold,
-                      ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          businessName,
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            color: theme.colorScheme.onPrimary,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        if (isDeleted || isDeletionPending)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.orange.shade300,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                'در حال حذف',
+                                style: TextStyle(
+                                  color: Colors.orange.shade900,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                   ),
+                  if (isDeleted || isDeletionPending) ...[
+                    const SizedBox(width: 8),
+                    ElevatedButton.icon(
+                      onPressed: _isRestoring ? null : () => _handleRestore(context),
+                      icon: _isRestoring
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              ),
+                            )
+                          : const Icon(Icons.restore, size: 18),
+                      label: Text(_isRestoring ? 'در حال بازیابی...' : 'بازیابی'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      ),
+                    ),
+                  ],
                   IconButton(
                     icon: Icon(
                       Icons.close,
@@ -300,8 +419,8 @@ class _BusinessDetailsDialog extends StatelessWidget {
                       child: TabBarView(
                         children: [
                           _buildBusinessInfoTab(theme),
-                          _WalletTab(businessId: business['id'] as int),
-                          _BusinessPoliciesTab(businessId: business['id'] as int),
+                          _WalletTab(businessId: widget.business['id'] as int),
+                          _BusinessPoliciesTab(businessId: widget.business['id'] as int),
                         ],
                       ),
                     ),
@@ -315,10 +434,70 @@ class _BusinessDetailsDialog extends StatelessWidget {
     );
   }
 
+  Future<void> _handleRestore(BuildContext context) async {
+    if (widget.business['id'] == null) return;
+    
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('بازیابی کسب و کار'),
+        content: Text(
+          'آیا مطمئن هستید که می‌خواهید کسب و کار "${widget.business['name']}" را بازیابی کنید؟',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('انصراف'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: FilledButton.styleFrom(backgroundColor: Colors.green),
+            child: const Text('بازیابی'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() {
+      _isRestoring = true;
+    });
+
+    try {
+      await BusinessApiService.restoreBusiness(widget.business['id'] as int);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('کسب و کار با موفقیت بازیابی شد'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        Navigator.of(context).pop();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('خطا در بازیابی کسب و کار: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isRestoring = false;
+        });
+      }
+    }
+  }
+
   Widget _buildBusinessInfoTab(ThemeData theme) {
-    final owner = business['owner'] as Map<String, dynamic>?;
-    final defaultCurrency = business['default_currency'] as Map<String, dynamic>?;
-    final currencies = business['currencies'] as List<dynamic>? ?? [];
+    final owner = widget.business['owner'] as Map<String, dynamic>?;
+    final defaultCurrency = widget.business['default_currency'] as Map<String, dynamic>?;
+    final currencies = widget.business['currencies'] as List<dynamic>? ?? [];
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -329,10 +508,10 @@ class _BusinessDetailsDialog extends StatelessWidget {
           _buildInfoCard(
             theme,
             [
-              _buildInfoRow(theme, 'شناسه', business['id']?.toString() ?? '-'),
-              _buildInfoRow(theme, 'نام کسب و کار', business['name'] ?? '-'),
-              _buildInfoRow(theme, 'نوع کسب و کار', business['business_type'] ?? '-'),
-              _buildInfoRow(theme, 'زمینه فعالیت', business['business_field'] ?? '-'),
+              _buildInfoRow(theme, 'شناسه', widget.business['id']?.toString() ?? '-'),
+              _buildInfoRow(theme, 'نام کسب و کار', widget.business['name'] ?? '-'),
+              _buildInfoRow(theme, 'نوع کسب و کار', widget.business['business_type'] ?? '-'),
+              _buildInfoRow(theme, 'زمینه فعالیت', widget.business['business_field'] ?? '-'),
             ],
           ),
           const SizedBox(height: 16),
@@ -354,16 +533,16 @@ class _BusinessDetailsDialog extends StatelessWidget {
           _buildInfoCard(
             theme,
             [
-              _buildInfoRow(theme, 'تلفن', business['phone'] ?? '-'),
-              _buildInfoRow(theme, 'موبایل', business['mobile'] ?? '-'),
-              _buildInfoRow(theme, 'آدرس', business['address'] ?? '-'),
-              if (business['province'] != null || business['city'] != null)
+              _buildInfoRow(theme, 'تلفن', widget.business['phone'] ?? '-'),
+              _buildInfoRow(theme, 'موبایل', widget.business['mobile'] ?? '-'),
+              _buildInfoRow(theme, 'آدرس', widget.business['address'] ?? '-'),
+              if (widget.business['province'] != null || widget.business['city'] != null)
                 _buildInfoRow(
                   theme,
                   'موقعیت',
-                  '${business['province'] ?? ''}${business['province'] != null && business['city'] != null ? '، ' : ''}${business['city'] ?? ''}',
+                  '${widget.business['province'] ?? ''}${widget.business['province'] != null && widget.business['city'] != null ? '، ' : ''}${widget.business['city'] ?? ''}',
                 ),
-              _buildInfoRow(theme, 'کد پستی', business['postal_code'] ?? '-'),
+              _buildInfoRow(theme, 'کد پستی', widget.business['postal_code'] ?? '-'),
             ],
           ),
           const SizedBox(height: 16),
@@ -372,18 +551,18 @@ class _BusinessDetailsDialog extends StatelessWidget {
           _buildInfoCard(
             theme,
             [
-              _buildInfoRow(theme, 'شناسه ملی', business['national_id'] ?? '-'),
-              _buildInfoRow(theme, 'شماره ثبت', business['registration_number'] ?? '-'),
-              _buildInfoRow(theme, 'شناسه اقتصادی', business['economic_id'] ?? '-'),
+              _buildInfoRow(theme, 'شناسه ملی', widget.business['national_id'] ?? '-'),
+              _buildInfoRow(theme, 'شماره ثبت', widget.business['registration_number'] ?? '-'),
+              _buildInfoRow(theme, 'شناسه اقتصادی', widget.business['economic_id'] ?? '-'),
               _buildInfoRow(
                 theme,
                 'تاریخ ایجاد',
-                date_formatters.DateFormatters.formatServerDateTime(business['created_at']),
+                date_formatters.DateFormatters.formatServerDateTime(widget.business['created_at']),
               ),
               _buildInfoRow(
                 theme,
                 'آخرین بروزرسانی',
-                date_formatters.DateFormatters.formatServerDateTime(business['updated_at']),
+                date_formatters.DateFormatters.formatServerDateTime(widget.business['updated_at']),
               ),
             ],
           ),

@@ -2258,6 +2258,82 @@
   "workflowErrorLoadingLogs": "خطا در دریافت لاگ‌ها",
   "workflowErrorUpdatingStatus": "خطا در تغییر وضعیت",
   "workflowHierarchicalLayoutApplied": "چیدمان Hierarchical اعمال شد",
-  "workflowForceDirectedLayoutApplied": "چیدمان Force-directed اعمال شد"
+  "workflowForceDirectedLayoutApplied": "چیدمان Force-directed اعمال شد",
+  "settingsCategoriesCount": "دسته‌بندی",
+  "settingsCount": "تنظیمات",
+  "expandAllCategories": "باز کردن همه",
+  "collapseAllCategories": "بستن همه",
+  "noSettingsFound": "هیچ تنظیماتی یافت نشد",
+  "searchResults": "نتایج جستجو",
+  "searchResultCount": "{count} نتیجه",
+  "@searchResultCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "noSearchResults": "نتیجه‌ای برای \"{query}\" یافت نشد",
+  "@noSearchResults": {
+    "placeholders": {
+      "query": {
+        "type": "String"
+      }
+    }
+  },
+  "searchSettingsPlaceholder": "جستجو در تنظیمات...",
+  "noSettingsInCategory": "هیچ تنظیماتی در این دسته یافت نشد",
+  "settingsCategoryCoreConfiguration": "پایه و پیکربندی",
+  "settingsCategoryCoreConfigurationDescription": "تنظیمات پایه و پیکربندی سیستم",
+  "settingsCategoryStorageFiles": "ذخیره‌سازی و فایل‌ها",
+  "settingsCategoryStorageFilesDescription": "مدیریت ذخیره‌سازی و پلن‌های ذخیره‌سازی",
+  "settingsCategoryFinancialPayment": "مالی و پرداخت",
+  "settingsCategoryFinancialPaymentDescription": "تنظیمات کیف‌پول و درگاه‌های پرداخت",
+  "settingsCategoryUsersBusinesses": "کاربران و کسب و کارها",
+  "settingsCategoryUsersBusinessesDescription": "مدیریت کاربران و کسب و کارها",
+  "settingsCategoryCommunications": "ارتباطات",
+  "settingsCategoryCommunicationsDescription": "ایمیل، اعلان‌ها و اعلان‌های سیستمی",
+  "settingsCategoryAI": "هوش مصنوعی",
+  "settingsCategoryAIDescription": "تنظیمات، پلن‌ها و Prompt های AI",
+  "settingsCategoryExternalServices": "سرویس‌های خارجی",
+  "settingsCategoryExternalServicesDescription": "ادغام‌های سرویس‌های خارجی",
+  "settingsCategoryMonitoringLogs": "مانیتورینگ و لاگ‌ها",
+  "settingsCategoryMonitoringLogsDescription": "مانیتورینگ سیستم و ثبت لاگ",
+  "settingsShareLinks": "لینک‌های اشتراک",
+  "settingsShareLinksDescription": "تعیین آدرس مقصد نمایش کارت حساب در لینک‌های عمومی",
+  "settingsRedisCache": "تنظیمات Redis Cache",
+  "settingsRedisCacheDescription": "پیکربندی Redis برای بهبود عملکرد و کاهش بار دیتابیس",
+  "settingsStoragePlans": "پلن‌های ذخیره‌سازی",
+  "settingsStoragePlansDescription": "مدیریت پلن‌های ذخیره‌سازی و تعیین قیمت‌ها",
+  "settingsDocumentMonetization": "تنظیمات پکیج‌ها",
+  "settingsDocumentMonetizationDescription": "مدیریت سناریوی درآمدزایی اسناد و پکیج‌ها",
+  "settingsWalletSettings": "تنظیمات کیف‌پول",
+  "settingsWalletSettingsDescription": "تعیین ارز پایه و سیاست‌ها",
+  "settingsPaymentGateways": "درگاه‌های پرداخت",
+  "settingsPaymentGatewaysDescription": "مدیریت و پیکربندی درگاه‌ها",
+  "settingsBusinessesManagement": "مدیریت کسب و کارها",
+  "settingsBusinessesManagementDescription": "مشاهده و مدیریت لیست همه کسب و کارهای سیستم",
+  "settingsAnnouncements": "مدیریت اعلان‌ها",
+  "settingsAnnouncementsDescription": "ایجاد/ویرایش/انتشار اعلان‌های سیستمی",
+  "settingsNotifications": "تنظیمات نوتیفیکیشن",
+  "settingsNotificationsDescription": "فعال/غیرفعال‌سازی کانال‌ها و ارسال تست",
+  "settingsNotificationTemplates": "قالب‌های نوتیفیکیشن",
+  "settingsNotificationTemplatesDescription": "مدیریت قالب‌ها برای کانال‌ها و زبان‌ها",
+  "settingsAISettings": "تنظیمات AI",
+  "settingsAISettingsDescription": "پیکربندی Provider، مدل و API Key",
+  "settingsAIPlans": "پلن‌های AI",
+  "settingsAIPlansDescription": "مدیریت پلن‌های استفاده از AI و تعیین قیمت‌ها",
+  "settingsAIPrompts": "Prompt های AI",
+  "settingsAIPromptsDescription": "مدیریت Prompt های پیش‌فرض برای نقش‌های مختلف",
+  "settingsZohalServices": "سرویس‌های زحل",
+  "settingsZohalServicesDescription": "مدیریت سرویس‌های استعلامات زحل و تنظیمات API",
+  "settingsZohalSettings": "تنظیمات زحل",
+  "settingsZohalSettingsDescription": "تنظیم API Key و پیکربندی سرویس زحل",
+  "settingsTaxProductCodes": "کدهای مالیاتی کالا",
+  "settingsTaxProductCodesDescription": "جستجو و ایمپورت لیست جدید از فایل XML",
+  "settingsSystemMonitoring": "مانیتورینگ سیستم",
+  "settingsSystemMonitoringDescription": "بررسی وضعیت سیستم، منابع سخت‌افزاری و سرویس‌ها",
+  "settingsServiceLogs": "لاگ‌های سرویس‌ها",
+  "settingsServiceLogsDescription": "مشاهده لاگ‌های hesabix-api و hesabix-rq-worker و مدیریت سرویس‌ها"
 }
 

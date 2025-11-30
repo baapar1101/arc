@@ -2214,6 +2214,82 @@
   "workflowErrorLoadingLogs": "Error loading logs",
   "workflowErrorUpdatingStatus": "Error updating status",
   "workflowHierarchicalLayoutApplied": "Hierarchical layout applied",
-  "workflowForceDirectedLayoutApplied": "Force-directed layout applied"
+  "workflowForceDirectedLayoutApplied": "Force-directed layout applied",
+  "settingsCategoriesCount": "Categories",
+  "settingsCount": "Settings",
+  "expandAllCategories": "Expand All",
+  "collapseAllCategories": "Collapse All",
+  "noSettingsFound": "No settings found",
+  "searchResults": "Search Results",
+  "searchResultCount": "{count} result",
+  "@searchResultCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "noSearchResults": "No results found for \"{query}\"",
+  "@noSearchResults": {
+    "placeholders": {
+      "query": {
+        "type": "String"
+      }
+    }
+  },
+  "searchSettingsPlaceholder": "Search settings...",
+  "noSettingsInCategory": "No settings found in this category",
+  "settingsCategoryCoreConfiguration": "Core & Configuration",
+  "settingsCategoryCoreConfigurationDescription": "Basic system settings and configuration",
+  "settingsCategoryStorageFiles": "Storage & Files",
+  "settingsCategoryStorageFilesDescription": "File storage and storage plan management",
+  "settingsCategoryFinancialPayment": "Financial & Payment",
+  "settingsCategoryFinancialPaymentDescription": "Wallet and payment gateway settings",
+  "settingsCategoryUsersBusinesses": "Users & Businesses",
+  "settingsCategoryUsersBusinessesDescription": "User and business management",
+  "settingsCategoryCommunications": "Communications",
+  "settingsCategoryCommunicationsDescription": "Email, notifications and announcements",
+  "settingsCategoryAI": "Artificial Intelligence",
+  "settingsCategoryAIDescription": "AI settings, plans and prompts",
+  "settingsCategoryExternalServices": "External Services",
+  "settingsCategoryExternalServicesDescription": "External service integrations",
+  "settingsCategoryMonitoringLogs": "Monitoring & Logs",
+  "settingsCategoryMonitoringLogsDescription": "System monitoring and logging",
+  "settingsShareLinks": "Share Links",
+  "settingsShareLinksDescription": "Configure public share link destinations",
+  "settingsRedisCache": "Redis Cache",
+  "settingsRedisCacheDescription": "Configure Redis cache for improved performance",
+  "settingsStoragePlans": "Storage Plans",
+  "settingsStoragePlansDescription": "Manage storage plans and pricing",
+  "settingsDocumentMonetization": "Document Monetization",
+  "settingsDocumentMonetizationDescription": "Manage document revenue scenarios and packages",
+  "settingsWalletSettings": "Wallet Settings",
+  "settingsWalletSettingsDescription": "Set base currency and policies",
+  "settingsPaymentGateways": "Payment Gateways",
+  "settingsPaymentGatewaysDescription": "Manage and configure payment gateways",
+  "settingsBusinessesManagement": "Businesses Management",
+  "settingsBusinessesManagementDescription": "View and manage all system businesses",
+  "settingsAnnouncements": "Announcements",
+  "settingsAnnouncementsDescription": "Create/edit/publish system announcements",
+  "settingsNotifications": "Notifications",
+  "settingsNotificationsDescription": "Enable/disable channels and send test messages",
+  "settingsNotificationTemplates": "Notification Templates",
+  "settingsNotificationTemplatesDescription": "Manage templates for channels and languages",
+  "settingsAISettings": "AI Settings",
+  "settingsAISettingsDescription": "Configure Provider, model and API Key",
+  "settingsAIPlans": "AI Plans",
+  "settingsAIPlansDescription": "Manage AI usage plans and pricing",
+  "settingsAIPrompts": "AI Prompts",
+  "settingsAIPromptsDescription": "Manage default prompts for different roles",
+  "settingsZohalServices": "Zohal Services",
+  "settingsZohalServicesDescription": "Manage Zohal inquiry services and API settings",
+  "settingsZohalSettings": "Zohal Settings",
+  "settingsZohalSettingsDescription": "Set API Key and configure Zohal service",
+  "settingsTaxProductCodes": "Tax Product Codes",
+  "settingsTaxProductCodesDescription": "Search and import new list from XML file",
+  "settingsSystemMonitoring": "System Monitoring",
+  "settingsSystemMonitoringDescription": "Check system status, hardware resources and services",
+  "settingsServiceLogs": "Service Logs",
+  "settingsServiceLogsDescription": "View logs of hesabix-api and hesabix-rq-worker and manage services"
 }
 

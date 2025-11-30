@@ -23,6 +23,7 @@ import '../../models/invoice_transaction.dart';
 import '../../widgets/invoice/product_combobox_widget.dart';
 import '../../widgets/invoice/customer_combobox_widget.dart';
 import '../../widgets/invoice/cash_register_combobox_widget.dart';
+import '../../widgets/product/product_form_dialog.dart';
 import '../../models/customer_model.dart';
 import '../../models/cash_register.dart';
 import 'package:go_router/go_router.dart';
@@ -89,6 +90,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
   final FocusNode _barcodeFocus = FocusNode();
   final FocusNode _keyboardListenerFocus = FocusNode();
   Timer? _searchDebounce;
+  String? _lastFailedSearchQuery; // آخرین جستجوی ناموفق برای نمایش دکمه افزودن کالا
 
   @override
   void initState() {
@@ -250,6 +252,12 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
             await _saveRecentProduct(product);
             _barcodeController.clear();
             _barcodeFocus.requestFocus();
+            // پاک کردن جستجوی ناموفق قبلی
+            if (mounted) {
+              setState(() {
+                _lastFailedSearchQuery = null;
+              });
+            }
             if (mounted) {
               SnackBarHelper.show(
                 context,
@@ -258,6 +266,12 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
             }
             return;
           }
+        }
+        // اگر دیالوگ انتخاب بسته شد بدون انتخاب، جستجوی ناموفق را ثبت کن
+        if (mounted) {
+          setState(() {
+            _lastFailedSearchQuery = code.trim();
+          });
         }
         return;
       }
@@ -277,6 +291,12 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
         await _saveRecentProduct(product);
         _barcodeController.clear();
         _barcodeFocus.requestFocus();
+        // پاک کردن جستجوی ناموفق قبلی
+        if (mounted) {
+          setState(() {
+            _lastFailedSearchQuery = null;
+          });
+        }
         // فیدبک بصری
         if (mounted) {
           SnackBarHelper.show(
@@ -305,6 +325,12 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
         await _saveRecentProduct(product);
         _barcodeController.clear();
         _barcodeFocus.requestFocus();
+        // پاک کردن جستجوی ناموفق قبلی
+        if (mounted) {
+          setState(() {
+            _lastFailedSearchQuery = null;
+          });
+        }
         // فیدبک بصری
         if (mounted) {
           SnackBarHelper.show(
@@ -314,12 +340,100 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
         }
       } else {
         if (mounted) {
+          setState(() {
+            _lastFailedSearchQuery = code.trim();
+          });
           SnackBarHelper.show(context, message: 'محصولی یافت نشد', isError: true);
         }
       }
     } catch (e) {
       if (mounted) {
         SnackBarHelper.show(context, message: 'خطا در جستجو: $e', isError: true);
+      }
+    }
+  }
+
+  /// باز کردن دیالوگ افزودن کالا با نام پیش‌فرض و افزودن به سبد بعد از ثبت
+  Future<void> _openAddProductDialog(String productName) async {
+    if (productName.trim().isEmpty) return;
+    
+    try {
+      // باز کردن دیالوگ با نام پیش‌فرض
+      final result = await showDialog<dynamic>(
+        context: context,
+        builder: (context) => ProductFormDialog(
+          businessId: widget.businessId,
+          authStore: widget.authStore,
+          product: {'name': productName.trim()}, // پاس دادن نام به عنوان product برای پیش‌پردازش
+          onSuccess: () {},
+        ),
+      );
+      
+      if (!mounted) return;
+      
+      // اگر کالا با موفقیت ثبت شد
+      if (result != null && result != false) {
+        int? newProductId;
+        
+        // استخراج product_id از نتیجه
+        if (result is int) {
+          newProductId = result;
+        } else if (result is Map) {
+          newProductId = result['id'] as int?;
+        }
+        
+        // اگر product_id را داریم، کالا را دریافت و به سبد اضافه کن
+        if (newProductId != null) {
+          try {
+            final product = await _productService.getProduct(
+              businessId: widget.businessId,
+              productId: newProductId,
+            );
+            
+            await _addToCart(product);
+            await _saveRecentProduct(product);
+            
+            // پاک کردن جستجوی ناموفق و فیلد جستجو
+            setState(() {
+              _lastFailedSearchQuery = null;
+            });
+            _barcodeController.clear();
+            _barcodeFocus.requestFocus();
+            
+            SnackBarHelper.show(
+              context,
+              message: '${product['name'] ?? 'محصول'} با موفقیت اضافه شد و به سبد خرید اضافه گردید',
+            );
+          } catch (e) {
+            SnackBarHelper.show(
+              context,
+              message: 'کالا ثبت شد اما خطا در افزودن به سبد: $e',
+              isError: true,
+            );
+          }
+        } else {
+          // اگر product_id را نداریم، فقط پیام موفقیت نمایش بده
+          setState(() {
+            _lastFailedSearchQuery = null;
+          });
+          _barcodeController.clear();
+          _barcodeFocus.requestFocus();
+          SnackBarHelper.show(
+            context,
+            message: 'کالا با موفقیت ثبت شد',
+          );
+        }
+      } else {
+        // اگر دیالوگ بسته شد بدون ثبت، جستجوی ناموفق را نگه دار
+        // تا کاربر بتواند دوباره روی دکمه + کلیک کند
+      }
+    } catch (e) {
+      if (mounted) {
+        SnackBarHelper.show(
+          context,
+          message: 'خطا در باز کردن دیالوگ افزودن کالا: $e',
+          isError: true,
+        );
       }
     }
   }
@@ -1105,15 +1219,33 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
                             hintText: 'اسکن یا وارد کردن بارکد، کد یا نام',
                             prefixIcon: const Icon(Icons.qr_code_scanner),
                             border: const OutlineInputBorder(),
-                            suffixIcon: IconButton(
-                              icon: const Icon(Icons.search),
-                              onPressed: () => _searchByBarcode(_barcodeController.text),
+                            suffixIcon: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                // دکمه افزودن کالا (فقط وقتی جستجو ناموفق باشد)
+                                if (_lastFailedSearchQuery != null && _lastFailedSearchQuery!.isNotEmpty)
+                                  IconButton(
+                                    icon: const Icon(Icons.add_circle, color: Colors.green),
+                                    tooltip: 'افزودن کالای جدید: $_lastFailedSearchQuery',
+                                    onPressed: () => _openAddProductDialog(_lastFailedSearchQuery!),
+                                  ),
+                                // دکمه جستجو
+                                IconButton(
+                                  icon: const Icon(Icons.search),
+                                  onPressed: () => _searchByBarcode(_barcodeController.text),
+                                  tooltip: 'جستجو',
+                                ),
+                              ],
                             ),
                           ),
                           onSubmitted: _searchByBarcode,
                           onChanged: (value) {
-                            // Debounce برای جستجوی خودکار (اختیاری - فقط برای نمایش نتایج)
-                            // در فروش سریع، جستجو فقط با Enter یا دکمه انجام می‌شود
+                            // پاک کردن جستجوی ناموفق وقتی کاربر شروع به تایپ می‌کند
+                            if (_lastFailedSearchQuery != null && value != _lastFailedSearchQuery) {
+                              setState(() {
+                                _lastFailedSearchQuery = null;
+                              });
+                            }
                           },
                           textInputAction: TextInputAction.search,
                         ),

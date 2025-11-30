@@ -5603,4 +5603,218 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get workflowForceDirectedLayoutApplied =>
       'Force-directed layout applied';
+
+  @override
+  String get settingsCategoriesCount => 'Categories';
+
+  @override
+  String get settingsCount => 'Settings';
+
+  @override
+  String get expandAllCategories => 'Expand All';
+
+  @override
+  String get collapseAllCategories => 'Collapse All';
+
+  @override
+  String get noSettingsFound => 'No settings found';
+
+  @override
+  String get searchResults => 'Search Results';
+
+  @override
+  String searchResultCount(int count) {
+    return '$count result';
+  }
+
+  @override
+  String noSearchResults(String query) {
+    return 'No results found for \"$query\"';
+  }
+
+  @override
+  String get searchSettingsPlaceholder => 'Search settings...';
+
+  @override
+  String get noSettingsInCategory => 'No settings found in this category';
+
+  @override
+  String get settingsCategoryCoreConfiguration => 'Core & Configuration';
+
+  @override
+  String get settingsCategoryCoreConfigurationDescription =>
+      'Basic system settings and configuration';
+
+  @override
+  String get settingsCategoryStorageFiles => 'Storage & Files';
+
+  @override
+  String get settingsCategoryStorageFilesDescription =>
+      'File storage and storage plan management';
+
+  @override
+  String get settingsCategoryFinancialPayment => 'Financial & Payment';
+
+  @override
+  String get settingsCategoryFinancialPaymentDescription =>
+      'Wallet and payment gateway settings';
+
+  @override
+  String get settingsCategoryUsersBusinesses => 'Users & Businesses';
+
+  @override
+  String get settingsCategoryUsersBusinessesDescription =>
+      'User and business management';
+
+  @override
+  String get settingsCategoryCommunications => 'Communications';
+
+  @override
+  String get settingsCategoryCommunicationsDescription =>
+      'Email, notifications and announcements';
+
+  @override
+  String get settingsCategoryAI => 'Artificial Intelligence';
+
+  @override
+  String get settingsCategoryAIDescription => 'AI settings, plans and prompts';
+
+  @override
+  String get settingsCategoryExternalServices => 'External Services';
+
+  @override
+  String get settingsCategoryExternalServicesDescription =>
+      'External service integrations';
+
+  @override
+  String get settingsCategoryMonitoringLogs => 'Monitoring & Logs';
+
+  @override
+  String get settingsCategoryMonitoringLogsDescription =>
+      'System monitoring and logging';
+
+  @override
+  String get settingsShareLinks => 'Share Links';
+
+  @override
+  String get settingsShareLinksDescription =>
+      'Configure public share link destinations';
+
+  @override
+  String get settingsRedisCache => 'Redis Cache';
+
+  @override
+  String get settingsRedisCacheDescription =>
+      'Configure Redis cache for improved performance';
+
+  @override
+  String get settingsStoragePlans => 'Storage Plans';
+
+  @override
+  String get settingsStoragePlansDescription =>
+      'Manage storage plans and pricing';
+
+  @override
+  String get settingsDocumentMonetization => 'Document Monetization';
+
+  @override
+  String get settingsDocumentMonetizationDescription =>
+      'Manage document revenue scenarios and packages';
+
+  @override
+  String get settingsWalletSettings => 'Wallet Settings';
+
+  @override
+  String get settingsWalletSettingsDescription =>
+      'Set base currency and policies';
+
+  @override
+  String get settingsPaymentGateways => 'Payment Gateways';
+
+  @override
+  String get settingsPaymentGatewaysDescription =>
+      'Manage and configure payment gateways';
+
+  @override
+  String get settingsBusinessesManagement => 'Businesses Management';
+
+  @override
+  String get settingsBusinessesManagementDescription =>
+      'View and manage all system businesses';
+
+  @override
+  String get settingsAnnouncements => 'Announcements';
+
+  @override
+  String get settingsAnnouncementsDescription =>
+      'Create/edit/publish system announcements';
+
+  @override
+  String get settingsNotifications => 'Notifications';
+
+  @override
+  String get settingsNotificationsDescription =>
+      'Enable/disable channels and send test messages';
+
+  @override
+  String get settingsNotificationTemplates => 'Notification Templates';
+
+  @override
+  String get settingsNotificationTemplatesDescription =>
+      'Manage templates for channels and languages';
+
+  @override
+  String get settingsAISettings => 'AI Settings';
+
+  @override
+  String get settingsAISettingsDescription =>
+      'Configure Provider, model and API Key';
+
+  @override
+  String get settingsAIPlans => 'AI Plans';
+
+  @override
+  String get settingsAIPlansDescription => 'Manage AI usage plans and pricing';
+
+  @override
+  String get settingsAIPrompts => 'AI Prompts';
+
+  @override
+  String get settingsAIPromptsDescription =>
+      'Manage default prompts for different roles';
+
+  @override
+  String get settingsZohalServices => 'Zohal Services';
+
+  @override
+  String get settingsZohalServicesDescription =>
+      'Manage Zohal inquiry services and API settings';
+
+  @override
+  String get settingsZohalSettings => 'Zohal Settings';
+
+  @override
+  String get settingsZohalSettingsDescription =>
+      'Set API Key and configure Zohal service';
+
+  @override
+  String get settingsTaxProductCodes => 'Tax Product Codes';
+
+  @override
+  String get settingsTaxProductCodesDescription =>
+      'Search and import new list from XML file';
+
+  @override
+  String get settingsSystemMonitoring => 'System Monitoring';
+
+  @override
+  String get settingsSystemMonitoringDescription =>
+      'Check system status, hardware resources and services';
+
+  @override
+  String get settingsServiceLogs => 'Service Logs';
+
+  @override
+  String get settingsServiceLogsDescription =>
+      'View logs of hesabix-api and hesabix-rq-worker and manage services';
 }

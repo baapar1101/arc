@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../services/business_dashboard_service.dart';
 import '../../services/business_user_service.dart';
+import '../../services/business_api_service.dart';
 import '../../core/api_client.dart';
 import '../../models/business_dashboard_models.dart';
 import '../../models/business_user_model.dart';
@@ -64,6 +65,20 @@ class _BusinessesPageState extends State<BusinessesPage> {
   }
 
   void _navigateToBusiness(int businessId) {
+    // بررسی اینکه کسب و کار حذف نشده باشد
+    final business = _businesses.firstWhere(
+      (b) => b.id == businessId,
+      orElse: () => throw Exception('کسب و کار یافت نشد'),
+    );
+    
+    if (business.isDeletionPending) {
+      SnackBarHelper.showError(
+        context,
+        message: 'این کسب و کار در حال حذف است و نمی‌توان به آن دسترسی داشت. می‌توانید آن را بازیابی کنید.',
+      );
+      return;
+    }
+    
     context.go('/business/$businessId/dashboard');
   }
 
@@ -318,6 +333,7 @@ class _BusinessCard extends StatefulWidget {
 class _BusinessCardState extends State<_BusinessCard> {
   String? _localCurrencyCode;
   bool _isLeaving = false;
+  bool _isRestoring = false;
   final BusinessUserService _userService = BusinessUserService(ApiClient());
 
   @override
@@ -490,29 +506,32 @@ class _BusinessCardState extends State<_BusinessCard> {
               
               SizedBox(height: cardPadding * 0.75),
               
-              // Footer with currency selector, leave button (for members), and arrow
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildCurrencyDropdown(context),
-                  ),
-                  if (!widget.business.isOwner) ...[
-                    SizedBox(width: cardPadding * 0.5),
-                    _buildLeaveButton(context, cardPadding),
-                  ],
-                  SizedBox(width: cardPadding * 0.5),
-                  Icon(
-                    Icons.arrow_forward_ios,
-                    size: ResponsiveHelper.responsiveValue(
-                      context,
-                      mobile: 12,
-                      tablet: 14,
-                      desktop: 16,
+              // Footer with restore button (for deleted businesses) or currency selector and leave button
+              if (widget.business.isDeletionPending && widget.business.isOwner)
+                _buildRestoreButton(context, cardPadding)
+              else
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildCurrencyDropdown(context),
                     ),
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                ],
-              ),
+                    if (!widget.business.isOwner) ...[
+                      SizedBox(width: cardPadding * 0.5),
+                      _buildLeaveButton(context, cardPadding),
+                    ],
+                    SizedBox(width: cardPadding * 0.5),
+                    Icon(
+                      Icons.arrow_forward_ios,
+                      size: ResponsiveHelper.responsiveValue(
+                        context,
+                        mobile: 12,
+                        tablet: 14,
+                        desktop: 16,
+                      ),
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ],
+                ),
             ],
           ),
         ),
@@ -528,7 +547,7 @@ class _BusinessCardState extends State<_BusinessCard> {
       elevation: 1,
       margin: EdgeInsets.zero,
       child: InkWell(
-        onTap: widget.onTap,
+        onTap: widget.business.isDeletionPending ? null : widget.onTap,
         borderRadius: BorderRadius.circular(12),
         child: Container(
           padding: EdgeInsets.all(cardPadding),
@@ -654,13 +673,18 @@ class _BusinessCardState extends State<_BusinessCard> {
                     
                     SizedBox(height: isMobile ? 8 : 12),
                     
-                    // Currency selector - در موبایل کوچکتر
-                    _buildCurrencyDropdown(context),
-                    
-                    // Leave button for members
-                    if (!widget.business.isOwner) ...[
-                      SizedBox(height: isMobile ? 8 : 12),
-                      _buildLeaveButton(context, isMobile ? 12.0 : 16.0),
+                    // Restore button (for deleted businesses) or currency selector and leave button
+                    if (widget.business.isDeletionPending && widget.business.isOwner)
+                      _buildRestoreButton(context, isMobile ? 12.0 : 16.0)
+                    else ...[
+                      // Currency selector - در موبایل کوچکتر
+                      _buildCurrencyDropdown(context),
+                      
+                      // Leave button for members
+                      if (!widget.business.isOwner) ...[
+                        SizedBox(height: isMobile ? 8 : 12),
+                        _buildLeaveButton(context, isMobile ? 12.0 : 16.0),
+                      ],
                     ],
                   ],
                 ),
@@ -668,12 +692,13 @@ class _BusinessCardState extends State<_BusinessCard> {
               
               SizedBox(width: isMobile ? 8 : 12),
               
-              // Arrow
-              Icon(
-                Icons.arrow_forward_ios,
-                size: isMobile ? 16 : 20,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
+              // Arrow (only if not deleted)
+              if (!widget.business.isDeletionPending)
+                Icon(
+                  Icons.arrow_forward_ios,
+                  size: isMobile ? 16 : 20,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
             ],
           ),
         ),
@@ -767,6 +792,147 @@ class _BusinessCardState extends State<_BusinessCard> {
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
       ),
     );
+  }
+
+  Widget _buildRestoreButton(BuildContext context, double size) {
+    final theme = Theme.of(context);
+    final isMobile = ResponsiveHelper.isMobile(context);
+    
+    // محاسبه مهلت باقی‌مانده
+    String? remainingDaysText;
+    if (widget.business.autoDeleteAt != null) {
+      try {
+        final autoDeleteDate = DateTime.parse(widget.business.autoDeleteAt!);
+        final now = DateTime.now();
+        final difference = autoDeleteDate.difference(now);
+        if (difference.inDays > 0) {
+          remainingDaysText = '${difference.inDays} روز باقی مانده';
+        } else if (difference.inHours > 0) {
+          remainingDaysText = '${difference.inHours} ساعت باقی مانده';
+        } else {
+          remainingDaysText = 'مهلت به پایان رسیده';
+        }
+      } catch (e) {
+        remainingDaysText = null;
+      }
+    }
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (remainingDaysText != null) ...[
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.orange.shade50,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.orange.shade200),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.access_time, size: 16, color: Colors.orange.shade900),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    remainingDaysText,
+                    style: TextStyle(
+                      color: Colors.orange.shade900,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          SizedBox(height: 12),
+        ],
+        FilledButton.icon(
+          onPressed: _isRestoring ? null : () => _handleRestore(context),
+          icon: _isRestoring
+              ? SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(theme.colorScheme.onPrimary),
+                  ),
+                )
+              : Icon(Icons.restore, size: 16),
+          label: Text(
+            _isRestoring ? 'در حال بازیابی...' : 'بازیابی کسب و کار',
+            style: TextStyle(fontSize: isMobile ? 12 : 14),
+          ),
+          style: FilledButton.styleFrom(
+            backgroundColor: Colors.green,
+            foregroundColor: Colors.white,
+            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _handleRestore(BuildContext context) async {
+    final t = AppLocalizations.of(context);
+    
+    // Show confirmation dialog
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('بازیابی کسب و کار'),
+        content: Text(
+          'آیا مطمئن هستید که می‌خواهید کسب و کار "${widget.business.name}" را بازیابی کنید؟\n\n'
+          'پس از بازیابی، دسترسی شما به این کسب و کار بازگردانده خواهد شد.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(t.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.green,
+            ),
+            child: const Text('بازیابی'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() {
+      _isRestoring = true;
+    });
+
+    try {
+      await BusinessApiService.restoreBusiness(widget.business.id);
+
+      if (mounted) {
+        SnackBarHelper.showSuccess(
+          context,
+          message: 'کسب و کار با موفقیت بازیابی شد',
+        );
+        
+        // Refresh businesses list
+        widget.onLeave?.call();
+      }
+    } catch (e) {
+      if (mounted) {
+        SnackBarHelper.showError(
+          context,
+          message: 'خطا در بازیابی کسب و کار: $e',
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isRestoring = false;
+        });
+      }
+    }
   }
 
   Future<void> _handleLeave(BuildContext context) async {

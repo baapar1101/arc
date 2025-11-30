@@ -199,11 +199,7 @@ class EmailService {
       );
 
       final data = response.data!;
-      return TestConnectionResponse(
-        success: data['success'] as bool? ?? true,
-        message: data['message'] as String? ?? '',
-        connected: data['data']?['connected'] as bool? ?? false,
-      );
+      return TestConnectionResponse.fromJson(data);
     } on DioException catch (e) {
       throw _handleError(e);
     }

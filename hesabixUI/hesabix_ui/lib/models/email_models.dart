@@ -1,3 +1,5 @@
+import 'package:shamsi_date/shamsi_date.dart';
+
 class EmailConfig {
   final int id;
   final String name;
@@ -42,8 +44,8 @@ class EmailConfig {
       fromName: json['from_name'] as String,
       isActive: json['is_active'] as bool,
       isDefault: json['is_default'] as bool? ?? false,
-      createdAt: _parseDateTime(json['created_at']),
-      updatedAt: _parseDateTime(json['updated_at']),
+      createdAt: _parseDateTime(json['created_at'] ?? json['created_at_raw']),
+      updatedAt: _parseDateTime(json['updated_at'] ?? json['updated_at_raw']),
     );
   }
 
@@ -52,15 +54,80 @@ class EmailConfig {
       return DateTime.now();
     }
     
+    if (dateValue is DateTime) {
+      return dateValue;
+    }
+    
     if (dateValue is String) {
-      return DateTime.parse(dateValue);
+      // Jalali format: YYYY/MM/DD [HH:MM:SS]
+      if (dateValue.contains('/') && !dateValue.contains('-')) {
+        try {
+          final parts = dateValue.split(' ');
+          final dateParts = parts[0].split('/');
+          if (dateParts.length == 3) {
+            final year = int.parse(dateParts[0]);
+            final month = int.parse(dateParts[1]);
+            final day = int.parse(dateParts[2]);
+            int hour = 0, minute = 0, second = 0;
+            if (parts.length > 1) {
+              final timeParts = parts[1].split(':');
+              if (timeParts.length >= 2) {
+                hour = int.parse(timeParts[0]);
+                minute = int.parse(timeParts[1]);
+                if (timeParts.length >= 3) {
+                  second = int.parse(timeParts[2]);
+                }
+              }
+            }
+            // اگر سال بزرگتر از 1500 است، Jalali است
+            if (year > 1500) {
+              final j = Jalali(year, month, day);
+              final dt = j.toDateTime();
+              return DateTime(dt.year, dt.month, dt.day, hour, minute, second);
+            } else {
+              // سال میلادی است
+              return DateTime(year, month, day, hour, minute, second);
+            }
+          }
+        } catch (_) {
+          // fallthrough to try ISO parsing
+        }
+      }
+      // ISO or other parseable formats
+      try {
+        return DateTime.parse(dateValue);
+      } catch (_) {
+        return DateTime.now();
+      }
     }
     
     if (dateValue is Map<String, dynamic>) {
       // Handle formatted date object
-      final formatted = dateValue['formatted'] as String?;
-      if (formatted != null) {
-        return DateTime.parse(formatted);
+      // First try to get raw date string
+      final raw = dateValue['formatted'] as String? ?? dateValue['date_time'] as String?;
+      if (raw != null) {
+        return _parseDateTime(raw);
+      }
+      // Try to construct from components
+      final year = dateValue['year'] as int?;
+      final month = dateValue['month'] as int?;
+      final day = dateValue['day'] as int?;
+      final hour = dateValue['hour'] as int? ?? 0;
+      final minute = dateValue['minute'] as int? ?? 0;
+      final second = dateValue['second'] as int? ?? 0;
+      if (year != null && month != null && day != null) {
+        // اگر سال بزرگتر از 1500 است، Jalali است
+        if (year > 1500) {
+          try {
+            final j = Jalali(year, month, day);
+            final dt = j.toDateTime();
+            return DateTime(dt.year, dt.month, dt.day, hour, minute, second);
+          } catch (_) {
+            return DateTime.now();
+          }
+        } else {
+          return DateTime(year, month, day, hour, minute, second);
+        }
       }
     }
     
@@ -289,18 +356,22 @@ class TestConnectionResponse {
   final bool success;
   final String message;
   final bool connected;
+  final String? errorMessage;
 
   TestConnectionResponse({
     required this.success,
     required this.message,
     required this.connected,
+    this.errorMessage,
   });
 
   factory TestConnectionResponse.fromJson(Map<String, dynamic> json) {
+    final data = json['data'] as Map<String, dynamic>? ?? json;
     return TestConnectionResponse(
       success: json['success'] as bool? ?? true,
       message: json['message'] as String? ?? '',
-      connected: json['connected'] as bool? ?? false,
+      connected: data['connected'] as bool? ?? false,
+      errorMessage: data['error_message'] as String?,
     );
   }
 }
