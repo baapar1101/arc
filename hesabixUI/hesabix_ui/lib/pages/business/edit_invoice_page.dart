@@ -614,7 +614,7 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
 
 
   Widget _buildProductsTab() {
-    return Padding(
+    return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Center(
         child: ConstrainedBox(

@@ -277,12 +277,36 @@ if [ ! -f "$BUILD_DIR/manifest.json" ]; then
   fi
 fi
 
+# کپی فایل‌های build شده به مسیر deployment Apache
+DEPLOY_DIR="/var/www/arc.hesabix.ir"
+if [ -d "$BUILD_DIR" ] && [ -n "$(ls -A "$BUILD_DIR" 2>/dev/null)" ]; then
+  echo ""
+  echo "کپی فایل‌های build شده به مسیر deployment..."
+  if [ -d "$DEPLOY_DIR" ] || mkdir -p "$DEPLOY_DIR" 2>/dev/null; then
+    rsync -a --delete "$BUILD_DIR/" "$DEPLOY_DIR/" 2>/dev/null || {
+      warn "خطا در کپی فایل‌ها به $DEPLOY_DIR"
+      warn "لطفاً به صورت دستی فایل‌ها را کپی کنید:"
+      warn "  rsync -a --delete $BUILD_DIR/ $DEPLOY_DIR/"
+    }
+    chown -R www-data:www-data "$DEPLOY_DIR" 2>/dev/null || true
+    echo "✓ فایل‌ها به $DEPLOY_DIR کپی شدند"
+  else
+    warn "نمی‌توان پوشه $DEPLOY_DIR را ایجاد کرد. لطفاً دسترسی‌ها را بررسی کنید."
+  fi
+else
+  warn "مسیر build خالی است یا وجود ندارد: $BUILD_DIR"
+fi
+
 echo ""
 echo "=========================================="
 echo "✓ Build کامل شد!"
 echo "=========================================="
 echo "فایل‌های build شده در مسیر زیر قرار دارند:"
 echo "  $BUILD_DIR"
+if [ -d "$DEPLOY_DIR" ]; then
+  echo "  و در مسیر deployment:"
+  echo "  $DEPLOY_DIR"
+fi
 echo ""
 if [ "$MODE" = "release" ]; then
   echo "✓ بهینه‌سازی‌های اعمال شده:"
