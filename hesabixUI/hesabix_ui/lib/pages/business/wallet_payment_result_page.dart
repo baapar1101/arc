@@ -36,18 +36,69 @@ class _WalletPaymentResultPageState extends State<WalletPaymentResultPage> {
     try {
       final api = ApiClient();
       final ws = WalletService(api);
-      final items = await ws.listTransactions(businessId: businessId, limit: 50);
-      final found = items.firstWhere(
-        (e) => int.tryParse('${e['id']}') == txId,
-        orElse: () => <String, dynamic>{},
-      );
-      if (found.isNotEmpty) {
-        setState(() => _tx = found);
+      // تلاش برای پیدا کردن تراکنش با محدودیت بیشتر
+      List<Map<String, dynamic>> items = [];
+      int skip = 0;
+      const int limit = 100;
+      bool found = false;
+      
+      // جستجو در چندین صفحه
+      for (int i = 0; i < 5 && !found; i++) {
+        final batch = await ws.listTransactions(
+          businessId: businessId,
+          limit: limit,
+          skip: skip,
+        );
+        if (batch.isEmpty) break;
+        
+        items.addAll(batch);
+        final tx = batch.firstWhere(
+          (e) => int.tryParse('${e['id']}') == txId,
+          orElse: () => <String, dynamic>{},
+        );
+        
+        if (tx.isNotEmpty) {
+          setState(() => _tx = tx);
+          found = true;
+          break;
+        }
+        
+        // اگر تراکنش پیدا نشد و تعداد کمتر از limit است، دیگر ادامه نده
+        if (batch.length < limit) break;
+        skip += limit;
+      }
+      
+      // اگر پیدا نشد، از API مستقیم درخواست کنیم (اگر endpoint وجود دارد)
+      if (!found && txId > 0) {
+        // تلاش برای دریافت مستقیم تراکنش از طریق API
+        try {
+          final allItems = await ws.listTransactions(
+            businessId: businessId,
+            limit: 1000, // افزایش محدودیت
+            skip: 0,
+          );
+          final tx = allItems.firstWhere(
+            (e) => int.tryParse('${e['id']}') == txId,
+            orElse: () => <String, dynamic>{},
+          );
+          if (tx.isNotEmpty) {
+            setState(() => _tx = tx);
+            found = true;
+          }
+        } catch (_) {
+          // اگر خطا رخ داد، ادامه می‌دهیم
+        }
+      }
+      
+      if (!found) {
+        setState(() => _error = 'تراکنش یافت نشد. ممکن است تراکنش در لیست اخیر نباشد.');
       }
     } catch (e) {
-      setState(() => _error = '$e');
+      setState(() => _error = 'خطا در بررسی وضعیت: $e');
     } finally {
-      setState(() => _loading = false);
+      if (mounted) {
+        setState(() => _loading = false);
+      }
     }
   }
 

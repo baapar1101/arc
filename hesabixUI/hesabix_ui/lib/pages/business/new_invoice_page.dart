@@ -2301,6 +2301,11 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
       extraInfo['warehouse_id'] = e.warehouseId;
     }
     
+    // اضافه کردن selected_instance_ids به extra_info برای کالاهای یونیک
+    if (e.selectedInstanceIds != null && e.selectedInstanceIds!.isNotEmpty) {
+      extraInfo['selected_instance_ids'] = e.selectedInstanceIds;
+    }
+    
     return <String, dynamic>{
       'product_id': e.productId,
       'quantity': e.quantity,
@@ -2397,6 +2402,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                 invoiceType: (_selectedInvoiceType?.value ?? 'sales'),
                 postInventory: _postInventory,
                 initialRows: _lineItems,
+                calendarController: widget.calendarController,
                 onChanged: (rows) {
                   setState(() {
                     _lineItems = rows;

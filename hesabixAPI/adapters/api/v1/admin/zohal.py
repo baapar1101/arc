@@ -1,7 +1,6 @@
 """
 API endpoints برای مدیریت سرویس‌های زحل (مدیر سیستم)
 """
-from __future__ import annotations
 
 from typing import Dict, Any, Optional
 from decimal import Decimal

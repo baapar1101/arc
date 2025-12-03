@@ -1087,6 +1087,12 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
       'fiscal_years': {
         'view': '${t.view} ${t.fiscalYears ?? 'سال‌های مالی'}',
       },
+      'warranty': {
+        'read': '${t.view ?? 'مشاهده'} ${t.warranty ?? 'گارانتی'}',
+        'write': '${t.add ?? 'افزودن'} ${t.warranty ?? 'گارانتی'}',
+        'delete': '${t.delete ?? 'حذف'} ${t.warranty ?? 'گارانتی'}',
+        'manage': '${t.manage ?? 'مدیریت'} ${t.warranty ?? 'گارانتی'}',
+      },
     };
   }
 
@@ -1365,6 +1371,11 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         'icon': Icons.settings,
         'sections': ['settings', 'storage', 'sms', 'marketplace', 'fiscal_years'],
       },
+      {
+        'title': 'گارانتی',
+        'icon': Icons.verified_user,
+        'sections': ['warranty'],
+      },
     ];
     
     for (int i = 0; i < sectionConfigs.length; i++) {
@@ -1500,6 +1511,7 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
       'marketplace': 'بازار افزونه‌ها',
       'reports': 'گزارش‌ها',
       'fiscal_years': 'سال‌های مالی',
+      'warranty': 'گارانتی',
     };
     
     return titles[sectionKey] ?? sectionKey;

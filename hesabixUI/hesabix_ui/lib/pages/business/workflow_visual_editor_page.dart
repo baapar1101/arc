@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/auth_store.dart';
 import '../../l10n/app_localizations.dart';
@@ -265,6 +266,12 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
                           });
                           _applyAutoLayout();
                         },
+                        onSaveAsTemplate: () {
+                          _saveAsTemplate();
+                        },
+                        onLoadTemplate: () {
+                          _loadTemplate();
+                        },
                       ),
                       Expanded(
                         child: WorkflowCanvas(
@@ -286,6 +293,12 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
                               context,
                               position,
                               node: node,
+                              onEditComment: () {
+                                Navigator.pop(context);
+                                Future.delayed(const Duration(milliseconds: 100), () {
+                                  if (mounted) _editNodeComment(node);
+                                });
+                              },
                               onEdit: () async {
                                 Navigator.pop(context); // بستن context menu
                                 await Future.delayed(const Duration(milliseconds: 100));
@@ -460,7 +473,7 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
       // Delete key
       if (event.logicalKey == LogicalKeyboardKey.delete ||
           event.logicalKey == LogicalKeyboardKey.backspace) {
-        _deleteSelectedNode();
+        _deleteSelectedNodes();
         return;
       }
 
@@ -487,6 +500,59 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
       // Ctrl+S (Save)
       if (isCtrlPressed && event.logicalKey == LogicalKeyboardKey.keyS) {
         _saveWorkflow();
+        return;
+      }
+
+      // Ctrl+C (Copy)
+      if (isCtrlPressed && event.logicalKey == LogicalKeyboardKey.keyC) {
+        _editorState.copySelectedNodes();
+        if (_editorState.selectedNodeIds.isNotEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('${_editorState.selectedNodeIds.length} نود کپی شد'),
+              duration: const Duration(seconds: 1),
+            ),
+          );
+        }
+        return;
+      }
+
+      // Ctrl+X (Cut)
+      if (isCtrlPressed && event.logicalKey == LogicalKeyboardKey.keyX) {
+        _editorState.cutSelectedNodes();
+        if (_editorState.hasClipboardContent) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('${_editorState.selectedNodeIds.length} نود برش خورد'),
+              duration: const Duration(seconds: 1),
+            ),
+          );
+        }
+        return;
+      }
+
+      // Ctrl+V (Paste)
+      if (isCtrlPressed && event.logicalKey == LogicalKeyboardKey.keyV) {
+        if (_editorState.hasClipboardContent) {
+          _editorState.pasteNodes();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('نودها چسبانده شدند'),
+              duration: Duration(seconds: 1),
+            ),
+          );
+        }
+        return;
+      }
+
+      // Ctrl+D (Duplicate)
+      if (isCtrlPressed && event.logicalKey == LogicalKeyboardKey.keyD) {
+        if (_editorState.selectedNodeId != null) {
+          final node = _editorState.getNodeById(_editorState.selectedNodeId!);
+          if (node != null) {
+            _duplicateNode(node);
+          }
+        }
         return;
       }
 
@@ -527,23 +593,58 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
         }
       }
 
-      // Ctrl+A - انتخاب همه (فعلاً فقط اولین node را انتخاب می‌کند)
+      // Ctrl+A - انتخاب همه نودها
       if (isCtrlPressed && event.logicalKey == LogicalKeyboardKey.keyA) {
         if (_editorState.nodes.isNotEmpty) {
-          _editorState.selectNode(_editorState.nodes.first.id);
+          _editorState.selectMultipleNodes(
+            _editorState.nodes.map((n) => n.id).toList()
+          );
+        }
+        return;
+      }
+
+      // Escape - لغو انتخاب چندگانه
+      if (event.logicalKey == LogicalKeyboardKey.escape) {
+        if (_editorState.selectedNodeIds.isNotEmpty) {
+          _editorState.selectNode(null);
         }
         return;
       }
     }
   }
 
-  void _deleteSelectedNode() {
-    final selectedId = _editorState.selectedNodeId;
-    if (selectedId != null) {
+  void _deleteSelectedNodes() {
+    final t = AppLocalizations.of(context);
+    
+    if (_editorState.selectedNodeIds.isEmpty) {
+      return;
+    }
+    
+    if (_editorState.selectedNodeIds.length == 1) {
+      // حذف تک نود
+      final selectedId = _editorState.selectedNodeIds.first;
       final node = _editorState.getNodeById(selectedId);
       if (node != null) {
         _deleteNode(node);
       }
+    } else {
+      // حذف چند نود
+      final count = _editorState.selectedNodeIds.length;
+      _editorState.deleteSelectedNodes();
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('$count ${t.workflowNodeDeleted}'),
+          action: SnackBarAction(
+            label: t.workflowUndo,
+            onPressed: () {
+              if (_editorState.canUndo) {
+                _editorState.undo();
+              }
+            },
+          ),
+        ),
+      );
     }
   }
 
@@ -567,14 +668,20 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
 
   void _duplicateNode(WorkflowNodeModel node) {
     final t = AppLocalizations.of(context);
+    
+    // پیدا کردن موقعیت خالی نزدیک به node اصلی
+    final targetPosition = Offset(node.position.dx + 50, node.position.dy + 50);
+    final newPosition = _editorState.findNearestEmptyPosition(targetPosition);
+    
     final newNode = WorkflowNodeModel(
       id: _uuid.v4(),
       type: node.type,
       label: '${node.label} (${t.workflowCopy})',
-      position: Offset(node.position.dx + 50, node.position.dy + 50),
+      position: newPosition,
       config: Map<String, dynamic>.from(node.config),
       key: node.key,
       icon: node.icon,
+      comment: node.comment,
     );
     // اضافه کردن node با موقعیت
     _editorState.addNodeWithPosition(newNode);
@@ -583,6 +690,219 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
         content: Text(t.workflowNodeDuplicated),
       ),
     );
+  }
+
+  void _editNodeComment(WorkflowNodeModel node) {
+    final commentController = TextEditingController(text: node.comment ?? '');
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('یادداشت/توضیح'),
+        content: TextField(
+          controller: commentController,
+          maxLines: 5,
+          decoration: const InputDecoration(
+            hintText: 'یادداشت یا توضیح برای این نود...',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('لغو'),
+          ),
+          if (node.comment != null && node.comment!.isNotEmpty)
+            TextButton(
+              onPressed: () {
+                final index = _editorState.nodes.indexWhere((n) => n.id == node.id);
+                if (index != -1) {
+                  _editorState.updateNodeConfig(node.id, {...node.config});
+                  // حذف comment با copyWith
+                  final updatedNode = _editorState.nodes[index].copyWith(comment: '');
+                  _editorState.nodes.removeAt(index);
+                  _editorState.addNodeWithPosition(updatedNode);
+                }
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('یادداشت حذف شد')),
+                );
+              },
+              child: const Text('حذف', style: TextStyle(color: Colors.red)),
+            ),
+          FilledButton(
+            onPressed: () {
+              final newComment = commentController.text.trim();
+              final index = _editorState.nodes.indexWhere((n) => n.id == node.id);
+              if (index != -1) {
+                final updatedNode = _editorState.nodes[index].copyWith(
+                  comment: newComment.isEmpty ? null : newComment,
+                );
+                _editorState.nodes.removeAt(index);
+                _editorState.addNodeWithPosition(updatedNode);
+              }
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(newComment.isEmpty 
+                      ? 'یادداشت پاک شد' 
+                      : 'یادداشت ذخیره شد'),
+                ),
+              );
+            },
+            child: const Text('ذخیره'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _saveAsTemplate() async {
+    final nameController = TextEditingController();
+    
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('ذخیره به عنوان قالب'),
+        content: TextField(
+          controller: nameController,
+          decoration: const InputDecoration(
+            labelText: 'نام قالب',
+            hintText: 'مثال: فرآیند فاکتور',
+            border: OutlineInputBorder(),
+          ),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('لغو'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('ذخیره'),
+          ),
+        ],
+      ),
+    );
+    
+    if (confirmed != true || nameController.text.trim().isEmpty) return;
+    
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final templateName = nameController.text.trim();
+      final workflowData = _editorState.toBackendFormat();
+      final templateData = {
+        'name': templateName,
+        'workflow': workflowData,
+        'created_at': DateTime.now().toIso8601String(),
+      };
+      
+      // ذخیره در shared preferences
+      final templatesKey = 'workflow_templates_${widget.businessId}';
+      final templatesJson = prefs.getString(templatesKey) ?? '[]';
+      final templates = List<Map<String, dynamic>>.from(
+        jsonDecode(templatesJson).map((t) => Map<String, dynamic>.from(t))
+      );
+      templates.add(templateData);
+      
+      await prefs.setString(templatesKey, jsonEncode(templates));
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('قالب "$templateName" ذخیره شد')),
+        );
+      }
+    } catch (e) {
+      debugPrint('خطا در ذخیره template: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('خطا در ذخیره قالب')),
+        );
+      }
+    }
+  }
+
+  Future<void> _loadTemplate() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final templatesKey = 'workflow_templates_${widget.businessId}';
+      final templatesJson = prefs.getString(templatesKey) ?? '[]';
+      final templates = List<Map<String, dynamic>>.from(
+        jsonDecode(templatesJson).map((t) => Map<String, dynamic>.from(t))
+      );
+      
+      if (templates.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('هیچ قالبی یافت نشد')),
+          );
+        }
+        return;
+      }
+      
+      // نمایش لیست قالب‌ها
+      final selectedTemplate = await showDialog<Map<String, dynamic>>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('انتخاب قالب'),
+          content: SizedBox(
+            width: 400,
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: templates.length,
+              itemBuilder: (context, index) {
+                final template = templates[index];
+                return ListTile(
+                  leading: const Icon(Icons.insert_drive_file),
+                  title: Text(template['name'] ?? 'قالب ${index + 1}'),
+                  subtitle: Text(template['created_at'] != null
+                      ? 'ایجاد شده: ${template['created_at']}'
+                      : ''),
+                  trailing: IconButton(
+                    icon: const Icon(Icons.delete, color: Colors.red),
+                    onPressed: () async {
+                      templates.removeAt(index);
+                      await prefs.setString(templatesKey, jsonEncode(templates));
+                      Navigator.pop(context);
+                      _loadTemplate(); // بارگذاری مجدد
+                    },
+                  ),
+                  onTap: () => Navigator.pop(context, template),
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('لغو'),
+            ),
+          ],
+        ),
+      );
+      
+      if (selectedTemplate != null) {
+        final workflowData = selectedTemplate['workflow'] as Map<String, dynamic>?;
+        if (workflowData != null) {
+          _editorState.loadWorkflow(workflowData);
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('قالب "${selectedTemplate['name']}" بارگذاری شد'),
+              ),
+            );
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('خطا در بارگذاری template: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('خطا در بارگذاری قالب')),
+        );
+      }
+    }
   }
 
 }

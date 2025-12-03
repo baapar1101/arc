@@ -14,6 +14,8 @@ class ProductAttributeItem {
   final int businessId;
   final String title;
   final String? description;
+  final String dataType;
+  final List<String>? options;
   final DateTime createdAt;
   final DateTime updatedAt;
   // Display strings coming from backend when calendar = jalali/gregorian
@@ -25,6 +27,8 @@ class ProductAttributeItem {
     required this.businessId,
     required this.title,
     this.description,
+    this.dataType = 'text',
+    this.options,
     required this.createdAt,
     required this.updatedAt,
     this.createdAtDisplay,
@@ -38,11 +42,21 @@ class ProductAttributeItem {
     final String? createdDisplay = _extractDisplay(createdRaw);
     final String? updatedDisplay = _extractDisplay(updatedRaw);
 
+    // تبدیل options از List یا null
+    List<String>? optionsList;
+    if (json['options'] != null) {
+      if (json['options'] is List) {
+        optionsList = List<String>.from(json['options'] as List);
+      }
+    }
+
     return ProductAttributeItem(
       id: json['id'] as int,
       businessId: json['business_id'] as int,
       title: json['title'] as String,
       description: json['description'] as String?,
+      dataType: json['data_type'] as String? ?? 'text',
+      options: optionsList,
       createdAt: _parseDate(createdRaw),
       updatedAt: _parseDate(updatedRaw),
       createdAtDisplay: createdDisplay,
@@ -159,6 +173,8 @@ class _ProductAttributesPageState extends State<ProductAttributesPage> {
       columns: [
         TextColumn('title', t.title, width: ColumnWidth.large, formatter: (e) => e.title),
         TextColumn('description', t.description, width: ColumnWidth.extraLarge, formatter: (e) => e.description ?? '-'),
+        TextColumn('data_type', 'نوع', width: ColumnWidth.medium, formatter: (e) => _formatDataType(e.dataType)),
+        TextColumn('options', 'مقادیر نوع', width: ColumnWidth.large, formatter: (e) => _formatOptions(e.options)),
         DateColumn('created_at', t.createdAt, formatter: (e) => _formatDateFromItem(e, context, isUpdated: false)),
         DateColumn('updated_at', t.updatedAt, formatter: (e) => _formatDateFromItem(e, context, isUpdated: true)),
         ActionColumn('actions', t.actions, actions: [
@@ -201,41 +217,206 @@ class _ProductAttributesPageState extends State<ProductAttributesPage> {
     return _formatDate(isUpdated ? e.updatedAt : e.createdAt, context);
   }
 
+  static String _formatDataType(String dataType) {
+    switch (dataType) {
+      case 'text':
+        return 'متن';
+      case 'number':
+        return 'عدد';
+      case 'date':
+        return 'تاریخ';
+      case 'select':
+        return 'انتخابی';
+      case 'boolean':
+        return 'بله/خیر';
+      default:
+        return dataType;
+    }
+  }
+
+  static String _formatOptions(List<String>? options) {
+    if (options == null || options.isEmpty) {
+      return '-';
+    }
+    return options.join('، ');
+  }
+
   void _openForm({ProductAttributeItem? editing}) async {
     final t = AppLocalizations.of(context);
     final titleCtrl = TextEditingController(text: editing?.title ?? '');
     final descCtrl = TextEditingController(text: editing?.description ?? '');
     
+    // دریافت data_type و options از editing
+    String? currentDataType = editing?.dataType ?? 'text';
+    List<String> currentOptions = [];
+    if (editing != null && editing.options != null) {
+      if (editing.options is List) {
+        currentOptions = List<String>.from(editing.options as List);
+      }
+    }
+    
+    String? selectedDataType = currentDataType;
+    final List<TextEditingController> optionControllers = currentOptions
+        .map((opt) => TextEditingController(text: opt))
+        .toList();
+    if (optionControllers.isEmpty && selectedDataType == 'select') {
+      optionControllers.add(TextEditingController());
+    }
 
     final result = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text(editing == null ? t.add : t.edit),
-        content: SizedBox(
-          width: 480,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(controller: titleCtrl, decoration: InputDecoration(labelText: t.title)),
-              const SizedBox(height: 8),
-              TextField(controller: descCtrl, maxLines: 3, decoration: InputDecoration(labelText: t.description)),
-              const SizedBox(height: 8),
-              const SizedBox.shrink(),
-            ],
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: Text(editing == null ? t.add : t.edit),
+          content: SizedBox(
+            width: 520,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  TextField(controller: titleCtrl, decoration: InputDecoration(labelText: t.title)),
+                  const SizedBox(height: 12),
+                  TextField(controller: descCtrl, maxLines: 3, decoration: InputDecoration(labelText: t.description)),
+                  const SizedBox(height: 12),
+                  // نوع داده
+                  DropdownButtonFormField<String>(
+                    value: selectedDataType,
+                    decoration: const InputDecoration(labelText: 'نوع داده'),
+                    items: const [
+                      DropdownMenuItem(value: 'text', child: Text('متن')),
+                      DropdownMenuItem(value: 'number', child: Text('عدد')),
+                      DropdownMenuItem(value: 'date', child: Text('تاریخ')),
+                      DropdownMenuItem(value: 'select', child: Text('انتخابی')),
+                      DropdownMenuItem(value: 'boolean', child: Text('بله/خیر')),
+                    ],
+                    onChanged: (value) {
+                      setState(() {
+                        selectedDataType = value;
+                        if (value == 'select' && optionControllers.isEmpty) {
+                          optionControllers.add(TextEditingController());
+                        } else if (value != 'select') {
+                          optionControllers.clear();
+                        }
+                      });
+                    },
+                  ),
+                  // گزینه‌های select
+                  if (selectedDataType == 'select') ...[
+                    const SizedBox(height: 12),
+                    const Text('گزینه‌ها:', style: TextStyle(fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 8),
+                    ...optionControllers.asMap().entries.map((entry) {
+                      final index = entry.key;
+                      final controller = entry.value;
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: controller,
+                                decoration: InputDecoration(
+                                  labelText: 'گزینه ${index + 1}',
+                                  border: const OutlineInputBorder(),
+                                ),
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete, color: Colors.red),
+                              onPressed: optionControllers.length > 1
+                                  ? () {
+                                      setState(() {
+                                        controller.dispose();
+                                        optionControllers.removeAt(index);
+                                      });
+                                    }
+                                  : null,
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
+                    TextButton.icon(
+                      icon: const Icon(Icons.add),
+                      label: const Text('افزودن گزینه'),
+                      onPressed: () {
+                        setState(() {
+                          optionControllers.add(TextEditingController());
+                        });
+                      },
+                    ),
+                  ],
+                ],
+              ),
+            ),
           ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context, false), child: Text(t.cancel)),
+            FilledButton(
+              onPressed: () {
+                // اعتبارسنجی
+                if (titleCtrl.text.trim().isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('لطفاً عنوان را وارد کنید')),
+                  );
+                  return;
+                }
+                if (selectedDataType == 'select') {
+                  final validOptions = optionControllers
+                      .map((c) => c.text.trim())
+                      .where((text) => text.isNotEmpty)
+                      .toList();
+                  if (validOptions.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('برای نوع انتخابی باید حداقل یک گزینه وارد کنید')),
+                    );
+                    return;
+                  }
+                }
+                Navigator.pop(context, true);
+              },
+              child: Text(t.save),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: Text(t.cancel)),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: Text(t.save)),
-        ],
       ),
     );
+    
+    // پاکسازی controllers
+    for (final controller in optionControllers) {
+      controller.dispose();
+    }
+    
     if (result == true && mounted) {
       try {
+        final title = titleCtrl.text.trim();
+        final description = descCtrl.text.trim().isEmpty ? null : descCtrl.text.trim();
+        final dataType = selectedDataType ?? 'text';
+        final List<String>? options = dataType == 'select'
+            ? optionControllers
+                .map((c) => c.text.trim())
+                .where((text) => text.isNotEmpty)
+                .toList()
+            : null;
+
         if (editing == null) {
-          await _service.create(businessId: widget.businessId, title: titleCtrl.text.trim(), description: descCtrl.text.trim().isEmpty ? null : descCtrl.text.trim());
+          await _service.create(
+            businessId: widget.businessId,
+            title: title,
+            description: description,
+            dataType: dataType,
+            options: options,
+          );
         } else {
-          await _service.update(businessId: widget.businessId, id: editing.id, title: titleCtrl.text.trim(), description: descCtrl.text.trim());
+          await _service.update(
+            businessId: widget.businessId,
+            id: editing.id,
+            title: title,
+            description: description,
+            dataType: dataType,
+            options: options,
+          );
         }
         if (mounted) {
           _refreshTable();
@@ -264,6 +445,9 @@ class _ProductAttributesPageState extends State<ProductAttributesPage> {
         SnackBarHelper.showError(context, message: 'خطا در ذخیره ویژگی: $e');
       }
     }
+    
+    titleCtrl.dispose();
+    descCtrl.dispose();
   }
 
   void _confirmDelete(ProductAttributeItem item) {

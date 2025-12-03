@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/api_client.dart';
 import '../../core/calendar_controller.dart';
 import '../../core/date_utils.dart';
 import '../../l10n/app_localizations.dart';
 import '../../services/document_monetization_service.dart';
+import '../../services/wallet_service.dart';
 import '../../services/errors/api_error.dart';
 import '../../utils/number_formatters.dart';
 import '../../widgets/data_table/data_table_widget.dart';
@@ -21,6 +23,7 @@ class DocumentMonetizationBusinessPage extends StatefulWidget {
 
 class _DocumentMonetizationBusinessPageState extends State<DocumentMonetizationBusinessPage> {
   late final DocumentMonetizationService _service;
+  late final WalletService _walletService;
   CalendarController? _calendarController;
   bool _loading = true;
   String? _error;
@@ -29,12 +32,16 @@ class _DocumentMonetizationBusinessPageState extends State<DocumentMonetizationB
   List<Map<String, dynamic>> _policies = const <Map<String, dynamic>>[];
   List<Map<String, dynamic>> _plans = const <Map<String, dynamic>>[];
   Map<String, dynamic>? _currentSubscription;
+  Map<String, dynamic>? _walletOverview;
   int? _activatingPlanId;
+  bool _finalizingVolume = false;
 
   @override
   void initState() {
     super.initState();
-    _service = DocumentMonetizationService(ApiClient());
+    final api = ApiClient();
+    _service = DocumentMonetizationService(api);
+    _walletService = WalletService(api);
     _initCalendarController();
     _load();
   }
@@ -54,9 +61,11 @@ class _DocumentMonetizationBusinessPageState extends State<DocumentMonetizationB
     try {
       final overviewFuture = _service.getBusinessOverview(widget.businessId);
       final plansFuture = _service.listBusinessPlans(widget.businessId);
+      final walletFuture = _walletService.getOverview(businessId: widget.businessId);
 
       final overview = await overviewFuture;
       final plansResponse = await plansFuture;
+      final walletOverview = await walletFuture;
 
       setState(() {
         _policies = (overview['policies'] as List<dynamic>? ?? const [])
@@ -70,6 +79,7 @@ class _DocumentMonetizationBusinessPageState extends State<DocumentMonetizationB
         }
         final current = plansResponse['current_subscription'];
         _currentSubscription = current is Map ? Map<String, dynamic>.from(current) : null;
+        _walletOverview = walletOverview;
         _loading = false;
       });
     } catch (e) {
@@ -86,28 +96,124 @@ class _DocumentMonetizationBusinessPageState extends State<DocumentMonetizationB
       await _service.payBusinessCharge(widget.businessId, chargeId);
       if (!mounted) return;
       SnackBarHelper.show(context, message: t.paymentSuccess);
-      // فقط جدول charges را refresh کنیم، نه کل صفحه
-      final state = _chargesTableKey.currentState;
-      if (state != null) {
-        try {
-          // ignore: avoid_dynamic_calls
-          (state as dynamic).refresh();
-        } catch (_) {}
-      }
+      // Refresh wallet و جدول charges
+      await _refreshAfterPayment();
     } catch (e) {
-      _showErrorFromException(e, fallback: t.paymentError);
+      if (!mounted) return;
+      // بررسی خطای INSUFFICIENT_FUNDS
+      String errorMessage = '';
+      bool isInsufficientFunds = false;
+      if (e is ApiErrorDetails) {
+        errorMessage = e.message ?? t.paymentError;
+        if (e.code == 'INSUFFICIENT_FUNDS' || errorMessage.contains('موجودی کافی') || errorMessage.contains('insufficient')) {
+          isInsufficientFunds = true;
+        }
+      } else {
+        final errorStr = e.toString();
+        if (errorStr.contains('INSUFFICIENT_FUNDS') || errorStr.contains('موجودی کافی') || errorStr.contains('insufficient')) {
+          isInsufficientFunds = true;
+          errorMessage = 'موجودی کیف‌پول کافی نیست';
+        } else {
+          errorMessage = errorStr.isNotEmpty && errorStr != 'Exception' ? errorStr : t.paymentError;
+        }
+      }
+      
+      if (isInsufficientFunds) {
+        final shouldCharge = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('موجودی کافی نیست'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(errorMessage),
+                const SizedBox(height: 16),
+                const Text('آیا می‌خواهید کیف‌پول را شارژ کنید؟'),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: Text(t.cancel),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: const Text('شارژ کیف‌پول'),
+              ),
+            ],
+          ),
+        );
+        if (shouldCharge == true && mounted) {
+          context.go('/business/${widget.businessId}/wallet');
+        }
+      } else {
+        SnackBarHelper.show(context, message: errorMessage);
+      }
     }
+  }
+
+  Future<void> _refreshAfterPayment() async {
+    // Refresh wallet
+    try {
+      final walletOverview = await _walletService.getOverview(businessId: widget.businessId);
+      if (mounted) {
+        setState(() {
+          _walletOverview = walletOverview;
+        });
+      }
+    } catch (_) {}
+    
+    // Refresh جدول charges
+    final state = _chargesTableKey.currentState;
+    if (state != null) {
+      try {
+        // ignore: avoid_dynamic_calls
+        (state as dynamic).refresh();
+      } catch (_) {}
+    }
+    
+    // Refresh subscription status
+    try {
+      final plansResponse = await _service.listBusinessPlans(widget.businessId);
+      if (mounted) {
+        setState(() {
+          final current = plansResponse['current_subscription'];
+          _currentSubscription = current is Map ? Map<String, dynamic>.from(current) : null;
+        });
+      }
+    } catch (_) {}
   }
 
   Future<void> _finalizeVolume() async {
     final t = AppLocalizations.of(context);
+    if (_finalizingVolume) return;
+    
+    setState(() {
+      _finalizingVolume = true;
+    });
+    
     try {
-      await _service.finalizeVolume(widget.businessId);
+      final result = await _service.finalizeVolume(widget.businessId);
       if (!mounted) return;
-      SnackBarHelper.show(context, message: t.volumeFinalized);
-      _load();
+      
+      final finalizedCount = result['finalized'] as int? ?? 0;
+      
+      String message = t.volumeFinalized;
+      if (finalizedCount > 0) {
+        message = 'نتیجه: $finalizedCount دوره نهایی شد';
+      }
+      
+      SnackBarHelper.show(context, message: message);
+      await _load();
     } catch (e) {
       _showErrorFromException(e, fallback: t.volumeFinalizeError);
+    } finally {
+      if (mounted) {
+        setState(() {
+          _finalizingVolume = false;
+        });
+      }
     }
   }
 
@@ -120,6 +226,13 @@ class _DocumentMonetizationBusinessPageState extends State<DocumentMonetizationB
       appBar: AppBar(
         title: Text(t.documentMonetizationTitle),
         actions: [
+          IconButton(
+            tooltip: t.viewWallet,
+            icon: const Icon(Icons.account_balance_wallet),
+            onPressed: () {
+              context.go('/business/${widget.businessId}/wallet');
+            },
+          ),
           IconButton(
             tooltip: t.refresh,
             icon: const Icon(Icons.refresh),
@@ -148,6 +261,8 @@ class _DocumentMonetizationBusinessPageState extends State<DocumentMonetizationB
                           ),
                         ),
                       ),
+                    _buildWalletBalanceCard(theme, t),
+                    const SizedBox(height: 16),
                     _buildSubscriptionCard(theme, t, isJalali),
                     const SizedBox(height: 16),
                     _buildPoliciesCard(theme, t),
@@ -158,9 +273,65 @@ class _DocumentMonetizationBusinessPageState extends State<DocumentMonetizationB
               ),
             ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: _finalizeVolume,
-        icon: const Icon(Icons.calculate),
+        onPressed: _finalizingVolume ? null : _finalizeVolume,
+        icon: _finalizingVolume
+            ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+            : const Icon(Icons.calculate),
         label: Text(t.finalizeVolume),
+      ),
+    );
+  }
+
+  Widget _buildWalletBalanceCard(ThemeData theme, AppLocalizations t) {
+    final balance = _walletOverview?['available_balance'] as num?;
+    final currencyCode = _walletOverview?['currency_code'] as String? ?? '';
+    final currencySymbol = _walletOverview?['currency_symbol'] as String? ?? currencyCode;
+    
+    if (balance == null) return const SizedBox.shrink();
+    
+    final balanceValue = balance.toDouble();
+    final isLow = balanceValue < 100000; // کمتر از 100K
+    
+    return Card(
+      color: isLow ? theme.colorScheme.errorContainer.withOpacity(0.3) : null,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            Icon(
+              Icons.account_balance_wallet,
+              color: isLow ? theme.colorScheme.error : theme.colorScheme.primary,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${t.wallet}: ${formatWithThousands(balanceValue)} $currencySymbol',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      color: isLow ? theme.colorScheme.error : null,
+                    ),
+                  ),
+                  if (isLow)
+                    Text(
+                      'موجودی کم است. لطفاً کیف‌پول را شارژ کنید.',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.error,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            TextButton.icon(
+              onPressed: () {
+                context.go('/business/${widget.businessId}/wallet');
+              },
+              icon: const Icon(Icons.arrow_forward),
+              label: Text(t.viewWallet),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -210,36 +381,107 @@ class _DocumentMonetizationBusinessPageState extends State<DocumentMonetizationB
     final status = _translateStatus(statusRaw, t);
     final autoRenew = current['auto_renew'] == true;
     final currencyCode = current['currency_code'] as String?;
+    final currencySymbol = current['currency_symbol'] as String? ?? currencyCode ?? '';
     final planPrice = current['plan_price'];
+
+    // محاسبه روزهای باقی‌مانده تا انقضا
+    int? daysUntilExpiry;
+    bool isExpiringSoon = false;
+    bool isExpired = false;
+    if (endsAt != null) {
+      final now = DateTime.now();
+      daysUntilExpiry = endsAt.difference(now).inDays;
+      isExpiringSoon = daysUntilExpiry <= 7 && daysUntilExpiry > 0;
+      isExpired = daysUntilExpiry < 0;
+    }
 
     return Container(
       decoration: BoxDecoration(
-        color: theme.colorScheme.primaryContainer,
+        color: isExpired 
+            ? theme.colorScheme.errorContainer.withOpacity(0.5)
+            : isExpiringSoon
+                ? theme.colorScheme.tertiaryContainer
+                : theme.colorScheme.primaryContainer,
         borderRadius: BorderRadius.circular(12),
+        border: isExpiringSoon || isExpired
+            ? Border.all(
+                color: isExpired ? theme.colorScheme.error : theme.colorScheme.tertiary,
+                width: 2,
+              )
+            : null,
       ),
       padding: const EdgeInsets.all(12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            planName,
-            style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.onPrimaryContainer),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  planName,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    color: isExpired 
+                        ? theme.colorScheme.onErrorContainer
+                        : theme.colorScheme.onPrimaryContainer,
+                  ),
+                ),
+              ),
+              if (isExpiringSoon || isExpired)
+                Chip(
+                  label: Text(isExpired ? 'منقضی شده' : 'به زودی منقضی می‌شود'),
+                  backgroundColor: isExpired 
+                      ? theme.colorScheme.error
+                      : theme.colorScheme.tertiary,
+                  labelStyle: TextStyle(
+                    color: isExpired
+                        ? theme.colorScheme.onError
+                        : theme.colorScheme.onTertiary,
+                    fontSize: 11,
+                  ),
+                ),
+            ],
           ),
           const SizedBox(height: 4),
           Text(
             '${t.status}: $status${autoRenew ? " | ${t.autoRenewActive}" : ""}',
-            style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onPrimaryContainer),
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: isExpired 
+                  ? theme.colorScheme.onErrorContainer
+                  : theme.colorScheme.onPrimaryContainer,
+            ),
           ),
           if (planPrice != null)
             Text(
-              '${t.periodAmount}: ${formatWithThousands(planPrice)} ${currencyCode ?? ""}',
-              style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onPrimaryContainer),
+              '${t.periodAmount}: ${formatWithThousands(planPrice)} $currencySymbol',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: isExpired 
+                    ? theme.colorScheme.onErrorContainer
+                    : theme.colorScheme.onPrimaryContainer,
+              ),
             ),
-          if (endsAt != null)
+          if (endsAt != null) ...[
             Text(
               '${t.expiryDate}: ${HesabixDateUtils.formatForDisplay(endsAt, isJalali)}',
-              style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onPrimaryContainer),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: isExpired 
+                    ? theme.colorScheme.onErrorContainer
+                    : theme.colorScheme.onPrimaryContainer,
+              ),
             ),
+            if (daysUntilExpiry != null && daysUntilExpiry > 0)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  '$daysUntilExpiry روز تا انقضا',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: isExpiringSoon 
+                        ? theme.colorScheme.onTertiaryContainer
+                        : theme.colorScheme.onPrimaryContainer,
+                    fontWeight: isExpiringSoon ? FontWeight.bold : FontWeight.normal,
+                  ),
+                ),
+              ),
+          ],
         ],
       ),
     );
@@ -455,15 +697,62 @@ class _DocumentMonetizationBusinessPageState extends State<DocumentMonetizationB
               Column(
                 children: _policies
                     .map(
-                      (policy) => ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        leading: Icon(
-                          policy['is_active'] == true ? Icons.verified : Icons.pause_circle,
-                          color: policy['is_active'] == true ? theme.colorScheme.primary : theme.colorScheme.outline,
-                        ),
-                        title: Text(policy['title'] as String? ?? '-'),
-                        subtitle: Text('${t.type}: ${_translatePolicyType(policy['policy_type'] as String? ?? '', t)} | ${t.priority}: ${policy['priority']}'),
-                      ),
+                      (policy) {
+                        final policyType = policy['policy_type'] as String? ?? '';
+                        final config = policy['config'] as Map<String, dynamic>? ?? {};
+                        final title = policy['title'] as String? ?? '-';
+                        final priority = policy['priority'] as int? ?? 0;
+                        
+                        String configText = '';
+                        if (policyType == 'per_document') {
+                          final fee = config['fee_amount'] as num? ?? 0;
+                          final autoCharge = config['auto_charge_wallet'] == true;
+                          configText = 'هزینه هر سند: ${formatWithThousands(fee.toDouble())} | کسر خودکار: ${autoCharge ? "بله" : "خیر"}';
+                        } else if (policyType == 'volume') {
+                          final cycle = config['cycle'] as String? ?? '';
+                          final tierAmount = config['tier_amount'] as num? ?? 0;
+                          final pricePerTier = config['price_per_tier'] as num? ?? 0;
+                          final freeThreshold = config['free_threshold_amount'] as num? ?? 0;
+                          final cycleText = cycle == 'monthly' ? 'ماهانه' : cycle == 'weekly' ? 'هفتگی' : cycle == 'yearly' ? 'سالانه' : cycle;
+                          configText = 'دوره: $cycleText | هر ${formatWithThousands(tierAmount.toDouble())}: ${formatWithThousands(pricePerTier.toDouble())}';
+                          if (freeThreshold > 0) {
+                            configText += ' | رایگان تا: ${formatWithThousands(freeThreshold.toDouble())}';
+                          }
+                        } else if (policyType == 'subscription') {
+                          configText = 'پکیج نامحدود';
+                        } else if (policyType == 'free') {
+                          configText = 'رایگان';
+                        }
+                        
+                        return ExpansionTile(
+                          leading: Icon(
+                            policy['is_active'] == true ? Icons.verified : Icons.pause_circle,
+                            color: policy['is_active'] == true ? theme.colorScheme.primary : theme.colorScheme.outline,
+                          ),
+                          title: Text(title),
+                          subtitle: Text('${t.type}: ${_translatePolicyType(policyType, t)} | ${t.priority}: $priority'),
+                          children: [
+                            if (configText.isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.all(16),
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.info_outline, size: 16, color: theme.colorScheme.onSurfaceVariant),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        configText,
+                                        style: theme.textTheme.bodySmall?.copyWith(
+                                          color: theme.colorScheme.onSurfaceVariant,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                          ],
+                        );
+                      },
                     )
                     .toList(),
               ),
@@ -515,13 +804,34 @@ class _DocumentMonetizationBusinessPageState extends State<DocumentMonetizationB
                     TextColumn('status', t.status,
                       formatter: (it) {
                         final statusRaw = it['status'] as String? ?? '';
-                        return _translateStatus(statusRaw, t);
+                        final status = _translateStatus(statusRaw, t);
+                        // اضافه کردن علامت برای شناسایی آسان‌تر
+                        if (statusRaw == 'paid') {
+                          return '✓ $status';
+                        } else if (statusRaw == 'awaiting_payment') {
+                          return '⚠ $status';
+                        } else if (statusRaw == 'invoiced') {
+                          return '📄 $status';
+                        }
+                        return status;
                       },
                       filterType: ColumnFilterType.multiSelect,
                       filterOptions: [
-                        FilterOption(value: 'awaiting_payment', label: t.statusAwaitingPayment),
-                        FilterOption(value: 'paid', label: t.statusPaid),
-                        FilterOption(value: 'invoiced', label: t.statusInvoiced),
+                        FilterOption(
+                          value: 'awaiting_payment',
+                          label: t.statusAwaitingPayment,
+                          color: Colors.orange,
+                        ),
+                        FilterOption(
+                          value: 'paid',
+                          label: t.statusPaid,
+                          color: Colors.green,
+                        ),
+                        FilterOption(
+                          value: 'invoiced',
+                          label: t.statusInvoiced,
+                          color: Colors.blue,
+                        ),
                       ],
                     ),
                     NumberColumn('amount', t.amount,
@@ -545,6 +855,37 @@ class _DocumentMonetizationBusinessPageState extends State<DocumentMonetizationB
                         return HesabixDateUtils.formatForDisplay(paidAt, isJalali);
                       },
                     ),
+                    TextColumn('document_id', 'سند حسابداری',
+                      formatter: (it) {
+                        final docId = it['document_id'];
+                        if (docId == null) return '-';
+                        return '#$docId';
+                      },
+                      searchable: false,
+                    ),
+                    TextColumn('period_key', 'دوره/متعلق',
+                      formatter: (it) {
+                        final chargeType = it['charge_type'] as String? ?? '';
+                        final periodKey = it['period_key'] as String?;
+                        final metrics = it['metrics'] as Map<String, dynamic>? ?? {};
+                        
+                        if (chargeType == 'volume_cycle' && periodKey != null) {
+                          final periodText = periodKey.replaceAll('monthly-', '').replaceAll('weekly-', '').replaceAll('yearly-', '');
+                          final docsCount = metrics['documents_count'] as int?;
+                          if (docsCount != null) {
+                            return '$periodText ($docsCount سند)';
+                          }
+                          return periodText;
+                        } else if (chargeType == 'per_document') {
+                          final docCode = metrics['document_code'] as String?;
+                          if (docCode != null) {
+                            return docCode;
+                          }
+                        }
+                        return periodKey ?? '-';
+                      },
+                      searchable: false,
+                    ),
                     DateColumn('created_at', t.createdAt,
                       formatter: (it) {
                         final createdAtRaw = it['created_at'];
@@ -561,6 +902,17 @@ class _DocumentMonetizationBusinessPageState extends State<DocumentMonetizationB
                     ),
                     ActionColumn('actions', t.actions, actions: [
                       DataTableAction(
+                        icon: Icons.receipt_long,
+                        label: 'مشاهده سند حسابداری',
+                        onTap: (charge) {
+                          final docId = charge['document_id'] as int?;
+                          if (docId != null) {
+                            context.go('/business/${widget.businessId}/documents?document_id=$docId');
+                          }
+                        },
+                        enabled: (charge) => charge['document_id'] != null,
+                      ),
+                      DataTableAction(
                         icon: Icons.payment,
                         label: t.pay,
                         onTap: (charge) {
@@ -569,6 +921,7 @@ class _DocumentMonetizationBusinessPageState extends State<DocumentMonetizationB
                             _payCharge(charge['id'] as int);
                           }
                         },
+                        enabled: (charge) => charge['status'] == 'awaiting_payment',
                       ),
                     ]),
                   ],

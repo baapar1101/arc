@@ -174,7 +174,7 @@ class DataTableAction {
   final void Function(dynamic item) onTap;
   final bool isDestructive;
   final Color? color;
-  final bool enabled;
+  final dynamic enabled; // bool or bool Function(dynamic item)
 
   const DataTableAction({
     required this.icon,
@@ -184,6 +184,16 @@ class DataTableAction {
     this.color,
     this.enabled = true,
   });
+
+  /// Helper method to get enabled state for an item
+  bool isEnabled(dynamic item) {
+    if (enabled is bool) {
+      return enabled as bool;
+    } else if (enabled is bool Function(dynamic)) {
+      return (enabled as bool Function(dynamic))(item);
+    }
+    return true;
+  }
 }
 
 /// Data table configuration
@@ -292,6 +302,9 @@ class DataTableConfig<T> {
   // Auto-fill available width: if true, columns will expand to fill available width
   // when user hasn't customized column widths
   final bool autoFillAvailableWidth;
+  
+  // HTTP method for data fetching (default: POST)
+  final String httpMethod;
 
   const DataTableConfig({
     required this.endpoint,
@@ -374,6 +387,7 @@ class DataTableConfig<T> {
     this.autoFitColumnsOnFirstLoad = true,
     this.autoFitSampleRows = 50,
     this.autoFillAvailableWidth = true,
+    this.httpMethod = 'POST',
   });
 
   /// Get column width as double

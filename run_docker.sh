@@ -6,14 +6,14 @@ API_DIR="$PROJECT_ROOT/hesabixAPI"
 
 cd "$API_DIR"
 
-echo "Docker باید نصب باشد. این اسکریپت سرویس‌ها را بالا می‌آورد."
-echo "برای توقف: docker compose down"
+echo "Docker must be installed. This script brings up the services."
+echo "To stop: docker compose down"
 
 docker compose up -d
 
-echo "برای اجرای مایگریشن داخل کانتینر:"
+echo "To run migrations inside container:"
 echo "  docker exec -it hesabix-api alembic upgrade head"
-echo "برای مشاهده لاگ‌ها:"
+echo "To view logs:"
 echo "  docker compose logs -f"
 
 

@@ -80,6 +80,8 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
   int? _defaultCurrencyId;
   int? _defaultPriceListId;
   bool _autoPrint = false;
+  bool _enableWarehouseDocument = true;
+  String _warehouseDocumentType = 'posted'; // 'draft' or 'posted'
   bool _autoPostWarehouse = true;
   bool _showInventory = true;
   bool _showPurchasePrice = false;
@@ -194,6 +196,8 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
         _defaultPriceListId = settings['default_price_list_id'];
         _selectedCashRegisterId = settings['default_cash_register_id']?.toString();
         _autoPrint = settings['auto_print'] ?? false;
+        _enableWarehouseDocument = settings['enable_warehouse_document'] ?? true;
+        _warehouseDocumentType = settings['warehouse_document_type'] ?? 'posted';
         _autoPostWarehouse = settings['auto_post_warehouse'] ?? true;
         _showInventory = settings['show_inventory'] ?? true;
         _showPurchasePrice = settings['show_purchase_price'] ?? false;
@@ -315,36 +319,78 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
       final products = await _productService.searchProducts(
         businessId: widget.businessId,
         searchQuery: code.trim(),
-        limit: 1,
+        limit: 10, // افزایش limit برای بررسی چند نتیجه
         searchFields: const ['code', 'barcode', 'name'],
       );
       
-      if (products.isNotEmpty) {
-        final product = products.first;
-        await _addToCart(product);
-        await _saveRecentProduct(product);
-        _barcodeController.clear();
-        _barcodeFocus.requestFocus();
-        // پاک کردن جستجوی ناموفق قبلی
-        if (mounted) {
-          setState(() {
-            _lastFailedSearchQuery = null;
-          });
-        }
-        // فیدبک بصری
-        if (mounted) {
-          SnackBarHelper.show(
-            context,
-            message: '${product['name'] ?? 'محصول'} به سبد اضافه شد',
-          );
-        }
-      } else {
+      if (products.isEmpty) {
         if (mounted) {
           setState(() {
             _lastFailedSearchQuery = code.trim();
           });
           SnackBarHelper.show(context, message: 'محصولی یافت نشد', isError: true);
         }
+        return;
+      }
+      
+      // اگر چند نتیجه پیدا شد، دیالوگ انتخاب نمایش بده
+      if (products.length > 1) {
+        if (!mounted) return;
+        final selected = await showDialog<Map<String, dynamic>>(
+          context: context,
+          builder: (context) => _ProductSelectionDialog(
+            products: products,
+            searchCode: code.trim(),
+          ),
+        );
+        
+        if (selected != null) {
+          await _addToCart(selected);
+          await _saveRecentProduct(selected);
+          _barcodeController.clear();
+          _barcodeFocus.requestFocus();
+          // پاک کردن جستجوی ناموفق قبلی
+          if (mounted) {
+            setState(() {
+              _lastFailedSearchQuery = null;
+            });
+          }
+          // فیدبک بصری
+          if (mounted) {
+            SnackBarHelper.show(
+              context,
+              message: '${selected['name'] ?? 'محصول'} به سبد اضافه شد',
+            );
+          }
+        } else {
+          // اگر دیالوگ انتخاب بسته شد بدون انتخاب، جستجوی ناموفق را ثبت کن
+          if (mounted) {
+            setState(() {
+              _lastFailedSearchQuery = code.trim();
+            });
+          }
+        }
+        return;
+      }
+      
+      // اگر فقط یک نتیجه پیدا شد، مستقیماً اضافه کن
+      final product = products.first;
+      await _addToCart(product);
+      await _saveRecentProduct(product);
+      _barcodeController.clear();
+      _barcodeFocus.requestFocus();
+      // پاک کردن جستجوی ناموفق قبلی
+      if (mounted) {
+        setState(() {
+          _lastFailedSearchQuery = null;
+        });
+      }
+      // فیدبک بصری
+      if (mounted) {
+        SnackBarHelper.show(
+          context,
+          message: '${product['name'] ?? 'محصول'} به سبد اضافه شد',
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -875,12 +921,12 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
       // دریافت تنظیمات auto_create_payment_document
       final autoCreatePaymentDoc = _settings?['auto_create_payment_document'] ?? true;
       
-      // ساخت extra_info با person_id
+      // ساخت extra_info با person_id و تنظیمات حواله انبار
       final extraInfo = <String, dynamic>{
         'quick_sale': true,
         'person_id': personId, // همیشه person_id را اضافه می‌کنیم
-        'post_inventory': true,
-        'auto_post_warehouse': _autoPostWarehouse,
+        'post_inventory': _enableWarehouseDocument, // آیا حواله ایجاد شود؟
+        'auto_post_warehouse': _enableWarehouseDocument && _warehouseDocumentType == 'posted', // آیا حواله قطعی شود؟
         'auto_create_payment_document': autoCreatePaymentDoc,
       };
       
@@ -2320,6 +2366,149 @@ class _InstanceSelectionDialog extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+/// Dialog برای انتخاب محصول از بین چند نتیجه
+class _ProductSelectionDialog extends StatelessWidget {
+  final List<Map<String, dynamic>> products;
+  final String searchCode;
+
+  const _ProductSelectionDialog({
+    required this.products,
+    required this.searchCode,
+  });
+
+  String _formatNumber(num? value) {
+    if (value == null) return '-';
+    return value.toStringAsFixed(0).replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (Match m) => '${m[1]},',
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    
+    return Dialog(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 600, maxHeight: 500),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // هدر
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: cs.primaryContainer,
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(16),
+                  topRight: Radius.circular(16),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.search, color: cs.onPrimaryContainer),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'چند نتیجه پیدا شد',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: cs.onPrimaryContainer,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'برای "$searchCode"',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: cs.onPrimaryContainer.withOpacity(0.8),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: Icon(Icons.close, color: cs.onPrimaryContainer),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ],
+              ),
+            ),
+            // لیست نتایج
+            Flexible(
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: products.length,
+                itemBuilder: (context, index) {
+                  final product = products[index];
+                  final productName = product['name']?.toString() ?? 'نامشخص';
+                  final productCode = product['code']?.toString();
+                  final barcode = product['barcode']?.toString();
+                  final salesPrice = product['base_sales_price'] ?? product['sales_price'];
+                  
+                  return ListTile(
+                    leading: const Icon(Icons.shopping_bag),
+                    title: Text(productName),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (productCode != null && productCode.isNotEmpty)
+                          Text('کد: $productCode'),
+                        if (barcode != null && barcode.isNotEmpty)
+                          Text('بارکد: $barcode'),
+                        if (salesPrice != null)
+                          Text(
+                            'قیمت: ${_formatNumber(_toNum(salesPrice))} ریال',
+                            style: TextStyle(
+                              color: cs.primary,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                      ],
+                    ),
+                    trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                    onTap: () {
+                      Navigator.of(context).pop(product);
+                    },
+                  );
+                },
+              ),
+            ),
+            // دکمه انصراف
+            Container(
+              padding: const EdgeInsets.all(16),
+              child: SizedBox(
+                width: double.infinity,
+                child: OutlinedButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('انصراف'),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// تبدیل مقدار به num (پشتیبانی از String و num)
+  num _toNum(dynamic value, {num defaultValue = 0.0}) {
+    if (value == null) return defaultValue;
+    if (value is num) return value;
+    if (value is String) {
+      return num.tryParse(value) ?? defaultValue;
+    }
+    return num.tryParse(value.toString()) ?? defaultValue;
   }
 }
 

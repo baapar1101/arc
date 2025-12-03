@@ -14,10 +14,13 @@ import 'package:hesabix_ui/models/person_share_link.dart';
 import 'package:hesabix_ui/services/business_dashboard_service.dart';
 import 'package:hesabix_ui/services/business_storage_service.dart';
 import 'package:hesabix_ui/services/person_service.dart';
+import 'package:hesabix_ui/services/warranty_service.dart';
+import 'package:hesabix_ui/models/warranty_models.dart';
 import 'package:hesabix_ui/widgets/attached_files/attached_files_widget.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_widget.dart';
 import 'package:hesabix_ui/widgets/document/document_details_dialog.dart';
+import 'package:hesabix_ui/widgets/warranty/warranty_code_details_dialog.dart';
 import 'package:hesabix_ui/core/date_utils.dart';
 import 'package:intl/intl.dart';
 import '../../utils/snackbar_helper.dart';
@@ -42,6 +45,7 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
   late TabController _tabController;
   late final PersonService _personService;
   late final BusinessStorageService _storageService;
+  late final WarrantyService _warrantyService;
   final AttachedFilesWidgetKey _attachedFilesKey = AttachedFilesWidgetKey();
   final GlobalKey _kardexTableKey = GlobalKey();
   Person? _person;
@@ -76,7 +80,8 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
     _person = widget.person;
     _personService = PersonService();
     _storageService = BusinessStorageService(ApiClient());
-    _tabController = TabController(length: 4, vsync: this);
+    _warrantyService = WarrantyService();
+    _tabController = TabController(length: 5, vsync: this);
     _loadPersonDetails();
     _ensureCalendarController();
     _initFinancialContext();
@@ -421,11 +426,12 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
               child: TabBar(
                 controller: _tabController,
                 isScrollable: true,
-                tabs: const [
-                  Tab(icon: Icon(Icons.info_outline), text: 'اطلاعات شخص'),
-                  Tab(icon: Icon(Icons.assignment), text: 'کارت حساب'),
-                  Tab(icon: Icon(Icons.attach_file), text: 'فایل‌ها'),
-                  Tab(icon: Icon(Icons.share), text: 'اشتراک‌گذاری'),
+                tabs: [
+                  const Tab(icon: Icon(Icons.info_outline), text: 'اطلاعات شخص'),
+                  const Tab(icon: Icon(Icons.assignment), text: 'کارت حساب'),
+                  Tab(icon: Icon(Icons.verified_user), text: t.warranty ?? 'گارانتی'),
+                  const Tab(icon: Icon(Icons.attach_file), text: 'فایل‌ها'),
+                  const Tab(icon: Icon(Icons.share), text: 'اشتراک‌گذاری'),
                 ],
               ),
             ),
@@ -435,6 +441,7 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
                 children: [
                   _buildInfoTab(theme),
                   _buildAccountCardTab(t, theme),
+                  _buildWarrantyTab(t, theme),
                   _buildAttachmentsTab(theme),
                   _buildShareTab(theme),
                 ],
@@ -756,6 +763,159 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
       searchFields: const ['document_code', 'document_type', 'description'],
       defaultPageSize: 10,
     );
+  }
+
+  Widget _buildWarrantyTab(AppLocalizations t, ThemeData theme) {
+    return FutureBuilder<List<WarrantyCode>>(
+      future: _loadPersonWarranties(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError) {
+          return Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.error_outline, size: 56, color: theme.colorScheme.error),
+                const SizedBox(height: 12),
+                Text(
+                  'خطا در بارگذاری گارانتی‌ها: ${snapshot.error}',
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.error),
+                ),
+              ],
+            ),
+          );
+        }
+        final warranties = snapshot.data ?? [];
+        if (warranties.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.verified_user_outlined, size: 64, color: theme.colorScheme.onSurfaceVariant),
+                const SizedBox(height: 16),
+                Text(
+                  'گارانتی‌ای برای این شخص ثبت نشده است',
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                t.warrantyCodes ?? 'کدهای گارانتی',
+                style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 16),
+              ...warranties.map((warranty) => _buildWarrantyCard(theme, warranty, t)),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<List<WarrantyCode>> _loadPersonWarranties() async {
+    if (widget.person.id == null) {
+      return [];
+    }
+    try {
+      final response = await _warrantyService.listCodesByPerson(
+        widget.businessId,
+        widget.person.id!,
+        limit: 100,
+        skip: 0,
+      );
+      return response.items;
+    } catch (e) {
+      return [];
+    }
+  }
+
+  Widget _buildWarrantyCard(ThemeData theme, WarrantyCode warranty, AppLocalizations t) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: ListTile(
+        leading: Icon(
+          Icons.verified_user,
+          color: _getStatusColor(warranty.status, theme),
+        ),
+        title: Text(warranty.code),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('سریال: ${warranty.warrantySerial}'),
+            Text('وضعیت: ${_getStatusLabel(warranty.status, t)}'),
+            if (warranty.activatedAt != null)
+              Text('فعال شده: ${HesabixDateUtils.formatDateTime(warranty.activatedAt!, _calendarController?.isJalali ?? true)}'),
+          ],
+        ),
+        trailing: IconButton(
+          icon: const Icon(Icons.open_in_new),
+          onPressed: () {
+            final calendarController = _calendarController ?? ApiClient.getCalendarController();
+            if (calendarController == null) {
+              CalendarController.load().then((c) {
+                if (mounted) {
+                  showDialog(
+                    context: context,
+                    builder: (context) => WarrantyCodeDetailsDialog(
+                      warrantyCode: warranty,
+                      calendarController: c,
+                    ),
+                  );
+                }
+              });
+            } else {
+              showDialog(
+                context: context,
+                builder: (context) => WarrantyCodeDetailsDialog(
+                  warrantyCode: warranty,
+                  calendarController: calendarController,
+                ),
+              );
+            }
+          },
+        ),
+      ),
+    );
+  }
+
+  Color _getStatusColor(WarrantyStatus status, ThemeData theme) {
+    switch (status) {
+      case WarrantyStatus.activated:
+        return Colors.green;
+      case WarrantyStatus.expired:
+        return Colors.orange;
+      case WarrantyStatus.revoked:
+        return Colors.red;
+      default:
+        return theme.colorScheme.primary;
+    }
+  }
+
+  String _getStatusLabel(WarrantyStatus status, AppLocalizations t) {
+    switch (status) {
+      case WarrantyStatus.generated:
+        return t.warrantyGenerated;
+      case WarrantyStatus.activated:
+        return t.warrantyActivated;
+      case WarrantyStatus.expired:
+        return t.warrantyExpired;
+      case WarrantyStatus.used:
+        return t.warrantyUsed;
+      case WarrantyStatus.revoked:
+        return t.warrantyRevoked;
+    }
   }
 
   Widget _buildAttachmentsTab(ThemeData theme) {

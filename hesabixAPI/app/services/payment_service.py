@@ -44,6 +44,8 @@ def initiate_payment(db: Session, business_id: int, tx_id: int, amount: float, g
 		return _initiate_zarinpal(db, gw, cfg, business_id, tx_id, amount)
 	elif provider == "parsian":
 		return _initiate_parsian(db, gw, cfg, business_id, tx_id, amount)
+	elif provider == "bitpay":
+		return _initiate_bitpay(db, gw, cfg, business_id, tx_id, amount)
 	else:
 		raise ApiError("UNSUPPORTED_PROVIDER", f"درگاه '{gw.provider}' پشتیبانی نمی‌شود", http_status=400)
 
@@ -61,6 +63,8 @@ def verify_payment_callback(db: Session, provider: str, params: Dict[str, Any]) 
 		return _verify_zarinpal(db, params)
 	elif provider_l == "parsian":
 		return _verify_parsian(db, params)
+	elif provider_l == "bitpay":
+		return _verify_bitpay(db, params)
 	else:
 		raise ApiError("UNSUPPORTED_PROVIDER", f"درگاه '{provider}' پشتیبانی نمی‌شود", http_status=400)
 
@@ -200,8 +204,21 @@ def _verify_zarinpal(db: Session, params: Dict[str, Any]) -> Dict[str, Any]:
 				except Exception:
 					success = False
 	# Confirm or fail based on verify (or status fallback)
+	user_id = None
 	if tx_id > 0:
-		confirm_top_up(db, tx_id, success=(success or is_ok), external_ref=authority or None)
+		# استخراج user_id از extra_info تراکنش
+		if tx:
+			try:
+				extra = json.loads(tx.extra_info or "{}") if tx.extra_info else {}
+				user_id = extra.get("created_by_user_id")
+			except Exception:
+				pass
+		# به‌روزرسانی fee_amount در صورت دریافت از درگاه
+		if fee_amount is not None and tx:
+			from decimal import Decimal
+			tx.fee_amount = Decimal(str(fee_amount))
+			db.flush()
+		confirm_top_up(db, tx_id, success=(success or is_ok), external_ref=authority or None, user_id=user_id)
 	return {"transaction_id": tx_id, "success": (success or is_ok), "external_ref": authority, "fee_amount": fee_amount, "ref_id": ref_id}
 
 
@@ -277,9 +294,265 @@ def _verify_parsian(db: Session, params: Dict[str, Any]) -> Dict[str, Any]:
 	tx_id = int(params.get("tx_id") or 0)
 	success = status in ("ok", "success", "0", "100")
 	fee_amount = None
+	user_id = None
 	if tx_id > 0:
-		confirm_top_up(db, tx_id, success=success, external_ref=token or None)
+		# بارگذاری تراکنش برای استخراج user_id
+		from adapters.db.models.wallet import WalletTransaction
+		tx = db.query(WalletTransaction).filter(WalletTransaction.id == int(tx_id)).first()
+		if tx:
+			try:
+				extra = json.loads(tx.extra_info or "{}") if tx.extra_info else {}
+				user_id = extra.get("created_by_user_id")
+			except Exception:
+				pass
+		confirm_top_up(db, tx_id, success=success, external_ref=token or None, user_id=user_id)
 	return {"transaction_id": tx_id, "success": success, "external_ref": token, "fee_amount": fee_amount}
+
+
+# --------------------------
+# BITPAY
+# --------------------------
+def _initiate_bitpay(db: Session, gw: PaymentGateway, cfg: Dict[str, Any], business_id: int, tx_id: int, amount: float) -> InitiateResult:
+	"""
+	BitPay integration:
+	- expects cfg fields: api (52 characters), callback_url (redirect)
+	- amount must be at least 5000 Rials (500 Tomans)
+	- returns id_get which is used to build payment URL
+	"""
+	api_key = str(cfg.get("api") or "").strip()
+	callback_url = str(cfg.get("callback_url") or "").strip()
+	if not api_key or not callback_url:
+		raise ApiError("INVALID_CONFIG", "api و callback_url الزامی هستند", http_status=400)
+	if len(api_key) != 52:
+		raise ApiError("INVALID_CONFIG", "API key باید 52 کاراکتر باشد", http_status=400)
+	# حداقل مبلغ 5000 ریال
+	if amount < 5000:
+		raise ApiError("INVALID_AMOUNT", "حداقل مبلغ 5000 ریال (500 تومان) است", http_status=400)
+	# تعیین URL بر اساس sandbox
+	base_url = "https://bitpay.ir/payment-test" if gw.is_sandbox else "https://bitpay.ir/payment"
+	gateway_send_url = f"{base_url}/gateway-send"
+	# encode کردن callback_url و اضافه کردن tx_id و source
+	from urllib.parse import urlencode, urlparse, parse_qsl, urlunparse, quote
+	
+	# استخراج source از extra_info تراکنش
+	source = "app"  # پیش‌فرض
+	_tx_for_source = db.query(WalletTransaction).filter(WalletTransaction.id == int(tx_id)).first()
+	if _tx_for_source and _tx_for_source.extra_info:
+		try:
+			extra_source = json.loads(_tx_for_source.extra_info)
+			source = extra_source.get("source", "app")
+		except Exception:
+			pass
+	
+	try:
+		u = urlparse(callback_url)
+		q = dict(parse_qsl(u.query))
+		q["tx_id"] = str(tx_id)
+		q["source"] = source
+		cb_url = urlunparse((u.scheme, u.netloc, u.path, u.params, urlencode(q), u.fragment))
+		# encode کردن کل URL برای BitPay (مطابق مستندات)
+		cb_url = quote(cb_url, safe='')
+	except Exception:
+		cb_url_temp = f"{callback_url}{'&' if '?' in callback_url else '?'}tx_id={tx_id}&source={source}"
+		cb_url = quote(cb_url_temp, safe='')
+	# بارگذاری اطلاعات کاربر از تراکنش
+	_tx = db.query(WalletTransaction).filter(WalletTransaction.id == int(tx_id)).first()
+	user_name = None
+	user_email = None
+	user_description = "افزایش اعتبار کیف پول"
+	
+	if _tx and _tx.extra_info:
+		try:
+			extra = json.loads(_tx.extra_info)
+			user_name = extra.get("user_name") or extra.get("user_mobile")
+			user_email = extra.get("user_email")
+			if _tx.description:
+				user_description = _tx.description
+		except Exception:
+			pass
+	
+	# آماده‌سازی داده‌های ارسالی (form data)
+	data = {
+		"api": api_key,
+		"redirect": cb_url,
+		"amount": int(round(float(amount))),
+		"factorId": str(tx_id),  # شماره فاکتور
+	}
+	
+	# فیلدهای اختیاری - استفاده از اطلاعات واقعی کاربر
+	if user_name:
+		data["name"] = str(user_name)
+	if user_email:
+		data["email"] = str(user_email)
+	# توضیحات از تراکنش
+	data["description"] = str(user_description)
+	id_get: Optional[str] = None
+	try:
+		with httpx.Client(timeout=10.0) as client:
+			# ارسال به صورت form data (نه JSON)
+			resp = client.post(gateway_send_url, data=data)
+			# پاسخ یک عدد است (id_get) که باید به string تبدیل شود
+			response_text = resp.text.strip()
+			# بررسی اینکه پاسخ یک عدد معتبر است
+			try:
+				id_get_int = int(response_text)
+				if id_get_int > 0:
+					id_get = str(id_get_int)
+			except ValueError:
+				# اگر عدد نبود، ممکن است خطا باشد
+				id_get = None
+	except Exception as e:
+		# در محیط توسعه، می‌توان یک id_get تستی تولید کرد
+		id_get = None
+	if not id_get:
+		# بررسی خطاهای احتمالی بر اساس مستندات
+		error_msg = "امکان ایجاد تراکنش در بیت‌پی نیست"
+		raise ApiError("GATEWAY_INIT_FAILED", error_msg, http_status=502)
+	# ساخت لینک پرداخت
+	payment_url = f"{base_url}/gateway-{id_get}-get"
+	# ذخیره اطلاعات در تراکنش
+	_tx = db.query(WalletTransaction).filter(WalletTransaction.id == int(tx_id)).first()
+	if _tx:
+		extra = {}
+		try:
+			extra = json.loads(_tx.extra_info or "{}")
+		except Exception:
+			extra = {}
+		extra.update({
+			"gateway_id": gw.id,
+			"provider": "bitpay",
+			"id_get": id_get,
+			"payment_url": payment_url,
+		})
+		_tx.external_ref = id_get
+		_tx.extra_info = json.dumps(extra, ensure_ascii=False)
+		db.flush()
+	return InitiateResult(payment_url=payment_url, external_ref=id_get)
+
+
+def _verify_bitpay(db: Session, params: Dict[str, Any]) -> Dict[str, Any]:
+	"""
+	Verify BitPay payment:
+	- Params expected: trans_id (id_trans), id_get (get_id), tx_id (optional)
+	- Returns standardized dict with transaction_id, success, external_ref, fee_amount
+	"""
+	trans_id = str(params.get("trans_id") or params.get("id_trans") or "").strip()
+	id_get = str(params.get("id_get") or params.get("get_id") or "").strip()
+	tx_id = int(params.get("tx_id") or 0)
+	if not trans_id or not id_get:
+		# اگر پارامترهای لازم وجود نداشت، تراکنش ناموفق است
+		if tx_id > 0:
+			user_id = None
+			tx = db.query(WalletTransaction).filter(WalletTransaction.id == int(tx_id)).first()
+			if tx:
+				try:
+					extra = json.loads(tx.extra_info or "{}") if tx.extra_info else {}
+					user_id = extra.get("created_by_user_id")
+				except Exception:
+					pass
+			confirm_top_up(db, tx_id, success=False, external_ref=None, user_id=user_id)
+		return {"transaction_id": tx_id, "success": False, "external_ref": None, "fee_amount": None}
+	# بارگذاری تراکنش و درگاه
+	tx = db.query(WalletTransaction).filter(WalletTransaction.id == int(tx_id)).first() if tx_id > 0 else None
+	gateway_id = None
+	if tx and tx.extra_info:
+		try:
+			extra = json.loads(tx.extra_info or "{}")
+			gateway_id = extra.get("gateway_id")
+		except Exception:
+			pass
+	gw = db.query(PaymentGateway).filter(PaymentGateway.id == int(gateway_id)).first() if gateway_id else None
+	if not gw:
+		# اگر درگاه پیدا نشد، تراکنش ناموفق است
+		if tx_id > 0:
+			user_id = None
+			if tx:
+				try:
+					extra = json.loads(tx.extra_info or "{}") if tx.extra_info else {}
+					user_id = extra.get("created_by_user_id")
+				except Exception:
+					pass
+			confirm_top_up(db, tx_id, success=False, external_ref=id_get, user_id=user_id)
+		return {"transaction_id": tx_id, "success": False, "external_ref": id_get, "fee_amount": None}
+	cfg = _load_config(gw)
+	api_key = str(cfg.get("api") or "").strip()
+	if not api_key:
+		# اگر API key وجود نداشت، تراکنش ناموفق است
+		if tx_id > 0:
+			user_id = None
+			if tx:
+				try:
+					extra = json.loads(tx.extra_info or "{}") if tx.extra_info else {}
+					user_id = extra.get("created_by_user_id")
+				except Exception:
+					pass
+			confirm_top_up(db, tx_id, success=False, external_ref=id_get, user_id=user_id)
+		return {"transaction_id": tx_id, "success": False, "external_ref": id_get, "fee_amount": None}
+	# تعیین URL بر اساس sandbox
+	base_url = "https://bitpay.ir/payment-test" if gw.is_sandbox else "https://bitpay.ir/payment"
+	verify_url = f"{base_url}/gateway-result-second"
+	# آماده‌سازی داده‌های ارسالی (form data با json=1)
+	data = {
+		"api": api_key,
+		"trans_id": trans_id,
+		"id_get": id_get,
+		"json": "1",  # برای دریافت پاسخ JSON
+	}
+	success = False
+	fee_amount = None
+	amount = None
+	card_num = None
+	factor_id = None
+	try:
+		with httpx.Client(timeout=10.0) as client:
+			# ارسال به صورت form data
+			resp = client.post(verify_url, data=data)
+			# پاسخ JSON است
+			if "application/json" in (resp.headers.get("content-type", "").lower()):
+				result = resp.json()
+			else:
+				# اگر JSON نبود، سعی می‌کنیم parse کنیم
+				try:
+					result = resp.json()
+				except Exception:
+					result = {}
+			status = result.get("status")
+			# بررسی status
+			# 1 = موفق
+			# -1 تا -5 = خطا
+			# 11 = قبلاً verify شده
+			if status == 1:
+				success = True
+				amount = result.get("amount")
+				card_num = result.get("cardNum")
+				factor_id = result.get("factorId")
+			elif status == 11:
+				# تراکنش قبلاً verify شده است
+				success = True  # قبلاً موفق بوده
+			else:
+				# خطا (status < 0)
+				success = False
+	except Exception:
+		success = False
+	# تایید یا رد تراکنش
+	user_id = None
+	if tx_id > 0 and tx:
+		try:
+			extra = json.loads(tx.extra_info or "{}") if tx.extra_info else {}
+			user_id = extra.get("created_by_user_id")
+		except Exception:
+			pass
+		# به‌روزرسانی fee_amount در صورت وجود (BitPay معمولاً fee را برنمی‌گرداند)
+		confirm_top_up(db, tx_id, success=success, external_ref=id_get, user_id=user_id)
+	return {
+		"transaction_id": tx_id,
+		"success": success,
+		"external_ref": id_get,
+		"fee_amount": fee_amount,
+		"amount": amount,
+		"card_num": card_num,
+		"factor_id": factor_id,
+	}
 
 
 

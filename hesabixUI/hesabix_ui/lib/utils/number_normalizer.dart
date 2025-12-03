@@ -332,3 +332,148 @@ class ThousandsSeparatorInputFormatter extends TextInputFormatter {
   }
 }
 
+/// TextInputFormatter ترکیبی برای تبدیل ارقام فارسی و افزودن جداکننده هزارگان با حفظ موقعیت کرسر
+class NumberInputFormatter extends TextInputFormatter {
+  final bool allowDecimal;
+  
+  const NumberInputFormatter({this.allowDecimal = true});
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    // اگر متن خالی است
+    if (newValue.text.isEmpty) {
+      return newValue;
+    }
+
+    // تبدیل ارقام فارسی به انگلیسی
+    String converted = toEnglishDigits(newValue.text);
+    
+    // حذف کاراکترهای غیرمجاز (فقط اعداد، نقطه اعشار و علامت منفی)
+    String cleanText = converted.replaceAll(RegExp(r'[^\d.\-]'), '');
+    
+    // اگر اعشار مجاز نیست، نقطه را حذف کن
+    if (!allowDecimal) {
+      cleanText = cleanText.replaceAll('.', '');
+    }
+    
+    // مدیریت نقطه اعشار (فقط یک نقطه)
+    final dotIndex = cleanText.indexOf('.');
+    if (dotIndex != -1) {
+      final beforeDot = cleanText.substring(0, dotIndex);
+      final afterDot = cleanText.substring(dotIndex + 1).replaceAll('.', '');
+      cleanText = '$beforeDot.$afterDot';
+    }
+    
+    // مدیریت علامت منفی (فقط در ابتدا)
+    bool isNegative = cleanText.startsWith('-');
+    if (isNegative) {
+      cleanText = cleanText.substring(1);
+    }
+    cleanText = cleanText.replaceAll('-', '');
+    if (isNegative) {
+      cleanText = '-$cleanText';
+    }
+
+    // فرمت کردن با جداکننده هزارگان
+    String formattedText = _addThousandsSeparator(cleanText);
+
+    // محاسبه موقعیت کرسر در cleanText (بدون کاما)
+    // باید موقعیت کرسر را در newValue.text به موقعیت در cleanText تبدیل کنیم
+    int cleanTextCursorPosition = _convertCursorPositionToCleanText(
+      newValue.text,
+      newValue.selection.baseOffset,
+    );
+
+    // محاسبه موقعیت جدید مکان‌نما
+    int selectionOffset = _calculateCursorPosition(
+      oldValue.text.replaceAll(',', ''),
+      cleanText,
+      formattedText,
+      cleanTextCursorPosition,
+    );
+
+    return TextEditingValue(
+      text: formattedText,
+      selection: TextSelection.collapsed(offset: selectionOffset),
+      composing: newValue.composing,
+    );
+  }
+
+  /// تبدیل موقعیت کرسر از متن با کاما به متن بدون کاما
+  int _convertCursorPositionToCleanText(String textWithCommas, int cursorPosition) {
+    if (cursorPosition >= textWithCommas.length) {
+      // اگر کرسر در انتهاست، تعداد کاراکترهای عددی را بشمار
+      int count = 0;
+      for (int i = 0; i < textWithCommas.length; i++) {
+        if (RegExp(r'[\d.\-]').hasMatch(textWithCommas[i])) {
+          count++;
+        }
+      }
+      return count;
+    }
+    
+    // شمارش کاراکترهای عددی قبل از موقعیت کرسر
+    int count = 0;
+    for (int i = 0; i < cursorPosition && i < textWithCommas.length; i++) {
+      if (RegExp(r'[\d.\-]').hasMatch(textWithCommas[i])) {
+        count++;
+      }
+    }
+    return count;
+  }
+
+  /// محاسبه موقعیت صحیح مکان‌نما بعد از فرمت کردن
+  int _calculateCursorPosition(
+    String oldText,
+    String newText,
+    String formattedText,
+    int newCursorPosition,
+  ) {
+    // اگر متن خالی است
+    if (formattedText.isEmpty) {
+      return 0;
+    }
+
+    // newText در اینجا cleanText است (بدون کاما)
+    // oldText هم بدون کاما است
+    
+    // اگر کرسر در انتهاست، آن را در انتها نگه دار
+    if (newCursorPosition >= newText.length) {
+      return formattedText.length;
+    }
+    
+    // تعداد کاراکترهای عددی (ارقام، نقطه، منفی) قبل از کرسر در متن جدید
+    // چون newText بدون کاما است، می‌توانیم مستقیماً از newCursorPosition استفاده کنیم
+    int charsBeforeCursor = newCursorPosition;
+    
+    // اگر هیچ کاراکتری قبل از کرسر نیست
+    if (charsBeforeCursor == 0) {
+      if (formattedText.startsWith('-')) {
+        return 1;
+      }
+      return 0;
+    }
+    
+    // پیدا کردن موقعیت در متن فرمت‌شده
+    // باید تعداد کاراکترهای عددی (بدون کاما) را بشماریم تا به تعداد مورد نظر برسیم
+    int charsCounted = 0;
+    for (int i = 0; i < formattedText.length; i++) {
+      final char = formattedText[i];
+      if (RegExp(r'[\d.\-]').hasMatch(char)) {
+        charsCounted++;
+        // وقتی به تعداد کاراکترهای قبل از کرسر رسیدیم
+        if (charsCounted >= charsBeforeCursor) {
+          // موقعیت کرسر را بعد از این کاراکتر قرار بده
+          return i + 1;
+        }
+      }
+    }
+    
+    // اگر به انتها رسیدیم، موقعیت را در انتها قرار بده
+    return formattedText.length;
+  }
+}
+

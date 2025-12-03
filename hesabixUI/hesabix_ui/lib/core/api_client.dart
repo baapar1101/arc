@@ -45,6 +45,10 @@ class ApiClient {
     _calendarController = controller;
   }
 
+  static CalendarController? getCalendarController() {
+    return _calendarController;
+  }
+
   // Fiscal Year binding (allows UI to update selected fiscal year globally)
   static void bindFiscalYear(ValueNotifier<int?> fiscalYearId) {
     _fiscalYearId = fiscalYearId;

@@ -45,14 +45,31 @@ def wallet_webhook_endpoint(
 			raise ApiError("INVALID_SIGNATURE", "خطا در اعتبارسنجی امضا", http_status=403)
 
 	tx_id = int(payload.get("transaction_id") or 0)
+	if tx_id <= 0:
+		raise ApiError("INVALID_TX_ID", "شناسه تراکنش نامعتبر است", http_status=400)
+	
 	status = str(payload.get("status") or "").lower()
 	success = status in ("success", "succeeded", "ok")
 	external_ref = str(payload.get("external_ref") or "")
 	nonce = str(payload.get("nonce") or "")
 
+	# بارگذاری تراکنش برای بررسی‌های امنیتی
+	tx = db.query(WalletTransaction).filter(WalletTransaction.id == int(tx_id)).first()
+	if not tx:
+		raise ApiError("TX_NOT_FOUND", "تراکنش یافت نشد", http_status=404)
+	
+	# بررسی نوع تراکنش
+	if tx.type != "top_up":
+		raise ApiError("INVALID_TX_TYPE", "تراکنش از نوع top_up نیست", http_status=400)
+	
+	# بررسی تعلق تراکنش به کسب‌وکار (امنیتی)
+	business_id_from_payload = payload.get("business_id")
+	if business_id_from_payload and int(business_id_from_payload) != int(tx.business_id):
+		raise ApiError("BUSINESS_MISMATCH", "تراکنش متعلق به کسب‌وکار درخواستی نیست", http_status=403)
+
 	# ضد تکرار ساده: ذخیره آخرین nonce در extra_info تراکنش و رد تکراری
+	user_id = None
 	try:
-		tx = db.query(WalletTransaction).filter(WalletTransaction.id == int(tx_id)).first()
 		if tx and nonce:
 			try:
 				extra = json.loads(tx.extra_info or "{}") if tx.extra_info else {}
@@ -63,24 +80,32 @@ def wallet_webhook_endpoint(
 				# تراکنش تکراری؛ بدون تغییر وضعیت پاسخ می‌دهیم
 				return success_response({"transaction_id": tx_id, "status": tx.status}, request, message="DUPLICATE_WEBHOOK_IGNORED")
 			extra["last_webhook_nonce"] = nonce
+			# استخراج user_id از extra_info
+			user_id = extra.get("created_by_user_id")
 			tx.extra_info = json.dumps(extra, ensure_ascii=False)
 			db.flush()
+		else:
+			# اگر nonce نداریم، user_id را از extra_info استخراج می‌کنیم
+			try:
+				extra = json.loads(tx.extra_info or "{}") if tx.extra_info else {}
+				user_id = extra.get("created_by_user_id")
+			except Exception:
+				pass
 	except Exception:
 		# عدم موفقیت در ضدتکرار نباید مانع مسیر اصلی شود؛ confirm_top_up ایدم‌پوتنت است
 		pass
+	
 	# اختیاری: دریافت کارمزد از وبهوک و نگهداری در تراکنش (fee_amount)
 	try:
 		fee_value = payload.get("fee_amount")
 		if fee_value is not None:
 			from decimal import Decimal
-			from adapters.db.models.wallet import WalletTransaction
-			tx = db.query(WalletTransaction).filter(WalletTransaction.id == int(tx_id)).first()
-			if tx:
-				tx.fee_amount = Decimal(str(fee_value))
-				db.flush()
+			tx.fee_amount = Decimal(str(fee_value))
+			db.flush()
 	except Exception:
 		pass
-	data = confirm_top_up(db, tx_id, success=success, external_ref=external_ref or None)
+	
+	data = confirm_top_up(db, tx_id, success=success, external_ref=external_ref or None, user_id=user_id)
 	return success_response(data, request, message="TOPUP_CONFIRMED" if success else "TOPUP_FAILED")
 
 

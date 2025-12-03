@@ -237,7 +237,8 @@ async def test_email_config(
         return success_response(
             data={
                 "connected": result.get("connected", False),
-                "error_message": result.get("error_message")
+                "error_message": result.get("error_message"),
+                "error_details": result.get("error_details")
             },
             request=request
         )

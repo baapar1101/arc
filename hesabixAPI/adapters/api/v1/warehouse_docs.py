@@ -1,4 +1,5 @@
 from typing import Dict, Any, List
+from datetime import datetime
 from fastapi import APIRouter, Depends, Request, Body, Response
 from sqlalchemy import and_, or_, exists
 from sqlalchemy.orm import Session
@@ -21,7 +22,7 @@ from app.services.invoice_service import (
 	INVOICE_PRODUCTION,
 	INVOICE_WASTE,
 )
-from app.services.warehouse_service import create_from_invoice, post_warehouse_document, warehouse_document_to_dict, create_manual_warehouse_document, update_warehouse_document, update_warehouse_document_line, delete_warehouse_document, cancel_warehouse_document, bulk_delete_warehouse_documents
+from app.services.warehouse_service import create_from_invoice, post_warehouse_document, warehouse_document_to_dict, create_manual_warehouse_document, update_warehouse_document, update_warehouse_document_line, delete_warehouse_document, cancel_warehouse_document, bulk_delete_warehouse_documents, start_stock_count, calculate_stock_count_differences, create_stock_count_adjustment
 
 
 router = APIRouter(prefix="/warehouse-docs", tags=["warehouse_docs"])
@@ -938,6 +939,10 @@ async def get_warehouse_doc_pdf(
 	</html>
 	"""
 	
+	# تابع کمکی برای slugify
+	def _slugify(text: str) -> str:
+		return re.sub(r"[^A-Za-z0-9_-]+", "_", (text or "")).strip("_") or "warehouse_doc"
+	
 	# تولید PDF
 	try:
 		pdf_bytes = HTML(string=html_content).write_pdf(font_config=FontConfiguration())
@@ -946,9 +951,6 @@ async def get_warehouse_doc_pdf(
 		logger = logging.getLogger(__name__)
 		logger.error(f"PDF generation failed: {e}", exc_info=True)
 		raise ApiError("PDF_GENERATION_ERROR", "خطا در تولید فایل PDF", http_status=500)
-	
-	def _slugify(text: str) -> str:
-		return re.sub(r"[^A-Za-z0-9_-]+", "_", (text or "")).strip("_") or "warehouse_doc"
 	
 	filename = f"warehouse_doc_{_slugify(doc_data.get('code', ''))}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
 	
@@ -961,5 +963,115 @@ async def get_warehouse_doc_pdf(
 			"Access-Control-Expose-Headers": "Content-Disposition",
 		},
 	)
+
+
+@router.post("/business/{business_id}/stock-count/start")
+@require_business_access("business_id")
+def start_stock_count_endpoint(
+	request: Request,
+	business_id: int,
+	payload: Dict[str, Any] = Body(default={}),
+	ctx: AuthContext = Depends(get_current_user),
+	db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+	"""شروع انبار گردانی: دریافت لیست محصولات با موجودی سیستم."""
+	if not ctx.has_business_permission("inventory", "read"):
+		raise ApiError("FORBIDDEN", "Missing business permission: inventory.read", http_status=403)
+	
+	from app.services.transfer_service import _parse_iso_date as _parse_date
+	from datetime import date as date_type
+	
+	warehouse_id = payload.get("warehouse_id")
+	if warehouse_id:
+		try:
+			warehouse_id = int(warehouse_id)
+		except Exception:
+			warehouse_id = None
+	
+	product_ids = payload.get("product_ids")
+	if product_ids and isinstance(product_ids, list):
+		product_ids = [int(p) for p in product_ids if p]
+	else:
+		product_ids = None
+	
+	as_of_date_str = payload.get("as_of_date")
+	as_of_date = None
+	if as_of_date_str:
+		try:
+			as_of_date = _parse_date(as_of_date_str)
+		except Exception:
+			as_of_date = None
+	
+	result = start_stock_count(db, business_id, warehouse_id, product_ids, as_of_date)
+	return success_response(data=result, request=request)
+
+
+@router.post("/business/{business_id}/stock-count/calculate")
+@require_business_access("business_id")
+def calculate_stock_count_differences_endpoint(
+	request: Request,
+	business_id: int,
+	payload: Dict[str, Any] = Body(...),
+	ctx: AuthContext = Depends(get_current_user),
+	db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+	"""محاسبه تفاوت‌های انبار گردانی."""
+	if not ctx.has_business_permission("inventory", "read"):
+		raise ApiError("FORBIDDEN", "Missing business permission: inventory.read", http_status=403)
+	
+	items = payload.get("items", [])
+	if not isinstance(items, list) or not items:
+		raise ApiError("INVALID_PAYLOAD", "items list is required", http_status=400)
+	
+	result = calculate_stock_count_differences(db, business_id, items)
+	return success_response(data=result, request=request)
+
+
+@router.post("/business/{business_id}/stock-count/create-adjustment")
+@require_business_access("business_id")
+def create_stock_count_adjustment_endpoint(
+	request: Request,
+	business_id: int,
+	payload: Dict[str, Any] = Body(...),
+	ctx: AuthContext = Depends(get_current_user),
+	db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+	"""ایجاد حواله تعدیل از تفاوت‌های انبار گردانی."""
+	if not ctx.has_business_permission("inventory", "write"):
+		raise ApiError("FORBIDDEN", "Missing business permission: inventory.write", http_status=403)
+	
+	from app.services.transfer_service import _parse_iso_date as _parse_date
+	from datetime import date as date_type
+	
+	stock_count_code = payload.get("stock_count_code", "").strip()
+	if not stock_count_code:
+		stock_count_code = f"INV-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+	
+	stock_count_date_str = payload.get("stock_count_date")
+	if not stock_count_date_str:
+		stock_count_date = datetime.now().date()
+	else:
+		try:
+			stock_count_date = _parse_date(stock_count_date_str)
+		except Exception:
+			stock_count_date = datetime.now().date()
+	
+	items = payload.get("items", [])
+	if not isinstance(items, list):
+		raise ApiError("INVALID_PAYLOAD", "items list is required", http_status=400)
+	
+	notes = payload.get("notes")
+	
+	wh = create_stock_count_adjustment(
+		db,
+		business_id,
+		ctx.get_user_id(),
+		stock_count_code,
+		stock_count_date,
+		items,
+		notes,
+	)
+	db.commit()
+	return success_response(data=warehouse_document_to_dict(db, wh), request=request)
 
 

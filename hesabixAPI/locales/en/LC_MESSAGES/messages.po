@@ -447,3 +447,61 @@ msgstr "Invoices list"
 
 msgid "INVOICE"
 msgstr "Invoice"
+
+# Warranty
+msgid "PLUGIN_NOT_ACTIVE"
+msgstr "Warranty plugin is not active for this business"
+
+msgid "WARRANTY_CODE_NOT_FOUND"
+msgstr "Warranty code not found"
+
+msgid "INVALID_WARRANTY_SERIAL"
+msgstr "Invalid warranty serial"
+
+msgid "WARRANTY_ALREADY_ACTIVATED"
+msgstr "This warranty has already been activated"
+
+msgid "WARRANTY_EXPIRED"
+msgstr "This warranty has expired"
+
+msgid "WARRANTY_REVOKED"
+msgstr "This warranty has been revoked"
+
+msgid "TOO_MANY_ATTEMPTS"
+msgstr "Too many activation attempts"
+
+msgid "PRODUCT_SERIAL_REQUIRED"
+msgstr "Product serial is required"
+
+msgid "PRODUCT_SERIAL_NOT_FOUND"
+msgstr "Product serial not found"
+
+msgid "LINK_NOT_FOUND"
+msgstr "Tracking link not found"
+
+msgid "LINK_EXPIRED"
+msgstr "Tracking link has expired"
+
+msgid "LINK_INACTIVE"
+msgstr "Tracking link is inactive"
+
+msgid "WARRANTY_NOT_FOUND"
+msgstr "Warranty not found"
+
+msgid "DUPLICATE_CODE"
+msgstr "Code already exists"
+
+msgid "DUPLICATE_SERIAL"
+msgstr "Serial already exists"
+
+msgid "CODE_GENERATION_FAILED"
+msgstr "Failed to generate unique code"
+
+msgid "SERIAL_GENERATION_FAILED"
+msgstr "Failed to generate unique serial"
+
+msgid "INVALID_CUSTOM_SERIALS"
+msgstr "Invalid custom serials count"
+
+msgid "INVALID_CUSTOM_CODES"
+msgstr "Invalid custom codes count"

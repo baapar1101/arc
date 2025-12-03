@@ -7,6 +7,7 @@ class WorkflowNodeContextMenu extends StatelessWidget {
   final VoidCallback? onEdit;
   final VoidCallback? onDuplicate;
   final VoidCallback? onDelete;
+  final VoidCallback? onEditComment;
 
   const WorkflowNodeContextMenu({
     super.key,
@@ -14,6 +15,7 @@ class WorkflowNodeContextMenu extends StatelessWidget {
     this.onEdit,
     this.onDuplicate,
     this.onDelete,
+    this.onEditComment,
   });
 
   static Future<String?> show(
@@ -23,6 +25,7 @@ class WorkflowNodeContextMenu extends StatelessWidget {
     VoidCallback? onEdit,
     VoidCallback? onDuplicate,
     VoidCallback? onDelete,
+    VoidCallback? onEditComment,
   }) async {
     return showMenu<String>(
       context: context,
@@ -44,6 +47,24 @@ class WorkflowNodeContextMenu extends StatelessWidget {
           onTap: () => onEdit?.call(),
         ),
         PopupMenuItem<String>(
+          value: 'comment',
+          child: ListTile(
+            leading: Icon(
+              node.comment != null && node.comment!.isNotEmpty 
+                  ? Icons.edit_note 
+                  : Icons.note_add,
+            ),
+            title: Text(
+              node.comment != null && node.comment!.isNotEmpty 
+                  ? 'ویرایش یادداشت' 
+                  : 'افزودن یادداشت',
+            ),
+            contentPadding: EdgeInsets.zero,
+            visualDensity: VisualDensity.compact,
+          ),
+          onTap: () => onEditComment?.call(),
+        ),
+        PopupMenuItem<String>(
           value: 'duplicate',
           child: ListTile(
             leading: const Icon(Icons.copy),
@@ -53,6 +74,7 @@ class WorkflowNodeContextMenu extends StatelessWidget {
           ),
           onTap: () => onDuplicate?.call(),
         ),
+        const PopupMenuDivider(),
         PopupMenuItem<String>(
           value: 'delete',
           child: ListTile(

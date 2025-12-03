@@ -31,7 +31,7 @@ class WorkflowNodePalette extends StatelessWidget {
 }
 
 /// محتوای پالت node ها (بدون Drawer wrapper)
-class WorkflowNodePaletteContent extends StatelessWidget {
+class WorkflowNodePaletteContent extends StatefulWidget {
   final List<WorkflowNodeMetadata> triggers;
   final List<WorkflowNodeMetadata> actions;
   final Function(WorkflowNodeType type, String key, String name) onNodeSelected;
@@ -44,9 +44,90 @@ class WorkflowNodePaletteContent extends StatelessWidget {
   });
 
   @override
+  State<WorkflowNodePaletteContent> createState() => _WorkflowNodePaletteContentState();
+}
+
+class _WorkflowNodePaletteContentState extends State<WorkflowNodePaletteContent> {
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+  WorkflowNodeType? _filterType;
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  List<WorkflowNodeMetadata> _filterItems(List<WorkflowNodeMetadata> items) {
+    if (_searchQuery.isEmpty) return items;
+    
+    return items.where((item) {
+      final nameLower = item.name.toLowerCase();
+      final descLower = item.description?.toLowerCase() ?? '';
+      final keyLower = item.key.toLowerCase();
+      final searchLower = _searchQuery.toLowerCase();
+      
+      return nameLower.contains(searchLower) ||
+             descLower.contains(searchLower) ||
+             keyLower.contains(searchLower);
+    }).toList();
+  }
+
+  List<WorkflowNodeMetadata> _getStaticConditionNodes() {
+    return const [
+      WorkflowNodeMetadata(
+        key: 'condition.if',
+        name: 'شرط IF',
+        description: 'بررسی یک شرط و اجرای مسیر مناسب',
+        type: WorkflowNodeType.condition,
+      ),
+      WorkflowNodeMetadata(
+        key: 'condition.switch',
+        name: 'شرط چندگانه (Switch)',
+        description: 'بررسی چند شرط و انتخاب یک مسیر',
+        type: WorkflowNodeType.condition,
+      ),
+      WorkflowNodeMetadata(
+        key: 'condition.compare',
+        name: 'مقایسه مقادیر',
+        description: 'مقایسه دو مقدار (بزرگتر، کوچکتر، مساوی)',
+        type: WorkflowNodeType.condition,
+      ),
+    ];
+  }
+
+  List<WorkflowNodeMetadata> _getStaticLoopNodes() {
+    return const [
+      WorkflowNodeMetadata(
+        key: 'loop.for_each',
+        name: 'حلقه For Each',
+        description: 'تکرار روی آرایه یا لیست',
+        type: WorkflowNodeType.loop,
+      ),
+      WorkflowNodeMetadata(
+        key: 'loop.while',
+        name: 'حلقه While',
+        description: 'تکرار تا زمانی که شرط برقرار است',
+        type: WorkflowNodeType.loop,
+      ),
+      WorkflowNodeMetadata(
+        key: 'loop.for',
+        name: 'حلقه For',
+        description: 'تکرار با تعداد مشخص',
+        type: WorkflowNodeType.loop,
+      ),
+    ];
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isRtl = Directionality.of(context) == TextDirection.rtl;
+
+    final filteredTriggers = _filterItems(widget.triggers);
+    final filteredActions = _filterItems(widget.actions);
+    final filteredLoops = _filterItems(_getStaticLoopNodes());
+    final filteredConditions = _filterItems(_getStaticConditionNodes());
 
     return Column(
       children: [
@@ -72,29 +153,151 @@ class WorkflowNodePaletteContent extends StatelessWidget {
             ],
           ),
         ),
+        // Search Box
+        Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            children: [
+              TextField(
+                controller: _searchController,
+                decoration: InputDecoration(
+                  hintText: 'جستجو...',
+                  prefixIcon: const Icon(Icons.search),
+                  suffixIcon: _searchQuery.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear),
+                          onPressed: () {
+                            setState(() {
+                              _searchController.clear();
+                              _searchQuery = '';
+                            });
+                          },
+                        )
+                      : null,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                ),
+                onChanged: (value) {
+                  setState(() {
+                    _searchQuery = value;
+                  });
+                },
+              ),
+              const SizedBox(height: 8),
+              // Filter Chips
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    FilterChip(
+                      label: const Text('همه'),
+                      selected: _filterType == null,
+                      onSelected: (selected) {
+                        setState(() {
+                          _filterType = null;
+                        });
+                      },
+                    ),
+                    const SizedBox(width: 8),
+                    FilterChip(
+                      label: const Text('Triggers'),
+                      avatar: const Icon(Icons.bolt, size: 16),
+                      selected: _filterType == WorkflowNodeType.trigger,
+                      onSelected: (selected) {
+                        setState(() {
+                          _filterType = selected ? WorkflowNodeType.trigger : null;
+                        });
+                      },
+                    ),
+                    const SizedBox(width: 8),
+                    FilterChip(
+                      label: const Text('Actions'),
+                      avatar: const Icon(Icons.play_arrow, size: 16),
+                      selected: _filterType == WorkflowNodeType.action,
+                      onSelected: (selected) {
+                        setState(() {
+                          _filterType = selected ? WorkflowNodeType.action : null;
+                        });
+                      },
+                    ),
+                    const SizedBox(width: 8),
+                    FilterChip(
+                      label: const Text('Loops'),
+                      avatar: const Icon(Icons.loop, size: 16),
+                      selected: _filterType == WorkflowNodeType.loop,
+                      onSelected: (selected) {
+                        setState(() {
+                          _filterType = selected ? WorkflowNodeType.loop : null;
+                        });
+                      },
+                    ),
+                    const SizedBox(width: 8),
+                    FilterChip(
+                      label: const Text('Conditions'),
+                      avatar: const Icon(Icons.code, size: 16),
+                      selected: _filterType == WorkflowNodeType.condition,
+                      onSelected: (selected) {
+                        setState(() {
+                          _filterType = selected ? WorkflowNodeType.condition : null;
+                        });
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
         // Content
         Expanded(
           child: ListView(
             padding: EdgeInsets.zero,
             children: [
               // Triggers Section
-              _buildSection(
-                context,
-                title: 'Trigger ها',
-                icon: Icons.bolt,
-                color: Colors.green,
-                items: triggers,
-                type: WorkflowNodeType.trigger,
-              ),
+              if (_filterType == null || _filterType == WorkflowNodeType.trigger)
+                _buildSection(
+                  context,
+                  title: 'Trigger ها',
+                  icon: Icons.bolt,
+                  color: Colors.green,
+                  items: filteredTriggers,
+                  type: WorkflowNodeType.trigger,
+                ),
               // Actions Section
-              _buildSection(
-                context,
-                title: 'Action ها',
-                icon: Icons.play_arrow,
-                color: theme.colorScheme.primary,
-                items: actions,
-                type: WorkflowNodeType.action,
-              ),
+              if (_filterType == null || _filterType == WorkflowNodeType.action)
+                _buildSection(
+                  context,
+                  title: 'Action ها',
+                  icon: Icons.play_arrow,
+                  color: theme.colorScheme.primary,
+                  items: filteredActions,
+                  type: WorkflowNodeType.action,
+                ),
+              // Loop Section
+              if (_filterType == null || _filterType == WorkflowNodeType.loop)
+                _buildSection(
+                  context,
+                  title: 'Loop ها',
+                  icon: Icons.loop,
+                  color: Colors.purple,
+                  items: filteredLoops,
+                  type: WorkflowNodeType.loop,
+                ),
+              // Condition Section
+              if (_filterType == null || _filterType == WorkflowNodeType.condition)
+                _buildSection(
+                  context,
+                  title: 'Condition ها',
+                  icon: Icons.code,
+                  color: Colors.orange,
+                  items: filteredConditions,
+                  type: WorkflowNodeType.condition,
+                ),
             ],
           ),
         ),
@@ -186,7 +389,7 @@ class WorkflowNodePaletteContent extends StatelessWidget {
         size: 20,
       ),
       onTap: () {
-        onNodeSelected(type, item.key, item.name);
+        widget.onNodeSelected(type, item.key, item.name);
       },
     );
   }

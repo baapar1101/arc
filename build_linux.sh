@@ -26,17 +26,17 @@ print_usage() {
 Usage: ./build_linux.sh [--project <path>] [--mode <debug|profile|release>] [--build-dir <dir>] [--output-dir <dir>] [--clean] [--install-deps] [--api-base-url <url>] [--archive] [--help]
 
 Options:
-  --project PATH     مسیر پروژه فلاتر (حاوی pubspec.yaml). در صورت عدم تعیین، به‌صورت خودکار تشخیص می‌شود.
-  --mode MODE        نوع build: debug، profile یا release (پیش‌فرض: $DEFAULT_MODE).
-  --build-dir DIR    مسیر build directory (پیش‌فرض: $DEFAULT_BUILD_DIR).
-  --output-dir DIR   مسیر خروجی نهایی (پیش‌فرض: $DEFAULT_OUTPUT_DIR).
-  --clean            پاک کردن build directory قبل از build.
-  --install-deps     نصب وابستگی‌ها قبل از build.
-  --api-base-url     آدرس پایه API که به برنامه به‌صورت --dart-define پاس داده می‌شود.
-  --archive          ایجاد فایل tar.gz از خروجی.
-  -h, --help         نمایش راهنما.
+  --project PATH     Flutter project path (contains pubspec.yaml). If not specified, will be auto-detected.
+  --mode MODE        Build type: debug, profile, or release (default: $DEFAULT_MODE).
+  --build-dir DIR    Build directory path (default: $DEFAULT_BUILD_DIR).
+  --output-dir DIR   Final output path (default: $DEFAULT_OUTPUT_DIR).
+  --clean            Clean build directory before building.
+  --install-deps     Install dependencies before building.
+  --api-base-url     API base URL passed to app as --dart-define.
+  --archive          Create tar.gz file from output.
+  -h, --help         Show help.
 
-نمونه اجرا:
+Usage examples:
   ./build_linux.sh
   ./build_linux.sh --mode debug --clean
   ./build_linux.sh --project hesabixUI/hesabix_ui --archive
@@ -58,27 +58,27 @@ ensure_flutter_in_path() {
     export PATH="$PATH:$SNAP_FLUTTER_BIN"
   fi
   if ! cmd_exists flutter; then
-    die "Flutter یافت نشد. لطفاً آن‌را نصب کرده یا PATH را تنظیم کنید. مسیر پیشنهادی: $SNAP_FLUTTER_BIN"
+    die "Flutter not found. Please install it or configure PATH. Suggested path: $SNAP_FLUTTER_BIN"
   fi
 }
 
 is_flutter_project_dir() {
   local dir="$1"
   [ -f "$dir/pubspec.yaml" ] || return 1
-  # حداقل بررسی: وجود sdk: flutter در pubspec.yaml
+  # Minimum check: presence of sdk: flutter in pubspec.yaml
   if grep -qiE "sdk:\s*flutter" "$dir/pubspec.yaml"; then
     return 0
   fi
-  # برخی قالب‌ها ممکن است شکل دیگری داشته باشند؛ صرف وجود pubspec را کافی بدانیم
+  # Some templates may have different format; just having pubspec is enough
   return 0
 }
 
 auto_detect_project_dir() {
-  # اولویت: آرگومان کاربر → متغیر محیطی → مسیر متداول → جستجو در hesabixUI
+  # Priority: user argument → environment variable → common path → search in hesabixUI
   if [ -n "$USER_PROJECT" ]; then
     local p="$USER_PROJECT"
-    [ -d "$p" ] || die "مسیر پروژه موجود نیست: $p"
-    is_flutter_project_dir "$p" || die "pubspec.yaml معتبر در مسیر یافت نشد: $p"
+    [ -d "$p" ] || die "Project path does not exist: $p"
+    is_flutter_project_dir "$p" || die "Valid pubspec.yaml not found in path: $p"
     echo "$(cd "$p" && pwd)"
     return 0
   fi
@@ -91,17 +91,17 @@ auto_detect_project_dir() {
     fi
   fi
 
-  # مسیر متداول این ریپو
+  # Common path in this repo
   local common_path="$REPO_ROOT/hesabixUI/hesabix_ui"
   if [ -d "$common_path" ] && is_flutter_project_dir "$common_path"; then
     echo "$common_path"
     return 0
   fi
 
-  # جستجو در hesabixUI برای نزدیک‌ترین pubspec.yaml
+  # Search in hesabixUI for nearest pubspec.yaml
   local search_root="$REPO_ROOT/hesabixUI"
   if [ -d "$search_root" ]; then
-    # محدود به عمق 3 برای سرعت
+    # Limited to depth 3 for speed
     local found
     found=$(find "$search_root" -maxdepth 3 -type f -name pubspec.yaml 2>/dev/null | head -n 1 || true)
     if [ -n "$found" ]; then
@@ -110,64 +110,64 @@ auto_detect_project_dir() {
     fi
   fi
 
-  die "پروژه فلاتر یافت نشد. لطفاً با --project مسیر را مشخص کنید."
+  die "Flutter project not found. Please specify path with --project."
 }
 
 check_linux_dependencies() {
-  echo "بررسی وابستگی‌های Linux..."
+  echo "Checking Linux dependencies..."
   
   local missing_deps=()
   
-  # بررسی وجود GTK development libraries
+  # Check GTK development libraries
   if ! pkg-config --exists gtk+-3.0; then
     missing_deps+=("libgtk-3-dev")
   fi
   
-  # بررسی وجود CMake
+  # Check CMake
   if ! cmd_exists cmake; then
     missing_deps+=("cmake")
   fi
   
-  # بررسی وجود Ninja
+  # Check Ninja
   if ! cmd_exists ninja; then
     missing_deps+=("ninja-build")
   fi
   
-  # بررسی وجود C++ compiler
+  # Check C++ compiler
   if ! cmd_exists clang++; then
     missing_deps+=("clang")
   fi
   
-  # بررسی وجود build-essential
+  # Check build-essential
   if ! cmd_exists gcc; then
     missing_deps+=("build-essential")
   fi
   
   if [ ${#missing_deps[@]} -gt 0 ]; then
-    echo "نصب وابستگی‌های مورد نیاز..."
-    echo "بسته‌های مورد نیاز: ${missing_deps[*]}"
+    echo "Installing required dependencies..."
+    echo "Required packages: ${missing_deps[*]}"
     
-    # تشخیص توزیع Linux
+    # Detect Linux distribution
     if command -v apt >/dev/null 2>&1; then
       # Ubuntu/Debian
-      echo "تشخیص توزیع: Ubuntu/Debian"
+      echo "Detected distribution: Ubuntu/Debian"
       sudo apt update
       sudo apt install -y "${missing_deps[@]}"
     elif command -v dnf >/dev/null 2>&1; then
       # Fedora/RHEL
-      echo "تشخیص توزیع: Fedora/RHEL"
+      echo "Detected distribution: Fedora/RHEL"
       sudo dnf install -y "${missing_deps[@]}"
     elif command -v pacman >/dev/null 2>&1; then
       # Arch Linux
-      echo "تشخیص توزیع: Arch Linux"
+      echo "Detected distribution: Arch Linux"
       sudo pacman -S --noconfirm "${missing_deps[@]}"
     else
-      die "توزیع Linux پشتیبانی شده یافت نشد. لطفاً وابستگی‌ها را به‌صورت دستی نصب کنید: ${missing_deps[*]}"
+      die "Supported Linux distribution not found. Please install dependencies manually: ${missing_deps[*]}"
     fi
     
-    echo "وابستگی‌ها نصب شدند."
+    echo "Dependencies installed."
   else
-    echo "همه وابستگی‌های مورد نیاز موجود هستند."
+    echo "All required dependencies are present."
   fi
 }
 
@@ -175,36 +175,36 @@ check_linux_dependencies() {
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --project)
-      [[ $# -ge 2 ]] || die "مقدار برای --project وارد نشده است"
+      [[ $# -ge 2 ]] || die "Value for --project not provided"
       USER_PROJECT="$2"; shift 2 ;;
     --mode)
-      [[ $# -ge 2 ]] || die "مقدار برای --mode وارد نشده است"
+      [[ $# -ge 2 ]] || die "Value for --mode not provided"
       MODE="$2"; shift 2 ;;
     --build-dir)
-      [[ $# -ge 2 ]] || die "مقدار برای --build-dir وارد نشده است"
+      [[ $# -ge 2 ]] || die "Value for --build-dir not provided"
       BUILD_DIR="$2"; shift 2 ;;
     --output-dir)
-      [[ $# -ge 2 ]] || die "مقدار برای --output-dir وارد نشده است"
+      [[ $# -ge 2 ]] || die "Value for --output-dir not provided"
       OUTPUT_DIR="$2"; shift 2 ;;
     --clean)
       CLEAN_BUILD=true; shift ;;
     --install-deps)
       INSTALL_DEPS=true; shift ;;
     --api-base-url)
-      [[ $# -ge 2 ]] || die "مقدار برای --api-base-url وارد نشده است"
+      [[ $# -ge 2 ]] || die "Value for --api-base-url not provided"
       API_BASE_URL="$2"; shift 2 ;;
     --archive)
       CREATE_ARCHIVE=true; shift ;;
     -h|--help)
       print_usage; exit 0 ;;
     *)
-      warn "آرگومان ناشناخته: $1"; shift ;;
+      warn "Unknown argument: $1"; shift ;;
   esac
 done
 
 case "$MODE" in
   debug|profile|release) ;;
-  *) die "mode نامعتبر است: $MODE (مجاز: debug|profile|release)" ;;
+  *) die "Invalid mode: $MODE (allowed: debug|profile|release)" ;;
 esac
 
 ensure_flutter_in_path
@@ -220,84 +220,84 @@ if [ -z "$OUTPUT_DIR" ]; then
   OUTPUT_DIR="$DEFAULT_OUTPUT_DIR"
 fi
 
-# تبدیل به مسیر مطلق
+# Convert to absolute path
 BUILD_DIR="$(cd "$APP_DIR" && realpath -m "$BUILD_DIR")"
 OUTPUT_DIR="$(cd "$APP_DIR" && realpath -m "$OUTPUT_DIR")"
 
-echo "ریشه ریپو: $REPO_ROOT"
-echo "مسیر پروژه: $APP_DIR"
-echo "حالت: $MODE"
-echo "مسیر build: $BUILD_DIR"
-echo "مسیر خروجی: $OUTPUT_DIR"
+echo "Repo root: $REPO_ROOT"
+echo "Project path: $APP_DIR"
+echo "Mode: $MODE"
+echo "Build path: $BUILD_DIR"
+echo "Output path: $OUTPUT_DIR"
 
 cd "$APP_DIR"
 
-# تنظیم mirror برای حل مشکل دسترسی به pub.dev
+# Configure mirror to resolve pub.dev access issues
 export PUB_HOSTED_URL="https://pub.flutter-io.cn"
 export FLUTTER_STORAGE_BASE_URL="https://storage.flutter-io.cn"
 
-# تنظیم C++ compiler flags برای حل مشکل deprecated warnings
+# Configure C++ compiler flags to resolve deprecated warnings
 export CXXFLAGS="-Wno-deprecated-literal-operator"
 export CFLAGS="-Wno-deprecated-literal-operator"
 
-# نصب وابستگی‌ها در صورت درخواست
+# Install dependencies if requested
 if [ "$INSTALL_DEPS" = true ]; then
-  echo "نصب وابستگی‌ها..."
+  echo "Installing dependencies..."
   flutter pub get
 fi
 
-# پاک کردن build directory در صورت درخواست
+# Clean build directory if requested
 if [ "$CLEAN_BUILD" = true ]; then
-  echo "پاک کردن build directory..."
+  echo "Cleaning build directory..."
   rm -rf "$BUILD_DIR"
 fi
 
-# تنظیم آرگومان‌های dart-define
+# Configure dart-define arguments
 DART_DEFINE_ARGS=()
 if [ -n "$API_BASE_URL" ]; then
   DART_DEFINE_ARGS+=(--dart-define "API_BASE_URL=$API_BASE_URL")
 fi
 
-# Build کردن Flutter برای Linux
-echo "Build کردن Flutter برای Linux..."
-echo "دستور: flutter build linux --$MODE ${DART_DEFINE_ARGS[*]:-}"
+# Building Flutter for Linux
+echo "Building Flutter for Linux..."
+echo "Command: flutter build linux --$MODE ${DART_DEFINE_ARGS[*]:-}"
 
 flutter build linux --"$MODE" ${DART_DEFINE_ARGS[@]:-}
 
-# کپی کردن فایل‌های build شده به مسیر خروجی
-echo "کپی کردن فایل‌های build شده..."
+# Copy built files to output path
+echo "Copying built files..."
 rm -rf "$OUTPUT_DIR"
 mkdir -p "$OUTPUT_DIR"
 
-# کپی کردن bundle از build directory
+# Copy bundle from build directory
 if [ -d "$BUILD_DIR/x64/$MODE/bundle" ]; then
   cp -r "$BUILD_DIR/x64/$MODE/bundle"/* "$OUTPUT_DIR/"
-  echo "فایل‌های build شده در مسیر زیر کپی شدند: $OUTPUT_DIR"
+  echo "Built files copied to: $OUTPUT_DIR"
 else
-  die "مسیر bundle یافت نشد: $BUILD_DIR/x64/$MODE/bundle"
+  die "Bundle path not found: $BUILD_DIR/x64/$MODE/bundle"
 fi
 
-# ایجاد فایل اجرایی
+# Create executable file
 EXECUTABLE_NAME="hesabix_ui"
 if [ -f "$OUTPUT_DIR/$EXECUTABLE_NAME" ]; then
   chmod +x "$OUTPUT_DIR/$EXECUTABLE_NAME"
-  echo "فایل اجرایی: $OUTPUT_DIR/$EXECUTABLE_NAME"
+  echo "Executable file: $OUTPUT_DIR/$EXECUTABLE_NAME"
 else
-  warn "فایل اجرایی یافت نشد: $OUTPUT_DIR/$EXECUTABLE_NAME"
+  warn "Executable file not found: $OUTPUT_DIR/$EXECUTABLE_NAME"
 fi
 
-# ایجاد archive در صورت درخواست
+# Create archive if requested
 if [ "$CREATE_ARCHIVE" = true ]; then
   ARCHIVE_NAME="hesabix_ui_linux_${MODE}_$(date +%Y%m%d_%H%M%S).tar.gz"
   ARCHIVE_PATH="$(dirname "$OUTPUT_DIR")/$ARCHIVE_NAME"
   
-  echo "ایجاد archive: $ARCHIVE_PATH"
+  echo "Creating archive: $ARCHIVE_PATH"
   cd "$(dirname "$OUTPUT_DIR")"
   tar -czf "$ARCHIVE_PATH" "$(basename "$OUTPUT_DIR")"
   
-  echo "Archive ایجاد شد: $ARCHIVE_PATH"
-  echo "برای اجرا: tar -xzf $ARCHIVE_NAME && cd $(basename "$OUTPUT_DIR") && ./$EXECUTABLE_NAME"
+  echo "Archive created: $ARCHIVE_PATH"
+  echo "To run: tar -xzf $ARCHIVE_NAME && cd $(basename "$OUTPUT_DIR") && ./$EXECUTABLE_NAME"
 fi
 
-echo "Build کامل شد!"
-echo "برای اجرا: cd $OUTPUT_DIR && ./$EXECUTABLE_NAME"
+echo "Build completed!"
+echo "To run: cd $OUTPUT_DIR && ./$EXECUTABLE_NAME"

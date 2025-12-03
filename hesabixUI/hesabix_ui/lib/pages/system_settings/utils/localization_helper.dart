@@ -23,6 +23,8 @@ class LocalizationHelper {
         return t.settingsStoragePlans;
       case 'settingsDocumentMonetization':
         return t.settingsDocumentMonetization;
+      case 'settingsMarketplacePlugins':
+        return t.settingsMarketplacePlugins;
       case 'settingsWalletSettings':
         return t.settingsWalletSettings;
       case 'settingsPaymentGateways':
@@ -77,6 +79,8 @@ class LocalizationHelper {
         return t.settingsStoragePlansDescription;
       case 'settingsDocumentMonetizationDescription':
         return t.settingsDocumentMonetizationDescription;
+      case 'settingsMarketplacePluginsDescription':
+        return t.settingsMarketplacePluginsDescription;
       case 'settingsWalletSettingsDescription':
         return t.settingsWalletSettingsDescription;
       case 'settingsPaymentGatewaysDescription':

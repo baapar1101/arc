@@ -78,10 +78,11 @@ class PasswordResetOtpService:
 			return ""
 		
 		# بررسی اینکه کاربر شماره موبایل داشته باشد
-		if not mobile:
+		if not mobile or not user.mobile:
 			# اگر فقط ایمیل دارد، نمی‌توانیم OTP ارسال کنیم
 			# در این حالت باید از روش ایمیل استفاده شود
-			raise ApiError("NO_MOBILE", "کاربر شماره موبایل ثبت نکرده است. لطفاً از روش ایمیل استفاده کنید", http_status=400)
+			# برای امنیت، همان پاسخ موفق را برمی‌گردانیم (برای جلوگیری از user enumeration)
+			return ""
 		
 		# نرمال‌سازی شماره موبایل
 		try:
@@ -122,9 +123,10 @@ class PasswordResetOtpService:
 			import structlog
 			logger = structlog.get_logger()
 			logger.error("sms_reset_password_send_failed", user_id=user.id, mobile=normalized_mobile)
-			# در صورت خطا، همچنان OTP را برمی‌گردانیم (برای تست)
+			# در صورت خطا در ارسال SMS، خطا برمی‌گردانیم
+			raise ApiError("SMS_SEND_FAILED", "خطا در ارسال پیامک. لطفاً بعداً تلاش کنید یا با پشتیبانی تماس بگیرید", http_status=500)
 		
-		return otp_code  # فقط برای تست
+		return otp_code  # فقط برای تست - در production نباید برگردانده شود
 	
 	def verify_reset_otp(self, identifier: str, otp_code: str) -> tuple[bool, Optional[str]]:
 		"""

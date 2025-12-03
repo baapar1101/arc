@@ -1,0 +1,75 @@
+{% extends "payment/base.html" %}
+
+{% block title %}پرداخت موفق{% endblock %}
+
+{% block content %}
+<div class="icon success">✓</div>
+<h1>پرداخت موفق!</h1>
+<p class="message">تراکنش شما با موفقیت انجام شد و حساب کیف پول شما شارژ گردید.</p>
+
+<div class="details">
+    <div class="detail-row">
+        <span class="detail-label">مبلغ پرداختی:</span>
+        <span class="detail-value">{{ amount | format_number }} ریال</span>
+    </div>
+    <div class="detail-row">
+        <span class="detail-label">شماره تراکنش:</span>
+        <span class="detail-value">{{ transaction_id }}</span>
+    </div>
+    <div class="detail-row">
+        <span class="detail-label">شماره پیگیری:</span>
+        <span class="detail-value">{{ external_ref }}</span>
+    </div>
+    {% if card_num %}
+    <div class="detail-row">
+        <span class="detail-label">شماره کارت:</span>
+        <span class="detail-value">{{ card_num }}</span>
+    </div>
+    {% endif %}
+    <div class="detail-row">
+        <span class="detail-label">تاریخ و زمان:</span>
+        <span class="detail-value">{{ timestamp }}</span>
+    </div>
+</div>
+
+{% if source == 'app' %}
+    <div class="redirect-message">
+        <div class="spinner"></div>
+        <p>در حال بازگشت به اپلیکیشن...</p>
+    </div>
+    <a href="#" id="openApp" class="btn btn-primary" onclick="openApp(); return false;">باز کردن اپلیکیشن</a>
+{% else %}
+    <a href="{{ dashboard_url }}" class="btn btn-primary">بازگشت به داشبورد</a>
+    {% if source == 'mobile_web' %}
+    <a href="#" id="openApp" class="btn btn-secondary" onclick="openApp(); return false;">باز کردن در اپ</a>
+    {% endif %}
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const deepLink = 'hesabix://payment/callback?tx_id={{ transaction_id }}&status=success&amount={{ amount }}&ref={{ external_ref }}';
+    
+    function openApp() {
+        window.location.href = deepLink;
+        
+        // اگر بعد از 2 ثانیه اپ باز نشد، به store هدایت کن
+        setTimeout(function() {
+            const userAgent = navigator.userAgent.toLowerCase();
+            if (/android/.test(userAgent)) {
+                window.location.href = 'https://play.google.com/store/apps/details?id=ir.hesabix.app';
+            } else if (/iphone|ipad|ipod/.test(userAgent)) {
+                window.location.href = 'https://apps.apple.com/app/hesabix/id123456789';
+            }
+        }, 2000);
+    }
+    
+    {% if source == 'app' %}
+    // تلاش خودکار برای باز کردن اپ بعد از 2 ثانیه
+    setTimeout(function() {
+        openApp();
+    }, 2000);
+    {% endif %}
+</script>
+{% endblock %}
+

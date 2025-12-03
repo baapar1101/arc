@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../services/warehouse_service.dart';
+import '../../services/product_service.dart';
+import '../../services/product_attribute_service.dart';
+import '../../core/calendar_controller.dart';
+import '../../utils/attribute_formatter.dart';
 
 class UniqueProductSelectorDialog extends StatefulWidget {
   final int businessId;
@@ -8,6 +12,7 @@ class UniqueProductSelectorDialog extends StatefulWidget {
   final int? warehouseId;
   final List<int>? selectedInstanceIds;
   final int? requiredQuantity;
+  final CalendarController? calendarController;
 
   const UniqueProductSelectorDialog({
     super.key,
@@ -17,6 +22,7 @@ class UniqueProductSelectorDialog extends StatefulWidget {
     this.warehouseId,
     this.selectedInstanceIds,
     this.requiredQuantity,
+    this.calendarController,
   });
 
   @override
@@ -25,11 +31,15 @@ class UniqueProductSelectorDialog extends StatefulWidget {
 
 class _UniqueProductSelectorDialogState extends State<UniqueProductSelectorDialog> {
   final _svc = WarehouseService();
+  final _productService = ProductService();
+  final _attributeService = ProductAttributeService();
   final _searchController = TextEditingController();
   List<Map<String, dynamic>> _instances = [];
+  Map<String, Map<String, dynamic>> _attributesMap = {};
   Set<int> _selectedIds = {};
   bool _loading = false;
   String? _error;
+  CalendarController? _calendarController;
 
   @override
   void initState() {
@@ -37,7 +47,7 @@ class _UniqueProductSelectorDialogState extends State<UniqueProductSelectorDialo
     if (widget.selectedInstanceIds != null) {
       _selectedIds = Set<int>.from(widget.selectedInstanceIds!);
     }
-    _loadInstances();
+    _loadData();
   }
 
   @override
@@ -46,13 +56,63 @@ class _UniqueProductSelectorDialogState extends State<UniqueProductSelectorDialo
     super.dispose();
   }
 
-  Future<void> _loadInstances() async {
+  Future<void> _loadData() async {
     setState(() {
       _loading = true;
       _error = null;
     });
 
     try {
+      // Load CalendarController (از widget استفاده کن اگر موجود است)
+      if (widget.calendarController != null) {
+        _calendarController = widget.calendarController;
+      } else {
+        final calendarController = await CalendarController.load();
+        if (mounted) {
+          setState(() {
+            _calendarController = calendarController;
+          });
+        }
+      }
+
+      // Load product info to get attribute_ids
+      final product = await _productService.getProduct(
+        businessId: widget.businessId,
+        productId: widget.productId,
+      );
+
+      // Load product attributes if product has attribute_ids
+      final attributeIds = product['attribute_ids'] as List<dynamic>? ?? [];
+      if (attributeIds.isNotEmpty) {
+        final attrsResult = await _attributeService.search(
+          businessId: widget.businessId,
+          limit: 1000,
+        );
+        final allAttributes = (attrsResult['items'] as List<dynamic>?) ?? [];
+        final productAttrs = allAttributes
+            .where((attr) {
+              final attrId = attr['id'] as int?;
+              return attrId != null && attributeIds.contains(attrId);
+            })
+            .map((attr) => Map<String, dynamic>.from(attr as Map))
+            .toList();
+
+        // Create map by title
+        final attrsMap = <String, Map<String, dynamic>>{};
+        for (var attr in productAttrs) {
+          final title = attr['title']?.toString();
+          if (title != null) {
+            attrsMap[title] = attr;
+          }
+        }
+        if (mounted) {
+          setState(() {
+            _attributesMap = attrsMap;
+          });
+        }
+      }
+
+      // Load instances
       final result = await _svc.getAvailableInstances(
         businessId: widget.businessId,
         productId: widget.productId,
@@ -83,7 +143,20 @@ class _UniqueProductSelectorDialogState extends State<UniqueProductSelectorDialo
     return _instances.where((inst) {
       final serial = inst['serial_number']?.toString().toLowerCase() ?? '';
       final barcode = inst['barcode']?.toString().toLowerCase() ?? '';
-      return serial.contains(searchTerm) || barcode.contains(searchTerm);
+      
+      // Also search in formatted attributes
+      final attrs = inst['custom_attributes'] as Map<String, dynamic>? ?? {};
+      final attrsText = _calendarController != null && _attributesMap.isNotEmpty
+          ? AttributeFormatter.formatAttributesForDisplay(
+              attrs,
+              _attributesMap,
+              _calendarController!.isJalali,
+            ).toLowerCase()
+          : attrs.entries.map((e) => '${e.key}: ${e.value}').join(', ').toLowerCase();
+      
+      return serial.contains(searchTerm) || 
+             barcode.contains(searchTerm) ||
+             attrsText.contains(searchTerm);
     }).toList();
   }
 
@@ -199,7 +272,7 @@ class _UniqueProductSelectorDialogState extends State<UniqueProductSelectorDialo
                               Text('خطا: $_error'),
                               const SizedBox(height: 16),
                               ElevatedButton(
-                                onPressed: _loadInstances,
+                                onPressed: _loadData,
                                 child: const Text('تلاش مجدد'),
                               ),
                             ],
@@ -218,6 +291,15 @@ class _UniqueProductSelectorDialogState extends State<UniqueProductSelectorDialo
                                 final attrs = inst['custom_attributes'] as Map<String, dynamic>? ?? {};
                                 final isSelected = instId != null && _selectedIds.contains(instId);
                                 
+                                // Format attributes
+                                final formattedAttrs = _calendarController != null && _attributesMap.isNotEmpty
+                                    ? AttributeFormatter.formatAttributesForDisplay(
+                                        attrs,
+                                        _attributesMap,
+                                        _calendarController!.isJalali,
+                                      )
+                                    : attrs.entries.map((e) => '${e.key}: ${e.value}').join(', ');
+                                
                                 return CheckboxListTile(
                                   value: isSelected,
                                   onChanged: instId != null
@@ -229,9 +311,9 @@ class _UniqueProductSelectorDialogState extends State<UniqueProductSelectorDialo
                                     children: [
                                       if (barcode != '-') Text('بارکد: $barcode'),
                                       if (warehouseName != null) Text('انبار: $warehouseName'),
-                                      if (attrs.isNotEmpty)
+                                      if (formattedAttrs.isNotEmpty)
                                         Text(
-                                          'ویژگی‌ها: ${attrs.entries.map((e) => '${e.key}: ${e.value}').join(', ')}',
+                                          'ویژگی‌ها: $formattedAttrs',
                                           style: Theme.of(context).textTheme.bodySmall,
                                         ),
                                     ],

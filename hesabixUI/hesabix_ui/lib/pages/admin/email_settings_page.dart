@@ -144,6 +144,7 @@ class _EmailSettingsPageState extends State<EmailSettingsPage> {
         // نمایش Dialog با جزئیات خطا
         _showConnectionErrorDialog(
           response.errorMessage ?? t.connectionFailed,
+          errorDetails: response.errorDetails,
         );
       }
     } catch (e) {
@@ -157,9 +158,37 @@ class _EmailSettingsPageState extends State<EmailSettingsPage> {
     }
   }
 
-  Future<void> _showConnectionErrorDialog(String errorMessage) async {
+  Future<void> _showConnectionErrorDialog(
+    String errorMessage, {
+    Map<String, dynamic>? errorDetails,
+  }) async {
     if (!mounted) return;
     final t = AppLocalizations.of(context);
+    
+    // ساخت متن کامل برای کپی
+    String fullErrorText = errorMessage;
+    if (errorDetails != null) {
+      fullErrorText += '\n\n=== جزئیات فنی ===\n';
+      if (errorDetails['error_type'] != null) {
+        fullErrorText += 'نوع خطا: ${errorDetails['error_type']}\n';
+      }
+      if (errorDetails['host'] != null) {
+        fullErrorText += 'میزبان: ${errorDetails['host']}\n';
+      }
+      if (errorDetails['port'] != null) {
+        fullErrorText += 'پورت: ${errorDetails['port']}\n';
+      }
+      if (errorDetails['use_ssl'] != null) {
+        fullErrorText += 'استفاده از SSL: ${errorDetails['use_ssl']}\n';
+      }
+      if (errorDetails['use_tls'] != null) {
+        fullErrorText += 'استفاده از TLS: ${errorDetails['use_tls']}\n';
+      }
+      if (errorDetails['raw_error'] != null) {
+        fullErrorText += '\nخطای خام:\n${errorDetails['raw_error']}\n';
+      }
+    }
+    
     await showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -210,6 +239,68 @@ class _EmailSettingsPageState extends State<EmailSettingsPage> {
                   ),
                 ),
               ),
+              if (errorDetails != null) ...[
+                const SizedBox(height: 16),
+                const Text(
+                  'اطلاعات فنی:',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surfaceVariant,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: Theme.of(context).colorScheme.outline.withOpacity(0.3),
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (errorDetails['error_type'] != null)
+                        _buildDetailRow('نوع خطا', errorDetails['error_type'].toString()),
+                      if (errorDetails['host'] != null)
+                        _buildDetailRow('میزبان', errorDetails['host'].toString()),
+                      if (errorDetails['port'] != null)
+                        _buildDetailRow('پورت', errorDetails['port'].toString()),
+                      if (errorDetails['use_ssl'] != null)
+                        _buildDetailRow('SSL', errorDetails['use_ssl'].toString()),
+                      if (errorDetails['use_tls'] != null)
+                        _buildDetailRow('TLS', errorDetails['use_tls'].toString()),
+                    ],
+                  ),
+                ),
+                if (errorDetails['raw_error'] != null) ...[
+                  const SizedBox(height: 12),
+                  ExpansionTile(
+                    title: const Text(
+                      'خطای خام (برای پشتیبانی)',
+                      style: TextStyle(fontSize: 13),
+                    ),
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.surface,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: SelectableText(
+                          errorDetails['raw_error'].toString(),
+                          style: TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 11,
+                            color: Theme.of(context).colorScheme.onSurface,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
               const SizedBox(height: 16),
               const Text(
                 'راهکارهای پیشنهادی:',
@@ -220,7 +311,7 @@ class _EmailSettingsPageState extends State<EmailSettingsPage> {
               ),
               const SizedBox(height: 8),
               _buildSuggestionItem('بررسی صحت آدرس میزبان SMTP'),
-              _buildSuggestionItem('بررسی صحت شماره پورت'),
+              _buildSuggestionItem('بررسی صحت شماره پورت (معمولاً 25, 587, 465)'),
               _buildSuggestionItem('بررسی صحت نام کاربری و رمز عبور'),
               _buildSuggestionItem('بررسی تنظیمات TLS/SSL'),
               _buildSuggestionItem('بررسی فایروال و تنظیمات شبکه'),
@@ -235,10 +326,40 @@ class _EmailSettingsPageState extends State<EmailSettingsPage> {
           TextButton(
             onPressed: () {
               Navigator.of(context).pop();
-              Clipboard.setData(ClipboardData(text: errorMessage));
+              Clipboard.setData(ClipboardData(text: fullErrorText));
               _showSuccessSnackBar('جزئیات خطا در کلیپ‌بورد کپی شد');
             },
             child: const Text('کپی خطا'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDetailRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 80,
+            child: Text(
+              '$label:',
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(
+                fontSize: 12,
+                fontFamily: 'monospace',
+              ),
+            ),
           ),
         ],
       ),

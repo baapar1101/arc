@@ -264,6 +264,57 @@ class WarehouseService {
     );
     return Map<String, dynamic>.from(res.data?['data'] ?? const {});
   }
+
+  // Stock Count Methods
+  Future<Map<String, dynamic>> startStockCount({
+    required int businessId,
+    int? warehouseId,
+    List<int>? productIds,
+    String? asOfDate,
+  }) async {
+    final payload = <String, dynamic>{};
+    if (warehouseId != null) payload['warehouse_id'] = warehouseId;
+    if (productIds != null && productIds.isNotEmpty) payload['product_ids'] = productIds;
+    if (asOfDate != null) payload['as_of_date'] = asOfDate;
+    
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/warehouse-docs/business/$businessId/stock-count/start',
+      data: payload,
+    );
+    return Map<String, dynamic>.from(res.data?['data'] ?? const {});
+  }
+
+  Future<Map<String, dynamic>> calculateStockCountDifferences({
+    required int businessId,
+    required List<Map<String, dynamic>> items,
+  }) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/warehouse-docs/business/$businessId/stock-count/calculate',
+      data: {'items': items},
+    );
+    return Map<String, dynamic>.from(res.data?['data'] ?? const {});
+  }
+
+  Future<Map<String, dynamic>> createStockCountAdjustment({
+    required int businessId,
+    required String stockCountCode,
+    required String stockCountDate,
+    required List<Map<String, dynamic>> items,
+    String? notes,
+  }) async {
+    final payload = <String, dynamic>{
+      'stock_count_code': stockCountCode,
+      'stock_count_date': stockCountDate,
+      'items': items,
+    };
+    if (notes != null) payload['notes'] = notes;
+    
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/warehouse-docs/business/$businessId/stock-count/create-adjustment',
+      data: payload,
+    );
+    return Map<String, dynamic>.from(res.data?['data'] ?? const {});
+  }
 }
 
 

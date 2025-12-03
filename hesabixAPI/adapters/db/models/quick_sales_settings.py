@@ -85,12 +85,26 @@ class QuickSalesSetting(Base):
     )
 
     # تنظیمات موجودی
+    enable_warehouse_document: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+        server_default="1",
+        comment="فعال/غیرفعال کردن صدور حواله انبار"
+    )
+    warehouse_document_type: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        default="posted",
+        server_default="posted",
+        comment="نوع سند حواله انبار: draft یا posted"
+    )
     auto_post_warehouse: Mapped[bool] = mapped_column(
         Boolean,
         nullable=False,
         default=True,
         server_default="1",
-        comment="قطعی خودکار حواله انبار"
+        comment="(قدیمی - برای سازگاری) قطعی خودکار حواله انبار"
     )
     show_inventory: Mapped[bool] = mapped_column(
         Boolean,

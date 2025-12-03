@@ -31,32 +31,32 @@ def upgrade():
     
     # اضافه کردن فیلدهای soft delete در صورت عدم وجود
     if 'deleted_at' not in columns:
-    op.add_column('businesses', sa.Column('deleted_at', sa.DateTime(), nullable=True))
+        op.add_column('businesses', sa.Column('deleted_at', sa.DateTime(), nullable=True))
     if 'deletion_requested_at' not in columns:
-    op.add_column('businesses', sa.Column('deletion_requested_at', sa.DateTime(), nullable=True))
+        op.add_column('businesses', sa.Column('deletion_requested_at', sa.DateTime(), nullable=True))
     if 'deletion_requested_by' not in columns:
-    op.add_column('businesses', sa.Column('deletion_requested_by', sa.Integer(), nullable=True))
+        op.add_column('businesses', sa.Column('deletion_requested_by', sa.Integer(), nullable=True))
     if 'deletion_reason' not in columns:
-    op.add_column('businesses', sa.Column('deletion_reason', sa.Text(), nullable=True))
+        op.add_column('businesses', sa.Column('deletion_reason', sa.Text(), nullable=True))
     if 'auto_delete_at' not in columns:
-    op.add_column('businesses', sa.Column('auto_delete_at', sa.DateTime(), nullable=True))
+        op.add_column('businesses', sa.Column('auto_delete_at', sa.DateTime(), nullable=True))
     
     # بررسی وجود ایندکس‌ها
     indexes = [idx['name'] for idx in inspector.get_indexes('businesses')]
     if 'ix_businesses_deleted_at' not in indexes:
-    op.create_index(op.f('ix_businesses_deleted_at'), 'businesses', ['deleted_at'], unique=False)
+        op.create_index(op.f('ix_businesses_deleted_at'), 'businesses', ['deleted_at'], unique=False)
     if 'ix_businesses_auto_delete_at' not in indexes:
-    op.create_index(op.f('ix_businesses_auto_delete_at'), 'businesses', ['auto_delete_at'], unique=False)
+        op.create_index(op.f('ix_businesses_auto_delete_at'), 'businesses', ['auto_delete_at'], unique=False)
     
     # بررسی وجود ForeignKey
     foreign_keys = [fk['name'] for fk in inspector.get_foreign_keys('businesses')]
     if 'fk_businesses_deletion_requested_by_users' not in foreign_keys:
-    op.create_foreign_key(
-        'fk_businesses_deletion_requested_by_users',
-        'businesses', 'users',
-        ['deletion_requested_by'], ['id'],
-        ondelete='SET NULL'
-    )
+        op.create_foreign_key(
+            'fk_businesses_deletion_requested_by_users',
+            'businesses', 'users',
+            ['deletion_requested_by'], ['id'],
+            ondelete='SET NULL'
+        )
 
 
 def downgrade():

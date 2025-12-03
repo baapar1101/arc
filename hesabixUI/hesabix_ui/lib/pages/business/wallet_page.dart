@@ -208,9 +208,10 @@ class _WalletPageState extends State<WalletPage> {
 
   Future<void> _openTopUpDialog() async {
     if (!context.mounted) return;
-    // دریافت واحد ارز از overview
-    final currencyCode = _overview?['base_currency_code'] ?? 'IRR';
-    final currencyLabel = currencyCode == 'IRR' ? 'تومان' : currencyCode;
+    // دریافت واحد ارز از overview - استفاده از symbol ارز پیش‌فرض
+    final currencySymbol = _overview?['base_currency_symbol']?.toString();
+    final currencyCode = _overview?['base_currency_code']?.toString() ?? 'IRR';
+    final currencyLabel = currencySymbol ?? currencyCode;
     
     await WalletTopUpDialog.show(
       context: context,
@@ -239,7 +240,10 @@ class _WalletPageState extends State<WalletPage> {
 
     final theme = Theme.of(context);
     final overview = _overview;
-    final currency = overview?['base_currency_code'] ?? 'IRR';
+    // استفاده از symbol ارز پیش‌فرض کیف‌پول
+    final currencySymbol = overview?['base_currency_symbol']?.toString();
+    final currencyCode = overview?['base_currency_code']?.toString() ?? 'IRR';
+    final currency = currencySymbol ?? currencyCode;
 
     return Scaffold(
       appBar: AppBar(title: Text(t.wallet)),

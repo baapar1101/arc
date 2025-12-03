@@ -124,20 +124,53 @@ class EmailService:
     def _send_smtp_email(self, config: EmailConfig, msg: MIMEMultipart) -> bool:
         """Internal method to send email via SMTP"""
         try:
-            # Create SMTP connection
+            # Create SMTP connection with timeout
             if config.use_ssl:
-                server = smtplib.SMTP_SSL(config.smtp_host, config.smtp_port)
+                server = smtplib.SMTP_SSL(config.smtp_host, config.smtp_port, timeout=10)
             else:
-                server = smtplib.SMTP(config.smtp_host, config.smtp_port)
+                server = smtplib.SMTP(config.smtp_host, config.smtp_port, timeout=10)
                 if config.use_tls:
                     server.starttls()
             
-            # Login and send
-            server.login(config.smtp_username, config.smtp_password)
+            # Login and send - ensure username and password are properly encoded
+            username = config.smtp_username
+            password = config.smtp_password
+            
+            # Handle encoding issues with password
+            if isinstance(password, bytes):
+                password = password.decode('utf-8', errors='replace')
+            if isinstance(username, bytes):
+                username = username.decode('utf-8', errors='replace')
+            
+            # Try to encode to ensure compatibility
+            try:
+                password.encode('ascii')
+            except UnicodeEncodeError:
+                # Password contains non-ASCII characters
+                # smtplib should handle this with base64 encoding, but let's ensure it's a proper string
+                pass
+            
+            server.login(username, password)
             server.send_message(msg)
             server.quit()
             
             return True
-        except Exception as e:
+        except smtplib.SMTPAuthenticationError as e:
+            print(f"SMTP Authentication error: {e}")
+            return False
+        except smtplib.SMTPConnectError as e:
+            print(f"SMTP Connection error: Cannot connect to {config.smtp_host}:{config.smtp_port} - {e}")
+            return False
+        except smtplib.SMTPException as e:
             print(f"SMTP error: {e}")
+            return False
+        except ConnectionRefusedError as e:
+            print(f"Connection refused: SMTP server at {config.smtp_host}:{config.smtp_port} is not available - {e}")
+            return False
+        except TimeoutError as e:
+            print(f"Timeout error: SMTP server at {config.smtp_host}:{config.smtp_port} did not respond - {e}")
+            return False
+        except Exception as e:
+            error_type = type(e).__name__
+            print(f"SMTP error ({error_type}): {e}")
             return False

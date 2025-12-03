@@ -14,7 +14,8 @@ class WorkflowNodeWidget extends StatelessWidget {
   final ValueChanged<Offset>? onConnectionDragUpdate;
   final double zoomLevel;
   final bool highlightConnectionPoints; // برای highlight کردن connection points قابل اتصال
-  final ValueChanged<Offset>? onDeltaChanged; // برای ارسال delta در canvas coordinates
+  final ValueChanged<Offset>? onDeltaChanged; // برای ارسال موقعیت global در canvas coordinates
+  final List<String>? validationErrors; // خطاهای اعتبارسنجی
 
   const WorkflowNodeWidget({
     super.key,
@@ -29,6 +30,7 @@ class WorkflowNodeWidget extends StatelessWidget {
     this.zoomLevel = 1.0,
     this.highlightConnectionPoints = false,
     this.onDeltaChanged,
+    this.validationErrors,
   });
 
   @override
@@ -42,167 +44,77 @@ class WorkflowNodeWidget extends StatelessWidget {
           ? node.position 
           : const Offset(200, 200);
       
-      // بررسی اعتبار zoomLevel
-      final validZoomLevel = (zoomLevel > 0 && zoomLevel.isFinite && !zoomLevel.isNaN) 
-          ? zoomLevel 
-          : 1.0;
+      // ذخیره مقادیر مورد نیاز در local variables برای استفاده در closures
+      final nodePosition = validPosition;
+      final nodeTypeForClosure = node.type;
+      final nodeLabelForClosure = node.label;
+      final themeForClosure = theme;
+      final colorForClosure = color;
+      final isSelectedForClosure = isSelected;
+      
+      // ایجاد icon data و text style
+      final iconData = _getNodeIcon(nodeTypeForClosure);
+      final textStyle = themeForClosure.textTheme.titleSmall?.copyWith(
+        fontWeight: FontWeight.bold,
+        color: colorForClosure,
+      );
+      
+      // ایجاد border color
+      final hasErrors = validationErrors != null && validationErrors!.isNotEmpty;
+      final borderColor = hasErrors 
+          ? Colors.red 
+          : (isSelectedForClosure ? themeForClosure.colorScheme.primary : colorForClosure);
+      final borderWidth = (isSelectedForClosure || hasErrors) ? 3.0 : 2.0;
+      
+      // ایجاد surface color
+      final surfaceColor = themeForClosure.colorScheme.surface;
+      
+      // ایجاد header background color
+      final headerBackgroundColor = colorForClosure.withOpacity(0.2);
+      
+      final isTrigger = _isTriggerNode(nodeTypeForClosure);
+      final isNotTrigger = !isTrigger;
 
+      // ساخت widget بدون Builder برای جلوگیری از مشکل closure
+      final stackWidget = _buildStackWidget(
+        context: context,
+        isTrigger: isTrigger,
+        isNotTrigger: isNotTrigger,
+        theme: theme,
+        color: color,
+        borderColor: borderColor,
+        borderWidth: borderWidth,
+        surfaceColor: surfaceColor,
+        headerBackgroundColor: headerBackgroundColor,
+        iconData: iconData,
+        textStyle: textStyle,
+      );
+      
       return Positioned(
         left: validPosition.dx,
         top: validPosition.dy,
-      child: RepaintBoundary(
-        child: GestureDetector(
-          onTap: onTap,
-          onLongPress: onLongPress,
-          onPanStart: (details) {
-            // ذخیره موقعیت اولیه برای محاسبه delta
-            if (onDeltaChanged != null) {
-              final RenderBox? box = context.findRenderObject() as RenderBox?;
-              if (box != null) {
-                final globalPosition = box.localToGlobal(details.localPosition);
-                onDeltaChanged?.call(globalPosition);
+        child: RepaintBoundary(
+          child: GestureDetector(
+            onTap: onTap,
+            onLongPress: onLongPress,
+            onPanStart: (details) {
+              // علامت‌گذاری شروع drag
+              if (onDeltaChanged != null) {
+                onDeltaChanged?.call(Offset.zero); // سیگنال شروع drag
               }
-            }
-          },
-          onPanUpdate: (details) {
-            if (onDeltaChanged != null) {
-              // ارسال موقعیت global برای محاسبه delta در parent
-              final RenderBox? box = context.findRenderObject() as RenderBox?;
-              if (box != null) {
-                final globalPosition = box.localToGlobal(details.localPosition);
-                onDeltaChanged?.call(globalPosition);
-              }
-            } else {
-              // Fallback: استفاده از delta با zoom adjustment
-              final validZoom = (zoomLevel > 0 && zoomLevel.isFinite) ? zoomLevel : 1.0;
-              final adjustedDelta = details.delta / validZoom;
-              final newPosition = node.position + adjustedDelta;
-              if (_isValidPosition(newPosition)) {
+            },
+            onPanUpdate: (details) {
+              if (onPositionChanged != null) {
+                // استفاده مستقیم از delta (adjust شده با zoom)
+                final adjustedDelta = details.delta / (zoomLevel > 0 ? zoomLevel : 1.0);
+                final newPosition = node.position + adjustedDelta;
                 onPositionChanged?.call(newPosition);
               }
-            }
-          },
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              // نود اصلی
-              Container(
-                width: WorkflowConstants.nodeWidth,
-                height: WorkflowConstants.nodeHeight,
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.surface,
-                  border: Border.all(
-                    color: isSelected ? theme.colorScheme.primary : color,
-                    width: isSelected ? 3 : 2,
-                  ),
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Header با رنگ
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: color.withOpacity(0.2),
-                        borderRadius: const BorderRadius.only(
-                          topLeft: Radius.circular(12),
-                          topRight: Radius.circular(12),
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            _getNodeIcon(node.type),
-                            size: 18,
-                            color: color,
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              node.label,
-                              style: theme.textTheme.titleSmall?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                color: color,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    // Body
-                    const Expanded(
-                      child: SizedBox(),
-                    ),
-                  ],
-                ),
-              ),
-              // Connection points در اطراف نود
-              // بالا (input) - فقط برای action/condition/loop
-              if (node.type != WorkflowNodeType.trigger)
-                Positioned(
-                  top: -8,
-                  left: WorkflowConstants.nodeWidth / 2 - 8, // وسط نود
-                  child: _buildConnectionPoint(
-                    context,
-                    ConnectionPointType.input,
-                    isHighlighted: highlightConnectionPoints,
-                    onTap: onEndConnection,
-                    onConnectionDragUpdate: onConnectionDragUpdate,
-                  ),
-                ),
-              // پایین (output) - برای همه
-              Positioned(
-                bottom: -8,
-                left: WorkflowConstants.nodeWidth / 2 - 8, // وسط نود
-                child: _buildConnectionPoint(
-                  context,
-                  ConnectionPointType.output,
-                  isHighlighted: false, // output نباید highlight شود
-                  onTap: onStartConnection,
-                  onConnectionDragUpdate: onConnectionDragUpdate,
-                ),
-              ),
-              // راست (output) - فقط برای action/condition/loop
-              if (node.type != WorkflowNodeType.trigger)
-                Positioned(
-                  top: WorkflowConstants.nodeHeight / 2 - 8, // وسط نود
-                  right: -8,
-                  child: _buildConnectionPoint(
-                    context,
-                    ConnectionPointType.output,
-                    isHighlighted: false,
-                    onTap: onStartConnection,
-                    onConnectionDragUpdate: onConnectionDragUpdate,
-                  ),
-                ),
-              // چپ (input) - فقط برای trigger
-              if (node.type == WorkflowNodeType.trigger)
-                Positioned(
-                  top: WorkflowConstants.nodeHeight / 2 - 8, // وسط نود
-                  left: -8,
-                  child: _buildConnectionPoint(
-                    context,
-                    ConnectionPointType.input,
-                    isHighlighted: highlightConnectionPoints,
-                    onTap: onEndConnection,
-                    onConnectionDragUpdate: onConnectionDragUpdate,
-                  ),
-                ),
-            ],
+            },
+            child: stackWidget,
           ),
         ),
-      ),
-    );
+      );
     } catch (e, stackTrace) {
       // در صورت خطا، یک widget placeholder برگردان
       debugPrint('خطا در ساخت WorkflowNodeWidget برای node ${node.id}: $e');
@@ -230,67 +142,343 @@ class WorkflowNodeWidget extends StatelessWidget {
            !position.dy.isNaN;
   }
 
+  /// بررسی اینکه آیا node از نوع trigger است یا نه
+  /// این متد به صورت safe enum را چک می‌کند تا مشکل type checking در Flutter Web نداشته باشیم
+  bool _isTriggerNode(WorkflowNodeType type) {
+    try {
+      // استفاده از switch برای جلوگیری از مشکل در Flutter Web
+      switch (type) {
+        case WorkflowNodeType.trigger:
+          return true;
+        case WorkflowNodeType.action:
+        case WorkflowNodeType.condition:
+        case WorkflowNodeType.loop:
+          return false;
+      }
+    } catch (e) {
+      debugPrint('🔴 [_isTriggerNode] خطا در بررسی نوع: $e');
+      return false; // در صورت خطا، فرض کنیم trigger نیست
+    }
+  }
+
+  /// ساخت Stack widget با connection points
+  Widget _buildStackWidget({
+    required BuildContext context,
+    required bool isTrigger,
+    required bool isNotTrigger,
+    required ThemeData theme,
+    required Color color,
+    required Color borderColor,
+    required double borderWidth,
+    required Color surfaceColor,
+    required Color headerBackgroundColor,
+    required IconData iconData,
+    required TextStyle? textStyle,
+  }) {
+    try {
+      // ایجاد لیست connection points
+      final connectionPoints = <Widget>[];
+      
+      // پایین (output) - برای همه
+      connectionPoints.add(
+        Positioned(
+          bottom: -8,
+          left: WorkflowConstants.nodeWidth / 2 - 8,
+          child: _buildConnectionPoint(
+            context,
+            isOutput: true,
+            isHighlighted: false,
+            onTap: onStartConnection,
+            onConnectionDragUpdate: onConnectionDragUpdate,
+          ),
+        ),
+      );
+      
+      // بالا (input) - فقط برای action/condition/loop
+      if (isNotTrigger) {
+        connectionPoints.add(
+          Positioned(
+            top: -8,
+            left: WorkflowConstants.nodeWidth / 2 - 8,
+            child: _buildConnectionPoint(
+              context,
+              isOutput: false,
+              isHighlighted: highlightConnectionPoints,
+              onTap: onEndConnection,
+              onConnectionDragUpdate: onConnectionDragUpdate,
+            ),
+          ),
+        );
+      }
+      
+      // راست (output) - فقط برای action/condition/loop
+      if (isNotTrigger) {
+        connectionPoints.add(
+          Positioned(
+            top: WorkflowConstants.nodeHeight / 2 - 8,
+            right: -8,
+            child: _buildConnectionPoint(
+              context,
+              isOutput: true,
+              isHighlighted: false,
+              onTap: onStartConnection,
+              onConnectionDragUpdate: onConnectionDragUpdate,
+            ),
+          ),
+        );
+      }
+      
+      // چپ (input) - فقط برای trigger
+      if (isTrigger) {
+        connectionPoints.add(
+          Positioned(
+            top: WorkflowConstants.nodeHeight / 2 - 8,
+            left: -8,
+            child: _buildConnectionPoint(
+              context,
+              isOutput: false,
+              isHighlighted: highlightConnectionPoints,
+              onTap: onEndConnection,
+              onConnectionDragUpdate: onConnectionDragUpdate,
+            ),
+          ),
+        );
+      }
+      
+      // ساخت Container اصلی
+      final mainContainer = Container(
+        width: WorkflowConstants.nodeWidth,
+        height: WorkflowConstants.nodeHeight,
+        decoration: BoxDecoration(
+          color: surfaceColor,
+          border: Border.all(
+            color: borderColor,
+            width: borderWidth,
+          ),
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Header
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: headerBackgroundColor,
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(12),
+                  topRight: Radius.circular(12),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    iconData,
+                    size: 18,
+                    color: color,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      node.label,
+                      style: textStyle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Body
+            const Expanded(
+              child: SizedBox(),
+            ),
+          ],
+        ),
+      );
+      
+      // ساخت لیست children
+      final children = <Widget>[
+        mainContainer,
+        ...connectionPoints,
+      ];
+      
+      // اضافه کردن error badge اگر خطا وجود دارد
+      if (validationErrors != null && validationErrors!.isNotEmpty) {
+        children.add(
+          Positioned(
+            top: -8,
+            right: -8,
+            child: Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: Colors.red,
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 2),
+              ),
+              child: Icon(
+                Icons.error,
+                color: Colors.white,
+                size: 16,
+              ),
+            ),
+          ),
+        );
+      }
+      
+      // اضافه کردن comment badge اگر یادداشت وجود دارد
+      if (node.comment != null && node.comment!.isNotEmpty) {
+        children.add(
+          Positioned(
+            top: -8,
+            left: -8,
+            child: Tooltip(
+              message: node.comment!,
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: Colors.blue,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white, width: 2),
+                ),
+                child: Icon(
+                  Icons.note,
+                  color: Colors.white,
+                  size: 16,
+                ),
+              ),
+            ),
+          ),
+        );
+      }
+      
+      // برگرداندن Stack
+      return Stack(
+        clipBehavior: Clip.none,
+        children: children,
+      );
+    } catch (e, stackTrace) {
+      debugPrint('خطا در _buildStackWidget: $e');
+      // در صورت خطا، یک widget ساده برگردان
+      return Container(
+        width: WorkflowConstants.nodeWidth,
+        height: WorkflowConstants.nodeHeight,
+        color: Colors.red.withOpacity(0.2),
+        child: Center(
+          child: Text(
+            'خطا: ${e.toString()}',
+            style: const TextStyle(color: Colors.red, fontSize: 10),
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      );
+    }
+  }
+
   Widget _buildConnectionPoint(
-    BuildContext context,
-    ConnectionPointType type, {
+    BuildContext context, {
+    required bool isOutput, // true برای output، false برای input
     bool isHighlighted = false,
     VoidCallback? onTap,
     ValueChanged<Offset>? onConnectionDragUpdate,
   }) {
-    final theme = Theme.of(context);
-    final isOutput = type == ConnectionPointType.output;
-
-    return GestureDetector(
-      onPanStart: (details) {
-        if (isOutput && onTap != null) {
-          onTap(); // شروع اتصال از output point
-        }
-      },
-      onPanUpdate: (details) {
-        if (isOutput && onConnectionDragUpdate != null) {
-          final RenderBox? box = context.findRenderObject() as RenderBox?;
-          if (box != null) {
-            final localToGlobal = box.localToGlobal(details.localPosition);
-            onConnectionDragUpdate(localToGlobal);
+    try {
+      final theme = Theme.of(context);
+      
+      // ایجاد widget بدون MouseRegion برای جلوگیری از مشکل type checking
+      Widget connectionWidget = GestureDetector(
+        onPanStart: (details) {
+          if (isOutput && onTap != null) {
+            onTap(); // شروع اتصال از output point
           }
-        }
-      },
-      onPanEnd: (details) {
-        if (!isOutput && onTap != null) {
-          onTap(); // کامل کردن اتصال در input point
-        }
-      },
-      child: MouseRegion(
-        cursor: isOutput ? SystemMouseCursors.grab : SystemMouseCursors.click,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          width: isHighlighted ? WorkflowConstants.connectionPointHighlightSize : WorkflowConstants.connectionPointSize,
-          height: isHighlighted ? WorkflowConstants.connectionPointHighlightSize : WorkflowConstants.connectionPointSize,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: isHighlighted ? Colors.green : theme.colorScheme.primary,
-            border: Border.all(
-              color: theme.colorScheme.surface,
-              width: isHighlighted ? 3 : 2,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: (isHighlighted ? Colors.green : Colors.black).withOpacity(isHighlighted ? 0.5 : 0.2),
-                blurRadius: isHighlighted ? 8 : 4,
-                offset: const Offset(0, 2),
-                spreadRadius: isHighlighted ? 2 : 0,
-              ),
-            ],
+        },
+        onPanUpdate: (details) {
+          if (isOutput && onConnectionDragUpdate != null) {
+            final RenderBox? box = context.findRenderObject() as RenderBox?;
+            if (box != null) {
+              final localToGlobal = box.localToGlobal(details.localPosition);
+              onConnectionDragUpdate(localToGlobal);
+            }
+          }
+        },
+        onPanEnd: (details) {
+          if (!isOutput && onTap != null) {
+            onTap(); // کامل کردن اتصال در input point
+          }
+        },
+        child: _buildConnectionPointContainer(
+          theme: theme,
+          isHighlighted: isHighlighted,
+          isOutput: isOutput,
+        ),
+      );
+      
+      // اضافه کردن MouseRegion فقط اگر لازم باشد
+      try {
+        final cursor = isOutput ? SystemMouseCursors.grab : SystemMouseCursors.click;
+        connectionWidget = MouseRegion(
+          cursor: cursor,
+          child: connectionWidget,
+        );
+      } catch (e) {
+        // Ignore cursor error, continue without it
+      }
+      
+      return connectionWidget;
+    } catch (e, stackTrace) {
+      debugPrint('خطا در _buildConnectionPoint: $e');
+      // در صورت خطا، یک widget ساده برگردان
+      return Container(
+        width: 16,
+        height: 16,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Widget _buildConnectionPointContainer({
+    required ThemeData theme,
+    required bool isHighlighted,
+    required bool isOutput,
+  }) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      width: isHighlighted ? WorkflowConstants.connectionPointHighlightSize : WorkflowConstants.connectionPointSize,
+      height: isHighlighted ? WorkflowConstants.connectionPointHighlightSize : WorkflowConstants.connectionPointSize,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: isHighlighted ? Colors.green : theme.colorScheme.primary,
+        border: Border.all(
+          color: theme.colorScheme.surface,
+          width: isHighlighted ? 3 : 2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: (isHighlighted ? Colors.green : Colors.black).withOpacity(isHighlighted ? 0.5 : 0.2),
+            blurRadius: isHighlighted ? 8 : 4,
+            offset: const Offset(0, 2),
+            spreadRadius: isHighlighted ? 2 : 0,
           ),
-          alignment: Alignment.center,
-          child: Container(
-            width: isHighlighted ? 10 : 8,
-            height: isHighlighted ? 10 : 8,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: theme.colorScheme.surface,
-            ),
-          ),
+        ],
+      ),
+      alignment: Alignment.center,
+      child: Container(
+        width: isHighlighted ? 10 : 8,
+        height: isHighlighted ? 10 : 8,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: theme.colorScheme.surface,
         ),
       ),
     );

@@ -134,53 +134,6 @@
   </div>
   
   <script>
-    // Configure Flutter to use local CanvasKit instead of CDN
-    window.flutterConfiguration = {
-      canvasKitBaseUrl: "canvaskit/",
-      renderer: "canvaskit",
-      usePathUrlStrategy: true,
-      useLocalCanvasKit: true
-    };
-    
-    // Intercept _flutter object to override loader.load() before it's called
-    window._flutter = window._flutter || {};
-    
-    // Override loader property setter to intercept and wrap the load method
-    let flutterLoader = null;
-    Object.defineProperty(window._flutter, 'loader', {
-      get: function() { return flutterLoader; },
-      set: function(loader) {
-        if (loader && typeof loader.load === 'function') {
-          const originalLoad = loader.load.bind(loader);
-          loader.load = function(options) {
-            options = options || {};
-            options.config = options.config || {};
-            // Force local CanvasKit configuration - never use CDN
-            options.config.canvasKitBaseUrl = "canvaskit/";
-            options.config.renderer = "canvaskit";
-            options.config.useLocalCanvasKit = true;
-            console.log('[Flutter] Using local CanvasKit from: canvaskit/');
-            return originalLoad(options);
-          };
-        }
-        flutterLoader = loader;
-      },
-      configurable: true
-    });
-    
-    // Override buildConfig to set useLocalCanvasKit
-    let flutterBuildConfig = null;
-    Object.defineProperty(window._flutter, 'buildConfig', {
-      get: function() { return flutterBuildConfig; },
-      set: function(config) {
-        if (config) {
-          config.useLocalCanvasKit = true;
-        }
-        flutterBuildConfig = config;
-      },
-      configurable: true
-    });
-    
     // پنهان کردن loading screen وقتی Flutter آماده شد
     function hideLoadingScreen() {
       const loadingScreen = document.getElementById('flutter-loading-screen');
@@ -212,7 +165,45 @@
         hideLoadingScreen();
       }
     }, 10000);
+    
+    // پیکربندی صحیح Flutter با روش جدید - intercept loader قبل از اجرای flutter_bootstrap
+    if (!window._flutter) {
+      window._flutter = {};
+    }
+    
+    // ذخیره تابع اصلی load برای override کردن بعداً
+    window._flutterConfig = {
+      canvasKitBaseUrl: "canvaskit/",
+      renderer: "canvaskit", 
+      useLocalCanvasKit: true
+    };
+    
+    // Intercept loader.load() برای اضافه کردن configuration
+    Object.defineProperty(window._flutter, 'loader', {
+      set: function(loader) {
+        this._loaderInstance = loader;
+        
+        // Override load method
+        if (loader && typeof loader.load === 'function') {
+          const originalLoad = loader.load;
+          loader.load = function(options) {
+            options = options || {};
+            options.config = options.config || {};
+            
+            // اعمال configuration محلی
+            Object.assign(options.config, window._flutterConfig);
+            
+            console.log('[Flutter] Using local CanvasKit from: canvaskit/');
+            return originalLoad.call(loader, options);
+          };
+        }
+      },
+      get: function() {
+        return this._loaderInstance;
+      },
+      configurable: true
+    });
   </script>
-  <script src="flutter_bootstrap.js"></script>
+  <script src="flutter_bootstrap.js" defer></script>
 </body>
 </html>

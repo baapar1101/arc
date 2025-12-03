@@ -181,7 +181,7 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
                   icon: const Icon(Icons.upload_outlined),
                 ),
               ],
-              selected: _selectedDocumentType != null ? {_selectedDocumentType} : <String?>{},
+              selected: {_selectedDocumentType},
               onSelectionChanged: (set) {
                 setState(() {
                   _selectedDocumentType = set.first;

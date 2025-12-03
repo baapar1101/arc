@@ -47,6 +47,7 @@ from adapters.api.v1.admin.storage_plans import router as admin_storage_plans_ro
 from adapters.api.v1.admin.businesses_admin import router as admin_businesses_router
 from adapters.api.v1.admin.document_monetization import router as admin_document_monetization_router
 from adapters.api.v1.admin.zohal import router as admin_zohal_router
+from adapters.api.v1.admin.marketplace import router as admin_marketplace_router
 from adapters.api.v1.announcements import router as announcements_router
 from adapters.api.v1.admin.announcements import router as admin_announcements_router
 from adapters.api.v1.receipts_payments import router as receipts_payments_router
@@ -63,6 +64,7 @@ from adapters.api.v1.wallet_webhook import router as wallet_webhook_router
 from adapters.api.v1.credit import router as credit_router
 from adapters.api.v1.document_numbering import router as document_numbering_router
 from adapters.api.v1.marketplace import router as marketplace_router
+from adapters.api.v1.warranty import router as warranty_router
 from adapters.api.v1.ping_pong import router as ping_pong_router
 from adapters.api.v1.integrations.telegram import router as telegram_integration_router
 from adapters.api.v1.notifications import router as notifications_router
@@ -75,6 +77,7 @@ from adapters.api.v1.jobs import router as jobs_router
 from adapters.api.v1.activity_logs import router as activity_logs_router
 from app.services.notification_processor import background_loop as notifications_background_loop
 from app.services.storage_background_jobs import storage_cleanup_loop, storage_subscription_check_loop
+from app.services.document_monetization_background_jobs import document_monetization_finalize_periods_loop
 from app.services.document_monetization_jobs import document_monetization_loop
 from app.services.monitoring_background_jobs import (
 	monitoring_metrics_collection_loop,
@@ -512,6 +515,8 @@ def create_app() -> FastAPI:
     application.include_router(product_instances_router, prefix=settings.api_v1_prefix)
     from adapters.api.v1.warehouse_docs import router as warehouse_docs_router
     application.include_router(warehouse_docs_router, prefix=settings.api_v1_prefix)
+    from adapters.api.v1.warehouse_reports import router as warehouse_reports_router
+    application.include_router(warehouse_reports_router, prefix=settings.api_v1_prefix)
     from adapters.api.v1.warehouses import router as warehouses_router
     application.include_router(warehouses_router, prefix=settings.api_v1_prefix)
     from adapters.api.v1.boms import router as boms_router
@@ -547,6 +552,7 @@ def create_app() -> FastAPI:
     application.include_router(quick_sales_router, prefix=settings.api_v1_prefix)
     application.include_router(document_numbering_router, prefix=settings.api_v1_prefix)
     application.include_router(marketplace_router, prefix=settings.api_v1_prefix)
+    application.include_router(warranty_router, prefix=settings.api_v1_prefix)
     # Ping Pong Game
     application.include_router(ping_pong_router, prefix=settings.api_v1_prefix)
     # Integrations
@@ -598,6 +604,7 @@ def create_app() -> FastAPI:
     application.include_router(admin_notification_templates_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_document_monetization_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_zohal_router, prefix=settings.api_v1_prefix)
+    application.include_router(admin_marketplace_router, prefix=settings.api_v1_prefix)
     # AI endpoints
     from adapters.api.v1.admin.ai_settings import router as admin_ai_settings_router
     from adapters.api.v1.admin.ai_plans import router as admin_ai_plans_router
@@ -628,6 +635,8 @@ def create_app() -> FastAPI:
         asyncio.create_task(storage_subscription_check_loop(6))
         # Document monetization processor
         asyncio.create_task(document_monetization_loop(10))
+        # Document monetization period finalization: هر 24 ساعت یکبار
+        asyncio.create_task(document_monetization_finalize_periods_loop(24))
         # AI background jobs
         from app.services.ai_background_jobs import (
             ai_quota_reset_loop,

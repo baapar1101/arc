@@ -23,16 +23,18 @@ class WorkflowNodeModel {
   final Map<String, dynamic> config;
   final String? icon;
   final String? key; // شناسه trigger/action (مثل "invoice.created")
+  final String? comment; // یادداشت/توضیح برای node
 
   WorkflowNodeModel({
     required this.id,
     required this.type,
     required this.label,
     required this.position,
-    this.config = const {},
+    Map<String, dynamic>? config,
     this.icon,
     this.key,
-  });
+    this.comment,
+  }) : config = config ?? <String, dynamic>{};
 
   WorkflowNodeModel copyWith({
     String? id,
@@ -42,6 +44,7 @@ class WorkflowNodeModel {
     Map<String, dynamic>? config,
     String? icon,
     String? key,
+    String? comment,
   }) {
     return WorkflowNodeModel(
       id: id ?? this.id,
@@ -51,23 +54,40 @@ class WorkflowNodeModel {
       config: config ?? this.config,
       icon: icon ?? this.icon,
       key: key ?? this.key,
+      comment: comment ?? this.comment,
     );
   }
 
   /// تبدیل به فرمت backend
   Map<String, dynamic> toJson() {
-    return {
+    final configMap = <String, dynamic>{};
+    
+    try {
+      configMap.addAll(config);
+    } catch (e) {
+      debugPrint('خطا در toJson addAll: $e');
+      rethrow;
+    }
+    
+    if (type == WorkflowNodeType.trigger && key != null) {
+      configMap['trigger_type'] = key;
+    }
+    if (type == WorkflowNodeType.action && key != null) {
+      configMap['action_type'] = key;
+    }
+    
+    final result = <String, dynamic>{
       'id': id,
       'type': type.name,
       'label': label,
-      'config': {
-        ...config,
-        if (type == WorkflowNodeType.trigger && key != null)
-          'trigger_type': key,
-        if (type == WorkflowNodeType.action && key != null)
-          'action_type': key,
-      },
+      'config': configMap,
     };
+    
+    if (comment != null && comment!.isNotEmpty) {
+      result['comment'] = comment;
+    }
+    
+    return result;
   }
 
   factory WorkflowNodeModel.fromJson(Map<String, dynamic> json) {
@@ -76,11 +96,14 @@ class WorkflowNodeModel {
       (e) => e.name == typeStr,
       orElse: () => WorkflowNodeType.action,
     );
-
+    
     final configRaw = json['config'];
-    final config = configRaw is Map
-        ? Map<String, dynamic>.from(configRaw.map((k, v) => MapEntry(k.toString(), v)))
-        : <String, dynamic>{};
+    final config = <String, dynamic>{};
+    if (configRaw is Map) {
+      for (final entry in configRaw.entries) {
+        config[entry.key.toString()] = entry.value;
+      }
+    }
     
     String? key;
     if (type == WorkflowNodeType.trigger) {
@@ -96,6 +119,7 @@ class WorkflowNodeModel {
       position: Offset.zero, // موقعیت در backend ذخیره نمی‌شود
       config: config,
       key: key,
+      comment: json['comment']?.toString(),
     );
   }
 }
@@ -134,7 +158,7 @@ class WorkflowConnectionModel {
 
   /// تبدیل به فرمت backend
   Map<String, dynamic> toJson() {
-    return {
+    return <String, dynamic>{
       'source': sourceNodeId,
       'target': targetNodeId,
     };
@@ -175,7 +199,7 @@ class WorkflowNodeMetadata {
   final Map<String, dynamic>? configSchema;
   final String? icon;
 
-  WorkflowNodeMetadata({
+  const WorkflowNodeMetadata({
     required this.key,
     required this.name,
     this.description,
@@ -189,9 +213,13 @@ class WorkflowNodeMetadata {
     WorkflowNodeType type,
   ) {
     final configSchemaRaw = json['config_schema'];
-    final configSchema = configSchemaRaw is Map
-        ? Map<String, dynamic>.from(configSchemaRaw.map((k, v) => MapEntry(k.toString(), v)))
-        : null;
+    Map<String, dynamic>? configSchema;
+    if (configSchemaRaw is Map) {
+      configSchema = <String, dynamic>{};
+      for (final entry in configSchemaRaw.entries) {
+        configSchema[entry.key.toString()] = entry.value;
+      }
+    }
     
     return WorkflowNodeMetadata(
       key: json['key']?.toString() ?? '',

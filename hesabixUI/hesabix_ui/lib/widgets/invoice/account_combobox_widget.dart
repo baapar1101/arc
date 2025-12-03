@@ -34,8 +34,16 @@ class _AccountComboboxWidgetState extends State<AccountComboboxWidget> {
   @override
   void initState() {
     super.initState();
-    _searchController.text = widget.selectedAccount?.name ?? '';
+    _searchController.text = widget.selectedAccount?.displayName ?? '';
     _loadAccounts();
+  }
+
+  @override
+  void didUpdateWidget(AccountComboboxWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.selectedAccount?.id != widget.selectedAccount?.id) {
+      _searchController.text = widget.selectedAccount?.displayName ?? '';
+    }
   }
 
   @override

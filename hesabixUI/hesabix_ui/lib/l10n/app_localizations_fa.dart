@@ -5693,6 +5693,13 @@ class AppLocalizationsFa extends AppLocalizations {
       'مدیریت سناریوی درآمدزایی اسناد و پکیج‌ها';
 
   @override
+  String get settingsMarketplacePlugins => 'مدیریت افزونه‌های بازار';
+
+  @override
+  String get settingsMarketplacePluginsDescription =>
+      'مدیریت افزونه‌ها و پلن‌های بازار افزونه‌ها';
+
+  @override
   String get settingsWalletSettings => 'تنظیمات کیف‌پول';
 
   @override
@@ -5787,4 +5794,225 @@ class AppLocalizationsFa extends AppLocalizations {
   @override
   String get settingsServiceLogsDescription =>
       'مشاهده لاگ‌های hesabix-api و hesabix-rq-worker و مدیریت سرویس‌ها';
+
+  @override
+  String get warranty => 'گارانتی';
+
+  @override
+  String get warrantyManagement => 'مدیریت گارانتی';
+
+  @override
+  String get warrantySettings => 'تنظیمات گارانتی';
+
+  @override
+  String get warrantyCodes => 'کدهای گارانتی';
+
+  @override
+  String get warrantyCode => 'کد گارانتی';
+
+  @override
+  String get warrantySerial => 'سریال گارانتی';
+
+  @override
+  String get generateWarrantyCodes => 'تولید کدهای گارانتی';
+
+  @override
+  String get warrantyActivation => 'فعال‌سازی گارانتی';
+
+  @override
+  String get warrantyTracking => 'رهگیری گارانتی';
+
+  @override
+  String get warrantyStatus => 'وضعیت گارانتی';
+
+  @override
+  String get warrantyGenerated => 'تولید شده';
+
+  @override
+  String get warrantyActivated => 'فعال شده';
+
+  @override
+  String get warrantyExpired => 'این گارانتی منقضی شده است';
+
+  @override
+  String get warrantyUsed => 'استفاده شده';
+
+  @override
+  String get warrantyRevoked => 'این گارانتی لغو شده است';
+
+  @override
+  String get warrantyDuration => 'مدت گارانتی';
+
+  @override
+  String get warrantyDurationDays => 'مدت گارانتی (روز)';
+
+  @override
+  String get warrantyExpiresAt => 'تاریخ انقضا';
+
+  @override
+  String get warrantyGeneratedAt => 'تاریخ تولید';
+
+  @override
+  String get warrantyActivatedAt => 'تاریخ فعال‌سازی';
+
+  @override
+  String get warrantyProduct => 'کالای گارانتی';
+
+  @override
+  String get warrantyCustomer => 'مشتری';
+
+  @override
+  String get warrantyCustomerName => 'نام مشتری';
+
+  @override
+  String get warrantyCustomerPhone => 'شماره تماس مشتری';
+
+  @override
+  String get warrantyCustomerEmail => 'ایمیل مشتری';
+
+  @override
+  String get warrantyProductSerial => 'سریال کالا';
+
+  @override
+  String get activateWarranty => 'فعال‌سازی گارانتی';
+
+  @override
+  String get trackWarranty => 'رهگیری گارانتی';
+
+  @override
+  String get warrantyTrackingLink => 'لینک رهگیری گارانتی';
+
+  @override
+  String get warrantyCodeFormat => 'فرمت کد';
+
+  @override
+  String get warrantyCodePrefix => 'پیشوند کد';
+
+  @override
+  String get warrantySerialFormat => 'فرمت سریال';
+
+  @override
+  String get warrantySerialLength => 'طول سریال';
+
+  @override
+  String get warrantyRandom => 'رندوم';
+
+  @override
+  String get warrantySequential => 'ترتیبی';
+
+  @override
+  String get warrantyCustom => 'دلخواه';
+
+  @override
+  String get warrantySecuritySettings => 'تنظیمات امنیتی';
+
+  @override
+  String get warrantyRequireSerialVerification => 'نیاز به تأیید سریال کالا';
+
+  @override
+  String get warrantyRequireProductInstanceMatch =>
+      'نیاز به تطابق با instance کالا';
+
+  @override
+  String get warrantyMaxActivationAttempts => 'حداکثر تلاش برای فعال‌سازی';
+
+  @override
+  String get warrantyActivationLockoutDuration => 'مدت قفل شدن (دقیقه)';
+
+  @override
+  String get warrantyAutoLinkToPerson => 'اتصال خودکار به Person';
+
+  @override
+  String get warrantyEnableTrackingLink => 'فعال‌سازی لینک رهگیری';
+
+  @override
+  String get warrantyTrackingLinkExpiresDays => 'مدت اعتبار لینک رهگیری (روز)';
+
+  @override
+  String get warrantyEnableSmsNotification => 'ارسال SMS هنگام فعال‌سازی';
+
+  @override
+  String get warrantyEnableEmailNotification => 'ارسال ایمیل هنگام فعال‌سازی';
+
+  @override
+  String get warrantyCodeNotFound => 'کد گارانتی یافت نشد';
+
+  @override
+  String get warrantyInvalidSerial => 'سریال گارانتی معتبر نیست';
+
+  @override
+  String get warrantyAlreadyActivated => 'این گارانتی قبلاً فعال شده است';
+
+  @override
+  String get warrantyActivationSuccess => 'گارانتی با موفقیت فعال شد';
+
+  @override
+  String get warrantyActivationFailed => 'فعال‌سازی گارانتی ناموفق بود';
+
+  @override
+  String get warrantyTooManyAttempts => 'تعداد تلاش‌های شما بیش از حد مجاز است';
+
+  @override
+  String get warrantyProductSerialRequired => 'وارد کردن سریال کالا الزامی است';
+
+  @override
+  String get warrantyProductSerialNotFound => 'سریال کالا یافت نشد';
+
+  @override
+  String get warrantyLinkNotFound => 'لینک رهگیری یافت نشد';
+
+  @override
+  String get warrantyLinkExpired => 'لینک رهگیری منقضی شده است';
+
+  @override
+  String get warrantyLinkInactive => 'لینک رهگیری غیرفعال است';
+
+  @override
+  String get warrantyPluginNotActive =>
+      'پلاگین گارانتی برای این کسب و کار فعال نیست';
+
+  @override
+  String get warrantyGenerateCodes => 'تولید کدهای گارانتی';
+
+  @override
+  String get warrantyQuantity => 'تعداد';
+
+  @override
+  String get warrantyCustomSerials => 'سریال‌های دلخواه';
+
+  @override
+  String get warrantyCustomCodes => 'کدهای دلخواه';
+
+  @override
+  String get warrantyListCodes => 'لیست کدهای گارانتی';
+
+  @override
+  String get warrantyFilterByStatus => 'فیلتر بر اساس وضعیت';
+
+  @override
+  String get warrantyFilterByProduct => 'فیلتر بر اساس کالا';
+
+  @override
+  String get warrantyEvents => 'رویدادهای گارانتی';
+
+  @override
+  String get warrantyEventActivation => 'فعال‌سازی';
+
+  @override
+  String get warrantyEventRepairRequest => 'درخواست تعمیر';
+
+  @override
+  String get warrantyEventRepairCompleted => 'تعمیر انجام شد';
+
+  @override
+  String get warrantyEventReplacement => 'تعویض';
+
+  @override
+  String get warrantyEventExpired => 'منقضی شد';
+
+  @override
+  String get warrantyEventRevoked => 'لغو شد';
+
+  @override
+  String get warrantyManage => 'مدیریت گارانتی';
 }

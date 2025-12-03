@@ -231,6 +231,35 @@ def _compute_available_stock(
             bal += mv["quantity"]
         elif mv["movement"] == "out":
             bal -= mv["quantity"]
+    
+    # اضافه کردن حرکات از حواله‌های انبار (WarehouseDocumentLine)
+    from adapters.db.models.warehouse_document import WarehouseDocument
+    from adapters.db.models.warehouse_document_line import WarehouseDocumentLine
+    
+    wh_movements_query = db.query(WarehouseDocumentLine).join(
+        WarehouseDocument,
+        WarehouseDocument.id == WarehouseDocumentLine.warehouse_document_id
+    ).filter(
+        and_(
+            WarehouseDocument.business_id == business_id,
+            WarehouseDocument.status == "posted",
+            WarehouseDocument.document_date <= up_to_date,
+            WarehouseDocumentLine.product_id == product_id,
+        )
+    )
+    
+    if warehouse_id is not None:
+        wh_movements_query = wh_movements_query.filter(
+            WarehouseDocumentLine.warehouse_id == warehouse_id
+        )
+    
+    wh_movements = wh_movements_query.all()
+    for wh_mv in wh_movements:
+        if wh_mv.movement == "in":
+            bal += Decimal(str(wh_mv.quantity))
+        elif wh_mv.movement == "out":
+            bal -= Decimal(str(wh_mv.quantity))
+    
     return bal
 
 
@@ -854,6 +883,90 @@ def _build_invoice_code(db: Session, business_id: int, invoice_type: str) -> str
     return f"{prefix}-{next_num:04d}"
 
 
+def _validate_selected_instances(
+    db: Session,
+    business_id: int,
+    product_id: int,
+    selected_instance_ids: List[Any],
+    quantity: int,
+    invoice_type: str,
+) -> None:
+    """
+    اعتبارسنجی selected_instance_ids برای کالاهای یونیک در فاکتور.
+    
+    این تابع فقط برای فاکتورهای فروش و برگشت از خرید معنا دارد (چون حواله خارج دارند).
+    """
+    from adapters.db.models.product_instance import ProductInstance
+    
+    # فقط برای فاکتورهای فروش و برگشت از خرید
+    if invoice_type not in (INVOICE_SALES, INVOICE_PURCHASE_RETURN):
+        return
+    
+    if not selected_instance_ids or not isinstance(selected_instance_ids, list):
+        return
+    
+    # بررسی محصول
+    product = db.query(Product).filter(
+        and_(Product.id == product_id, Product.business_id == business_id)
+    ).first()
+    if not product:
+        raise ApiError("PRODUCT_NOT_FOUND", f"Product {product_id} not found", http_status=404)
+    
+    # بررسی اینکه کالا یونیک است
+    if product.inventory_mode != "unique":
+        raise ApiError(
+            "NOT_UNIQUE_PRODUCT",
+            f"کالای {product.name} در حالت یونیک نیست. انتخاب instance فقط برای کالاهای یونیک امکان‌پذیر است.",
+            http_status=400
+        )
+    
+    # بررسی تعداد - باید دقیقاً برابر quantity باشد
+    instance_count = len(selected_instance_ids)
+    if instance_count != quantity:
+        raise ApiError(
+            "INSTANCE_COUNT_MISMATCH",
+            f"تعداد instance های انتخاب شده ({instance_count}) باید دقیقاً برابر با تعداد کالا ({quantity}) باشد",
+            http_status=400
+        )
+    
+    # بررسی تکرار در لیست
+    unique_ids = set()
+    for inst_id in selected_instance_ids:
+        try:
+            inst_id_int = int(inst_id)
+            if inst_id_int in unique_ids:
+                raise ApiError(
+                    "DUPLICATE_INSTANCE",
+                    f"instance با ID {inst_id_int} به صورت تکراری انتخاب شده است",
+                    http_status=400
+                )
+            unique_ids.add(inst_id_int)
+        except (ValueError, TypeError):
+            raise ApiError(
+                "INVALID_INSTANCE_ID",
+                f"شناسه instance معتبر نیست: {inst_id}",
+                http_status=400
+            )
+    
+    # بررسی دسترس بودن همه instance ها
+    for inst_id_int in unique_ids:
+        instance = db.query(ProductInstance).filter(
+            and_(
+                ProductInstance.id == inst_id_int,
+                ProductInstance.business_id == business_id,
+                ProductInstance.product_id == product_id,
+                ProductInstance.status == "available",
+            )
+        ).first()
+        
+        if not instance:
+            raise ApiError(
+                "INSTANCE_NOT_AVAILABLE",
+                f"کالای یونیک با ID {inst_id_int} یافت نشد یا در دسترس نیست (status != available)",
+                http_status=404
+            )
+
+
 def create_invoice(
     db: Session,
     business_id: int,
@@ -1154,6 +1267,14 @@ def create_invoice(
             raise ApiError("INVALID_LINE", "line.product_id and positive quantity are required", http_status=400)
         extra_info = dict(line.get("extra_info") or {})
         extra_info.pop("inventory_posted", None)
+        
+        # اعتبارسنجی selected_instance_ids برای کالاهای یونیک
+        selected_instance_ids = extra_info.get("selected_instance_ids")
+        if selected_instance_ids:
+            _validate_selected_instances(
+                db, business_id, int(product_id), selected_instance_ids, int(qty), invoice_type
+            )
+        
         db.add(InvoiceItemLine(
             document_id=document.id,
             product_id=int(product_id),
@@ -1690,7 +1811,9 @@ def create_invoice(
     else:
         logger.warning(f"No payment_docs to save for invoice {document.id}. payments data: {payments}")
 
-    # ایجاد حواله انبار draft در صورت نیاز و جدا از فاکتور
+    # ایجاد حواله انبار در صورت نیاز (بر اساس تنظیمات enable_warehouse_document)
+    # post_inventory: تعیین می‌کند که آیا اصلاً حواله ایجاد شود یا نه
+    # auto_post_warehouse: تعیین می‌کند که آیا حواله بلافاصله قطعی شود (posted) یا به صورت پیش‌نویس (draft) بماند
     try:
         if bool(data.get("extra_info", {}).get("post_inventory", True)):
             from app.services.warehouse_service import create_from_invoice, post_warehouse_document
@@ -1857,6 +1980,14 @@ def update_invoice(
         if not product_id or qty <= 0:
             raise ApiError("INVALID_LINE", "line.product_id and positive quantity are required", http_status=400)
         extra_info = dict(line.get("extra_info") or {})
+        
+        # اعتبارسنجی selected_instance_ids برای کالاهای یونیک
+        selected_instance_ids = extra_info.get("selected_instance_ids")
+        if selected_instance_ids:
+            _validate_selected_instances(
+                db, business_id, int(product_id), selected_instance_ids, int(qty), inv_type
+            )
+        
         db.add(InvoiceItemLine(
             document_id=document.id,
             product_id=int(product_id),
@@ -4344,7 +4475,7 @@ def get_materials_consumption_report(
                 'id': product.id,
                 'code': product.code,
                 'name': product.name,
-                'unit': product.unit,
+                'unit': product.main_unit or "",
             }
     
     # دریافت اطلاعات انبارها
@@ -4606,7 +4737,7 @@ def get_production_report(
                 'id': product.id,
                 'code': product.code,
                 'name': product.name,
-                'unit': product.unit,
+                'unit': product.main_unit or "",
             }
     
     # دریافت اطلاعات انبارها

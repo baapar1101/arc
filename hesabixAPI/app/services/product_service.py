@@ -1600,7 +1600,7 @@ def get_inventory_stock_report(
                 "warehouse_code": None,
                 "warehouse_name": "بدون انبار / کل",
                 "quantity": float(stock),
-                "unit": product.unit or "",
+                "unit": product.main_unit or "",
                 "track_inventory": product.track_inventory,
                 "has_movements": has_movements,
             })
@@ -1630,7 +1630,7 @@ def get_inventory_stock_report(
                     "warehouse_code": warehouse.code or "",
                     "warehouse_name": warehouse.name,
                     "quantity": float(stock),
-                    "unit": product.unit or "",
+                    "unit": product.main_unit or "",
                     "track_inventory": product.track_inventory,
                     "has_movements": has_movements,
                 })
@@ -1659,7 +1659,14 @@ def get_inventory_stock_report(
         categories = db.query(BusinessCategory).filter(
             BusinessCategory.id.in_(list(category_ids_set))
         ).all()
-        category_dict = {cat.id: cat.name for cat in categories}
+        category_dict = {}
+        for cat in categories:
+            # استخراج نام از title_translations (اول fa، سپس en)
+            if isinstance(cat.title_translations, dict):
+                title = cat.title_translations.get('fa') or cat.title_translations.get('en') or cat.title_translations.get('default') or ''
+            else:
+                title = ''
+            category_dict[cat.id] = title
         for item in paginated_items:
             if item['category_id']:
                 item['category_name'] = category_dict.get(item['category_id'])

@@ -13,6 +13,7 @@ from app.core.responses import success_response, ApiError
 from adapters.db.models.product_instance import ProductInstance
 from adapters.db.models.product import Product
 from adapters.db.models.warehouse import Warehouse
+from app.services.product_attribute_service import validate_custom_attributes
 
 
 router = APIRouter(prefix="/product-instances", tags=["product_instances"])
@@ -200,6 +201,17 @@ def create_product_instance(
         if not warehouse:
             raise ApiError("WAREHOUSE_NOT_FOUND", "Warehouse not found", http_status=404)
     
+    # اعتبارسنجی custom_attributes
+    if custom_attributes:
+        is_valid, error_message = validate_custom_attributes(
+            db=db,
+            business_id=business_id,
+            product_id=product_id,
+            custom_attributes=custom_attributes
+        )
+        if not is_valid:
+            raise ApiError("INVALID_CUSTOM_ATTRIBUTES", error_message or "مقادیر ویژگی‌های کالا معتبر نیست", http_status=400)
+    
     # ایجاد کالای یونیک
     instance = ProductInstance(
         business_id=business_id,
@@ -281,6 +293,18 @@ def create_bulk_product_instances(
                 ).first()
                 if existing_barcode:
                     errors.append({"index": idx, "error": f"Barcode {barcode} already exists"})
+                    continue
+            
+            # اعتبارسنجی custom_attributes
+            if custom_attributes:
+                is_valid, error_message = validate_custom_attributes(
+                    db=db,
+                    business_id=business_id,
+                    product_id=product_id,
+                    custom_attributes=custom_attributes
+                )
+                if not is_valid:
+                    errors.append({"index": idx, "error": error_message or "مقادیر ویژگی‌های کالا معتبر نیست"})
                     continue
             
             instance = ProductInstance(
@@ -553,7 +577,18 @@ def update_product_instance(
         instance.status = payload.get("status")
     
     if "custom_attributes" in payload:
-        instance.custom_attributes = payload.get("custom_attributes")
+        custom_attributes = payload.get("custom_attributes")
+        # اعتبارسنجی custom_attributes
+        if custom_attributes:
+            is_valid, error_message = validate_custom_attributes(
+                db=db,
+                business_id=business_id,
+                product_id=instance.product_id,
+                custom_attributes=custom_attributes
+            )
+            if not is_valid:
+                raise ApiError("INVALID_CUSTOM_ATTRIBUTES", error_message or "مقادیر ویژگی‌های کالا معتبر نیست", http_status=400)
+        instance.custom_attributes = custom_attributes
     
     if "last_movement_date" in payload:
         movement_date = payload.get("last_movement_date")

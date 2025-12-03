@@ -43,7 +43,9 @@ class _QuickSalesSettingsPageState extends State<QuickSalesSettingsPage> {
   // Boolean settings
   bool _autoCreateAnonymousCustomer = true;
   bool _autoPrint = false;
-  bool _autoPostWarehouse = true;
+  bool _enableWarehouseDocument = true;
+  String _warehouseDocumentType = 'posted'; // 'draft' or 'posted'
+  bool _autoPostWarehouse = true; // برای سازگاری با گذشته
   bool _showInventory = true;
   bool _autoCreatePaymentDocument = true;
   bool _showPurchasePrice = false;
@@ -76,6 +78,8 @@ class _QuickSalesSettingsPageState extends State<QuickSalesSettingsPage> {
         _selectedCurrencyId = settings['default_currency_id'];
         _selectedPriceListId = settings['default_price_list_id'];
         _autoPrint = settings['auto_print'] ?? false;
+        _enableWarehouseDocument = settings['enable_warehouse_document'] ?? true;
+        _warehouseDocumentType = settings['warehouse_document_type'] ?? 'posted';
         _autoPostWarehouse = settings['auto_post_warehouse'] ?? true;
         _showInventory = settings['show_inventory'] ?? true;
         _autoCreatePaymentDocument = settings['auto_create_payment_document'] ?? true;
@@ -120,6 +124,8 @@ class _QuickSalesSettingsPageState extends State<QuickSalesSettingsPage> {
         if (_selectedPriceListId != null)
           'default_price_list_id': _selectedPriceListId,
         'auto_print': _autoPrint,
+        'enable_warehouse_document': _enableWarehouseDocument,
+        'warehouse_document_type': _warehouseDocumentType,
         'auto_post_warehouse': _autoPostWarehouse,
         'show_inventory': _showInventory,
         'auto_create_payment_document': _autoCreatePaymentDocument,
@@ -290,15 +296,72 @@ class _QuickSalesSettingsPageState extends State<QuickSalesSettingsPage> {
                         icon: Icons.warehouse_outlined,
                         children: [
                           SwitchListTile(
-                            title: const Text('قطعی خودکار حواله انبار'),
-                            subtitle: const Text('حواله انبار به صورت خودکار قطعی شود'),
-                            value: _autoPostWarehouse,
+                            title: const Text('صدور حواله انبار'),
+                            subtitle: const Text('صدور سند حواله انبار هنگام فروش'),
+                            value: _enableWarehouseDocument,
                             onChanged: (v) {
                               setState(() {
-                                _autoPostWarehouse = v;
+                                _enableWarehouseDocument = v;
                               });
                             },
                           ),
+                          if (_enableWarehouseDocument) ...[
+                            const SizedBox(height: 8),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 16),
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: cs.surfaceContainerHighest.withOpacity(0.3),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: cs.outline.withOpacity(0.2),
+                                    width: 1,
+                                  ),
+                                ),
+                                padding: const EdgeInsets.all(12),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'نوع سند حواله انبار:',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w500,
+                                        color: cs.onSurface,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    RadioListTile<String>(
+                                      title: const Text('پیش‌نویس'),
+                                      subtitle: const Text('حواله ایجاد می‌شود اما تاثیری در موجودی ندارد'),
+                                      value: 'draft',
+                                      groupValue: _warehouseDocumentType,
+                                      onChanged: (value) {
+                                        setState(() {
+                                          _warehouseDocumentType = value!;
+                                        });
+                                      },
+                                      dense: true,
+                                      contentPadding: EdgeInsets.zero,
+                                    ),
+                                    RadioListTile<String>(
+                                      title: const Text('قطعی'),
+                                      subtitle: const Text('حواله ایجاد و بلافاصله قطعی می‌شود (موجودی کم می‌شود)'),
+                                      value: 'posted',
+                                      groupValue: _warehouseDocumentType,
+                                      onChanged: (value) {
+                                        setState(() {
+                                          _warehouseDocumentType = value!;
+                                        });
+                                      },
+                                      dense: true,
+                                      contentPadding: EdgeInsets.zero,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
                           const SizedBox(height: 8),
                           SwitchListTile(
                             title: const Text('نمایش موجودی'),

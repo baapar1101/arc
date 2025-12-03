@@ -90,8 +90,10 @@ class _WalletTopUpDialogState extends State<WalletTopUpDialog> {
       if (widget.currencyLabel == null) {
         try {
           final overview = await _walletService.getOverview(businessId: widget.businessId);
-          final currencyCode = overview['base_currency_code'] ?? 'IRR';
-          _currencyLabel = currencyCode == 'IRR' ? 'تومان' : currencyCode;
+          // استفاده از symbol ارز پیش‌فرض کیف‌پول
+          final currencySymbol = overview['base_currency_symbol']?.toString();
+          final currencyCode = overview['base_currency_code']?.toString() ?? 'IRR';
+          _currencyLabel = currencySymbol ?? currencyCode;
         } catch (_) {
           // اگر خطا رخ داد، از پیش‌فرض استفاده می‌کنیم
         }
@@ -107,11 +109,47 @@ class _WalletTopUpDialogState extends State<WalletTopUpDialog> {
 
   Future<void> _handleSubmit() async {
     if (!_formKey.currentState!.validate()) return;
-    if (_gateways.isNotEmpty && _gatewayId == null) return;
+    
+    // بررسی وجود درگاه پرداخت
+    if (_gateways.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('هیچ درگاه پرداختی تنظیم نشده است. لطفاً از بخش تنظیمات، درگاه پرداخت اضافه کنید.'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+      return;
+    }
+    
+    if (_gatewayId == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('لطفاً درگاه پرداخت را انتخاب کنید.'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+      return;
+    }
 
     setState(() => _loading = true);
     try {
       final amount = double.tryParse(_amountCtrl.text.replaceAll(',', '')) ?? 0;
+      if (amount <= 0) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('مبلغ باید بزرگتر از صفر باشد.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+      
       final data = await _walletService.topUp(
         businessId: widget.businessId,
         amount: amount,
@@ -123,21 +161,61 @@ class _WalletTopUpDialogState extends State<WalletTopUpDialog> {
 
       final paymentUrl = (data['payment_url'] ?? '').toString();
       if (paymentUrl.isNotEmpty) {
+        bool urlLaunched = false;
         try {
-          await launchUrl(Uri.parse(paymentUrl), mode: LaunchMode.externalApplication);
-        } catch (_) {
-          // اگر باز نشد، فقط لینک را نمایش می‌دهیم
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('لینک پرداخت: $paymentUrl')),
-            );
+          final uri = Uri.parse(paymentUrl);
+          if (await canLaunchUrl(uri)) {
+            await launchUrl(uri, mode: LaunchMode.externalApplication);
+            urlLaunched = true;
           }
+        } catch (e) {
+          // خطا در باز کردن لینک
+          urlLaunched = false;
+        }
+        
+        if (!urlLaunched && mounted) {
+          // نمایش دیالوگ با لینک قابل کپی
+          showDialog(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: const Text('لینک پرداخت'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('لینک پرداخت با موفقیت ایجاد شد. لطفاً لینک زیر را کپی کرده و در مرورگر باز کنید:'),
+                  const SizedBox(height: 12),
+                  SelectableText(
+                    paymentUrl,
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  child: const Text('بستن'),
+                ),
+                FilledButton(
+                  onPressed: () {
+                    Clipboard.setData(ClipboardData(text: paymentUrl));
+                    ScaffoldMessenger.of(ctx).showSnackBar(
+                      const SnackBar(content: Text('لینک کپی شد')),
+                    );
+                  },
+                  child: const Text('کپی لینک'),
+                ),
+              ],
+            ),
+          );
         }
       } else {
         if (mounted) {
           final t = AppLocalizations.of(context);
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(t.walletTopUpNoPaymentLink)),
+            SnackBar(
+              content: Text(t.walletTopUpNoPaymentLink),
+              backgroundColor: Colors.orange,
+            ),
           );
         }
       }
@@ -154,6 +232,7 @@ class _WalletTopUpDialogState extends State<WalletTopUpDialog> {
           SnackBar(
             content: Text('خطا در افزایش اعتبار: $errorMsg'),
             backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
           ),
         );
       }

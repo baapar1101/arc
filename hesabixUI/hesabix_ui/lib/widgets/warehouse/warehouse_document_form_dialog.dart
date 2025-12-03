@@ -11,11 +11,13 @@ import '../../core/calendar_controller.dart';
 import '../../utils/number_normalizer.dart' show parseFormattedNumber;
 import '../../utils/responsive_helper.dart';
 import '../../utils/number_formatters.dart' show formatWithThousands;
+import '../../utils/attribute_formatter.dart';
 import 'product_instance_form_dialog.dart';
 import 'unique_product_selector_dialog.dart';
 
 class WarehouseDocumentFormDialog extends StatefulWidget {
   final int businessId;
+  final int? documentId; // null = ایجاد جدید, not null = ویرایش
   final VoidCallback? onSuccess;
   final String? initialDocType;
   final DateTime? initialDocumentDate;
@@ -29,6 +31,7 @@ class WarehouseDocumentFormDialog extends StatefulWidget {
   const WarehouseDocumentFormDialog({
     super.key,
     required this.businessId,
+    this.documentId,
     this.onSuccess,
     this.initialDocType,
     this.initialDocumentDate,
@@ -72,8 +75,12 @@ class _WarehouseDocumentFormDialogState extends State<WarehouseDocumentFormDialo
   // اطلاعات مقادیر خطوط فاکتور (مورد نیاز، از قبل، باقی مانده)
   Map<int, Map<String, double>> _lineQuantities = {}; // product_id -> {required, processed, remaining}
   bool _loadingQuantities = false;
+  bool _loadingDocument = false; // برای بارگذاری حواله موجود در حالت ویرایش
+  String? _documentStatus; // وضعیت حواله (draft, posted, cancelled)
   bool get _isFromInvoice => widget.sourceInvoiceId != null;
-  bool get _isDocTypeLocked => widget.lockDocType || _isFromInvoice;
+  bool get _isEditMode => widget.documentId != null;
+  bool get _isDocTypeLocked => widget.lockDocType || _isFromInvoice || _isEditMode;
+  bool get _isPosted => _documentStatus == 'posted'; // آیا حواله قطعی شده است؟
   
   // بررسی نیاز به نمایش فیلد نام باربری
   bool get _showCarrierName => _deliveryMethod != null && 
@@ -195,6 +202,17 @@ class _WarehouseDocumentFormDialogState extends State<WarehouseDocumentFormDialo
       final instanceData = line['instance_data'] as List<dynamic>?;
       final instanceIds = line['instance_ids'] as List<dynamic>?;
       
+      // برای حواله‌های posted، فقط instance_data و instance_ids را ارسال می‌کنیم
+      if (_isPosted) {
+        final basePayload = {
+          'id': line['id'], // شناسه خط برای به‌روزرسانی
+          'instance_data': instanceData,
+          'instance_ids': instanceIds,
+        };
+        // حذف فیلدهای null
+        return Map<String, dynamic>.from(basePayload)..removeWhere((key, value) => value == null);
+      }
+      
       // استفاده از تابع مرکزی برای تعیین انبار
       final warehouseResolved = _resolveLineWarehouse(line, movement);
       
@@ -271,7 +289,12 @@ class _WarehouseDocumentFormDialogState extends State<WarehouseDocumentFormDialo
     _docType = widget.initialDocType;
     _documentDate = widget.initialDocumentDate ?? DateTime.now();
     _loadCalendarController();
-    if (widget.initialLines != null && widget.initialLines!.isNotEmpty) {
+    
+    // اگر در حالت ویرایش هستیم، حواله را بارگذاری می‌کنیم
+    if (_isEditMode) {
+      _loadDocumentForEdit();
+    } else if (widget.initialLines != null && widget.initialLines!.isNotEmpty) {
+      // حالت ایجاد جدید با خطوط اولیه
       for (final raw in widget.initialLines!) {
         final normalized = Map<String, dynamic>.from(raw);
         normalized['extra_info'] = Map<String, dynamic>.from(normalized['extra_info'] ?? const {});
@@ -289,8 +312,6 @@ class _WarehouseDocumentFormDialogState extends State<WarehouseDocumentFormDialo
     if (_isFromInvoice && widget.sourceInvoiceId != null) {
       _loadLineQuantities();
     }
-    // مقداردهی اولیه فیلدهای ارسال (در صورت ویرایش)
-    // این فیلدها از extra_info در صورت ویرایش حواله موجود می‌آیند
   }
 
   /// بارگذاری اطلاعات کامل کالاها برای خطوط اولیه
@@ -440,6 +461,136 @@ class _WarehouseDocumentFormDialogState extends State<WarehouseDocumentFormDialo
     }
   }
 
+  /// بارگذاری داده‌های حواله موجود برای ویرایش
+  Future<void> _loadDocumentForEdit() async {
+    if (widget.documentId == null) return;
+    
+    setState(() => _loadingDocument = true);
+    
+    try {
+      final doc = await _svc.getDoc(
+        businessId: widget.businessId,
+        docId: widget.documentId!,
+      );
+      final item = doc['item'] ?? doc;
+      
+      // بررسی وضعیت حواله - draft و posted قابل ویرایش هستند
+      final status = item['status'] as String?;
+      _documentStatus = status;
+      if (status != 'draft' && status != 'posted') {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('فقط حواله‌های پیش‌نویس و قطعی شده قابل ویرایش هستند'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+          Navigator.of(context).pop();
+        }
+        return;
+      }
+      
+      // برای حواله‌های posted، فقط اطلاعات کالاهای یونیک قابل ویرایش است
+      if (status == 'posted') {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('برای حواله‌های قطعی شده، فقط اطلاعات کالاهای یونیک قابل ویرایش است'),
+              backgroundColor: Colors.blue,
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
+      }
+      
+      // پر کردن فیلدهای فرم
+      _docType = item['doc_type'] as String?;
+      final docDateStr = item['document_date'] as String?;
+      if (docDateStr != null) {
+        _documentDate = DateTime.tryParse(docDateStr);
+      }
+      _warehouseIdFrom = item['warehouse_id_from'] as int?;
+      _warehouseIdTo = item['warehouse_id_to'] as int?;
+      
+      // فیلدهای ارسال از extra_info
+      final extraInfo = item['extra_info'] as Map<String, dynamic>? ?? {};
+      _description = item['description'] as String? ?? extraInfo['description'] as String?;
+      _deliveryMethod = item['delivery_method'] as String? ?? extraInfo['delivery_method'] as String?;
+      _carrierName = item['carrier_name'] as String? ?? extraInfo['carrier_name'] as String?;
+      _recipientName = item['recipient_name'] as String? ?? extraInfo['recipient_name'] as String?;
+      _recipientPhone = item['recipient_phone'] as String? ?? extraInfo['recipient_phone'] as String?;
+      _trackingNumber = item['tracking_number'] as String? ?? extraInfo['tracking_number'] as String?;
+      
+      // بارگذاری خطوط
+      final lines = (item['lines'] as List<dynamic>?) ?? [];
+      _lines.clear();
+      for (final line in lines) {
+        final lineMap = Map<String, dynamic>.from(line as Map);
+        // اطمینان از وجود فیلدهای ضروری
+        lineMap['extra_info'] = Map<String, dynamic>.from(lineMap['extra_info'] ?? const {});
+        if (lineMap['movement'] == null) {
+          lineMap['movement'] = _movementForDocType(_docType);
+        }
+        
+        // اگر instance_data از API برگردانده شده، آن را حفظ کن
+        // اگر instance_ids وجود دارد اما instance_data نیست، instance_data را از instance_ids بساز
+        if (lineMap['instance_data'] == null && lineMap['instance_ids'] != null) {
+          // instance_data از API باید برگردانده شود، اما اگر نیست، 
+          // می‌توانیم از instance_ids استفاده کنیم (این حالت نباید رخ دهد چون بک‌اند instance_data را برمی‌گرداند)
+          // اما برای اطمینان، instance_ids را حفظ می‌کنیم
+        }
+        
+        _lines.add(lineMap);
+      }
+      
+      // بارگذاری اطلاعات کامل محصولات برای نمایش در کامبوباکس
+      await _loadProductsForLines();
+      
+      if (mounted) {
+        setState(() {
+          _loadingDocument = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading document for edit: $e');
+      if (mounted) {
+        setState(() => _loadingDocument = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('خطا در بارگذاری حواله: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        Navigator.of(context).pop();
+      }
+    }
+  }
+
+  /// بارگذاری اطلاعات کامل محصولات برای خطوط
+  Future<void> _loadProductsForLines() async {
+    for (var i = 0; i < _lines.length; i++) {
+      final line = _lines[i];
+      final productId = line['product_id'] as int?;
+      if (productId != null) {
+        try {
+          await _loadProductInfo(productId);
+          if (_productCache.containsKey(productId)) {
+            final product = _productCache[productId]!;
+            _updateLine(i, {
+              'product_name': product['name'],
+              'product_code': product['code'],
+            });
+          }
+        } catch (e) {
+          debugPrint('Error loading product info for line $i: $e');
+        }
+      }
+    }
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
   List<Widget> _buildWarehouseFields({required bool isMobile}) {
     if (_docType == 'transfer') {
       if (isMobile) {
@@ -447,14 +598,14 @@ class _WarehouseDocumentFormDialogState extends State<WarehouseDocumentFormDialo
           WarehouseComboboxWidget(
             businessId: widget.businessId,
             selectedWarehouseId: _warehouseIdFrom,
-            onChanged: (id) => setState(() => _warehouseIdFrom = id),
+            onChanged: _isPosted ? (_) {} : (id) => setState(() => _warehouseIdFrom = id),
             label: 'انبار مبدا *',
           ),
           const SizedBox(height: 12),
           WarehouseComboboxWidget(
             businessId: widget.businessId,
             selectedWarehouseId: _warehouseIdTo,
-            onChanged: (id) => setState(() => _warehouseIdTo = id),
+            onChanged: _isPosted ? (_) {} : (id) => setState(() => _warehouseIdTo = id),
             label: 'انبار مقصد *',
           ),
         ];
@@ -466,7 +617,7 @@ class _WarehouseDocumentFormDialogState extends State<WarehouseDocumentFormDialo
               child: WarehouseComboboxWidget(
                 businessId: widget.businessId,
                 selectedWarehouseId: _warehouseIdFrom,
-                onChanged: (id) => setState(() => _warehouseIdFrom = id),
+                onChanged: _isPosted ? (_) {} : (id) => setState(() => _warehouseIdFrom = id),
                 label: 'انبار مبدا *',
               ),
             ),
@@ -475,7 +626,7 @@ class _WarehouseDocumentFormDialogState extends State<WarehouseDocumentFormDialo
               child: WarehouseComboboxWidget(
                 businessId: widget.businessId,
                 selectedWarehouseId: _warehouseIdTo,
-                onChanged: (id) => setState(() => _warehouseIdTo = id),
+                onChanged: _isPosted ? (_) {} : (id) => setState(() => _warehouseIdTo = id),
                 label: 'انبار مقصد *',
               ),
             ),
@@ -487,7 +638,7 @@ class _WarehouseDocumentFormDialogState extends State<WarehouseDocumentFormDialo
         WarehouseComboboxWidget(
           businessId: widget.businessId,
           selectedWarehouseId: _warehouseIdFrom,
-          onChanged: (id) => setState(() => _warehouseIdFrom = id),
+          onChanged: _isPosted ? (_) {} : (id) => setState(() => _warehouseIdFrom = id),
           label: 'انبار *',
         ),
       ];
@@ -496,7 +647,7 @@ class _WarehouseDocumentFormDialogState extends State<WarehouseDocumentFormDialo
         WarehouseComboboxWidget(
           businessId: widget.businessId,
           selectedWarehouseId: _warehouseIdTo,
-          onChanged: (id) => setState(() => _warehouseIdTo = id),
+          onChanged: _isPosted ? (_) {} : (id) => setState(() => _warehouseIdTo = id),
           label: 'انبار *',
         ),
       ];
@@ -797,36 +948,45 @@ class _WarehouseDocumentFormDialogState extends State<WarehouseDocumentFormDialo
       return;
     }
     
-    // لیست instance های ثبت شده
-    final List<Map<String, dynamic>> instances = [];
+    // دریافت instance های قبلی (اگر وجود داشته باشد)
+    final existingInstances = (line['instance_data'] as List<dynamic>?)?.map((e) => Map<String, dynamic>.from(e as Map)).toList() ?? [];
     
-    // ثبت اطلاعات برای هر واحد
-    for (int i = 0; i < quantity; i++) {
-      final result = await showDialog<Map<String, dynamic>>(
-        context: context,
-        builder: (context) => ProductInstanceFormDialog(
-          businessId: widget.businessId,
-          productId: productId,
-          productName: productName,
-          trackSerial: trackSerial,
-          trackBarcode: trackBarcode,
-          productAttributes: attributes,
-        ),
-      );
-      
-      if (result == null) {
-        // کاربر انصراف داد
+    // نمایش دیالوگ مدیریت instance ها
+    final result = await showDialog<List<Map<String, dynamic>>>(
+      context: context,
+      builder: (context) => _ProductInstancesManagerDialog(
+        businessId: widget.businessId,
+        productId: productId,
+        productName: productName,
+        trackSerial: trackSerial,
+        trackBarcode: trackBarcode,
+        productAttributes: attributes,
+        existingInstances: existingInstances,
+        requiredQuantity: quantity,
+        calendarController: widget.calendarController,
+      ),
+    );
+    
+    if (result != null) {
+      // بررسی اینکه تعداد instance_data از quantity بیشتر نشود
+      if (result.length > quantity) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('تعداد کالاهای یونیک ثبت شده (${result.length}) نمی‌تواند از تعداد وارد شده ($quantity) بیشتر باشد'),
+            backgroundColor: Colors.red,
+          ),
+        );
         return;
       }
       
-      instances.add(result);
+      // ذخیره instance_data در خط
+      // توجه: quantity اصلی حفظ می‌شود و تغییر نمی‌کند
+      // instance_data فقط برای ردیابی است و بر موجودی تأثیری ندارد
+      _updateLine(lineIndex, {
+        'instance_data': result,
+        // quantity تغییر نمی‌کند - موجودی از quantity محاسبه می‌شود
+      });
     }
-    
-    // ذخیره instance_data در خط
-    _updateLine(lineIndex, {
-      'instance_data': instances,
-      'quantity': quantity.toDouble(),
-    });
   }
 
   Future<void> _selectUniqueProductInstances(int lineIndex) async {
@@ -847,7 +1007,11 @@ class _WarehouseDocumentFormDialogState extends State<WarehouseDocumentFormDialo
     final product = _productCache[productId]!;
     final productName = product['name']?.toString() ?? 'کالا';
     final quantity = (line['quantity'] as num?)?.toInt();
-    final warehouseId = _warehouseIdFrom ?? line['warehouse_id'] as int?;
+    // برای transfer، از انبار مبدا استفاده می‌کنیم (از خط یا سطح سند)
+    // برای issue/production_out، از انبار خروج استفاده می‌کنیم
+    final warehouseId = _docType == 'transfer'
+        ? (line['warehouse_id_from'] as int? ?? _warehouseIdFrom)
+        : (_warehouseIdFrom ?? line['warehouse_id'] as int?);
     
     // نمایش دیالوگ انتخاب
     final selectedIds = await showDialog<List<int>>(
@@ -859,14 +1023,34 @@ class _WarehouseDocumentFormDialogState extends State<WarehouseDocumentFormDialo
         warehouseId: warehouseId,
         selectedInstanceIds: line['instance_ids'] as List<int>?,
         requiredQuantity: quantity,
+        calendarController: _calendarController,
       ),
     );
     
     if (selectedIds != null && selectedIds.isNotEmpty) {
-      _updateLine(lineIndex, {
-        'instance_ids': selectedIds,
-        'quantity': selectedIds.length.toDouble(),
-      });
+      // بررسی اینکه تعداد instance های انتخاب شده از quantity بیشتر نشود
+      final currentQuantity = (line['quantity'] as num?)?.toInt();
+      if (currentQuantity != null && currentQuantity > 0) {
+        if (selectedIds.length > currentQuantity) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('تعداد کالاهای یونیک انتخاب شده (${selectedIds.length}) نمی‌تواند از تعداد وارد شده ($currentQuantity) بیشتر باشد'),
+              backgroundColor: Colors.red,
+            ),
+          );
+          return;
+        }
+        // اگر quantity از قبل تنظیم شده، آن را حفظ می‌کنیم
+        _updateLine(lineIndex, {
+          'instance_ids': selectedIds,
+        });
+      } else {
+        // اگر quantity تنظیم نشده، آن را به تعداد instance ها تنظیم می‌کنیم
+        _updateLine(lineIndex, {
+          'instance_ids': selectedIds,
+          'quantity': selectedIds.length.toDouble(),
+        });
+      }
     }
   }
 
@@ -960,6 +1144,42 @@ class _WarehouseDocumentFormDialogState extends State<WarehouseDocumentFormDialo
         );
         return;
       }
+      
+      // بررسی تعداد instance ها برای کالاهای یونیک
+      final productId = line['product_id'] as int?;
+      if (productId != null) {
+        await _loadProductInfo(productId);
+        if (_isProductUnique(productId)) {
+          final quantity = (line['quantity'] as num?)?.toInt() ?? 0;
+          final instanceIds = line['instance_ids'] as List?;
+          final instanceData = line['instance_data'] as List?;
+          
+          if (instanceIds != null && instanceIds.isNotEmpty) {
+            if (instanceIds.length > quantity) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('خط ${i + 1}: تعداد کالاهای یونیک انتخاب شده (${instanceIds.length}) نمی‌تواند از تعداد وارد شده ($quantity) بیشتر باشد'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+              return;
+            }
+          }
+          
+          if (instanceData != null && instanceData.isNotEmpty) {
+            if (instanceData.length > quantity) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('خط ${i + 1}: تعداد کالاهای یونیک ثبت شده (${instanceData.length}) نمی‌تواند از تعداد وارد شده ($quantity) بیشتر باشد'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+              return;
+            }
+          }
+        }
+      }
+      
       // اعتبارسنجی انبار با استفاده از تابع مرکزی
       final warehouseError = _validateLineWarehouse(line, i);
       if (warehouseError != null) {
@@ -1008,12 +1228,27 @@ class _WarehouseDocumentFormDialogState extends State<WarehouseDocumentFormDialo
       if (_trackingNumber != null && _trackingNumber!.isNotEmpty) 'tracking_number': _trackingNumber,
     };
 
-    await _svc.createManual(businessId: widget.businessId, payload: payload);
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('حواله ایجاد شد')),
-    );
-    Navigator.of(context).pop();
+    if (_isEditMode && widget.documentId != null) {
+      // حالت ویرایش
+      await _svc.updateDoc(
+        businessId: widget.businessId,
+        docId: widget.documentId!,
+        payload: payload,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('حواله ویرایش شد')),
+      );
+    } else {
+      // حالت ایجاد جدید
+      await _svc.createManual(businessId: widget.businessId, payload: payload);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('حواله ایجاد شد')),
+      );
+    }
+    
+    Navigator.of(context).pop(true);
     widget.onSuccess?.call();
   }
 
@@ -1094,7 +1329,9 @@ class _WarehouseDocumentFormDialogState extends State<WarehouseDocumentFormDialo
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      _isFromInvoice ? 'ایجاد حواله از فاکتور' : 'ایجاد حواله دستی',
+                      _isEditMode
+                          ? 'ویرایش حواله'
+                          : (_isFromInvoice ? 'ایجاد حواله از فاکتور' : 'ایجاد حواله دستی'),
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(
                             fontWeight: FontWeight.bold,
                           ),
@@ -1116,13 +1353,15 @@ class _WarehouseDocumentFormDialogState extends State<WarehouseDocumentFormDialo
                   minHeight: isMobile ? 300 : 500,
                 ),
                 padding: const EdgeInsets.all(16),
-                child: Form(
-                  key: _formKey,
-                  child: SingleChildScrollView(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
+                child: _loadingDocument
+                    ? const Center(child: CircularProgressIndicator())
+                    : Form(
+                        key: _formKey,
+                        child: SingleChildScrollView(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
                 if (_isFromInvoice) ...[
                   _buildSourceBanner(),
                   const SizedBox(height: 12),
@@ -1155,7 +1394,7 @@ class _WarehouseDocumentFormDialogState extends State<WarehouseDocumentFormDialo
                                   DropdownMenuItem(value: 'production_in', child: Text('ورود تولید')),
                                   DropdownMenuItem(value: 'production_out', child: Text('خروج تولید')),
                                 ],
-                                onChanged: _isDocTypeLocked
+                                onChanged: (_isDocTypeLocked || _isPosted)
                                     ? null
                                     : (value) {
                                         setState(() {
@@ -1171,10 +1410,11 @@ class _WarehouseDocumentFormDialogState extends State<WarehouseDocumentFormDialo
                                 DateInputField(
                                   value: _documentDate,
                                   calendarController: _calendarController!,
-                                  onChanged: (date) => setState(() => _documentDate = date),
+                                  onChanged: _isPosted ? null : (date) => setState(() => _documentDate = date),
                                   labelText: 'تاریخ *',
                                   firstDate: DateTime(2000),
                                   lastDate: DateTime(2100),
+                                  enabled: !_isPosted,
                                 )
                               else
                                 const Center(child: CircularProgressIndicator()),
@@ -1207,7 +1447,7 @@ class _WarehouseDocumentFormDialogState extends State<WarehouseDocumentFormDialo
                                       DropdownMenuItem(value: 'production_in', child: Text('ورود تولید')),
                                       DropdownMenuItem(value: 'production_out', child: Text('خروج تولید')),
                                     ],
-                                    onChanged: _isDocTypeLocked
+                                    onChanged: (_isDocTypeLocked || _isPosted)
                                         ? null
                                         : (value) {
                                             setState(() {
@@ -1309,7 +1549,7 @@ class _WarehouseDocumentFormDialogState extends State<WarehouseDocumentFormDialo
                                             'code': line['product_code'],
                                           }
                                         : null,
-                                    onChanged: (product) async {
+                                    onChanged: _isPosted ? (_) {} : (product) {
                                       final productId = product?['id'];
                                       final productName = product?['name'];
                                       final productCode = product?['code'];
@@ -1323,16 +1563,17 @@ class _WarehouseDocumentFormDialogState extends State<WarehouseDocumentFormDialo
                                       
                                       // بارگذاری اطلاعات کالا برای بررسی یونیک بودن
                                       if (productId != null) {
-                                        await _loadProductInfo(productId);
-                                        // به‌روزرسانی اطلاعات کامل کالا از cache در صورت نیاز
-                                        if (_productCache.containsKey(productId)) {
-                                          final cachedProduct = _productCache[productId]!;
-                                          _updateLine(index, {
-                                            'product_name': cachedProduct['name'],
-                                            'product_code': cachedProduct['code'],
-                                          });
-                                        }
-                                        setState(() {}); // به‌روزرسانی UI
+                                        _loadProductInfo(productId).then((_) {
+                                          // به‌روزرسانی اطلاعات کامل کالا از cache در صورت نیاز
+                                          if (_productCache.containsKey(productId)) {
+                                            final cachedProduct = _productCache[productId]!;
+                                            _updateLine(index, {
+                                              'product_name': cachedProduct['name'],
+                                              'product_code': cachedProduct['code'],
+                                            });
+                                          }
+                                          if (mounted) setState(() {}); // به‌روزرسانی UI
+                                        });
                                       }
                                     },
                                   ),
@@ -1347,14 +1588,14 @@ class _WarehouseDocumentFormDialogState extends State<WarehouseDocumentFormDialo
                                     tooltip: 'ثبت اطلاعات کالاهای یونیک',
                                     color: Theme.of(context).colorScheme.primary,
                                   ),
-                                // دکمه انتخاب کالاهای یونیک (فقط برای حواله خروج و کالاهای یونیک)
-                                if ((_docType == 'issue' || _docType == 'production_out') &&
+                                // دکمه انتخاب کالاهای یونیک (برای حواله خروج و انتقال و کالاهای یونیک)
+                                if ((_docType == 'issue' || _docType == 'production_out' || _docType == 'transfer') &&
                                     line['product_id'] != null &&
                                     _isProductUnique(line['product_id'] as int))
                                   IconButton(
                                     icon: const Icon(Icons.checklist, size: 20),
                                     onPressed: () => _selectUniqueProductInstances(index),
-                                    tooltip: 'انتخاب کالاهای یونیک',
+                                    tooltip: _docType == 'transfer' ? 'انتخاب کالاهای یونیک از انبار مبدا' : 'انتخاب کالاهای یونیک',
                                     color: Theme.of(context).colorScheme.primary,
                                   ),
                                 // دکمه تکمیل خودکار سطح (فقط برای حواله از فاکتور)
@@ -1365,11 +1606,12 @@ class _WarehouseDocumentFormDialogState extends State<WarehouseDocumentFormDialo
                                     tooltip: 'تکمیل خودکار این خط',
                                     color: Theme.of(context).colorScheme.primary,
                                   ),
-                                IconButton(
-                                  icon: const Icon(Icons.delete_outline),
-                                  onPressed: () => _removeLine(index),
-                                  color: Colors.red,
-                                ),
+                                if (!_isPosted)
+                                  IconButton(
+                                    icon: const Icon(Icons.delete_outline),
+                                    onPressed: () => _removeLine(index),
+                                    color: Colors.red,
+                                  ),
                               ],
                             ),
                             // نمایش اطلاعات مقادیر (فقط برای حواله از فاکتور)
@@ -1448,39 +1690,173 @@ class _WarehouseDocumentFormDialogState extends State<WarehouseDocumentFormDialo
                                           color: Theme.of(context).colorScheme.primary,
                                         ),
                                         const SizedBox(width: 8),
-                                        Text(
-                                          'اطلاعات ${line['instance_data'].length} کالای یونیک ثبت شده',
-                                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                            fontWeight: FontWeight.bold,
-                                            color: Theme.of(context).colorScheme.primary,
+                                        Expanded(
+                                          child: Text(
+                                            'اطلاعات ${line['instance_data'].length} کالای یونیک ثبت شده',
+                                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                              fontWeight: FontWeight.bold,
+                                              color: Theme.of(context).colorScheme.primary,
+                                            ),
+                                          ),
+                                        ),
+                                        TextButton.icon(
+                                          onPressed: () => _registerUniqueProductInstances(index),
+                                          icon: const Icon(Icons.edit, size: 16),
+                                          label: const Text('ویرایش'),
+                                          style: TextButton.styleFrom(
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                            minimumSize: Size.zero,
+                                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                                           ),
                                         ),
                                       ],
                                     ),
                                     const SizedBox(height: 8),
-                                    ...(line['instance_data'] as List<dynamic>).take(3).map((inst) {
+                                    ...(line['instance_data'] as List<dynamic>).asMap().entries.map((entry) {
+                                      final idx = entry.key;
+                                      final inst = entry.value;
                                       final instMap = Map<String, dynamic>.from(inst as Map);
                                       final serial = instMap['serial_number']?.toString();
                                       final barcode = instMap['barcode']?.toString();
+                                      final attrs = instMap['custom_attributes'] as Map<String, dynamic>?;
+                                      
+                                      final parts = <String>[];
+                                      if (serial != null && serial.isNotEmpty) {
+                                        parts.add('سریال: $serial');
+                                      }
+                                      if (barcode != null && barcode.isNotEmpty) {
+                                        parts.add('بارکد: $barcode');
+                                      }
+                                      if (attrs != null && attrs.isNotEmpty) {
+                                        // دریافت productAttributes برای فرمت صحیح
+                                        final productId = line['product_id'] as int?;
+                                        final productAttrs = productId != null ? _productAttributesCache[productId] : null;
+                                        
+                                        if (productAttrs != null && productAttrs.isNotEmpty) {
+                                          // ساخت attributesMap
+                                          final attrsMap = <String, Map<String, dynamic>>{};
+                                          for (var attr in productAttrs) {
+                                            final title = attr['title']?.toString();
+                                            if (title != null) {
+                                              attrsMap[title] = attr;
+                                            }
+                                          }
+                                          
+                                          final isJalali = _calendarController?.isJalali ?? true;
+                                          final formattedAttrs = AttributeFormatter.formatAttributesForDisplay(
+                                            attrs,
+                                            attrsMap,
+                                            isJalali,
+                                          );
+                                          if (formattedAttrs.isNotEmpty) {
+                                            parts.add('ویژگی‌ها: $formattedAttrs');
+                                          }
+                                        } else {
+                                          // اگر productAttributes در دسترس نیست، نمایش خام
+                                          final attrParts = attrs.entries.map((e) => '${e.key}: ${e.value}').join(', ');
+                                          parts.add('ویژگی‌ها: $attrParts');
+                                        }
+                                      }
+                                      
                                       return Padding(
-                                        padding: const EdgeInsets.only(bottom: 4),
-                                        child: Text(
-                                          '${serial != null ? "سریال: $serial" : ""}${serial != null && barcode != null ? " | " : ""}${barcode != null ? "بارکد: $barcode" : ""}',
-                                          style: Theme.of(context).textTheme.bodySmall,
+                                        padding: const EdgeInsets.only(bottom: 6),
+                                        child: Row(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Container(
+                                              width: 24,
+                                              height: 24,
+                                              decoration: BoxDecoration(
+                                                color: Theme.of(context).colorScheme.primaryContainer,
+                                                borderRadius: BorderRadius.circular(4),
+                                              ),
+                                              child: Center(
+                                                child: Text(
+                                                  '${idx + 1}',
+                                                  style: TextStyle(
+                                                    fontSize: 12,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: Theme.of(context).colorScheme.onPrimaryContainer,
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Expanded(
+                                              child: Text(
+                                                parts.isEmpty ? 'بدون اطلاعات' : parts.join(' | '),
+                                                style: Theme.of(context).textTheme.bodySmall,
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       );
                                     }).toList(),
-                                    if ((line['instance_data'] as List<dynamic>).length > 3)
-                                      Text(
-                                        'و ${(line['instance_data'] as List<dynamic>).length - 3} مورد دیگر...',
-                                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                          fontStyle: FontStyle.italic,
-                                        ),
-                                      ),
                                   ],
                                 ),
                               ),
                             ],
+                            // نمایش اطلاعات انتخاب شده کالاهای یونیک (برای transfer و issue)
+                            Builder(
+                              builder: (context) {
+                                final instanceIds = line['instance_ids'] as List?;
+                                final instanceData = line['instance_data'] as List?;
+                                final hasInstanceIds = instanceIds != null && instanceIds.isNotEmpty;
+                                final hasInstanceData = instanceData != null && instanceData.isNotEmpty;
+                                
+                                if (!hasInstanceIds && !hasInstanceData) {
+                                  return const SizedBox.shrink();
+                                }
+                                
+                                return Column(
+                                  children: [
+                                    const SizedBox(height: 8),
+                                    Container(
+                                      padding: const EdgeInsets.all(12),
+                                      decoration: BoxDecoration(
+                                        color: Theme.of(context).colorScheme.secondaryContainer.withOpacity(0.3),
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(
+                                          color: Theme.of(context).colorScheme.secondary.withOpacity(0.3),
+                                        ),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          Icon(
+                                            Icons.check_circle,
+                                            size: 18,
+                                            color: Theme.of(context).colorScheme.secondary,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(
+                                              hasInstanceData
+                                                  ? 'اطلاعات ${instanceData!.length} کالای یونیک ثبت شده'
+                                                  : '${instanceIds!.length} کالای یونیک انتخاب شده',
+                                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                                fontWeight: FontWeight.bold,
+                                                color: Theme.of(context).colorScheme.secondary,
+                                              ),
+                                            ),
+                                          ),
+                                          if ((_docType == 'transfer' || _docType == 'issue' || _docType == 'production_out') && hasInstanceIds)
+                                            TextButton.icon(
+                                              onPressed: () => _selectUniqueProductInstances(index),
+                                              icon: const Icon(Icons.edit, size: 16),
+                                              label: const Text('ویرایش'),
+                                              style: TextButton.styleFrom(
+                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                                minimumSize: Size.zero,
+                                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                              ),
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              },
+                            ),
                             // نمایش اطلاعات انبار (برای انواع غیر از adjustment و transfer)
                             if (_docType != 'adjustment' && _docType != 'transfer') ...[
                               const SizedBox(height: 8),
@@ -1762,7 +2138,7 @@ class _WarehouseDocumentFormDialogState extends State<WarehouseDocumentFormDialo
                                         WarehouseComboboxWidget(
                                           businessId: widget.businessId,
                                           selectedWarehouseId: line['warehouse_id'] as int?,
-                                          onChanged: (id) => _updateLine(index, {'warehouse_id': id}),
+                                          onChanged: _isPosted ? (_) {} : (id) => _updateLine(index, {'warehouse_id': id}),
                                           label: 'انبار',
                                           isRequired: true,
                                         ),
@@ -1776,7 +2152,8 @@ class _WarehouseDocumentFormDialogState extends State<WarehouseDocumentFormDialo
                                         ),
                                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
                                         initialValue: line['quantity'].toString(),
-                                        onChanged: (value) {
+                                        enabled: !_isPosted,
+                                        onChanged: _isPosted ? null : (value) {
                                           final qty = parseFormattedNumber(value) ?? 0.0;
                                           _updateLine(index, {'quantity': qty});
                                         },
@@ -1803,7 +2180,7 @@ class _WarehouseDocumentFormDialogState extends State<WarehouseDocumentFormDialo
                                             DropdownMenuItem(value: 'in', child: Text('ورود')),
                                             DropdownMenuItem(value: 'out', child: Text('خروج')),
                                           ],
-                                          onChanged: (value) {
+                                          onChanged: _isPosted ? null : (value) {
                                             if (value != null) {
                                               _updateLine(index, {'movement': value});
                                             }
@@ -1817,7 +2194,7 @@ class _WarehouseDocumentFormDialogState extends State<WarehouseDocumentFormDialo
                                         child: WarehouseComboboxWidget(
                                           businessId: widget.businessId,
                                           selectedWarehouseId: line['warehouse_id'] as int?,
-                                          onChanged: (id) => _updateLine(index, {'warehouse_id': id}),
+                                          onChanged: _isPosted ? (_) {} : (id) => _updateLine(index, {'warehouse_id': id}),
                                           label: 'انبار',
                                           isRequired: true,
                                         ),
@@ -1833,7 +2210,8 @@ class _WarehouseDocumentFormDialogState extends State<WarehouseDocumentFormDialo
                                         ),
                                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
                                         initialValue: line['quantity'].toString(),
-                                        onChanged: (value) {
+                                        enabled: !_isPosted,
+                                        onChanged: _isPosted ? null : (value) {
                                           final qty = parseFormattedNumber(value) ?? 0.0;
                                           _updateLine(index, {'quantity': qty});
                                         },
@@ -1922,6 +2300,338 @@ class _WarehouseDocumentFormDialogState extends State<WarehouseDocumentFormDialo
           ],
         ),
       ),
+      ),
+    );
+  }
+}
+
+/// دیالوگ مدیریت instance های کالای یونیک
+class _ProductInstancesManagerDialog extends StatefulWidget {
+  final int businessId;
+  final int productId;
+  final String productName;
+  final bool trackSerial;
+  final bool trackBarcode;
+  final List<Map<String, dynamic>> productAttributes;
+  final List<Map<String, dynamic>> existingInstances;
+  final int requiredQuantity;
+  final CalendarController? calendarController;
+
+  const _ProductInstancesManagerDialog({
+    required this.businessId,
+    required this.productId,
+    required this.productName,
+    required this.trackSerial,
+    required this.trackBarcode,
+    required this.productAttributes,
+    required this.existingInstances,
+    required this.requiredQuantity,
+    this.calendarController,
+  });
+
+  @override
+  State<_ProductInstancesManagerDialog> createState() => _ProductInstancesManagerDialogState();
+}
+
+class _ProductInstancesManagerDialogState extends State<_ProductInstancesManagerDialog> {
+  late List<Map<String, dynamic>> _instances;
+
+  @override
+  void initState() {
+    super.initState();
+    _instances = List.from(widget.existingInstances);
+  }
+
+  Future<void> _addInstance() async {
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (context) => ProductInstanceFormDialog(
+        businessId: widget.businessId,
+        productId: widget.productId,
+        productName: widget.productName,
+        trackSerial: widget.trackSerial,
+        trackBarcode: widget.trackBarcode,
+        productAttributes: widget.productAttributes,
+        calendarController: widget.calendarController,
+      ),
+    );
+
+    if (result != null) {
+      setState(() {
+        _instances.add(result);
+      });
+    }
+  }
+
+  Future<void> _editInstance(int index) async {
+    final existing = _instances[index];
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (context) => ProductInstanceFormDialog(
+        businessId: widget.businessId,
+        productId: widget.productId,
+        productName: widget.productName,
+        trackSerial: widget.trackSerial,
+        trackBarcode: widget.trackBarcode,
+        productAttributes: widget.productAttributes,
+        initialData: existing,
+        calendarController: widget.calendarController,
+      ),
+    );
+
+    if (result != null) {
+      setState(() {
+        _instances[index] = result;
+      });
+    }
+  }
+
+  void _deleteInstance(int index) {
+    setState(() {
+      _instances.removeAt(index);
+    });
+  }
+
+  String _formatInstanceInfo(Map<String, dynamic> instance) {
+    final parts = <String>[];
+    final serial = instance['serial_number']?.toString();
+    final barcode = instance['barcode']?.toString();
+    final attrs = instance['custom_attributes'] as Map<String, dynamic>?;
+
+    if (serial != null && serial.isNotEmpty) {
+      parts.add('سریال: $serial');
+    }
+    if (barcode != null && barcode.isNotEmpty) {
+      parts.add('بارکد: $barcode');
+    }
+    if (attrs != null && attrs.isNotEmpty) {
+      // ساخت attributesMap از productAttributes
+      final attrsMap = <String, Map<String, dynamic>>{};
+      for (var attr in widget.productAttributes) {
+        final title = attr['title']?.toString();
+        if (title != null) {
+          attrsMap[title] = attr;
+        }
+      }
+      
+      final isJalali = widget.calendarController?.isJalali ?? true;
+      final formattedAttrs = AttributeFormatter.formatAttributesForDisplay(
+        attrs,
+        attrsMap,
+        isJalali,
+      );
+      if (formattedAttrs.isNotEmpty) {
+        parts.add('ویژگی‌ها: $formattedAttrs');
+      }
+    }
+
+    return parts.isEmpty ? 'بدون اطلاعات' : parts.join(' | ');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final remaining = widget.requiredQuantity - _instances.length;
+    final isComplete = _instances.length >= widget.requiredQuantity;
+    // اجازه ثبت جزئی: کاربر می‌تواند کمتر از requiredQuantity ثبت کند
+    // instance ها فقط برای ردیابی هستند و بر موجودی تأثیری ندارند
+
+    return Dialog(
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 800, maxHeight: 700),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Header
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.3),
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(12),
+                  topRight: Radius.circular(12),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.qr_code_scanner,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'مدیریت کالاهای یونیک',
+                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                        ),
+                        Text(
+                          widget.productName,
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.of(context).pop(),
+                    tooltip: 'بستن',
+                  ),
+                ],
+              ),
+            ),
+            // Status bar
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              color: isComplete
+                  ? Theme.of(context).colorScheme.primaryContainer.withOpacity(0.3)
+                  : Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.5),
+              child: Row(
+                children: [
+                  Icon(
+                    isComplete ? Icons.check_circle : Icons.info_outline,
+                    size: 20,
+                    color: isComplete
+                        ? Theme.of(context).colorScheme.primary
+                        : Theme.of(context).colorScheme.onSurface,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          isComplete
+                              ? 'تکمیل شده: ${_instances.length} از ${widget.requiredQuantity}'
+                              : 'ثبت شده: ${_instances.length} از ${widget.requiredQuantity}',
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w500,
+                                color: isComplete
+                                    ? Theme.of(context).colorScheme.primary
+                                    : Theme.of(context).colorScheme.onSurface,
+                              ),
+                        ),
+                        if (!isComplete)
+                          Text(
+                            'نکته: می‌توانید کمتر از ${widget.requiredQuantity} مورد ثبت کنید. موجودی از تعداد حواله محاسبه می‌شود.',
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                                  fontSize: 11,
+                                ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Content
+            Flexible(
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                child: _instances.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.inventory_2_outlined,
+                              size: 64,
+                              color: Colors.grey[400],
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'هیچ کالایی ثبت نشده است',
+                              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                    color: Colors.grey[600],
+                                  ),
+                            ),
+                          ],
+                        ),
+                      )
+                    : ListView.builder(
+                        itemCount: _instances.length,
+                        itemBuilder: (context, index) {
+                          final instance = _instances[index];
+                          return Card(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            child: ListTile(
+                              leading: CircleAvatar(
+                                backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                                child: Text(
+                                  '${index + 1}',
+                                  style: TextStyle(
+                                    color: Theme.of(context).colorScheme.onPrimaryContainer,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                              title: Text(
+                                _formatInstanceInfo(instance),
+                                style: Theme.of(context).textTheme.bodyMedium,
+                              ),
+                              trailing: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  IconButton(
+                                    icon: const Icon(Icons.edit, size: 20),
+                                    onPressed: () => _editInstance(index),
+                                    tooltip: 'ویرایش',
+                                    color: Theme.of(context).colorScheme.primary,
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.delete_outline, size: 20),
+                                    onPressed: () => _deleteInstance(index),
+                                    tooltip: 'حذف',
+                                    color: Theme.of(context).colorScheme.error,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+              ),
+            ),
+            // Actions
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                border: Border(
+                  top: BorderSide(color: Colors.grey.shade300),
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  TextButton.icon(
+                    onPressed: _addInstance,
+                    icon: const Icon(Icons.add),
+                    label: const Text('افزودن کالا'),
+                  ),
+                  Row(
+                    children: [
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        child: const Text('انصراف'),
+                      ),
+                      const SizedBox(width: 8),
+                      FilledButton(
+                        onPressed: _instances.isNotEmpty
+                            ? () => Navigator.of(context).pop(_instances)
+                            : null,
+                        child: const Text('ذخیره'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

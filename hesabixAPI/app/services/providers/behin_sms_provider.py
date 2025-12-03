@@ -201,15 +201,16 @@ class BehinSmsProvider:
 			return False, None, str(e)
 		
 		# آماده‌سازی پارامترها
+		# استفاده از نام‌های استاندارد API behinsms
 		params = {
-			'to': recipient_numbers_str,
-			'message': text,
-			'from': self.sender,
+			'RecipientNumber': recipient_numbers_str,
+			'MessageBody': text,
+			'SpecialNumber': self.sender,
 			'IsFlashMessage': 'true' if is_flash else 'false',
 		}
 		
 		if checking_message_id:
-			params['chkMessageId'] = checking_message_id
+			params['CheckingMessageID'] = checking_message_id
 		
 		# ارسال درخواست
 		success, result, error_msg = self._make_request('SendArray', params)

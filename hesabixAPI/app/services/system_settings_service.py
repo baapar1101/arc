@@ -221,8 +221,8 @@ def get_effective_notifications_settings(db: Session) -> Dict[str, Any]:
 		"sms_provider_name": db_values.get("sms_provider_name") or env.sms_provider_name,
 		"sms_api_key": db_values.get("sms_api_key") or env.sms_api_key,
 		"sms_sender": db_values.get("sms_sender") or env.sms_sender,
-		"sms_provider_username": db_values.get("sms_provider_username"),
-		"sms_provider_password": db_values.get("sms_provider_password"),
+		"sms_provider_username": db_values.get("sms_provider_username") or getattr(env, 'sms_provider_username', None),
+		"sms_provider_password": db_values.get("sms_provider_password") or getattr(env, 'sms_provider_password', None),
 		"sms_is_flash": db_values.get("sms_is_flash", False),
 		"telegram_proxy": {
 			"enabled": (

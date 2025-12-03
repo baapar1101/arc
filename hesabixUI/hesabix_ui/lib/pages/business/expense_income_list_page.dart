@@ -86,7 +86,7 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
                 padding: const EdgeInsets.all(8.0),
                 child: DataTableWidget<ExpenseIncomeDocument>(
                   key: _tableKey,
-                  config: _buildTableConfig(t),
+                  config: _buildTableConfig(t, context),
                   fromJson: (json) => ExpenseIncomeDocument.fromJson(json),
                   calendarController: widget.calendarController,
                 ),
@@ -223,7 +223,8 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
   }
 
   /// ساخت تنظیمات جدول
-  DataTableConfig<ExpenseIncomeDocument> _buildTableConfig(AppLocalizations t) {
+  DataTableConfig<ExpenseIncomeDocument> _buildTableConfig(AppLocalizations t, BuildContext context) {
+    final theme = Theme.of(context);
     return DataTableConfig<ExpenseIncomeDocument>(
       endpoint: '/businesses/${widget.businessId}/expense-income',
       title: 'هزینه و درآمد',
@@ -239,8 +240,8 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
           child: FilledButton.icon(
             onPressed: _selectedCount > 0 ? _onBulkDelete : null,
             style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.errorContainer,
-              foregroundColor: Theme.of(context).colorScheme.onErrorContainer,
+              backgroundColor: theme.colorScheme.errorContainer,
+              foregroundColor: theme.colorScheme.onErrorContainer,
             ),
             icon: const Icon(Icons.delete_forever),
             label: Text('حذف ($_selectedCount)'),
@@ -378,9 +379,11 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
       defaultPageSize: 20,
       pageSizeOptions: [10, 20, 50, 100],
       onRowSelectionChanged: (rows) {
-        setState(() {
-          _selectedCount = rows.length;
-        });
+        if (mounted) {
+          setState(() {
+            _selectedCount = rows.length;
+          });
+        }
       },
       additionalParams: {
         // همیشه document_type را ارسال کن، حتی اگر null باشد

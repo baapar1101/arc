@@ -1,7 +1,5 @@
 """API مدیریت سناریوی درآمدزایی اسناد حسابداری (Admin)"""
 
-from __future__ import annotations
-
 from typing import Dict, Any, Optional
 
 from fastapi import APIRouter, Depends, Body, Query, Request

@@ -83,6 +83,47 @@ class _WarehouseDocsPageState extends State<WarehouseDocsPage> {
     await _handleInvoiceWizardResult(wizardResult);
   }
 
+  Future<void> _editDocument(WarehouseDocument doc) async {
+    // حواله‌های draft و posted قابل ویرایش هستند
+    // برای حواله‌های posted، فقط اطلاعات کالاهای یونیک قابل ویرایش است
+    if (doc.status != 'draft' && doc.status != 'posted') {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('فقط حواله‌های پیش‌نویس و قطعی شده قابل ویرایش هستند'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    try {
+      final result = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => WarehouseDocumentFormDialog(
+          businessId: widget.businessId,
+          documentId: doc.id, // ارسال ID برای حالت ویرایش
+          calendarController: _calendarController,
+          onSuccess: () => _refreshTable(),
+        ),
+      );
+
+      if (result == true) {
+        _refreshTable();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('خطا در بارگذاری حواله: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   Future<void> _handleInvoiceWizardResult(WarehouseDocWizardResult wizardResult) async {
     if (wizardResult.invoiceId == null) return;
     bool loaderDismissed = false;
@@ -397,6 +438,21 @@ class _WarehouseDocsPageState extends State<WarehouseDocsPage> {
                       ),
                     ).then((_) => _refreshTable());
                   }
+                },
+              ),
+              DataTableAction(
+                icon: Icons.edit,
+                label: 'ویرایش',
+                onTap: (item) {
+                  if (item is WarehouseDocument && item.id != null) {
+                    _editDocument(item);
+                  }
+                },
+                enabled: (item) {
+                  if (item is WarehouseDocument) {
+                    return item.status == 'draft';
+                  }
+                  return false;
                 },
               ),
               DataTableAction(

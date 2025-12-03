@@ -380,7 +380,9 @@ def require_business_permission_by_entity_dep(
     action: str,
     entity_model,
     entity_id_param: str = None,
-    business_id_field: str = "business_id"
+    business_id_field: str = "business_id",
+    allow_null_business_id: bool = False,
+    business_id_param: str = "business_id"
 ):
     """FastAPI dependency برای بررسی دسترسی کسب و کار برای endpoint هایی که business_id در path ندارند.
     
@@ -394,9 +396,14 @@ def require_business_permission_by_entity_dep(
         entity_id_param: نام پارامتر entity_id در path (مثل "person_id", "document_id")
                          اگر None باشد، از نام مدل استفاده می‌شود (مثل Person -> "person_id")
         business_id_field: نام فیلد business_id در مدل (پیش‌فرض: "business_id")
+        allow_null_business_id: اگر True باشد، موجودیت‌هایی با business_id = None (مثل حساب‌های عمومی) را پشتیبانی می‌کند
+                                در این صورت از business_id موجود در path استفاده می‌شود
+        business_id_param: نام پارامتر business_id در path (پیش‌فرض: "business_id")
     
     استفاده:
         _: None = Depends(require_business_permission_by_entity_dep("people", "edit", Person, "person_id"))
+        # برای موجودیت‌های عمومی (مثل Account):
+        _: None = Depends(require_business_permission_by_entity_dep("chart_of_accounts", "view", Account, "account_id", allow_null_business_id=True))
     """
     import logging
     logger = logging.getLogger(__name__)
@@ -445,7 +452,21 @@ def require_business_permission_by_entity_dep(
         
         # استخراج business_id از entity
         business_id = getattr(entity, business_id_field, None)
-        if not business_id:
+        
+        # اگر entity دارای business_id نیست و allow_null_business_id فعال است، از business_id موجود در path استفاده می‌کنیم
+        if not business_id and allow_null_business_id:
+            try:
+                path_business_id = request.path_params.get(business_id_param)
+                if path_business_id:
+                    business_id = int(path_business_id)
+                    logger.info(f"Entity {entity_id} is public (business_id is None), using business_id from path: {business_id}")
+                else:
+                    logger.error(f"Entity {entity_id} does not have {business_id_field} and {business_id_param} not found in path")
+                    raise ApiError("BAD_REQUEST", f"Entity does not have business_id and {business_id_param} not found in path", http_status=400)
+            except (ValueError, TypeError, AttributeError, KeyError) as e:
+                logger.error(f"Could not extract {business_id_param} from path: {e}")
+                raise ApiError("BAD_REQUEST", f"Entity does not have business_id and could not extract {business_id_param} from path", http_status=400)
+        elif not business_id:
             logger.error(f"Entity {entity_id} does not have {business_id_field} field")
             raise ApiError("BAD_REQUEST", f"Entity does not have business_id", http_status=400)
         

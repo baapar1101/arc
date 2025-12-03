@@ -1,0 +1,72 @@
+{% extends "payment/base.html" %}
+
+{% block title %}پرداخت ناموفق{% endblock %}
+
+{% block content %}
+<div class="icon failed">✕</div>
+<h1>پرداخت ناموفق</h1>
+<p class="message">متأسفانه تراکنش شما با موفقیت انجام نشد. {% if error_message %}{{ error_message }}{% endif %}</p>
+
+<div class="details">
+    <div class="detail-row">
+        <span class="detail-label">شماره تراکنش:</span>
+        <span class="detail-value">{{ transaction_id }}</span>
+    </div>
+    {% if external_ref %}
+    <div class="detail-row">
+        <span class="detail-label">شماره پیگیری:</span>
+        <span class="detail-value">{{ external_ref }}</span>
+    </div>
+    {% endif %}
+    <div class="detail-row">
+        <span class="detail-label">تاریخ و زمان:</span>
+        <span class="detail-value">{{ timestamp }}</span>
+    </div>
+    {% if error_code %}
+    <div class="detail-row">
+        <span class="detail-label">کد خطا:</span>
+        <span class="detail-value">{{ error_code }}</span>
+    </div>
+    {% endif %}
+</div>
+
+<div style="background: #fef2f2; border-radius: 12px; padding: 15px; margin-bottom: 20px; text-align: right;">
+    <p style="color: #991b1b; font-size: 14px; line-height: 1.6;">
+        💡 <strong>راهنمایی:</strong><br>
+        لطفاً موجودی کارت و صحت اطلاعات وارد شده را بررسی کنید. در صورت کسر مبلغ، ظرف 72 ساعت به حساب شما بازگردانده می‌شود.
+    </p>
+</div>
+
+{% if source == 'app' %}
+    <a href="{{ retry_url }}" class="btn btn-primary">تلاش مجدد</a>
+    <a href="#" id="openApp" class="btn btn-secondary" onclick="openApp(); return false;">بازگشت به اپلیکیشن</a>
+{% else %}
+    <a href="{{ retry_url }}" class="btn btn-primary">تلاش مجدد</a>
+    <a href="{{ dashboard_url }}" class="btn btn-secondary">بازگشت به داشبورد</a>
+{% endif %}
+
+<div style="margin-top: 20px; color: #6b7280; font-size: 13px;">
+    <p>نیاز به کمک دارید؟ <a href="{{ support_url }}" style="color: #667eea; text-decoration: none;">تماس با پشتیبانی</a></p>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const deepLink = 'hesabix://payment/callback?tx_id={{ transaction_id }}&status=failed{% if external_ref %}&ref={{ external_ref }}{% endif %}';
+    
+    function openApp() {
+        window.location.href = deepLink;
+        
+        // اگر بعد از 2 ثانیه اپ باز نشد، به store هدایت کن
+        setTimeout(function() {
+            const userAgent = navigator.userAgent.toLowerCase();
+            if (/android/.test(userAgent)) {
+                window.location.href = 'https://play.google.com/store/apps/details?id=ir.hesabix.app';
+            } else if (/iphone|ipad|ipod/.test(userAgent)) {
+                window.location.href = 'https://apps.apple.com/app/hesabix/id123456789';
+            }
+        }, 2000);
+    }
+</script>
+{% endblock %}
+

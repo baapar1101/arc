@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'pages/profile/notifications_settings_page.dart';
 import 'pages/profile/user_notifications_page.dart';
+import 'pages/profile/notification_history_page.dart';
 import 'pages/profile/notification_templates_admin_page.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
@@ -45,6 +46,7 @@ import 'pages/admin/payment_gateways_page.dart';
 import 'pages/admin/storage_plans_admin_page.dart';
 import 'pages/admin/document_monetization_page.dart';
 import 'pages/admin/share_link_settings_page.dart';
+import 'pages/admin/marketplace_plugins_admin_page.dart';
 import 'pages/business/invoices_list_page.dart';
 import 'pages/business/tax_workspace_page.dart';
 import 'pages/business/new_invoice_page.dart';
@@ -60,6 +62,17 @@ import 'pages/business/item_movements_report_page.dart';
 import 'pages/business/sales_by_product_report_page.dart';
 import 'pages/business/inventory_kardex_report_page.dart';
 import 'pages/business/inventory_stock_report_page.dart';
+import 'pages/business/stock_count_report_page.dart';
+import 'pages/business/warehouse_documents_summary_report_page.dart';
+import 'pages/business/slow_moving_items_report_page.dart';
+import 'pages/business/critical_stock_report_page.dart';
+import 'pages/business/inter_warehouse_transfers_report_page.dart';
+import 'pages/business/adjustment_documents_report_page.dart';
+import 'pages/business/warehouse_performance_report_page.dart';
+import 'pages/business/product_movement_history_report_page.dart';
+import 'pages/business/inventory_valuation_report_page.dart';
+import 'pages/business/pending_documents_report_page.dart';
+import 'pages/business/inventory_turnover_report_page.dart';
 import 'pages/business/bank_accounts_turnover_report_page.dart';
 import 'pages/business/cash_petty_turnover_report_page.dart';
 import 'pages/business/activity_logs_page.dart';
@@ -79,6 +92,10 @@ import 'pages/business/account_review_report_page.dart';
 import 'pages/business/persons_page.dart';
 import 'pages/business/product_attributes_page.dart';
 import 'pages/business/products_page.dart';
+import 'pages/business/warranty_management_page.dart';
+import 'pages/business/warranty_settings_page.dart';
+import 'pages/public/public_warranty_activation_page.dart';
+import 'pages/public/public_warranty_tracking_page.dart';
 import 'pages/business/price_lists_page.dart';
 import 'pages/business/price_list_items_page.dart';
 import 'pages/business/cash_registers_page.dart';
@@ -94,6 +111,8 @@ import 'pages/business/transfers_page.dart';
 import 'pages/business/documents_page.dart';
 import 'pages/business/warehouses_page.dart';
 import 'pages/warehouse/warehouse_docs_page.dart';
+import 'pages/warehouse/warehouse_document_details_page.dart';
+import 'pages/warehouse/stock_count_page.dart';
 import 'pages/business/installments_report_page.dart';
 import 'pages/business/credit_settings_page.dart';
 import 'pages/business/quick_sales_settings_page.dart';
@@ -791,6 +810,53 @@ class _MyAppState extends State<MyApp> {
           ),
         ),
         GoRoute(
+          path: '/public/warranty/activate/:business_id',
+          name: 'public_warranty_activate',
+          builder: (context, state) {
+            final businessId = int.tryParse(state.pathParameters['business_id'] ?? '');
+            if (businessId == null) {
+              return const Scaffold(
+                body: Center(child: Text('شناسه کسب و کار نامعتبر است')),
+              );
+            }
+            return PublicWarrantyActivationPage(
+              businessId: businessId,
+            );
+          },
+        ),
+        GoRoute(
+          path: '/public/warranty/track',
+          name: 'public_warranty_track',
+          builder: (context, state) {
+            final codeOrSerial = state.uri.queryParameters['code'];
+            final linkCode = state.uri.queryParameters['link'];
+            return PublicWarrantyTrackingPage(
+              codeOrSerial: codeOrSerial,
+              linkCode: linkCode,
+            );
+          },
+        ),
+        GoRoute(
+          path: '/public/warranty/track/:code',
+          name: 'public_warranty_track_code',
+          builder: (context, state) {
+            final code = state.pathParameters['code'] ?? '';
+            return PublicWarrantyTrackingPage(
+              codeOrSerial: code,
+            );
+          },
+        ),
+        GoRoute(
+          path: '/public/warranty/track/link/:linkCode',
+          name: 'public_warranty_track_link',
+          builder: (context, state) {
+            final linkCode = state.pathParameters['linkCode'] ?? '';
+            return PublicWarrantyTrackingPage(
+              linkCode: linkCode,
+            );
+          },
+        ),
+        GoRoute(
           path: '/login',
           name: 'login',
           builder: (context, state) {
@@ -898,6 +964,11 @@ class _MyAppState extends State<MyApp> {
               path: '/user/profile/notifications',
               name: 'profile_notifications',
               builder: (context, state) => UserNotificationsPage(calendarController: _calendarController!),
+            ),
+            GoRoute(
+              path: '/user/profile/notification-history',
+              name: 'profile_notification_history',
+              builder: (context, state) => NotificationHistoryPage(calendarController: _calendarController!),
             ),
             GoRoute(
               path: '/user/profile/operator',
@@ -1151,6 +1222,20 @@ class _MyAppState extends State<MyApp> {
                       return PermissionGuard.buildAccessDeniedPage();
                     }
                     return const StoragePlansAdminPage();
+                  },
+                ),
+                GoRoute(
+                  path: 'marketplace-plugins',
+                  name: 'system_settings_marketplace_plugins',
+                  builder: (context, state) {
+                    if (_authStore == null) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    final allowed = _authStore!.isSuperAdmin || _authStore!.hasAppPermission('system_settings');
+                    if (!allowed) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    return const MarketplacePluginsAdminPage();
                   },
                 ),
                 GoRoute(
@@ -1467,6 +1552,34 @@ class _MyAppState extends State<MyApp> {
               },
             ),
             GoRoute(
+              path: '/business/:business_id/warranty',
+              name: 'business_warranty',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return NoTransitionPage(
+                  child: WarrantyManagementPage(
+                    businessId: businessId,
+                    authStore: _authStore!,
+                    calendarController: _calendarController!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/warranty/settings',
+              name: 'business_warranty_settings',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return NoTransitionPage(
+                  child: WarrantySettingsPage(
+                    businessId: businessId,
+                    authStore: _authStore!,
+                    calendarController: _calendarController!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
               path: '/business/:business_id/workflows',
               name: 'business_workflows',
               pageBuilder: (context, state) {
@@ -1687,6 +1800,149 @@ class _MyAppState extends State<MyApp> {
                 final businessId = int.parse(state.pathParameters['business_id']!);
                 return NoTransitionPage(
                   child: InventoryStockReportPage(
+                    businessId: businessId,
+                    calendarController: _calendarController!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/reports/stock-count',
+              name: 'business_reports_stock_count',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return NoTransitionPage(
+                  child: StockCountReportPage(
+                    businessId: businessId,
+                    calendarController: _calendarController!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/reports/warehouse-documents-summary',
+              name: 'business_reports_warehouse_documents_summary',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return NoTransitionPage(
+                  child: WarehouseDocumentsSummaryReportPage(
+                    businessId: businessId,
+                    calendarController: _calendarController!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/reports/slow-moving-items',
+              name: 'business_reports_slow_moving_items',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return NoTransitionPage(
+                  child: SlowMovingItemsReportPage(
+                    businessId: businessId,
+                    calendarController: _calendarController!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/reports/critical-stock',
+              name: 'business_reports_critical_stock',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return NoTransitionPage(
+                  child: CriticalStockReportPage(
+                    businessId: businessId,
+                    calendarController: _calendarController!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/reports/inter-warehouse-transfers',
+              name: 'business_reports_inter_warehouse_transfers',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return NoTransitionPage(
+                  child: InterWarehouseTransfersReportPage(
+                    businessId: businessId,
+                    calendarController: _calendarController!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/reports/adjustment-documents',
+              name: 'business_reports_adjustment_documents',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return NoTransitionPage(
+                  child: AdjustmentDocumentsReportPage(
+                    businessId: businessId,
+                    calendarController: _calendarController!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/reports/warehouse-performance',
+              name: 'business_reports_warehouse_performance',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return NoTransitionPage(
+                  child: WarehousePerformanceReportPage(
+                    businessId: businessId,
+                    calendarController: _calendarController!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/reports/product-movement-history',
+              name: 'business_reports_product_movement_history',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return NoTransitionPage(
+                  child: ProductMovementHistoryReportPage(
+                    businessId: businessId,
+                    calendarController: _calendarController!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/reports/inventory-valuation',
+              name: 'business_reports_inventory_valuation',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return NoTransitionPage(
+                  child: InventoryValuationReportPage(
+                    businessId: businessId,
+                    calendarController: _calendarController!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/reports/pending-documents',
+              name: 'business_reports_pending_documents',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return NoTransitionPage(
+                  child: PendingDocumentsReportPage(
+                    businessId: businessId,
+                    calendarController: _calendarController!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/reports/inventory-turnover',
+              name: 'business_reports_inventory_turnover',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return NoTransitionPage(
+                  child: InventoryTurnoverReportPage(
                     businessId: businessId,
                     calendarController: _calendarController!,
                   ),
@@ -2261,6 +2517,34 @@ class _MyAppState extends State<MyApp> {
                 return NoTransitionPage(
                   child: WarehouseDocsPage(
                     businessId: businessId,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/warehouse-docs/:doc_id',
+              name: 'business_warehouse_doc_details',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                final docId = int.parse(state.pathParameters['doc_id']!);
+                return NoTransitionPage(
+                  child: WarehouseDocumentDetailsPage(
+                    businessId: businessId,
+                    documentId: docId,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/stock-count',
+              name: 'business_stock_count',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                final calendarController = ApiClient.getCalendarController();
+                return NoTransitionPage(
+                  child: StockCountPage(
+                    businessId: businessId,
+                    calendarController: calendarController,
                   ),
                 );
               },

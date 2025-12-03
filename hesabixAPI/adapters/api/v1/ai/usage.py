@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from typing import Dict, Any, Optional, List
 from fastapi import APIRouter, Depends, Request, Query, Path, Body
 from sqlalchemy.orm import Session

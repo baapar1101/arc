@@ -360,18 +360,31 @@ async def login(request: Request, payload: LoginRequest, db: Session = Depends(g
 	error_message="تعداد درخواست‌های بازیابی رمز عبور بیش از حد مجاز است. لطفاً بعداً تلاش کنید."
 )
 async def forgot_password(request: Request, payload: ForgotPasswordRequest, db: Session = Depends(get_db)) -> dict:
-	# In production do not return token; send via email/SMS. Here we return for dev/testing.
+	# ایجاد token برای reset password
 	token = create_password_reset(db=db, identifier=payload.identifier, captcha_id=payload.captcha_id, captcha_code=payload.captcha_code)
 	# Send notification via preferred channels
 	if token:
 		from adapters.db.repositories.user_repo import UserRepository
 		from app.services.notification_service import NotificationService
-		repo = UserRepository(db)
-		user = repo.get_by_email(payload.identifier) or repo.get_by_mobile(payload.identifier)
-		if user:
-			svc = NotificationService(db)
-			svc.send(user_id=user.id, event_key="auth.password_reset", context={"token": token})
-	return success_response({"ok": True, "token": token if token else None})
+		from app.services.auth_service import _detect_identifier
+		import logging
+		logger = logging.getLogger(__name__)
+		
+		# تشخیص نوع identifier و جستجوی صحیح کاربر
+		kind, email, mobile = _detect_identifier(payload.identifier)
+		if kind != "invalid":
+			repo = UserRepository(db)
+			user = repo.get_by_email(email) if email else repo.get_by_mobile(mobile)  # type: ignore[arg-type]
+			if user:
+				try:
+					svc = NotificationService(db)
+					svc.send(user_id=user.id, event_key="auth.password_reset", context={"token": token})
+				except Exception as e:
+					# در صورت خطا در ارسال notification، log می‌کنیم اما فرآیند ادامه می‌یابد
+					logger.error(f"Failed to send password reset notification for user {user.id}: {e}")
+	# همیشه پاسخ موفق برمی‌گردانیم (برای جلوگیری از user enumeration)
+	# در production نباید token برگردانده شود
+	return success_response({"ok": True})
 
 
 @router.post("/reset-password", 

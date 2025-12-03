@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../utils/number_normalizer.dart' show parseFormattedNumber;
+import '../../widgets/date_input_field.dart';
+import '../../core/calendar_controller.dart';
 
 class ProductInstanceFormDialog extends StatefulWidget {
   final int businessId;
@@ -11,6 +13,7 @@ class ProductInstanceFormDialog extends StatefulWidget {
   final List<Map<String, dynamic>> productAttributes;
   final Map<String, dynamic>? initialData;
   final VoidCallback? onSuccess;
+  final CalendarController? calendarController;
 
   const ProductInstanceFormDialog({
     super.key,
@@ -22,6 +25,7 @@ class ProductInstanceFormDialog extends StatefulWidget {
     required this.productAttributes,
     this.initialData,
     this.onSuccess,
+    this.calendarController,
   });
 
   @override
@@ -34,15 +38,27 @@ class _ProductInstanceFormDialogState extends State<ProductInstanceFormDialog> {
   final _barcodeController = TextEditingController();
   final Map<String, dynamic> _attributeValues = {};
   bool _saving = false;
+  CalendarController? _calendarController;
 
   @override
   void initState() {
     super.initState();
+    _calendarController = widget.calendarController;
     if (widget.initialData != null) {
       _serialController.text = widget.initialData!['serial_number']?.toString() ?? '';
       _barcodeController.text = widget.initialData!['barcode']?.toString() ?? '';
       final attrs = widget.initialData!['custom_attributes'] as Map<String, dynamic>? ?? {};
       _attributeValues.addAll(attrs);
+    }
+    // لود کردن CalendarController اگر ارائه نشده باشد
+    if (_calendarController == null) {
+      CalendarController.load().then((c) {
+        if (mounted) {
+          setState(() {
+            _calendarController = c;
+          });
+        }
+      });
     }
   }
 
@@ -78,15 +94,17 @@ class _ProductInstanceFormDialogState extends State<ProductInstanceFormDialog> {
   Widget _buildAttributeField(Map<String, dynamic> attribute) {
     final attrId = attribute['id'] as int?;
     final attrName = (attribute['title'] ?? 'ویژگی ${attrId}').toString();
-    final attrType = (attribute['attribute_type'] ?? 'text').toString();
+    // استفاده از data_type به جای attribute_type (برای سازگاری با هر دو)
+    final attrType = (attribute['data_type'] ?? attribute['attribute_type'] ?? 'text').toString();
     final isRequired = (attribute['is_required'] == true);
-    final currentValue = _attributeValues[attrName]?.toString() ?? '';
+    final currentValue = _attributeValues[attrName];
 
     switch (attrType) {
       case 'number':
+        final numValue = currentValue?.toString() ?? '';
         return TextFormField(
-          key: ValueKey('attr_${attrId}_$currentValue'),
-          initialValue: currentValue,
+          key: ValueKey('attr_${attrId}_$numValue'),
+          initialValue: numValue,
           decoration: InputDecoration(
             labelText: attrName + (isRequired ? ' *' : ''),
             border: const OutlineInputBorder(),
@@ -109,10 +127,43 @@ class _ProductInstanceFormDialogState extends State<ProductInstanceFormDialog> {
             }
           },
         );
+      case 'date':
+        DateTime? dateValue;
+        if (currentValue != null) {
+          if (currentValue is String) {
+            dateValue = DateTime.tryParse(currentValue);
+          } else if (currentValue is DateTime) {
+            dateValue = currentValue;
+          }
+        }
+        if (_calendarController == null) {
+          return TextFormField(
+            decoration: InputDecoration(
+              labelText: attrName + (isRequired ? ' *' : ''),
+              border: const OutlineInputBorder(),
+              hintText: 'در حال بارگذاری...',
+            ),
+            enabled: false,
+          );
+        }
+        return DateInputField(
+          value: dateValue,
+          onChanged: (date) {
+            if (date != null) {
+              _attributeValues[attrName] = date.toIso8601String().split('T').first;
+            } else {
+              _attributeValues.remove(attrName);
+            }
+            setState(() {});
+          },
+          calendarController: _calendarController!,
+          labelText: attrName + (isRequired ? ' *' : ''),
+        );
       case 'select':
         final options = (attribute['options'] as List<dynamic>?) ?? [];
+        final selectedValue = currentValue?.toString() ?? '';
         return DropdownButtonFormField<String>(
-          value: currentValue.isNotEmpty ? currentValue : null,
+          value: selectedValue.isNotEmpty ? selectedValue : null,
           decoration: InputDecoration(
             labelText: attrName + (isRequired ? ' *' : ''),
             border: const OutlineInputBorder(),
@@ -138,10 +189,24 @@ class _ProductInstanceFormDialogState extends State<ProductInstanceFormDialog> {
             setState(() {});
           },
         );
+      case 'boolean':
+        final boolValue = currentValue is bool 
+            ? currentValue 
+            : (currentValue?.toString().toLowerCase() == 'true' || currentValue?.toString() == '1');
+        return SwitchListTile(
+          title: Text(attrName + (isRequired ? ' *' : '')),
+          value: boolValue,
+          onChanged: (value) {
+            setState(() {
+              _attributeValues[attrName] = value;
+            });
+          },
+        );
       default: // text
+        final textValue = currentValue?.toString() ?? '';
         return TextFormField(
-          key: ValueKey('attr_${attrId}_$currentValue'),
-          initialValue: currentValue,
+          key: ValueKey('attr_${attrId}_$textValue'),
+          initialValue: textValue,
           decoration: InputDecoration(
             labelText: attrName + (isRequired ? ' *' : ''),
             border: const OutlineInputBorder(),

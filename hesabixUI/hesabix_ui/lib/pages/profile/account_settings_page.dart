@@ -38,13 +38,13 @@ class AccountSettingsPage extends StatelessWidget {
                     : constraints.maxWidth > 800
                         ? 2
                         : 1;
-                final spacing = constraints.maxWidth > 800 ? 16.0 : 12.0;
-                // افزایش aspect ratio برای کاهش ارتفاع
+                final spacing = constraints.maxWidth > 800 ? 12.0 : 10.0;
+                // افزایش aspect ratio برای کاهش ارتفاع و کوچکتر کردن کارت‌ها
                 final aspectRatio = constraints.maxWidth > 1200
-                    ? 1.8  // دسکتاپ بزرگ: عرض بیشتر از ارتفاع
+                    ? 2.4  // دسکتاپ بزرگ: کارت‌های کوچکتر و پهن‌تر
                     : constraints.maxWidth > 800
-                        ? 1.6  // دسکتاپ کوچک
-                        : 2.2;  // موبایل: عرض خیلی بیشتر از ارتفاع
+                        ? 2.1  // تبلت: کارت‌های کوچکتر
+                        : 2.5;  // موبایل: کارت‌های کوچکتر و پهن‌تر
 
                 return GridView.count(
                   crossAxisCount: crossAxisCount,
@@ -102,6 +102,13 @@ class AccountSettingsPage extends StatelessWidget {
                       icon: Icons.verified_user,
                       color: Colors.teal,
                       onTap: () => context.go('/user/profile/verification'),
+                    ),
+                    _SettingsCard(
+                      title: 'تاریخچه ناتیفیکیشن‌ها',
+                      description: 'مشاهده تمام ناتیفیکیشن‌های ارسال شده (OTP، فراموشی رمز، تیکت و ...)',
+                      icon: Icons.history,
+                      color: Colors.indigo,
+                      onTap: () => context.go('/user/profile/notification-history'),
                     ),
                   ],
                 );
@@ -200,20 +207,22 @@ class _SettingsCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final isDesktop = MediaQuery.of(context).size.width > 800;
+    final width = MediaQuery.of(context).size.width;
+    final isDesktop = width > 800;
+    final isMobile = width <= 600;
 
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
       ),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
         child: Container(
-          padding: EdgeInsets.all(isDesktop ? 16 : 14),
+          padding: EdgeInsets.all(isDesktop ? 12 : isMobile ? 10 : 11),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(12),
             border: Border.all(
               color: colorScheme.outline.withValues(alpha: 0.1),
             ),
@@ -226,50 +235,51 @@ class _SettingsCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(10),
+                    padding: EdgeInsets.all(isDesktop ? 8 : 7),
                     decoration: BoxDecoration(
                       color: color.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(8),
                     ),
                     child: Icon(
                       icon,
                       color: color,
-                      size: 24,
+                      size: isDesktop ? 20 : 18,
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  SizedBox(height: isDesktop ? 10 : 8),
                   Text(
                     title,
-                    style: theme.textTheme.titleMedium?.copyWith(
+                    style: theme.textTheme.titleSmall?.copyWith(
                       fontWeight: FontWeight.bold,
                       color: colorScheme.onSurface,
+                      fontSize: isDesktop ? 15 : 14,
                     ),
                   ),
-                  const SizedBox(height: 6),
+                  SizedBox(height: 4),
                   Text(
                     description,
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: colorScheme.onSurfaceVariant,
                       height: 1.3,
-                      fontSize: 12,
+                      fontSize: isDesktop ? 11 : 10,
                     ),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
+              SizedBox(height: 6),
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 5,
+                    padding: EdgeInsets.symmetric(
+                      horizontal: isDesktop ? 8 : 7,
+                      vertical: isDesktop ? 4 : 3,
                     ),
                     decoration: BoxDecoration(
                       color: color.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(18),
+                      borderRadius: BorderRadius.circular(16),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -279,13 +289,13 @@ class _SettingsCard extends StatelessWidget {
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: color,
                             fontWeight: FontWeight.w600,
-                            fontSize: 11,
+                            fontSize: isDesktop ? 10 : 9,
                           ),
                         ),
-                        const SizedBox(width: 4),
+                        SizedBox(width: 3),
                         Icon(
                           Icons.arrow_forward_ios,
-                          size: 12,
+                          size: isDesktop ? 11 : 10,
                           color: color,
                         ),
                       ],

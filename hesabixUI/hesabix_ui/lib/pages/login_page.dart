@@ -734,7 +734,36 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     try {
       final identifier = _forgotIdentifierCtrl.text.trim();
       // بررسی اینکه آیا شماره موبایل است یا ایمیل
-      final isMobile = RegExp(r'^09\d{9}$').hasMatch(toEnglishDigits(identifier));
+      // استفاده از منطق مشابه بک‌اند برای تشخیص
+      final cleaned = toEnglishDigits(identifier.trim().replaceAll(RegExp(r'[\s\-\(\)]'), ''));
+      bool isMobile = false;
+      
+      // بررسی فرمت‌های مختلف موبایل ایرانی
+      if (cleaned.contains('@')) {
+        // اگر @ دارد، قطعاً ایمیل است
+        isMobile = false;
+      } else {
+        // تبدیل به فرمت استاندارد برای بررسی
+        String normalized = cleaned;
+        if (normalized.startsWith('+989')) {
+          normalized = '0${normalized.substring(4)}'; // +989 -> 0
+        } else if (normalized.startsWith('00989')) {
+          normalized = '0${normalized.substring(5)}'; // 00989 -> 0
+        } else if (normalized.startsWith('989') && normalized.length >= 12) {
+          normalized = '0${normalized.substring(3)}'; // 989 -> 0
+        } else if (normalized.startsWith('9') && normalized.length == 10) {
+          normalized = '0$normalized';
+        }
+        
+        // بررسی فرمت نهایی (باید 0912... باشد)
+        if (RegExp(r'^09\d{9}$').hasMatch(normalized)) {
+          isMobile = true;
+        } else if (RegExp(r'^\+989\d{9}$').hasMatch(cleaned) ||
+                   RegExp(r'^00989\d{9}$').hasMatch(cleaned) ||
+                   RegExp(r'^989\d{9}$').hasMatch(cleaned)) {
+          isMobile = true;
+        }
+      }
       
       if (isMobile) {
         // استفاده از OTP برای موبایل
@@ -778,19 +807,32 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
         }
       } else {
         // استفاده از روش قدیمی (ایمیل)
-      final api = ApiClient();
-      await api.post<Map<String, dynamic>>(
-        '/api/v1/auth/forgot-password',
-        data: {
+        final api = ApiClient();
+        final response = await api.post<Map<String, dynamic>>(
+          '/api/v1/auth/forgot-password',
+          data: {
             'identifier': identifier,
-          'captcha_id': _forgotCaptchaId,
+            'captcha_id': _forgotCaptchaId,
             'captcha_code': toEnglishDigits(_forgotCaptchaCtrl.text.trim()),
-          'referrer_code': await ReferralStore.getReferrerCode(),
-        },
-      );
+            'referrer_code': await ReferralStore.getReferrerCode(),
+          },
+        );
 
-      if (!mounted) return;
-      _showSnack(t.forgotSent);
+        if (!mounted) return;
+        
+        // بررسی اینکه آیا درخواست موفق بوده است
+        final body = response.data;
+        if (body is Map<String, dynamic>) {
+          final data = body['data'] as Map<String, dynamic>?;
+          final ok = data?['ok'] as bool?;
+          if (ok == true) {
+            _showSnack(t.forgotSent);
+          } else {
+            _showSnack('خطا در ارسال درخواست بازیابی رمز عبور');
+          }
+        } else {
+          _showSnack(t.forgotSent);
+        }
       }
     } catch (e) {
       if (!mounted) return;
@@ -808,8 +850,49 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
   Future<bool> _showResetPasswordDialog(BuildContext context, String resetToken) async {
     final newPasswordCtrl = TextEditingController();
     final confirmPasswordCtrl = TextEditingController();
+    final captchaCtrl = TextEditingController();
     final formKey = GlobalKey<FormState>();
     bool saving = false;
+    String? captchaId;
+    Uint8List? captchaImage;
+    Timer? captchaTimer;
+
+    // تابع برای دریافت کپچا
+    Future<void> loadCaptcha() async {
+      try {
+        final api = ApiClient();
+        final captchaRes = await api.post<Map<String, dynamic>>('/api/v1/auth/captcha');
+        final captchaData = captchaRes.data?['data'] as Map<String, dynamic>?;
+        final String? id = captchaData?['captcha_id']?.toString();
+        final String? imgB64 = captchaData?['image_base64']?.toString();
+        final int? ttl = (captchaData?['ttl_seconds'] as num?)?.toInt();
+        
+        if (id != null && imgB64 != null) {
+          try {
+            final bytes = base64Decode(imgB64);
+            if (context.mounted) {
+              setState(() {
+                captchaId = id;
+                captchaImage = bytes;
+              });
+              if (ttl != null && ttl > 0) {
+                captchaTimer?.cancel();
+                captchaTimer = Timer(Duration(seconds: ttl), () {
+                  loadCaptcha();
+                });
+              }
+            }
+          } catch (_) {
+            // خطا در decode
+          }
+        }
+      } catch (_) {
+        // خطا در دریافت کپچا
+      }
+    }
+
+    // بارگذاری اولیه کپچا
+    await loadCaptcha();
 
     final result = await showDialog<bool>(
       context: context,
@@ -854,48 +937,101 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                       return null;
                     },
                   ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextFormField(
+                          controller: captchaCtrl,
+                          decoration: const InputDecoration(
+                            labelText: 'کد کپچا',
+                            prefixIcon: Icon(Icons.security),
+                          ),
+                          keyboardType: TextInputType.number,
+                          inputFormatters: [
+                            const EnglishDigitsFormatter(),
+                            FilteringTextInputFormatter.digitsOnly,
+                          ],
+                          validator: (v) {
+                            if (v == null || v.trim().isEmpty) {
+                              return 'کد کپچا الزامی است';
+                            }
+                            return null;
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      if (captchaImage != null)
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: Image.memory(
+                            captchaImage!,
+                            height: 40,
+                            width: 120,
+                            fit: BoxFit.contain,
+                          ),
+                        )
+                      else
+                        const SizedBox(height: 40, width: 120),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        onPressed: saving ? null : () async {
+                          await loadCaptcha();
+                          setDialogState(() {});
+                        },
+                        icon: const Icon(Icons.refresh),
+                        tooltip: 'تازه‌سازی',
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
           ),
           actions: [
             TextButton(
-              onPressed: saving ? null : () => Navigator.of(dialogContext).pop(false),
+              onPressed: saving ? null : () {
+                captchaTimer?.cancel();
+                Navigator.of(dialogContext).pop(false);
+              },
               child: const Text('انصراف'),
             ),
             FilledButton(
               onPressed: saving ? null : () async {
                 if (!formKey.currentState!.validate()) return;
                 
+                if (captchaId == null || captchaCtrl.text.trim().isEmpty) {
+                  SnackBarHelper.showError(dialogContext, message: 'لطفاً کد کپچا را وارد کنید');
+                  return;
+                }
+                
                 setDialogState(() => saving = true);
                 try {
                   final api = ApiClient();
-                  // دریافت captcha جدید
-                  final captchaRes = await api.post<Map<String, dynamic>>('/api/v1/auth/captcha');
-                  final captchaData = captchaRes.data?['data'] as Map<String, dynamic>?;
-                  final captchaId = captchaData?['captcha_id']?.toString();
-                  final captchaCode = ''; // کاربر باید captcha وارد کند
-                  
-                  // در اینجا باید captcha از کاربر بگیریم
-                  // برای ساده‌سازی، از captcha خالی استفاده می‌کنیم
-                  // در production باید captcha را نمایش دهیم
                   
                   await api.post<Map<String, dynamic>>(
                     '/api/v1/auth/reset-password',
                     data: {
                       'token': resetToken,
                       'new_password': newPasswordCtrl.text,
-                      'captcha_id': captchaId ?? '',
-                      'captcha_code': captchaCode,
+                      'captcha_id': captchaId!,
+                      'captcha_code': toEnglishDigits(captchaCtrl.text.trim()),
                     },
                   );
                   
                   if (dialogContext.mounted) {
+                    captchaTimer?.cancel();
                     Navigator.of(dialogContext).pop(true);
                   }
                 } catch (e) {
                   if (dialogContext.mounted) {
-                    SnackBarHelper.showError(dialogContext, message: 'خطا در تغییر رمز عبور: $e');
+                    final msg = _extractErrorMessage(e, AppLocalizations.of(dialogContext));
+                    SnackBarHelper.showError(dialogContext, message: msg.isNotEmpty ? msg : 'خطا در تغییر رمز عبور: $e');
+                    // تازه‌سازی کپچا در صورت خطا
+                    await loadCaptcha();
+                    setDialogState(() {
+                      captchaCtrl.clear();
+                    });
                   }
                 } finally {
                   if (dialogContext.mounted) {
@@ -916,8 +1052,10 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
       ),
     );
 
+    captchaTimer?.cancel();
     newPasswordCtrl.dispose();
     confirmPasswordCtrl.dispose();
+    captchaCtrl.dispose();
     return result ?? false;
   }
 

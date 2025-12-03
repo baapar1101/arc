@@ -21,9 +21,17 @@ from adapters.db.models.document_monetization import (
 )
 from adapters.db.models.document import Document
 from adapters.db.models.document_line import DocumentLine
+from adapters.db.models.account import Account
+from adapters.db.models.fiscal_year import FiscalYear
 from adapters.db.models.currency import Currency
 from adapters.db.models.wallet import WalletAccount
-from app.services.wallet_service import charge_wallet_for_service
+from app.services.wallet_service import (
+	charge_wallet_for_service,
+	_get_fixed_account_by_code,
+	_resolve_wallet_currency_id,
+	_create_simple_document,
+	_get_current_fiscal_year as _get_fiscal_year_wallet,
+)
 from app.services.system_settings_service import (
 	get_wallet_settings,
 	DEFAULT_WALLET_CURRENCY_CODE,
@@ -36,6 +44,207 @@ logger = structlog.get_logger()
 
 def _decimal(value: Any) -> Decimal:
 	return Decimal(str(value or 0))
+
+
+def _get_current_fiscal_year(db: Session, business_id: int) -> FiscalYear:
+	"""دریافت سال مالی جاری کسب‌وکار"""
+	try:
+		return _get_fiscal_year_wallet(db, business_id)
+	except Exception:
+		# Fallback implementation
+		from datetime import date
+		today = date.today()
+		fy = (
+			db.query(FiscalYear)
+			.filter(
+				and_(
+					FiscalYear.business_id == business_id,
+					FiscalYear.start_date <= today,
+					FiscalYear.end_date >= today,
+				)
+			)
+			.first()
+		)
+		if not fy:
+			# Try to get last fiscal year
+			fy = (
+				db.query(FiscalYear)
+				.filter(FiscalYear.business_id == business_id)
+				.order_by(FiscalYear.start_date.desc())
+				.first()
+			)
+		if not fy:
+			raise ApiError("FISCAL_YEAR_NOT_FOUND", "سال مالی جاری یافت نشد", http_status=404)
+		return fy
+
+
+def _ensure_document_monetization_expense_account(db: Session) -> Account:
+	"""
+	بررسی و ایجاد/به‌روزرسانی حساب هزینه اشتراک و خدمات سیستم (70507)
+	"""
+	account = db.query(Account).filter(
+		and_(
+			Account.code == "70507",
+			Account.business_id.is_(None)
+		)
+	).first()
+	
+	expected_name = "هزینه اشتراک و خدمات سیستم"
+	
+	if not account:
+		try:
+			parent_account = _get_fixed_account_by_code(db, "705")
+			parent_id = parent_account.id if parent_account else None
+		except Exception:
+			parent_id = None
+		
+		account = Account(
+			name=expected_name,
+			code="70507",
+			account_type="accounting_document",
+			business_id=None,
+			parent_id=parent_id
+		)
+		db.add(account)
+		db.flush()
+		logger.info("created_document_monetization_expense_account", account_id=account.id)
+	else:
+		if account.name != expected_name:
+			account.name = expected_name
+			if account.account_type != "accounting_document":
+				account.account_type = "accounting_document"
+			db.flush()
+			logger.info("updated_document_monetization_expense_account", account_id=account.id)
+	
+	return account
+
+
+def _create_document_monetization_accounting_document(
+	db: Session,
+	business_id: int,
+	user_id: int,
+	charge: DocumentUsageCharge,
+	amount: Decimal,
+	charge_type: str,
+) -> int:
+	"""
+	ایجاد سند حسابداری برای تراکنش‌های درآمدزایی اسناد
+	
+	Args:
+		db: Database session
+		business_id: شناسه کسب‌وکار
+		user_id: شناسه کاربر
+		charge: DocumentUsageCharge object
+		amount: مبلغ تراکنش
+		charge_type: نوع هزینه (subscription_fee, per_document, volume_cycle)
+	
+	Returns:
+		شناسه سند حسابداری ایجاد شده
+	"""
+	from datetime import date as date_type
+	
+	try:
+		# دریافت حساب‌ها
+		expense_account = _ensure_document_monetization_expense_account(db)
+		wallet_account = _get_fixed_account_by_code(db, "10205")  # حساب کیف پول
+		
+		# دریافت سال مالی
+		fiscal_year = _get_current_fiscal_year(db, business_id)
+		
+		# تولید کد سند
+		doc_date = charge.created_at.date() if charge.created_at else date_type.today()
+		prefix = f"PY-{doc_date.strftime('%Y%m%d')}"
+		last_doc = (
+			db.query(Document)
+			.filter(
+				and_(
+					Document.business_id == business_id,
+					Document.code.like(f"{prefix}-%"),
+				)
+			)
+			.order_by(Document.code.desc())
+			.first()
+		)
+		if last_doc:
+			try:
+				last_num = int(str(last_doc.code).split("-")[-1])
+				next_num = last_num + 1
+			except Exception:
+				next_num = 1
+		else:
+			next_num = 1
+		doc_code = f"{prefix}-{next_num:04d}"
+		
+		# تعیین توضیحات بر اساس نوع charge
+		charge_type_names = {
+			"subscription_fee": "هزینه اشتراک نامحدود",
+			"per_document": "هزینه ثبت سند",
+			"volume_cycle": "هزینه دوره حجمی",
+			"manual": "هزینه دستی",
+		}
+		type_name = charge_type_names.get(charge_type, "هزینه خدمات سیستم")
+		
+		description = charge.description or f"{type_name} - {charge.id}"
+		
+		# ایجاد سند
+		document = Document(
+			business_id=business_id,
+			fiscal_year_id=fiscal_year.id,
+			code=doc_code,
+			document_type="payment",
+			document_date=doc_date,
+			currency_id=charge.currency_id,
+			created_by_user_id=user_id,
+			registered_at=datetime.utcnow(),
+			is_proforma=False,
+			description=description,
+			extra_info={
+				"source": "document_monetization",
+				"charge_id": charge.id,
+				"charge_type": charge_type,
+				"policy_id": charge.policy_id,
+			},
+		)
+		db.add(document)
+		db.flush()
+		
+		# ایجاد ردیف‌های حسابداری
+		# ردیف 1: بدهکار - هزینه اشتراک و خدمات سیستم
+		db.add(DocumentLine(
+			document_id=document.id,
+			account_id=expense_account.id,
+			debit=amount,
+			credit=Decimal("0"),
+			description=type_name,
+		))
+		
+		# ردیف 2: بستانکار - کیف پول
+		db.add(DocumentLine(
+			document_id=document.id,
+			account_id=wallet_account.id,
+			debit=Decimal("0"),
+			credit=amount,
+			description="پرداخت از کیف پول",
+		))
+		
+		db.flush()
+		logger.info(
+			"created_document_monetization_accounting_document",
+			document_id=document.id,
+			charge_id=charge.id,
+			charge_type=charge_type,
+			amount=float(amount),
+		)
+		return int(document.id)
+	except Exception as e:
+		logger.error(
+			"failed_to_create_document_monetization_accounting_document",
+			charge_id=charge.id,
+			error=str(e),
+			error_type=type(e).__name__,
+			exc_info=True,
+		)
+		raise
 
 
 def _serialize_plan(plan: DocumentSubscriptionPlan) -> Dict[str, Any]:
@@ -255,6 +464,33 @@ def assign_subscription_to_business(
 			charge.status = "paid"
 			charge.wallet_transaction_id = charge_result["transaction_id"]
 			charge.paid_at = datetime.utcnow()
+			
+			# ایجاد سند حسابداری
+			try:
+				doc_id = _create_document_monetization_accounting_document(
+					db=db,
+					business_id=business_id,
+					user_id=user_id,
+					charge=charge,
+					amount=_decimal(plan.price),
+					charge_type="subscription_fee",
+				)
+				charge.document_id = doc_id
+				# به‌روزرسانی WalletTransaction با document_id
+				from adapters.db.models.wallet import WalletTransaction
+				if charge.wallet_transaction_id:
+					wallet_tx = db.query(WalletTransaction).filter(
+						WalletTransaction.id == charge.wallet_transaction_id
+					).first()
+					if wallet_tx:
+						wallet_tx.document_id = doc_id
+			except Exception as doc_exc:
+				logger.warning(
+					"subscription_accounting_document_creation_failed",
+					business_id=business_id,
+					charge_id=charge.id,
+					error=str(doc_exc),
+				)
 		except ApiError as exc:  # type: ignore[assignment]
 			logger.warning("subscription_charge_failed", business_id=business_id, error=str(exc))
 			charge.status = "awaiting_payment"
@@ -668,6 +904,33 @@ def pay_document_usage_charge(db: Session, business_id: int, charge_id: int, use
 	charge.status = "paid"
 	charge.paid_at = datetime.utcnow()
 
+	# ایجاد سند حسابداری
+	try:
+		doc_id = _create_document_monetization_accounting_document(
+			db=db,
+			business_id=business_id,
+			user_id=user_id,
+			charge=charge,
+			amount=_decimal(charge.amount),
+			charge_type=charge.charge_type,
+		)
+		charge.document_id = doc_id
+		# به‌روزرسانی WalletTransaction با document_id
+		from adapters.db.models.wallet import WalletTransaction
+		if charge.wallet_transaction_id:
+			wallet_tx = db.query(WalletTransaction).filter(
+				WalletTransaction.id == charge.wallet_transaction_id
+			).first()
+			if wallet_tx:
+				wallet_tx.document_id = doc_id
+	except Exception as doc_exc:
+		logger.warning(
+			"pay_charge_accounting_document_creation_failed",
+			business_id=business_id,
+			charge_id=charge.id,
+			error=str(doc_exc),
+		)
+
 	if charge.charge_type == "subscription_fee" and charge.metrics:
 		subscription_id = charge.metrics.get("subscription_id")
 		if subscription_id:
@@ -893,6 +1156,34 @@ def _apply_per_document_policy(
 			charge.status = "paid"
 			charge.wallet_transaction_id = tx["transaction_id"]
 			charge.paid_at = datetime.utcnow()
+			
+			# ایجاد سند حسابداری
+			try:
+				doc_id = _create_document_monetization_accounting_document(
+					db=db,
+					business_id=document.business_id,
+					user_id=document.created_by_user_id or 0,
+					charge=charge,
+					amount=fee_amount,
+					charge_type="per_document",
+				)
+				charge.document_id = doc_id
+				# به‌روزرسانی WalletTransaction با document_id
+				from adapters.db.models.wallet import WalletTransaction
+				if charge.wallet_transaction_id:
+					wallet_tx = db.query(WalletTransaction).filter(
+						WalletTransaction.id == charge.wallet_transaction_id
+					).first()
+					if wallet_tx:
+						wallet_tx.document_id = doc_id
+			except Exception as doc_exc:
+				logger.warning(
+					"per_document_accounting_document_creation_failed",
+					business_id=document.business_id,
+					charge_id=charge.id,
+					document_id=document.id,
+					error=str(doc_exc),
+				)
 		except ApiError as exc:
 			if exc.code == "INSUFFICIENT_FUNDS":
 				charge.status = "awaiting_payment"
@@ -944,6 +1235,19 @@ def _apply_volume_policy(
 
 def _get_or_create_period(db: Session, policy: DocumentUsagePolicy, doc_date: datetime, cycle: str) -> DocumentUsagePeriod:
 	start, end, period_key = _resolve_period_window(doc_date, cycle)
+	# استفاده از with_for_update برای جلوگیری از race condition
+	period = (
+		db.query(DocumentUsagePeriod)
+		.filter(
+			DocumentUsagePeriod.policy_id == policy.id,
+			DocumentUsagePeriod.period_key == period_key,
+		)
+		.with_for_update()
+		.first()
+	)
+	if period:
+		return period
+	# اگر وجود نداشت، دوباره بدون lock بررسی کن (ممکن است thread دیگری ایجاد کرده باشد)
 	period = (
 		db.query(DocumentUsagePeriod)
 		.filter(
@@ -954,6 +1258,7 @@ def _get_or_create_period(db: Session, policy: DocumentUsagePolicy, doc_date: da
 	)
 	if period:
 		return period
+	# ایجاد period جدید
 	period = DocumentUsagePeriod(
 		business_id=policy.business_id,
 		policy_id=policy.id,
@@ -1077,6 +1382,36 @@ def _finalize_period(db: Session, period: DocumentUsagePeriod) -> None:
 			charge.status = "paid"
 			charge.wallet_transaction_id = tx["transaction_id"]
 			charge.paid_at = datetime.utcnow()
+			
+			# ایجاد سند حسابداری
+			try:
+				# دریافت user_id از policy یا business
+				user_id = policy.created_by_user_id or policy.updated_by_user_id or 0
+				doc_id = _create_document_monetization_accounting_document(
+					db=db,
+					business_id=period.business_id,
+					user_id=user_id,
+					charge=charge,
+					amount=charge_amount,
+					charge_type="volume_cycle",
+				)
+				charge.document_id = doc_id
+				# به‌روزرسانی WalletTransaction با document_id
+				from adapters.db.models.wallet import WalletTransaction
+				if charge.wallet_transaction_id:
+					wallet_tx = db.query(WalletTransaction).filter(
+						WalletTransaction.id == charge.wallet_transaction_id
+					).first()
+					if wallet_tx:
+						wallet_tx.document_id = doc_id
+			except Exception as doc_exc:
+				logger.warning(
+					"volume_cycle_accounting_document_creation_failed",
+					business_id=period.business_id,
+					charge_id=charge.id,
+					period_key=period.period_key,
+					error=str(doc_exc),
+				)
 		except ApiError as exc:
 			if exc.code == "INSUFFICIENT_FUNDS":
 				charge.status = "awaiting_payment"

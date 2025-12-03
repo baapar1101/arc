@@ -266,8 +266,12 @@ class ProfileDashboardService {
     if (keys.contains('profile_recent_businesses')) {
       try {
         final businesses = await _businessService.getUserBusinesses();
+        // فیلتر کردن کسب و کارهای حذف شده یا در حال حذف
+        final filteredBusinesses = businesses
+            .where((b) => !b.isDeleted && !b.isDeletionPending && b.deletedAt == null)
+            .toList();
         out['profile_recent_businesses'] = {
-          'items': businesses
+          'items': filteredBusinesses
               .map((b) => {
                     'id': b.id,
                     'name': b.name,

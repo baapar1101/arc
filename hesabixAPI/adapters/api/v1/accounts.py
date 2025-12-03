@@ -139,7 +139,7 @@ def get_account_by_id(
 	account_id: int,
 	ctx: AuthContext = Depends(get_current_user),
 	db: Session = Depends(get_db),
-	_: None = Depends(require_business_permission_by_entity_dep("chart_of_accounts", "view", Account, "account_id")),
+	_: None = Depends(require_business_permission_by_entity_dep("chart_of_accounts", "view", Account, "account_id", allow_null_business_id=True)),
 ) -> dict:
 	"""دریافت یک حساب خاص"""
 	account = db.query(Account).filter(

@@ -26,6 +26,7 @@ class _WarehouseDocumentDetailsPageState extends State<WarehouseDocumentDetailsP
   bool _loading = true;
   String? _error;
   Map<String, dynamic>? _doc;
+  Map<String, dynamic>? _relatedDoc; // حواله مرتبط (اصلی یا کنسلی)
 
   @override
   void initState() {
@@ -34,14 +35,78 @@ class _WarehouseDocumentDetailsPageState extends State<WarehouseDocumentDetailsP
   }
 
   Future<void> _load() async {
-    setState(() { _loading = true; _error = null; });
+    setState(() { _loading = true; _error = null; _relatedDoc = null; });
     try {
       final res = await _svc.getDoc(businessId: widget.businessId, docId: widget.documentId);
-      setState(() { _doc = Map<String, dynamic>.from(res['item'] ?? res); });
+      final doc = Map<String, dynamic>.from(res['item'] ?? res);
+      setState(() { _doc = doc; });
+      
+      // پیدا کردن حواله مرتبط
+      await _loadRelatedDoc(doc);
     } catch (e) {
       setState(() { _error = e.toString(); });
     } finally {
       setState(() { _loading = false; });
+    }
+  }
+
+  Future<void> _loadRelatedDoc(Map<String, dynamic> doc) async {
+    try {
+      final extraInfo = doc['extra_info'] as Map<String, dynamic>?;
+      final sourceType = doc['source_type'] as String?;
+      final sourceDocumentId = doc['source_document_id'] as int?;
+      final docId = doc['id'] as int?;
+      
+      int? relatedDocId;
+      
+      // اگر حواله کنسلی است (extra_info.cancels_warehouse_document_id دارد)
+      if (extraInfo != null && extraInfo['cancels_warehouse_document_id'] != null) {
+        relatedDocId = extraInfo['cancels_warehouse_document_id'] as int?;
+      }
+      // اگر حواله اصلی است و source_document_id دارد و source_type manual است
+      else if (sourceType == 'manual' && sourceDocumentId != null) {
+        relatedDocId = sourceDocumentId;
+      }
+      // اگر حواله اصلی است (status cancelled است)، باید حواله کنسلی را پیدا کنیم
+      else if (doc['status'] == 'cancelled' && docId != null) {
+        // جستجو برای پیدا کردن حواله کنسلی که cancels_warehouse_document_id آن برابر با این حواله است
+        try {
+          final searchResult = await _svc.search(
+            businessId: widget.businessId,
+            filters: {
+              'source_document_id': docId,
+              'source_type': 'manual',
+            },
+          );
+          final items = searchResult['items'] as List<dynamic>?;
+          if (items != null && items.isNotEmpty) {
+            // پیدا کردن حواله‌ای که cancels_warehouse_document_id آن برابر با docId است
+            for (final item in items) {
+              final itemExtraInfo = item['extra_info'] as Map<String, dynamic>?;
+              if (itemExtraInfo != null && itemExtraInfo['cancels_warehouse_document_id'] == docId) {
+                relatedDocId = item['id'] as int?;
+                break;
+              }
+            }
+          }
+        } catch (e) {
+          // خطا را نادیده می‌گیریم
+        }
+      }
+      
+      if (relatedDocId != null) {
+        try {
+          final relatedRes = await _svc.getDoc(businessId: widget.businessId, docId: relatedDocId);
+          final relatedDoc = Map<String, dynamic>.from(relatedRes['item'] ?? relatedRes);
+          if (mounted) {
+            setState(() { _relatedDoc = relatedDoc; });
+          }
+        } catch (e) {
+          // اگر حواله مرتبط پیدا نشد، خطا را نادیده می‌گیریم
+        }
+      }
+    } catch (e) {
+      // خطا را نادیده می‌گیریم
     }
   }
 
@@ -115,16 +180,16 @@ class _WarehouseDocumentDetailsPageState extends State<WarehouseDocumentDetailsP
   Future<void> _deleteDoc() async {
     final ok = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('حذف حواله'),
         content: const Text('آیا از حذف این حواله مطمئن هستید؟'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
+            onPressed: () => Navigator.of(dialogContext).pop(false),
             child: const Text('انصراف'),
           ),
           FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
             child: const Text('حذف'),
           ),
         ],
@@ -151,16 +216,16 @@ class _WarehouseDocumentDetailsPageState extends State<WarehouseDocumentDetailsP
   Future<void> _cancelDoc() async {
     final ok = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('لغو حواله'),
         content: const Text('آیا از لغو این حواله مطمئن هستید؟ حواله معکوس ایجاد خواهد شد.'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
+            onPressed: () => Navigator.of(dialogContext).pop(false),
             child: const Text('انصراف'),
           ),
           FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
             child: const Text('لغو'),
           ),
         ],
@@ -168,10 +233,14 @@ class _WarehouseDocumentDetailsPageState extends State<WarehouseDocumentDetailsP
     );
     if (ok != true) return;
     try {
-      await _svc.cancelDoc(businessId: widget.businessId, docId: widget.documentId);
+      final result = await _svc.cancelDoc(businessId: widget.businessId, docId: widget.documentId);
       if (!mounted) return;
+      final cancelDocCode = result['code'] as String?;
+      final message = cancelDocCode != null
+          ? 'حواله لغو شد. حواله پیش‌نویس با کد $cancelDocCode ایجاد شد.'
+          : 'حواله لغو شد و حواله معکوس ایجاد شد.';
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('حواله لغو شد و حواله معکوس ایجاد شد')),
+        SnackBar(content: Text(message)),
       );
       _load();
     } catch (e) {
@@ -317,6 +386,40 @@ class _WarehouseDocumentDetailsPageState extends State<WarehouseDocumentDetailsP
                                 color: Theme.of(context).colorScheme.primary,
                                 decoration: TextDecoration.underline,
                               ),
+                            ),
+                          ),
+                        ),
+                      // نمایش حواله مرتبط (اصلی یا کنسلی)
+                      if (_relatedDoc != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: InkWell(
+                            onTap: () {
+                              Navigator.of(context).pushReplacement(
+                                MaterialPageRoute(
+                                  builder: (_) => WarehouseDocumentDetailsPage(
+                                    businessId: widget.businessId,
+                                    documentId: _relatedDoc!['id'] as int,
+                                  ),
+                                ),
+                              );
+                            },
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.link,
+                                  size: 16,
+                                  color: Theme.of(context).colorScheme.primary,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'حواله مرتبط: ${_relatedDoc!['code'] ?? _relatedDoc!['id']} (${_getStatusName(_relatedDoc!['status'])})',
+                                  style: TextStyle(
+                                    color: Theme.of(context).colorScheme.primary,
+                                    decoration: TextDecoration.underline,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ),

@@ -31,12 +31,16 @@ class ProductAttributeService {
     required int businessId,
     required String title,
     String? description,
+    String? dataType,
+    List<String>? options,
   }) async {
     final res = await _apiClient.post<Map<String, dynamic>>(
       '/api/v1/product-attributes/business/$businessId',
       data: {
         'title': title,
         if (description != null) 'description': description,
+        if (dataType != null) 'data_type': dataType,
+        if (options != null && options.isNotEmpty) 'options': options,
       },
     );
     return Map<String, dynamic>.from(res.data?['data'] ?? const {});
@@ -57,10 +61,20 @@ class ProductAttributeService {
     required int id,
     String? title,
     String? description,
+    String? dataType,
+    List<String>? options,
   }) async {
     final body = <String, dynamic>{};
     if (title != null) body['title'] = title;
     if (description != null) body['description'] = description;
+    if (dataType != null) body['data_type'] = dataType;
+    if (options != null) {
+      if (options.isEmpty) {
+        body['options'] = null;
+      } else {
+        body['options'] = options;
+      }
+    }
     final res = await _apiClient.put<Map<String, dynamic>>(
       '/api/v1/product-attributes/business/$businessId/$id',
       data: body,

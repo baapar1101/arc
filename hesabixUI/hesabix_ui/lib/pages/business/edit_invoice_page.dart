@@ -170,6 +170,19 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
           }
         }
 
+        // بارگذاری selected_instance_ids از extra_info
+        List<int>? selectedInstanceIds;
+        if (info['selected_instance_ids'] != null) {
+          final ids = info['selected_instance_ids'];
+          if (ids is List) {
+            selectedInstanceIds = ids
+                .map((id) => _toInt(id))
+                .where((id) => id != null)
+                .cast<int>()
+                .toList();
+          }
+        }
+
         return InvoiceLineItem(
           productId: _toInt(r['product_id']),
           productName: r['product_name']?.toString(),
@@ -182,7 +195,8 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
           taxRate: taxRate,
           description: r['description']?.toString(),
           trackInventory: false,
-          warehouseId: null,
+          warehouseId: _toInt(info['warehouse_id']),
+          selectedInstanceIds: selectedInstanceIds,
         );
       }).toList();
 
@@ -629,6 +643,7 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
                 invoiceType: (_selectedInvoiceType?.value ?? 'sales'),
                 postInventory: _postInventory,
                 initialRows: _lineItems,
+                calendarController: widget.calendarController,
                 onChanged: (rows) {
                   setState(() {
                     _lineItems = rows;
@@ -882,6 +897,11 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
     
     if (e.warehouseId != null) {
       extraInfoMap['warehouse_id'] = e.warehouseId;
+    }
+    
+    // اضافه کردن selected_instance_ids به extra_info برای کالاهای یونیک
+    if (e.selectedInstanceIds != null && e.selectedInstanceIds!.isNotEmpty) {
+      extraInfoMap['selected_instance_ids'] = e.selectedInstanceIds;
     }
 
     return <String, dynamic>{

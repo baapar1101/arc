@@ -5,6 +5,7 @@ import '../../services/admin_notification_templates_service.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../widgets/data_table/data_table_widget.dart';
 import '../../widgets/data_table/data_table_config.dart';
+import '../../widgets/data_table/helpers/data_table_utils.dart';
 import '../../models/notification_template_model.dart';
 import '../../models/event_key_info.dart';
 
@@ -53,12 +54,20 @@ class _NotificationTemplatesAdminPageState extends State<NotificationTemplatesAd
           'شناسه',
           width: ColumnWidth.small,
           textAlign: TextAlign.center,
+          formatter: (item) {
+            final template = item as NotificationTemplate;
+            return template.id.toString();
+          },
         ),
         TextColumn(
           'event_key',
           'کلید رویداد',
           width: ColumnWidth.medium,
           filterType: ColumnFilterType.text,
+          formatter: (item) {
+            final template = item as NotificationTemplate;
+            return template.eventKey;
+          },
         ),
         TextColumn(
           'channel',
@@ -71,6 +80,10 @@ class _NotificationTemplatesAdminPageState extends State<NotificationTemplatesAd
             FilterOption(value: 'sms', label: 'پیامک', icon: Icons.sms),
             FilterOption(value: 'inapp', label: 'درون برنامه', icon: Icons.notifications),
           ],
+          formatter: (item) {
+            final template = item as NotificationTemplate;
+            return template.channel;
+          },
         ),
         TextColumn(
           'locale',
@@ -148,12 +161,26 @@ class _NotificationTemplatesAdminPageState extends State<NotificationTemplatesAd
           'تاریخ ایجاد',
           width: ColumnWidth.medium,
           showTime: true,
+          formatter: (item) {
+            final template = item as NotificationTemplate;
+            return DataTableUtils.formatDate(
+              template.createdAt,
+              showTime: true,
+            );
+          },
         ),
         DateColumn(
           'updated_at',
           'تاریخ به‌روزرسانی',
           width: ColumnWidth.medium,
           showTime: true,
+          formatter: (item) {
+            final template = item as NotificationTemplate;
+            return DataTableUtils.formatDate(
+              template.updatedAt,
+              showTime: true,
+            );
+          },
         ),
         ActionColumn(
           'actions',

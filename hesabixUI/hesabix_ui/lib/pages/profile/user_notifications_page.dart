@@ -28,6 +28,8 @@ class _ChannelOption {
     required this.title,
     required this.description,
     required this.onChanged,
+    this.canEnable = true,
+    this.disabledReason,
   });
 
   final String key;
@@ -36,6 +38,8 @@ class _ChannelOption {
   final String title;
   final String description;
   final ValueChanged<bool> onChanged;
+  final bool canEnable;
+  final String? disabledReason;
 }
 
 class _UserNotificationsPageState extends State<UserNotificationsPage> {
@@ -48,6 +52,8 @@ class _UserNotificationsPageState extends State<UserNotificationsPage> {
   bool _sms = true;
   bool _inapp = true;
   bool _saving = false;
+  bool _emailVerified = false;
+  bool _mobileVerified = false;
   // Telegram connection state
   bool _telegramLinked = false;
   String? _telegramConnectedAt;
@@ -83,9 +89,11 @@ class _UserNotificationsPageState extends State<UserNotificationsPage> {
       await _loadTelegramStatus();
       if (!mounted) return;
       setState(() {
-        _telegram = (s['telegram_enabled'] ?? true) == true;
-        _email = (s['email_enabled'] ?? true) == true;
-        _sms = (s['sms_enabled'] ?? true) == true;
+        _emailVerified = (s['email_verified'] ?? false) == true;
+        _mobileVerified = (s['mobile_verified'] ?? false) == true;
+        _telegram = (s['telegram_enabled'] ?? false) == true;
+        _email = (s['email_enabled'] ?? false) == true;
+        _sms = (s['sms_enabled'] ?? false) == true;
         _inapp = (s['inapp_enabled'] ?? true) == true;
         _loading = false;
       });
@@ -520,6 +528,7 @@ class _UserNotificationsPageState extends State<UserNotificationsPage> {
         title: t.notificationsChannelTelegram,
         description: t.notificationsChannelTelegramDescription,
         onChanged: (v) => setState(() => _telegram = v),
+        canEnable: true, // Telegram همیشه قابل استفاده است
       ),
       _ChannelOption(
         key: 'email',
@@ -528,6 +537,8 @@ class _UserNotificationsPageState extends State<UserNotificationsPage> {
         title: t.notificationsChannelEmail,
         description: t.notificationsChannelEmailDescription,
         onChanged: (v) => setState(() => _email = v),
+        canEnable: _emailVerified,
+        disabledReason: _emailVerified ? null : 'برای فعال کردن نوتیفیکیشن ایمیل، ابتدا باید ایمیل خود را تایید کنید',
       ),
       _ChannelOption(
         key: 'sms',
@@ -536,6 +547,8 @@ class _UserNotificationsPageState extends State<UserNotificationsPage> {
         title: t.notificationsChannelSms,
         description: t.notificationsChannelSmsDescription,
         onChanged: (v) => setState(() => _sms = v),
+        canEnable: _mobileVerified,
+        disabledReason: _mobileVerified ? null : 'برای فعال کردن نوتیفیکیشن پیامک، ابتدا باید شماره موبایل خود را تایید کنید',
       ),
       _ChannelOption(
         key: 'inapp',
@@ -544,6 +557,7 @@ class _UserNotificationsPageState extends State<UserNotificationsPage> {
         title: t.notificationsChannelInApp,
         description: t.notificationsChannelInAppDescription,
         onChanged: (v) => setState(() => _inapp = v),
+        canEnable: true, // InApp همیشه قابل استفاده است
       ),
     ];
 
@@ -620,12 +634,42 @@ class _UserNotificationsPageState extends State<UserNotificationsPage> {
             ] else ...[
               SwitchListTile.adaptive(
                 value: options[i].enabled,
-                onChanged: options[i].onChanged,
+                onChanged: options[i].canEnable ? options[i].onChanged : null,
                 title: Text(options[i].title),
-                subtitle: Text(options[i].description),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(options[i].description),
+                    if (!options[i].canEnable && options[i].disabledReason != null) ...[
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.info_outline, size: 16, color: Colors.orange.shade700),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                options[i].disabledReason!,
+                                style: theme.textTheme.bodySmall?.copyWith(color: Colors.orange.shade700),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
                 secondary: Icon(
                   options[i].icon,
-                  color: options[i].enabled ? colorScheme.primary : colorScheme.onSurfaceVariant,
+                  color: options[i].enabled && options[i].canEnable 
+                      ? colorScheme.primary 
+                      : colorScheme.onSurfaceVariant,
                 ),
                 activeColor: colorScheme.primary,
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16),
@@ -645,47 +689,14 @@ class _UserNotificationsPageState extends State<UserNotificationsPage> {
       children: [
         SwitchListTile.adaptive(
           value: option.enabled,
-          onChanged: option.onChanged,
+          onChanged: option.canEnable ? option.onChanged : null,
           title: Text(option.title),
           subtitle: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(option.description),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Icon(
-                    _telegramLinked ? Icons.check_circle : Icons.cancel,
-                    size: 16,
-                    color: _telegramLinked ? Colors.green : Colors.red,
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    _telegramLinked ? t.notificationsTelegramConnected : t.notificationsTelegramNotConnected,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: _telegramLinked ? Colors.green : Colors.red,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  if (_telegramLinked && _telegramConnectedAt != null) ...[
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        t.notificationsTelegramConnectedSince(
-                          HesabixDateUtils.formatForDisplay(
-                            DateTime.tryParse(_telegramConnectedAt!),
-                            widget.calendarController.isJalali,
-                          ),
-                        ),
-                        style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-              if (option.enabled && !_telegramLinked) ...[
-                const SizedBox(height: 4),
+              if (!option.canEnable && option.disabledReason != null) ...[
+                const SizedBox(height: 8),
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
@@ -695,23 +706,82 @@ class _UserNotificationsPageState extends State<UserNotificationsPage> {
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.warning_amber_rounded, size: 16, color: Colors.orange),
+                      Icon(Icons.info_outline, size: 16, color: Colors.orange.shade700),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          t.notificationsTelegramConnectionWarning,
+                          option.disabledReason!,
                           style: theme.textTheme.bodySmall?.copyWith(color: Colors.orange.shade700),
                         ),
                       ),
                     ],
                   ),
                 ),
+              ] else ...[
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Icon(
+                      _telegramLinked ? Icons.check_circle : Icons.cancel,
+                      size: 16,
+                      color: _telegramLinked ? Colors.green : Colors.red,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      _telegramLinked ? t.notificationsTelegramConnected : t.notificationsTelegramNotConnected,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: _telegramLinked ? Colors.green : Colors.red,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    if (_telegramLinked && _telegramConnectedAt != null) ...[
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          t.notificationsTelegramConnectedSince(
+                            HesabixDateUtils.formatForDisplay(
+                              DateTime.tryParse(_telegramConnectedAt!),
+                              widget.calendarController.isJalali,
+                            ),
+                          ),
+                          style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                if (option.enabled && !_telegramLinked) ...[
+                  const SizedBox(height: 4),
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.warning_amber_rounded, size: 16, color: Colors.orange),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            t.notificationsTelegramConnectionWarning,
+                            style: theme.textTheme.bodySmall?.copyWith(color: Colors.orange.shade700),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ],
             ],
           ),
           secondary: Icon(
             option.icon,
-            color: option.enabled ? colorScheme.primary : colorScheme.onSurfaceVariant,
+            color: option.enabled && option.canEnable 
+                ? colorScheme.primary 
+                : colorScheme.onSurfaceVariant,
           ),
           activeColor: colorScheme.primary,
           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),

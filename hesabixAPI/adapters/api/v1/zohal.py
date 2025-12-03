@@ -1,7 +1,6 @@
 """
 API endpoints برای استفاده از سرویس‌های استعلامات زحل (کاربران)
 """
-from __future__ import annotations
 
 from typing import Dict, Any, Optional
 import structlog

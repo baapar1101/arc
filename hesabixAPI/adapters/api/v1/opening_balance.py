@@ -13,6 +13,7 @@ from app.services.opening_balance_service import (
     get_opening_balance,
     upsert_opening_balance,
     post_opening_balance,
+    preview_opening_balance,
 )
 
 
@@ -30,15 +31,8 @@ async def get_opening_balance_endpoint(
     fiscal_year_id: Optional[int] = None,
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
+    _: None = Depends(require_business_permission_dep("opening_balance", "view")),
 ):
-    # Permission: view opening_balance
-    if not ctx.has_business_permission("opening_balance", "view"):
-        from app.core.responses import ApiError
-        raise ApiError("FORBIDDEN", "Missing business permission: opening_balance.view", http_status=403)
-    # Access check
-    if not ctx.can_access_business(int(business_id)):
-        from app.core.responses import ApiError
-        raise ApiError("FORBIDDEN", f"No access to business {business_id}", http_status=403)
     result = get_opening_balance(db, business_id, fiscal_year_id)
     return success_response(data=format_datetime_fields(result, request), request=request, message="OPENING_BALANCE_FETCHED")
 
@@ -61,6 +55,23 @@ async def upsert_opening_balance_endpoint(
 
 
 @router.post(
+    "/businesses/{business_id}/opening-balance/preview",
+    summary="پیش‌نمایش تراز افتتاحیه",
+    description="پیش‌نمایش تراز افتتاحیه بدون ذخیره",
+)
+async def preview_opening_balance_endpoint(
+    request: Request,
+    business_id: int,
+    body: Dict[str, Any] = Body(...),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+    _: None = Depends(require_business_permission_dep("opening_balance", "edit")),
+):
+    preview = preview_opening_balance(db, business_id, body)
+    return success_response(data=format_datetime_fields(preview, request), request=request, message="OPENING_BALANCE_PREVIEWED")
+
+
+@router.post(
     "/businesses/{business_id}/opening-balance/post",
     summary="نهایی‌سازی تراز افتتاحیه",
     description="قفل کردن و علامت‌گذاری سند تراز افتتاحیه به عنوان نهایی",
@@ -73,9 +84,6 @@ async def post_opening_balance_endpoint(
     ctx: AuthContext = Depends(get_current_user),
     _: None = Depends(require_business_permission_dep("opening_balance", "edit")),
 ):
-    if not ctx.can_access_business(int(business_id)):
-        from app.core.responses import ApiError
-        raise ApiError("FORBIDDEN", f"No access to business {business_id}", http_status=403)
     posted = post_opening_balance(db, business_id, ctx.get_user_id(), fiscal_year_id)
     return success_response(data=format_datetime_fields(posted, request), request=request, message="OPENING_BALANCE_POSTED")
 

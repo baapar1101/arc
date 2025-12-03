@@ -6,6 +6,7 @@ import '../../core/calendar_controller.dart';
 import '../../theme/theme_controller.dart';
 import '../../core/auth_store.dart';
 import '../../services/business_user_service.dart';
+import '../../services/marketplace_service.dart';
 import '../../models/business_user_model.dart';
 import '../../core/api_client.dart';
 import '../../utils/snackbar_helper.dart';
@@ -33,7 +34,10 @@ class SettingsPage extends StatefulWidget {
 
 class _SettingsPageState extends State<SettingsPage> {
   final BusinessUserService _userService = BusinessUserService(ApiClient());
+  final MarketplaceService _marketplaceService = MarketplaceService();
   bool _isLeaving = false;
+  List<Map<String, dynamic>> _businessPlugins = [];
+  bool _pluginsLoaded = false;
   
   AuthStore? get _authStore => ApiClient.getAuthStore();
   
@@ -45,6 +49,7 @@ class _SettingsPageState extends State<SettingsPage> {
     if (authStore != null) {
       authStore.addListener(_onAuthStoreChanged);
     }
+    _loadBusinessPlugins();
   }
   
   @override
@@ -60,6 +65,59 @@ class _SettingsPageState extends State<SettingsPage> {
     if (mounted) {
       setState(() {});
     }
+  }
+
+  Future<void> _loadBusinessPlugins() async {
+    if (_pluginsLoaded) return;
+    
+    try {
+      final plugins = await _marketplaceService.listBusinessPlugins(businessId: widget.businessId);
+      if (mounted) {
+        setState(() {
+          _businessPlugins = plugins.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+          _pluginsLoaded = true;
+        });
+      }
+    } catch (e) {
+      // خطا را نادیده می‌گیریم تا صفحه کار کند
+      if (mounted) {
+        setState(() {
+          _pluginsLoaded = true;
+        });
+      }
+    }
+  }
+
+  bool _isWarrantyPluginActive() {
+    try {
+      final warrantyPlugin = _businessPlugins.firstWhere(
+        (plugin) => plugin['plugin_code'] == 'product_warranty',
+        orElse: () => <String, dynamic>{},
+      );
+      return warrantyPlugin['is_active'] == true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  bool _canAccessWarrantySettings() {
+    final authStore = _authStore;
+    if (authStore == null) return false;
+    
+    // بررسی فعال بودن پلاگین
+    if (!_isWarrantyPluginActive()) {
+      return false;
+    }
+    
+    // بررسی دسترسی
+    // اگر کاربر مالک است، دسترسی دارد
+    if (authStore.currentBusiness?.isOwner == true) {
+      return true;
+    }
+    
+    // بررسی دسترسی warranty.manage یا warranty.read
+    return authStore.hasBusinessPermission('warranty', 'manage') ||
+           authStore.hasBusinessPermission('warranty', 'read');
   }
   
   @override
@@ -176,6 +234,14 @@ class _SettingsPageState extends State<SettingsPage> {
                   icon: Icons.cloud_sync_outlined,
                   onTap: () => context.go('/business/${widget.businessId}/settings/tax'),
                 ),
+                if (_canAccessWarrantySettings())
+                  _buildSettingItem(
+                    context,
+                    title: t.warrantySettings ?? 'تنظیمات گارانتی',
+                    subtitle: 'تنظیمات فرمت کد، سریال و امنیت گارانتی',
+                    icon: Icons.verified_user,
+                    onTap: () => context.go('/business/${widget.businessId}/warranty/settings'),
+                  ),
               ],
             ),
             

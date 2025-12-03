@@ -10,6 +10,9 @@ import '../../core/api_client.dart';
 import '../../core/auth_store.dart';
 import './warehouse_combobox_widget.dart';
 import '../../utils/number_normalizer.dart';
+import '../../core/calendar_controller.dart';
+import './unique_product_instance_selector_dialog.dart';
+import '../../services/product_service.dart';
 
 class InvoiceLineItemsTable extends StatefulWidget {
   final int businessId;
@@ -19,6 +22,7 @@ class InvoiceLineItemsTable extends StatefulWidget {
   final bool postInventory;
   final List<InvoiceLineItem>? initialRows; // برای مقداردهی اولیه (ویرایش فاکتور)
   final AuthStore? authStore;
+  final CalendarController? calendarController; // برای فرمت تاریخ در دیالوگ انتخاب instance
 
   const InvoiceLineItemsTable({
     super.key,
@@ -29,6 +33,7 @@ class InvoiceLineItemsTable extends StatefulWidget {
     this.postInventory = true,
     this.initialRows,
     this.authStore,
+    this.calendarController,
   });
 
   @override
@@ -38,9 +43,103 @@ class InvoiceLineItemsTable extends StatefulWidget {
 class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
   final List<InvoiceLineItem> _rows = <InvoiceLineItem>[];
   final PriceListService _priceListService = PriceListService(apiClient: ApiClient());
+  final ProductService _productService = ProductService();
   Map<String, dynamic>? _inlinePriceList; // کش لیست قیمت برای آیکون انتخاب قیمت
+  final Map<int, Map<String, dynamic>> _productCache = {}; // کش اطلاعات کالاها برای بررسی یونیک بودن
 
   void _notify() => widget.onChanged?.call(List<InvoiceLineItem>.from(_rows));
+  
+  /// بررسی اینکه آیا باید قابلیت انتخاب instance نمایش داده شود
+  bool _shouldShowInstanceSelector(InvoiceLineItem item) {
+    // فقط برای فاکتور فروش و برگشت از خرید
+    if (widget.invoiceType != 'sales' && widget.invoiceType != 'purchase_return') {
+      return false;
+    }
+    
+    // باید کالا انتخاب شده باشد
+    if (item.productId == null) {
+      return false;
+    }
+    
+    // بررسی اینکه کالا یونیک است
+    final product = _productCache[item.productId];
+    if (product == null) return false;
+    
+    return product['inventory_mode'] == 'unique';
+  }
+  
+  /// بارگذاری اطلاعات کالا برای بررسی یونیک بودن
+  Future<void> _loadProductInfo(int productId) async {
+    if (_productCache.containsKey(productId)) {
+      return; // قبلاً بارگذاری شده
+    }
+    
+    try {
+      final product = await _productService.getProduct(
+        businessId: widget.businessId,
+        productId: productId,
+      );
+      if (mounted) {
+        setState(() {
+          _productCache[productId] = product;
+        });
+      }
+    } catch (e) {
+      // خطا در بارگذاری - نادیده می‌گیریم
+    }
+  }
+  
+  /// باز کردن دیالوگ انتخاب instance ها
+  Future<void> _selectUniqueProductInstances(int index, InvoiceLineItem item) async {
+    if (item.productId == null) return;
+    
+    // بارگذاری اطلاعات کالا
+    await _loadProductInfo(item.productId!);
+    
+    if (!_shouldShowInstanceSelector(item)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('این کالا در حالت یونیک نیست')),
+      );
+      return;
+    }
+    
+    if (widget.calendarController == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('خطا: CalendarController در دسترس نیست')),
+      );
+      return;
+    }
+    
+    final product = _productCache[item.productId!]!;
+    final quantity = item.quantity.toInt();
+    
+    if (quantity <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('لطفاً ابتدا تعداد را وارد کنید')),
+      );
+      return;
+    }
+    
+    final selectedIds = await showDialog<List<int>>(
+      context: context,
+      builder: (context) => UniqueProductInstanceSelectorDialog(
+        businessId: widget.businessId,
+        productId: item.productId!,
+        productName: item.productName ?? 'کالا',
+        warehouseId: item.warehouseId,
+        selectedInstanceIds: item.selectedInstanceIds,
+        requiredQuantity: quantity,
+        calendarController: widget.calendarController!,
+      ),
+    );
+    
+    if (selectedIds != null && mounted) {
+      setState(() {
+        _rows[index] = item.copyWith(selectedInstanceIds: selectedIds);
+      });
+      _notify();
+    }
+  }
 
   void _updateRow(int index, InvoiceLineItem updated) {
     setState(() {
@@ -84,7 +183,18 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
     if ((widget.initialRows ?? const <InvoiceLineItem>[]).isNotEmpty) {
       _rows.clear();
       _rows.addAll(widget.initialRows!);
+      // بارگذاری اطلاعات کالاها برای بررسی یونیک بودن
+      _loadProductInfosForInitialRows();
       _notify();
+    }
+  }
+  
+  /// بارگذاری اطلاعات کالاهای موجود در ردیف‌های اولیه
+  Future<void> _loadProductInfosForInitialRows() async {
+    for (var item in _rows) {
+      if (item.productId != null && !_productCache.containsKey(item.productId)) {
+        await _loadProductInfo(item.productId!);
+      }
     }
   }
 
@@ -330,47 +440,79 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
     final t = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+    return Stack(
+      clipBehavior: Clip.none,
       children: [
-        Row(
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            ElevatedButton.icon(
-              onPressed: _addRow,
-              icon: const Icon(Icons.add),
-              label: Text(t.add),
+            Row(
+              children: [
+                // لیست قیمت از بالای جدول حذف شد
+                const Spacer(),
+                // حالت فشرده به صورت پیش‌فرض و تنها حالت است
+                if (widget.selectedCurrencyId != null)
+                  Chip(label: Text('${t.currency}: ${widget.selectedCurrencyId}')),
+              ],
             ),
-            const SizedBox(width: 12),
-            // لیست قیمت از بالای جدول حذف شد
-            const Spacer(),
-            // حالت فشرده به صورت پیش‌فرض و تنها حالت است
-            if (widget.selectedCurrencyId != null)
-              Chip(label: Text('${t.currency}: ${widget.selectedCurrencyId}')),
+            const SizedBox(height: 12),
+            Container(
+              decoration: BoxDecoration(
+                border: Border.all(color: colorScheme.outline.withValues(alpha: 0.5)),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Column(
+                children: [
+                  _buildHeader(context),
+                  const Divider(height: 1),
+                  if (_rows.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Text(
+                        t.noRowsAdded,
+                        style: theme.textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant),
+                      ),
+                    )
+                  else
+                    ..._rows.asMap().entries.map((e) => _buildCompactRow(context, e.key, e.value)),
+                ],
+              ),
+            ),
+            // فضای خالی برای دکمه شناور (فقط زمانی که خطوط وجود دارند)
+            if (_rows.isNotEmpty) const SizedBox(height: 80),
           ],
         ),
-        const SizedBox(height: 12),
-        Container(
-          decoration: BoxDecoration(
-            border: Border.all(color: colorScheme.outline.withValues(alpha: 0.5)),
-            borderRadius: BorderRadius.circular(8),
+        // دکمه شناور در پایین (فقط زمانی که خطوط وجود دارند)
+        if (_rows.isNotEmpty)
+          Positioned(
+            bottom: 0,
+            right: 0,
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: FloatingActionButton.extended(
+                onPressed: _addRow,
+                icon: const Icon(Icons.add),
+                label: Text(t.add),
+                backgroundColor: colorScheme.primary,
+                foregroundColor: colorScheme.onPrimary,
+                elevation: 4,
+              ),
+            ),
+          )
+        else
+          // اگر خطوطی وجود ندارد، دکمه را در بالای جدول نمایش بده
+          Positioned(
+            top: 0,
+            right: 0,
+            child: Padding(
+              padding: const EdgeInsets.only(top: 0, right: 0),
+              child: ElevatedButton.icon(
+                onPressed: _addRow,
+                icon: const Icon(Icons.add),
+                label: Text(t.add),
+              ),
+            ),
           ),
-          child: Column(
-            children: [
-              _buildHeader(context),
-              const Divider(height: 1),
-              if (_rows.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Text(
-                    t.noRowsAdded,
-                    style: theme.textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant),
-                  ),
-                )
-              else
-                ..._rows.asMap().entries.map((e) => _buildCompactRow(context, e.key, e.value)),
-            ],
-          ),
-        ),
       ],
     );
   }
@@ -519,8 +661,14 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                     }
                     final shouldReplaceDescription = _shouldReplaceDescription(item.description, previousAuto);
                     
+                    // ذخیره اطلاعات کالا در cache برای بررسی یونیک بودن
+                    final productId = _toInt(p['id']);
+                    if (productId != null) {
+                      _productCache[productId] = Map<String, dynamic>.from(p);
+                    }
+                    
                     final updated = item.copyWith(
-                      productId: _toInt(p['id']),
+                      productId: productId,
                       productCode: p['code']?.toString(),
                       productName: p['name']?.toString(),
                       mainUnit: mainUnit,
@@ -686,6 +834,65 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
               ),
             ],
           ),
+          // سطر سوم: نمایش instance های انتخاب شده و دکمه انتخاب (فقط برای کالاهای یونیک)
+          if (_shouldShowInstanceSelector(item)) ...[
+            const SizedBox(height: 6),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(width: 36),
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.blue[50],
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: Colors.blue[200]!),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.qr_code_scanner, size: 16, color: Colors.blue[700]),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: item.selectedInstanceIds != null && item.selectedInstanceIds!.isNotEmpty
+                              ? Text(
+                                  '${item.selectedInstanceIds!.length} کالای یونیک انتخاب شده',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.blue[900],
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                )
+                              : Text(
+                                  'برای انتخاب کالاهای یونیک کلیک کنید',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.blue[700],
+                                    fontStyle: FontStyle.italic,
+                                  ),
+                                ),
+                        ),
+                        TextButton.icon(
+                          onPressed: () => _selectUniqueProductInstances(index, item),
+                          icon: const Icon(Icons.arrow_forward, size: 16),
+                          label: Text(
+                            item.selectedInstanceIds != null && item.selectedInstanceIds!.isNotEmpty
+                                ? 'ویرایش'
+                                : 'انتخاب',
+                          ),
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );

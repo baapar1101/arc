@@ -20,7 +20,7 @@ def _mask_config(cfg: dict) -> dict:
 	if not isinstance(cfg, dict):
 		return {}
 	masked = dict(cfg)
-	for key in ["merchant_id", "terminal_id", "username", "password", "secret", "secret_key", "api_key"]:
+	for key in ["merchant_id", "terminal_id", "username", "password", "secret", "secret_key", "api_key", "api"]:
 		if key in masked and masked[key]:
 			val = str(masked[key])
 			if len(val) > 6:
@@ -77,8 +77,8 @@ def create_payment_gateway(
 	is_active = bool(payload.get("is_active", True))
 	is_sandbox = bool(payload.get("is_sandbox", True))
 	config = payload.get("config") or {}
-	if provider not in ("zarinpal", "parsian"):
-		raise ApiError("UNSUPPORTED_PROVIDER", "provider باید یکی از zarinpal یا parsian باشد", http_status=400)
+	if provider not in ("zarinpal", "parsian", "bitpay"):
+		raise ApiError("UNSUPPORTED_PROVIDER", "provider باید یکی از zarinpal، parsian یا bitpay باشد", http_status=400)
 	if not display_name:
 		raise ApiError("INVALID_NAME", "display_name الزامی است", http_status=400)
 	gw = PaymentGateway(

@@ -27,6 +27,16 @@ class NotificationsService {
   Future<void> sendTest(String channel) async {
     await _api.post<Map<String, dynamic>>('/api/v1/notifications/test', query: {'channel': channel});
   }
+
+  /// دریافت تاریخچه ناتیفیکیشن‌های کاربر
+  /// queryInfo: اطلاعات کوئری شامل فیلترها، مرتب‌سازی و صفحه‌بندی
+  Future<Map<String, dynamic>> getHistory(Map<String, dynamic> queryInfo) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/notifications/history',
+      data: queryInfo,
+    );
+    return Map<String, dynamic>.from(res.data?['data'] as Map? ?? const {});
+  }
 }
 
 

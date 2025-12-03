@@ -87,11 +87,11 @@ prompt_vars() {
   : "${UI_DOMAIN:=}"
   : "${BRANCH:=main}"
   : "${DB_PASSWORD:=}"
-  # بهینه‌سازی تعداد workers برای مقیاس‌پذیری بالا:
-  # فرمول: (2 * CPU cores) + 1
-  # برای سرور 8 هسته: 17 worker
-  # با pool_size=20 و max_overflow=30، هر worker تا 50 اتصال دارد
-  # در مجموع: 17 * 50 = 850 اتصال حداکثر
+  # Optimize worker count for high scalability:
+  # Formula: (2 * CPU cores) + 1
+  # For 8-core server: 17 workers
+  # With pool_size=20 and max_overflow=30, each worker has up to 50 connections
+  # Total: 17 * 50 = 850 maximum connections
   : "${UVICORN_WORKERS:=17}"
   : "${FLUTTER_VERSION:=3.24.0}"
   

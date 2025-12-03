@@ -357,12 +357,14 @@ class TestConnectionResponse {
   final String message;
   final bool connected;
   final String? errorMessage;
+  final Map<String, dynamic>? errorDetails;
 
   TestConnectionResponse({
     required this.success,
     required this.message,
     required this.connected,
     this.errorMessage,
+    this.errorDetails,
   });
 
   factory TestConnectionResponse.fromJson(Map<String, dynamic> json) {
@@ -372,6 +374,7 @@ class TestConnectionResponse {
       message: json['message'] as String? ?? '',
       connected: data['connected'] as bool? ?? false,
       errorMessage: data['error_message'] as String?,
+      errorDetails: data['error_details'] as Map<String, dynamic>?,
     );
   }
 }

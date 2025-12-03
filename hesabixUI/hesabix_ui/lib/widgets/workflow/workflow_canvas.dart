@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../models/workflow_editor_models.dart';
 import '../../models/workflow_editor_state.dart';
 import '../../utils/workflow_constants.dart';
@@ -31,8 +32,8 @@ class _WorkflowCanvasState extends State<WorkflowCanvas> {
   Offset? _connectingToPosition;
   final GlobalKey _canvasKey = GlobalKey();
   final GlobalKey _interactiveViewerKey = GlobalKey();
-  Offset? _dragStartPosition; // موقعیت شروع drag در canvas coordinates
   String? _draggingNodeId; // ID نودی که در حال drag است
+  bool _isDragStarted = false; // آیا drag شروع شده است
 
   @override
   void initState() {
@@ -63,7 +64,6 @@ class _WorkflowCanvasState extends State<WorkflowCanvas> {
           nodePositions[node.id] = node.position;
         } else {
           // اگر موقعیت نامعتبر است، از موقعیت پیش‌فرض استفاده کن
-          debugPrint('موقعیت نامعتبر برای node ${node.id}: ${node.position}');
           nodePositions[node.id] = const Offset(200, 200);
         }
       }
@@ -88,11 +88,11 @@ class _WorkflowCanvasState extends State<WorkflowCanvas> {
       transformationController: _transformationController,
       minScale: WorkflowConstants.minZoom,
       maxScale: WorkflowConstants.maxZoom,
-      panEnabled: !widget.state.isConnecting, // غیرفعال کردن pan هنگام اتصال
-      scaleEnabled: !widget.state.isConnecting,
+      panEnabled: !widget.state.isConnecting && _draggingNodeId == null, // غیرفعال کردن pan هنگام اتصال یا drag نود
+      scaleEnabled: !widget.state.isConnecting && _draggingNodeId == null,
       onInteractionUpdate: (details) {
-        if (details.pointerCount == 1 && !widget.state.isConnecting) {
-          // Pan - فقط وقتی که در حال اتصال نیستیم
+        if (details.pointerCount == 1 && !widget.state.isConnecting && _draggingNodeId == null) {
+          // Pan - فقط وقتی که در حال اتصال و drag نیستیم
           widget.state.updateViewport(
             Offset(
               _transformationController.value.getTranslation().x,
@@ -103,8 +103,18 @@ class _WorkflowCanvasState extends State<WorkflowCanvas> {
         }
       },
       child: GestureDetector(
+        behavior: HitTestBehavior.translucent, // اجازه می‌دهد child ها events را بگیرند
         onPanStart: (details) {
           _lastPanPosition = details.localPosition;
+          
+          // اگر Shift فشار نشده و روی node نیستیم، شروع selection box
+          if (!HardwareKeyboard.instance.isShiftPressed && 
+              !widget.state.isConnecting && _draggingNodeId == null) {
+            final canvasPosition = _localToCanvasCoordinates(details.localPosition);
+            if (!_isOnNode(canvasPosition)) {
+              widget.state.startSelection(canvasPosition);
+            }
+          }
         },
         onPanUpdate: (details) {
           if (widget.state.isConnecting) {
@@ -113,6 +123,10 @@ class _WorkflowCanvasState extends State<WorkflowCanvas> {
             _connectingToPosition = canvasPosition;
             widget.state.updateConnectingPosition(canvasPosition);
             setState(() {}); // Force rebuild برای نمایش خط
+          } else if (widget.state.isSelecting) {
+            // به‌روزرسانی selection box
+            final canvasPosition = _localToCanvasCoordinates(details.localPosition);
+            widget.state.updateSelection(canvasPosition);
           } else {
             // Pan canvas
             final delta = details.localPosition - (_lastPanPosition ?? Offset.zero);
@@ -127,10 +141,18 @@ class _WorkflowCanvasState extends State<WorkflowCanvas> {
             final droppedNode = _findNodeAtPosition(canvasPosition);
             widget.state.endConnection(droppedNode?.id);
             _connectingToPosition = null;
+          } else if (widget.state.isSelecting) {
+            widget.state.endSelection();
+          } else if (_draggingNodeId != null) {
+            // اعمال snap to grid در پایان drag
+            final node = widget.state.getNodeById(_draggingNodeId!);
+            if (node != null) {
+              widget.state.snapNodeToGrid(_draggingNodeId!);
+            }
           }
           _lastPanPosition = null;
-          _dragStartPosition = null;
           _draggingNodeId = null;
+          _isDragStarted = false;
         },
         onTapUp: (details) {
           // لغو انتخاب
@@ -146,9 +168,10 @@ class _WorkflowCanvasState extends State<WorkflowCanvas> {
           child: Stack(
             children: [
               // Grid background
-              RepaintBoundary(
-                child: _buildGrid(widget.state.gridSize > 0 ? widget.state.gridSize : WorkflowConstants.gridSize),
-              ),
+              if (widget.state.showGrid)
+                RepaintBoundary(
+                  child: _buildGrid(widget.state.gridSize > 0 ? widget.state.gridSize : WorkflowConstants.gridSize),
+                ),
               // Connections (رسم قبل از nodes تا زیر آنها نباشند)
               RepaintBoundary(
                 child: CustomPaint(
@@ -163,17 +186,26 @@ class _WorkflowCanvasState extends State<WorkflowCanvas> {
                   size: Size.infinite,
                 ),
               ),
+              // Selection Box
+              if (widget.state.isSelecting && 
+                  widget.state.selectionStart != null && 
+                  widget.state.selectionEnd != null)
+                CustomPaint(
+                  painter: SelectionBoxPainter(
+                    start: widget.state.selectionStart!,
+                    end: widget.state.selectionEnd!,
+                  ),
+                  size: Size.infinite,
+                ),
               // Nodes (بالاتر از connections)
               ...widget.state.nodes.where((node) {
                 // فیلتر کردن نودهایی با موقعیت نامعتبر
-                if (!_isValidPosition(node.position)) {
-                  debugPrint('نود با موقعیت نامعتبر نادیده گرفته شد: ${node.id}');
-                  return false;
-                }
-                return true;
+                return _isValidPosition(node.position);
               }).map((node) {
                 try {
-                  final isSelected = widget.state.selectedNodeId == node.id;
+                  final isSelected = widget.state.selectedNodeId == node.id || 
+                                      widget.state.selectedNodeIds.contains(node.id);
+                  
                   // بررسی اینکه آیا این node قابل اتصال است (برای highlight)
                   final canConnect = _canConnectToNode(node);
                   
@@ -186,16 +218,32 @@ class _WorkflowCanvasState extends State<WorkflowCanvas> {
                       ? node.copyWith(position: validPosition)
                       : node;
                   
-                  return RepaintBoundary(
+                  final validationErrors = widget.state.validateNode(node.id);
+                  
+                  return WorkflowNodeWidget(
                     key: ValueKey(node.id),
-                    child: WorkflowNodeWidget(
-                      node: nodeToDisplay,
-                      isSelected: isSelected,
-                      zoomLevel: widget.state.zoomLevel > 0 ? widget.state.zoomLevel : 1.0,
-                      highlightConnectionPoints: widget.state.isConnecting && canConnect,
+                    node: nodeToDisplay,
+                    isSelected: isSelected,
+                    zoomLevel: widget.state.zoomLevel > 0 ? widget.state.zoomLevel : 1.0,
+                    highlightConnectionPoints: widget.state.isConnecting && canConnect,
+                    validationErrors: validationErrors.isNotEmpty ? validationErrors : null,
                       onTap: () {
-                        widget.state.selectNode(node.id);
-                        widget.onNodeTap?.call(node);
+                        // بررسی کلیدهای Shift و Ctrl
+                        final isShiftPressed = HardwareKeyboard.instance.isShiftPressed;
+                        final isCtrlPressed = HardwareKeyboard.instance.isControlPressed || 
+                                              HardwareKeyboard.instance.isMetaPressed;
+                        
+                        if (isCtrlPressed) {
+                          // Ctrl+Click: toggle selection
+                          widget.state.selectNode(node.id, toggle: true);
+                        } else if (isShiftPressed) {
+                          // Shift+Click: add to selection
+                          widget.state.selectNode(node.id, addToSelection: true);
+                        } else {
+                          // کلیک معمولی
+                          widget.state.selectNode(node.id);
+                          widget.onNodeTap?.call(node);
+                        }
                       },
                       onLongPress: () {
                         widget.state.selectNode(node.id);
@@ -209,34 +257,21 @@ class _WorkflowCanvasState extends State<WorkflowCanvas> {
                           }
                         }
                       },
-                      onDeltaChanged: (globalPosition) {
-                        try {
-                          // تبدیل global position به canvas coordinates
-                          final canvasPosition = _globalToCanvasCoordinates(globalPosition);
-                          
-                          if (!_isValidPosition(canvasPosition)) {
-                            return;
-                          }
-                          
-                          if (_draggingNodeId != node.id) {
-                            // شروع drag جدید - ذخیره موقعیت نسبی
-                            _draggingNodeId = node.id;
-                            // ذخیره موقعیت نسبی (فاصله از گوشه بالا چپ نود)
-                            _dragStartPosition = canvasPosition - validPosition;
-                          } else if (_dragStartPosition != null) {
-                            // محاسبه موقعیت جدید: موقعیت موس منهای فاصله نسبی
-                            final newPosition = canvasPosition - _dragStartPosition!;
-                            if (_isValidPosition(newPosition)) {
-                              widget.state.updateNodePosition(node.id, newPosition);
-                            }
-                          }
-                        } catch (e) {
-                          debugPrint('خطا در onDeltaChanged: $e');
+                      onDeltaChanged: (signal) {
+                        // سیگنال شروع drag
+                        if (signal == Offset.zero) {
+                          _draggingNodeId = node.id;
+                          _isDragStarted = true;
                         }
                       },
                       onPositionChanged: (newPosition) {
                         if (_isValidPosition(newPosition)) {
-                          widget.state.updateNodePosition(node.id, newPosition);
+                          if (_isDragStarted && _draggingNodeId == node.id) {
+                            // در حین drag از updateWithoutSnap استفاده می‌کنیم
+                            widget.state.updateNodePositionWithoutSnap(node.id, newPosition);
+                          } else {
+                            widget.state.updateNodePosition(node.id, newPosition);
+                          }
                         }
                       },
                       onStartConnection: () {
@@ -257,11 +292,9 @@ class _WorkflowCanvasState extends State<WorkflowCanvas> {
                           debugPrint('خطا در onConnectionDragUpdate: $e');
                         }
                       },
-                    ),
                   );
                 } catch (e, stackTrace) {
                   debugPrint('خطا در ساخت widget برای node ${node.id}: $e');
-                  debugPrint('StackTrace: $stackTrace');
                   // برگرداندن یک placeholder widget برای جلوگیری از crash
                   return SizedBox(
                     key: ValueKey('error_${node.id}'),
@@ -346,34 +379,22 @@ class _WorkflowCanvasState extends State<WorkflowCanvas> {
   Offset _localToCanvasCoordinates(Offset localPosition) {
     try {
       final matrix = _transformationController.value;
-      
-      // استفاده از getMaxScaleOnAxis برای دقت بیشتر
       final scale = matrix.getMaxScaleOnAxis();
       final translation = matrix.getTranslation();
       
-      // بررسی اعتبار مقادیر
-      if (!scale.isFinite || scale.isNaN || scale <= 0) {
-        final result = Offset(
-          localPosition.dx - (translation.x.isFinite ? translation.x : 0), 
-          localPosition.dy - (translation.y.isFinite ? translation.y : 0)
-        );
-        return _isValidPosition(result) ? result : const Offset(0, 0);
-      }
-      
-      if (!translation.x.isFinite || !translation.y.isFinite || 
+      // بررسی سریع اعتبار
+      if (!scale.isFinite || scale <= 0 || 
+          !translation.x.isFinite || !translation.y.isFinite ||
           !localPosition.dx.isFinite || !localPosition.dy.isFinite) {
         return const Offset(0, 0);
       }
       
-      // تبدیل معکوس: از viewport coordinates به canvas coordinates
-      // canvas = (viewport - translation) / scale
+      // تبدیل معکوس: canvas = (viewport - translation) / scale
       final canvasX = (localPosition.dx - translation.x) / scale;
       final canvasY = (localPosition.dy - translation.y) / scale;
       
-      final result = Offset(canvasX, canvasY);
-      return _isValidPosition(result) ? result : const Offset(0, 0);
+      return Offset(canvasX, canvasY);
     } catch (e) {
-      debugPrint('خطا در _localToCanvasCoordinates: $e');
       return const Offset(0, 0);
     }
   }
@@ -381,27 +402,16 @@ class _WorkflowCanvasState extends State<WorkflowCanvas> {
   /// تبدیل موقعیت global به canvas coordinates
   Offset _globalToCanvasCoordinates(Offset globalPosition) {
     try {
-      if (!_isValidPosition(globalPosition)) {
-        return const Offset(0, 0);
-      }
-      
-      // پیدا کردن RenderBox برای InteractiveViewer child (Container)
+      // پیدا کردن RenderBox برای Canvas container
       final RenderBox? canvasBox = _canvasKey.currentContext?.findRenderObject() as RenderBox?;
       if (canvasBox == null) {
         return const Offset(0, 0);
       }
       
-      // تبدیل global به local نسبت به canvas container
+      // تبدیل global به local و سپس به canvas coordinates
       final localPosition = canvasBox.globalToLocal(globalPosition);
-      
-      if (!_isValidPosition(localPosition)) {
-        return const Offset(0, 0);
-      }
-      
-      // سپس تبدیل با transformation matrix
       return _localToCanvasCoordinates(localPosition);
     } catch (e) {
-      debugPrint('خطا در _globalToCanvasCoordinates: $e');
       return const Offset(0, 0);
     }
   }
@@ -472,6 +482,45 @@ class GridPainter extends CustomPainter {
   @override
   bool shouldRepaint(GridPainter oldDelegate) {
     return oldDelegate.gridSize != gridSize || oldDelegate.showGrid != showGrid;
+  }
+}
+
+/// Painter برای رسم selection box
+class SelectionBoxPainter extends CustomPainter {
+  final Offset start;
+  final Offset end;
+
+  SelectionBoxPainter({
+    required this.start,
+    required this.end,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final left = math.min(start.dx, end.dx);
+    final right = math.max(start.dx, end.dx);
+    final top = math.min(start.dy, end.dy);
+    final bottom = math.max(start.dy, end.dy);
+    
+    final rect = Rect.fromLTRB(left, top, right, bottom);
+    
+    // رسم پس‌زمینه
+    final fillPaint = Paint()
+      ..color = Colors.blue.withOpacity(0.1)
+      ..style = PaintingStyle.fill;
+    canvas.drawRect(rect, fillPaint);
+    
+    // رسم border
+    final borderPaint = Paint()
+      ..color = Colors.blue
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.0;
+    canvas.drawRect(rect, borderPaint);
+  }
+
+  @override
+  bool shouldRepaint(SelectionBoxPainter oldDelegate) {
+    return oldDelegate.start != start || oldDelegate.end != end;
   }
 }
 

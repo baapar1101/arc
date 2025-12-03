@@ -88,6 +88,16 @@ class SettingsCategorizationService {
             categoryId: 'storage_files',
             order: 3,
           ),
+          SettingsItem(
+            id: 'marketplace_plugins',
+            title: 'settingsMarketplacePlugins',
+            description: 'settingsMarketplacePluginsDescription',
+            icon: Icons.extension_outlined,
+            color: const Color(0xFF9C27B0),
+            route: '/user/profile/system-settings/marketplace-plugins',
+            categoryId: 'storage_files',
+            order: 4,
+          ),
         ],
       ),
 

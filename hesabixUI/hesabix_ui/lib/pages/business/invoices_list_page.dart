@@ -316,38 +316,6 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
             // دسکتاپ/تبلت: Row layout
             Row(
               children: [
-                if (_fiscalYears.isNotEmpty)
-                  SizedBox(
-                    width: 280,
-                    child: DropdownButtonFormField<int>(
-                      value: _selectedFiscalYearId,
-                      decoration: InputDecoration(
-                        labelText: t.fiscalYear,
-                        border: const OutlineInputBorder(),
-                        isDense: true,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-                      ),
-                      items: _fiscalYears.map<DropdownMenuItem<int>>((fy) {
-                        final id = fy['id'] as int?;
-                        final title = (fy['title'] ?? '').toString();
-                        return DropdownMenuItem<int>(
-                          value: id,
-                          child: Text(
-                            title.isNotEmpty ? title : 'FY ${id ?? ''}',
-                            overflow: TextOverflow.ellipsis,
-                            maxLines: 1,
-                          ),
-                        );
-                      }).toList(),
-                      onChanged: (val) {
-                        setState(() {
-                          _selectedFiscalYearId = val;
-                        });
-                        _refreshData();
-                      },
-                    ),
-                  ),
-                if (_fiscalYears.isNotEmpty) const SizedBox(width: 16),
                 Expanded(
                   flex: 3,
                   child: Row(

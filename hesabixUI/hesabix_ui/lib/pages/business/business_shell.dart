@@ -14,6 +14,7 @@ import '../../widgets/banking/petty_cash_form_dialog.dart';
 import '../../widgets/product/product_form_dialog.dart';
 import '../../widgets/category/category_tree_dialog.dart';
 import '../../services/business_dashboard_service.dart';
+import '../../services/marketplace_service.dart';
 import '../../core/api_client.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'receipts_payments_list_page.dart' show BulkSettlementDialog;
@@ -60,10 +61,13 @@ class _BusinessShellState extends State<BusinessShell> {
   bool _isWarehouseManagementExpanded = false;
   bool _isAIExpanded = false;
   final BusinessDashboardService _businessService = BusinessDashboardService(ApiClient());
+  final MarketplaceService _marketplaceService = MarketplaceService();
   final List<Map<String, dynamic>> _notifications = <Map<String, dynamic>>[];
   int _unreadCount = 0;
   final Set<int> _busyAnnIds = <int>{};
   NotificationsWsClient? _ws;
+  List<Map<String, dynamic>> _businessPlugins = [];
+  bool _pluginsLoaded = false;
 
   @override
   void initState() {
@@ -81,6 +85,7 @@ class _BusinessShellState extends State<BusinessShell> {
     
     // بارگذاری اطلاعات کسب و کار و دسترسی‌ها
     _loadBusinessInfo();
+    _loadBusinessPlugins();
     _initNotifications();
   }
 
@@ -214,6 +219,40 @@ class _BusinessShellState extends State<BusinessShell> {
           ),
         );
       }
+    }
+  }
+
+  Future<void> _loadBusinessPlugins() async {
+    if (_pluginsLoaded) return;
+    
+    try {
+      final plugins = await _marketplaceService.listBusinessPlugins(businessId: widget.businessId);
+      if (mounted) {
+        setState(() {
+          _businessPlugins = plugins.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+          _pluginsLoaded = true;
+        });
+      }
+    } catch (e) {
+      // خطا را نادیده می‌گیریم تا منو کار کند
+      if (mounted) {
+        setState(() {
+          _pluginsLoaded = true;
+        });
+      }
+    }
+  }
+
+  bool _isWarrantyPluginActive() {
+    // پیدا کردن پلاگین گارانتی
+    try {
+      final warrantyPlugin = _businessPlugins.firstWhere(
+        (plugin) => plugin['plugin_code'] == 'product_warranty',
+        orElse: () => <String, dynamic>{},
+      );
+      return warrantyPlugin['is_active'] == true;
+    } catch (e) {
+      return false;
     }
   }
 
@@ -469,6 +508,14 @@ class _BusinessShellState extends State<BusinessShell> {
             type: _MenuItemType.simple,
             hasAddButton: true,
           ),
+          _MenuItem(
+            label: 'انبار گردانی',
+            icon: Icons.inventory,
+            selectedIcon: Icons.inventory,
+            path: '/business/${widget.businessId}/stock-count',
+            type: _MenuItemType.simple,
+            hasAddButton: false,
+          ),
         ],
       ),
       _MenuItem(
@@ -517,6 +564,14 @@ class _BusinessShellState extends State<BusinessShell> {
         icon: Icons.hub_outlined,
         selectedIcon: Icons.hub,
         path: '/business/${widget.businessId}/workflows',
+        type: _MenuItemType.simple,
+        hasAddButton: false,
+      ),
+      _MenuItem(
+        label: t.warranty ?? 'گارانتی',
+        icon: Icons.verified_user,
+        selectedIcon: Icons.verified_user,
+        path: '/business/${widget.businessId}/warranty',
         type: _MenuItemType.simple,
         hasAddButton: false,
       ),
@@ -1640,6 +1695,13 @@ class _BusinessShellState extends State<BusinessShell> {
       return true;
     }
     
+    // بررسی فعال بودن پلاگین گارانتی
+    if (section == 'warranty') {
+      if (!_isWarrantyPluginActive()) {
+        return false;
+      }
+    }
+    
     // اگر سکشن تعریف نشده، نمایش داده نشود
     if (section == null) {
       return false;
@@ -1712,6 +1774,7 @@ class _BusinessShellState extends State<BusinessShell> {
     if (label == t.taxpayers) return 'settings';
     if (label == t.settings) return 'settings';
     if (label == t.pluginMarketplace) return 'marketplace';
+    if (label == t.warranty || label == 'گارانتی' || label == 'Warranty') return 'warranty';
     if (label == 'هوش مصنوعی' || label == 'AI Tools') return 'ai';
     if (label == 'چت با AI' || label == 'AI Chat') return 'ai';
     if (label == 'اشتراک AI' || label == 'AI Subscription') return 'ai';

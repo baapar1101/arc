@@ -95,14 +95,24 @@ class WorkflowAutoLayout {
       }
     }
 
-    // قرار دادن node های بدون اتصال
+    // قرار دادن node های بدون اتصال در لایه جداگانه
+    final disconnectedNodes = <String>[];
     for (final node in nodes) {
       if (!visited.contains(node.id)) {
-        if (layers.isEmpty) {
-          layers.add([node.id]);
-        } else {
-          layers.last.add(node.id);
-        }
+        disconnectedNodes.add(node.id);
+        visited.add(node.id);
+      }
+    }
+    
+    // اگر node های بدون اتصال وجود دارند، آنها را در لایه‌های جداگانه قرار بده
+    if (disconnectedNodes.isNotEmpty) {
+      // تقسیم به گروه‌های 3 تایی برای جلوگیری از شلوغی
+      const nodesPerLayer = 3;
+      for (int i = 0; i < disconnectedNodes.length; i += nodesPerLayer) {
+        final endIndex = (i + nodesPerLayer < disconnectedNodes.length) 
+            ? i + nodesPerLayer 
+            : disconnectedNodes.length;
+        layers.add(disconnectedNodes.sublist(i, endIndex));
       }
     }
 

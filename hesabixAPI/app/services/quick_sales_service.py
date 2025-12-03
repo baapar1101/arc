@@ -41,6 +41,8 @@ def get_quick_sales_settings(db: Session, business_id: int) -> Dict[str, Any]:
             "default_price_list_id": None,
             "auto_print": False,
             "print_template_id": None,
+            "enable_warehouse_document": True,
+            "warehouse_document_type": "posted",
             "auto_post_warehouse": True,
             "show_inventory": True,
             "auto_create_payment_document": True,
@@ -61,6 +63,8 @@ def get_quick_sales_settings(db: Session, business_id: int) -> Dict[str, Any]:
         "default_price_list_id": int(obj.default_price_list_id) if obj.default_price_list_id else None,
         "auto_print": bool(obj.auto_print),
         "print_template_id": int(obj.print_template_id) if obj.print_template_id else None,
+        "enable_warehouse_document": bool(getattr(obj, 'enable_warehouse_document', True)),
+        "warehouse_document_type": str(getattr(obj, 'warehouse_document_type', 'posted')),
         "auto_post_warehouse": bool(obj.auto_post_warehouse),
         "show_inventory": bool(obj.show_inventory),
         "auto_create_payment_document": bool(obj.auto_create_payment_document),
@@ -163,6 +167,15 @@ def update_quick_sales_settings(db: Session, business_id: int, payload: Dict[str
     if "print_template_id" in payload:
         template_id = payload.get("print_template_id")
         obj.print_template_id = int(template_id) if template_id is not None else None
+    
+    if "enable_warehouse_document" in payload:
+        obj.enable_warehouse_document = bool(payload.get("enable_warehouse_document"))
+    
+    if "warehouse_document_type" in payload:
+        doc_type = payload.get("warehouse_document_type")
+        if doc_type not in ("draft", "posted"):
+            raise ApiError("INVALID_WAREHOUSE_DOCUMENT_TYPE", "نوع سند حواله باید draft یا posted باشد", http_status=400)
+        obj.warehouse_document_type = str(doc_type)
     
     if "auto_post_warehouse" in payload:
         obj.auto_post_warehouse = bool(payload.get("auto_post_warehouse"))

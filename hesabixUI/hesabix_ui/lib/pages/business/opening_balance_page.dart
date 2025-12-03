@@ -14,6 +14,11 @@ import 'package:hesabix_ui/widgets/invoice/warehouse_combobox_widget.dart';
 import 'package:hesabix_ui/widgets/invoice/account_combobox_widget.dart';
 import 'package:hesabix_ui/models/account_model.dart';
 import 'package:hesabix_ui/services/account_service.dart';
+import 'package:hesabix_ui/services/bank_account_service.dart';
+import 'package:hesabix_ui/services/cash_register_service.dart';
+import 'package:hesabix_ui/services/petty_cash_service.dart';
+import 'package:hesabix_ui/services/person_service.dart';
+import 'package:hesabix_ui/services/product_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:hesabix_ui/utils/number_normalizer.dart';
 import '../../utils/snackbar_helper.dart';
@@ -31,6 +36,7 @@ class OpeningBalancePage extends StatefulWidget {
 class _OpeningBalancePageState extends State<OpeningBalancePage> {
   late final OpeningBalanceService _service;
   bool _loading = false;
+  bool _accountsLoading = true; // برای ردیابی بارگذاری حساب‌ها
   Map<String, dynamic>? _document;
   // Local form state
   final List<Map<String, dynamic>> _bankCashPettyLines = <Map<String, dynamic>>[];
@@ -47,21 +53,45 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
   int? _pettyControlAccountId;   // 10201
   int? _personReceivableAccountId; // 10401
   int? _personPayableAccountId;    // 20201
+  Account? _bankControlAccount;
+  Account? _cashControlAccount;
+  Account? _pettyControlAccount;
+  Account? _personReceivableAccount;
+  Account? _personPayableAccount;
 
   @override
   void initState() {
     super.initState();
     _service = OpeningBalanceService(ApiClient());
+    _initializeAccounts();
     _load();
-    _loadDefaultAccounts();
-    _loadSavedDefaults();
+  }
+
+  Future<void> _initializeAccounts() async {
+    setState(() => _accountsLoading = true);
+    try {
+      // ابتدا حساب‌های پیش‌فرض را بارگذاری کن
+      await _loadDefaultAccounts();
+      // سپس حساب‌های ذخیره شده را بارگذاری کن (که ممکن است حساب‌های پیش‌فرض را override کنند)
+      await _loadSavedDefaults();
+    } finally {
+      if (mounted) {
+        setState(() => _accountsLoading = false);
+      }
+    }
   }
 
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
       final doc = await _service.fetch(businessId: widget.businessId);
-      setState(() => _document = doc);
+      setState(() {
+        _document = doc;
+        // بارگذاری خطوط از document
+        if (doc != null) {
+          _loadLinesFromDocument(doc);
+        }
+      });
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -73,63 +103,319 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
     }
   }
 
+  void _loadLinesFromDocument(Map<String, dynamic> doc) {
+    // پاک کردن لیست‌های قبلی
+    _bankCashPettyLines.clear();
+    _personLines.clear();
+    _inventoryLines.clear();
+    _otherAccountLines.clear();
+
+    // بارگذاری تنظیمات
+    final extraInfo = doc['extra_info'] as Map<String, dynamic>? ?? {};
+    _autoBalance = extraInfo['auto_balance_to_equity'] as bool? ?? true;
+
+    // بارگذاری خطوط
+    final lines = doc['lines'] as List<dynamic>? ?? [];
+    for (final line in lines) {
+      final lineMap = Map<String, dynamic>.from(line as Map);
+      
+      // خطوط موجودی (دارای product_id)
+      if (lineMap['product_id'] != null) {
+        final extraInfo = Map<String, dynamic>.from(lineMap['extra_info'] as Map? ?? {});
+        final warehouseId = extraInfo['warehouse_id'] as int?;
+        final quantity = (lineMap['quantity'] as num?)?.toDouble() ?? 0.0;
+        final costPrice = (extraInfo['cost_price'] as num?)?.toDouble() ?? 0.0;
+        
+        if (warehouseId != null && quantity > 0) {
+          _inventoryLines.add({
+            'product': {
+              'id': lineMap['product_id'],
+              'code': lineMap['product_code'] ?? '',
+              'name': lineMap['product_name'] ?? '',
+            },
+            'warehouseId': warehouseId,
+            'quantity': quantity,
+            'cost_price': costPrice,
+          });
+        }
+      }
+      // خطوط بانک/صندوق/تنخواه
+      else if (lineMap['bank_account_id'] != null || 
+               lineMap['cash_register_id'] != null || 
+               lineMap['petty_cash_id'] != null) {
+        final debit = (lineMap['debit'] as num?)?.toDouble() ?? 0.0;
+        final credit = (lineMap['credit'] as num?)?.toDouble() ?? 0.0;
+        if (debit > 0 || credit > 0) {
+          String type = 'bank';
+          int? refId;
+          String? name;
+          
+          if (lineMap['bank_account_id'] != null) {
+            type = 'bank';
+            refId = lineMap['bank_account_id'] as int?;
+            name = lineMap['bank_account_name'] as String?;
+          } else if (lineMap['cash_register_id'] != null) {
+            type = 'cash';
+            refId = lineMap['cash_register_id'] as int?;
+            name = lineMap['cash_register_name'] as String?;
+          } else if (lineMap['petty_cash_id'] != null) {
+            type = 'petty';
+            refId = lineMap['petty_cash_id'] as int?;
+            name = lineMap['petty_cash_name'] as String?;
+          }
+          
+          if (refId != null) {
+            _bankCashPettyLines.add({
+              'type': type,
+              'refId': refId,
+              'name': name ?? 'نامشخص',
+              'debit': debit,
+              'credit': credit,
+            });
+          }
+        }
+      }
+      // خطوط اشخاص
+      else if (lineMap['person_id'] != null) {
+        final debit = (lineMap['debit'] as num?)?.toDouble() ?? 0.0;
+        final credit = (lineMap['credit'] as num?)?.toDouble() ?? 0.0;
+        if (debit > 0 || credit > 0) {
+          _personLines.add({
+            'personId': lineMap['person_id'],
+            'personName': lineMap['person_name'] ?? 'نامشخص',
+            'debit': debit,
+            'credit': credit,
+          });
+        }
+      }
+      // سایر حساب‌ها (که auto-balance نیستند)
+      else if (lineMap['account_id'] != null) {
+        final accountId = lineMap['account_id'] as int?;
+        final debit = (lineMap['debit'] as num?)?.toDouble() ?? 0.0;
+        final credit = (lineMap['credit'] as num?)?.toDouble() ?? 0.0;
+        final description = lineMap['description'] as String? ?? '';
+        
+        // خطوط auto-balance را نادیده بگیر (دارای description خاص هستند)
+        if (description.contains('بستن اختلاف تراز افتتاحیه')) {
+          // این خط auto-balance است، فقط account_id را برای equity ذخیره کن
+          if (_equityAccountId == null && accountId != null) {
+            _equityAccountId = accountId;
+          }
+          continue;
+        }
+        
+        if (accountId != null && (debit > 0 || credit > 0)) {
+          _otherAccountLines.add({
+            'account': Account(
+              id: accountId,
+              code: lineMap['account_code'] ?? '',
+              name: lineMap['account_name'] ?? '',
+              accountType: lineMap['account_type'] ?? 'asset',
+              businessId: widget.businessId,
+            ),
+            'debit': debit,
+            'credit': credit,
+          });
+        }
+      }
+    }
+
+    // بارگذاری inventory_account_id و equity_account_id از extra_info
+    if (doc['inventory_account_id'] != null) {
+      _inventoryAccountId = doc['inventory_account_id'] as int?;
+    }
+    if (doc['equity_account_id'] != null) {
+      _equityAccountId = doc['equity_account_id'] as int?;
+    }
+  }
+
   Future<void> _loadDefaultAccounts() async {
     try {
       final accountService = AccountService();
+      
+      // تابع برای پیدا کردن حساب با کد دقیق
       Future<Account?> findByCode(String code) async {
-        final res = await accountService.searchAccounts(businessId: widget.businessId, searchQuery: code, limit: 50);
-        final items = (res['items'] as List<dynamic>? ?? const <dynamic>[]);
-        for (final it in items) {
-          final acc = Account.fromJson(Map<String, dynamic>.from(it as Map));
-          if (acc.code == code) return acc;
+        try {
+          // ابتدا از getAccounts استفاده می‌کنیم که همه حساب‌ها را برمی‌گرداند
+          final res = await accountService.getAccounts(businessId: widget.businessId);
+          final items = (res['items'] as List<dynamic>? ?? const <dynamic>[]);
+          for (final it in items) {
+            final acc = Account.fromJson(Map<String, dynamic>.from(it as Map));
+            if (acc.code == code) {
+              debugPrint('حساب با کد $code پیدا شد: ${acc.name} (ID: ${acc.id})');
+              return acc;
+            }
+          }
+          debugPrint('حساب با کد $code پیدا نشد');
+        } catch (e) {
+          debugPrint('خطا در جستجوی حساب با کد $code: $e');
         }
         return null;
       }
 
-      final inv = await findByCode('10101');
-      final bank = await findByCode('10203');
-      final cash = await findByCode('10202');
-      final petty = await findByCode('10201');
-      final ar = await findByCode('10401');
-      final ap = await findByCode('20201');
-      // برای تراز خودکار: اگر 30201 نبود، سرمایه اولیه 30101 را استفاده کن
-      final equity = (await findByCode('30201')) ?? (await findByCode('30101'));
+      // تابع برای پیدا کردن حساب با کدهای جایگزین (fallback)
+      Future<Account?> findByCodeWithFallback(String primaryCode, List<String> fallbackCodes) async {
+        // ابتدا کد اصلی را امتحان کن
+        final primary = await findByCode(primaryCode);
+        if (primary != null) return primary;
+        
+        // اگر پیدا نشد، کدهای جایگزین را امتحان کن
+        for (final code in fallbackCodes) {
+          final acc = await findByCode(code);
+          if (acc != null) return acc;
+        }
+        return null;
+      }
+
+      // بارگذاری حساب‌ها با fallback
+      final inv = await findByCodeWithFallback('10101', ['101', '1010']);
+      final bank = await findByCodeWithFallback('10203', ['102', '1020']);
+      final cash = await findByCodeWithFallback('10202', ['102', '1020']);
+      final petty = await findByCodeWithFallback('10201', ['102', '1020']);
+      final ar = await findByCodeWithFallback('10401', ['104', '1040']);
+      final ap = await findByCodeWithFallback('20201', ['202', '2020']);
+      // برای تراز خودکار: ابتدا 30201، سپس 30101، سپس 302 یا 301
+      final equity = (await findByCode('30201')) ?? 
+                     (await findByCode('30101')) ?? 
+                     (await findByCode('302')) ?? 
+                     (await findByCode('301'));
 
       if (!mounted) return;
+      
+      // Debug: لاگ کردن حساب‌های پیدا شده
+      debugPrint('حساب‌های پیش‌فرض پیدا شده:');
+      debugPrint('  موجودی: ${inv?.code} - ${inv?.name}');
+      debugPrint('  بانک: ${bank?.code} - ${bank?.name}');
+      debugPrint('  صندوق: ${cash?.code} - ${cash?.name}');
+      debugPrint('  تنخواه: ${petty?.code} - ${petty?.name}');
+      debugPrint('  دریافتنی: ${ar?.code} - ${ar?.name}');
+      debugPrint('  پرداختنی: ${ap?.code} - ${ap?.name}');
+      debugPrint('  حقوق صاحبان سهام: ${equity?.code} - ${equity?.name}');
+      
       setState(() {
         _inventoryAccount = inv;
         _inventoryAccountId = inv?.id;
+        _bankControlAccount = bank;
         _bankControlAccountId = bank?.id;
+        _cashControlAccount = cash;
         _cashControlAccountId = cash?.id;
+        _pettyControlAccount = petty;
         _pettyControlAccountId = petty?.id;
+        _personReceivableAccount = ar;
         _personReceivableAccountId = ar?.id;
+        _personPayableAccount = ap;
         _personPayableAccountId = ap?.id;
         _equityAccount = equity;
         _equityAccountId = equity?.id;
       });
-    } catch (_) {
-      // نادیده بگیر؛ کاربر می‌تواند دستی انتخاب کند
+      
+      // ذخیره خودکار حساب‌های پیدا شده به عنوان پیش‌فرض
+      if (mounted) {
+        if (inv != null) await _saveDefault('inventory_account_id', inv.id);
+        if (bank != null) await _saveDefault('bank_control_id', bank.id);
+        if (cash != null) await _saveDefault('cash_control_id', cash.id);
+        if (petty != null) await _saveDefault('petty_control_id', petty.id);
+        if (ar != null) await _saveDefault('ar_control_id', ar.id);
+        if (ap != null) await _saveDefault('ap_control_id', ap.id);
+        if (equity != null) await _saveDefault('equity_account_id', equity.id);
+      }
+    } catch (e) {
+      // در صورت خطا، لاگ کن اما ادامه بده
+      if (mounted) {
+        debugPrint('خطا در بارگذاری حساب‌های پیش‌فرض: $e');
+      }
     }
   }
 
   Future<void> _loadSavedDefaults() async {
     try {
       final prefs = await SharedPreferences.getInstance();
+      final accountService = AccountService();
       String k(String name) => 'ob_default_${widget.businessId}_$name';
+      
       int? gi(String name) {
         final v = prefs.getInt(k(name));
         return v is int && v > 0 ? v : null;
       }
+      
+      // بارگذاری Account objects برای حساب‌های ذخیره شده
+      Future<Account?> loadAccountById(int? id) async {
+        if (id == null) return null;
+        try {
+          // ابتدا سعی می‌کنیم با business_id حساب را بگیریم
+          final accountData = await accountService.getAccount(businessId: widget.businessId, accountId: id);
+          return Account.fromJson(accountData);
+        } catch (e) {
+          // اگر خطا گرفتیم (مثلاً حساب عمومی است که business_id ندارد)، 
+          // از getAccounts استفاده می‌کنیم که حساب‌های عمومی و اختصاصی را برمی‌گرداند
+          try {
+            final accountsResult = await accountService.getAccounts(businessId: widget.businessId);
+            final items = (accountsResult['items'] as List<dynamic>? ?? const <dynamic>[]);
+            for (final it in items) {
+              final acc = Account.fromJson(Map<String, dynamic>.from(it as Map));
+              if (acc.id == id) return acc;
+            }
+          } catch (_) {
+            // اگر getAccounts هم خطا داد، null برمی‌گردانیم
+          }
+          return null;
+        }
+      }
+
+      final savedInventoryId = gi('inventory_account_id') ?? _inventoryAccountId;
+      final savedEquityId = gi('equity_account_id') ?? _equityAccountId;
+      final savedBankId = gi('bank_control_id') ?? _bankControlAccountId;
+      final savedCashId = gi('cash_control_id') ?? _cashControlAccountId;
+      final savedPettyId = gi('petty_control_id') ?? _pettyControlAccountId;
+      final savedArId = gi('ar_control_id') ?? _personReceivableAccountId;
+      final savedApId = gi('ap_control_id') ?? _personPayableAccountId;
+
+      // بارگذاری Account objects
+      final savedInventory = savedInventoryId != null ? await loadAccountById(savedInventoryId) : null;
+      final savedEquity = savedEquityId != null ? await loadAccountById(savedEquityId) : null;
+      final savedBank = savedBankId != null ? await loadAccountById(savedBankId) : null;
+      final savedCash = savedCashId != null ? await loadAccountById(savedCashId) : null;
+      final savedPetty = savedPettyId != null ? await loadAccountById(savedPettyId) : null;
+      final savedAr = savedArId != null ? await loadAccountById(savedArId) : null;
+      final savedAp = savedApId != null ? await loadAccountById(savedApId) : null;
+
+      if (!mounted) return;
       setState(() {
-        _inventoryAccountId = gi('inventory_account_id') ?? _inventoryAccountId;
-        _equityAccountId = gi('equity_account_id') ?? _equityAccountId;
-        _bankControlAccountId = gi('bank_control_id') ?? _bankControlAccountId;
-        _cashControlAccountId = gi('cash_control_id') ?? _cashControlAccountId;
-        _pettyControlAccountId = gi('petty_control_id') ?? _pettyControlAccountId;
-        _personReceivableAccountId = gi('ar_control_id') ?? _personReceivableAccountId;
-        _personPayableAccountId = gi('ap_control_id') ?? _personPayableAccountId;
+        // فقط اگر حساب ذخیره شده وجود دارد، آن را استفاده کن (override پیش‌فرض)
+        if (savedInventoryId != null) {
+          _inventoryAccount = savedInventory ?? _inventoryAccount;
+          _inventoryAccountId = savedInventoryId;
+        }
+        if (savedEquityId != null) {
+          _equityAccount = savedEquity ?? _equityAccount;
+          _equityAccountId = savedEquityId;
+        }
+        if (savedBankId != null) {
+          _bankControlAccount = savedBank;
+          _bankControlAccountId = savedBankId;
+        }
+        if (savedCashId != null) {
+          _cashControlAccount = savedCash;
+          _cashControlAccountId = savedCashId;
+        }
+        if (savedPettyId != null) {
+          _pettyControlAccount = savedPetty;
+          _pettyControlAccountId = savedPettyId;
+        }
+        if (savedArId != null) {
+          _personReceivableAccount = savedAr;
+          _personReceivableAccountId = savedArId;
+        }
+        if (savedApId != null) {
+          _personPayableAccount = savedAp;
+          _personPayableAccountId = savedApId;
+        }
       });
-    } catch (_) {}
+    } catch (e) {
+      if (mounted) {
+        debugPrint('خطا در بارگذاری حساب‌های ذخیره شده: $e');
+      }
+    }
   }
 
   Future<void> _saveDefault(String name, int? id) async {
@@ -181,57 +467,74 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
   Widget _buildContent(AppLocalizations t) {
     final totals = _calcTotals();
     _computeValidation();
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(t.openingBalance, style: Theme.of(context).textTheme.titleLarge),
-              if ((_document?['extra_info']?['posted'] ?? false) == true)
-                const Chip(label: Text('نهایی شده')),
-            ],
-          ),
-          const SizedBox(height: 16),
-          _buildValidationWarnings(),
-          const SizedBox(height: 8),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('سال مالی: ${_document?['fiscal_year_title'] ?? '-'}'),
-                  const SizedBox(height: 8),
-                  Text('تاریخ سند: ${_document?['document_date'] ?? '-'}'),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(child: Text('جمع بدهکار: ${totals['debit']?.toStringAsFixed(2) ?? '0'}')),
-                      Expanded(child: Text('جمع بستانکار: ${totals['credit']?.toStringAsFixed(2) ?? '0'}')),
-                      Expanded(child: Text('اختلاف: ${(totals['diff'] as double).toStringAsFixed(2)}')),
-                    ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final screenHeight = constraints.maxHeight;
+        final tabHeight = screenHeight * 0.5; // 50% از ارتفاع صفحه برای تب‌ها
+        
+        return SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(t.openingBalance, style: Theme.of(context).textTheme.titleLarge),
+                    if ((_document?['extra_info']?['posted'] ?? false) == true)
+                      Chip(
+                        label: const Text('نهایی شده'),
+                        avatar: const Icon(Icons.check_circle, size: 18),
+                        backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                        labelStyle: TextStyle(color: Theme.of(context).colorScheme.onPrimaryContainer),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                _buildValidationWarnings(),
+                const SizedBox(height: 8),
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('سال مالی: ${_document?['fiscal_year_title'] ?? '-'}'),
+                        const SizedBox(height: 8),
+                        Text('تاریخ سند: ${_document?['document_date'] ?? '-'}'),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Expanded(child: Text('جمع بدهکار: ${totals['debit']?.toStringAsFixed(2) ?? '0'}')),
+                            Expanded(child: Text('جمع بستانکار: ${totals['credit']?.toStringAsFixed(2) ?? '0'}')),
+                            Expanded(child: Text('اختلاف: ${(totals['diff'] as double).toStringAsFixed(2)}')),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Switch(value: _autoBalance, onChanged: (v) => setState(() => _autoBalance = v)),
+                            const SizedBox(width: 8),
+                            const Text('بستن خودکار اختلاف به حقوق صاحبان سهام'),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        _buildQuickSelectors(),
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Switch(value: _autoBalance, onChanged: (v) => setState(() => _autoBalance = v)),
-                      const SizedBox(width: 8),
-                      const Text('بستن خودکار اختلاف به حقوق صاحبان سهام'),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  _buildQuickSelectors(),
-                ],
-              ),
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  height: tabHeight,
+                  child: _buildTabs(t),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 16),
-          Expanded(child: _buildTabs(t)),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -265,6 +568,14 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
     );
   }
 
+  bool _isBankCashPettyDuplicate(String type, dynamic refId) {
+    final int? refIdInt = refId is int ? refId : (refId is String ? int.tryParse(refId) : (refId is num ? refId.toInt() : null));
+    if (refIdInt == null) return false;
+    return _bankCashPettyLines.any((line) => 
+      line['type'] == type && (line['refId'] as int? ?? 0) == refIdInt
+    );
+  }
+
   Widget _buildBankCashPettyTab() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -277,7 +588,26 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
                 selectedAccountId: null,
                 onChanged: (opt) {
                   if (opt == null) return;
-                  _bankCashPettyLines.add({'type': 'bank', 'refId': opt.id, 'amount': 0.0});
+                  if (_isBankCashPettyDuplicate('bank', opt.id)) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('این حساب بانکی قبلاً اضافه شده است'),
+                          backgroundColor: Theme.of(context).colorScheme.error,
+                        ),
+                      );
+                    }
+                    return;
+                  }
+                  final bankId = int.tryParse(opt.id);
+                  if (bankId == null) return;
+                  _bankCashPettyLines.add({
+                    'type': 'bank', 
+                    'refId': bankId, 
+                    'name': opt.name ?? 'نامشخص',
+                    'debit': 0.0,
+                    'credit': 0.0,
+                  });
                   setState(() {});
                 },
                 label: 'افزودن بانک',
@@ -292,7 +622,26 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
                 selectedRegisterId: null,
                 onChanged: (opt) {
                   if (opt == null) return;
-                  _bankCashPettyLines.add({'type': 'cash', 'refId': opt.id, 'amount': 0.0});
+                  if (_isBankCashPettyDuplicate('cash', opt.id)) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('این صندوق قبلاً اضافه شده است'),
+                          backgroundColor: Theme.of(context).colorScheme.error,
+                        ),
+                      );
+                    }
+                    return;
+                  }
+                  final cashId = int.tryParse(opt.id);
+                  if (cashId == null) return;
+                  _bankCashPettyLines.add({
+                    'type': 'cash', 
+                    'refId': cashId, 
+                    'name': opt.name ?? 'نامشخص',
+                    'debit': 0.0,
+                    'credit': 0.0,
+                  });
                   setState(() {});
                 },
                 label: 'افزودن صندوق',
@@ -307,7 +656,26 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
                 selectedPettyCashId: null,
                 onChanged: (opt) {
                   if (opt == null) return;
-                  _bankCashPettyLines.add({'type': 'petty', 'refId': opt.id, 'amount': 0.0});
+                  if (_isBankCashPettyDuplicate('petty', opt.id)) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('این تنخواه قبلاً اضافه شده است'),
+                          backgroundColor: Theme.of(context).colorScheme.error,
+                        ),
+                      );
+                    }
+                    return;
+                  }
+                  final pettyId = int.tryParse(opt.id);
+                  if (pettyId == null) return;
+                  _bankCashPettyLines.add({
+                    'type': 'petty', 
+                    'refId': pettyId, 
+                    'name': opt.name ?? 'نامشخص',
+                    'debit': 0.0,
+                    'credit': 0.0,
+                  });
                   setState(() {});
                 },
                 label: 'افزودن تنخواه',
@@ -319,33 +687,67 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
         ),
         const SizedBox(height: 12),
         Expanded(
-          child: ListView.separated(
-            itemCount: _bankCashPettyLines.length,
-            separatorBuilder: (_, __) => const Divider(height: 1),
-            itemBuilder: (context, index) {
+          child: _bankCashPettyLines.isEmpty
+              ? const Center(child: Text('هیچ موردی اضافه نشده است'))
+              : ListView.separated(
+                  itemCount: _bankCashPettyLines.length,
+                  separatorBuilder: (_, __) => const Divider(height: 1),
+                  itemBuilder: (context, index) {
               final m = _bankCashPettyLines[index];
+              final typeLabel = m['type'] == 'bank' ? 'بانک' : (m['type'] == 'cash' ? 'صندوق' : 'تنخواه');
+              final name = m['name'] as String? ?? 'نامشخص';
               return ListTile(
                 leading: Icon(m['type'] == 'bank' ? Icons.account_balance : (m['type'] == 'cash' ? Icons.point_of_sale : Icons.wallet)),
-                title: Text('${m['type']} - ${m['refId']}'),
-                subtitle: TextField(
-                  decoration: const InputDecoration(isDense: true, labelText: 'مبلغ'),
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  inputFormatters: [
-                    EnglishDigitsFormatter(),
-                    FilteringTextInputFormatter.allow(RegExp(r'[-0-9.,]')),
+                title: Text('$typeLabel: $name'),
+                subtitle: Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: TextEditingController(
+                          text: formatNumberForInput(m['debit'] as double?, decimalPlaces: 2),
+                        ),
+                        decoration: const InputDecoration(isDense: true, labelText: 'بدهکار'),
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        inputFormatters: [
+                          NumberInputFormatter(allowDecimal: true),
+                        ],
+                        onChanged: (v) {
+                          m['debit'] = parseFormattedDouble(v) ?? 0.0;
+                          setState(() {});
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: TextField(
+                        controller: TextEditingController(
+                          text: formatNumberForInput(m['credit'] as double?, decimalPlaces: 2),
+                        ),
+                        decoration: const InputDecoration(isDense: true, labelText: 'بستانکار'),
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        inputFormatters: [
+                          NumberInputFormatter(allowDecimal: true),
+                        ],
+                        onChanged: (v) {
+                          m['credit'] = parseFormattedDouble(v) ?? 0.0;
+                          setState(() {});
+                        },
+                      ),
+                    ),
                   ],
-                  onChanged: (v) {
-                    m['amount'] = double.tryParse(v.replaceAll(',', '')) ?? 0.0;
-                    setState(() {});
-                  },
                 ),
                 trailing: IconButton(icon: const Icon(Icons.delete_outline), onPressed: () { _bankCashPettyLines.removeAt(index); setState(() {}); }),
               );
-            },
-          ),
+                  },
+                ),
         ),
       ],
     );
+  }
+
+  bool _isPersonDuplicate(int? personId) {
+    if (personId == null) return false;
+    return _personLines.any((line) => line['personId'] == personId);
   }
 
   Widget _buildPersonsTab() {
@@ -353,11 +755,27 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
       children: [
         Align(
           alignment: Alignment.centerLeft,
-          child: PersonComboboxWidget(
+            child: PersonComboboxWidget(
             businessId: widget.businessId,
             onChanged: (p) {
               if (p == null) return;
-              _personLines.add({'personId': p.id, 'debit': 0.0, 'credit': 0.0});
+              if (_isPersonDuplicate(p.id)) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('این شخص قبلاً اضافه شده است'),
+                      backgroundColor: Theme.of(context).colorScheme.error,
+                    ),
+                  );
+                }
+                return;
+              }
+              _personLines.add({
+                'personId': p.id, 
+                'personName': p.aliasName ?? 'نامشخص',
+                'debit': 0.0, 
+                'credit': 0.0
+              });
               setState(() {});
             },
             label: 'افزودن شخص',
@@ -366,26 +784,31 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
         ),
         const SizedBox(height: 12),
         Expanded(
-          child: ListView.separated(
-            itemCount: _personLines.length,
-            separatorBuilder: (_, __) => const Divider(height: 1),
-            itemBuilder: (context, index) {
+          child: _personLines.isEmpty
+              ? const Center(child: Text('هیچ موردی اضافه نشده است'))
+              : ListView.separated(
+                  itemCount: _personLines.length,
+                  separatorBuilder: (_, __) => const Divider(height: 1),
+                  itemBuilder: (context, index) {
               final m = _personLines[index];
+              final personName = m['personName'] as String? ?? 'شخص #${m['personId']}';
               return ListTile(
                 leading: const Icon(Icons.person_outline),
-                title: Text('شخص #${m['personId']}'),
+                title: Text(personName),
                 subtitle: Row(
                   children: [
                     Expanded(
                       child: TextField(
+                        controller: TextEditingController(
+                          text: formatNumberForInput(m['debit'] as double?, decimalPlaces: 2),
+                        ),
                         decoration: const InputDecoration(isDense: true, labelText: 'بدهکار'),
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
                         inputFormatters: [
-                          EnglishDigitsFormatter(),
-                          FilteringTextInputFormatter.allow(RegExp(r'[-0-9.,]')),
+                          NumberInputFormatter(allowDecimal: true),
                         ],
                         onChanged: (v) {
-                          m['debit'] = double.tryParse(v) ?? 0.0;
+                          m['debit'] = parseFormattedDouble(v) ?? 0.0;
                           setState(() {});
                         },
                       ),
@@ -393,14 +816,16 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: TextField(
+                        controller: TextEditingController(
+                          text: formatNumberForInput(m['credit'] as double?, decimalPlaces: 2),
+                        ),
                         decoration: const InputDecoration(isDense: true, labelText: 'بستانکار'),
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
                         inputFormatters: [
-                          EnglishDigitsFormatter(),
-                          FilteringTextInputFormatter.allow(RegExp(r'[-0-9.,]')),
+                          NumberInputFormatter(allowDecimal: true),
                         ],
                         onChanged: (v) {
-                          m['credit'] = double.tryParse(v) ?? 0.0;
+                          m['credit'] = parseFormattedDouble(v) ?? 0.0;
                           setState(() {});
                         },
                       ),
@@ -409,11 +834,20 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
                 ),
                 trailing: IconButton(icon: const Icon(Icons.delete_outline), onPressed: () { _personLines.removeAt(index); setState(() {}); }),
               );
-            },
-          ),
+                  },
+                ),
         ),
       ],
     );
+  }
+
+  bool _isInventoryDuplicate(int productId, int? warehouseId) {
+    return _inventoryLines.any((line) {
+      final product = line['product'] as Map<String, dynamic>?;
+      final pid = product?['id'] as int?;
+      final wid = line['warehouseId'] as int?;
+      return pid == productId && wid == warehouseId;
+    });
   }
 
   Widget _buildInventoryTab() {
@@ -427,6 +861,20 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
                 businessId: widget.businessId,
                 onChanged: (p) {
                   if (p == null) return;
+                  final productId = p['id'] as int?;
+                  if (productId == null) return;
+                  // چک می‌کنیم که آیا این کالا با انبار null قبلاً اضافه شده یا نه
+                  if (_isInventoryDuplicate(productId, null)) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('این کالا قبلاً اضافه شده است. لطفاً مورد موجود را ویرایش کنید یا حذف کنید'),
+                          backgroundColor: Theme.of(context).colorScheme.error,
+                        ),
+                      );
+                    }
+                    return;
+                  }
                   _inventoryLines.add({'product': p, 'warehouseId': null, 'quantity': 0.0, 'cost_price': 0.0});
                   setState(() {});
                 },
@@ -452,10 +900,12 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
         ),
         const SizedBox(height: 12),
         Expanded(
-          child: ListView.separated(
-            itemCount: _inventoryLines.length,
-            separatorBuilder: (_, __) => const Divider(height: 1),
-            itemBuilder: (context, index) {
+          child: _inventoryLines.isEmpty
+              ? const Center(child: Text('هیچ موردی اضافه نشده است'))
+              : ListView.separated(
+                  itemCount: _inventoryLines.length,
+                  separatorBuilder: (_, __) => const Divider(height: 1),
+                  itemBuilder: (context, index) {
               final m = _inventoryLines[index];
               return ListTile(
                 leading: const Icon(Icons.inventory_outlined),
@@ -467,6 +917,30 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
                         businessId: widget.businessId,
                         selectedWarehouseId: m['warehouseId'] as int?,
                         onChanged: (wid) {
+                          final product = m['product'] as Map<String, dynamic>?;
+                          final pid = product?['id'] as int?;
+                          if (pid != null && wid != null) {
+                            // چک می‌کنیم که آیا این کالا با این انبار در سایر موارد (غیر از مورد فعلی) وجود دارد
+                            final isDuplicate = _inventoryLines.asMap().entries.any((entry) {
+                              if (entry.key == index) return false; // مورد فعلی را نادیده بگیر
+                              final otherLine = entry.value;
+                              final otherProduct = otherLine['product'] as Map<String, dynamic>?;
+                              final otherPid = otherProduct?['id'] as int?;
+                              final otherWid = otherLine['warehouseId'] as int?;
+                              return otherPid == pid && otherWid == wid;
+                            });
+                            if (isDuplicate) {
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('این کالا با این انبار قبلاً اضافه شده است'),
+                                    backgroundColor: Theme.of(context).colorScheme.error,
+                                  ),
+                                );
+                              }
+                              return;
+                            }
+                          }
                           m['warehouseId'] = wid;
                           setState(() {});
                         },
@@ -475,14 +949,16 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: TextField(
+                        controller: TextEditingController(
+                          text: formatNumberForInput(m['quantity'] as double?, decimalPlaces: 2),
+                        ),
                         decoration: const InputDecoration(isDense: true, labelText: 'تعداد'),
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
                         inputFormatters: [
-                          EnglishDigitsFormatter(),
-                          FilteringTextInputFormatter.allow(RegExp(r'[-0-9.,]')),
+                          NumberInputFormatter(allowDecimal: true),
                         ],
                         onChanged: (v) {
-                          m['quantity'] = double.tryParse(v) ?? 0.0;
+                          m['quantity'] = parseFormattedDouble(v) ?? 0.0;
                           setState(() {});
                         },
                       ),
@@ -490,14 +966,16 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: TextField(
+                        controller: TextEditingController(
+                          text: formatNumberForInput(m['cost_price'] as double?, decimalPlaces: 2),
+                        ),
                         decoration: const InputDecoration(isDense: true, labelText: 'بهای واحد'),
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
                         inputFormatters: [
-                          EnglishDigitsFormatter(),
-                          FilteringTextInputFormatter.allow(RegExp(r'[-0-9.,]')),
+                          NumberInputFormatter(allowDecimal: true),
                         ],
                         onChanged: (v) {
-                          m['cost_price'] = double.tryParse(v) ?? 0.0;
+                          m['cost_price'] = parseFormattedDouble(v) ?? 0.0;
                           setState(() {});
                         },
                       ),
@@ -513,6 +991,14 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
     );
   }
 
+  bool _isAccountDuplicate(int? accountId) {
+    if (accountId == null) return false;
+    return _otherAccountLines.any((line) {
+      final acc = line['account'] as Account?;
+      return acc?.id == accountId;
+    });
+  }
+
   Widget _buildOtherAccountsTab() {
     return Column(
       children: [
@@ -524,6 +1010,17 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
                 selectedAccount: null,
                 onChanged: (acc) {
                   if (acc != null) {
+                    if (_isAccountDuplicate(acc.id)) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('این حساب قبلاً اضافه شده است'),
+                            backgroundColor: Theme.of(context).colorScheme.error,
+                          ),
+                        );
+                      }
+                      return;
+                    }
                     _otherAccountLines.add({'account': acc, 'debit': 0.0, 'credit': 0.0});
                     setState(() {});
                   }
@@ -550,9 +1047,11 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
         ),
         const SizedBox(height: 12),
         Expanded(
-          child: ListView.builder(
-            itemCount: _otherAccountLines.length,
-            itemBuilder: (context, index) {
+          child: _otherAccountLines.isEmpty
+              ? const Center(child: Text('هیچ موردی اضافه نشده است'))
+              : ListView.builder(
+                  itemCount: _otherAccountLines.length,
+                  itemBuilder: (context, index) {
               final m = _otherAccountLines[index];
               return ListTile(
                 leading: const Icon(Icons.account_balance_wallet_outlined),
@@ -561,14 +1060,16 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
                   children: [
                     Expanded(
                       child: TextField(
+                        controller: TextEditingController(
+                          text: formatNumberForInput(m['debit'] as double?, decimalPlaces: 2),
+                        ),
                         decoration: const InputDecoration(isDense: true, labelText: 'بدهکار'),
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
                         inputFormatters: [
-                          EnglishDigitsFormatter(),
-                          FilteringTextInputFormatter.allow(RegExp(r'[-0-9.,]')),
+                          NumberInputFormatter(allowDecimal: true),
                         ],
                         onChanged: (v) {
-                          m['debit'] = double.tryParse(v) ?? 0.0;
+                          m['debit'] = parseFormattedDouble(v) ?? 0.0;
                           setState(() {});
                         },
                       ),
@@ -576,14 +1077,16 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: TextField(
+                        controller: TextEditingController(
+                          text: formatNumberForInput(m['credit'] as double?, decimalPlaces: 2),
+                        ),
                         decoration: const InputDecoration(isDense: true, labelText: 'بستانکار'),
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
                         inputFormatters: [
-                          EnglishDigitsFormatter(),
-                          FilteringTextInputFormatter.allow(RegExp(r'[-0-9.,]')),
+                          NumberInputFormatter(allowDecimal: true),
                         ],
                         onChanged: (v) {
-                          m['credit'] = double.tryParse(v) ?? 0.0;
+                          m['credit'] = parseFormattedDouble(v) ?? 0.0;
                           setState(() {});
                         },
                       ),
@@ -603,7 +1106,8 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
     double debit = 0.0;
     double credit = 0.0;
     for (final m in _bankCashPettyLines) {
-      debit += (m['amount'] as double? ?? 0.0);
+      debit += (m['debit'] as double? ?? 0.0);
+      credit += (m['credit'] as double? ?? 0.0);
     }
     for (final m in _personLines) {
       debit += (m['debit'] as double? ?? 0.0);
@@ -686,10 +1190,53 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
 
   Widget _buildQuickSelectors() {
     final textStyle = Theme.of(context).textTheme.bodyMedium;
+    final hasDefaults = _inventoryAccountId != null || 
+                        _equityAccountId != null || 
+                        _bankControlAccountId != null ||
+                        _cashControlAccountId != null ||
+                        _pettyControlAccountId != null ||
+                        _personReceivableAccountId != null ||
+                        _personPayableAccountId != null;
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('حساب‌های کلیدی (می‌توانید سریع تغییر دهید):', style: textStyle),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'حساب‌های کلیدی (به صورت خودکار تکمیل شده):',
+                style: textStyle?.copyWith(fontWeight: FontWeight.bold),
+              ),
+            ),
+            if (hasDefaults)
+              Icon(
+                Icons.check_circle_outline,
+                size: 18,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+          ],
+        ),
+        if (hasDefaults)
+          Padding(
+            padding: const EdgeInsets.only(top: 4, bottom: 8),
+            child: Text(
+              'حساب‌های پیش‌فرض به صورت خودکار انتخاب شده‌اند. در صورت نیاز می‌توانید تغییر دهید.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+          )
+        else
+          Padding(
+            padding: const EdgeInsets.only(top: 4, bottom: 8),
+            child: Text(
+              'لطفاً حساب‌های کلیدی را انتخاب کنید تا بتوانید تراز افتتاحیه را ثبت کنید.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.error,
+              ),
+            ),
+          ),
         const SizedBox(height: 8),
         Row(
           children: [
@@ -732,9 +1279,10 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
             Expanded(
               child: AccountComboboxWidget(
                 businessId: widget.businessId,
-                selectedAccount: null,
+                selectedAccount: _bankControlAccount,
                 onChanged: (acc) {
                   setState(() {
+                    _bankControlAccount = acc;
                     _bankControlAccountId = acc?.id;
                   });
                   _saveDefault('bank_control_id', _bankControlAccountId);
@@ -747,9 +1295,10 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
             Expanded(
               child: AccountComboboxWidget(
                 businessId: widget.businessId,
-                selectedAccount: null,
+                selectedAccount: _cashControlAccount,
                 onChanged: (acc) {
                   setState(() {
+                    _cashControlAccount = acc;
                     _cashControlAccountId = acc?.id;
                   });
                   _saveDefault('cash_control_id', _cashControlAccountId);
@@ -766,9 +1315,10 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
             Expanded(
               child: AccountComboboxWidget(
                 businessId: widget.businessId,
-                selectedAccount: null,
+                selectedAccount: _pettyControlAccount,
                 onChanged: (acc) {
                   setState(() {
+                    _pettyControlAccount = acc;
                     _pettyControlAccountId = acc?.id;
                   });
                   _saveDefault('petty_control_id', _pettyControlAccountId);
@@ -781,9 +1331,10 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
             Expanded(
               child: AccountComboboxWidget(
                 businessId: widget.businessId,
-                selectedAccount: null,
+                selectedAccount: _personReceivableAccount,
                 onChanged: (acc) {
                   setState(() {
+                    _personReceivableAccount = acc;
                     _personReceivableAccountId = acc?.id;
                   });
                   _saveDefault('ar_control_id', _personReceivableAccountId);
@@ -800,9 +1351,10 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
             Expanded(
               child: AccountComboboxWidget(
                 businessId: widget.businessId,
-                selectedAccount: null,
+                selectedAccount: _personPayableAccount,
                 onChanged: (acc) {
                   setState(() {
+                    _personPayableAccount = acc;
                     _personPayableAccountId = acc?.id;
                   });
                   _saveDefault('ap_control_id', _personPayableAccountId);
@@ -822,22 +1374,47 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
   Future<void> _save() async {
     final accountLines = <Map<String, dynamic>>[];
     for (final m in _bankCashPettyLines) {
-      final amount = (m['amount'] as double? ?? 0.0);
-      if (amount <= 0) continue;
+      final debit = (m['debit'] as double? ?? 0.0);
+      final credit = (m['credit'] as double? ?? 0.0);
+      if (debit <= 0 && credit <= 0) continue;
+      final refId = m['refId'];
+      final int? refIdInt = refId is int ? refId : (refId is num ? refId.toInt() : int.tryParse('$refId'));
+      if (refIdInt == null) continue;
+      
+      final accountId = _inferAccountIdForType(m['type'] as String);
+      if (accountId == null) {
+        final typeLabel = m['type'] == 'bank' ? 'بانک' : (m['type'] == 'cash' ? 'صندوق' : 'تنخواه');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('برای ثبت $typeLabel، انتخاب حساب کنترل الزامی است')),
+          );
+        }
+        return;
+      }
+      
       accountLines.add({
-        'account_id': _inferAccountIdForType(m['type'] as String),
-        if (m['type'] == 'bank') 'bank_account_id': int.tryParse('${m['refId']}'),
-        if (m['type'] == 'cash') 'cash_register_id': int.tryParse('${m['refId']}'),
-        if (m['type'] == 'petty') 'petty_cash_id': int.tryParse('${m['refId']}'),
-        'debit': amount,
-        'credit': 0,
+        'account_id': accountId,
+        if (m['type'] == 'bank') 'bank_account_id': refIdInt,
+        if (m['type'] == 'cash') 'cash_register_id': refIdInt,
+        if (m['type'] == 'petty') 'petty_cash_id': refIdInt,
+        'debit': debit,
+        'credit': credit,
       });
     }
     for (final m in _personLines) {
       final d = (m['debit'] as double? ?? 0.0);
       final c = (m['credit'] as double? ?? 0.0);
       if (d <= 0 && c <= 0) continue;
-      accountLines.add({'account_id': _inferPersonAccountId(d, c), 'person_id': m['personId'], 'debit': d, 'credit': c});
+      final accountId = _inferPersonAccountId(d, c);
+      if (accountId == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('برای ثبت اشخاص، انتخاب حساب دریافتنی یا پرداختنی الزامی است')),
+          );
+        }
+        return;
+      }
+      accountLines.add({'account_id': accountId, 'person_id': m['personId'], 'debit': d, 'credit': c});
     }
     for (final m in _otherAccountLines) {
       final d = (m['debit'] as double? ?? 0.0);
@@ -855,8 +1432,34 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
       final wid = m['warehouseId'] as int?;
       final q = (m['quantity'] as double? ?? 0.0);
       final c = (m['cost_price'] as double? ?? 0.0);
-      if (pid == null || wid == null || q <= 0) continue;
-      inventoryLines.add({'product_id': pid, 'quantity': q, 'extra_info': {'movement': 'in', 'warehouse_id': wid, if (c > 0) 'cost_price': c}});
+      
+      if (pid == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('شناسه کالا نامعتبر است')),
+          );
+        }
+        return;
+      }
+      if (wid == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('برای ثبت موجودی، انتخاب انبار الزامی است')),
+          );
+        }
+        return;
+      }
+      if (q <= 0) continue;
+      
+      inventoryLines.add({
+        'product_id': pid, 
+        'quantity': q, 
+        'extra_info': {
+          'movement': 'in', 
+          'warehouse_id': wid, 
+          if (c > 0) 'cost_price': c
+        }
+      });
     }
 
     final payload = <String, dynamic>{
@@ -869,10 +1472,26 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
       if (_equityAccountId != null) 'equity_account_id': _equityAccountId,
     };
 
-    final saved = await _service.save(businessId: widget.businessId, payload: payload);
-    setState(() => _document = saved);
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('ذخیره شد')));
+    try {
+      final saved = await _service.save(businessId: widget.businessId, payload: payload);
+      setState(() => _document = saved);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('ذخیره شد'),
+            backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('خطا در ذخیره: ${e.toString()}'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+      }
     }
   }
 
@@ -899,10 +1518,26 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
   }
 
   Future<void> _post() async {
-    final posted = await _service.post(businessId: widget.businessId);
-    setState(() => _document = posted);
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('نهایی شد')));
+    try {
+      final posted = await _service.post(businessId: widget.businessId);
+      setState(() => _document = posted);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('تراز افتتاحیه نهایی شد'),
+            backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('خطا در نهایی‌سازی: ${e.toString()}'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+      }
     }
   }
 }

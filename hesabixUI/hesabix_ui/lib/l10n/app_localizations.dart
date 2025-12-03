@@ -10904,6 +10904,18 @@ abstract class AppLocalizations {
   /// **'Manage document revenue scenarios and packages'**
   String get settingsDocumentMonetizationDescription;
 
+  /// No description provided for @settingsMarketplacePlugins.
+  ///
+  /// In en, this message translates to:
+  /// **'Marketplace Plugins Management'**
+  String get settingsMarketplacePlugins;
+
+  /// No description provided for @settingsMarketplacePluginsDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage plugins and plans for the marketplace'**
+  String get settingsMarketplacePluginsDescription;
+
   /// No description provided for @settingsWalletSettings.
   ///
   /// In en, this message translates to:
@@ -11071,6 +11083,444 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'View logs of hesabix-api and hesabix-rq-worker and manage services'**
   String get settingsServiceLogsDescription;
+
+  /// No description provided for @warranty.
+  ///
+  /// In en, this message translates to:
+  /// **'Warranty'**
+  String get warranty;
+
+  /// No description provided for @warrantyManagement.
+  ///
+  /// In en, this message translates to:
+  /// **'Warranty Management'**
+  String get warrantyManagement;
+
+  /// No description provided for @warrantySettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Warranty Settings'**
+  String get warrantySettings;
+
+  /// No description provided for @warrantyCodes.
+  ///
+  /// In en, this message translates to:
+  /// **'Warranty Codes'**
+  String get warrantyCodes;
+
+  /// No description provided for @warrantyCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Warranty Code'**
+  String get warrantyCode;
+
+  /// No description provided for @warrantySerial.
+  ///
+  /// In en, this message translates to:
+  /// **'Warranty Serial'**
+  String get warrantySerial;
+
+  /// No description provided for @generateWarrantyCodes.
+  ///
+  /// In en, this message translates to:
+  /// **'Generate Warranty Codes'**
+  String get generateWarrantyCodes;
+
+  /// No description provided for @warrantyActivation.
+  ///
+  /// In en, this message translates to:
+  /// **'Warranty Activation'**
+  String get warrantyActivation;
+
+  /// No description provided for @warrantyTracking.
+  ///
+  /// In en, this message translates to:
+  /// **'Warranty Tracking'**
+  String get warrantyTracking;
+
+  /// No description provided for @warrantyStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Warranty Status'**
+  String get warrantyStatus;
+
+  /// No description provided for @warrantyGenerated.
+  ///
+  /// In en, this message translates to:
+  /// **'Generated'**
+  String get warrantyGenerated;
+
+  /// No description provided for @warrantyActivated.
+  ///
+  /// In en, this message translates to:
+  /// **'Activated'**
+  String get warrantyActivated;
+
+  /// No description provided for @warrantyExpired.
+  ///
+  /// In en, this message translates to:
+  /// **'This warranty has expired'**
+  String get warrantyExpired;
+
+  /// No description provided for @warrantyUsed.
+  ///
+  /// In en, this message translates to:
+  /// **'Used'**
+  String get warrantyUsed;
+
+  /// No description provided for @warrantyRevoked.
+  ///
+  /// In en, this message translates to:
+  /// **'This warranty has been revoked'**
+  String get warrantyRevoked;
+
+  /// No description provided for @warrantyDuration.
+  ///
+  /// In en, this message translates to:
+  /// **'Warranty Duration'**
+  String get warrantyDuration;
+
+  /// No description provided for @warrantyDurationDays.
+  ///
+  /// In en, this message translates to:
+  /// **'Warranty Duration (Days)'**
+  String get warrantyDurationDays;
+
+  /// No description provided for @warrantyExpiresAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Expires At'**
+  String get warrantyExpiresAt;
+
+  /// No description provided for @warrantyGeneratedAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Generated At'**
+  String get warrantyGeneratedAt;
+
+  /// No description provided for @warrantyActivatedAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Activated At'**
+  String get warrantyActivatedAt;
+
+  /// No description provided for @warrantyProduct.
+  ///
+  /// In en, this message translates to:
+  /// **'Warranty Product'**
+  String get warrantyProduct;
+
+  /// No description provided for @warrantyCustomer.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer'**
+  String get warrantyCustomer;
+
+  /// No description provided for @warrantyCustomerName.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer Name'**
+  String get warrantyCustomerName;
+
+  /// No description provided for @warrantyCustomerPhone.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer Phone'**
+  String get warrantyCustomerPhone;
+
+  /// No description provided for @warrantyCustomerEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer Email'**
+  String get warrantyCustomerEmail;
+
+  /// No description provided for @warrantyProductSerial.
+  ///
+  /// In en, this message translates to:
+  /// **'Product Serial'**
+  String get warrantyProductSerial;
+
+  /// No description provided for @activateWarranty.
+  ///
+  /// In en, this message translates to:
+  /// **'Activate Warranty'**
+  String get activateWarranty;
+
+  /// No description provided for @trackWarranty.
+  ///
+  /// In en, this message translates to:
+  /// **'Track Warranty'**
+  String get trackWarranty;
+
+  /// No description provided for @warrantyTrackingLink.
+  ///
+  /// In en, this message translates to:
+  /// **'Warranty Tracking Link'**
+  String get warrantyTrackingLink;
+
+  /// No description provided for @warrantyCodeFormat.
+  ///
+  /// In en, this message translates to:
+  /// **'Code Format'**
+  String get warrantyCodeFormat;
+
+  /// No description provided for @warrantyCodePrefix.
+  ///
+  /// In en, this message translates to:
+  /// **'Code Prefix'**
+  String get warrantyCodePrefix;
+
+  /// No description provided for @warrantySerialFormat.
+  ///
+  /// In en, this message translates to:
+  /// **'Serial Format'**
+  String get warrantySerialFormat;
+
+  /// No description provided for @warrantySerialLength.
+  ///
+  /// In en, this message translates to:
+  /// **'Serial Length'**
+  String get warrantySerialLength;
+
+  /// No description provided for @warrantyRandom.
+  ///
+  /// In en, this message translates to:
+  /// **'Random'**
+  String get warrantyRandom;
+
+  /// No description provided for @warrantySequential.
+  ///
+  /// In en, this message translates to:
+  /// **'Sequential'**
+  String get warrantySequential;
+
+  /// No description provided for @warrantyCustom.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom'**
+  String get warrantyCustom;
+
+  /// No description provided for @warrantySecuritySettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Security Settings'**
+  String get warrantySecuritySettings;
+
+  /// No description provided for @warrantyRequireSerialVerification.
+  ///
+  /// In en, this message translates to:
+  /// **'Require Product Serial Verification'**
+  String get warrantyRequireSerialVerification;
+
+  /// No description provided for @warrantyRequireProductInstanceMatch.
+  ///
+  /// In en, this message translates to:
+  /// **'Require Product Instance Match'**
+  String get warrantyRequireProductInstanceMatch;
+
+  /// No description provided for @warrantyMaxActivationAttempts.
+  ///
+  /// In en, this message translates to:
+  /// **'Max Activation Attempts'**
+  String get warrantyMaxActivationAttempts;
+
+  /// No description provided for @warrantyActivationLockoutDuration.
+  ///
+  /// In en, this message translates to:
+  /// **'Lockout Duration (Minutes)'**
+  String get warrantyActivationLockoutDuration;
+
+  /// No description provided for @warrantyAutoLinkToPerson.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto Link to Person'**
+  String get warrantyAutoLinkToPerson;
+
+  /// No description provided for @warrantyEnableTrackingLink.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable Tracking Link'**
+  String get warrantyEnableTrackingLink;
+
+  /// No description provided for @warrantyTrackingLinkExpiresDays.
+  ///
+  /// In en, this message translates to:
+  /// **'Tracking Link Expires (Days)'**
+  String get warrantyTrackingLinkExpiresDays;
+
+  /// No description provided for @warrantyEnableSmsNotification.
+  ///
+  /// In en, this message translates to:
+  /// **'Send SMS on Activation'**
+  String get warrantyEnableSmsNotification;
+
+  /// No description provided for @warrantyEnableEmailNotification.
+  ///
+  /// In en, this message translates to:
+  /// **'Send Email on Activation'**
+  String get warrantyEnableEmailNotification;
+
+  /// No description provided for @warrantyCodeNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'Warranty code not found'**
+  String get warrantyCodeNotFound;
+
+  /// No description provided for @warrantyInvalidSerial.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid warranty serial'**
+  String get warrantyInvalidSerial;
+
+  /// No description provided for @warrantyAlreadyActivated.
+  ///
+  /// In en, this message translates to:
+  /// **'This warranty has already been activated'**
+  String get warrantyAlreadyActivated;
+
+  /// No description provided for @warrantyActivationSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Warranty activated successfully'**
+  String get warrantyActivationSuccess;
+
+  /// No description provided for @warrantyActivationFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Warranty activation failed'**
+  String get warrantyActivationFailed;
+
+  /// No description provided for @warrantyTooManyAttempts.
+  ///
+  /// In en, this message translates to:
+  /// **'Too many activation attempts'**
+  String get warrantyTooManyAttempts;
+
+  /// No description provided for @warrantyProductSerialRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Product serial is required'**
+  String get warrantyProductSerialRequired;
+
+  /// No description provided for @warrantyProductSerialNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'Product serial not found'**
+  String get warrantyProductSerialNotFound;
+
+  /// No description provided for @warrantyLinkNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'Tracking link not found'**
+  String get warrantyLinkNotFound;
+
+  /// No description provided for @warrantyLinkExpired.
+  ///
+  /// In en, this message translates to:
+  /// **'Tracking link has expired'**
+  String get warrantyLinkExpired;
+
+  /// No description provided for @warrantyLinkInactive.
+  ///
+  /// In en, this message translates to:
+  /// **'Tracking link is inactive'**
+  String get warrantyLinkInactive;
+
+  /// No description provided for @warrantyPluginNotActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Warranty plugin is not active for this business'**
+  String get warrantyPluginNotActive;
+
+  /// No description provided for @warrantyGenerateCodes.
+  ///
+  /// In en, this message translates to:
+  /// **'Generate Warranty Codes'**
+  String get warrantyGenerateCodes;
+
+  /// No description provided for @warrantyQuantity.
+  ///
+  /// In en, this message translates to:
+  /// **'Quantity'**
+  String get warrantyQuantity;
+
+  /// No description provided for @warrantyCustomSerials.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom Serials'**
+  String get warrantyCustomSerials;
+
+  /// No description provided for @warrantyCustomCodes.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom Codes'**
+  String get warrantyCustomCodes;
+
+  /// No description provided for @warrantyListCodes.
+  ///
+  /// In en, this message translates to:
+  /// **'List Warranty Codes'**
+  String get warrantyListCodes;
+
+  /// No description provided for @warrantyFilterByStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Filter by Status'**
+  String get warrantyFilterByStatus;
+
+  /// No description provided for @warrantyFilterByProduct.
+  ///
+  /// In en, this message translates to:
+  /// **'Filter by Product'**
+  String get warrantyFilterByProduct;
+
+  /// No description provided for @warrantyEvents.
+  ///
+  /// In en, this message translates to:
+  /// **'Warranty Events'**
+  String get warrantyEvents;
+
+  /// No description provided for @warrantyEventActivation.
+  ///
+  /// In en, this message translates to:
+  /// **'Activation'**
+  String get warrantyEventActivation;
+
+  /// No description provided for @warrantyEventRepairRequest.
+  ///
+  /// In en, this message translates to:
+  /// **'Repair Request'**
+  String get warrantyEventRepairRequest;
+
+  /// No description provided for @warrantyEventRepairCompleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Repair Completed'**
+  String get warrantyEventRepairCompleted;
+
+  /// No description provided for @warrantyEventReplacement.
+  ///
+  /// In en, this message translates to:
+  /// **'Replacement'**
+  String get warrantyEventReplacement;
+
+  /// No description provided for @warrantyEventExpired.
+  ///
+  /// In en, this message translates to:
+  /// **'Expired'**
+  String get warrantyEventExpired;
+
+  /// No description provided for @warrantyEventRevoked.
+  ///
+  /// In en, this message translates to:
+  /// **'Revoked'**
+  String get warrantyEventRevoked;
+
+  /// No description provided for @warrantyManage.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage Warranty'**
+  String get warrantyManage;
 }
 
 class _AppLocalizationsDelegate

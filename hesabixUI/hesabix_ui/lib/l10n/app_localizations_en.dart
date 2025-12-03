@@ -5722,6 +5722,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Manage document revenue scenarios and packages';
 
   @override
+  String get settingsMarketplacePlugins => 'Marketplace Plugins Management';
+
+  @override
+  String get settingsMarketplacePluginsDescription =>
+      'Manage plugins and plans for the marketplace';
+
+  @override
   String get settingsWalletSettings => 'Wallet Settings';
 
   @override
@@ -5817,4 +5824,227 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get settingsServiceLogsDescription =>
       'View logs of hesabix-api and hesabix-rq-worker and manage services';
+
+  @override
+  String get warranty => 'Warranty';
+
+  @override
+  String get warrantyManagement => 'Warranty Management';
+
+  @override
+  String get warrantySettings => 'Warranty Settings';
+
+  @override
+  String get warrantyCodes => 'Warranty Codes';
+
+  @override
+  String get warrantyCode => 'Warranty Code';
+
+  @override
+  String get warrantySerial => 'Warranty Serial';
+
+  @override
+  String get generateWarrantyCodes => 'Generate Warranty Codes';
+
+  @override
+  String get warrantyActivation => 'Warranty Activation';
+
+  @override
+  String get warrantyTracking => 'Warranty Tracking';
+
+  @override
+  String get warrantyStatus => 'Warranty Status';
+
+  @override
+  String get warrantyGenerated => 'Generated';
+
+  @override
+  String get warrantyActivated => 'Activated';
+
+  @override
+  String get warrantyExpired => 'This warranty has expired';
+
+  @override
+  String get warrantyUsed => 'Used';
+
+  @override
+  String get warrantyRevoked => 'This warranty has been revoked';
+
+  @override
+  String get warrantyDuration => 'Warranty Duration';
+
+  @override
+  String get warrantyDurationDays => 'Warranty Duration (Days)';
+
+  @override
+  String get warrantyExpiresAt => 'Expires At';
+
+  @override
+  String get warrantyGeneratedAt => 'Generated At';
+
+  @override
+  String get warrantyActivatedAt => 'Activated At';
+
+  @override
+  String get warrantyProduct => 'Warranty Product';
+
+  @override
+  String get warrantyCustomer => 'Customer';
+
+  @override
+  String get warrantyCustomerName => 'Customer Name';
+
+  @override
+  String get warrantyCustomerPhone => 'Customer Phone';
+
+  @override
+  String get warrantyCustomerEmail => 'Customer Email';
+
+  @override
+  String get warrantyProductSerial => 'Product Serial';
+
+  @override
+  String get activateWarranty => 'Activate Warranty';
+
+  @override
+  String get trackWarranty => 'Track Warranty';
+
+  @override
+  String get warrantyTrackingLink => 'Warranty Tracking Link';
+
+  @override
+  String get warrantyCodeFormat => 'Code Format';
+
+  @override
+  String get warrantyCodePrefix => 'Code Prefix';
+
+  @override
+  String get warrantySerialFormat => 'Serial Format';
+
+  @override
+  String get warrantySerialLength => 'Serial Length';
+
+  @override
+  String get warrantyRandom => 'Random';
+
+  @override
+  String get warrantySequential => 'Sequential';
+
+  @override
+  String get warrantyCustom => 'Custom';
+
+  @override
+  String get warrantySecuritySettings => 'Security Settings';
+
+  @override
+  String get warrantyRequireSerialVerification =>
+      'Require Product Serial Verification';
+
+  @override
+  String get warrantyRequireProductInstanceMatch =>
+      'Require Product Instance Match';
+
+  @override
+  String get warrantyMaxActivationAttempts => 'Max Activation Attempts';
+
+  @override
+  String get warrantyActivationLockoutDuration => 'Lockout Duration (Minutes)';
+
+  @override
+  String get warrantyAutoLinkToPerson => 'Auto Link to Person';
+
+  @override
+  String get warrantyEnableTrackingLink => 'Enable Tracking Link';
+
+  @override
+  String get warrantyTrackingLinkExpiresDays => 'Tracking Link Expires (Days)';
+
+  @override
+  String get warrantyEnableSmsNotification => 'Send SMS on Activation';
+
+  @override
+  String get warrantyEnableEmailNotification => 'Send Email on Activation';
+
+  @override
+  String get warrantyCodeNotFound => 'Warranty code not found';
+
+  @override
+  String get warrantyInvalidSerial => 'Invalid warranty serial';
+
+  @override
+  String get warrantyAlreadyActivated =>
+      'This warranty has already been activated';
+
+  @override
+  String get warrantyActivationSuccess => 'Warranty activated successfully';
+
+  @override
+  String get warrantyActivationFailed => 'Warranty activation failed';
+
+  @override
+  String get warrantyTooManyAttempts => 'Too many activation attempts';
+
+  @override
+  String get warrantyProductSerialRequired => 'Product serial is required';
+
+  @override
+  String get warrantyProductSerialNotFound => 'Product serial not found';
+
+  @override
+  String get warrantyLinkNotFound => 'Tracking link not found';
+
+  @override
+  String get warrantyLinkExpired => 'Tracking link has expired';
+
+  @override
+  String get warrantyLinkInactive => 'Tracking link is inactive';
+
+  @override
+  String get warrantyPluginNotActive =>
+      'Warranty plugin is not active for this business';
+
+  @override
+  String get warrantyGenerateCodes => 'Generate Warranty Codes';
+
+  @override
+  String get warrantyQuantity => 'Quantity';
+
+  @override
+  String get warrantyCustomSerials => 'Custom Serials';
+
+  @override
+  String get warrantyCustomCodes => 'Custom Codes';
+
+  @override
+  String get warrantyListCodes => 'List Warranty Codes';
+
+  @override
+  String get warrantyFilterByStatus => 'Filter by Status';
+
+  @override
+  String get warrantyFilterByProduct => 'Filter by Product';
+
+  @override
+  String get warrantyEvents => 'Warranty Events';
+
+  @override
+  String get warrantyEventActivation => 'Activation';
+
+  @override
+  String get warrantyEventRepairRequest => 'Repair Request';
+
+  @override
+  String get warrantyEventRepairCompleted => 'Repair Completed';
+
+  @override
+  String get warrantyEventReplacement => 'Replacement';
+
+  @override
+  String get warrantyEventExpired => 'Expired';
+
+  @override
+  String get warrantyEventRevoked => 'Revoked';
+
+  @override
+  String get warrantyManage => 'Manage Warranty';
 }

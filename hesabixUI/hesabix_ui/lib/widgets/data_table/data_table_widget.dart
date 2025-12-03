@@ -264,18 +264,46 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
         inventoryAsOfDate: inventoryAsOfDate,
       );
 
-      // Add additional parameters (excluding inventory params that are already in QueryInfo)
-      final requestData = queryInfo.toJson();
-      if (widget.config.additionalParams != null) {
-        final additionalParamsCopy = Map<String, dynamic>.from(widget.config.additionalParams!);
-        additionalParamsCopy.remove('include_inventory');
-        additionalParamsCopy.remove('inventory_as_of_date');
-        if (additionalParamsCopy.isNotEmpty) {
-          requestData.addAll(additionalParamsCopy);
+      // Use appropriate HTTP method based on config
+      final Response<Map<String, dynamic>> res;
+      if (widget.config.httpMethod.toUpperCase() == 'GET') {
+        // For GET requests, use simple query parameters
+        final queryParams = <String, dynamic>{
+          'limit': _limit,
+          'skip': (_page - 1) * _limit,
+        };
+        
+        // Add sorting
+        if (_sortBy != null) {
+          queryParams['sort_by'] = _sortBy;
+          queryParams['sort_desc'] = _sortDesc;
         }
+        
+        // Add search
+        if (_searchCtrl.text.trim().isNotEmpty) {
+          queryParams['search'] = _searchCtrl.text.trim();
+        }
+        
+        // Add additional parameters
+        if (widget.config.additionalParams != null) {
+          queryParams.addAll(widget.config.additionalParams!);
+        }
+        
+        res = await api.get<Map<String, dynamic>>(widget.config.endpoint, query: queryParams);
+      } else {
+        // For POST requests, use QueryInfo structure
+        final requestData = queryInfo.toJson();
+        if (widget.config.additionalParams != null) {
+          final additionalParamsCopy = Map<String, dynamic>.from(widget.config.additionalParams!);
+          additionalParamsCopy.remove('include_inventory');
+          additionalParamsCopy.remove('inventory_as_of_date');
+          if (additionalParamsCopy.isNotEmpty) {
+            requestData.addAll(additionalParamsCopy);
+          }
+        }
+        
+        res = await api.post<Map<String, dynamic>>(widget.config.endpoint, data: requestData);
       }
-
-      final res = await api.post<Map<String, dynamic>>(widget.config.endpoint, data: requestData);
       final body = res.data;
       
       if (body == null) {
@@ -2202,9 +2230,13 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
       );
     }));
 
+    // بررسی می‌کنیم که ScrollController دارای ScrollPosition است یا نه
+    // برای جلوگیری از خطای "ScrollController has no ScrollPosition attached"
+    final hasScrollPosition = _horizontalScrollController.hasClients;
+    
     return Scrollbar(
-      controller: _horizontalScrollController,
-      thumbVisibility: true,
+      controller: hasScrollPosition ? _horizontalScrollController : null,
+      thumbVisibility: hasScrollPosition,
       child: DataTableTheme(
         data: DataTableThemeData(
           headingRowColor: WidgetStatePropertyAll(
@@ -2220,7 +2252,10 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
         child: DataTable2(
           columnSpacing: 0,
           horizontalMargin: 10,
-          minWidth: widget.config.minTableWidth ?? 600,
+          // محاسبه minWidth بر اساس عرض کل ستون‌ها برای جلوگیری از warning
+          // اگر عرض ستون‌ها بیش از availableWidth باشد، از همان استفاده می‌کنیم
+          // در غیر این صورت از config استفاده می‌کنیم
+          minWidth: _calculateMinTableWidth(columns, availableWidth),
           horizontalScrollController: _horizontalScrollController,
           headingRowHeight: _dense ? 40 : 44,
           dataRowHeight: _dense ? 38 : 48,
@@ -2467,14 +2502,15 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
       icon: const Icon(Icons.more_vert, size: 20),
       onSelected: (index) {
         final action = column.actions[index];
-        if (action.enabled) action.onTap(item);
+        if (action.isEnabled(item)) action.onTap(item);
       },
       itemBuilder: (context) {
         return List.generate(column.actions.length, (index) {
           final action = column.actions[index];
+          final isActionEnabled = action.isEnabled(item);
           return PopupMenuItem<int>(
             value: index,
-            enabled: action.enabled,
+            enabled: isActionEnabled,
             child: Row(
               children: [
                 Icon(
@@ -2561,6 +2597,34 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     return computed;
   }
 
+  /// محاسبه minWidth برای DataTable2 بر اساس عرض ستون‌ها
+  /// این جلوی warning "combined width of columns ... is greater than available parent width" را می‌گیرد
+  double _calculateMinTableWidth(List<DataColumn2> columns, double availableWidth) {
+    // محاسبه مجموع fixedWidth ستون‌ها
+    double totalFixedWidth = 0.0;
+    for (final col in columns) {
+      if (col.fixedWidth != null) {
+        totalFixedWidth += col.fixedWidth!;
+      }
+    }
+    
+    // DataTable2 assertion چک می‌کند که minWidth >= totalFixedWidth + (horizontalMargin * 2)
+    // horizontalMargin در DataTable2 برابر با 10 است، پس باید 20 اضافه کنیم
+    const horizontalMarginTotal = 20.0; // horizontalMargin * 2 = 10 * 2
+    
+    // minWidth باید حداقل برابر با totalFixedWidth + horizontalMarginTotal باشد تا assertion نخورد
+    final minRequiredWidth = totalFixedWidth + horizontalMarginTotal;
+    
+    // اگر availableWidth infinity است یا نامعتبر است، فقط minRequiredWidth را برگردانیم
+    if (!availableWidth.isFinite || availableWidth <= 0) {
+      return minRequiredWidth;
+    }
+    
+    // همیشه minRequiredWidth را برگردانیم تا از assertion error جلوگیری شود
+    // DataTable2 به صورت خودکار scroll می‌شود اگر فضا کافی نباشد
+    return minRequiredWidth;
+  }
+
   /// محاسبه عرض کل ستون‌ها و تنظیم عرض‌ها برای پر کردن فضای موجود
   /// این متد عرض کل ستون‌ها را محاسبه می‌کند و اگر شرایط برقرار باشد،
   /// عرض ستون‌ها را به نسبت افزایش می‌دهد تا فضای موجود را پر کنند
@@ -2573,9 +2637,6 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
       fontWeight: FontWeight.w600,
       color: theme.colorScheme.onSurface,
     ) ?? const TextStyle(fontSize: 14, fontWeight: FontWeight.w600);
-    
-    // بررسی اینکه آیا کاربر عرض ستون‌ها را تنظیم کرده یا نه
-    final hasUserCustomizedWidths = _columnSettings?.columnWidths.isNotEmpty ?? false;
     
     // محاسبه عرض کل ستون‌ها
     double totalColumnsWidth = 0.0;
@@ -2618,10 +2679,9 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     // اضافه کردن horizontalMargin (10 * 2 = 20)
     totalColumnsWidth += 20.0;
     
-    // اگر autoFillAvailableWidth فعال باشد و کاربر عرض ستون‌ها را تنظیم نکرده باشد
-    // و عرض کل کمتر از عرض موجود باشد، عرض ستون‌ها را به نسبت افزایش می‌دهیم
+    // اگر autoFillAvailableWidth فعال باشد و عرض کل کمتر از عرض موجود باشد،
+    // عرض ستون‌ها را به نسبت افزایش می‌دهیم تا فضای خالی پر شود
     if (widget.config.autoFillAvailableWidth && 
-        !hasUserCustomizedWidths && 
         totalColumnsWidth < availableWidth &&
         dataColumnsToShow.isNotEmpty) {
       // محاسبه ضریب افزایش (فقط برای ستون‌های داده)

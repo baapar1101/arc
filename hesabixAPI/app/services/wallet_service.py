@@ -128,6 +128,8 @@ def get_wallet_overview(db: Session, business_id: int) -> Dict[str, Any]:
 		"status": account.status,
 		"base_currency_code": settings.get("wallet_base_currency_code"),
 		"base_currency_id": settings.get("wallet_base_currency_id"),
+		"base_currency_title": settings.get("wallet_base_currency_title"),
+		"base_currency_symbol": settings.get("wallet_base_currency_symbol"),
 	}
 
 
@@ -434,16 +436,56 @@ def create_top_up_request(db: Session, business_id: int, user_id: int, payload: 
 	ایجاد درخواست افزایش اعتبار (در انتظار تایید درگاه)
 	- مانده pending افزایش می‌یابد تا پس از تایید به available منتقل شود
 	"""
+	logger.info("create_top_up_request_start", business_id=business_id, user_id=user_id, amount=payload.get("amount"))
 	amount = Decimal(str(payload.get("amount") or 0))
 	if amount <= 0:
+		logger.error("create_top_up_request_invalid_amount", amount=float(amount))
 		raise ApiError("INVALID_AMOUNT", "مبلغ نامعتبر است", http_status=400)
+	
 	gateway_id = payload.get("gateway_id")
-	if not gateway_id:
-		# اجازه می‌دهیم بدون gateway_id نیز ساخته شود، اما برای پرداخت آنلاین لازم است
-		pass
+	source = payload.get("source", "app")  # پیش‌فرض: app
+	# اعتبارسنجی gateway_id در صورت ارسال
+	if gateway_id:
+		try:
+			from adapters.db.models.payment_gateway import PaymentGateway
+			gw = db.query(PaymentGateway).filter(PaymentGateway.id == int(gateway_id)).first()
+			if not gw:
+				logger.error("create_top_up_request_gateway_not_found", gateway_id=gateway_id)
+				raise ApiError("GATEWAY_NOT_FOUND", "درگاه پرداخت یافت نشد", http_status=404)
+			if not gw.is_active:
+				logger.error("create_top_up_request_gateway_inactive", gateway_id=gateway_id)
+				raise ApiError("GATEWAY_DISABLED", "درگاه پرداخت غیرفعال است", http_status=400)
+		except ApiError:
+			raise
+		except Exception as ex:
+			logger.error("create_top_up_request_gateway_check_failed", gateway_id=gateway_id, error=str(ex))
+			raise ApiError("GATEWAY_CHECK_FAILED", "خطا در بررسی درگاه پرداخت", http_status=500)
+	
+	# اگر gateway_id نداریم، فقط تراکنش ایجاد می‌کنیم بدون افزایش pending
+	# (برای پرداخت دستی یا روش‌های دیگر)
 	account = _get_wallet_account_for_update(db, business_id)
-	account.pending_balance = Decimal(str(account.pending_balance or 0)) + amount
-	db.flush()
+	
+	# بارگذاری اطلاعات کاربر برای ارسال به درگاه پرداخت
+	from adapters.db.models.user import User
+	user = db.query(User).filter(User.id == int(user_id)).first()
+	
+	# ذخیره user_id و اطلاعات کاربر در extra_info برای استفاده بعدی
+	extra_info_dict = {"created_by_user_id": user_id, "source": source}
+	
+	if user:
+		# نام کامل کاربر (ترکیب first_name و last_name یا mobile)
+		user_full_name = None
+		if user.first_name or user.last_name:
+			user_full_name = f"{user.first_name or ''} {user.last_name or ''}".strip()
+		elif user.mobile:
+			user_full_name = user.mobile
+		
+		extra_info_dict["user_name"] = user_full_name
+		extra_info_dict["user_email"] = user.email
+		extra_info_dict["user_mobile"] = user.mobile
+	
+	extra_info_json = json.dumps(extra_info_dict, ensure_ascii=False)
+	
 	tx = WalletTransaction(
 		business_id=int(business_id),
 		type="top_up",
@@ -453,12 +495,19 @@ def create_top_up_request(db: Session, business_id: int, user_id: int, payload: 
 		description=str(payload.get("description") or "افزایش اعتبار"),
 		external_ref=None,
 		document_id=None,
+		extra_info=extra_info_json,
 	)
 	db.add(tx)
 	db.flush()
+	
 	# تولید لینک درگاه پرداخت (در صورت ارسال gateway_id)
 	payment_url = None
 	if gateway_id:
+		# فقط در صورت وجود gateway_id، pending_balance را افزایش می‌دهیم
+		account.pending_balance = Decimal(str(account.pending_balance or 0)) + amount
+		db.flush()
+		logger.info("create_top_up_request_pending_increased", tx_id=tx.id, amount=float(amount), new_pending=float(account.pending_balance))
+		
 		try:
 			from app.services.payment_service import initiate_payment
 			init_res = initiate_payment(
@@ -469,35 +518,53 @@ def create_top_up_request(db: Session, business_id: int, user_id: int, payload: 
 				gateway_id=int(gateway_id),
 			)
 			payment_url = init_res.payment_url
+			logger.info("create_top_up_request_payment_url_created", tx_id=tx.id, payment_url=payment_url)
 		except Exception as ex:
 			# اگر ایجاد لینک شکست بخورد، مانده pending به حالت قبل برگردد و تراکنش failed شود
+			logger.error("create_top_up_request_gateway_init_failed", tx_id=tx.id, error=str(ex), exc_info=True)
 			try:
-				account.pending_balance = Decimal(str(account.pending_balance or 0)) - amount
-				if account.pending_balance < 0:
+				current_pending = Decimal(str(account.pending_balance or 0))
+				if current_pending >= amount:
+					account.pending_balance = current_pending - amount
+				else:
 					account.pending_balance = Decimal("0")
 				tx.status = "failed"
 				db.flush()
-			finally:
-				import structlog
-				logger = structlog.get_logger()
-				logger.warning("gateway_initiate_failed", error=str(ex))
+				logger.info("create_top_up_request_rollback_completed", tx_id=tx.id, new_pending=float(account.pending_balance))
+			except Exception as rollback_ex:
+				logger.error("create_top_up_request_rollback_failed", tx_id=tx.id, error=str(rollback_ex), exc_info=True)
+			raise ApiError("GATEWAY_INIT_FAILED", f"خطا در ایجاد لینک پرداخت: {str(ex)}", http_status=502)
+	else:
+		logger.info("create_top_up_request_no_gateway", tx_id=tx.id, message="تراکنش بدون درگاه ایجاد شد")
+	
+	logger.info("create_top_up_request_completed", tx_id=tx.id, status=tx.status, has_payment_url=payment_url is not None)
 	return {"transaction_id": tx.id, "status": tx.status, **({"payment_url": payment_url} if payment_url else {})}
 
 
-def confirm_top_up(db: Session, tx_id: int, success: bool, external_ref: str | None = None) -> Dict[str, Any]:
+def confirm_top_up(db: Session, tx_id: int, success: bool, external_ref: str | None = None, user_id: int | None = None) -> Dict[str, Any]:
 	"""
 	تایید/لغو top-up از وبهوک درگاه
 	- در موفقیت: انتقال از pending به available
 	- در عدم موفقیت: کاهش از pending
 	"""
+	logger.info("confirm_top_up_start", tx_id=tx_id, success=success, external_ref=external_ref, user_id=user_id)
 	tx = db.query(WalletTransaction).filter(WalletTransaction.id == int(tx_id)).first()
 	if not tx or tx.type != "top_up":
+		logger.error("confirm_top_up_tx_not_found", tx_id=tx_id)
 		raise ApiError("TX_NOT_FOUND", "تراکنش افزایش اعتبار یافت نشد", http_status=404)
+	
+	# بررسی تعلق تراکنش به کسب‌وکار (امنیتی)
+	if tx.business_id is None:
+		logger.error("confirm_top_up_no_business_id", tx_id=tx_id)
+		raise ApiError("INVALID_TX", "تراکنش به کسب‌وکار مرتبط نیست", http_status=400)
+	
 	# Idempotency guard: if already finalized, do nothing
 	if (tx.status or "").lower() in ("succeeded", "failed"):
+		logger.info("confirm_top_up_already_finalized", tx_id=tx_id, status=tx.status)
 		tx.external_ref = external_ref or tx.external_ref
 		db.flush()
 		return {"transaction_id": tx.id, "status": tx.status}
+	
 	account = _get_wallet_account_for_update(db, tx.business_id)
 	if success:
 		# move pending -> available
@@ -510,24 +577,48 @@ def confirm_top_up(db: Session, tx_id: int, success: bool, external_ref: str | N
 		net = gross - fee
 		# Prevent negative pending due to duplicate webhook/callback
 		current_pending = Decimal(str(account.pending_balance or 0))
-		account.pending_balance = current_pending - gross if current_pending >= gross else Decimal("0")
+		if current_pending < gross:
+			logger.warning("confirm_top_up_insufficient_pending", tx_id=tx_id, current_pending=float(current_pending), gross=float(gross))
+			# اگر pending کمتر از gross باشد، فقط همان مقدار موجود را کم می‌کنیم
+			account.pending_balance = Decimal("0")
+		else:
+			account.pending_balance = current_pending - gross
 		account.available_balance = Decimal(str(account.available_balance or 0)) + net
 		tx.status = "succeeded"
+		logger.info("confirm_top_up_success", tx_id=tx_id, gross=float(gross), fee=float(fee), net=float(net), new_available=float(account.available_balance))
 		# create accounting document
 		try:
-			doc_id = _post_topup_document(db, tx.business_id, user_id=0, amount=gross, fee_amount=fee)
+			# استفاده از user_id از تراکنش یا پارامتر ورودی
+			doc_user_id = user_id if user_id and user_id > 0 else None
+			# اگر user_id نداریم، از extra_info تراکنش تلاش می‌کنیم
+			if not doc_user_id:
+				try:
+					extra = json.loads(tx.extra_info or "{}") if tx.extra_info else {}
+					doc_user_id = extra.get("created_by_user_id")
+				except Exception:
+					pass
+			# در نهایت اگر هنوز نداریم، از 0 استفاده می‌کنیم (سیستم)
+			doc_user_id = doc_user_id if doc_user_id and doc_user_id > 0 else 0
+			doc_id = _post_topup_document(db, tx.business_id, user_id=doc_user_id, amount=gross, fee_amount=fee)
 			tx.document_id = int(doc_id)
-		except Exception:
+			logger.info("confirm_top_up_document_created", tx_id=tx_id, document_id=doc_id)
+		except Exception as ex:
 			# اگر سند ایجاد نشد، تراکنش مالی معتبر است اما سند ندارد
-			pass
+			logger.warning("confirm_top_up_document_failed", tx_id=tx_id, error=str(ex), exc_info=True)
 	else:
 		# rollback pending
 		current_pending = Decimal(str(account.pending_balance or 0))
 		dec_amt = Decimal(str(tx.amount or 0))
-		account.pending_balance = current_pending - dec_amt if current_pending >= dec_amt else Decimal("0")
+		if current_pending < dec_amt:
+			logger.warning("confirm_top_up_insufficient_pending_rollback", tx_id=tx_id, current_pending=float(current_pending), dec_amt=float(dec_amt))
+			account.pending_balance = Decimal("0")
+		else:
+			account.pending_balance = current_pending - dec_amt
 		tx.status = "failed"
+		logger.info("confirm_top_up_failed", tx_id=tx_id, new_pending=float(account.pending_balance))
 	tx.external_ref = external_ref
 	db.flush()
+	logger.info("confirm_top_up_completed", tx_id=tx_id, status=tx.status)
 	return {"transaction_id": tx.id, "status": tx.status}
 
 
@@ -546,7 +637,7 @@ def refund_transaction(db: Session, tx_id: int, amount: Decimal | None = None, r
 	available = Decimal(str(account.available_balance or 0))
 	if refund_amount > available:
 		raise ApiError("INSUFFICIENT_FUNDS", "موجودی کافی برای استرداد نیست", http_status=400)
-	account.available_balance = float(available - refund_amount)
+	account.available_balance = available - refund_amount
 	db.flush()
 	tx = WalletTransaction(
 		business_id=int(src.business_id),

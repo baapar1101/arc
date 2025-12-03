@@ -31,6 +31,8 @@ class MarketplacePlugin(Base):
 	category: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
 	icon_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
 	is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+	trial_days: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)  # تعداد روزهای trial (مثلاً 7 روز)
+	trial_allowed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)  # آیا trial مجاز است
 
 	created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 	updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
@@ -108,6 +110,8 @@ class BusinessPlugin(Base):
 	starts_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 	ends_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 	auto_renew: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+	is_trial: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)  # آیا این لایسنس trial است
+	trial_started_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)  # تاریخ شروع trial
 	extra_info: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
 	created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)

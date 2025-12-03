@@ -28,7 +28,8 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
   @override
   void initState() {
     super.initState();
-    _config = Map<String, dynamic>.from(widget.node.config);
+    _config = <String, dynamic>{};
+    _config.addAll(widget.node.config);
     
     // دریافت config_schema از metadata
     if (widget.editorState != null && widget.node.key != null) {

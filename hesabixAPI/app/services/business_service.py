@@ -244,19 +244,25 @@ def get_businesses_by_owner(db: Session, owner_id: int, query_info: Dict[str, An
     }
 
 
-def get_user_businesses(db: Session, user_id: int, query_info: Dict[str, Any]) -> Dict[str, Any]:
+def get_user_businesses(db: Session, user_id: int, query_info: Dict[str, Any], include_deleted_for_owner: bool = True) -> Dict[str, Any]:
     """
     دریافت لیست کسب و کارهای کاربر (مالک + عضو)
     
     قوانین نمایش:
-    - برای مالک: کسب و کارهای حذف شده را نشان می‌دهد (اگر auto_delete_at نگذشته باشد)
+    - برای مالک: کسب و کارهای حذف شده را نشان می‌دهد (اگر auto_delete_at نگذشته باشد) - قابل کنترل با include_deleted_for_owner
     - برای سایر کاربران: کسب و کارهای حذف شده را نشان نمی‌دهد
+    
+    Args:
+        db: Session دیتابیس
+        user_id: شناسه کاربر
+        query_info: اطلاعات جستجو و صفحه‌بندی
+        include_deleted_for_owner: آیا کسب‌وکارهای حذف‌شده برای مالک نمایش داده شوند؟ (پیش‌فرض True)
     """
     business_repo = BusinessRepository(db)
     permission_repo = BusinessPermissionRepository(db)
     
-    # دریافت کسب و کارهای مالک (شامل حذف شده‌ها که هنوز مهلت دارند)
-    owned_businesses = business_repo.get_by_owner_id(user_id, include_deleted=True)
+    # دریافت کسب و کارهای مالک (شامل حذف شده‌ها که هنوز مهلت دارند - بسته به پارامتر)
+    owned_businesses = business_repo.get_by_owner_id(user_id, include_deleted=include_deleted_for_owner)
     
     # دریافت کسب و کارهای عضو (فقط غیرحذف شده‌ها)
     member_permissions = permission_repo.get_user_member_businesses(user_id)

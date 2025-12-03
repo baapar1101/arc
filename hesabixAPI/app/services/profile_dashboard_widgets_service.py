@@ -199,8 +199,27 @@ def _resolve_profile_recent_businesses(
         "sort_desc": True,
         "search": None,
     }
-    result = get_user_businesses(db, user_id, query_dict)
+    # برای داشبورد پروفایل، کسب‌وکارهای حذف‌شده را نشان نمی‌دهیم
+    result = get_user_businesses(db, user_id, query_dict, include_deleted_for_owner=False)
     items = result.get("items", [])
+    
+    # فیلتر کردن کسب و کارهای حذف شده (در حال حذف یا حذف شده)
+    # کسب و کارهایی که deleted_at دارند یا در حال حذف هستند را نشان نمی‌دهیم
+    filtered_items = []
+    for item in items:
+        deleted_at = item.get("deleted_at")
+        is_deleted = item.get("is_deleted", False)
+        is_deletion_pending = item.get("is_deletion_pending", False)
+        
+        # بررسی اینکه آیا کسب و کار حذف شده یا در حال حذف است
+        # deleted_at می‌تواند None، string خالی یا string با تاریخ باشد
+        has_deleted_at = deleted_at is not None and deleted_at != ""
+        
+        # اگر حذف نشده و در حال حذف نیست، اضافه کن
+        if not has_deleted_at and not is_deleted and not is_deletion_pending:
+            filtered_items.append(item)
+    
+    items = filtered_items
     
     # Format items for widget
     formatted_items = []

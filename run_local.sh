@@ -13,10 +13,10 @@ fi
 source .venv/bin/activate
 python -m pip install --upgrade pip
 
-# نصب با وابستگی‌های توسعه برای اجرای تست‌ها
+# Install with development dependencies for running tests
 pip install --no-input -e .[dev]
 
-# ایجاد .env در صورت نبود
+# Create .env if not present
 if [ ! -f .env ]; then
   cp -n env.example .env || true
 fi
@@ -34,7 +34,7 @@ case "$CMD" in
     uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
     ;;
   serve-workers)
-    # اجرای uvicorn با چند worker (بدون reload)
+    # Run uvicorn with multiple workers (without reload)
     WORKERS=${WORKERS:-4}
     uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers "$WORKERS"
     ;;

@@ -34,6 +34,9 @@ class InvoiceLineItem {
   // presentation
   String? description;
 
+  // unique product instances (for inventory_mode=unique)
+  List<int>? selectedInstanceIds;
+
   // extra info for API payload
   final Map<String, dynamic>? extraInfo;
 
@@ -57,6 +60,7 @@ class InvoiceLineItem {
     this.minOrderQty,
     this.trackInventory = false,
     this.warehouseId,
+    this.selectedInstanceIds,
     this.extraInfo,
   });
 
@@ -80,6 +84,7 @@ class InvoiceLineItem {
     int? minOrderQty,
     bool? trackInventory,
     int? warehouseId,
+    List<int>? selectedInstanceIds,
     Map<String, dynamic>? extraInfo,
   }) {
     return InvoiceLineItem(
@@ -102,6 +107,7 @@ class InvoiceLineItem {
       minOrderQty: minOrderQty ?? this.minOrderQty,
       trackInventory: trackInventory ?? this.trackInventory,
       warehouseId: warehouseId ?? this.warehouseId,
+      selectedInstanceIds: selectedInstanceIds ?? this.selectedInstanceIds,
       extraInfo: extraInfo ?? this.extraInfo,
     );
   }

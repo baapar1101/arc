@@ -37,6 +37,15 @@ class _NotificationsSettingsPageState extends State<NotificationsSettingsPage> {
   final _smsUsernameCtrl = TextEditingController();
   final _smsPasswordCtrl = TextEditingController();
   bool _smsIsFlash = false;
+  String? _selectedSmsProvider;
+  bool _smsProviderIsCustom = false;
+  
+  // لیست provider های از پیش تعریف شده
+  static const List<String> _predefinedSmsProviders = [
+    'behinsms',
+    'behin_sms',
+  ];
+  static const String _customProviderValue = '__custom__';
   bool _adminLoading = true;
   bool _adminSaving = false;
   bool _webhookRegistering = false;
@@ -94,12 +103,27 @@ class _NotificationsSettingsPageState extends State<NotificationsSettingsPage> {
         _tgProxyBaseUrlCtrl.text = '${admin['telegram_proxy_base_url'] ?? ''}';
         _tgProxyApiKeyCtrl.text = '${admin['telegram_proxy_api_key'] ?? ''}';
         proxyEnabled = (admin['telegram_proxy_enabled'] ?? false) == true;
-        _smsProviderCtrl.text = '${admin['sms_provider_name'] ?? ''}';
+        final providerName = '${admin['sms_provider_name'] ?? ''}';
         _smsApiKeyCtrl.text = '${admin['sms_api_key'] ?? ''}';
         _smsSenderCtrl.text = '${admin['sms_sender'] ?? ''}';
         _smsUsernameCtrl.text = '${admin['sms_provider_username'] ?? ''}';
         _smsPasswordCtrl.text = '${admin['sms_provider_password'] ?? ''}';
         _smsIsFlash = (admin['sms_is_flash'] ?? false) == true;
+        
+        // بررسی اینکه provider در لیست از پیش تعریف شده است یا نه
+        if (providerName.isNotEmpty && _predefinedSmsProviders.contains(providerName)) {
+          _selectedSmsProvider = providerName;
+          _smsProviderIsCustom = false;
+          _smsProviderCtrl.text = '';
+        } else if (providerName.isNotEmpty) {
+          _selectedSmsProvider = _customProviderValue;
+          _smsProviderIsCustom = true;
+          _smsProviderCtrl.text = providerName;
+        } else {
+          _selectedSmsProvider = null;
+          _smsProviderIsCustom = false;
+          _smsProviderCtrl.text = '';
+        }
       } catch (_) {}
       if (!mounted) return;
       setState(() {
@@ -202,6 +226,14 @@ class _NotificationsSettingsPageState extends State<NotificationsSettingsPage> {
   }
 
   Map<String, dynamic> _collectAdvancedPayload() {
+    // تعیین نام provider: اگر custom است از TextField، وگرنه از dropdown
+    String providerName = '';
+    if (_selectedSmsProvider == _customProviderValue) {
+      providerName = _smsProviderCtrl.text.trim();
+    } else if (_selectedSmsProvider != null) {
+      providerName = _selectedSmsProvider!;
+    }
+    
     return {
       'telegram_bot_token': _tgTokenCtrl.text.trim(),
       'telegram_bot_username': _tgUsernameCtrl.text.trim(),
@@ -210,7 +242,7 @@ class _NotificationsSettingsPageState extends State<NotificationsSettingsPage> {
       'telegram_proxy_enabled': _tgProxyEnabled,
       'telegram_proxy_base_url': _tgProxyBaseUrlCtrl.text.trim(),
       'telegram_proxy_api_key': _tgProxyApiKeyCtrl.text.trim(),
-      'sms_provider_name': _smsProviderCtrl.text.trim(),
+      'sms_provider_name': providerName,
       'sms_api_key': _smsApiKeyCtrl.text.trim(),
       'sms_sender': _smsSenderCtrl.text.trim(),
       'sms_provider_username': _smsUsernameCtrl.text.trim(),
@@ -555,7 +587,43 @@ class _NotificationsSettingsPageState extends State<NotificationsSettingsPage> {
           else ...[
             Column(
               children: [
-                _buildCredentialField(_smsProviderCtrl, t.notificationsFieldSmsProvider),
+                // Dropdown برای انتخاب Provider
+                DropdownButtonFormField<String>(
+                  value: _selectedSmsProvider,
+                  decoration: InputDecoration(
+                    labelText: t.notificationsFieldSmsProvider,
+                    helperText: 'انتخاب provider از لیست یا وارد کردن نام دلخواه',
+                    border: const OutlineInputBorder(),
+                  ),
+                  items: [
+                    ..._predefinedSmsProviders.map((provider) => DropdownMenuItem(
+                      value: provider,
+                      child: Text(provider),
+                    )),
+                    const DropdownMenuItem(
+                      value: _customProviderValue,
+                      child: Text('سایر (Custom)'),
+                    ),
+                  ],
+                  onChanged: (value) {
+                    setState(() {
+                      _selectedSmsProvider = value;
+                      _smsProviderIsCustom = (value == _customProviderValue);
+                      if (!_smsProviderIsCustom) {
+                        _smsProviderCtrl.text = '';
+                      }
+                    });
+                  },
+                ),
+                // TextField برای Custom Provider
+                if (_smsProviderIsCustom) ...[
+                  const SizedBox(height: 12),
+                  _buildCredentialField(
+                    _smsProviderCtrl, 
+                    'نام Provider (Custom)',
+                    helper: 'نام provider دلخواه را وارد کنید',
+                  ),
+                ],
                 const SizedBox(height: 12),
                 _buildCredentialField(_smsApiKeyCtrl, t.notificationsFieldSmsApiKey, helper: t.notificationsFieldSmsApiKeyHint),
                 const SizedBox(height: 12),

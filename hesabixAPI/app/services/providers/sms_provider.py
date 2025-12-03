@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from typing import Optional
+from typing import Optional, Tuple
 from app.core.settings import get_settings
 from app.services.providers.behin_sms_provider import BehinSmsProvider
+from app.utils.phone_utils import normalize_phone_number
 
 
 class SmsProvider:
@@ -47,7 +48,7 @@ class SmsProvider:
 
 	def send_text(self, *, to_phone: str, text: str) -> bool:
 		"""
-		ارسال پیامک
+		ارسال پیامک (متد قدیمی برای سازگاری با کد موجود)
 		
 		Args:
 			to_phone: شماره گیرنده
@@ -56,24 +57,54 @@ class SmsProvider:
 		Returns:
 			True اگر ارسال موفق باشد
 		"""
+		success, _ = self.send_text_with_error(to_phone=to_phone, text=text)
+		return success
+	
+	def send_text_with_error(self, *, to_phone: str, text: str) -> Tuple[bool, Optional[str]]:
+		"""
+		ارسال پیامک با برگرداندن پیام خطا
+		
+		Args:
+			to_phone: شماره گیرنده
+			text: متن پیامک
+		
+		Returns:
+			(success: bool, error_message: Optional[str])
+		"""
 		if not self.is_configured():
-			return False
+			return False, "SMS Provider پیکربندی نشده است"
+		
+		# نرمال‌سازی شماره موبایل
+		try:
+			normalized_phone = normalize_phone_number(to_phone)
+		except ValueError as e:
+			return False, f"فرمت شماره موبایل نامعتبر: {str(e)}"
+		
+		# بررسی متن پیامک
+		if not text or not text.strip():
+			return False, "متن پیامک خالی است"
 		
 		# استفاده از BehinSmsProvider
 		if self._provider:
-			success, _, error_msg = self._provider.send_text(
-				to_phone=to_phone,
-				text=text,
-				is_flash=self.is_flash
-			)
-			if not success and error_msg:
+			try:
+				success, _, error_msg = self._provider.send_text(
+					to_phone=normalized_phone,
+					text=text,
+					is_flash=self.is_flash
+				)
+				if not success and error_msg:
+					import structlog
+					logger = structlog.get_logger()
+					logger.error("sms_send_failed", error=error_msg, phone=normalized_phone)
+				return success, error_msg
+			except Exception as e:
 				import structlog
 				logger = structlog.get_logger()
-				logger.error("sms_send_failed", error=error_msg, phone=to_phone)
-			return success
+				logger.error("sms_send_exception", error=str(e), phone=normalized_phone, exc_info=True)
+				return False, f"خطای غیرمنتظره در ارسال SMS: {str(e)}"
 		
 		# Fallback: اگر provider دیگری بود (برای آینده)
-		return False
+		return False, "Provider پشتیبانی نمی‌شود"
 	
 	def get_credit(self) -> tuple[bool, Optional[float], Optional[str]]:
 		"""

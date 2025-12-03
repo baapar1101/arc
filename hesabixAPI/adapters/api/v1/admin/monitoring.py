@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from typing import Dict, Any, Optional, List
 from datetime import datetime
 from fastapi import APIRouter, Depends, Request, Query, WebSocket, WebSocketDisconnect

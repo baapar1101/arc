@@ -43,7 +43,14 @@ class Settings(BaseSettings):
 	default_phone_region: str = "IR"
 
 	# CORS
-	cors_allowed_origins: list[str] = ["*"]
+	# نکته: وقتی allow_credentials=True است، نمی‌توان از "*" استفاده کرد
+	# باید دامنه‌های خاص را مشخص کنید
+	cors_allowed_origins: list[str] = [
+		"https://arc.hesabix.ir",
+		"https://hsxn.hesabix.ir",
+		"http://localhost:3000",
+		"http://localhost:8080",
+	]
 
 	# Telegram Bot
 	telegram_bot_token: str | None = None
@@ -57,6 +64,8 @@ class Settings(BaseSettings):
 	sms_provider_name: str | None = None  # e.g., "twilio" or custom
 	sms_api_key: str | None = None
 	sms_sender: str | None = None
+	sms_provider_username: str | None = None  # برای behinsms
+	sms_provider_password: str | None = None  # برای behinsms
 
 	# Share link / public card settings
 	share_link_code_length: int = 9

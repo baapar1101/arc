@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/auth_store.dart';
 import '../../services/marketplace_service.dart';
+import '../../utils/number_formatters.dart' show formatWithThousands;
 
 class MarketplaceInvoicesPage extends StatefulWidget {
   final int businessId;
@@ -60,10 +61,17 @@ class _MarketplaceInvoicesPageState extends State<MarketplaceInvoicesPage> {
               separatorBuilder: (_, __) => const Divider(height: 1),
               itemBuilder: (context, index) {
                 final it = _items[index];
+                final total = (it['total'] ?? 0).toDouble();
+                final currency = it['currency'] as Map<String, dynamic>?;
+                final currencySymbol = currency?['symbol']?.toString() ?? currency?['code']?.toString() ?? '';
+                final totalFormatted = formatWithThousands(total, decimalPlaces: 0);
+                final totalText = currencySymbol.isNotEmpty 
+                    ? '$totalFormatted $currencySymbol'
+                    : totalFormatted;
                 return ListTile(
                   leading: const Icon(Icons.receipt_long),
                   title: Text(it['code'] ?? '-'),
-                  subtitle: Text('مبلغ: ${it['total']} | وضعیت: ${it['status']}'),
+                  subtitle: Text('مبلغ: $totalText | وضعیت: ${it['status']}'),
                   trailing: Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     mainAxisAlignment: MainAxisAlignment.center,

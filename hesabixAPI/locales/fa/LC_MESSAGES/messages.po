@@ -470,3 +470,61 @@ msgstr "لیست فاکتورها"
 msgid "INVOICE"
 msgstr "فاکتور"
 
+
+# Warranty
+msgid "PLUGIN_NOT_ACTIVE"
+msgstr "پلاگین گارانتی برای این کسب و کار فعال نیست"
+
+msgid "WARRANTY_CODE_NOT_FOUND"
+msgstr "کد گارانتی یافت نشد"
+
+msgid "INVALID_WARRANTY_SERIAL"
+msgstr "سریال گارانتی معتبر نیست"
+
+msgid "WARRANTY_ALREADY_ACTIVATED"
+msgstr "این گارانتی قبلاً فعال شده است"
+
+msgid "WARRANTY_EXPIRED"
+msgstr "این گارانتی منقضی شده است"
+
+msgid "WARRANTY_REVOKED"
+msgstr "این گارانتی لغو شده است"
+
+msgid "TOO_MANY_ATTEMPTS"
+msgstr "تعداد تلاش‌های شما بیش از حد مجاز است"
+
+msgid "PRODUCT_SERIAL_REQUIRED"
+msgstr "وارد کردن سریال کالا الزامی است"
+
+msgid "PRODUCT_SERIAL_NOT_FOUND"
+msgstr "سریال کالا یافت نشد"
+
+msgid "LINK_NOT_FOUND"
+msgstr "لینک رهگیری یافت نشد"
+
+msgid "LINK_EXPIRED"
+msgstr "لینک رهگیری منقضی شده است"
+
+msgid "LINK_INACTIVE"
+msgstr "لینک رهگیری غیرفعال است"
+
+msgid "WARRANTY_NOT_FOUND"
+msgstr "گارانتی یافت نشد"
+
+msgid "DUPLICATE_CODE"
+msgstr "کد تکراری است"
+
+msgid "DUPLICATE_SERIAL"
+msgstr "سریال تکراری است"
+
+msgid "CODE_GENERATION_FAILED"
+msgstr "تولید کد یکتا ناموفق بود"
+
+msgid "SERIAL_GENERATION_FAILED"
+msgstr "تولید سریال یکتا ناموفق بود"
+
+msgid "INVALID_CUSTOM_SERIALS"
+msgstr "تعداد سریال‌های دلخواه نامعتبر است"
+
+msgid "INVALID_CUSTOM_CODES"
+msgstr "تعداد کدهای دلخواه نامعتبر است"

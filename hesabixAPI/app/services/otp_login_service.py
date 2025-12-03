@@ -354,14 +354,13 @@ class OtpLoginService:
 				}
 				
 				# ارسال از طریق NotificationService
-				self.notification_service.send(
+				success = self.notification_service.send(
 					user_id=user.id,
 					event_key="auth.otp_login",
 					context=context,
 					preferred_channels=[channel],
 					locale="fa"  # یا می‌توانید از locale کاربر استفاده کنید
 				)
-				success = True
 			except Exception as e:
 				logger.warning(f"خطا در ارسال از طریق NotificationService، استفاده از fallback: {e}")
 				# Fallback به روش قدیمی

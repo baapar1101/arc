@@ -20,6 +20,7 @@ from adapters.db.repositories.notification_repo import (
 )
 from adapters.db.models.announcement import Announcement, UserAnnouncement
 from app.services.system_settings_service import get_effective_notifications_settings
+from app.utils.phone_utils import normalize_phone_number
 
 logger = logging.getLogger(__name__)
 
@@ -104,7 +105,7 @@ class NotificationService:
 			# در صورت خطا، متن خام برمی‌گردانیم
 			return template_text
 
-	def send(self, *, user_id: int, event_key: str, context: Dict[str, Any], preferred_channels: Optional[Iterable[str]] = None, locale: Optional[str] = None) -> None:
+	def send(self, *, user_id: int, event_key: str, context: Dict[str, Any], preferred_channels: Optional[Iterable[str]] = None, locale: Optional[str] = None) -> bool:
 		"""
 		Minimal synchronous sender with basic fallback:
 		- Try Telegram if linked and requested
@@ -118,10 +119,13 @@ class NotificationService:
 			context: پارامترهای context برای جایگزینی در قالب (مثلاً {"code": "123456"})
 			preferred_channels: لیست کانال‌های ترجیحی برای ارسال
 			locale: زبان مورد نظر (اختیاری)
+		
+		Returns:
+			True اگر ناتیفیکیشن با موفقیت ارسال شد، False در غیر این صورت
 		"""
 		user = self.user_repo.db.get(self.user_repo.model_class, user_id)
 		if user is None:
-			return
+			return False
 
 		channels = list(preferred_channels) if preferred_channels else ["telegram", "sms", "email", "inapp"]
 
@@ -139,6 +143,19 @@ class NotificationService:
 				# اگر قالب پیدا نشد، از context استفاده می‌کنیم
 				subj_raw = context.get("subject", "پیام سیستم")
 				body_raw = context.get("message", "")
+				
+				# Fallback برای auth.otp_login: اگر قالب پیدا نشد و code در context وجود دارد
+				if event_key == "auth.otp_login":
+					code = context.get("code", "")
+					expiry_minutes = context.get("expiry_minutes", 5)
+					if code:
+						# اگر subject خالی است یا پیش‌فرض است، subject مناسب برای OTP تنظیم می‌کنیم
+						if not subj_raw or subj_raw == "پیام سیستم":
+							subj_raw = "کد ورود به حساب کاربری"
+						# اگر body خالی است، body مناسب برای OTP تنظیم می‌کنیم
+						if not body_raw:
+							body_raw = f"کد ورود یک بار مصرف شما: {code}\nاین کد تا {expiry_minutes} دقیقه اعتبار دارد."
+				
 				# حتی اگر قالب نباشد، می‌توانیم پارامترها را جایگزین کنیم
 				subj = self._render_template(subj_raw, context)
 				body = self._render_template(body_raw, context)
@@ -187,6 +204,15 @@ class NotificationService:
 					self.db.commit()
 					continue
 			elif channel == "email":
+				# بررسی اینکه body_email خالی نباشد
+				if not body_email or not body_email.strip():
+					outbox.status = "failed"
+					outbox.error_message = "empty_email_body"
+					self._log_attempt(outbox_id=outbox.id, channel=channel, success=False, error_message="متن ایمیل خالی است")
+					self.db.add(outbox)
+					self.db.commit()
+					continue
+				
 				ok = self.email.send(user_id=user_id, subject=subject_email, body_text=body_email)
 				self._log_attempt(outbox_id=outbox.id, channel=channel, success=ok, error_message=None if ok else "email_send_failed")
 				if ok:
@@ -202,25 +228,60 @@ class NotificationService:
 					self.db.add(outbox)
 					self.db.commit()
 			elif channel == "sms":
+				# بررسی پیکربندی SMS Provider
+				if not self.sms.is_configured():
+					outbox.status = "failed"
+					outbox.error_message = "sms_provider_not_configured"
+					self._log_attempt(outbox_id=outbox.id, channel=channel, success=False, error_message="SMS Provider پیکربندی نشده است")
+					self.db.add(outbox)
+					self.db.commit()
+					continue
+				
 				mobile = getattr(user, "mobile", None)
-				if mobile:
-					ok = self.sms.send_text(to_phone=mobile, text=body_sms or context.get("message", ""))
-					self._log_attempt(outbox_id=outbox.id, channel=channel, success=ok, error_message=None if ok else "sms_send_failed")
-					if ok:
-						outbox.status = "sent"
-						self.db.add(outbox)
-						self.db.commit()
-						sent = True
-						break
-					else:
-						outbox.status = "failed"
-						outbox.retry_count = outbox.retry_count + 1
-						outbox.next_attempt_at = datetime.utcnow() + timedelta(minutes=10)
-						self.db.add(outbox)
-						self.db.commit()
-				else:
+				if not mobile:
 					outbox.status = "failed"
 					outbox.error_message = "no_mobile_number"
+					self._log_attempt(outbox_id=outbox.id, channel=channel, success=False, error_message="کاربر شماره موبایل ثبت نکرده است")
+					self.db.add(outbox)
+					self.db.commit()
+					continue
+				
+				# نرمال‌سازی شماره موبایل
+				try:
+					normalized_mobile = normalize_phone_number(mobile)
+				except ValueError as e:
+					# شماره موبایل نامعتبر
+					error_msg = f"فرمت شماره موبایل نامعتبر: {str(e)}"
+					outbox.status = "failed"
+					outbox.error_message = "invalid_mobile_number"
+					self._log_attempt(outbox_id=outbox.id, channel=channel, success=False, error_message=error_msg)
+					self.db.add(outbox)
+					self.db.commit()
+					continue
+				
+				# ارسال SMS با مدیریت خطا
+				error_msg = None
+				ok = False
+				try:
+					ok, error_msg = self.sms.send_text_with_error(to_phone=normalized_mobile, text=body_sms or context.get("message", ""))
+					if not ok and error_msg is None:
+						error_msg = "sms_send_failed"
+				except Exception as e:
+					error_msg = f"خطای غیرمنتظره در ارسال SMS: {str(e)}"
+					logger.error(f"خطا در ارسال SMS به {normalized_mobile}: {e}", exc_info=True)
+				
+				self._log_attempt(outbox_id=outbox.id, channel=channel, success=ok, error_message=error_msg)
+				if ok:
+					outbox.status = "sent"
+					self.db.add(outbox)
+					self.db.commit()
+					sent = True
+					break
+				else:
+					outbox.status = "failed"
+					outbox.error_message = error_msg or "sms_send_failed"
+					outbox.retry_count = outbox.retry_count + 1
+					outbox.next_attempt_at = datetime.utcnow() + timedelta(minutes=10)
 					self.db.add(outbox)
 					self.db.commit()
 			elif channel == "inapp":
@@ -264,6 +325,8 @@ class NotificationService:
 				outbox.error_message = "unknown_channel"
 				self.db.add(outbox)
 				self.db.commit()
+		
+		return sent
 
 	def notify_support_operators(
 		self,

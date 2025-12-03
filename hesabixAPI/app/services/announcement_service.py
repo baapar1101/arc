@@ -131,10 +131,14 @@ def user_list(
 		q = q.filter(Announcement.level == level)
 	if only_unread:
 		# فقط اعلان‌هایی که نه خوانده شده‌اند و نه پنهان شده‌اند
+		# یا اصلاً در UserAnnouncement نیستند (یعنی خوانده نشده‌اند) یا اگر هستند، read_at و dismissed_at باید None باشند
 		q = q.filter(
-			and_(
-				or_(UserAnnouncement.read_at == None, UserAnnouncement.read_at == None),
-				or_(UserAnnouncement.dismissed_at == None, UserAnnouncement.dismissed_at == None),
+			or_(
+				UserAnnouncement.id == None,  # اعلان‌هایی که اصلاً در UserAnnouncement نیستند
+				and_(
+					UserAnnouncement.read_at == None,
+					UserAnnouncement.dismissed_at == None,
+				)
 			)
 		)
 	q = q.order_by(Announcement.is_pinned.desc(), Announcement.updated_at.desc())

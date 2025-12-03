@@ -48,6 +48,8 @@ class ProductAttributeRepository(BaseRepository[ProductAttribute]):
                 "business_id": r.business_id,
                 "title": r.title,
                 "description": r.description,
+                "data_type": r.data_type if hasattr(r, 'data_type') else 'text',
+                "options": r.options if hasattr(r, 'options') else None,
                 "created_at": r.created_at,
                 "updated_at": r.updated_at,
             }
@@ -66,14 +68,22 @@ class ProductAttributeRepository(BaseRepository[ProductAttribute]):
             },
         }
 
-    def create(self, *, business_id: int, title: str, description: str | None) -> ProductAttribute:
-        obj = ProductAttribute(business_id=business_id, title=title, description=description)
+    def create(self, *, business_id: int, title: str, description: str | None, 
+               data_type: str = 'text', options: dict | None = None) -> ProductAttribute:
+        obj = ProductAttribute(
+            business_id=business_id, 
+            title=title, 
+            description=description,
+            data_type=data_type,
+            options=options
+        )
         self.db.add(obj)
         self.db.commit()
         self.db.refresh(obj)
         return obj
 
-    def update(self, *, attribute_id: int, title: str | None, description: str | None) -> Optional[ProductAttribute]:
+    def update(self, *, attribute_id: int, title: str | None, description: str | None,
+               data_type: str | None = None, options: dict | None = None) -> Optional[ProductAttribute]:
         obj = self.db.get(ProductAttribute, attribute_id)
         if not obj:
             return None
@@ -81,6 +91,10 @@ class ProductAttributeRepository(BaseRepository[ProductAttribute]):
             obj.title = title
         if description is not None:
             obj.description = description
+        if data_type is not None:
+            obj.data_type = data_type
+        if options is not None:
+            obj.options = options
         self.db.commit()
         self.db.refresh(obj)
         return obj

@@ -30,13 +30,27 @@ class _AnnouncementsPageState extends State<AnnouncementsPage> {
     _service = AnnouncementsService(ApiClient());
     _scrollController = ScrollController();
     _scrollController.addListener(_onScroll);
+    // Listen to calendar changes to update date formats
+    final calendarController = ApiClient.getCalendarController();
+    calendarController?.addListener(_onCalendarChanged);
     _loadInitial();
+  }
+
+  void _onCalendarChanged() {
+    if (mounted) {
+      setState(() {
+        // Trigger rebuild to update date formats
+      });
+    }
   }
 
   @override
   void dispose() {
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
+    // Remove calendar listener
+    final calendarController = ApiClient.getCalendarController();
+    calendarController?.removeListener(_onCalendarChanged);
     super.dispose();
   }
 

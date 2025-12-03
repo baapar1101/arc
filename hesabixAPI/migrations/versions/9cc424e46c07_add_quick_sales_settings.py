@@ -26,8 +26,8 @@ def upgrade() -> None:
     # بررسی وجود جدول quick_sales_settings
     tables = inspector.get_table_names()
     if 'quick_sales_settings' not in tables:
-    # جدول quick_sales_settings
-    op.create_table(
+        # جدول quick_sales_settings
+        op.create_table(
         'quick_sales_settings',
         sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
         sa.Column('business_id', sa.Integer(), nullable=False),
@@ -52,13 +52,13 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(['default_currency_id'], ['currencies.id'], ondelete='SET NULL'),
         sa.PrimaryKeyConstraint('id'),
         sa.UniqueConstraint('business_id', name='uq_quick_sales_settings_business')
-    )
+        )
     
     # بررسی وجود ایندکس
     if 'quick_sales_settings' in tables:
         indexes = [idx['name'] for idx in inspector.get_indexes('quick_sales_settings')]
         if 'ix_quick_sales_settings_business_id' not in indexes:
-    op.create_index(op.f('ix_quick_sales_settings_business_id'), 'quick_sales_settings', ['business_id'], unique=False)
+            op.create_index(op.f('ix_quick_sales_settings_business_id'), 'quick_sales_settings', ['business_id'], unique=False)
 
 
 def downgrade() -> None:
