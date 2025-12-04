@@ -33,42 +33,35 @@
 </div>
 
 {% if source == 'app' %}
-    <div class="redirect-message">
-        <div class="spinner"></div>
-        <p>در حال بازگشت به اپلیکیشن...</p>
+    <a href="hesabix://payment/callback?tx_id={{ transaction_id }}&status=success&amount={{ amount }}&ref={{ external_ref }}" class="btn btn-primary" style="font-size: 18px; padding: 18px 40px;">
+        🎉 بازگشت به اپلیکیشن
+    </a>
+    <div style="margin-top: 16px;">
+        <a href="{{ dashboard_url }}" class="btn btn-secondary">نمایش در مرورگر</a>
     </div>
-    <a href="#" id="openApp" class="btn btn-primary" onclick="openApp(); return false;">باز کردن اپلیکیشن</a>
 {% else %}
     <a href="{{ dashboard_url }}" class="btn btn-primary">بازگشت به داشبورد</a>
     {% if source == 'mobile_web' %}
-    <a href="#" id="openApp" class="btn btn-secondary" onclick="openApp(); return false;">باز کردن در اپ</a>
+    <a href="hesabix://payment/callback?tx_id={{ transaction_id }}&status=success&amount={{ amount }}&ref={{ external_ref }}" class="btn btn-secondary">باز کردن در اپ</a>
     {% endif %}
 {% endif %}
 {% endblock %}
 
 {% block scripts %}
 <script>
-    const deepLink = 'hesabix://payment/callback?tx_id={{ transaction_id }}&status=success&amount={{ amount }}&ref={{ external_ref }}';
-    
-    function openApp() {
-        window.location.href = deepLink;
-        
-        // اگر بعد از 2 ثانیه اپ باز نشد، به store هدایت کن
-        setTimeout(function() {
-            const userAgent = navigator.userAgent.toLowerCase();
-            if (/android/.test(userAgent)) {
-                window.location.href = 'https://play.google.com/store/apps/details?id=ir.hesabix.app';
-            } else if (/iphone|ipad|ipod/.test(userAgent)) {
-                window.location.href = 'https://apps.apple.com/app/hesabix/id123456789';
-            }
-        }, 2000);
-    }
-    
+    // نمایش راهنمایی برای کاربر
     {% if source == 'app' %}
-    // تلاش خودکار برای باز کردن اپ بعد از 2 ثانیه
+    // نمایش پیام راهنما بعد از 3 ثانیه اگر هنوز اینجاست
     setTimeout(function() {
-        openApp();
-    }, 2000);
+        if (!document.hidden) {
+            // کاربر هنوز در صفحه است
+            const container = document.querySelector('.container');
+            const hint = document.createElement('div');
+            hint.style.cssText = 'margin-top: 20px; padding: 12px; background: #fef3c7; border-radius: 10px; color: #92400e; font-size: 14px;';
+            hint.innerHTML = '💡 لطفاً روی دکمه "بازگشت به اپلیکیشن" کلیک کنید';
+            container.appendChild(hint);
+        }
+    }, 3000);
     {% endif %}
 </script>
 {% endblock %}

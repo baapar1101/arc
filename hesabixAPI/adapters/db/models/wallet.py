@@ -79,11 +79,17 @@ class WalletPayout(Base):
 
 	external_ref: Mapped[str | None] = mapped_column(String(100), nullable=True)
 	extra_info: Mapped[str | None] = mapped_column(Text, nullable=True)
+	document_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("documents.id", ondelete="SET NULL"), nullable=True, index=True)
+	settlement_date: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+	bank_tracking_code: Mapped[str | None] = mapped_column(String(100), nullable=True)
+	settlement_note: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 	created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 	updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
 	business = relationship("Business", backref="wallet_payouts")
+	bank_account = relationship("BankAccount", backref="wallet_payouts")
+	document = relationship("Document", backref="wallet_payouts")
 
 
 class WalletSetting(Base):

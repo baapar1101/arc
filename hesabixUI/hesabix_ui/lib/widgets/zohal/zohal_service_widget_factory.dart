@@ -5,11 +5,13 @@ import 'inquiry_widgets/card_inquiry_widget.dart';
 import 'inquiry_widgets/shahkar_inquiry_widget.dart';
 import 'inquiry_widgets/vehicle_inquiry_widget.dart';
 import 'inquiry_widgets/company_inquiry_widget.dart';
+import 'inquiry_widgets/identity_inquiry_widget.dart';
 import 'inquiry_widgets/default_inquiry_widget.dart';
 import 'result_widgets/card_inquiry_result_widget.dart';
 import 'result_widgets/shahkar_result_widget.dart';
 import 'result_widgets/vehicle_inquiry_result_widget.dart';
 import 'result_widgets/company_inquiry_result_widget.dart';
+import 'result_widgets/identity_inquiry_result_widget.dart';
 import 'result_widgets/default_result_widget.dart';
 
 /// فکتوری برای ساخت ویجت‌های اختصاصی ورودی و نمایش نتیجه سرویس‌های زحل
@@ -58,6 +60,18 @@ class ZohalServiceWidgetFactory {
       
       case 'company_inquiry':
         return CompanyInquiryWidget(
+          service: service,
+          controllers: controllers,
+          formKey: formKey,
+          onSubmit: onSubmit,
+          isSubmitting: isSubmitting,
+        );
+      
+      case 'identity_inquiry':
+      case 'national_code_inquiry':
+      case 'identity':
+      case 'national_code':
+        return IdentityInquiryWidget(
           service: service,
           controllers: controllers,
           formKey: formKey,
@@ -115,6 +129,17 @@ class ZohalServiceWidgetFactory {
       
       case 'company_inquiry':
         return CompanyInquiryResultWidget(
+          result: result,
+          amountCharged: amountCharged,
+          remainingBalance: remainingBalance,
+          walletCurrency: walletCurrency,
+        );
+      
+      case 'identity_inquiry':
+      case 'national_code_inquiry':
+      case 'identity':
+      case 'national_code':
+        return IdentityInquiryResultWidget(
           result: result,
           amountCharged: amountCharged,
           remainingBalance: remainingBalance,

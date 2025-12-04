@@ -9,17 +9,30 @@ class WebNotificationsWsClient implements NotificationsWsClient {
   web.WebSocket? _ws;
   @override
   void connect({required String apiKey, void Function(Map<String, dynamic>)? onMessage}) {
+    // قطع اتصال قبلی در صورت وجود
+    disconnect();
+    
     try {
       final apiBase = AppConfig.apiBaseUrl; // e.g. http://localhost:8000
       final wsBase = apiBase.startsWith('https://')
           ? apiBase.replaceFirst('https://', 'wss://')
           : apiBase.replaceFirst('http://', 'ws://');
       final url = '$wsBase/ws/notifications?api_key=$apiKey';
+      
       _ws = web.WebSocket(url);
       
+      // Handle open event
+      _ws!.onOpen.listen((web.Event _) {
+        // اتصال با موفقیت برقرار شد (اختیاری: می‌توانید log کنید)
+      });
+      
       // Handle connection errors silently
-      _ws!.onError.listen((web.Event _) {
+      _ws!.onError.listen((web.Event event) {
         // Connection failed, silently ignore
+        // در محیط production، این خطا را log نمی‌کنیم تا console شلوغ نشود
+        _ws = null;
+      }, onError: (error) {
+        // مدیریت خطاهای listener
         _ws = null;
       });
       
@@ -34,10 +47,14 @@ class WebNotificationsWsClient implements NotificationsWsClient {
         } catch (_) {
           // Ignore message parsing errors
         }
+      }, onError: (error) {
+        // مدیریت خطاهای دریافت پیام
       });
       
       // Handle close events
-      _ws!.onClose.listen((web.CloseEvent _) {
+      _ws!.onClose.listen((web.CloseEvent event) {
+        _ws = null;
+      }, onError: (error) {
         _ws = null;
       });
     } catch (_) {

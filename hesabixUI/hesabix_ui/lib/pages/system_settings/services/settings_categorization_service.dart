@@ -130,6 +130,16 @@ class SettingsCategorizationService {
             categoryId: 'financial_payment',
             order: 2,
           ),
+          SettingsItem(
+            id: 'wallet_payouts_admin',
+            title: 'settingsWalletPayoutsAdmin',
+            description: 'settingsWalletPayoutsAdminDescription',
+            icon: Icons.account_balance_outlined,
+            color: const Color(0xFF00695C),
+            route: '/user/profile/system-settings/wallet-payouts',
+            categoryId: 'financial_payment',
+            order: 3,
+          ),
         ],
       ),
 

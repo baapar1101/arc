@@ -275,3 +275,4 @@ warranty_code.activated_by_person_id = person.id if person else None
 
 این فرآیند از طریق UI (صفحه عمومی) یا مستقیماً از طریق API قابل انجام است.
 
+

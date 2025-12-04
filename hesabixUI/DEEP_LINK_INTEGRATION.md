@@ -184,3 +184,4 @@ support_url="https://hsxn.hesabix.ir/support",      # ⬅️ تغییر دهید
 2. تست Deep Link را با ADB/Simulator انجام دهید
 3. بررسی کنید که `source: 'app'` به API ارسال می‌شود
 
+

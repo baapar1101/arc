@@ -4353,6 +4353,47 @@ class AppLocalizationsEn extends AppLocalizations {
   String get walletPayoutRequested => 'Payout request submitted';
 
   @override
+  String get settingsWalletPayoutsAdmin => 'Wallet payout management';
+
+  @override
+  String get settingsWalletPayoutsAdminDescription =>
+      'Review wallet payout requests and record bank settlement details';
+
+  @override
+  String get walletPayoutsAdminTitle => 'Wallet payout requests';
+
+  @override
+  String get walletPayoutsAdminSubtitle =>
+      'Monitor pending payout requests, review bank account details, and register settlement information after transfers are completed.';
+
+  @override
+  String get walletPayoutsAdminEmpty => 'No payout requests to show.';
+
+  @override
+  String get walletPayoutsAdminSettleDialogTitle =>
+      'Record settlement information';
+
+  @override
+  String get walletPayoutsAdminSettleAction => 'Record & settle';
+
+  @override
+  String get walletPayoutsAdminSuccess =>
+      'Settlement information saved successfully.';
+
+  @override
+  String get walletPayoutsAdminFormRequired => 'This field is required';
+
+  @override
+  String get walletPayoutsAdminSettlementDate => 'Settlement date';
+
+  @override
+  String get walletPayoutsAdminFeeHint =>
+      'If the bank charged a fee, enter the amount here';
+
+  @override
+  String get bankTrackingCode => 'Bank tracking code';
+
+  @override
   String get walletTopUpTitle => 'Top up';
 
   @override

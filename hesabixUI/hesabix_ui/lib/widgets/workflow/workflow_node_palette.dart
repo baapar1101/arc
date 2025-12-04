@@ -101,19 +101,19 @@ class _WorkflowNodePaletteContentState extends State<WorkflowNodePaletteContent>
       WorkflowNodeMetadata(
         key: 'loop.for_each',
         name: 'حلقه For Each',
-        description: 'تکرار روی آرایه یا لیست',
+        description: 'تکرار روی آرایه یا لیست (⚠️ در حال توسعه)',
         type: WorkflowNodeType.loop,
       ),
       WorkflowNodeMetadata(
         key: 'loop.while',
         name: 'حلقه While',
-        description: 'تکرار تا زمانی که شرط برقرار است',
+        description: 'تکرار تا زمانی که شرط برقرار است (⚠️ در حال توسعه)',
         type: WorkflowNodeType.loop,
       ),
       WorkflowNodeMetadata(
         key: 'loop.for',
         name: 'حلقه For',
-        description: 'تکرار با تعداد مشخص',
+        description: 'تکرار با تعداد مشخص (⚠️ در حال توسعه)',
         type: WorkflowNodeType.loop,
       ),
     ];
@@ -354,6 +354,8 @@ class _WorkflowNodePaletteContentState extends State<WorkflowNodePaletteContent>
     Color color,
   ) {
     final theme = Theme.of(context);
+    final isLoop = type == WorkflowNodeType.loop;
+    final isInDevelopment = item.description?.contains('⚠️') ?? false;
 
     return ListTile(
       leading: Container(
@@ -369,29 +371,134 @@ class _WorkflowNodePaletteContentState extends State<WorkflowNodePaletteContent>
           size: 20,
         ),
       ),
-      title: Text(
-        item.name,
-        style: theme.textTheme.bodyMedium?.copyWith(
-          fontWeight: FontWeight.w500,
-        ),
+      title: Row(
+        children: [
+          Expanded(
+            child: Text(
+              item.name,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          if (isInDevelopment)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.orange.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(color: Colors.orange, width: 1),
+              ),
+              child: Text(
+                'در حال توسعه',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: Colors.orange.shade700,
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+        ],
       ),
-      subtitle: item.description != null && item.description!.isNotEmpty
-          ? Text(
-              item.description!,
-              style: theme.textTheme.bodySmall,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            )
-          : null,
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (item.description != null && item.description!.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                item.description!,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: isInDevelopment 
+                      ? Colors.orange.shade700 
+                      : theme.colorScheme.onSurfaceVariant,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          // نمایش اطلاعات اضافی برای triggerها
+          if (type == WorkflowNodeType.trigger)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline, size: 12, color: theme.colorScheme.primary),
+                  const SizedBox(width: 4),
+                  Text(
+                    _getTriggerInfo(item.key),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.primary,
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
       trailing: Icon(
         Icons.drag_handle,
         color: theme.colorScheme.onSurfaceVariant,
         size: 20,
       ),
       onTap: () {
-        widget.onNodeSelected(type, item.key, item.name);
+        if (isInDevelopment) {
+          // نمایش هشدار برای نودهای در حال توسعه
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('⚠️ در حال توسعه'),
+              content: Text(
+                'این نود هنوز به طور کامل پیاده‌سازی نشده است. '
+                'لطفاً فقط برای تست استفاده کنید.',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('انصراف'),
+                ),
+                FilledButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    widget.onNodeSelected(type, item.key, item.name);
+                  },
+                  child: const Text('ادامه'),
+                ),
+              ],
+            ),
+          );
+        } else {
+          widget.onNodeSelected(type, item.key, item.name);
+        }
       },
     );
+  }
+
+  /// دریافت اطلاعات trigger برای نمایش
+  String _getTriggerInfo(String triggerKey) {
+    switch (triggerKey) {
+      case 'invoice.sales.created':
+      case 'invoice.purchase.created':
+      case 'invoice.created':
+        return 'بعد از ایجاد فاکتور فعال می‌شود';
+      case 'document.created':
+        return 'بعد از ایجاد سند حسابداری فعال می‌شود';
+      case 'receipt_payment.created':
+        return 'بعد از ثبت دریافت/پرداخت فعال می‌شود';
+      case 'person.created':
+        return 'بعد از ایجاد شخص جدید فعال می‌شود';
+      case 'inventory.low':
+        return 'زمانی که موجودی کم شود فعال می‌شود';
+      case 'check.due_date':
+        return 'زمانی که چک به سررسید برسد فعال می‌شود';
+      case 'scheduled':
+        return 'بر اساس زمان‌بندی (cron) فعال می‌شود';
+      case 'webhook':
+        return 'از طریق webhook خارجی فعال می‌شود';
+      default:
+        return 'رویداد سیستم';
+    }
   }
 
   IconData _getIconForType(WorkflowNodeType type) {

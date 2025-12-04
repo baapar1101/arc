@@ -230,3 +230,4 @@ class PublicWarrantyActivationPage extends StatefulWidget {
 
 **نتیجه**: مشتری فقط باید کد گارانتی را وارد کند و سیستم به صورت خودکار کسب‌وکار را تشخیص می‌دهد.
 
+

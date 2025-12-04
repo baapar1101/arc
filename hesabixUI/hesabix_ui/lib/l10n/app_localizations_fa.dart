@@ -4326,6 +4326,46 @@ class AppLocalizationsFa extends AppLocalizations {
   String get walletPayoutRequested => 'درخواست تسویه ثبت شد';
 
   @override
+  String get settingsWalletPayoutsAdmin => 'مدیریت تسویه کیف‌پول';
+
+  @override
+  String get settingsWalletPayoutsAdminDescription =>
+      'مشاهده، پیگیری و ثبت تسویه‌های کیف‌پول کسب‌وکارها';
+
+  @override
+  String get walletPayoutsAdminTitle => 'درخواست‌های تسویه کیف‌پول';
+
+  @override
+  String get walletPayoutsAdminSubtitle =>
+      'در این بخش می‌توانید درخواست‌های تسویه کیف‌پول را مشاهده و وضعیت واریز بانکی آن‌ها را ثبت کنید.';
+
+  @override
+  String get walletPayoutsAdminEmpty =>
+      'در حال حاضر درخواستی برای نمایش وجود ندارد.';
+
+  @override
+  String get walletPayoutsAdminSettleDialogTitle => 'ثبت اطلاعات واریز بانکی';
+
+  @override
+  String get walletPayoutsAdminSettleAction => 'ثبت و تسویه';
+
+  @override
+  String get walletPayoutsAdminSuccess => 'اطلاعات تسویه با موفقیت ثبت شد.';
+
+  @override
+  String get walletPayoutsAdminFormRequired => 'این فیلد الزامی است';
+
+  @override
+  String get walletPayoutsAdminSettlementDate => 'تاریخ واریز';
+
+  @override
+  String get walletPayoutsAdminFeeHint =>
+      'در صورت وجود کارمزد انتقال، آن را وارد کنید';
+
+  @override
+  String get bankTrackingCode => 'کد پیگیری بانک';
+
+  @override
   String get walletTopUpTitle => 'افزایش اعتبار';
 
   @override

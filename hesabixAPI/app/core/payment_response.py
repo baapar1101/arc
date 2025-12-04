@@ -196,3 +196,4 @@ def should_return_json(request: Request) -> bool:
     # پیش‌فرض: HTML برای تجربه بهتر کاربری
     return False
 
+

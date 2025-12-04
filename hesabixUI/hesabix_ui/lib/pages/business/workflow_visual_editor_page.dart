@@ -18,6 +18,8 @@ import '../../widgets/workflow/workflow_node_config_dialog.dart';
 import '../../widgets/workflow/workflow_node_context_menu.dart';
 import '../../widgets/workflow/workflow_node_palette.dart';
 import '../../widgets/workflow/workflow_toolbar_widget.dart';
+import '../../widgets/workflow/workflow_execution_history_panel.dart';
+import '../../widgets/workflow/workflow_templates.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:uuid/uuid.dart';
@@ -197,6 +199,13 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
             onPressed: () => Navigator.of(context).pop(),
           ),
           actions: [
+            // دکمه تاریخچه اجرا (فقط برای workflowهای ذخیره شده)
+            if (_workflow != null && _workflow!['id'] != null)
+              IconButton(
+                icon: const Icon(Icons.history),
+                onPressed: () => Scaffold.of(context).openEndDrawer(),
+                tooltip: 'تاریخچه اجرا',
+              ),
             // در موبایل فقط آیکون ذخیره نمایش داده شود
             isMobile
                 ? IconButton(
@@ -282,6 +291,8 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
                               builder: (_) => WorkflowNodeConfigDialog(
                                 node: node,
                                 editorState: _editorState,
+                                allNodes: _editorState.nodes,
+                                businessId: widget.businessId,
                               ),
                             );
                             if (result != null) {
@@ -307,6 +318,8 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
                                   builder: (_) => WorkflowNodeConfigDialog(
                                     node: node,
                                     editorState: _editorState,
+                                    allNodes: _editorState.nodes,
+                                    businessId: widget.businessId,
                                   ),
                                 );
                                 if (result != null && mounted) {
@@ -825,71 +838,49 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
 
   Future<void> _loadTemplate() async {
     try {
+      // دریافت قالب‌های آماده
+      final builtInTemplates = WorkflowTemplates.getTemplates();
+      
+      // دریافت قالب‌های ذخیره شده کاربر
       final prefs = await SharedPreferences.getInstance();
       final templatesKey = 'workflow_templates_${widget.businessId}';
       final templatesJson = prefs.getString(templatesKey) ?? '[]';
-      final templates = List<Map<String, dynamic>>.from(
+      final savedTemplates = List<Map<String, dynamic>>.from(
         jsonDecode(templatesJson).map((t) => Map<String, dynamic>.from(t))
       );
-      
-      if (templates.isEmpty) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('هیچ قالبی یافت نشد')),
-          );
-        }
-        return;
-      }
       
       // نمایش لیست قالب‌ها
       final selectedTemplate = await showDialog<Map<String, dynamic>>(
         context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('انتخاب قالب'),
-          content: SizedBox(
-            width: 400,
-            child: ListView.builder(
-              shrinkWrap: true,
-              itemCount: templates.length,
-              itemBuilder: (context, index) {
-                final template = templates[index];
-                return ListTile(
-                  leading: const Icon(Icons.insert_drive_file),
-                  title: Text(template['name'] ?? 'قالب ${index + 1}'),
-                  subtitle: Text(template['created_at'] != null
-                      ? 'ایجاد شده: ${template['created_at']}'
-                      : ''),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.delete, color: Colors.red),
-                    onPressed: () async {
-                      templates.removeAt(index);
-                      await prefs.setString(templatesKey, jsonEncode(templates));
-                      Navigator.pop(context);
-                      _loadTemplate(); // بارگذاری مجدد
-                    },
-                  ),
-                  onTap: () => Navigator.pop(context, template),
-                );
-              },
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('لغو'),
-            ),
-          ],
+        builder: (context) => _TemplateSelectorDialog(
+          builtInTemplates: builtInTemplates,
+          savedTemplates: savedTemplates,
+          onDeleteSaved: (index) async {
+            savedTemplates.removeAt(index);
+            await prefs.setString(templatesKey, jsonEncode(savedTemplates));
+            Navigator.pop(context);
+            _loadTemplate(); // بارگذاری مجدد
+          },
         ),
       );
       
       if (selectedTemplate != null) {
-        final workflowData = selectedTemplate['workflow'] as Map<String, dynamic>?;
+        Map<String, dynamic>? workflowData;
+        
+        // اگر از قالب‌های آماده است
+        if (selectedTemplate['is_builtin'] == true) {
+          workflowData = selectedTemplate['workflow_data'] as Map<String, dynamic>?;
+        } else {
+          // قالب ذخیره شده کاربر
+          workflowData = selectedTemplate['workflow_data'] as Map<String, dynamic>?;
+        }
+        
         if (workflowData != null) {
           _editorState.loadWorkflow(workflowData);
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('قالب "${selectedTemplate['name']}" بارگذاری شد'),
+                content: Text('قالب "${selectedTemplate['name'] ?? 'قالب'}" بارگذاری شد'),
               ),
             );
           }
@@ -899,11 +890,144 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
       debugPrint('خطا در بارگذاری template: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('خطا در بارگذاری قالب')),
+          SnackBar(content: Text('خطا در بارگذاری قالب: $e')),
         );
       }
     }
   }
 
+}
+
+/// Dialog برای انتخاب Template
+class _TemplateSelectorDialog extends StatelessWidget {
+  final List<WorkflowTemplate> builtInTemplates;
+  final List<Map<String, dynamic>> savedTemplates;
+  final Function(int) onDeleteSaved;
+
+  const _TemplateSelectorDialog({
+    required this.builtInTemplates,
+    required this.savedTemplates,
+    required this.onDeleteSaved,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    
+    return AlertDialog(
+      title: const Text('انتخاب قالب'),
+      content: SizedBox(
+        width: 500,
+        child: DefaultTabController(
+          length: 2,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TabBar(
+                tabs: const [
+                  Tab(text: 'قالب‌های آماده'),
+                  Tab(text: 'قالب‌های ذخیره شده'),
+                ],
+              ),
+              SizedBox(
+                height: 400,
+                child: TabBarView(
+                  children: [
+                    // قالب‌های آماده
+                    ListView.builder(
+                      itemCount: builtInTemplates.length,
+                      itemBuilder: (context, index) {
+                        final template = builtInTemplates[index];
+                        return ListTile(
+                          leading: Icon(template.icon, color: theme.colorScheme.primary),
+                          title: Text(template.name),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(template.description),
+                              const SizedBox(height: 4),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: theme.colorScheme.primaryContainer,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  template.category,
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: theme.colorScheme.onPrimaryContainer,
+                                    fontSize: 10,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          trailing: Icon(Icons.arrow_forward, color: theme.colorScheme.primary),
+                          onTap: () => Navigator.pop(context, {
+                            'is_builtin': true,
+                            'name': template.name,
+                            'workflow_data': template.workflowData,
+                          }),
+                        );
+                      },
+                    ),
+                    // قالب‌های ذخیره شده
+                    savedTemplates.isEmpty
+                        ? Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.folder_open,
+                                  size: 48,
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  'هیچ قالب ذخیره شده‌ای وجود ندارد',
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    color: theme.colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        : ListView.builder(
+                            itemCount: savedTemplates.length,
+                            itemBuilder: (context, index) {
+                              final template = savedTemplates[index];
+                              return ListTile(
+                                leading: const Icon(Icons.insert_drive_file),
+                                title: Text(template['name'] ?? 'قالب ${index + 1}'),
+                                subtitle: Text(template['created_at'] != null
+                                    ? 'ایجاد شده: ${template['created_at']}'
+                                    : ''),
+                                trailing: IconButton(
+                                  icon: const Icon(Icons.delete, color: Colors.red),
+                                  onPressed: () => onDeleteSaved(index),
+                                ),
+                                onTap: () => Navigator.pop(context, {
+                                  'is_builtin': false,
+                                  'name': template['name'],
+                                  'workflow_data': template['workflow_data'],
+                                }),
+                              );
+                            },
+                          ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('لغو'),
+        ),
+      ],
+    );
+  }
 }
 

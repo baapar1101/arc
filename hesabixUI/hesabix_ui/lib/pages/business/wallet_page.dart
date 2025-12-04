@@ -105,25 +105,56 @@ class _WalletPageState extends State<WalletPage> {
   }
 
   Future<void> _load() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+    if (!mounted) return;
+    
     try {
+      if (!mounted) return;
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+      
       final res = await _service.getOverview(businessId: widget.businessId);
+      if (!mounted) return;
+      
       final now = DateTime.now();
       _toDate = now;
       _fromDate = now.subtract(const Duration(days: 30));
-      final m = await _service.getMetrics(businessId: widget.businessId, fromDate: _fromDate, toDate: _toDate);
+      
+      final m = await _service.getMetrics(
+        businessId: widget.businessId, 
+        fromDate: _fromDate, 
+        toDate: _toDate,
+      );
+      
+      if (!mounted) return;
+      
+      // اعتبارسنجی داده‌های دریافتی
+      if (res is! Map<String, dynamic>) {
+        throw Exception('پاسخ نامعتبر از سرور: overview باید Map باشد');
+      }
+      if (m is! Map<String, dynamic>) {
+        throw Exception('پاسخ نامعتبر از سرور: metrics باید Map باشد');
+      }
+      
       setState(() {
         _overview = res;
         _metrics = m;
+        _error = null;
       });
-    } catch (e) {
+    } catch (e, stackTrace) {
+      // ثبت خطا برای دیباگ
+      debugPrint('خطا در بارگذاری wallet: $e');
+      debugPrint('Stack trace: $stackTrace');
+      
+      if (!mounted) return;
       setState(() {
-        _error = '$e';
+        _error = 'خطا در بارگذاری اطلاعات: ${e.toString()}';
+        _overview = null;
+        _metrics = null;
       });
     } finally {
+      if (!mounted) return;
       setState(() {
         _loading = false;
       });

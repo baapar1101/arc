@@ -38,8 +38,12 @@
 </div>
 
 {% if source == 'app' %}
-    <a href="{{ retry_url }}" class="btn btn-primary">تلاش مجدد</a>
-    <a href="#" id="openApp" class="btn btn-secondary" onclick="openApp(); return false;">بازگشت به اپلیکیشن</a>
+    <a href="hesabix://payment/callback?tx_id={{ transaction_id }}&status=failed{% if external_ref %}&ref={{ external_ref }}{% endif %}" class="btn btn-primary" style="font-size: 18px; padding: 18px 40px;">
+        بازگشت به اپلیکیشن
+    </a>
+    <div style="margin-top: 16px;">
+        <a href="{{ retry_url }}" class="btn btn-secondary">تلاش مجدد</a>
+    </div>
 {% else %}
     <a href="{{ retry_url }}" class="btn btn-primary">تلاش مجدد</a>
     <a href="{{ dashboard_url }}" class="btn btn-secondary">بازگشت به داشبورد</a>
@@ -52,21 +56,18 @@
 
 {% block scripts %}
 <script>
-    const deepLink = 'hesabix://payment/callback?tx_id={{ transaction_id }}&status=failed{% if external_ref %}&ref={{ external_ref }}{% endif %}';
-    
-    function openApp() {
-        window.location.href = deepLink;
-        
-        // اگر بعد از 2 ثانیه اپ باز نشد، به store هدایت کن
-        setTimeout(function() {
-            const userAgent = navigator.userAgent.toLowerCase();
-            if (/android/.test(userAgent)) {
-                window.location.href = 'https://play.google.com/store/apps/details?id=ir.hesabix.app';
-            } else if (/iphone|ipad|ipod/.test(userAgent)) {
-                window.location.href = 'https://apps.apple.com/app/hesabix/id123456789';
-            }
-        }, 2000);
-    }
+    // راهنمایی برای کاربر
+    {% if source == 'app' %}
+    setTimeout(function() {
+        if (!document.hidden) {
+            const container = document.querySelector('.container');
+            const hint = document.createElement('div');
+            hint.style.cssText = 'margin-top: 20px; padding: 12px; background: #fef3c7; border-radius: 10px; color: #92400e; font-size: 14px;';
+            hint.innerHTML = '💡 روی دکمه "بازگشت به اپلیکیشن" کلیک کنید یا "تلاش مجدد" برای پرداخت دوباره';
+            container.appendChild(hint);
+        }
+    }, 3000);
+    {% endif %}
 </script>
 {% endblock %}
 

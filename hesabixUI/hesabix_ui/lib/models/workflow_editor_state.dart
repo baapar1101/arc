@@ -131,19 +131,26 @@ class WorkflowEditorState extends ChangeNotifier {
 
   /// اعمال auto-layout اگر لازم باشد
   void _applyAutoLayoutIfNeeded() {
-    // بررسی که آیا همه node ها موقعیت دارند
-    final needsLayout = _nodes.any((n) => n.position == Offset.zero) || 
-                        _nodes.every((n) => n.position.dx == 0 && n.position.dy == 0);
+    if (_nodes.isEmpty) return;
+    
+    // بررسی که آیا نودها موقعیت معتبر دارند
+    final nodesWithoutPosition = _nodes.where((n) => 
+      n.position == Offset.zero || 
+      (n.position.dx == 0 && n.position.dy == 0)
+    ).toList();
 
-    if (needsLayout && _nodes.isNotEmpty) {
-      // استفاده از auto-layout ساده
+    // اگر حداقل یک نود بدون موقعیت وجود دارد، auto-layout اعمال شود
+    if (nodesWithoutPosition.isNotEmpty) {
       final positions = _calculateSimpleLayout();
       for (final node in _nodes) {
         if (positions.containsKey(node.id)) {
           final index = _nodes.indexWhere((n) => n.id == node.id);
           if (index != -1) {
-            _nodes[index] = node.copyWith(position: positions[node.id]!);
-            _nodesMap[node.id] = _nodes[index]; // به‌روزرسانی map
+            // فقط نودهایی که موقعیت ندارند را update کن
+            if (nodesWithoutPosition.contains(node)) {
+              _nodes[index] = node.copyWith(position: positions[node.id]!);
+              _nodesMap[node.id] = _nodes[index];
+            }
           }
         }
       }

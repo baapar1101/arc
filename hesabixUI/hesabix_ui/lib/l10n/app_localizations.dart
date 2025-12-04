@@ -8420,6 +8420,78 @@ abstract class AppLocalizations {
   /// **'Payout request submitted'**
   String get walletPayoutRequested;
 
+  /// No description provided for @settingsWalletPayoutsAdmin.
+  ///
+  /// In en, this message translates to:
+  /// **'Wallet payout management'**
+  String get settingsWalletPayoutsAdmin;
+
+  /// No description provided for @settingsWalletPayoutsAdminDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Review wallet payout requests and record bank settlement details'**
+  String get settingsWalletPayoutsAdminDescription;
+
+  /// No description provided for @walletPayoutsAdminTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Wallet payout requests'**
+  String get walletPayoutsAdminTitle;
+
+  /// No description provided for @walletPayoutsAdminSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Monitor pending payout requests, review bank account details, and register settlement information after transfers are completed.'**
+  String get walletPayoutsAdminSubtitle;
+
+  /// No description provided for @walletPayoutsAdminEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No payout requests to show.'**
+  String get walletPayoutsAdminEmpty;
+
+  /// No description provided for @walletPayoutsAdminSettleDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Record settlement information'**
+  String get walletPayoutsAdminSettleDialogTitle;
+
+  /// No description provided for @walletPayoutsAdminSettleAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Record & settle'**
+  String get walletPayoutsAdminSettleAction;
+
+  /// No description provided for @walletPayoutsAdminSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Settlement information saved successfully.'**
+  String get walletPayoutsAdminSuccess;
+
+  /// No description provided for @walletPayoutsAdminFormRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'This field is required'**
+  String get walletPayoutsAdminFormRequired;
+
+  /// No description provided for @walletPayoutsAdminSettlementDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Settlement date'**
+  String get walletPayoutsAdminSettlementDate;
+
+  /// No description provided for @walletPayoutsAdminFeeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'If the bank charged a fee, enter the amount here'**
+  String get walletPayoutsAdminFeeHint;
+
+  /// No description provided for @bankTrackingCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Bank tracking code'**
+  String get bankTrackingCode;
+
   /// No description provided for @walletTopUpTitle.
   ///
   /// In en, this message translates to:

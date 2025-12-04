@@ -81,6 +81,10 @@ class WorkflowNodeModel {
       'type': type.name,
       'label': label,
       'config': configMap,
+      'position': {
+        'x': position.dx,
+        'y': position.dy,
+      },
     };
     
     if (comment != null && comment!.isNotEmpty) {
@@ -112,11 +116,22 @@ class WorkflowNodeModel {
       key = config['action_type']?.toString();
     }
 
+    // خواندن موقعیت از JSON
+    Offset position = Offset.zero;
+    final positionRaw = json['position'];
+    if (positionRaw is Map) {
+      final x = positionRaw['x'];
+      final y = positionRaw['y'];
+      if (x is num && y is num) {
+        position = Offset(x.toDouble(), y.toDouble());
+      }
+    }
+
     return WorkflowNodeModel(
       id: json['id']?.toString() ?? '',
       type: type,
       label: json['label']?.toString() ?? '',
-      position: Offset.zero, // موقعیت در backend ذخیره نمی‌شود
+      position: position,
       config: config,
       key: key,
       comment: json['comment']?.toString(),

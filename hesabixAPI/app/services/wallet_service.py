@@ -5,7 +5,7 @@ from decimal import Decimal
 import json
 import structlog
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import select, and_
 
 from adapters.db.models.wallet import WalletAccount, WalletTransaction, WalletPayout, WalletSetting
@@ -202,15 +202,6 @@ def get_wallet_metrics(
 			fees_out += fee if fee > 0 else Decimal("0")
 		# سایر انواع در صورت نیاز بعداً اضافه شوند
 
-	# همچنین از wallet_payouts برای کارمزدهای تسویه استفاده کنیم
-	pq = db.query(WalletPayout).filter(WalletPayout.business_id == int(business_id))
-	if from_date is not None:
-		pq = pq.filter(WalletPayout.created_at >= from_date)
-	if to_date is not None:
-		pq = pq.filter(WalletPayout.created_at <= to_date)
-	for p in pq.all():
-		fees_out += Decimal(str(p.fees or 0))
-
 	net_in = gross_in - fees_in
 	net_out = gross_out + fees_out  # خروجی خالصی که از کیف‌پول خارج می‌شود
 
@@ -254,11 +245,13 @@ def create_payout_request(
 
 	account = _get_wallet_account_for_update(db, business_id)
 	available = Decimal(str(account.available_balance or 0))
+	pending_balance = Decimal(str(account.pending_balance or 0))
 	if amount > available:
 		raise ApiError("INSUFFICIENT_FUNDS", "موجودی کافی نیست", http_status=400)
 
 	# قفل مبلغ: کسر از مانده قابل برداشت
 	account.available_balance = available - amount
+	account.pending_balance = pending_balance + amount
 	db.flush()
 
 	payout = WalletPayout(
@@ -315,9 +308,15 @@ def cancel_payout_request(db: Session, payout_id: int, canceller_user_id: int) -
 	if payout.status not in ("requested", "approved"):
 		raise ApiError("INVALID_STATE", "فقط درخواست‌های requested/approved قابل لغو هستند", http_status=400)
 
-	# بازگردانی مبلغ به مانده قابل برداشت
+	# بازگردانی مبلغ به مانده قابل برداشت و آزادسازی pending
 	account = _get_wallet_account_for_update(db, payout.business_id)
-	account.available_balance = Decimal(str(account.available_balance or 0)) + Decimal(str(payout.gross_amount or 0))
+	gross_amount = Decimal(str(payout.gross_amount or 0))
+	account.available_balance = Decimal(str(account.available_balance or 0)) + gross_amount
+	current_pending = Decimal(str(account.pending_balance or 0))
+	if current_pending <= gross_amount:
+		account.pending_balance = Decimal("0")
+	else:
+		account.pending_balance = current_pending - gross_amount
 	db.flush()
 
 	payout.status = "canceled"
@@ -325,41 +324,124 @@ def cancel_payout_request(db: Session, payout_id: int, canceller_user_id: int) -
 	return {"id": payout.id, "status": payout.status}
 
 
-def settle_payout(db: Session, payout_id: int, user_id: int) -> Dict[str, Any]:
+def settle_payout(
+	db: Session,
+	payout_id: int,
+	user_id: int,
+	*,
+	settlement_date: date | datetime | None = None,
+	bank_tracking_code: str | None = None,
+	fee_amount: Decimal | None = None,
+	note: str | None = None,
+) -> Dict[str, Any]:
+	def _to_datetime(value: date | datetime | None) -> datetime | None:
+		if value is None:
+			return None
+		if isinstance(value, datetime):
+			return value
+		if isinstance(value, date):
+			return datetime.combine(value, datetime.min.time())
+		try:
+			return datetime.fromisoformat(str(value))
+		except Exception:
+			return None
+
 	payout = db.query(WalletPayout).filter(WalletPayout.id == int(payout_id)).first()
 	if not payout:
 		raise ApiError("PAYOUT_NOT_FOUND", "درخواست تسویه یافت نشد", http_status=404)
 	if payout.status not in ("approved", "processing"):
 		raise ApiError("INVALID_STATE", "تسویه تنها پس از تایید/در حال پردازش مجاز است", http_status=400)
-	# ایجاد سند پرداخت برای خالص دریافتی بانک
+
+	fee_value = Decimal(str(fee_amount if fee_amount is not None else payout.fees or 0))
+	if fee_value < 0:
+		fee_value = Decimal("0")
+
+	gross_amount = Decimal(str(payout.gross_amount or 0))
+	if fee_value > gross_amount:
+		fee_value = gross_amount
+
+	net_amount = gross_amount - fee_value
+	payout.fees = fee_value
+	payout.net_amount = net_amount
+
+	settlement_dt = _to_datetime(settlement_date) or datetime.utcnow()
+	payout.settlement_date = settlement_dt
+	if bank_tracking_code:
+		payout.bank_tracking_code = bank_tracking_code
+	if note is not None:
+		payout.settlement_note = note
+
+	account = _get_wallet_account_for_update(db, payout.business_id)
+	current_pending = Decimal(str(account.pending_balance or 0))
+	if current_pending <= gross_amount:
+		account.pending_balance = Decimal("0")
+	else:
+		account.pending_balance = current_pending - gross_amount
+	db.flush()
+
+	# ایجاد سند پرداخت
 	try:
 		doc_id = _post_payout_document(
 			db,
 			business_id=int(payout.business_id),
 			user_id=int(user_id),
-			net_amount=Decimal(str(payout.net_amount or 0)),
-			fee_amount=Decimal(str(payout.fees or 0)),
+			net_amount=net_amount,
+			fee_amount=fee_value,
 		)
 	except Exception:
 		doc_id = None
+
 	payout.status = "settled"
+	payout.document_id = doc_id
 	db.flush()
-	# ثبت تراکنش کیف‌پول برای گزارش‌ها
+
+	# به‌روزرسانی تراکنش درخواست
 	try:
+		request_tx = (
+			db.query(WalletTransaction)
+			.filter(
+				WalletTransaction.business_id == int(payout.business_id),
+				WalletTransaction.type == "payout_request",
+				WalletTransaction.external_ref == str(payout.id),
+			)
+			.order_by(WalletTransaction.id.desc())
+			.first()
+		)
+		if request_tx:
+			request_tx.status = "succeeded"
+			if doc_id:
+				request_tx.document_id = doc_id
+	except Exception:
+		pass
+
+	# ثبت تراکنش تسویه
+	try:
+		extra_payload = {
+			"bank_tracking_code": payout.bank_tracking_code,
+			"settlement_date": payout.settlement_date.isoformat() if payout.settlement_date else None,
+		}
 		tx = WalletTransaction(
 			business_id=int(payout.business_id),
 			type="payout_settlement",
 			status="succeeded",
-			amount=Decimal(str(payout.net_amount or 0)),
-			fee_amount=Decimal(str(payout.fees or 0)),
+			amount=gross_amount,
+			fee_amount=fee_value,
 			description="تسویه کیف‌پول",
 			document_id=doc_id,
+			external_ref=str(payout.id),
+			extra_info=json.dumps(extra_payload),
 		)
 		db.add(tx)
 		db.flush()
 	except Exception:
 		pass
-	return {"id": payout.id, "status": payout.status, "document_id": doc_id}
+
+	return {
+		"id": payout.id,
+		"status": payout.status,
+		"document_id": doc_id,
+		"settlement_date": payout.settlement_date,
+	}
 
 
 def get_business_wallet_settings(db: Session, business_id: int) -> Dict[str, Any]:
@@ -428,8 +510,164 @@ def run_auto_settlement(db: Session, business_id: int, user_id: int) -> Dict[str
 	pa = db.query(WalletPayout).filter(WalletPayout.id == int(pr["id"])).first()
 	# تایید و تسویه
 	approve_payout_request(db, pa.id, user_id)
-	result = settle_payout(db, pa.id, user_id)
+	result = settle_payout(
+		db,
+		pa.id,
+		user_id,
+		settlement_date=datetime.utcnow(),
+		bank_tracking_code=f"AUTO-{pa.id}",
+		fee_amount=Decimal(str(pa.fees or 0)),
+		note="AUTO_SETTLEMENT",
+	)
 	return {"executed": True, "payout": result}
+
+
+def _serialize_wallet_payout(payout: WalletPayout) -> Dict[str, Any]:
+	bank_acc = payout.bank_account
+	business = payout.business
+	return {
+		"id": payout.id,
+		"business_id": payout.business_id,
+		"business_name": getattr(business, "name", None),
+		"bank_account_id": payout.bank_account_id,
+		"bank_account": {
+			"id": getattr(bank_acc, "id", None),
+			"iban": getattr(bank_acc, "iban", None),
+			"bank_name": getattr(bank_acc, "bank_name", None),
+			"owner_name": getattr(bank_acc, "owner_name", None),
+		} if bank_acc else None,
+		"gross_amount": float(payout.gross_amount or 0),
+		"fees": float(payout.fees or 0),
+		"net_amount": float(payout.net_amount or 0),
+		"status": payout.status,
+		"schedule_type": payout.schedule_type,
+		"external_ref": payout.external_ref,
+		"document_id": payout.document_id,
+		"settlement_date": payout.settlement_date,
+		"bank_tracking_code": payout.bank_tracking_code,
+		"settlement_note": payout.settlement_note,
+		"created_at": payout.created_at,
+		"updated_at": payout.updated_at,
+	}
+
+
+def list_wallet_payouts_admin(
+	db: Session,
+	*,
+	statuses: List[str] | None = None,
+	business_id: int | None = None,
+	skip: int = 0,
+	limit: int = 50,
+) -> Dict[str, Any]:
+	q = (
+		db.query(WalletPayout)
+		.options(
+			joinedload(WalletPayout.bank_account),
+			joinedload(WalletPayout.business),
+		)
+		.order_by(WalletPayout.id.desc())
+	)
+	if statuses:
+		normalized = [str(s).lower() for s in statuses if s]
+		if normalized:
+			q = q.filter(WalletPayout.status.in_(normalized))
+	if business_id:
+		q = q.filter(WalletPayout.business_id == int(business_id))
+	total = q.count()
+	items = (
+		q.offset(max(0, int(skip)))
+		.limit(max(1, min(200, int(limit))))
+		.all()
+	)
+	return {
+		"items": [_serialize_wallet_payout(item) for item in items],
+		"total": total,
+		"skip": skip,
+		"limit": limit,
+	}
+
+
+def get_wallet_payouts_stats_admin(db: Session) -> Dict[str, Any]:
+	"""
+	آمار کلی درخواست‌های تسویه برای داشبورد ادمین
+	"""
+	from sqlalchemy import func
+	from datetime import datetime, timedelta
+	
+	now = datetime.utcnow()
+	month_start = datetime(now.year, now.month, 1)
+	
+	# تعداد کل درخواست‌ها
+	total_count = db.query(WalletPayout).count()
+	
+	# تعداد بر اساس وضعیت
+	status_counts = {}
+	for status in ["requested", "approved", "processing", "settled", "canceled", "failed"]:
+		count = db.query(WalletPayout).filter(WalletPayout.status == status).count()
+		status_counts[status] = count
+	
+	# مجموع مبالغ در انتظار تسویه (requested + approved + processing)
+	pending_statuses = ["requested", "approved", "processing"]
+	pending_total = (
+		db.query(func.sum(WalletPayout.gross_amount))
+		.filter(WalletPayout.status.in_(pending_statuses))
+		.scalar() or Decimal("0")
+	)
+	
+	# مجموع مبالغ تسویه شده در ماه جاری
+	monthly_settled = (
+		db.query(func.sum(WalletPayout.net_amount))
+		.filter(
+			WalletPayout.status == "settled",
+			WalletPayout.settlement_date >= month_start,
+		)
+		.scalar() or Decimal("0")
+	)
+	
+	# مجموع کارمزدهای ماه جاری
+	monthly_fees = (
+		db.query(func.sum(WalletPayout.fees))
+		.filter(
+			WalletPayout.status == "settled",
+			WalletPayout.settlement_date >= month_start,
+		)
+		.scalar() or Decimal("0")
+	)
+	
+	# تعداد درخواست‌های قدیمی (> 7 روز)
+	old_threshold = now - timedelta(days=7)
+	old_count = (
+		db.query(WalletPayout)
+		.filter(
+			WalletPayout.status.in_(pending_statuses),
+			WalletPayout.created_at < old_threshold,
+		)
+		.count()
+	)
+	
+	return {
+		"total_count": total_count,
+		"status_counts": status_counts,
+		"pending_total": float(pending_total),
+		"monthly_settled": float(monthly_settled),
+		"monthly_fees": float(monthly_fees),
+		"old_pending_count": old_count,
+	}
+
+
+def get_wallet_payout_admin(db: Session, payout_id: int) -> Dict[str, Any]:
+	payout = (
+		db.query(WalletPayout)
+		.options(
+			joinedload(WalletPayout.bank_account),
+			joinedload(WalletPayout.business),
+		)
+		.filter(WalletPayout.id == int(payout_id))
+		.first()
+	)
+	if not payout:
+		raise ApiError("PAYOUT_NOT_FOUND", "درخواست تسویه یافت نشد", http_status=404)
+	return _serialize_wallet_payout(payout)
 
 def create_top_up_request(db: Session, business_id: int, user_id: int, payload: Dict[str, Any]) -> Dict[str, Any]:
 	"""

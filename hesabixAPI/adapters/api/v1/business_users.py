@@ -16,6 +16,7 @@ from app.core.permissions import require_business_access, require_business_permi
 from adapters.db.repositories.business_permission_repo import BusinessPermissionRepository
 from adapters.db.models.user import User
 from adapters.db.models.business import Business
+from sqlalchemy import select, and_, or_
 
 router = APIRouter(prefix="/business", tags=["business-users"])
 
@@ -666,4 +667,86 @@ def leave_business(
         data={},
         request=request,
         message="شما با موفقیت از کسب و کار خارج شدید"
+    )
+
+
+@router.get("/{business_id}/users/telegram-connected",
+    summary="لیست کاربران متصل به تلگرام",
+    description="دریافت لیست کاربران عضو کسب و کار که به ربات تلگرام متصل هستند",
+    responses={
+        200: {
+            "description": "لیست کاربران متصل به تلگرام",
+        },
+        401: {
+            "description": "کاربر احراز هویت نشده است"
+        },
+        403: {
+            "description": "دسترسی غیرمجاز به کسب و کار"
+        }
+    }
+)
+@require_business_access("business_id")
+def get_telegram_connected_users(
+    request: Request,
+    business_id: int,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    """دریافت لیست کاربران عضو کسب و کار که به ربات تلگرام متصل هستند"""
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    current_user_id = ctx.get_user_id()
+    logger.info(f"Getting telegram-connected users for business {business_id}, current user: {current_user_id}")
+    
+    # بررسی وجود کسب‌وکار
+    business = db.get(Business, business_id)
+    if not business:
+        logger.error(f"Business {business_id} not found")
+        raise HTTPException(status_code=404, detail="کسب و کار یافت نشد")
+    
+    # دریافت لیست کاربران عضو کسب و کار
+    permission_repo = BusinessPermissionRepository(db)
+    business_permissions = permission_repo.get_business_users(business_id)
+    
+    # جمع‌آوری user_id های عضو کسب و کار (شامل owner)
+    user_ids = {business.owner_id}
+    for perm in business_permissions:
+        if perm.user_id:
+            user_ids.add(perm.user_id)
+    
+    # دریافت کاربرانی که telegram_chat_id دارند
+    stmt = select(User).where(
+        and_(
+            User.id.in_(list(user_ids)),
+            User.telegram_chat_id.isnot(None)
+        )
+    )
+    connected_users = db.execute(stmt).scalars().all()
+    
+    # فرمت کردن داده‌ها
+    formatted_users = []
+    for user in connected_users:
+        # تعیین نقش کاربر
+        role = "owner" if user.id == business.owner_id else "member"
+        
+        user_data = {
+            "user_id": user.id,
+            "name": f"{user.first_name or ''} {user.last_name or ''}".strip() or user.email or "کاربر",
+            "email": user.email or "",
+            "mobile": user.mobile or "",
+            "telegram_chat_id": user.telegram_chat_id,
+            "role": role,
+        }
+        formatted_users.append(user_data)
+    
+    logger.info(f"Found {len(formatted_users)} telegram-connected users for business {business_id}")
+    
+    return success_response(
+        data={
+            "users": formatted_users,
+            "total": len(formatted_users)
+        },
+        request=request,
+        message="لیست کاربران متصل به تلگرام دریافت شد"
     )

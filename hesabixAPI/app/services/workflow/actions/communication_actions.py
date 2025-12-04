@@ -2,10 +2,13 @@
 Actionهای مربوط به ارتباطات (ایمیل، تلگرام، notification)
 """
 
+import logging
 from typing import Any, Dict, Optional
 from app.services.workflow.action_registry import ActionHandler
 from app.services.workflow.workflow_engine import WorkflowEngine
 from app.services.workflow.utils import execute_with_retry, get_retry_config_from_action_config
+
+logger = logging.getLogger(__name__)
 
 
 class SendEmailAction(ActionHandler):
@@ -182,17 +185,17 @@ class SendTelegramAction(ActionHandler):
     def get_metadata(self) -> Dict[str, Any]:
         return {
             "name": "ارسال پیام تلگرام",
-            "description": "ارسال پیام به کاربر از طریق تلگرام",
+            "description": "ارسال پیام به کاربر عضو کسب و کار از طریق تلگرام (فقط کاربران متصل به ربات)",
             "config_schema": {
                 "user_id": {
-                    "type": "integer",
-                    "description": "شناسه کاربر (اختیاری - اگر مشخص نشود از context استفاده می‌شود)",
-                    "required": False
-                },
-                "chat_id": {
                     "type": "string",
-                    "description": "شناسه چت (جایگزین user_id)",
-                    "required": False
+                    "description": "شناسه کاربر عضو کسب و کار که به ربات تلگرام متصل است (می‌تواند از نودهای قبلی باشد: $node_id.user_id)",
+                    "required": True,
+                    "ui_type": "telegram_user_selector",
+                    "ui_config": {
+                        "filter": "telegram_connected",
+                        "business_scoped": True
+                    }
                 },
                 "message": {
                     "type": "string",
@@ -223,6 +226,12 @@ class SendTelegramAction(ActionHandler):
                     "description": "تعداد تلاش‌های مجدد",
                     "default": 3,
                     "required": False
+                },
+                "retry_delay_seconds": {
+                    "type": "integer",
+                    "description": "تاخیر بین تلاش‌ها (ثانیه)",
+                    "default": 60,
+                    "required": False
                 }
             }
         }
@@ -237,10 +246,81 @@ class SendTelegramAction(ActionHandler):
         from app.services.providers.telegram_provider import TelegramProvider
         from app.services.system_settings_service import get_effective_notifications_settings
         from app.services.workflow.utils import execute_with_retry, get_retry_config_from_action_config
+        from adapters.db.models.user import User
+        from adapters.db.repositories.business_permission_repo import BusinessPermissionRepository
         
         db = context.get("db")
         if not db:
             db = get_db_session().__enter__()
+        
+        business_id = context.get("business_id")
+        if not business_id:
+            return {
+                "success": False,
+                "error": "business_id در context موجود نیست"
+            }
+        
+        # حل کردن user_id (ممکن است از نودهای قبلی باشد)
+        user_id_raw = config.get("user_id")
+        if not user_id_raw:
+            return {
+                "success": False,
+                "error": "user_id مشخص نشده است"
+            }
+        
+        # حل کردن reference اگر باشد
+        user_id_resolved = WorkflowEngine._resolve_value_static(user_id_raw, context, node_results)
+        
+        # تبدیل به integer
+        try:
+            user_id = int(user_id_resolved) if user_id_resolved else None
+        except (ValueError, TypeError):
+            return {
+                "success": False,
+                "error": f"user_id نامعتبر: {user_id_resolved}"
+            }
+        
+        if not user_id:
+            return {
+                "success": False,
+                "error": "user_id مشخص نشده است"
+            }
+        
+        # بررسی اینکه کاربر عضو کسب و کار است
+        permission_repo = BusinessPermissionRepository(db)
+        is_owner = False
+        is_member = False
+        
+        # بررسی owner
+        from adapters.db.models.business import Business
+        business = db.get(Business, business_id)
+        if business and business.owner_id == user_id:
+            is_owner = True
+        else:
+            # بررسی member
+            permission = permission_repo.get_by_user_and_business(user_id, business_id)
+            if permission:
+                is_member = True
+        
+        if not is_owner and not is_member:
+            return {
+                "success": False,
+                "error": f"کاربر {user_id} عضو کسب و کار {business_id} نیست"
+            }
+        
+        # دریافت کاربر و بررسی اتصال به تلگرام
+        user = db.get(User, user_id)
+        if not user:
+            return {
+                "success": False,
+                "error": f"کاربر {user_id} یافت نشد"
+            }
+        
+        if not user.telegram_chat_id:
+            return {
+                "success": False,
+                "error": f"کاربر {user_id} به ربات تلگرام متصل نیست"
+            }
         
         # دریافت تنظیمات تلگرام
         notify_cfg = get_effective_notifications_settings(db)
@@ -249,17 +329,31 @@ class SendTelegramAction(ActionHandler):
             proxy_config=notify_cfg.get("telegram_proxy"),
         )
         
-        # حل کردن مقادیر
-        user_id = config.get("user_id") or context.get("user_id")
-        chat_id = config.get("chat_id")
+        if not telegram.is_configured():
+            return {
+                "success": False,
+                "error": "ربات تلگرام پیکربندی نشده است"
+            }
+        
+        # حل کردن متن پیام
         message = WorkflowEngine._resolve_value_static(config.get("message"), context, node_results)
+        if not message:
+            return {
+                "success": False,
+                "error": "متن پیام مشخص نشده است"
+            }
+        
+        parse_mode = config.get("parse_mode", "None")
+        if parse_mode == "None":
+            parse_mode = None
         
         def _send_telegram():
-            if chat_id:
-                # استفاده از chat_id
-                return telegram.send(chat_id=chat_id, message=str(message))
-            else:
-                return telegram.send(user_id=user_id, message=str(message))
+            # استفاده از send_text با telegram_chat_id
+            return telegram.send_text(
+                chat_id=int(user.telegram_chat_id),
+                text=str(message),
+                parse_mode=parse_mode
+            )
         
         # ارسال با retry mechanism
         retry_on_failure = config.get("retry_on_failure", True)
@@ -271,17 +365,18 @@ class SendTelegramAction(ActionHandler):
             else:
                 success = _send_telegram()
         except Exception as e:
+            logger.error(f"Error sending telegram message: {e}", exc_info=True)
             return {
                 "success": False,
                 "error": str(e),
                 "user_id": user_id,
-                "chat_id": chat_id
+                "telegram_chat_id": user.telegram_chat_id
             }
         
         return {
             "success": success,
             "user_id": user_id,
-            "chat_id": chat_id,
+            "telegram_chat_id": user.telegram_chat_id,
             "message": message
         }
 

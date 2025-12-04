@@ -47,6 +47,7 @@ import 'pages/admin/storage_plans_admin_page.dart';
 import 'pages/admin/document_monetization_page.dart';
 import 'pages/admin/share_link_settings_page.dart';
 import 'pages/admin/marketplace_plugins_admin_page.dart';
+import 'pages/admin/wallet_payouts_admin_page.dart';
 import 'pages/business/invoices_list_page.dart';
 import 'pages/business/tax_workspace_page.dart';
 import 'pages/business/new_invoice_page.dart';
@@ -1012,6 +1013,20 @@ class _MyAppState extends State<MyApp> {
                       return PermissionGuard.buildAccessDeniedPage();
                     }
                     return const WalletSettingsPage();
+                  },
+                ),
+                GoRoute(
+                  path: 'wallet-payouts',
+                  name: 'system_settings_wallet_payouts',
+                  builder: (context, state) {
+                    if (_authStore == null) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    final allowed = _authStore!.isSuperAdmin || _authStore!.hasAppPermission('system_settings');
+                    if (!allowed) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    return const WalletPayoutsAdminPage();
                   },
                 ),
                 GoRoute(

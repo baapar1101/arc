@@ -137,6 +137,22 @@ class WorkflowService {
         .cast<Map<String, dynamic>>();
   }
 
+  Future<List<Map<String, dynamic>>> getTelegramConnectedUsers({
+    required int businessId,
+  }) async {
+    final res = await _apiClient.get<Map<String, dynamic>>(
+      '/business/$businessId/users/telegram-connected',
+    );
+    final data = _asMap(res.data?['data']);
+    final users = (data['users'] as List?)
+            ?.map<Map<String, dynamic>>(
+              (item) => Map<String, dynamic>.from(item as Map),
+            )
+            .toList() ??
+        const <Map<String, dynamic>>[];
+    return users;
+  }
+
   Map<String, dynamic> _asMap(dynamic value) {
     if (value is Map<String, dynamic>) {
       return value;

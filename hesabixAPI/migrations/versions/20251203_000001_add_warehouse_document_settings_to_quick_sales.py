@@ -17,40 +17,47 @@ depends_on = None
 
 
 def upgrade():
+    # بررسی وجود ستون‌ها قبل از اضافه کردن
+    connection = op.get_bind()
+    inspector = sa.inspect(connection)
+    columns = [col['name'] for col in inspector.get_columns('quick_sales_settings')]
+    
     # اضافه کردن فیلد enable_warehouse_document
-    op.add_column(
-        'quick_sales_settings',
-        sa.Column(
-            'enable_warehouse_document',
-            sa.Boolean(),
-            nullable=False,
-            server_default='1',
-            comment='فعال/غیرفعال کردن صدور حواله انبار'
+    if 'enable_warehouse_document' not in columns:
+        op.add_column(
+            'quick_sales_settings',
+            sa.Column(
+                'enable_warehouse_document',
+                sa.Boolean(),
+                nullable=False,
+                server_default='1',
+                comment='فعال/غیرفعال کردن صدور حواله انبار'
+            )
         )
-    )
     
     # اضافه کردن فیلد warehouse_document_type
-    op.add_column(
-        'quick_sales_settings',
-        sa.Column(
-            'warehouse_document_type',
-            sa.String(20),
-            nullable=False,
-            server_default='posted',
-            comment='نوع سند حواله انبار: draft یا posted'
+    if 'warehouse_document_type' not in columns:
+        op.add_column(
+            'quick_sales_settings',
+            sa.Column(
+                'warehouse_document_type',
+                sa.String(20),
+                nullable=False,
+                server_default='posted',
+                comment='نوع سند حواله انبار: draft یا posted'
+            )
         )
-    )
-    
-    # به‌روزرسانی مقادیر موجود بر اساس auto_post_warehouse
-    # اگر auto_post_warehouse = True باشد، warehouse_document_type = 'posted'
-    # اگر auto_post_warehouse = False باشد، warehouse_document_type = 'draft'
-    op.execute("""
-        UPDATE quick_sales_settings 
-        SET warehouse_document_type = CASE 
-            WHEN auto_post_warehouse = 1 THEN 'posted'
-            ELSE 'draft'
-        END
-    """)
+        
+        # به‌روزرسانی مقادیر موجود بر اساس auto_post_warehouse
+        # اگر auto_post_warehouse = True باشد، warehouse_document_type = 'posted'
+        # اگر auto_post_warehouse = False باشد، warehouse_document_type = 'draft'
+        op.execute("""
+            UPDATE quick_sales_settings 
+            SET warehouse_document_type = CASE 
+                WHEN auto_post_warehouse = 1 THEN 'posted'
+                ELSE 'draft'
+            END
+        """)
 
 
 def downgrade():
