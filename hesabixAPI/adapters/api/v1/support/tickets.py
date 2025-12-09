@@ -145,7 +145,6 @@ async def create_ticket(
             "ticket_id": ticket.id,
             "ticket_title": ticket.title,
             "user_name": user_name,
-            "user_email": user.email or "",
             "category": ticket_with_details.category.name if ticket_with_details.category else "نامشخص",
             "priority": ticket_with_details.priority.name if ticket_with_details.priority else "نامشخص"
         }
@@ -222,7 +221,10 @@ async def send_message(
     # ارسال ناتیفیکیشن به اپراتورها (فقط برای پیام‌های غیرداخلی)
     if not message_request.is_internal:
         try:
+            from adapters.db.repositories.user_repo import UserRepository
+            
             notification_service = NotificationService(db)
+            user_repo = UserRepository(db)
             user = current_user.user
             user_name = f"{user.first_name or ''} {user.last_name or ''}".strip() or user.email or "کاربر"
             message_preview = message_request.content[:200] + ("..." if len(message_request.content) > 200 else "")
@@ -233,12 +235,18 @@ async def send_message(
                 "ticket_id": ticket.id,
                 "ticket_title": ticket.title,
                 "user_name": user_name,
-                "user_email": user.email or "",
                 "message_preview": message_preview
             }
             
             # اگر تیکت به اپراتور خاصی تخصیص شده، فقط به او ارسال می‌کنیم
             assigned_operator_id = getattr(ticket, 'assigned_operator_id', None)
+            
+            # اعتبارسنجی: اگر assigned_operator_id وجود دارد، باید واقعاً یک اپراتور باشد
+            if assigned_operator_id and not user_repo.is_support_operator(assigned_operator_id):
+                # اگر assigned_operator_id نامعتبر است، به همه اپراتورها ارسال می‌کنیم
+                logger = logging.getLogger(__name__)
+                logger.warning(f"assigned_operator_id {assigned_operator_id} برای تیکت {ticket.id} یک اپراتور معتبر نیست. ارسال به همه اپراتورها")
+                assigned_operator_id = None
             
             notification_service.notify_support_operators(
                 event_key="support.user_reply",

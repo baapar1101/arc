@@ -68,13 +68,8 @@ class TelegramAIChatService:
 		if user_context.is_superadmin():
 			buttons.append([{"text": "👥 مدیریت سیستم", "callback_data": "menu:admin"}])
 		
-		# دکمه‌های عمومی دیگر
-		buttons.append([
-			{"text": "📊 گزارش‌های سریع", "callback_data": "menu:reports"},
-			{"text": "🔍 جستجو", "callback_data": "menu:search"}
-		])
+		# دکمه جلسات
 		buttons.append([{"text": "📋 جلسات من", "callback_data": "menu:sessions"}])
-		buttons.append([{"text": "⚙️ تنظیمات", "callback_data": "menu:settings"}])
 		
 		keyboard = self._build_inline_keyboard(buttons)
 		return self.telegram_provider.send_text(
@@ -224,9 +219,6 @@ class TelegramAIChatService:
 		# ارسال پیام تایید
 		buttons = [
 			[{"text": "💬 سوال بپرس", "callback_data": "chat:ask"}],
-			[{"text": "📊 گزارش مالی", "callback_data": "chat:report"}],
-			[{"text": "🔍 جستجوی محصول", "callback_data": "chat:search_product"}],
-			[{"text": "📦 لیست فاکتورها", "callback_data": "chat:invoices"}],
 			[{"text": "⬅️ بازگشت", "callback_data": "back:chat"}]
 		]
 		keyboard = self._build_inline_keyboard(buttons)
@@ -261,8 +253,10 @@ class TelegramAIChatService:
 				])
 			)
 		
-		# چک اعتبار قبل از ارسال (بدون try-except گسترده)
+		# ایجاد AI Service یکبار
 		ai_service = AIService(self.db, user_context, active_session.business_id)
+		
+		# چک اعتبار قبل از ارسال (بدون try-except گسترده)
 		availability = ai_service.check_availability(estimated_tokens=len(text) * 2)
 		
 		if not availability["can_use"]:
@@ -275,8 +269,6 @@ class TelegramAIChatService:
 		)
 		
 		try:
-			# ارسال به AI
-			ai_service = AIService(self.db, user_context, active_session.business_id)
 			
 			# دریافت پیام‌های قبلی
 			previous_messages = self.ai_message_repo.get_session_messages(

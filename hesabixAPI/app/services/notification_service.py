@@ -293,16 +293,52 @@ class NotificationService:
 				self.db.add(outbox)
 				self.db.commit()
 				# Persist as an announcement for visibility in UI even if realtime WS is not connected
+				# اما برای اعلان‌های پشتیبانی باید audience_filters را به درستی تنظیم کنیم
 				try:
+					# اگر event_key مربوط به پشتیبانی است، audience_filters را تنظیم می‌کنیم
+					audience_filters = None
+					if event_key.startswith("support."):
+						if event_key == "support.operator_reply":
+							# برای پاسخ اپراتور: فقط کاربر صاحب تیکت می‌تواند ببیند
+							audience_filters = {
+								"allowed_user_ids": [user_id]
+							}
+						elif event_key == "support.ticket_assigned":
+							# برای تخصیص تیکت: فقط اپراتور تخصیص‌یافته می‌تواند ببیند
+							# (این اعلان به اپراتور ارسال می‌شود)
+							audience_filters = {
+								"allowed_user_ids": [user_id]  # user_id در اینجا همان operator_id است
+							}
+						elif event_key == "support.ticket_status_changed":
+							# برای تغییر وضعیت: فقط کاربر صاحب تیکت
+							# استخراج user_id از context اگر موجود باشد
+							ticket_user_id = context.get("user_id") or user_id
+							audience_filters = {
+								"allowed_user_ids": [ticket_user_id]
+							}
+						else:
+							# برای سایر اعلان‌های پشتیبانی (ticket_created, user_reply): فقط اپراتورها
+							audience_filters = {
+								"require_permissions": ["support_operator"]
+							}
+					
+					# محدود کردن محتوای حساس برای اعلان‌های پشتیبانی
+					announcement_body = body_inapp or ""
+					if event_key.startswith("support."):
+						# محدود کردن طول body برای جلوگیری از نمایش اطلاعات حساس
+						max_body_length = 500
+						if len(announcement_body) > max_body_length:
+							announcement_body = announcement_body[:max_body_length] + "..."
+					
 					a = Announcement(
 						title=subject_inapp or "پیام سیستم",
-						body=body_inapp or "",
+						body=announcement_body,
 						level="info",
 						is_pinned=False,
 						is_active=True,
 						starts_at=None,
 						ends_at=None,
-						audience_filters=None,
+						audience_filters=audience_filters,
 						created_by=None,
 					)
 					self.db.add(a)
@@ -350,6 +386,12 @@ class NotificationService:
 		logger = logging.getLogger(__name__)
 		
 		if assigned_operator_id:
+			# اعتبارسنجی: بررسی اینکه assigned_operator_id واقعاً یک اپراتور است
+			if not self.user_repo.is_support_operator(assigned_operator_id):
+				logger.warning(f"assigned_operator_id {assigned_operator_id} یک اپراتور معتبر نیست. ارسال به همه اپراتورها")
+				assigned_operator_id = None
+		
+		if assigned_operator_id:
 			# ارسال فقط به اپراتور تخصیص‌یافته
 			operator = self.user_repo.get_by_id(assigned_operator_id)
 			if operator and operator.is_active:
@@ -363,9 +405,15 @@ class NotificationService:
 					)
 				except Exception as e:
 					logger.error(f"خطا در ارسال ناتیفیکیشن به اپراتور {operator.id}: {e}")
+			else:
+				logger.warning(f"اپراتور {assigned_operator_id} یافت نشد یا غیرفعال است")
 		else:
 			# ارسال به تمام اپراتورها
 			operators = self.user_repo.get_support_operators()
+			if not operators:
+				logger.warning("هیچ اپراتور پشتیبانی فعالی یافت نشد. اعلان ارسال نخواهد شد.")
+				return
+			
 			for operator in operators:
 				try:
 					self.send(

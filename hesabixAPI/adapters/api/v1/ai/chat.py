@@ -218,13 +218,19 @@ async def send_message(
         # refresh کردن session تا مطمئن شویم که به‌روزرسانی‌های بعدی کار می‌کنند
         db.refresh(session)
         
+        # ذخیره business_id قبل از بستن session
+        business_id = session.business_id
+        
+        # بستن session اصلی برای جلوگیری از connection leak
+        # session برای streaming استفاده نمی‌شود (در _stream_message_response از session جدید استفاده می‌شود)
+        db.close()
+        
         return StreamingResponse(
             _stream_message_response(
                 session_id=session_id,
                 messages=messages,
-                db=db,
                 ctx=ctx,
-                session=session,
+                business_id=business_id,
                 previous_messages=previous_messages,
                 message_content=message_data.content
             ),
@@ -239,10 +245,21 @@ async def send_message(
     # برای non-streaming، بعد از ذخیره پیام AI commit می‌کنیم
     db.flush()
     
+    # ذخیره business_id و session title قبل از بستن session
+    business_id = session.business_id
+    session_title = session.title
+    is_first_message = len(previous_messages) == 0
+    
+    # بستن session اصلی برای جلوگیری از connection leak در طول async operation
+    db.close()
+    
     # حالت non-streaming (کد قبلی)
-    # ارسال به AI به صورت async
-    ai_service = AIService(db, ctx, session.business_id)
-    response = await ai_service.chat_completion(messages, use_function_calling=True, session_business_id=session.business_id)
+    # ارسال به AI به صورت async (بدون session)
+    from adapters.db.session import get_db_session
+    with get_db_session() as new_db:
+        new_ai_service = AIService(new_db, ctx, business_id)
+        response = await new_ai_service.chat_completion(messages, use_function_calling=True, session_business_id=business_id)
+    
     response_content_preview = (response.get("message", {}).get("content") or "")[:500]
     logger.info(
         "[AI Response][session=%s][stream=%s] preview=%s",
@@ -251,54 +268,65 @@ async def send_message(
         response_content_preview
     )
     
-    # بررسی سهمیه و شارژ
+    # بررسی سهمیه و شارژ و ذخیره پاسخ (با session جدید)
     usage = response.get("usage", {})
     input_tokens = usage.get("input_tokens", 0)
     output_tokens = usage.get("output_tokens", 0)
     
-    charge_result = ai_service.check_quota_and_charge(input_tokens, output_tokens)
-    
-    # ذخیره پاسخ AI
-    assistant_message = AIChatMessage(
-        session_id=session_id,
-        role=MessageRole.ASSISTANT.value,
-        content=response["message"]["content"],
-        tokens_used=input_tokens + output_tokens
-    )
-    db.add(assistant_message)
-    
-    # ثبت لاگ استفاده
-    ai_service.log_usage(
-        provider=ai_service.config.provider if ai_service.config else "openai",
-        model=ai_service.config.model_name if ai_service.config else "gpt-4",
-        input_tokens=input_tokens,
-        output_tokens=output_tokens,
-        cost=charge_result.get("cost", 0),
-        payment_method=charge_result.get("payment_method", "free"),
-        wallet_transaction_id=charge_result.get("wallet_transaction_id"),
-        document_id=charge_result.get("document_id")
-    )
-    
-    # اگر عنوان پیش‌فرض است و این اولین پیام کاربر است، عنوان هوشمند بساز
-    if (not session.title or session.title == DEFAULT_CHAT_TITLE) and len(previous_messages) == 0:
-        generated_title = await ai_service.generate_chat_title(message_data.content)
-        if generated_title:
-            session.title = generated_title[:80]
-    
-    # به‌روزرسانی زمان جلسه
-    from datetime import datetime
-    session.updated_at = datetime.utcnow()
-    
-    db.commit()
+    with get_db_session() as commit_db:
+        # خواندن session از دیتابیس
+        commit_session_repo = AIChatSessionRepository(commit_db)
+        commit_session = commit_session_repo.get_by_id(session_id)
+        
+        if not commit_session:
+            raise ApiError("SESSION_NOT_FOUND", "گفت‌وگو یافت نشد", http_status=404)
+        
+        commit_ai_service = AIService(commit_db, ctx, business_id)
+        charge_result = commit_ai_service.check_quota_and_charge(input_tokens, output_tokens)
+        
+        # ذخیره پاسخ AI
+        assistant_message = AIChatMessage(
+            session_id=session_id,
+            role=MessageRole.ASSISTANT.value,
+            content=response["message"]["content"],
+            tokens_used=input_tokens + output_tokens
+        )
+        commit_db.add(assistant_message)
+        
+        # ثبت لاگ استفاده
+        commit_ai_service.log_usage(
+            provider=commit_ai_service.config.provider if commit_ai_service.config else "openai",
+            model=commit_ai_service.config.model_name if commit_ai_service.config else "gpt-4",
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            cost=charge_result.get("cost", 0),
+            payment_method=charge_result.get("payment_method", "free"),
+            wallet_transaction_id=charge_result.get("wallet_transaction_id"),
+            document_id=charge_result.get("document_id")
+        )
+        
+        # اگر عنوان پیش‌فرض است و این اولین پیام کاربر است، عنوان هوشمند بساز
+        if (not commit_session.title or commit_session.title == DEFAULT_CHAT_TITLE) and is_first_message:
+            generated_title = await commit_ai_service.generate_chat_title(message_data.content)
+            if generated_title:
+                commit_session.title = generated_title[:80]
+        
+        # به‌روزرسانی زمان جلسه
+        from datetime import datetime
+        commit_session.updated_at = datetime.utcnow()
+        
+        commit_db.commit()
+        commit_db.refresh(assistant_message)
+        message_id = assistant_message.id
     
     return success_response({
         "message": {
-            "id": assistant_message.id,
-            "session_id": assistant_message.session_id,
-            "role": assistant_message.role if isinstance(assistant_message.role, str) else getattr(assistant_message.role, "value", assistant_message.role),
-            "content": assistant_message.content,
-            "tokens_used": assistant_message.tokens_used,
-            "created_at": assistant_message.created_at.isoformat() if assistant_message.created_at else None
+            "id": message_id,
+            "session_id": session_id,
+            "role": MessageRole.ASSISTANT.value,
+            "content": response["message"]["content"],
+            "tokens_used": input_tokens + output_tokens,
+            "created_at": None  # از دیتابیس خوانده می‌شود
         },
         "usage": {
             "input_tokens": input_tokens,
@@ -313,50 +341,58 @@ async def send_message(
 async def _stream_message_response(
     session_id: int,
     messages: List[Dict[str, Any]],
-    db: Session,
     ctx: AuthContext,
-    session: AIChatSession,
+    business_id: int,
     previous_messages: List[AIChatMessage],
     message_content: str
 ):
     """Generator برای streaming response
     
-    ⚠️ مهم: Session را فقط برای خواندن استفاده می‌کنیم و بعد از streaming بسته می‌شود.
-    برای commit های بعدی از session جدید استفاده می‌کنیم.
+    ⚠️ مهم: از session جدید برای هر عملیات استفاده می‌کنیم تا از connection leak جلوگیری کنیم.
+    Session فقط برای commit نهایی استفاده می‌شود و بلافاصله بسته می‌شود.
     """
     from adapters.db.session import get_db_session
     
     try:
-        # استفاده از session موجود فقط برای خواندن
-        ai_service = AIService(db, ctx, session.business_id)
+        # استفاده از session جدید برای AI service (فقط برای خواندن config)
+        with get_db_session() as db:
+            ai_service = AIService(db, ctx, business_id)
+            # کپی کردن config برای استفاده بعد از بسته شدن session
+            ai_config = ai_service.config
+        
+        # استفاده از config برای streaming (بدون session)
         accumulated_content = ""
         final_usage = None
         
-        # ارسال chunks به صورت streaming
-        async for chunk in ai_service.chat_completion_stream(messages, use_function_calling=True, session_business_id=session.business_id):
-            delta = chunk.get("delta", {})
-            content_chunk = delta.get("content", "")
-            
-            if content_chunk:
-                accumulated_content += content_chunk
-                logger.info(
-                    "[AI Stream][session=%s] chunk=%s",
-                    session_id,
-                    content_chunk[:200]
-                )
-            
-            # ذخیره usage از chunk آخر
-            if chunk.get("usage"):
-                final_usage = chunk["usage"]
-            
-            # فرمت SSE: data: {json}\n\n
-            yield f"data: {json.dumps({'content': content_chunk, 'done': chunk.get('done', False)})}\n\n"
-            
-            # اگر streaming تمام شده باشد
-            if chunk.get("done", False):
-                # در chunk نهایی، accumulated_content باید کامل باشد
-                # اما برای اطمینان، از content_chunk هم استفاده نمی‌کنیم چون خالی است
-                break
+        # ایجاد AI service موقت برای streaming
+        # برای streaming، از session موقت استفاده می‌کنیم که بعد از streaming بسته می‌شود
+        with get_db_session() as temp_db:
+            temp_ai_service = AIService(temp_db, ctx, business_id)
+            # ارسال chunks به صورت streaming
+            async for chunk in temp_ai_service.chat_completion_stream(messages, use_function_calling=True, session_business_id=business_id):
+                delta = chunk.get("delta", {})
+                content_chunk = delta.get("content", "")
+                
+                if content_chunk:
+                    accumulated_content += content_chunk
+                    logger.info(
+                        "[AI Stream][session=%s] chunk=%s",
+                        session_id,
+                        content_chunk[:200]
+                    )
+                
+                # ذخیره usage از chunk آخر
+                if chunk.get("usage"):
+                    final_usage = chunk["usage"]
+                
+                # فرمت SSE: data: {json}\n\n
+                yield f"data: {json.dumps({'content': content_chunk, 'done': chunk.get('done', False)})}\n\n"
+                
+                # اگر streaming تمام شده باشد
+                if chunk.get("done", False):
+                    # در chunk نهایی، accumulated_content باید کامل باشد
+                    # اما برای اطمینان، از content_chunk هم استفاده نمی‌کنیم چون خالی است
+                    break
         
         logger.info(
             "[AI Stream][session=%s] final_response_length=%s preview=%s",

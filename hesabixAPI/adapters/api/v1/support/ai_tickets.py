@@ -189,7 +189,7 @@ async def ai_auto_reply(
                 event_key="support.operator_reply",
                 context=context,
                 preferred_channels=["inapp", "email", "telegram", "sms"],
-                broadcast_mode=True
+                broadcast_mode=False
             )
         except Exception as e:
             # در صورت خطا، لاگ می‌کنیم اما فرآیند اصلی ادامه می‌یابد

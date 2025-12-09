@@ -50,43 +50,22 @@ class AuthContext:
 	@staticmethod
 	def _normalize_permissions_value(value) -> dict:
 		"""نرمال‌سازی مقدار JSON دسترسی‌ها به dict برای سازگاری با داده‌های legacy"""
-		import logging
-		logger = logging.getLogger(__name__)
-		
-		logger.info(f"=== _normalize_permissions_value START ===")
-		logger.info(f"Input value type: {type(value)}")
-		logger.info(f"Input value: {value}")
-		
 		if isinstance(value, dict):
-			logger.info("Value is already a dict, returning as is")
-			logger.info(f"=== _normalize_permissions_value END ===")
 			return value
 		if isinstance(value, list):
-			logger.info("Value is a list, processing...")
 			try:
 				# لیست جفت‌ها مانند [["join", true], ["sales", {..}]]
 				if all(isinstance(item, list) and len(item) == 2 for item in value):
-					logger.info("Detected list of key-value pairs")
-					result = {k: v for k, v in value if isinstance(k, str)}
-					logger.info(f"Converted to dict: {result}")
-					logger.info(f"=== _normalize_permissions_value END ===")
-					return result
+					return {k: v for k, v in value if isinstance(k, str)}
 				# لیست دیکشنری‌ها مانند [{"join": true}, {"sales": {...}}]
 				if all(isinstance(item, dict) for item in value):
-					logger.info("Detected list of dictionaries")
 					merged = {}
 					for item in value:
 						merged.update({k: v for k, v in item.items()})
-					logger.info(f"Merged to dict: {merged}")
-					logger.info(f"=== _normalize_permissions_value END ===")
 					return merged
-			except Exception as e:
-				logger.error(f"Error processing list: {e}")
-				logger.info(f"=== _normalize_permissions_value END ===")
+			except Exception:
 				return {}
 		
-		logger.info(f"Unsupported value type {type(value)}, returning empty dict")
-		logger.info(f"=== _normalize_permissions_value END ===")
 		return {}
 	
 	def get_translator(self) -> Translator:
@@ -125,34 +104,18 @@ class AuthContext:
 	
 	def _get_business_permissions(self) -> dict:
 		"""دریافت دسترسی‌های کسب و کار از دیتابیس"""
-		import logging
-		logger = logging.getLogger(__name__)
-		
-		logger.info(f"=== _get_business_permissions START ===")
-		logger.info(f"User ID: {self.user.id}")
-		logger.info(f"Business ID: {self.business_id}")
-		logger.info(f"DB available: {self.db is not None}")
-		
 		if not self.business_id or not self.db:
-			logger.info("No business_id or db, returning empty permissions")
 			return {}
 		
 		from adapters.db.repositories.business_permission_repo import BusinessPermissionRepository
 		repo = BusinessPermissionRepository(self.db)
 		permission_obj = repo.get_by_user_and_business(self.user.id, self.business_id)
 		
-		logger.info(f"Permission object found: {permission_obj}")
-		
 		if permission_obj and permission_obj.business_permissions:
 			raw_permissions = permission_obj.business_permissions
-			logger.info(f"Raw permissions: {raw_permissions}")
 			normalized_permissions = AuthContext._normalize_permissions_value(raw_permissions)
-			logger.info(f"Normalized permissions: {normalized_permissions}")
-			logger.info(f"=== _get_business_permissions END ===")
 			return normalized_permissions
 		
-		logger.info("No permissions found, returning empty dict")
-		logger.info(f"=== _get_business_permissions END ===")
 		return {}
 	
 	# بررسی دسترسی‌های اپلیکیشن
@@ -603,14 +566,6 @@ def get_current_user(
 	
 	# تشخیص سال مالی از هدر X-Fiscal-Year-ID (آینده)
 	fiscal_year_id = _detect_fiscal_year_id(request)
-
-	logger.info(f"Creating AuthContext for user {user.id}:")
-	logger.info(f"  - Language: {language}")
-	logger.info(f"  - Calendar type: {calendar_type}")
-	logger.info(f"  - Timezone: {timezone}")
-	logger.info(f"  - Business ID: {business_id}")
-	logger.info(f"  - Fiscal year ID: {fiscal_year_id}")
-	logger.info(f"  - App permissions: {user.app_permissions}")
 
 	auth_context = AuthContext(
 		user=user, 

@@ -9,6 +9,23 @@ import '../main.dart' show navigatorKey;
 /// shows SnackBar below them. This helper finds the root ScaffoldMessenger
 /// to ensure SnackBar appears above all dialogs and bottom sheets.
 class SnackBarHelper {
+  /// Determines the appropriate text color based on background brightness
+  static Color _getTextColorForBackground(Color backgroundColor) {
+    final brightness = ThemeData.estimateBrightnessForColor(backgroundColor);
+    return brightness == Brightness.dark ? Colors.white : Colors.black87;
+  }
+  
+  /// Gets the default background color for snackbars based on theme
+  static Color _getDefaultBackgroundColor(ThemeData theme, bool isError) {
+    if (isError) {
+      return Colors.red;
+    }
+    // Use a color that works well in both light and dark themes
+    final brightness = theme.brightness;
+    return brightness == Brightness.dark
+        ? theme.colorScheme.surfaceContainerHighest
+        : theme.colorScheme.inverseSurface;
+  }
   /// Shows a SnackBar using the root ScaffoldMessenger to ensure it appears
   /// above all dialogs.
   /// 
@@ -61,12 +78,16 @@ class SnackBarHelper {
     
     final theme = Theme.of(context);
     final effectiveBackgroundColor = backgroundColor ?? 
-        (isError ? Colors.red : theme.colorScheme.surfaceContainerHighest);
+        _getDefaultBackgroundColor(theme, isError);
+    final textColor = _getTextColorForBackground(effectiveBackgroundColor);
     
     debugPrint('[SnackBarHelper.show] Showing SnackBar with message: "$message"');
     rootMessenger.showSnackBar(
       SnackBar(
-        content: Text(message),
+        content: Text(
+          message,
+          style: TextStyle(color: textColor),
+        ),
         backgroundColor: effectiveBackgroundColor,
         duration: duration ?? const Duration(seconds: 4),
         action: action,
@@ -94,7 +115,8 @@ class SnackBarHelper {
 
     final theme = Theme.of(rootContext);
     final effectiveBackgroundColor = backgroundColor ?? 
-        (isError ? Colors.red : theme.colorScheme.surfaceContainerHighest);
+        _getDefaultBackgroundColor(theme, isError);
+    final textColor = _getTextColorForBackground(effectiveBackgroundColor);
     final effectiveDuration = duration ?? const Duration(seconds: 4);
 
     late OverlayEntry overlayEntry;
@@ -123,7 +145,7 @@ class SnackBarHelper {
                         Expanded(
                           child: Text(
                             message,
-                            style: const TextStyle(color: Colors.white),
+                            style: TextStyle(color: textColor),
                           ),
                         ),
                         if (action != null)
@@ -135,7 +157,7 @@ class SnackBarHelper {
                             },
                             child: Text(
                               action.label,
-                              style: const TextStyle(color: Colors.white),
+                              style: TextStyle(color: textColor),
                             ),
                           ),
                       ],

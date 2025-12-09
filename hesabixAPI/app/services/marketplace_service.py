@@ -840,57 +840,95 @@ def get_business_plugin_status(db: Session, business_id: int, plugin_id: int) ->
 
 
 def list_business_plugins(db: Session, business_id: int) -> List[Dict[str, Any]]:
-	now = datetime.utcnow()
-	licenses = (
-		db.query(BusinessPlugin)
-		.filter(BusinessPlugin.business_id == int(business_id))
-		.order_by(BusinessPlugin.id.desc())
-		.all()
-	)
+	import logging
+	from sqlalchemy.exc import SQLAlchemyError
+	
+	logger = logging.getLogger(__name__)
+	
+	try:
+		now = datetime.utcnow()
+		licenses = (
+			db.query(BusinessPlugin)
+			.filter(BusinessPlugin.business_id == int(business_id))
+			.order_by(BusinessPlugin.id.desc())
+			.all()
+		)
 
-	result: List[Dict[str, Any]] = []
-	for license in licenses:
-		plugin = db.query(MarketplacePlugin).filter(MarketplacePlugin.id == license.plugin_id).first()
-		plan = db.query(MarketplacePluginPlan).filter(MarketplacePluginPlan.id == license.plan_id).first()
+		result: List[Dict[str, Any]] = []
+		for license in licenses:
+			try:
+				plugin = db.query(MarketplacePlugin).filter(MarketplacePlugin.id == license.plugin_id).first()
+				plan = db.query(MarketplacePluginPlan).filter(MarketplacePluginPlan.id == license.plan_id).first()
 
-		# بررسی انقضا
-		is_expired = False
-		if license.ends_at and license.ends_at < now:
-			is_expired = True
-			if license.status == "active":
-				license.status = "expired"
-				db.commit()
+				# بررسی انقضا
+				is_expired = False
+				if license.ends_at and license.ends_at < now:
+					is_expired = True
+					if license.status == "active":
+						try:
+							license.status = "expired"
+							db.commit()
+						except SQLAlchemyError as e:
+							logger.warning(
+								f"Failed to update expired license status for license_id={license.id}: {str(e)}",
+								extra={"license_id": license.id, "business_id": business_id}
+							)
+							db.rollback()
+							# ادامه می‌دهیم حتی اگر commit fail شود
 
-		is_active = license.status == "active" and not is_expired
-		
-		# محاسبه روزهای باقی‌مانده trial
-		trial_remaining_days = None
-		if license.is_trial and license.ends_at:
-			remaining = (license.ends_at - now).days
-			trial_remaining_days = max(0, remaining)
+				is_active = license.status == "active" and not is_expired
+				
+				# محاسبه روزهای باقی‌مانده trial
+				trial_remaining_days = None
+				if license.is_trial and license.ends_at:
+					remaining = (license.ends_at - now).days
+					trial_remaining_days = max(0, remaining)
 
-		result.append({
-			"license_id": license.id,
-			"plugin_id": license.plugin_id,
-			"plugin_code": plugin.code if plugin else None,
-			"plugin_name": plugin.name if plugin else None,
-			"plan_id": license.plan_id,
-			"plan_period": plan.period if plan else None,
-			"plan_price": float(plan.price or 0) if plan else None,
-			"status": license.status,
-			"is_active": is_active,
-			"is_expired": is_expired,
-			"is_trial": license.is_trial,
-			"trial_started_at": license.trial_started_at,
-			"trial_remaining_days": trial_remaining_days,
-			"starts_at": license.starts_at,
-			"ends_at": license.ends_at,
-			"auto_renew": license.auto_renew,
-			"created_at": license.created_at,
-			"updated_at": license.updated_at,
-		})
+				result.append({
+					"license_id": license.id,
+					"plugin_id": license.plugin_id,
+					"plugin_code": plugin.code if plugin else None,
+					"plugin_name": plugin.name if plugin else None,
+					"plan_id": license.plan_id,
+					"plan_period": plan.period if plan else None,
+					"plan_price": float(plan.price or 0) if plan else None,
+					"status": license.status,
+					"is_active": is_active,
+					"is_expired": is_expired,
+					"is_trial": license.is_trial,
+					"trial_started_at": license.trial_started_at,
+					"trial_remaining_days": trial_remaining_days,
+					"starts_at": license.starts_at,
+					"ends_at": license.ends_at,
+					"auto_renew": license.auto_renew,
+					"created_at": license.created_at,
+					"updated_at": license.updated_at,
+				})
+			except Exception as e:
+				# اگر خطا در پردازش یک license رخ دهد، آن را لاگ می‌کنیم و ادامه می‌دهیم
+				logger.warning(
+					f"Error processing license_id={license.id} for business_id={business_id}: {str(e)}",
+					exc_info=True,
+					extra={"license_id": license.id, "business_id": business_id}
+				)
+				# ادامه می‌دهیم تا سایر licenses را پردازش کنیم
 
-	return result
+		return result
+	except SQLAlchemyError as e:
+		logger.error(
+			f"Database error in list_business_plugins for business_id={business_id}: {str(e)}",
+			exc_info=True,
+			extra={"business_id": business_id}
+		)
+		db.rollback()
+		raise
+	except Exception as e:
+		logger.error(
+			f"Unexpected error in list_business_plugins for business_id={business_id}: {str(e)}",
+			exc_info=True,
+			extra={"business_id": business_id}
+		)
+		raise
 
 
 def check_and_update_expired_licenses(db: Session) -> Dict[str, Any]:

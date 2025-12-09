@@ -2027,7 +2027,7 @@ class _BusinessShellState extends State<BusinessShell> {
       });
       refreshDialog();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('به‌عنوان خوانده‌شده علامت خورد')));
+        SnackBarHelper.show(context, message: 'به‌عنوان خوانده‌شده علامت خورد');
       }
     } catch (e) {
       if (mounted) {

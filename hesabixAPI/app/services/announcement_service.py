@@ -106,6 +106,66 @@ def admin_publish(db: Session, ann_id: int, active: bool, is_pinned: Optional[bo
 
 
 # ========== User ==========
+def _check_user_has_permission(user_app_permissions: Optional[Dict], permission: str) -> bool:
+	"""
+	بررسی اینکه آیا کاربر permission خاصی را دارد یا نه
+	
+	Args:
+		user_app_permissions: app_permissions کاربر (dict یا None)
+		permission: نام permission مورد نظر (مثلاً "support_operator")
+	
+	Returns:
+		True اگر کاربر این permission را دارد، False در غیر این صورت
+	"""
+	if not user_app_permissions:
+		return False
+	return bool(user_app_permissions.get(permission, False))
+
+
+def _check_user_can_see_announcement(user_id: int, user_app_permissions: Optional[Dict], audience_filters: Optional[Dict]) -> bool:
+	"""
+	بررسی اینکه آیا کاربر مجاز است این اعلان را ببیند یا نه
+	
+	Args:
+		user_id: شناسه کاربر
+		user_app_permissions: app_permissions کاربر (dict یا None)
+		audience_filters: audience_filters اعلان (dict یا None)
+	
+	Returns:
+		True اگر کاربر مجاز است این اعلان را ببیند، False در غیر این صورت
+	"""
+	# اگر audience_filters وجود ندارد، همه می‌توانند ببینند
+	if not audience_filters:
+		return True
+	
+	# بررسی allowed_user_ids (اولویت اول)
+	allowed_user_ids = audience_filters.get("allowed_user_ids")
+	if allowed_user_ids:
+		# اگر لیستی از user_id های مجاز مشخص شده، فقط آنها می‌توانند ببینند
+		if isinstance(allowed_user_ids, list):
+			return user_id in allowed_user_ids
+		# اگر یک عدد است
+		elif isinstance(allowed_user_ids, int):
+			return user_id == allowed_user_ids
+	
+	# بررسی require_permissions
+	require_permissions = audience_filters.get("require_permissions")
+	if require_permissions:
+		# اگر لیستی از permissions مورد نیاز است، کاربر باید حداقل یکی از آنها را داشته باشد
+		if isinstance(require_permissions, list):
+			for permission in require_permissions:
+				if _check_user_has_permission(user_app_permissions, permission):
+					return True
+			# اگر هیچ کدام از permissions را نداشت، نمی‌تواند ببیند
+			return False
+		# اگر یک string است
+		elif isinstance(require_permissions, str):
+			return _check_user_has_permission(user_app_permissions, require_permissions)
+	
+	# اگر هیچ محدودیتی نیست، همه می‌توانند ببینند
+	return True
+
+
 def user_list(
 	db: Session,
 	user_id: int,
@@ -115,6 +175,20 @@ def user_list(
 	only_unread: bool = False,
 	locale: Optional[str] = None,
 ) -> Dict[str, Any]:
+	# دریافت اطلاعات کاربر برای بررسی permissions
+	from adapters.db.models.user import User
+	user = db.query(User).filter(User.id == int(user_id)).first()
+	if not user:
+		return {
+			"items": [],
+			"total": 0,
+			"page": page,
+			"limit": limit,
+			"total_pages": 0,
+		}
+	
+	user_app_permissions = user.app_permissions
+	
 	now = datetime.utcnow()
 	q = db.query(Announcement, UserAnnouncement).outerjoin(
 		UserAnnouncement,
@@ -142,13 +216,37 @@ def user_list(
 			)
 		)
 	q = q.order_by(Announcement.is_pinned.desc(), Announcement.updated_at.desc())
-	items, total, page, total_pages = _paginate(q, page, limit)
+	
+	# ابتدا همه اعلان‌ها را می‌گیریم (بدون pagination) برای فیلتر کردن بر اساس audience_filters
+	all_items = q.all()
+	
+	# فیلتر کردن بر اساس audience_filters
+	filtered_items: List[Tuple[Announcement, Optional[UserAnnouncement]]] = []
+	for a, ua in all_items:
+		# بررسی اینکه آیا کاربر مجاز است این اعلان را ببیند یا نه
+		if _check_user_can_see_announcement(user_id, user_app_permissions, a.audience_filters):
+			filtered_items.append((a, ua))
+	
+	# محاسبه total بر اساس اعلان‌های فیلتر شده
+	total = len(filtered_items)
+	if limit <= 0:
+		limit = 10
+	if page <= 0:
+		page = 1
+	total_pages = (total + limit - 1) // limit if limit > 0 else 1
+	
+	# اعمال pagination
+	offset = (page - 1) * limit
+	paginated_items = filtered_items[offset:offset + limit]
+	
+	# تبدیل به دیکشنری
 	out_items: List[Dict[str, Any]] = []
-	for a, ua in items:
+	for a, ua in paginated_items:
 		item = _to_dict(a)
-		item["is_read"] = bool(getattr(ua, "read_at", None) is not None)
-		item["is_dismissed"] = bool(getattr(ua, "dismissed_at", None) is not None)
+		item["is_read"] = bool(getattr(ua, "read_at", None) is not None) if ua else False
+		item["is_dismissed"] = bool(getattr(ua, "dismissed_at", None) is not None) if ua else False
 		out_items.append(item)
+	
 	return {
 		"items": out_items,
 		"total": total,

@@ -86,24 +86,67 @@ async def create_product_endpoint(
 @router.post("/business/{business_id}/search")
 @require_business_access("business_id")
 def search_products_endpoint(
-    request: Request,
-    business_id: int,
-    query_info: QueryInfo,
-    ctx: AuthContext = Depends(get_current_user),
-    db: Session = Depends(get_db),
-    _: None = Depends(require_business_permission_dep("products", "view")),
+	request: Request,
+	business_id: int,
+	query_info: QueryInfo,
+	ctx: AuthContext = Depends(get_current_user),
+	db: Session = Depends(get_db),
+	_: None = Depends(require_business_permission_dep("products", "view")),
 ) -> Dict[str, Any]:
-    result = list_products(db, business_id, {
-        "take": query_info.take,
-        "skip": query_info.skip,
-        "sort_by": query_info.sort_by,
-        "sort_desc": query_info.sort_desc,
-        "search": query_info.search,
-        "filters": query_info.filters,
-        "include_inventory": query_info.include_inventory,
-        "inventory_as_of_date": query_info.inventory_as_of_date,
-    })
-    return success_response(data=format_datetime_fields(result, request), request=request)
+	import logging
+	from app.core.responses import ApiError
+	from sqlalchemy.exc import SQLAlchemyError
+	
+	logger = logging.getLogger(__name__)
+	
+	try:
+		result = list_products(db, business_id, {
+			"take": query_info.take,
+			"skip": query_info.skip,
+			"sort_by": query_info.sort_by,
+			"sort_desc": query_info.sort_desc,
+			"search": query_info.search,
+			"filters": query_info.filters,
+			"include_inventory": query_info.include_inventory,
+			"inventory_as_of_date": query_info.inventory_as_of_date,
+		})
+		return success_response(data=format_datetime_fields(result, request), request=request)
+	except SQLAlchemyError as e:
+		logger.error(
+			f"Database error in search_products for business_id={business_id}",
+			exc_info=True,
+			extra={
+				"business_id": business_id,
+				"user_id": ctx.get_user_id() if ctx else None,
+				"path": request.url.path,
+				"query": {
+					"take": query_info.take,
+					"skip": query_info.skip,
+					"search": query_info.search,
+				}
+			}
+		)
+		db.rollback()
+		raise ApiError(
+			"DATABASE_ERROR",
+			"خطا در ارتباط با پایگاه داده. لطفاً بعداً تلاش کنید.",
+			http_status=500
+		)
+	except Exception as e:
+		logger.error(
+			f"Unexpected error in search_products for business_id={business_id}: {str(e)}",
+			exc_info=True,
+			extra={
+				"business_id": business_id,
+				"user_id": ctx.get_user_id() if ctx else None,
+				"path": request.url.path,
+			}
+		)
+		raise ApiError(
+			"INTERNAL_SERVER_ERROR",
+			"خطای داخلی سرور رخ داد. لطفاً با پشتیبانی تماس بگیرید.",
+			http_status=500
+		)
 
 
 @router.get("/business/{business_id}/{product_id}")

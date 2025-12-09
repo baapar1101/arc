@@ -13,6 +13,7 @@ import '../../services/workflow_service.dart';
 import '../../widgets/data_table/data_table_config.dart';
 import '../../widgets/permission/permission_widgets.dart';
 import '../../widgets/workflow/workflow_analytics_dialog.dart';
+import '../../utils/snackbar_helper.dart';
 
 class WorkflowsPage extends StatefulWidget {
   final int businessId;
@@ -541,14 +542,12 @@ class _WorkflowsPageState extends State<WorkflowsPage> {
       if (!mounted) return;
       final t = AppLocalizations.of(context);
       final message = result['message']?.toString() ?? t.workflowExecuted;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+      SnackBarHelper.show(context, message: message);
     } catch (e, stackTrace) {
       debugPrint('خطا در اجرای workflow: $e');
       debugPrint('StackTrace: $stackTrace');
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppLocalizations.of(context).workflowErrorExecuting)),
-      );
+      SnackBarHelper.showError(context, message: AppLocalizations.of(context).workflowErrorExecuting);
     }
   }
 

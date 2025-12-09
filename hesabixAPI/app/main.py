@@ -1159,6 +1159,41 @@ def create_app() -> FastAPI:
         return response
 
     @application.middleware("http")
+    async def track_request_context(request: Request, call_next):
+        """Middleware برای ذخیره اطلاعات request در context variable برای connection leak tracking"""
+        from adapters.db.session import _request_context
+        
+        # استخراج user_id از request state (اگر در دسترس باشد)
+        user_id = None
+        try:
+            if hasattr(request.state, 'user_id'):
+                user_id = request.state.user_id
+            elif hasattr(request.state, 'auth_context'):
+                auth_ctx = request.state.auth_context
+                if hasattr(auth_ctx, 'get_user_id'):
+                    user_id = auth_ctx.get_user_id()
+        except Exception:
+            pass
+        
+        # ذخیره اطلاعات request در context variable
+        request_info = {
+            'path': str(request.url.path),
+            'method': request.method,
+            'user_id': user_id,
+            'client_ip': request.client.host if request.client else None,
+        }
+        
+        # تنظیم context variable
+        token = _request_context.set(request_info)
+        
+        try:
+            response = await call_next(request)
+            return response
+        finally:
+            # پاک کردن context variable
+            _request_context.reset(token)
+
+    @application.middleware("http")
     async def log_slow_requests(request: Request, call_next):
         import time
         import structlog

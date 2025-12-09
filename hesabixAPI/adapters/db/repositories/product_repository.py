@@ -14,7 +14,7 @@ class ProductRepository(BaseRepository[Product]):
     def __init__(self, db: Session) -> None:
         super().__init__(db, Product)
 
-    def search(self, *, business_id: int, take: int = 20, skip: int = 0, sort_by: str | None = None, sort_desc: bool = True, search: str | None = None, filters: dict[str, Any] | None = None) -> dict[str, Any]:
+    def search(self, *, business_id: int, take: int = 20, skip: int = 0, sort_by: str | None = None, sort_desc: bool = True, search: str | None = None, filters: dict[str, Any] | None = None, include_inventory: bool = False, inventory_as_of_date: str | None = None) -> dict[str, Any]:
         stmt = select(Product).where(Product.business_id == business_id)
 
         if search:
@@ -62,8 +62,14 @@ class ProductRepository(BaseRepository[Product]):
                 # Category ID filter (supports "in" operator for multi-select)
                 if field == "category_id":
                     if operator == "in" and isinstance(value, (list, tuple)):
-                        # Convert string IDs to integers
-                        category_ids = [int(v) for v in value if v]
+                        # Convert string IDs to integers with error handling
+                        category_ids = []
+                        for v in value:
+                            if v:
+                                try:
+                                    category_ids.append(int(v))
+                                except (ValueError, TypeError):
+                                    pass
                         if category_ids:
                             stmt = stmt.where(Product.category_id.in_(category_ids))
                     elif operator == "=":
@@ -92,12 +98,115 @@ class ProductRepository(BaseRepository[Product]):
         )
         rows = list(self.db.execute(stmt).unique().scalars().all())
 
+        # محاسبه موجودی‌ها اگر include_inventory فعال باشد
+        inventory_data = {}
+        if include_inventory:
+            from datetime import date as date_type
+            from decimal import Decimal
+            
+            # تبدیل تاریخ
+            as_of_date_obj = date_type.today()
+            if inventory_as_of_date:
+                try:
+                    # پشتیبانی از فرمت YYYY-MM-DD و YYYY/MM/DD
+                    date_str = inventory_as_of_date.replace('/', '-')
+                    as_of_date_obj = date_type.fromisoformat(date_str)
+                except Exception:
+                    pass
+            
+            # جدا کردن کالاهای unique و bulk
+            unique_products = [p for p in rows if p.track_inventory and getattr(p, 'inventory_mode', None) == "unique"]
+            bulk_products = [p for p in rows if p.track_inventory and getattr(p, 'inventory_mode', None) != "unique"]
+            
+            unique_product_ids = [p.id for p in unique_products]
+            bulk_product_ids = [p.id for p in bulk_products]
+            
+            # محاسبه موجودی برای کالاهای unique (از ProductInstance)
+            if unique_product_ids:
+                try:
+                    from adapters.db.models.product_instance import ProductInstance
+                    
+                    # شمارش ProductInstance های available برای موجودی حسابداری
+                    # (برای unique، موجودی حسابداری و انبارداری یکسان است - تعداد instance های available)
+                    accounting_counts = (
+                        self.db.query(
+                            ProductInstance.product_id,
+                            func.count(ProductInstance.id).label('count')
+                        )
+                        .filter(
+                            and_(
+                                ProductInstance.business_id == business_id,
+                                ProductInstance.product_id.in_(unique_product_ids),
+                                ProductInstance.status == "available",
+                            )
+                        )
+                        .group_by(ProductInstance.product_id)
+                        .all()
+                    )
+                    
+                    for pid, count in accounting_counts:
+                        inventory_data[pid] = {
+                            'accounting': float(count),
+                            'warehouse': float(count),  # برای unique، هر دو یکسان هستند
+                        }
+                    
+                    # برای کالاهای unique که instance ندارند، موجودی 0 است
+                    for pid in unique_product_ids:
+                        if pid not in inventory_data:
+                            inventory_data[pid] = {
+                                'accounting': 0.0,
+                                'warehouse': 0.0,
+                            }
+                except Exception:
+                    # در صورت خطا، موجودی 0 برای همه unique products
+                    for pid in unique_product_ids:
+                        if pid not in inventory_data:
+                            inventory_data[pid] = {
+                                'accounting': 0.0,
+                                'warehouse': 0.0,
+                            }
+            
+            # محاسبه موجودی برای کالاهای bulk (از حرکات اسناد)
+            if bulk_product_ids:
+                # محاسبه موجودی حسابداری (از اسناد حسابداری)
+                try:
+                    from app.services.invoice_service import get_financial_stock_bulk
+                    accounting_stocks = get_financial_stock_bulk(
+                        db=self.db,
+                        business_id=business_id,
+                        product_ids=bulk_product_ids,
+                        as_of_date=as_of_date_obj,
+                        warehouse_id=None,  # موجودی کل (بدون تفکیک انبار)
+                    )
+                    for pid, stock in accounting_stocks.items():
+                        if pid not in inventory_data:
+                            inventory_data[pid] = {}
+                        inventory_data[pid]['accounting'] = float(stock)
+                except Exception:
+                    pass
+                
+                # محاسبه موجودی انبارداری (از حواله‌های انبار)
+                try:
+                    from app.services.warehouse_service import get_physical_stock_bulk
+                    warehouse_stocks = get_physical_stock_bulk(
+                        db=self.db,
+                        business_id=business_id,
+                        product_ids=bulk_product_ids,
+                        as_of_date=as_of_date_obj,
+                    )
+                    for pid, stock in warehouse_stocks.items():
+                        if pid not in inventory_data:
+                            inventory_data[pid] = {}
+                        inventory_data[pid]['warehouse'] = float(stock)
+                except Exception:
+                    pass
+
         def _to_dict(p: Product) -> dict[str, Any]:
             # دریافت attribute_ids از ProductAttributeLink
             links = self.db.query(ProductAttributeLink).filter(ProductAttributeLink.product_id == p.id).all()
             attribute_ids = [link.attribute_id for link in links]
             
-            return {
+            result = {
                 "id": p.id,
                 "business_id": p.business_id,
                 "item_type": p.item_type.value if hasattr(p.item_type, 'value') else str(p.item_type),
@@ -109,7 +218,7 @@ class ProductRepository(BaseRepository[Product]):
                     (p.category.title_translations or {}).get("fa")
                     or (p.category.title_translations or {}).get("en")
                     or ""
-                ) if p.category else None,
+                ) if (p.category and hasattr(p.category, 'title_translations')) else None,
                 "main_unit": p.main_unit,
                 "secondary_unit": p.secondary_unit,
                 "unit_conversion_factor": p.unit_conversion_factor,
@@ -121,7 +230,7 @@ class ProductRepository(BaseRepository[Product]):
                 "reorder_point": p.reorder_point,
                 "min_order_qty": p.min_order_qty,
                 "lead_time_days": p.lead_time_days,
-                "inventory_mode": p.inventory_mode or "bulk",
+                "inventory_mode": getattr(p, 'inventory_mode', None) or "bulk",
                 "track_serial": p.track_serial,
                 "track_barcode": p.track_barcode,
                 "is_sales_taxable": p.is_sales_taxable,
@@ -135,11 +244,29 @@ class ProductRepository(BaseRepository[Product]):
                 "image_file_id": p.image_file_id,
                 "image_url": f"/api/v1/business/{p.business_id}/storage/files/{p.image_file_id}/download" if p.image_file_id else None,
                 "default_warehouse_id": p.default_warehouse_id,
-                "default_warehouse_name": p.default_warehouse.name if p.default_warehouse else None,
-                "default_warehouse_code": p.default_warehouse.code if p.default_warehouse else None,
+                "default_warehouse_name": (p.default_warehouse.name if hasattr(p.default_warehouse, 'name') else None) if p.default_warehouse else None,
+                "default_warehouse_code": (p.default_warehouse.code if hasattr(p.default_warehouse, 'code') else None) if p.default_warehouse else None,
                 "created_at": p.created_at,
                 "updated_at": p.updated_at,
             }
+            
+            # اضافه کردن موجودی‌ها اگر محاسبه شده باشند
+            if include_inventory and p.track_inventory:
+                pid = p.id
+                if pid in inventory_data:
+                    # استفاده از get با مقدار پیش‌فرض 0.0 برای اطمینان از برگرداندن عدد
+                    result["inventory_stock_accounting"] = inventory_data[pid].get("accounting", 0.0)
+                    result["inventory_stock_warehouse"] = inventory_data[pid].get("warehouse", 0.0)
+                else:
+                    # اگر در inventory_data نیست، یعنی موجودی 0 است (نه null)
+                    result["inventory_stock_accounting"] = 0.0
+                    result["inventory_stock_warehouse"] = 0.0
+            elif include_inventory:
+                # اگر track_inventory false باشد، موجودی null است
+                result["inventory_stock_accounting"] = None
+                result["inventory_stock_warehouse"] = None
+            
+            return result
 
         items = [_to_dict(r) for r in rows]
 

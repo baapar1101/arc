@@ -435,15 +435,17 @@ def _resolve_top_selling_products(
     except Exception:
         limit = 10
 
-    # Query invoice item lines for sales invoices
-    q = (
+    # بهینه‌سازی: استفاده از aggregation در SQL برای quantity
+    # برای amount، از روش hybrid استفاده می‌کنیم (SQL برای quantity، Python برای amount)
+    currency_id = filters.get("currency_id")
+    
+    # Query برای quantity aggregation در SQL (سریع‌تر)
+    quantity_query = (
         db.query(
             Product.id.label("product_id"),
             Product.code.label("product_code"),
             Product.name.label("product_name"),
-            InvoiceItemLine.quantity,
-            InvoiceItemLine.extra_info,
-            Document.currency_id,
+            func.sum(InvoiceItemLine.quantity).label("total_quantity")
         )
         .join(InvoiceItemLine, InvoiceItemLine.product_id == Product.id)
         .join(Document, Document.id == InvoiceItemLine.document_id)
@@ -454,53 +456,91 @@ def _resolve_top_selling_products(
                 Document.is_proforma == False,  # noqa: E712
             )
         )
+        .group_by(Product.id, Product.code, Product.name)
     )
     
     # If calculation_type is 'amount', filter by currency_id if provided
-    currency_id = filters.get("currency_id")
     if calculation_type == "amount" and currency_id is not None:
         try:
             currency_id_int = int(currency_id)
-            q = q.filter(Document.currency_id == currency_id_int)
+            quantity_query = quantity_query.filter(Document.currency_id == currency_id_int)
         except Exception:
             pass
     
-    rows = q.all()
-    
-    # Aggregate by product
-    product_agg: Dict[int, Dict[str, Any]] = {}
-    
-    for row in rows:
-        product_id = int(row.product_id)
-        
-        if product_id not in product_agg:
-            product_agg[product_id] = {
-                "product_id": product_id,
-                "product_code": row.product_code,
-                "product_name": row.product_name,
-                "total_quantity": 0.0,
-                "total_amount": 0.0,
-            }
-        
-        # Extract quantity
-        qty = float(row.quantity) if row.quantity else 0.0
-        product_agg[product_id]["total_quantity"] += qty
-        
-        # Extract amount from extra_info
-        extra_info = row.extra_info or {}
-        line_total = float(extra_info.get("line_total", 0) or 0)
-        product_agg[product_id]["total_amount"] += line_total
-    
-    # Convert to list and sort
-    products_list = list(product_agg.values())
-    
+    # Order by و limit در SQL
     if calculation_type == "quantity":
-        products_list.sort(key=lambda x: x["total_quantity"], reverse=True)
+        quantity_query = quantity_query.order_by(func.sum(InvoiceItemLine.quantity).desc())
     else:
-        products_list.sort(key=lambda x: x["total_amount"], reverse=True)
+        # برای amount، ابتدا بر اساس quantity مرتب می‌کنیم (تقریبی)
+        quantity_query = quantity_query.order_by(func.sum(InvoiceItemLine.quantity).desc())
     
-    # Limit results
-    products_list = products_list[:limit]
+    # افزایش limit برای amount (چون بعداً بر اساس amount مرتب می‌کنیم)
+    query_limit = limit * 3 if calculation_type == "amount" else limit
+    quantity_query = quantity_query.limit(query_limit)
+    
+    # اجرای query
+    quantity_rows = quantity_query.all()
+    
+    # برای amount، باید extra_info را هم بخوانیم
+    if calculation_type == "amount":
+        product_ids = [int(row.product_id) for row in quantity_rows]
+        if product_ids:
+            # خواندن extra_info فقط برای product های انتخاب شده
+            amount_query = (
+                db.query(
+                    Product.id.label("product_id"),
+                    InvoiceItemLine.extra_info
+                )
+                .join(InvoiceItemLine, InvoiceItemLine.product_id == Product.id)
+                .join(Document, Document.id == InvoiceItemLine.document_id)
+                .filter(
+                    and_(
+                        Document.business_id == business_id,
+                        Document.document_type == INVOICE_SALES,
+                        Document.is_proforma == False,  # noqa: E712
+                        Product.id.in_(product_ids)
+                    )
+                )
+            )
+            if currency_id is not None:
+                try:
+                    currency_id_int = int(currency_id)
+                    amount_query = amount_query.filter(Document.currency_id == currency_id_int)
+                except Exception:
+                    pass
+            
+            amount_rows = amount_query.all()
+            # Aggregate amount در Python (فقط برای product های انتخاب شده)
+            amount_by_product: Dict[int, float] = {}
+            for row in amount_rows:
+                product_id = int(row.product_id)
+                extra_info = row.extra_info or {}
+                line_total = float(extra_info.get("line_total", 0) or 0)
+                amount_by_product[product_id] = amount_by_product.get(product_id, 0) + line_total
+        else:
+            amount_by_product = {}
+    else:
+        amount_by_product = {}
+    
+    # تبدیل نتایج به فرمت مورد نیاز
+    products_list = []
+    for row in quantity_rows:
+        product_id = int(row.product_id)
+        total_quantity = float(row.total_quantity or 0)
+        total_amount = amount_by_product.get(product_id, 0.0) if calculation_type == "amount" else 0.0
+        
+        products_list.append({
+            "product_id": product_id,
+            "product_code": row.product_code,
+            "product_name": row.product_name,
+            "total_quantity": total_quantity,
+            "total_amount": total_amount,
+        })
+    
+    # برای amount، بر اساس total_amount مرتب می‌کنیم
+    if calculation_type == "amount":
+        products_list.sort(key=lambda x: x["total_amount"], reverse=True)
+        products_list = products_list[:limit]
     
     result = {
         "items": products_list,

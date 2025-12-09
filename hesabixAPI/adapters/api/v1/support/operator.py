@@ -146,6 +146,17 @@ async def update_ticket_status(
     """تغییر وضعیت تیکت"""
     ticket_repo = TicketRepository(db)
     
+    # دریافت وضعیت قبلی تیکت
+    old_ticket = ticket_repo.get_operator_ticket_with_details(ticket_id)
+    if not old_ticket:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="تیکت یافت نشد"
+        )
+    
+    old_status_id = old_ticket.status_id
+    old_status_name = old_ticket.status.name if old_ticket.status else "نامشخص"
+    
     ticket = ticket_repo.update_ticket_status(
         ticket_id=ticket_id,
         status_id=status_request.status_id,
@@ -158,8 +169,39 @@ async def update_ticket_status(
             detail="تیکت یافت نشد"
         )
     
-    # دریافت تیکت با جزئیات
+    db.commit()
+    
+    # دریافت تیکت با جزئیات جدید
     ticket_with_details = ticket_repo.get_operator_ticket_with_details(ticket_id)
+    new_status_name = ticket_with_details.status.name if ticket_with_details.status else "نامشخص"
+    
+    # ارسال ناتیفیکیشن به کاربر صاحب تیکت (اگر وضعیت تغییر کرده باشد)
+    if old_status_id != status_request.status_id and ticket_with_details.user_id:
+        try:
+            notification_service = NotificationService(db)
+            operator_name = f"{current_user.user.first_name or ''} {current_user.user.last_name or ''}".strip() or "اپراتور پشتیبانی"
+            
+            context = {
+                "subject": f"وضعیت تیکت #{ticket_id} تغییر کرد",
+                "message": f"وضعیت تیکت شما (#{ticket_id}: {ticket.title}) از '{old_status_name}' به '{new_status_name}' تغییر کرد.",
+                "ticket_id": ticket_id,
+                "ticket_title": ticket.title,
+                "operator_name": operator_name,
+                "old_status": old_status_name,
+                "new_status": new_status_name,
+                "user_id": ticket_with_details.user_id  # برای audience_filters
+            }
+            
+            notification_service.send(
+                user_id=ticket_with_details.user_id,
+                event_key="support.ticket_status_changed",
+                context=context,
+                preferred_channels=["inapp", "email", "telegram"],
+                broadcast_mode=False
+            )
+        except Exception as e:
+            logger = logging.getLogger(__name__)
+            logger.error(f"خطا در ارسال ناتیفیکیشن برای تغییر وضعیت تیکت {ticket_id}: {e}")
     
     # Format datetime fields based on calendar type
     ticket_data = TicketResponse.from_orm(ticket_with_details).dict()
@@ -178,8 +220,31 @@ async def assign_ticket(
     db: Session = Depends(get_db)
 ):
     """تخصیص تیکت به اپراتور"""
-    ticket_repo = TicketRepository(db)
+    from adapters.db.repositories.user_repo import UserRepository
     
+    ticket_repo = TicketRepository(db)
+    user_repo = UserRepository(db)
+    
+    # بررسی اینکه operator_id واقعاً یک اپراتور است
+    if assign_request.operator_id:
+        if not user_repo.is_support_operator(assign_request.operator_id):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="کاربر مشخص شده یک اپراتور پشتیبانی نیست"
+            )
+    
+    # بررسی وجود تیکت
+    ticket = ticket_repo.get_operator_ticket_with_details(ticket_id)
+    if not ticket:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="تیکت یافت نشد"
+        )
+    
+    old_operator_id = ticket.assigned_operator_id
+    new_operator_id = assign_request.operator_id
+    
+    # تخصیص تیکت
     ticket = ticket_repo.assign_ticket(ticket_id, assign_request.operator_id)
     if not ticket:
         raise HTTPException(
@@ -187,8 +252,37 @@ async def assign_ticket(
             detail="تیکت یافت نشد"
         )
     
+    db.commit()
+    
     # دریافت تیکت با جزئیات
     ticket_with_details = ticket_repo.get_operator_ticket_with_details(ticket_id)
+    
+    # ارسال ناتیفیکیشن به اپراتور جدید (اگر تغییر کرده باشد)
+    if new_operator_id and new_operator_id != old_operator_id:
+        try:
+            notification_service = NotificationService(db)
+            operator = user_repo.get_by_id(new_operator_id)
+            operator_name = f"{operator.first_name or ''} {operator.last_name or ''}".strip() if operator else "اپراتور پشتیبانی"
+            
+            context = {
+                "subject": f"تیکت جدید به شما تخصیص داده شد: #{ticket_id}",
+                "message": f"تیکت #{ticket_id}: {ticket.title} به شما تخصیص داده شد.",
+                "ticket_id": ticket_id,
+                "ticket_title": ticket.title,
+                "operator_name": operator_name,
+                "user_id": ticket_with_details.user_id  # برای audience_filters (اگر نیاز باشد)
+            }
+            
+            notification_service.send(
+                user_id=new_operator_id,
+                event_key="support.ticket_assigned",
+                context=context,
+                preferred_channels=["inapp", "email", "telegram"],
+                broadcast_mode=False
+            )
+        except Exception as e:
+            logger = logging.getLogger(__name__)
+            logger.error(f"خطا در ارسال ناتیفیکیشن برای تخصیص تیکت {ticket_id}: {e}")
     
     # Format datetime fields based on calendar type
     ticket_data = TicketResponse.from_orm(ticket_with_details).dict()
@@ -218,6 +312,12 @@ async def send_operator_message(
             detail="تیکت یافت نشد"
         )
     
+    # بررسی تخصیص: اگر تیکت به اپراتور دیگری تخصیص شده، فقط هشدار می‌دهیم اما اجازه پاسخ می‌دهیم
+    # (ممکن است اپراتورها بخواهند به تیکت‌های یکدیگر کمک کنند)
+    if ticket.assigned_operator_id and ticket.assigned_operator_id != current_user.get_user_id():
+        logger = logging.getLogger(__name__)
+        logger.info(f"اپراتور {current_user.get_user_id()} به تیکت {ticket_id} که به اپراتور {ticket.assigned_operator_id} تخصیص شده پاسخ می‌دهد")
+    
     # ایجاد پیام
     message = message_repo.create_message(
         ticket_id=ticket_id,
@@ -230,6 +330,7 @@ async def send_operator_message(
     # اگر تیکت هنوز به اپراتور تخصیص نشده، آن را تخصیص ده
     if not ticket.assigned_operator_id:
         ticket_repo.assign_ticket(ticket_id, current_user.get_user_id())
+        db.commit()
     
     # ارسال ناتیفیکیشن به کاربر (فقط برای پیام‌های غیرداخلی)
     if not message_request.is_internal and ticket.user_id:
@@ -252,7 +353,7 @@ async def send_operator_message(
                 event_key="support.operator_reply",
                 context=context,
                 preferred_channels=["inapp", "email", "telegram", "sms"],
-                broadcast_mode=True
+                broadcast_mode=False
             )
         except Exception as e:
             # در صورت خطا، لاگ می‌کنیم اما فرآیند اصلی ادامه می‌یابد

@@ -23,6 +23,7 @@ import 'check_combobox_widget.dart';
 import '../../models/invoice_type_model.dart';
 import '../../utils/number_normalizer.dart';
 import '../../core/api_client.dart';
+import '../../widgets/date_input_field.dart';
 
 class InvoiceTransactionsWidget extends StatefulWidget {
   final List<InvoiceTransaction> transactions;
@@ -1242,26 +1243,26 @@ class _TransactionDialogState extends State<TransactionDialog> {
                       const SizedBox(height: 16),
                       
                       // تاریخ تراکنش
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextFormField(
-                              readOnly: true,
-                              decoration: InputDecoration(
-                                labelText: 'تاریخ تراکنش *',
-                                border: const OutlineInputBorder(),
-                                suffixIcon: const Icon(Icons.calendar_today),
-                              ),
-                              onTap: () => _selectDate(),
-                              controller: TextEditingController(
-                                text: HesabixDateUtils.formatForDisplay(
-                                  _transactionDate,
-                                  widget.calendarController.isJalali == true,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
+                      DateInputField(
+                        value: _transactionDate,
+                        onChanged: (date) {
+                          if (date != null) {
+                            setState(() {
+                              _transactionDate = date;
+                            });
+                          }
+                        },
+                        labelText: 'تاریخ تراکنش *',
+                        helpText: 'انتخاب تاریخ تراکنش',
+                        calendarController: widget.calendarController,
+                        firstDate: DateTime(2020),
+                        lastDate: DateTime(2030),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'تاریخ تراکنش الزامی است';
+                          }
+                          return null;
+                        },
                       ),
                       const SizedBox(height: 16),
                       
@@ -1526,20 +1527,6 @@ class _TransactionDialogState extends State<TransactionDialog> {
     );
   }
 
-  Future<void> _selectDate() async {
-    final date = await showDatePicker(
-      context: context,
-      initialDate: _transactionDate,
-      firstDate: DateTime(2020),
-      lastDate: DateTime(2030),
-    );
-    
-    if (date != null) {
-      setState(() {
-        _transactionDate = date;
-      });
-    }
-  }
 
   void _saveTransaction() {
     if (!_formKey.currentState!.validate()) return;

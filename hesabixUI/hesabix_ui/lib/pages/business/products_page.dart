@@ -1114,7 +1114,7 @@ class _ProductsPageState extends State<ProductsPage> {
             ),
             // موجودی انبارداری (فیزیکی)
             NumberColumn(
-              'inventory_stock_physical',
+              'inventory_stock_warehouse',
               'موجودی انبارداری',
               width: ColumnWidth.medium,
               decimalPlaces: 0,
@@ -1123,17 +1123,22 @@ class _ProductsPageState extends State<ProductsPage> {
                 if (row['track_inventory'] != true) {
                   return '-';
                 }
-                final stock = row['inventory_stock_physical'];
+                // پشتیبانی از نام‌های قدیمی برای سازگاری
+                final stock = row['inventory_stock_warehouse'] ?? row['inventory_stock_physical'];
+                // اگر null است و track_inventory true است، یعنی موجودی محاسبه نشده (مثلاً خطا) - "-" نمایش بده
+                // اگر 0 است، "0" نمایش بده
                 if (stock == null) {
                   return '-';
                 }
-                return formatWithThousands(stock, decimalPlaces: 0);
+                // تبدیل به عدد برای اطمینان از نمایش صحیح
+                final stockNum = (stock is num) ? stock : (double.tryParse(stock.toString()) ?? 0.0);
+                return formatWithThousands(stockNum, decimalPlaces: 0);
               },
             ),
-            // موجودی مالی
+            // موجودی حسابداری (مالی)
             NumberColumn(
-              'inventory_stock_financial',
-              'موجودی مالی',
+              'inventory_stock_accounting',
+              'موجودی حسابداری',
               width: ColumnWidth.medium,
               decimalPlaces: 0,
               sortable: false,
@@ -1141,11 +1146,16 @@ class _ProductsPageState extends State<ProductsPage> {
                 if (row['track_inventory'] != true) {
                   return '-';
                 }
-                final stock = row['inventory_stock_financial'];
+                // پشتیبانی از نام‌های قدیمی برای سازگاری
+                final stock = row['inventory_stock_accounting'] ?? row['inventory_stock_financial'];
+                // اگر null است و track_inventory true است، یعنی موجودی محاسبه نشده (مثلاً خطا) - "-" نمایش بده
+                // اگر 0 است، "0" نمایش بده
                 if (stock == null) {
                   return '-';
                 }
-                return formatWithThousands(stock, decimalPlaces: 0);
+                // تبدیل به عدد برای اطمینان از نمایش صحیح
+                final stockNum = (stock is num) ? stock : (double.tryParse(stock.toString()) ?? 0.0);
+                return formatWithThousands(stockNum, decimalPlaces: 0);
               },
             ),
             // شارژ انبار
@@ -1161,10 +1171,11 @@ class _ProductsPageState extends State<ProductsPage> {
                   return const Center(child: Text('-'));
                 }
                 
-                final stockFinancial = item['inventory_stock_financial'];
+                // استفاده از موجودی حسابداری (با پشتیبانی از نام قدیمی)
+                final stockFinancial = item['inventory_stock_accounting'] ?? item['inventory_stock_financial'];
                 final reorderPoint = item['reorder_point'];
                 
-                // اگر موجودی مالی یا نقطه سفارش مجدد null باشد، ضربدر نمایش بده
+                // اگر موجودی حسابداری یا نقطه سفارش مجدد null باشد، ضربدر نمایش بده
                 if (stockFinancial == null || reorderPoint == null) {
                   return const Center(
                     child: Icon(
@@ -1178,7 +1189,7 @@ class _ProductsPageState extends State<ProductsPage> {
                 final stock = (stockFinancial is num) ? stockFinancial.toDouble() : 0.0;
                 final reorder = (reorderPoint is num) ? reorderPoint.toDouble() : 0.0;
                 
-                // اگر موجودی مالی کمتر از نقطه سفارش مجدد باشد، تیک بزن
+                // اگر موجودی حسابداری کمتر از نقطه سفارش مجدد باشد، تیک بزن
                 if (stock < reorder) {
                   return const Center(
                     child: Icon(

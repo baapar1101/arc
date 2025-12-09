@@ -44,15 +44,11 @@ def list_business_currencies(
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> dict:
-    business = (
-        db.query(Business)
-        .options(
-            joinedload(Business.default_currency),
-            joinedload(Business.currencies),
-        )
-        .filter(Business.id == business_id)
-        .first()
-    )
+    # بهینه‌سازی: استفاده از query مستقیم به جای joinedload برای کاهش زمان
+    from adapters.db.models.currency import Currency, BusinessCurrency
+    
+    # دریافت business برای بررسی default_currency_id
+    business = db.query(Business).filter(Business.id == business_id).first()
     if not business:
         raise ApiError("NOT_FOUND", "کسب‌وکار یافت نشد", http_status=404)
 
@@ -60,20 +56,29 @@ def list_business_currencies(
     result = []
 
     # Add default currency first if exists
-    if business.default_currency:
-        c = business.default_currency
-        result.append({
-            "id": c.id,
-            "name": c.name,
-            "title": c.title,
-            "symbol": c.symbol,
-            "code": c.code,
-            "is_default": True,
-        })
-        seen_ids.add(c.id)
+    if business.default_currency_id:
+        default_currency = db.query(Currency).filter(Currency.id == business.default_currency_id).first()
+        if default_currency:
+            result.append({
+                "id": default_currency.id,
+                "name": default_currency.name,
+                "title": default_currency.title,
+                "symbol": default_currency.symbol,
+                "code": default_currency.code,
+                "is_default": True,
+            })
+            seen_ids.add(default_currency.id)
 
     # Add active business currencies (excluding duplicates)
-    for c in business.currencies or []:
+    # استفاده از query مستقیم به جای relationship
+    business_currencies = (
+        db.query(Currency)
+        .join(BusinessCurrency, BusinessCurrency.currency_id == Currency.id)
+        .filter(BusinessCurrency.business_id == business_id)
+        .all()
+    )
+    
+    for c in business_currencies:
         if c.id in seen_ids:
             continue
         result.append({

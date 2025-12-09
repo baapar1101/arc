@@ -12,8 +12,24 @@ router = APIRouter(prefix="/jobs", tags=["jobs"])
 
 
 @router.get("/{job_id}")
-async def get_job_status(request: Request, job_id: str):
+async def get_job_status(
+    request: Request, 
+    job_id: str, 
+    ctx: AuthContext = Depends(get_current_user),
+):
     """دریافت وضعیت job"""
+    # این endpoint فقط از queue service استفاده می‌کند و نیازی به db ندارد
+    queue_service = get_queue_service()
+    
+    # ابتدا از QueueService بررسی کن (برای RQ jobs)
+    if queue_service and queue_service.enabled:
+        job_status = queue_service.get_job_status(job_id)
+        if job_status:
+            # همیشه وضعیت job را برگردان (نه مستقیماً نتیجه)
+            # Frontend خودش نتیجه را از job_status["result"] استخراج می‌کند
+            return success_response(job_status, request=request)
+    
+    # Fallback به JobManager (برای memory-based jobs)
     st = JobManager.instance().get(job_id)
     if not st:
         raise ApiError("JOB_NOT_FOUND", "Job not found", http_status=404)

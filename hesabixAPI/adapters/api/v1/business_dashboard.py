@@ -1,5 +1,6 @@
 # Removed __future__ annotations to fix OpenAPI schema generation
 
+import structlog
 from fastapi import APIRouter, Depends, Request, HTTPException
 from sqlalchemy.orm import Session
 
@@ -20,6 +21,7 @@ from app.services.dashboard_widgets_service import (
     save_business_default_layout,
 )
 
+logger = structlog.get_logger()
 router = APIRouter(prefix="/business", tags=["business-dashboard"])
 
 
@@ -258,53 +260,29 @@ def get_business_info_with_permissions(
     db: Session = Depends(get_db)
 ) -> dict:
     """دریافت اطلاعات کسب و کار همراه با دسترسی‌های کاربر"""
-    import logging
-    logger = logging.getLogger(__name__)
-    
-    logger.info(f"=== get_business_info_with_permissions START ===")
-    logger.info(f"Business ID: {business_id}")
-    logger.info(f"User ID: {ctx.get_user_id()}")
-    logger.info(f"User context business_id: {ctx.business_id}")
-    logger.info(f"Is superadmin: {ctx.is_superadmin()}")
-    logger.info(f"Is business owner: {ctx.is_business_owner(business_id)}")
-    
     from adapters.db.models.business import Business
     from adapters.db.repositories.business_permission_repo import BusinessPermissionRepository
     
     # دریافت اطلاعات کسب و کار
     business = db.get(Business, business_id)
     if not business:
-        logger.error(f"Business {business_id} not found")
         from app.core.responses import ApiError
         raise ApiError("NOT_FOUND", "Business not found", http_status=404)
-    
-    logger.info(f"Business found: {business.name} (Owner ID: {business.owner_id})")
     
     # دریافت دسترسی‌های کاربر
     permissions = {}
     
-    # Debug logging
-    logger.info(f"Checking permissions for user {ctx.get_user_id()}")
-    logger.info(f"Is superadmin: {ctx.is_superadmin()}")
-    logger.info(f"Is business owner of {business_id}: {ctx.is_business_owner(business_id)}")
-    logger.info(f"Context business_id: {ctx.business_id}")
-    
     if ctx.is_superadmin():
-        logger.info("User is superadmin, but superadmin permissions don't apply to business operations")
         # SuperAdmin فقط برای مدیریت سیستم است، نه برای کسب و کارهای خاص
         # باید دسترسی‌های کسب و کار را از جدول business_permissions دریافت کند
         permission_repo = BusinessPermissionRepository(db)
         business_permission = permission_repo.get_by_user_and_business(ctx.get_user_id(), business_id)
-        logger.info(f"Business permission object for superadmin: {business_permission}")
         
         if business_permission:
             permissions = business_permission.business_permissions or {}
-            logger.info(f"Superadmin business permissions: {permissions}")
         else:
-            logger.info("No business permission found for superadmin user")
             permissions = {}
     elif ctx.is_business_owner(business_id):
-        logger.info("User is business owner, granting full permissions")
         # مالک کسب و کار تمام دسترسی‌ها را دارد
         permissions = {
             "people": {"add": True, "edit": True, "view": True, "delete": True},
@@ -333,18 +311,13 @@ def get_business_info_with_permissions(
             "join": True
         }
     else:
-        logger.info("User is not superadmin and not business owner, checking permissions")
         # دریافت دسترسی‌های کسب و کار از business_permissions
         permission_repo = BusinessPermissionRepository(db)
         # ترتیب آرگومان‌ها: (user_id, business_id)
         business_permission = permission_repo.get_by_user_and_business(ctx.get_user_id(), business_id)
-        logger.info(f"Business permission object: {business_permission}")
         
         if business_permission:
             permissions = business_permission.business_permissions or {}
-            logger.info(f"User permissions: {permissions}")
-        else:
-            logger.info("No business permission found for user")
     
     business_info = {
         "id": business.id,
@@ -369,7 +342,6 @@ def get_business_info_with_permissions(
         "has_access": has_access
     }
     
-    logger.info(f"Response data: {response_data}")
     logger.info(f"=== get_business_info_with_permissions END ===")
     
     formatted_data = format_datetime_fields(response_data, request)
@@ -389,22 +361,13 @@ def list_dashboard_widget_definitions(
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> dict:
-    # ایجاد AuthContext با business_id صحیح برای بررسی دسترسی‌ها
-    # ctx ممکن است business_id نداشته باشد، پس باید آن را تنظیم کنیم
+    # بهینه‌سازی: فقط business_id را تنظیم می‌کنیم و business_permissions را lazy load می‌کنیم
+    # این باعث می‌شود query های اضافی انجام نشود
     if ctx.business_id != business_id:
-        # ایجاد یک AuthContext جدید با business_id صحیح
-        from app.core.auth_dependency import AuthContext
-        ctx_with_business = AuthContext(
-            user=ctx.user,
-            api_key_id=ctx.api_key_id,
-            language=ctx.language,
-            calendar_type=ctx.calendar_type,
-            timezone=ctx.timezone,
-            business_id=business_id,
-            fiscal_year_id=ctx.fiscal_year_id,
-            db=db
-        )
-        ctx = ctx_with_business
+        # تنظیم business_id در ctx موجود (بدون ساخت instance جدید)
+        ctx.business_id = business_id
+        # Lazy load business_permissions فقط اگر نیاز باشد
+        ctx.business_permissions = ctx._get_business_permissions()
     
     data = get_widget_definitions(db=db, business_id=business_id, user_id=ctx.get_user_id(), ctx=ctx)
     return success_response(data, request)
@@ -459,7 +422,7 @@ def put_dashboard_layout(
 
 @router.post("/{business_id}/dashboard/data",
     summary="دریافت داده‌ی ویجت‌ها (Batch)",
-    description="کلیدهای ویجت را می‌گیرد و داده‌ی هر ویجت را در یک پاسخ برمی‌گرداند.",
+    description="کلیدهای ویجت را می‌گیرد و داده‌ی هر ویجت را در یک پاسخ برمی‌گرداند. برای query های طولانی از background job استفاده می‌کند.",
     response_model=SuccessResponse,
 )
 @require_business_access("business_id")
@@ -470,19 +433,67 @@ def post_dashboard_widgets_data(
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> dict:
+    """
+    دریافت داده‌های dashboard widgets
+    به صورت خودکار تصمیم می‌گیرد که از background job استفاده کند یا نه
+    """
+    from fastapi import Query
+    
     widget_keys = payload.get("widget_keys") or []
     filters = payload.get("filters") or {}
     calendar_type = ctx.calendar_type if hasattr(ctx, 'calendar_type') else "gregorian"
-    data = get_widgets_batch_data(
-        db=db,
-        business_id=business_id,
-        user_id=ctx.get_user_id(),
-        widget_keys=[str(k) for k in widget_keys],
-        filters=filters,
-        calendar_type=calendar_type,
-    )
-    formatted = format_datetime_fields(data, request)
-    return success_response(formatted, request)
+    use_queue = payload.get("use_queue", False)  # پارامتر اختیاری از payload
+    
+    # تصمیم‌گیری خودکار: اگر تعداد widget ها زیاد است یا query های سنگین داریم، از queue استفاده کن
+    # ویجت‌های سنگین: top_selling_products, sales_bar_chart
+    heavy_widgets = {"top_selling_products", "sales_bar_chart"}
+    has_heavy_widgets = any(key in heavy_widgets for key in widget_keys)
+    use_background = use_queue or len(widget_keys) > 5 or has_heavy_widgets
+    
+    if use_background:
+        # استفاده از background job برای پردازش
+        from app.core.queue import get_queue_service, QUEUE_DEFAULT
+        from app.services.jobs.dashboard_job import process_dashboard_widgets_job
+        
+        queue_service = get_queue_service()
+        if queue_service and queue_service.enabled:
+            # ایجاد job در queue
+            job = queue_service.enqueue(
+                process_dashboard_widgets_job,
+                business_id=business_id,
+                user_id=ctx.get_user_id(),
+                widget_keys=[str(k) for k in widget_keys],
+                filters=filters,
+                calendar_type=calendar_type,
+                queue_name=QUEUE_DEFAULT,
+                timeout=300,  # 5 دقیقه timeout
+                result_ttl=3600,  # نتیجه را 1 ساعت نگه دار
+            )
+            
+            if job:
+                return success_response({
+                    "job_id": job.id,
+                    "status": "queued",
+                    "message": "Dashboard widgets are being processed in background. Use GET /api/v1/jobs/{job_id} to check status."
+                }, request)
+        
+        # اگر queue در دسترس نبود، به صورت sync اجرا کن (fallback)
+    
+    # اجرای sync برای query های سریع
+    try:
+        data = get_widgets_batch_data(
+            db=db,
+            business_id=business_id,
+            user_id=ctx.get_user_id(),
+            widget_keys=[str(k) for k in widget_keys],
+            filters=filters,
+            calendar_type=calendar_type,
+        )
+        formatted = format_datetime_fields(data, request)
+        return success_response(formatted, request)
+    finally:
+        # بستن session بلافاصله بعد از استفاده
+        db.close()
 
 
 @router.get("/{business_id}/dashboard/layout/default",

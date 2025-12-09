@@ -97,8 +97,46 @@ def list_business_plugins_endpoint(
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
-	data = list_business_plugins(db, business_id=int(business_id))
-	return success_response(data, request)
+	import logging
+	from app.core.responses import ApiError
+	from sqlalchemy.exc import SQLAlchemyError
+	
+	logger = logging.getLogger(__name__)
+	
+	try:
+		data = list_business_plugins(db, business_id=int(business_id))
+		return success_response(data, request)
+	except SQLAlchemyError as e:
+		logger.error(
+			f"Database error in list_business_plugins for business_id={business_id}",
+			exc_info=True,
+			extra={
+				"business_id": business_id,
+				"user_id": ctx.get_user_id() if ctx else None,
+				"path": request.url.path,
+			}
+		)
+		db.rollback()
+		raise ApiError(
+			"DATABASE_ERROR",
+			"خطا در ارتباط با پایگاه داده. لطفاً بعداً تلاش کنید.",
+			http_status=503
+		)
+	except Exception as e:
+		logger.error(
+			f"Unexpected error in list_business_plugins for business_id={business_id}: {str(e)}",
+			exc_info=True,
+			extra={
+				"business_id": business_id,
+				"user_id": ctx.get_user_id() if ctx else None,
+				"path": request.url.path,
+			}
+		)
+		raise ApiError(
+			"INTERNAL_SERVER_ERROR",
+			"خطای داخلی سرور رخ داد. لطفاً با پشتیبانی تماس بگیرید.",
+			http_status=500
+		)
 
 
 @router.get(

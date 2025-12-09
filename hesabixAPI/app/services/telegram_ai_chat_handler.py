@@ -282,6 +282,8 @@ async def handle_back_callback(
 		return service.send_chat_menu(user_context)
 	elif back_to == "tickets":
 		return await send_tickets_menu(service, user_context)
+	elif back_to == "admin":
+		return await send_admin_menu(service, user_context)
 	
 	return False
 
@@ -438,6 +440,7 @@ async def handle_suggest_reply(
 			})
 		
 		# ایجاد AI Service
+		# توجه: برای اپراتورها نیازی به business_id نیست چون دسترسی سیستمی دارند
 		ai_service = AIService(db, user_context)
 		
 		# ساخت prompt برای AI
@@ -491,7 +494,6 @@ async def handle_suggest_reply(
 			suggested_reply = suggested_reply[:4000] + "\n\n... (متن کامل در برنامه قابل مشاهده است)"
 		
 		buttons = [
-			[{"text": "✅ استفاده از این پاسخ", "callback_data": f"ticket:{ticket_id}:use_reply"}],
 			[{"text": "⬅️ بازگشت", "callback_data": f"ticket:{ticket_id}"}]
 		]
 		keyboard = service._build_inline_keyboard(buttons)
@@ -552,6 +554,7 @@ async def handle_auto_reply(
 			})
 		
 		# ایجاد AI Service
+		# توجه: برای اپراتورها نیازی به business_id نیست چون دسترسی سیستمی دارند
 		ai_service = AIService(db, user_context)
 		
 		# ساخت prompt برای AI
@@ -631,7 +634,7 @@ async def handle_auto_reply(
 				event_key="support.operator_reply",
 				context=context,
 				preferred_channels=["inapp", "email", "telegram", "sms"],
-				broadcast_mode=True
+				broadcast_mode=False
 			)
 			except Exception as e:
 				logger.error(f"خطا در ارسال ناتیفیکیشن برای پاسخ AI به تیکت {ticket_id}: {e}")

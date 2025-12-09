@@ -3,6 +3,7 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../core/api_client.dart';
 import '../../config/app_config.dart';
 import '../../services/payment_gateway_service.dart';
+import '../../utils/snackbar_helper.dart';
 import 'package:uuid/uuid.dart';
 
 class PaymentGatewaysPage extends StatefulWidget {
@@ -139,13 +140,13 @@ class _PaymentGatewaysPageState extends State<PaymentGatewaysPage> {
       if (!ctx.mounted) return;
       Navigator.of(dialogCtx).pop();
       final t = AppLocalizations.of(ctx);
-      ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(t.save)));
+      SnackBarHelper.showSuccess(ctx, message: t.save);
       await _load();
     } catch (e) {
       print('❌ [CREATE] Error creating gateway: $e');
       if (!ctx.mounted) return;
       final t = AppLocalizations.of(ctx);
-      ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text('${t.error}: $e')));
+      SnackBarHelper.showError(ctx, message: '${t.error}: $e');
     }
   }
 
@@ -178,13 +179,13 @@ class _PaymentGatewaysPageState extends State<PaymentGatewaysPage> {
       if (!ctx.mounted) return;
       Navigator.of(dialogCtx).pop();
       final t = AppLocalizations.of(ctx);
-      ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(t.updated)));
+      SnackBarHelper.showSuccess(ctx, message: t.updated);
       await _load();
     } catch (e) {
       print('❌ [UPDATE] Error updating gateway: $e');
       if (!ctx.mounted) return;
       final t = AppLocalizations.of(ctx);
-      ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text('${t.error}: $e')));
+      SnackBarHelper.showError(ctx, message: '${t.error}: $e');
     }
   }
 

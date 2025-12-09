@@ -490,7 +490,7 @@ def get_max_file_size_mb(db: Session) -> int:
 def get_max_users(db: Session) -> int:
 	"""خواندن حداکثر تعداد کاربران (0 = نامحدود)"""
 	max_users = _get_setting_int(db, SYSTEM_CONFIG_MAX_USERS)
-	return (max_users if max_users is not None else 1000)
+	return (max_users if max_users is not None else 0)
 
 
 def get_default_language(db: Session) -> str:
@@ -541,7 +541,7 @@ def get_system_configuration(db: Session) -> Dict[str, Any]:
 		"enable_maintenance_mode": (enable_maintenance_mode if enable_maintenance_mode is not None else False),
 		"session_timeout": (session_timeout if session_timeout is not None else 30),
 		"max_file_size": (max_file_size if max_file_size is not None else 10),
-		"max_users": (max_users if max_users is not None else 1000),
+		"max_users": (max_users if max_users is not None else 0),
 		"business_creation_verification_requirement": business_creation_requirement,
 	}
 

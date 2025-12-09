@@ -296,6 +296,7 @@ class BusinessDashboardService {
     required int businessId,
     required List<String> widgetKeys,
     Map<String, dynamic>? filters,
+    Function(String jobId)? onJobQueued,
   }) async {
     final res = await _api_client_postJson(
       '/api/v1/business/$businessId/dashboard/data',
@@ -304,8 +305,106 @@ class BusinessDashboardService {
         'filters': filters ?? const <String, dynamic>{},
       },
     );
-    final data = (res['data'] as Map?) ?? const {};
+    
+    final responseData = (res['data'] as Map?) ?? const {};
+    
+    // بررسی اینکه آیا job در queue قرار گرفته است
+    if (responseData.containsKey('job_id') && responseData.containsKey('status')) {
+      final jobId = responseData['job_id'] as String?;
+      final status = responseData['status'] as String?;
+      
+      if (jobId != null && status == 'queued') {
+        // اگر job در queue قرار گرفته، callback را فراخوانی کن
+        if (onJobQueued != null) {
+          onJobQueued(jobId);
+        }
+        
+        // polling برای دریافت نتیجه
+        return await _pollJobResult(jobId);
+      }
+    }
+    
+    // اگر data مستقیماً برگردانده شده، آن را برگردان
+    final data = responseData.containsKey('data') 
+        ? (responseData['data'] as Map?) ?? const {}
+        : responseData;
     return Map<String, dynamic>.from(data);
+  }
+
+  /// Polling برای دریافت نتیجه job
+  Future<Map<String, dynamic>> _pollJobResult(String jobId, {int maxAttempts = 60}) async {
+    int attempts = 0;
+    while (attempts < maxAttempts) {
+      await Future.delayed(const Duration(seconds: 1));
+      
+      try {
+        final res = await _apiClient.get<Map<String, dynamic>>('/api/v1/jobs/$jobId');
+        final responseData = res.data;
+        
+        if (responseData != null && responseData.containsKey('data')) {
+          final data = responseData['data'];
+          
+          // بررسی اینکه آیا response مستقیماً widget data است (بدون state)
+          // این حالت زمانی رخ می‌دهد که endpoint مستقیماً داده‌ها را برگردانده
+          if (data is Map<String, dynamic>) {
+            // اگر data شامل widget keys است (مثل latest_sales_invoices, sales_bar_chart)
+            // و state یا id ندارد، یعنی مستقیماً widget data است
+            final hasWidgetKeys = data.containsKey('latest_sales_invoices') || 
+                                 data.containsKey('sales_bar_chart') || 
+                                 data.containsKey('checks_today') ||
+                                 data.containsKey('top_selling_products');
+            final hasJobMetadata = data.containsKey('state') || data.containsKey('id');
+            
+            if (hasWidgetKeys && !hasJobMetadata) {
+              // این یعنی job تمام شده و endpoint مستقیماً widget data را برگردانده
+              return Map<String, dynamic>.from(data);
+            }
+            
+            // اگر data شامل state است، یعنی job status است
+            if (hasJobMetadata && data.containsKey('state')) {
+              final state = data['state'] as String?;
+              
+              // RQ states: queued, started, finished, failed
+              if (state == 'finished') {
+                // اگر job تمام شده، نتیجه را برگردان
+                final result = data['result'];
+                
+                // اگر result یک Map است
+                if (result is Map<String, dynamic>) {
+                  // اگر result شامل success و data است (dashboard job result)
+                  if (result.containsKey('success') && result.containsKey('data')) {
+                    return Map<String, dynamic>.from(result['data'] as Map? ?? const {});
+                  }
+                  // اگر result خودش data است (مستقیم)
+                  if (result.containsKey('data')) {
+                    return Map<String, dynamic>.from(result['data'] as Map? ?? const {});
+                  }
+                  // اگر result خودش یک Map از widget data است
+                  return Map<String, dynamic>.from(result);
+                }
+                
+                // اگر result null است یا نوع دیگری دارد
+                return const <String, dynamic>{};
+              } else if (state == 'failed') {
+                // اگر job ناموفق بود، خطا را throw کن
+                final error = data['error'] as String? ?? 'Job failed';
+                throw Exception(error);
+              }
+              // در غیر این صورت (queued, started)، ادامه polling
+            }
+          }
+        }
+      } catch (e) {
+        // اگر خطا در polling بود، بعد از چند تلاش throw کن
+        if (attempts >= maxAttempts - 1) {
+          throw Exception('Timeout waiting for job result: $e');
+        }
+      }
+      
+      attempts++;
+    }
+    
+    throw Exception('Timeout waiting for job result after $maxAttempts attempts');
   }
 
   // Business default layout (owner can publish)

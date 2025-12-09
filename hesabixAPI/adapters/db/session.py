@@ -1,8 +1,11 @@
 from collections.abc import Generator
 from contextlib import contextmanager
-from typing import Callable, Any
+from typing import Callable, Any, Optional
 import time
 import logging
+import traceback
+import inspect
+from contextvars import ContextVar
 
 from sqlalchemy import create_engine, text, event
 from sqlalchemy.exc import OperationalError, TimeoutError as SQLTimeoutError
@@ -12,6 +15,9 @@ from sqlalchemy.pool import QueuePool
 from app.core.settings import get_settings
 
 logger = logging.getLogger(__name__)
+
+# Context variable برای ذخیره اطلاعات request
+_request_context: ContextVar[Optional[dict]] = ContextVar('request_context', default=None)
 
 
 class Base(DeclarativeBase):
@@ -57,6 +63,9 @@ def set_mysql_session_params(dbapi_conn, connection_record):
 			cursor.execute("SET SESSION transaction_isolation = 'READ-COMMITTED'")
 			# بهینه‌سازی برای Query Performance
 			cursor.execute("SET SESSION sql_mode = 'STRICT_TRANS_TABLES,NO_ZERO_DATE,NO_ZERO_IN_DATE,ERROR_FOR_DIVISION_BY_ZERO'")
+			# تنظیم timeout برای query ها (120 ثانیه = 120000 میلی‌ثانیه)
+			# این باعث می‌شود query های طولانی‌تر از 2 دقیقه timeout شوند
+			cursor.execute("SET SESSION max_execution_time = 120000")
 	except Exception as e:
 		logger.warning(f"Error setting MySQL session variables: {e}")
 
@@ -90,11 +99,47 @@ def receive_checkout(dbapi_conn, connection_record, connection_proxy):
 	checked_out = pool.checkedout()
 	usage_percent = (checked_out / total_capacity * 100) if total_capacity > 0 else 0
 	
-	# ثبت زمان checkout برای leak detection
+	# ثبت زمان checkout برای leak detection با اطلاعات کامل
 	connection_id = id(dbapi_conn)
-	_connection_checkout_times[connection_id] = time.time()
-	
 	current_time = time.time()
+	
+	# گرفتن stack trace برای تشخیص محل checkout
+	stack_frames = []
+	try:
+		stack = inspect.stack()
+		# گرفتن 15 فریم اول برای پیدا کردن فریم‌های مربوط به کد ما
+		for frame_info in stack[1:16]:
+			filename = frame_info.filename
+			lineno = frame_info.lineno
+			function = frame_info.function
+			# فقط فریم‌های مربوط به کد ما را نگه دار (بدون site-packages و __pycache__)
+			if 'hesabixAPI' in filename and 'site-packages' not in filename and '__pycache__' not in filename:
+				# تبدیل مسیر کامل به مسیر نسبی
+				relative_path = filename
+				if '/var/www/ark/hesabixAPI/' in filename:
+					relative_path = filename.split('/var/www/ark/hesabixAPI/')[-1]
+				stack_frames.append(f"{relative_path}:{lineno} in {function}")
+		stack_trace = "\n".join(stack_frames[:5]) if stack_frames else "No stack frames found"
+	except Exception as e:
+		stack_trace = f"Error getting stack trace: {e}"
+	
+	# گرفتن اطلاعات request از context (اگر در دسترس باشد)
+	request_info = {}
+	try:
+		request_ctx = _request_context.get()
+		if request_ctx:
+			request_info = request_ctx.copy()
+	except Exception:
+		pass
+	
+	# ذخیره اطلاعات کامل checkout
+	_connection_checkout_times[connection_id] = {
+		'checkout_time': current_time,
+		'stack_trace': stack_trace,
+		'request_info': request_info,
+		'checked_out_count': checked_out,
+		'usage_percent': usage_percent
+	}
 	
 	# Critical warning فقط اگر Pool واقعاً پر باشد (بیش از 95% و حداقل 475 connection)
 	# این از warning های غیرضروری جلوگیری می‌کند
@@ -110,8 +155,8 @@ def receive_checkout(dbapi_conn, connection_record, connection_proxy):
 				f"Total capacity: {total_capacity}. "
 				f"Possible connection leak detected!"
 			)
-	# Warning اگر Pool بیش از 85% استفاده شده باشد و حداقل 425 connection (با rate limiting)
-	elif usage_percent > 85 and checked_out > 425:
+	# Warning اگر Pool بیش از 80% استفاده شده باشد و حداقل 400 connection (با rate limiting)
+	elif usage_percent > 80 and checked_out > 400:
 		if current_time - _last_pool_warning_time >= _pool_warning_interval:
 			_last_pool_warning_time = current_time
 			logger.warning(
@@ -130,10 +175,10 @@ def receive_checkout(dbapi_conn, connection_record, connection_proxy):
 
 
 # Monitoring برای connection leak detection
-_connection_checkout_times = {}  # {connection_id: checkout_time}
-_connection_leak_threshold = 30  # کاهش به 30 ثانیه برای تشخیص سریع‌تر leak ها
+_connection_checkout_times = {}  # {connection_id: {'checkout_time': float, 'stack_trace': str, 'request_info': dict}}
+_connection_leak_threshold = 120  # 2 دقیقه - برای عملیات طولانی مثل AI streaming که می‌تواند چند دقیقه طول بکشد
 _last_leak_check_time = 0
-_leak_check_interval = 15  # بررسی leak ها هر 15 ثانیه برای تشخیص سریع‌تر
+_leak_check_interval = 30  # بررسی leak ها هر 30 ثانیه
 
 def _check_connection_leaks():
 	"""بررسی connection leak برای اتصالاتی که هنوز checkout هستند"""
@@ -149,10 +194,16 @@ def _check_connection_leaks():
 	pool = engine.pool
 	leaked_connections = []
 	
-	for connection_id, checkout_time in list(_connection_checkout_times.items()):
+	for connection_id, checkout_info in list(_connection_checkout_times.items()):
+		if isinstance(checkout_info, dict):
+			checkout_time = checkout_info.get('checkout_time', current_time)
+		else:
+			# برای سازگاری با داده‌های قدیمی
+			checkout_time = checkout_info if isinstance(checkout_info, (int, float)) else current_time
+		
 		connection_duration = current_time - checkout_time
 		if connection_duration > _connection_leak_threshold:
-			leaked_connections.append((connection_id, connection_duration))
+			leaked_connections.append((connection_id, checkout_info, connection_duration))
 	
 	if leaked_connections:
 		logger.warning(
@@ -161,6 +212,27 @@ def _check_connection_leaks():
 			f"Pool size: {pool.size()}, Checked out: {pool.checkedout()}, "
 			f"Usage: {(pool.checkedout() / (pool.size() + pool.overflow()) * 100) if (pool.size() + pool.overflow()) > 0 else 0:.1f}%"
 		)
+		
+		# لاگ جزئیات هر connection leak
+		for idx, (conn_id, checkout_info, duration) in enumerate(leaked_connections[:5], 1):  # فقط 5 مورد اول
+			if isinstance(checkout_info, dict):
+				stack_trace = checkout_info.get('stack_trace', 'N/A')
+				request_info = checkout_info.get('request_info', {})
+				checked_out_at = checkout_info.get('checked_out_count', 'N/A')
+				usage_at = checkout_info.get('usage_percent', 'N/A')
+				
+				logger.warning(
+					f"  🔍 Leaked Connection #{idx} (ID: {conn_id}):\n"
+					f"    Duration: {duration:.1f}s\n"
+					f"    Checked out when: {checked_out_at} connections active ({usage_at:.1f}% usage)\n"
+					f"    Request: {request_info.get('path', 'N/A')} [{request_info.get('method', 'N/A')}]\n"
+					f"    User ID: {request_info.get('user_id', 'N/A')}\n"
+					f"    Stack trace:\n{stack_trace}"
+				)
+			else:
+				logger.warning(
+					f"  🔍 Leaked Connection #{idx} (ID: {conn_id}): Duration: {duration:.1f}s (legacy format)"
+				)
 
 @event.listens_for(engine.pool, "checkin")
 def receive_checkin(dbapi_conn, connection_record):
@@ -170,7 +242,19 @@ def receive_checkin(dbapi_conn, connection_record):
 	
 	# بررسی connection leak
 	if connection_id in _connection_checkout_times:
-		checkout_time = _connection_checkout_times.pop(connection_id)
+		checkout_info = _connection_checkout_times.pop(connection_id)
+		
+		# استخراج checkout_time
+		if isinstance(checkout_info, dict):
+			checkout_time = checkout_info.get('checkout_time', time.time())
+			stack_trace = checkout_info.get('stack_trace', 'N/A')
+			request_info = checkout_info.get('request_info', {})
+		else:
+			# برای سازگاری با داده‌های قدیمی
+			checkout_time = checkout_info if isinstance(checkout_info, (int, float)) else time.time()
+			stack_trace = 'N/A'
+			request_info = {}
+		
 		connection_duration = time.time() - checkout_time
 		
 		if connection_duration > _connection_leak_threshold:
@@ -178,7 +262,10 @@ def receive_checkin(dbapi_conn, connection_record):
 				f"⚠️ Long-running connection detected! "
 				f"Connection was checked out for {connection_duration:.1f} seconds "
 				f"(threshold: {_connection_leak_threshold}s). "
-				f"Pool size: {pool.size()}, Checked out: {pool.checkedout()}"
+				f"Pool size: {pool.size()}, Checked out: {pool.checkedout()}\n"
+				f"    Request: {request_info.get('path', 'N/A')} [{request_info.get('method', 'N/A')}]\n"
+				f"    User ID: {request_info.get('user_id', 'N/A')}\n"
+				f"    Stack trace:\n{stack_trace}"
 			)
 	
 	# بررسی leak های موجود

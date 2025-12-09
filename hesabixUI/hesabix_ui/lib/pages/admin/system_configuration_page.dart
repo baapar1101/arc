@@ -30,7 +30,7 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
   bool _enableMaintenanceMode = false;
   int _sessionTimeout = 30;
   int _maxFileSize = 10;
-  int _maxUsers = 1000;
+  int _maxUsers = 0;
   String _businessCreationRequirement = 'none';
 
   @override
@@ -58,7 +58,7 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
           _enableMaintenanceMode = data['enable_maintenance_mode'] as bool? ?? false;
           _sessionTimeout = data['session_timeout'] as int? ?? 30;
           _maxFileSize = data['max_file_size'] as int? ?? 10;
-          _maxUsers = data['max_users'] as int? ?? 1000;
+          _maxUsers = data['max_users'] as int? ?? 0;
           final reqValueRaw = data['business_creation_verification_requirement'];
           String? reqValue;
           if (reqValueRaw != null) {
@@ -176,15 +176,31 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
           onPressed: () => context.go('/user/profile/system-settings'),
         ),
         actions: [
-          TextButton(
-            onPressed: _isLoading ? null : _saveConfiguration,
-            child: _isLoading
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : Text(t.save),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8.0),
+            child: ElevatedButton.icon(
+              onPressed: _isLoading ? null : _saveConfiguration,
+              icon: _isLoading
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Icon(Icons.save, size: 18),
+              label: Text(
+                _isLoading ? t.saving : t.save,
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ),
           ),
         ],
       ),
@@ -334,6 +350,39 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
                     ),
                   ],
                 ),
+                const SizedBox(height: 32),
+                // دکمه ذخیره بزرگ و واضح در پایین صفحه
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: _isLoading ? null : _saveConfiguration,
+                    icon: _isLoading
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Icon(Icons.save),
+                    label: Text(
+                      _isLoading ? t.saving : t.save,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: 2,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24), // فاصله اضافی برای اطمینان از نمایش کامل
               ],
             ),
           ),
@@ -382,6 +431,7 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: TextFormField(
+        key: ValueKey('$label-$value'),
         initialValue: value,
         decoration: InputDecoration(
           labelText: label,
@@ -401,7 +451,7 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: DropdownButtonFormField<String>(
-        initialValue: value,
+        value: value,
         decoration: InputDecoration(
           labelText: label,
           border: const OutlineInputBorder(),
@@ -516,6 +566,7 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
         'session_timeout': _sessionTimeout,
         'max_file_size': _maxFileSize,
         'max_users': _maxUsers,
+        'business_creation_verification_requirement': _businessCreationRequirement,
       });
 
       if (mounted) {

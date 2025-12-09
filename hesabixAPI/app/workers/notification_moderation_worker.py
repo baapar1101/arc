@@ -5,8 +5,11 @@ Worker برای پردازش خودکار صف بررسی قالب‌های نو
 """
 import asyncio
 import logging
+import os
+import fcntl
 from datetime import datetime
 from typing import Optional
+from pathlib import Path
 
 from sqlalchemy.orm import Session
 
@@ -22,6 +25,41 @@ from adapters.db.models.business_notification import (
 from app.services.ai_moderation_service import AIContentModerationService
 
 logger = logging.getLogger(__name__)
+
+# File lock برای جلوگیری از اجرای همزمان worker در چندین process
+_lock_file_path = Path("/tmp/hesabix_notification_moderation_worker.lock")
+_worker_lock = None
+
+
+def _acquire_lock():
+    """تلاش برای دریافت lock - فقط یک worker می‌تواند در هر زمان اجرا شود"""
+    global _worker_lock
+    try:
+        _lock_file_path.parent.mkdir(parents=True, exist_ok=True)
+        _worker_lock = open(_lock_file_path, 'w')
+        fcntl.flock(_worker_lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        return True
+    except (IOError, OSError):
+        # Lock در حال استفاده است
+        if _worker_lock:
+            try:
+                _worker_lock.close()
+            except:
+                pass
+            _worker_lock = None
+        return False
+
+
+def _release_lock():
+    """آزاد کردن lock"""
+    global _worker_lock
+    if _worker_lock:
+        try:
+            fcntl.flock(_worker_lock.fileno(), fcntl.LOCK_UN)
+            _worker_lock.close()
+        except:
+            pass
+        _worker_lock = None
 
 
 class NotificationModerationWorker:
@@ -42,16 +80,14 @@ class NotificationModerationWorker:
         Args:
             max_items: حداکثر تعداد آیتم برای پردازش در هر بار
         """
-        logger.info("شروع پردازش صف moderation...")
-        
         # دریافت آیتم‌های pending
         pending_items = self.queue_repo.get_pending(status='pending', limit=max_items)
         
         if not pending_items:
-            logger.info("هیچ آیتمی در صف نیست")
+            logger.debug("هیچ آیتمی در صف نیست")
             return
         
-        logger.info(f"{len(pending_items)} آیتم برای بررسی یافت شد")
+        logger.info(f"شروع پردازش صف moderation... {len(pending_items)} آیتم برای بررسی یافت شد")
         
         for item in pending_items:
             try:
@@ -185,23 +221,32 @@ async def run_worker_loop(interval_seconds: int = 60):
         interval_seconds: فاصله زمانی بین هر اجرا (ثانیه)
     
     این loop در background اجرا می‌شود و قابل مشاهده در Monitoring Panel است
+    فقط یک worker در هر زمان اجرا می‌شود (با استفاده از file lock)
     """
-    logger.info(
-        f"🚀 شروع Notification Moderation Worker (interval={interval_seconds}s) - "
-        f"قابل مدیریت از /user/profile/system-settings/monitoring"
-    )
+    # تلاش برای دریافت lock
+    if not _acquire_lock():
+        logger.debug("Worker دیگری در حال اجرا است، این instance متوقف می‌شود")
+        return
     
-    iteration = 0
-    
-    while True:
-        try:
-            iteration += 1
-            logger.debug(f"Worker iteration #{iteration}")
-            await run_worker_once()
-        except Exception as e:
-            logger.error(f"خطا در loop worker iteration #{iteration}: {e}", exc_info=True)
+    try:
+        logger.info(
+            f"🚀 شروع Notification Moderation Worker (interval={interval_seconds}s) - "
+            f"قابل مدیریت از /user/profile/system-settings/monitoring"
+        )
         
-        await asyncio.sleep(interval_seconds)
+        iteration = 0
+        
+        while True:
+            try:
+                iteration += 1
+                logger.debug(f"Worker iteration #{iteration}")
+                await run_worker_once()
+            except Exception as e:
+                logger.error(f"خطا در loop worker iteration #{iteration}: {e}", exc_info=True)
+            
+            await asyncio.sleep(interval_seconds)
+    finally:
+        _release_lock()
 
 
 if __name__ == "__main__":

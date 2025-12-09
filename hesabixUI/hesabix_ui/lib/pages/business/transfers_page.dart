@@ -409,7 +409,7 @@ class _TransfersPageState extends State<TransfersPage> {
         final svc = TransferService(widget.apiClient);
         await svc.deleteById(item.id);
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('حذف شد'), backgroundColor: Colors.green));
+          SnackBarHelper.showSuccess(context, message: 'حذف شد');
         }
         _refreshData();
       } catch (e) {

@@ -100,6 +100,16 @@ class UserRepository(BaseRepository[User]):
 		).where(User.is_active == True)
 		return list(self.db.execute(stmt).scalars().all())
 	
+	def is_support_operator(self, user_id: int) -> bool:
+		"""بررسی اینکه آیا کاربر یک اپراتور پشتیبانی است یا نه"""
+		user = self.get_by_id(user_id)
+		if not user or not user.is_active:
+			return False
+		if not user.app_permissions:
+			return False
+		# SuperAdmin هم می‌تواند اپراتور باشد
+		return bool(user.app_permissions.get("support_operator", False) or user.app_permissions.get("superadmin", False))
+	
 	def to_dict(self, user: User, include_extended: bool = False) -> dict:
 		"""تبدیل User object به dictionary برای API response"""
 		# ساخت full_name

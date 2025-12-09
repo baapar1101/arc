@@ -562,7 +562,7 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> {
                 onPressed: () async {
                   await _reloadAnnouncements(onlyUnread: _annOnlyUnread);
                   if (!context.mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('اعلان‌ها به‌روز شد')));
+                  SnackBarHelper.show(context, message: 'اعلان‌ها به‌روز شد');
                 },
                 icon: const Icon(Icons.refresh, size: 18),
                 label: const Text('بازخوانی'),
@@ -647,7 +647,7 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> {
                                 });
                               }
                               if (!context.mounted) return;
-                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('به‌عنوان خوانده‌شده علامت خورد')));
+                              SnackBarHelper.show(context, message: 'به‌عنوان خوانده‌شده علامت خورد');
                             } catch (e) {
                               if (!context.mounted) return;
                               SnackBarHelper.showError(context, message: 'خطا: $e');
