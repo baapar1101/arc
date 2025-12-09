@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/api_client.dart';
+import '../../l10n/app_localizations.dart';
 import '../../services/session_service.dart';
 import '../../utils/snackbar_helper.dart';
 
@@ -32,7 +33,8 @@ class _SessionsPageState extends State<SessionsPage> {
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.showError(context, message: 'خطا در بارگذاری سشن‌ها: $e');
+        final t = AppLocalizations.of(context);
+        SnackBarHelper.showError(context, message: '${t.sessionsErrorLoading}: $e');
       }
     } finally {
       if (mounted) {
@@ -42,8 +44,9 @@ class _SessionsPageState extends State<SessionsPage> {
   }
 
   Future<void> _revokeSession(SessionInfo session) async {
+    final t = AppLocalizations.of(context);
     if (session.isCurrent) {
-      SnackBarHelper.showError(context, message: 'نمی‌توانید session فعلی را حذف کنید');
+      SnackBarHelper.showError(context, message: t.sessionsCannotDeleteCurrent);
       return;
     }
 
@@ -55,21 +58,21 @@ class _SessionsPageState extends State<SessionsPage> {
           children: [
             Icon(Icons.warning, color: Theme.of(context).colorScheme.error),
             const SizedBox(width: 8),
-            const Expanded(child: Text('حذف سشن')),
+            Expanded(child: Text(t.sessionsDeleteTitle)),
           ],
         ),
-        content: Text('آیا از حذف session "${session.deviceName}" اطمینان دارید؟\nاین عمل غیرقابل بازگشت است.'),
+        content: Text(t.sessionsDeleteConfirmation(session.deviceName)),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('لغو'),
+            child: Text(t.cancel),
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
             style: FilledButton.styleFrom(
               backgroundColor: Theme.of(context).colorScheme.error,
             ),
-            child: const Text('حذف'),
+            child: Text(t.delete),
           ),
         ],
       ),
@@ -80,20 +83,23 @@ class _SessionsPageState extends State<SessionsPage> {
         await _sessionService.revokeSession(session.id);
         _loadSessions();
         if (mounted) {
-          SnackBarHelper.showSuccess(context, message: 'Session با موفقیت حذف شد');
+          final t = AppLocalizations.of(context);
+          SnackBarHelper.showSuccess(context, message: t.sessionsDeletedSuccessfully);
         }
       } catch (e) {
         if (mounted) {
-          SnackBarHelper.showError(context, message: 'خطا در حذف session: $e');
+          final t = AppLocalizations.of(context);
+          SnackBarHelper.showError(context, message: '${t.sessionsErrorDeleting}: $e');
         }
       }
     }
   }
 
   Future<void> _revokeOtherSessions() async {
+    final t = AppLocalizations.of(context);
     final otherSessions = _sessions.where((s) => !s.isCurrent).toList();
     if (otherSessions.isEmpty) {
-      SnackBarHelper.showInfo(context, message: 'هیچ session دیگری وجود ندارد');
+      SnackBarHelper.showInfo(context, message: t.sessionsNoOtherSessions);
       return;
     }
 
@@ -105,25 +111,23 @@ class _SessionsPageState extends State<SessionsPage> {
           children: [
             Icon(Icons.logout, color: Theme.of(context).colorScheme.error),
             const SizedBox(width: 8),
-            const Expanded(child: Text('خروج از همه دستگاه‌ها')),
+            Expanded(child: Text(t.sessionsRevokeAllTitle)),
           ],
         ),
         content: Text(
-          'آیا از حذف ${otherSessions.length} session دیگر اطمینان دارید؟\n'
-          'این عمل باعث خروج از تمام دستگاه‌های دیگر می‌شود.\n'
-          'Session فعلی شما حفظ خواهد شد.',
+          t.sessionsRevokeAllConfirmation(otherSessions.length),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('لغو'),
+            child: Text(t.cancel),
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
             style: FilledButton.styleFrom(
               backgroundColor: Theme.of(context).colorScheme.error,
             ),
-            child: const Text('حذف همه'),
+            child: Text(t.sessionsDeleteAll),
           ),
         ],
       ),
@@ -134,14 +138,16 @@ class _SessionsPageState extends State<SessionsPage> {
         final deletedCount = await _sessionService.revokeOtherSessions();
         _loadSessions();
         if (mounted) {
+          final t = AppLocalizations.of(context);
           SnackBarHelper.showSuccess(
             context,
-            message: '$deletedCount session حذف شد',
+            message: t.sessionsDeleted(deletedCount),
           );
         }
       } catch (e) {
         if (mounted) {
-          SnackBarHelper.showError(context, message: 'خطا در حذف sessions: $e');
+          final t = AppLocalizations.of(context);
+          SnackBarHelper.showError(context, message: '${t.sessionsErrorDeleting}: $e');
         }
       }
     }
@@ -170,11 +176,12 @@ class _SessionsPageState extends State<SessionsPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final t = AppLocalizations.of(context);
     final colorScheme = theme.colorScheme;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('سشن‌های ورود'),
+        title: Text(t.accountSettingsLoginSessionsTitle),
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
@@ -192,7 +199,7 @@ class _SessionsPageState extends State<SessionsPage> {
                           ),
                           const SizedBox(height: 16),
                           Text(
-                            'هیچ session فعالی وجود ندارد',
+                            t.sessionsNoActive,
                             style: theme.textTheme.titleMedium?.copyWith(
                               color: colorScheme.onSurfaceVariant,
                             ),
@@ -209,7 +216,7 @@ class _SessionsPageState extends State<SessionsPage> {
                             child: FilledButton.icon(
                               onPressed: _revokeOtherSessions,
                               icon: const Icon(Icons.logout),
-                              label: const Text('خروج از همه دستگاه‌ها'),
+                              label: Text(t.sessionsRevokeAllTitle),
                               style: FilledButton.styleFrom(
                                 backgroundColor: colorScheme.error,
                                 foregroundColor: colorScheme.onError,
@@ -260,6 +267,7 @@ class _SessionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       elevation: 2,
@@ -310,7 +318,7 @@ class _SessionCard extends StatelessWidget {
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               child: Text(
-                                'این دستگاه',
+                                t.sessionsThisDevice,
                                 style: theme.textTheme.labelSmall?.copyWith(
                                   color: colorScheme.onPrimaryContainer,
                                   fontWeight: FontWeight.bold,
@@ -340,7 +348,7 @@ class _SessionCard extends StatelessWidget {
                     onPressed: onRevoke,
                     icon: const Icon(Icons.delete_outline),
                     color: colorScheme.error,
-                    tooltip: 'حذف',
+                    tooltip: t.delete,
                   ),
               ],
             ),
@@ -352,7 +360,7 @@ class _SessionCard extends StatelessWidget {
                 Icon(Icons.access_time, size: 16, color: colorScheme.onSurfaceVariant),
                 const SizedBox(width: 8),
                 Text(
-                  'آخرین استفاده: ${session.lastUsedRelative}',
+                  '${t.sessionsLastUsed}: ${session.lastUsedRelative}',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: colorScheme.onSurfaceVariant,
                   ),
@@ -380,7 +388,7 @@ class _SessionCard extends StatelessWidget {
                 Icon(Icons.calendar_today, size: 16, color: colorScheme.onSurfaceVariant),
                 const SizedBox(width: 8),
                 Text(
-                  'ایجاد شده: ${_formatDate(session.createdAt)}',
+                  '${t.sessionsCreatedAt}: ${_formatDate(session.createdAt, t)}',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: colorScheme.onSurfaceVariant,
                   ),
@@ -393,22 +401,22 @@ class _SessionCard extends StatelessWidget {
     );
   }
 
-  String _formatDate(DateTime date) {
+  String _formatDate(DateTime date, AppLocalizations t) {
     final now = DateTime.now();
     final diff = now.difference(date);
 
     if (diff.inDays == 0) {
-      return 'امروز';
+      return t.sessionsToday;
     } else if (diff.inDays == 1) {
-      return 'دیروز';
+      return t.sessionsYesterday;
     } else if (diff.inDays < 7) {
-      return '${diff.inDays} روز پیش';
+      return t.sessionsDaysAgo(diff.inDays);
     } else if (diff.inDays < 30) {
       final weeks = (diff.inDays / 7).floor();
-      return '$weeks هفته پیش';
+      return t.sessionsWeeksAgo(weeks);
     } else {
       final months = (diff.inDays / 30).floor();
-      return '$months ماه پیش';
+      return t.sessionsMonthsAgo(months);
     }
   }
 }

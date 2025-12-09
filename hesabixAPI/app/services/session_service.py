@@ -132,6 +132,26 @@ def revoke_session(db: Session, user_id: int, session_id: int, current_api_key_h
 	success = repo.revoke_session(session_id, user_id)
 	if not success:
 		raise ApiError("INTERNAL_ERROR", "خطا در حذف session", http_status=500)
+	
+	# لاگ‌گیری logout
+	try:
+		from app.services.activity_log_service import log_user_activity
+		log_user_activity(
+			db=db,
+			user_id=user_id,
+			action="logout",
+			description=f"خروج از سشن (Session ID: {session_id})",
+			extra_info={
+				"session_id": session_id,
+				"device_id": session.device_id,
+				"ip_address": session.ip
+			}
+		)
+		db.commit()
+	except Exception as e:
+		import logging
+		logger = logging.getLogger(__name__)
+		logger.warning(f"Failed to log logout activity: {e}")
 
 
 def revoke_other_sessions(db: Session, user_id: int, current_api_key_hash: str) -> int:
@@ -147,5 +167,26 @@ def revoke_other_sessions(db: Session, user_id: int, current_api_key_hash: str) 
 		تعداد session های حذف شده
 	"""
 	repo = ApiKeyRepository(db)
-	return repo.revoke_other_sessions(user_id, current_api_key_hash)
+	deleted_count = repo.revoke_other_sessions(user_id, current_api_key_hash)
+	
+	# لاگ‌گیری logout از همه سشن‌ها
+	if deleted_count > 0:
+		try:
+			from app.services.activity_log_service import log_user_activity
+			log_user_activity(
+				db=db,
+				user_id=user_id,
+				action="logout_all",
+				description=f"خروج از {deleted_count} سشن",
+				extra_info={
+					"deleted_count": deleted_count
+				}
+			)
+			db.commit()
+		except Exception as e:
+			import logging
+			logger = logging.getLogger(__name__)
+			logger.warning(f"Failed to log logout_all activity: {e}")
+	
+	return deleted_count
 

@@ -3,9 +3,10 @@ API endpoints برای مدیریت Workflow
 """
 
 from typing import Any, Dict, List, Optional
+from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, Request, Body, HTTPException, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import select, and_, or_, func
+from sqlalchemy import select, and_, or_, func, cast, Text, case, text
 
 from adapters.db.session import get_db
 from adapters.db.models.workflow import (
@@ -372,5 +373,440 @@ async def list_actions(
         data=actions,
         request=request,
         message="ACTIONS_LISTED",
+    )
+
+
+@router.get(
+    "/businesses/{business_id}/workflows/analytics/errors",
+    summary="تحلیل خطاهای workflow",
+    description="دریافت آمار و تحلیل خطاهای workflow در بازه زمانی مشخص",
+)
+@require_business_access("business_id")
+async def get_workflow_errors_analytics(
+    request: Request,
+    business_id: int,
+    days: int = Query(7, ge=1, le=90, description="تعداد روزهای گذشته"),
+    workflow_id: Optional[int] = Query(None, description="فیلتر بر اساس workflow خاص"),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    """تحلیل خطاهای workflow"""
+    
+    # Query پایه
+    stmt = select(
+        func.coalesce(
+            cast(WorkflowLog.data['error_type'], Text),
+            'Unknown'
+        ).label('error_type'),
+        func.count(WorkflowLog.id).label('count'),
+        func.max(WorkflowLog.timestamp).label('last_occurrence'),
+        func.min(WorkflowLog.timestamp).label('first_occurrence')
+    ).select_from(WorkflowLog) \
+     .join(WorkflowExecution, WorkflowExecution.id == WorkflowLog.execution_id) \
+     .join(Workflow, Workflow.id == WorkflowExecution.workflow_id) \
+     .where(
+         and_(
+             Workflow.business_id == business_id,
+             WorkflowLog.level == 'error',
+             WorkflowLog.timestamp >= datetime.utcnow() - timedelta(days=days)
+         )
+     )
+    
+    # فیلتر بر اساس workflow
+    if workflow_id:
+        stmt = stmt.where(Workflow.id == workflow_id)
+    
+    stmt = stmt.group_by(cast(WorkflowLog.data['error_type'], Text)) \
+               .order_by(func.count(WorkflowLog.id).desc())
+    
+    results = list(db.execute(stmt).all())
+    
+    # محاسبه آمار کلی
+    total_errors = sum(r.count for r in results)
+    
+    return success_response(
+        data={
+            "total_errors": total_errors,
+            "unique_error_types": len(results),
+            "period_days": days,
+            "errors_by_type": [
+                {
+                    "error_type": r.error_type,
+                    "count": r.count,
+                    "percentage": round((r.count / total_errors * 100), 2) if total_errors > 0 else 0,
+                    "last_occurrence": format_datetime_fields({"timestamp": r.last_occurrence}, request)["timestamp"],
+                    "first_occurrence": format_datetime_fields({"timestamp": r.first_occurrence}, request)["timestamp"]
+                }
+                for r in results
+            ]
+        },
+        request=request,
+        message="WORKFLOW_ERRORS_ANALYTICS_RETRIEVED",
+    )
+
+
+@router.get(
+    "/businesses/{business_id}/workflows/analytics/performance",
+    summary="تحلیل عملکرد workflows",
+    description="دریافت آمار عملکرد workflows شامل تعداد اجراها، نرخ موفقیت، و میانگین زمان اجرا",
+)
+@require_business_access("business_id")
+async def get_workflow_performance_analytics(
+    request: Request,
+    business_id: int,
+    workflow_id: Optional[int] = Query(None, description="فیلتر بر اساس workflow خاص"),
+    days: int = Query(30, ge=1, le=365, description="تعداد روزهای گذشته"),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    """تحلیل عملکرد workflows"""
+    
+    # Query پایه
+    stmt = select(
+        Workflow.id,
+        Workflow.name,
+        Workflow.status,
+        func.count(WorkflowExecution.id).label('total_executions'),
+        func.count(
+            case(
+                (WorkflowExecution.status == WorkflowExecutionStatus.COMPLETED, 1),
+            )
+        ).label('successful'),
+        func.count(
+            case(
+                (WorkflowExecution.status == WorkflowExecutionStatus.FAILED, 1),
+            )
+        ).label('failed'),
+        func.avg(
+            text("TIMESTAMPDIFF(SECOND, workflow_executions.started_at, workflow_executions.completed_at)")
+        ).label('avg_duration_seconds'),
+        func.min(
+            text("TIMESTAMPDIFF(SECOND, workflow_executions.started_at, workflow_executions.completed_at)")
+        ).label('min_duration_seconds'),
+        func.max(
+            text("TIMESTAMPDIFF(SECOND, workflow_executions.started_at, workflow_executions.completed_at)")
+        ).label('max_duration_seconds')
+    ).select_from(Workflow) \
+     .outerjoin(WorkflowExecution, WorkflowExecution.workflow_id == Workflow.id) \
+     .where(
+         and_(
+             Workflow.business_id == business_id,
+             or_(
+                 WorkflowExecution.created_at >= datetime.utcnow() - timedelta(days=days),
+                 WorkflowExecution.created_at.is_(None)
+             )
+         )
+     )
+    
+    # فیلتر بر اساس workflow
+    if workflow_id:
+        stmt = stmt.where(Workflow.id == workflow_id)
+    
+    stmt = stmt.group_by(Workflow.id, Workflow.name, Workflow.status) \
+               .order_by(func.count(WorkflowExecution.id).desc())
+    
+    results = list(db.execute(stmt).all())
+    
+    return success_response(
+        data={
+            "period_days": days,
+            "workflows": [
+                {
+                    "workflow_id": r.id,
+                    "workflow_name": r.name,
+                    "workflow_status": r.status.value if r.status else None,
+                    "total_executions": r.total_executions or 0,
+                    "successful": r.successful or 0,
+                    "failed": r.failed or 0,
+                    "success_rate": round(
+                        (r.successful / r.total_executions * 100) if r.total_executions > 0 else 0,
+                        2
+                    ),
+                    "avg_duration_seconds": round(r.avg_duration_seconds, 2) if r.avg_duration_seconds else 0,
+                    "min_duration_seconds": round(r.min_duration_seconds, 2) if r.min_duration_seconds else 0,
+                    "max_duration_seconds": round(r.max_duration_seconds, 2) if r.max_duration_seconds else 0
+                }
+                for r in results
+            ]
+        },
+        request=request,
+        message="WORKFLOW_PERFORMANCE_ANALYTICS_RETRIEVED",
+    )
+
+
+@router.get(
+    "/businesses/{business_id}/workflows/{workflow_id}/executions/{execution_id}/timeline",
+    summary="Timeline اجرای workflow",
+    description="دریافت timeline دقیق اجرای workflow برای debugging",
+)
+@require_business_access("business_id")
+async def get_execution_timeline(
+    request: Request,
+    business_id: int,
+    workflow_id: int,
+    execution_id: int,
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    """دریافت timeline اجرای workflow"""
+    
+    # بررسی وجود workflow
+    workflow = db.get(Workflow, workflow_id)
+    if not workflow or workflow.business_id != business_id:
+        raise ApiError("WORKFLOW_NOT_FOUND", "Workflow یافت نشد")
+    
+    # بررسی وجود execution
+    execution = db.get(WorkflowExecution, execution_id)
+    if not execution or execution.workflow_id != workflow_id:
+        raise ApiError("EXECUTION_NOT_FOUND", "اجرای workflow یافت نشد")
+    
+    # دریافت تمام لاگ‌ها
+    logs_stmt = select(WorkflowLog) \
+        .where(WorkflowLog.execution_id == execution_id) \
+        .order_by(WorkflowLog.timestamp.asc())
+    
+    logs = list(db.execute(logs_stmt).scalars().all())
+    
+    # ساخت timeline
+    timeline = []
+    node_stats = {}
+    
+    for log in logs:
+        # اضافه به timeline
+        log_data = {
+            "timestamp": format_datetime_fields({"t": log.timestamp}, request)["t"],
+            "level": log.level.value if hasattr(log.level, 'value') else str(log.level),
+            "message": log.message,
+            "node_id": log.node_id,
+            "data": log.data
+        }
+        timeline.append(log_data)
+        
+        # محاسبه آمار nodeها
+        if log.node_id:
+            if log.node_id not in node_stats:
+                node_stats[log.node_id] = {
+                    "node_id": log.node_id,
+                    "executions": 0,
+                    "errors": 0,
+                    "total_duration_ms": 0,
+                    "node_type": log.data.get("node_type") if log.data else None,
+                    "node_label": log.data.get("node_label") if log.data else None
+                }
+            
+            node_stats[log.node_id]["executions"] += 1
+            
+            if log.level.value == 'error' or (hasattr(log.level, 'value') and log.level.value == 'error'):
+                node_stats[log.node_id]["errors"] += 1
+            
+            if log.data and "duration_ms" in log.data:
+                node_stats[log.node_id]["total_duration_ms"] += log.data["duration_ms"]
+    
+    # محاسبه میانگین duration برای هر node
+    for node_id, stats in node_stats.items():
+        if stats["executions"] > 0:
+            stats["avg_duration_ms"] = round(
+                stats["total_duration_ms"] / stats["executions"],
+                2
+            )
+    
+    # محاسبه مدت زمان کلی
+    duration_seconds = None
+    if execution.completed_at and execution.started_at:
+        duration_seconds = (execution.completed_at - execution.started_at).total_seconds()
+    
+    return success_response(
+        data={
+            "execution": {
+                "id": execution.id,
+                "workflow_id": execution.workflow_id,
+                "workflow_name": workflow.name,
+                "status": execution.status.value if hasattr(execution.status, 'value') else str(execution.status),
+                "started_at": format_datetime_fields({"t": execution.started_at}, request)["t"] if execution.started_at else None,
+                "completed_at": format_datetime_fields({"t": execution.completed_at}, request)["t"] if execution.completed_at else None,
+                "duration_seconds": round(duration_seconds, 2) if duration_seconds else None,
+                "error_message": execution.error_message
+            },
+            "timeline": timeline,
+            "node_statistics": list(node_stats.values()),
+            "summary": {
+                "total_logs": len(logs),
+                "total_nodes": len(node_stats),
+                "error_count": sum(1 for log in logs if log.level.value == 'error' or str(log.level) == 'error')
+            }
+        },
+        request=request,
+        message="EXECUTION_TIMELINE_RETRIEVED",
+    )
+
+
+@router.get(
+    "/workflows/metadata/triggers",
+    summary="دریافت metadata triggerها",
+    description="دریافت لیست triggerهای موجود با metadata",
+)
+async def get_triggers_metadata(
+    request: Request,
+    lang: str = Query("fa", description="زبان (fa/en)"),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    """دریافت metadata triggerها"""
+    from app.services.workflow.i18n import translate_metadata
+    
+    trigger_registry = TriggerRegistry()
+    all_triggers = trigger_registry.get_all_metadata()
+    
+    # ترجمه metadata
+    translated_triggers = []
+    for trigger in all_triggers:
+        # فعلاً ترجمه ساده (بعداً کامل می‌شود)
+        translated_triggers.append(trigger)
+    
+    return success_response(
+        data=translated_triggers,
+        request=request,
+        message="TRIGGERS_METADATA_RETRIEVED",
+    )
+
+
+@router.get(
+    "/workflows/metadata/actions",
+    summary="دریافت metadata actionها",
+    description="دریافت لیست actionهای موجود با metadata",
+)
+async def get_actions_metadata(
+    request: Request,
+    lang: str = Query("fa", description="زبان (fa/en)"),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    """دریافت metadata actionها با پشتیبانی از ترجمه"""
+    from app.services.workflow.i18n import translate_metadata
+    
+    action_registry = ActionRegistry()
+    all_actions = action_registry.get_all_metadata()
+    
+    # ترجمه metadata برای هر action
+    translated_actions = []
+    for action in all_actions:
+        action_key = action.get("key", "")
+        
+        # تعیین context برای ترجمه
+        translation_context = None
+        if "invoice" in action_key and "create" in action_key:
+            translation_context = "create_invoice"
+        elif "telegram" in action_key:
+            translation_context = "send_telegram"
+        elif "email" in action_key:
+            translation_context = "send_email"
+        
+        # ترجمه metadata
+        if translation_context:
+            translated = translate_metadata(action, lang, translation_context)
+        else:
+            translated = action
+        
+        translated_actions.append(translated)
+    
+    return success_response(
+        data=translated_actions,
+        request=request,
+        message="ACTIONS_METADATA_RETRIEVED",
+    )
+
+
+@router.get(
+    "/workflows/translations",
+    summary="دریافت تمام ترجمه‌های ورک‌فلو",
+    description="دریافت تمام رشته‌های ترجمه شده برای استفاده در UI",
+)
+async def get_workflow_translations(
+    request: Request,
+    lang: str = Query("fa", description="زبان (fa/en)"),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    """دریافت تمام ترجمه‌های ورک‌فلو"""
+    from app.services.workflow.i18n import (
+        COMMON_TRANSLATIONS,
+        CREATE_INVOICE_TRANSLATIONS,
+        SEND_TELEGRAM_TRANSLATIONS,
+        SEND_EMAIL_TRANSLATIONS,
+        OTHER_ACTIONS_TRANSLATIONS,
+    )
+    
+    # ترکیب تمام ترجمه‌ها
+    all_translations = {}
+    
+    # ترجمه‌های مشترک
+    all_translations.update(COMMON_TRANSLATIONS.get(lang, {}))
+    
+    # ترجمه‌های اکشن‌ها
+    all_translations["create_invoice"] = CREATE_INVOICE_TRANSLATIONS.get(lang, {})
+    all_translations["send_telegram"] = SEND_TELEGRAM_TRANSLATIONS.get(lang, {})
+    all_translations["send_email"] = SEND_EMAIL_TRANSLATIONS.get(lang, {})
+    all_translations["others"] = OTHER_ACTIONS_TRANSLATIONS.get(lang, {})
+    
+    return success_response(
+        data={
+            "language": lang,
+            "translations": all_translations
+        },
+        request=request,
+        message="TRANSLATIONS_RETRIEVED",
+    )
+
+
+@router.get(
+    "/workflows/translations/export",
+    summary="صادرات ترجمه‌ها برای Flutter",
+    description="صادرات ترجمه‌های ورک‌فلو به فرمت مناسب برای فایل‌های arb",
+)
+async def export_workflow_translations(
+    request: Request,
+    lang: str = Query("fa", description="زبان (fa/en)"),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    """صادرات ترجمه‌ها به فرمت arb"""
+    from app.services.workflow.i18n import (
+        COMMON_TRANSLATIONS,
+        CREATE_INVOICE_TRANSLATIONS,
+        SEND_TELEGRAM_TRANSLATIONS,
+        SEND_EMAIL_TRANSLATIONS,
+        OTHER_ACTIONS_TRANSLATIONS,
+    )
+    
+    # تبدیل به فرمت arb (flat structure با prefix)
+    arb_translations = {}
+    
+    # مشترک
+    for key, value in COMMON_TRANSLATIONS.get(lang, {}).items():
+        arb_translations[f"workflow_{key}"] = value
+    
+    # Create Invoice
+    for key, value in CREATE_INVOICE_TRANSLATIONS.get(lang, {}).items():
+        arb_translations[f"workflowCreateInvoice_{key}"] = value
+    
+    # Send Telegram
+    for key, value in SEND_TELEGRAM_TRANSLATIONS.get(lang, {}).items():
+        arb_translations[f"workflowSendTelegram_{key}"] = value
+    
+    # Send Email
+    for key, value in SEND_EMAIL_TRANSLATIONS.get(lang, {}).items():
+        arb_translations[f"workflowSendEmail_{key}"] = value
+    
+    # Others
+    for key, value in OTHER_ACTIONS_TRANSLATIONS.get(lang, {}).items():
+        arb_translations[f"workflowOthers_{key}"] = value
+    
+    return success_response(
+        data={
+            "language": lang,
+            "format": "arb",
+            "translations": arb_translations,
+            "total_keys": len(arb_translations)
+        },
+        request=request,
+        message="TRANSLATIONS_EXPORTED",
     )
 

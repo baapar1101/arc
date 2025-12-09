@@ -119,6 +119,38 @@ class _SettingsPageState extends State<SettingsPage> {
     return authStore.hasBusinessPermission('warranty', 'manage') ||
            authStore.hasBusinessPermission('warranty', 'read');
   }
+
+  bool _isRepairShopPluginActive() {
+    try {
+      final repairShopPlugin = _businessPlugins.firstWhere(
+        (plugin) => plugin['plugin_code'] == 'repair_shop_management',
+        orElse: () => <String, dynamic>{},
+      );
+      return repairShopPlugin['is_active'] == true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  bool _canAccessRepairShopSettings() {
+    final authStore = _authStore;
+    if (authStore == null) return false;
+    
+    // بررسی فعال بودن پلاگین
+    if (!_isRepairShopPluginActive()) {
+      return false;
+    }
+    
+    // بررسی دسترسی
+    // اگر کاربر مالک است، دسترسی دارد
+    if (authStore.currentBusiness?.isOwner == true) {
+      return true;
+    }
+    
+    // بررسی دسترسی repair_shop.manage یا repair_shop.read
+    return authStore.hasBusinessPermission('repair_shop', 'manage') ||
+           authStore.hasBusinessPermission('repair_shop', 'read');
+  }
   
   @override
   Widget build(BuildContext context) {
@@ -200,6 +232,13 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
                 _buildSettingItem(
                   context,
+                  title: 'مدیریت پروژه‌ها',
+                  subtitle: 'تعریف و مدیریت پروژه‌ها برای ردیابی هزینه‌ها و درآمدها',
+                  icon: Icons.account_tree,
+                  onTap: () => context.go('/business/${widget.businessId}/projects'),
+                ),
+                _buildSettingItem(
+                  context,
                   title: 'شماره‌گذاری اسناد',
                   subtitle: 'تنظیم نحوه شماره‌گذاری انواع اسناد',
                   icon: Icons.numbers,
@@ -242,6 +281,21 @@ class _SettingsPageState extends State<SettingsPage> {
                     icon: Icons.verified_user,
                     onTap: () => context.go('/business/${widget.businessId}/warranty/settings'),
                   ),
+                if (_canAccessRepairShopSettings())
+                  _buildSettingItem(
+                    context,
+                    title: 'تنظیمات تعمیرگاه',
+                    subtitle: 'شماره‌گذاری، اعلان‌ها و پیش‌فرض‌های تعمیرگاه',
+                    icon: Icons.build_circle,
+                    onTap: () => context.go('/business/${widget.businessId}/repair-shop-settings'),
+                  ),
+                _buildSettingItem(
+                  context,
+                  title: 'قالب‌های نوتیفیکیشن',
+                  subtitle: 'مدیریت قالب‌های پیامک و ایمیل برای رویدادهای مختلف',
+                  icon: Icons.notifications_active,
+                  onTap: () => context.go('/business/${widget.businessId}/notification-templates'),
+                ),
               ],
             ),
             

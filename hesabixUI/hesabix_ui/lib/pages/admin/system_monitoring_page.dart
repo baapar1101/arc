@@ -470,6 +470,8 @@ class _SystemMonitoringPageState extends State<SystemMonitoringPage> with Single
         _buildServiceCard(theme, 'Redis', services['redis'] as Map? ?? {}),
         const SizedBox(height: 12),
         _buildServiceCard(theme, 'Workers', services['workers'] as Map? ?? {}),
+        const SizedBox(height: 12),
+        _buildNotificationModerationCard(theme, services['notification_moderation'] as Map? ?? {}),
       ],
     );
   }
@@ -544,6 +546,8 @@ class _SystemMonitoringPageState extends State<SystemMonitoringPage> with Single
         _buildServiceCard(theme, 'Redis', services['redis'] as Map? ?? {}),
         const SizedBox(height: 12),
         _buildServiceCard(theme, 'Workers', services['workers'] as Map? ?? {}),
+        const SizedBox(height: 12),
+        _buildNotificationModerationCard(theme, services['notification_moderation'] as Map? ?? {}),
       ],
     );
   }
@@ -600,6 +604,232 @@ class _SystemMonitoringPageState extends State<SystemMonitoringPage> with Single
         ),
       ),
     );
+  }
+
+  Widget _buildNotificationModerationCard(ThemeData theme, Map status) {
+    final statusText = status['status'] as String? ?? 'unknown';
+    final statusColor = _getServiceStatusColor(statusText);
+    final isActive = status['is_active'] as bool? ?? false;
+    final queue = status['queue'] as Map? ?? {};
+    final pending = queue['pending'] as int? ?? 0;
+    final reviewedToday = queue['reviewed_today'] as int? ?? 0;
+    final lastActivity = status['last_activity'] as String?;
+    
+    return Card(
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 12,
+                  height: 12,
+                  decoration: BoxDecoration(
+                    color: statusColor,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.auto_awesome, size: 20),
+                          const SizedBox(width: 8),
+                          Text(
+                            'AI Moderation Worker',
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        _translateStatus(statusText),
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: statusColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.refresh),
+                  tooltip: 'Restart',
+                  onPressed: isActive ? () => _restartNotificationModerationWorker() : null,
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            const Divider(),
+            const SizedBox(height: 8),
+            // آمار صف
+            Row(
+              children: [
+                Expanded(
+                  child: _buildStatItem(
+                    theme,
+                    'در صف',
+                    pending.toString(),
+                    Icons.hourglass_empty,
+                    pending > 10 ? Colors.orange : Colors.blue,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _buildStatItem(
+                    theme,
+                    'امروز',
+                    reviewedToday.toString(),
+                    Icons.check_circle_outline,
+                    Colors.green,
+                  ),
+                ),
+              ],
+            ),
+            if (lastActivity != null) ...[
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Icon(Icons.access_time, size: 14, color: Colors.grey[600]),
+                  const SizedBox(width: 4),
+                  Text(
+                    'آخرین فعالیت: ${_formatLastActivity(lastActivity)}',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatItem(
+    ThemeData theme,
+    String label,
+    String value,
+    IconData icon,
+    Color color,
+  ) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: color, size: 20),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: Colors.grey[700],
+                  ),
+                ),
+                Text(
+                  value,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: color,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatLastActivity(String isoTime) {
+    try {
+      final dt = DateTime.parse(isoTime);
+      final now = DateTime.now();
+      final diff = now.difference(dt);
+      
+      if (diff.inMinutes < 1) return 'همین الان';
+      if (diff.inMinutes < 60) return '${diff.inMinutes} دقیقه پیش';
+      if (diff.inHours < 24) return '${diff.inHours} ساعت پیش';
+      return '${diff.inDays} روز پیش';
+    } catch (e) {
+      return isoTime;
+    }
+  }
+
+  Future<void> _restartNotificationModerationWorker() async {
+    try {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Restart Worker'),
+          content: const Text('آیا مطمئن هستید که می‌خواهید AI Moderation Worker را restart کنید؟'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('لغو'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Restart'),
+            ),
+          ],
+        ),
+      );
+      
+      if (confirmed != true) return;
+      
+      // نمایش loading
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('در حال restart کردن Worker...')),
+        );
+      }
+      
+      // فراخوانی API restart
+      await ApiClient().post(
+        '/api/v1/admin/system-services/restart',
+        query: {'service_name': 'hesabix-notification-moderation'},
+      );
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ Worker با موفقیت restart شد'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+      
+      // رفرش داده‌ها بعد از 2 ثانیه
+      await Future.delayed(const Duration(seconds: 2));
+      _loadData();
+      
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('خطا در restart: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   Widget _buildAlertCard(ThemeData theme, Map<String, dynamic> alert) {

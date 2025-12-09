@@ -42,6 +42,22 @@ const List<EventKeyInfo> eventKeysList = [
     icon: Icons.lock_outline,
   ),
   EventKeyInfo(
+    key: 'auth.password_reset',
+    category: 'auth',
+    title: 'فراموشی کلمه عبور',
+    description: 'این رویداد هنگام درخواست بازیابی کلمه عبور توسط کاربر فعال می‌شود.',
+    when: 'هنگام درخواست فراموشی کلمه عبور',
+    recipient: 'کاربر درخواست‌دهنده',
+    availableParams: ['token', 'user_name', 'user_email', 'expiry_hours'],
+    paramExamples: {
+      'token': 'reset_abc123xyz',
+      'user_name': 'علی احمدی',
+      'user_email': 'ali@example.com',
+      'expiry_hours': '24',
+    },
+    icon: Icons.lock_reset,
+  ),
+  EventKeyInfo(
     key: 'support.ticket_created',
     category: 'support',
     title: 'ایجاد تیکت جدید',
@@ -124,6 +140,8 @@ enum EventKeyInputMode {
 String buildExampleTemplate(EventKeyInfo info) {
   if (info.key == 'auth.otp_login') {
     return 'کد ورود شما: {{ code }}\nاین کد تا {{ expiry_minutes }} دقیقه اعتبار دارد.';
+  } else if (info.key == 'auth.password_reset') {
+    return 'سلام {{ user_name }} عزیز،\nبرای بازیابی کلمه عبور خود از لینک زیر استفاده کنید:\n{{ token }}\nاین لینک تا {{ expiry_hours }} ساعت معتبر است.';
   } else if (info.key == 'support.ticket_created') {
     return 'تیکت جدید: {{ ticket_title }}\nکاربر: {{ user_name }}\nشماره تیکت: #{{ ticket_id }}';
   } else if (info.key == 'support.user_reply') {

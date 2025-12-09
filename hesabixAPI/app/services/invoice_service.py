@@ -1223,6 +1223,18 @@ def create_invoice(
 
     document: Optional[Document] = None
     max_code_attempts = 5
+    
+    # دریافت project_id (اختیاری)
+    project_id = data.get("project_id")
+    if project_id:
+        # اعتبارسنجی پروژه
+        from adapters.db.models.project import Project
+        project = db.query(Project).filter(
+            and_(Project.id == project_id, Project.business_id == business_id, Project.is_active == True)
+        ).first()
+        if not project:
+            raise ApiError("PROJECT_NOT_FOUND", "پروژه یافت نشد یا غیرفعال است", http_status=404)
+    
     for attempt in range(max_code_attempts):
         doc_code = generate_document_code(db, business_id, invoice_type, document_date)
         candidate = Document(
@@ -1237,6 +1249,7 @@ def create_invoice(
             is_proforma=bool(data.get("is_proforma", False)),
             description=data.get("description"),
             extra_info=new_extra_info,
+            project_id=project_id,
         )
         try:
             with db.begin_nested():
@@ -1885,6 +1898,21 @@ def create_invoice(
         except Exception:
             pass
 
+    # فراخوانی workflow triggers برای فاکتور ایجاد شده
+    try:
+        from app.services.workflow.workflow_trigger_service import trigger_invoice_created
+        trigger_invoice_created(
+            db=db,
+            business_id=business_id,
+            invoice_id=document.id,
+            invoice_type=invoice_type,
+            total_amount=float(total_with_tax),
+            user_id=user_id
+        )
+    except Exception as e:
+        # عدم موفقیت در trigger نباید مانع بازگشت فاکتور شود
+        logger.warning(f"Failed to trigger workflows for invoice {document.id}: {e}")
+
     return invoice_document_to_dict(db, document)
 
 
@@ -1922,6 +1950,17 @@ def update_invoice(
     # به‌روزرسانی وضعیت پیش‌فاکتور
     if "is_proforma" in data:
         document.is_proforma = bool(data.get("is_proforma", False))
+    # به‌روزرسانی پروژه
+    if "project_id" in data:
+        project_id = data.get("project_id")
+        if project_id:
+            from adapters.db.models.project import Project
+            project = db.query(Project).filter(
+                and_(Project.id == project_id, Project.business_id == document.business_id, Project.is_active == True)
+            ).first()
+            if not project:
+                raise ApiError("PROJECT_NOT_FOUND", "پروژه یافت نشد یا غیرفعال است", http_status=404)
+        document.project_id = project_id
     if isinstance(data.get("extra_info"), dict) or data.get("extra_info") is None:
         # preserve links if present
         new_extra = data.get("extra_info") or {}
@@ -1934,6 +1973,37 @@ def update_invoice(
         if data.get("description") is not None:
             document.description = data.get("description")
 
+    # آزادسازی instance های قبلی این فاکتور (برای کالاهای یونیک)
+    # قبل از حذف سطرها، instance های sold شده توسط این فاکتور را به حالت available برمی‌گردانیم
+    from adapters.db.models.product_instance import ProductInstance
+    try:
+        old_invoice_lines = db.query(InvoiceItemLine).filter(
+            InvoiceItemLine.document_id == document.id
+        ).all()
+        
+        for old_line in old_invoice_lines:
+            if old_line.extra_info:
+                selected_ids = old_line.extra_info.get("selected_instance_ids")
+                if selected_ids and isinstance(selected_ids, list):
+                    # آزاد کردن instance هایی که به این فاکتور اختصاص داده شده بودند
+                    db.query(ProductInstance).filter(
+                        and_(
+                            ProductInstance.id.in_([int(x) for x in selected_ids]),
+                            ProductInstance.business_id == document.business_id,
+                            ProductInstance.current_invoice_id == document.id,
+                        )
+                    ).update(
+                        {
+                            "status": "available",
+                            "current_invoice_id": None,
+                        },
+                        synchronize_session=False
+                    )
+        db.flush()
+    except Exception as e:
+        # اگر خطایی رخ داد، فقط log می‌کنیم و ادامه می‌دهیم
+        logger.warning(f"Failed to release instances for invoice {document.id}: {e}")
+    
     # Recreate lines: حذف سطرهای حسابداری و اقلام فاکتور و بازایجاد
     db.query(DocumentLine).filter(DocumentLine.document_id == document.id).delete(synchronize_session=False)
     db.query(InvoiceItemLine).filter(InvoiceItemLine.document_id == document.id).delete(synchronize_session=False)
@@ -1985,7 +2055,7 @@ def update_invoice(
         selected_instance_ids = extra_info.get("selected_instance_ids")
         if selected_instance_ids:
             _validate_selected_instances(
-                db, business_id, int(product_id), selected_instance_ids, int(qty), inv_type
+                db, document.business_id, int(product_id), selected_instance_ids, int(qty), inv_type
             )
         
         db.add(InvoiceItemLine(
@@ -2759,6 +2829,14 @@ def invoice_document_to_dict(db: Session, document: Document) -> Dict[str, Any]:
     created_by = db.query(User).filter(User.id == document.created_by_user_id).first()
     created_by_name = f"{getattr(created_by, 'first_name', '')} {getattr(created_by, 'last_name', '')}".strip() if created_by else None
     currency = db.query(Currency).filter(Currency.id == document.currency_id).first()
+    
+    # دریافت نام پروژه
+    project_name = None
+    if document.project_id:
+        from adapters.db.models.project import Project
+        project = db.query(Project).filter(Project.id == document.project_id).first()
+        if project:
+            project_name = project.name
 
     return {
         "id": document.id,
@@ -2773,6 +2851,8 @@ def invoice_document_to_dict(db: Session, document: Document) -> Dict[str, Any]:
         "created_by_name": created_by_name,
         "is_proforma": document.is_proforma,
         "description": document.description,
+        "project_id": document.project_id,
+        "project_name": project_name,
         "extra_info": document.extra_info,
         "product_lines": product_lines,
         "account_lines": account_lines,

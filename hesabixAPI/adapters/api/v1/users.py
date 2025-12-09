@@ -20,7 +20,7 @@ from uuid import UUID
 from starlette.responses import StreamingResponse
 
 
-router = APIRouter(prefix="/users", tags=["users"])
+router = APIRouter(prefix="/users", tags=["کاربران", "مدیریت سیستم"])
 
 
 @router.post("/search", 

@@ -6055,4 +6055,368 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get warrantyManage => 'مدیریت گارانتی';
+
+  @override
+  String get identityInquiryTitle => 'استعلام اطلاعات هویتی';
+
+  @override
+  String get identityInquirySubtitle =>
+      'لطفاً کد ملی و تاریخ تولد را وارد کنید';
+
+  @override
+  String get nationalIdHint => 'کد ملی 10 رقمی';
+
+  @override
+  String get nationalIdRequired => 'کد ملی الزامی است';
+
+  @override
+  String get nationalIdInvalidLength => 'کد ملی باید 10 رقم باشد';
+
+  @override
+  String get nationalIdInvalid => 'کد ملی نامعتبر است';
+
+  @override
+  String get birthDate => 'تاریخ تولد';
+
+  @override
+  String get birthDateHint => 'تاریخ شمسی (YYYY-MM-DD یا YYYY/MM/DD)';
+
+  @override
+  String get birthDateRequired => 'تاریخ تولد الزامی است';
+
+  @override
+  String get birthDateInvalid => 'فرمت تاریخ نامعتبر است';
+
+  @override
+  String get selectBirthDate => 'انتخاب تاریخ';
+
+  @override
+  String get inquire => 'استعلام';
+
+  @override
+  String get inquiring => 'در حال استعلام...';
+
+  @override
+  String get inquiryError => 'خطا در استعلام';
+
+  @override
+  String get inquiryErrorPrefix => 'خطا در استعلام:';
+
+  @override
+  String get unknownError => 'خطای نامشخص';
+
+  @override
+  String get noMatch => 'عدم تطابق';
+
+  @override
+  String get noMatchDescription =>
+      'کد ملی و تاریخ تولد با یکدیگر مطابقت ندارند';
+
+  @override
+  String get personalInformation => 'اطلاعات شخصی';
+
+  @override
+  String get fatherName => 'نام پدر';
+
+  @override
+  String get alive => 'زنده';
+
+  @override
+  String get deceased => 'فوت شده';
+
+  @override
+  String get newInquiry => 'استعلام جدید';
+
+  @override
+  String get identityInquiryDescription =>
+      'با وارد کردن کد ملی و تاریخ تولد می‌توانید اطلاعات هویتی فرد را استعلام کنید';
+
+  @override
+  String get noResultAvailable => 'خطا: نتیجه‌ای وجود ندارد';
+
+  @override
+  String get accountSettingsTitle => 'تنظیمات حساب کاربری';
+
+  @override
+  String get accountSettingsSubtitle =>
+      'مدیریت و تنظیم تمام بخش‌های حساب کاربری شما';
+
+  @override
+  String get accountSettingsMarketingDescription =>
+      'مدیریت لینک معرفی و گزارش‌های بازاریابی';
+
+  @override
+  String get accountSettingsNotificationsTitle => 'اعلان‌ها و نوتیفیکیشن';
+
+  @override
+  String get accountSettingsNotificationsDescription =>
+      'تنظیمات کانال‌های اعلان‌رسانی و نوتیفیکیشن';
+
+  @override
+  String get accountSettingsSignatureTitle => 'امضا و تصویر کاربر';
+
+  @override
+  String get accountSettingsSignatureDescription =>
+      'بارگذاری و مدیریت امضای شخصی و تصویر پروفایل';
+
+  @override
+  String get accountSettingsApiKeysTitle => 'کلیدهای API';
+
+  @override
+  String get accountSettingsApiKeysDescription =>
+      'مدیریت کلیدهای API برای دسترسی به سیستم';
+
+  @override
+  String get accountSettingsLoginSessionsTitle => 'سشن‌های ورود';
+
+  @override
+  String get accountSettingsLoginSessionsDescription =>
+      'مشاهده و مدیریت دستگاه‌های متصل به حساب کاربری';
+
+  @override
+  String get accountSettingsChangePasswordDescription =>
+      'تغییر کلمه عبور حساب کاربری';
+
+  @override
+  String get accountSettingsVerificationTitle => 'تایید شماره موبایل و ایمیل';
+
+  @override
+  String get accountSettingsVerificationDescription =>
+      'تایید شماره موبایل و ایمیل برای امنیت بیشتر';
+
+  @override
+  String get accountSettingsNotificationHistoryTitle => 'تاریخچه ناتیفیکیشن‌ها';
+
+  @override
+  String get accountSettingsNotificationHistoryDescription =>
+      'مشاهده تمام ناتیفیکیشن‌های ارسال شده (OTP، فراموشی رمز، تیکت و ...)';
+
+  @override
+  String get apiKeysPageTitle => 'مدیریت کلیدهای API';
+
+  @override
+  String get apiKeyErrorLoadingKeys => 'خطا در بارگذاری کلیدها';
+
+  @override
+  String get apiKeyErrorCreatingKey => 'خطا در ایجاد کلید';
+
+  @override
+  String get apiKeyCreatedSuccessfully => 'کلید API ایجاد شد';
+
+  @override
+  String get apiKeySaveWarning =>
+      'لطفاً این کلید را ذخیره کنید. این تنها باری است که نمایش داده می‌شود.';
+
+  @override
+  String get apiKeyClose => 'بستن';
+
+  @override
+  String get apiKeyCopy => 'کپی';
+
+  @override
+  String get apiKeyCopied => 'کلید کپی شد';
+
+  @override
+  String get apiKeyUpdatedSuccessfully => 'کلید با موفقیت به‌روزرسانی شد';
+
+  @override
+  String get apiKeyErrorUpdating => 'خطا در به‌روزرسانی کلید';
+
+  @override
+  String get apiKeyDeleteTitle => 'حذف کلید API';
+
+  @override
+  String apiKeyDeleteConfirmation(String name) {
+    return 'آیا از حذف کلید \"$name\" اطمینان دارید؟\nاین عمل غیرقابل بازگشت است.';
+  }
+
+  @override
+  String get apiKeyDeletedSuccessfully => 'کلید با موفقیت حذف شد';
+
+  @override
+  String get apiKeyErrorDeleting => 'خطا در حذف کلید';
+
+  @override
+  String get apiKeyFilterActive => 'فعال';
+
+  @override
+  String get apiKeyFilterRevoked => 'لغو شده';
+
+  @override
+  String get apiKeyFilterAll => 'همه';
+
+  @override
+  String get apiKeyNoActiveKeys => 'هیچ کلید فعالی وجود ندارد';
+
+  @override
+  String get apiKeyNoRevokedKeys => 'هیچ کلید لغو شده‌ای وجود ندارد';
+
+  @override
+  String get apiKeyNoKeysCreated => 'هیچ کلید API ایجاد نشده است';
+
+  @override
+  String get apiKeyCreateNewButton => 'ایجاد کلید جدید';
+
+  @override
+  String get apiKeyCreateHint =>
+      'برای ایجاد یک کلید جدید، روی دکمه ایجاد کلیک کنید';
+
+  @override
+  String get apiKeyNoRevokedHint => 'هیچ کلید لغو شده‌ای برای نمایش وجود ندارد';
+
+  @override
+  String get apiKeyUsageHint =>
+      'برای استفاده از API در برنامه‌های دیگر، یک کلید ایجاد کنید';
+
+  @override
+  String get apiKeyEdit => 'ویرایش';
+
+  @override
+  String get apiKeyDelete => 'حذف';
+
+  @override
+  String get apiKeyCreatedAt => 'ایجاد شده';
+
+  @override
+  String get apiKeyLastUsed => 'آخرین استفاده';
+
+  @override
+  String get apiKeyExpiresAt => 'انقضا';
+
+  @override
+  String get apiKeyRevokedAt => 'لغو شده';
+
+  @override
+  String get apiKeyAllowedIPs => 'IP های مجاز';
+
+  @override
+  String get apiKeyCreateNewTitle => 'ایجاد کلید API جدید';
+
+  @override
+  String get apiKeyNameLabel => 'نام کلید';
+
+  @override
+  String get apiKeyNameHint => 'مثال: Production API Key';
+
+  @override
+  String get apiKeyScopeLabel => 'محدوده دسترسی (JSON)';
+
+  @override
+  String get apiKeyScopeHint =>
+      'اختیاری - مثال: {\"read\": true, \"write\": false}';
+
+  @override
+  String get apiKeyIPsLabel => 'لیست IP های مجاز';
+
+  @override
+  String get apiKeyIPsHint => 'جدا شده با کاما - مثال: 192.168.1.1, 10.0.0.1';
+
+  @override
+  String get apiKeyExpiryLabel => 'تاریخ و زمان انقضا (اختیاری)';
+
+  @override
+  String get apiKeyExpiryHint => 'انتخاب کنید';
+
+  @override
+  String get apiKeyNoExpiry => 'بدون انقضا';
+
+  @override
+  String get apiKeyEditTitle => 'ویرایش کلید API';
+
+  @override
+  String get apiKeyWithoutName => 'بدون نام';
+
+  @override
+  String get datePickerSelectDate => 'انتخاب تاریخ';
+
+  @override
+  String get timePickerSelectTime => 'انتخاب زمان';
+
+  @override
+  String get dateTimeLabel => 'تاریخ و زمان';
+
+  @override
+  String get dateLabel => 'تاریخ';
+
+  @override
+  String get timeLabel => 'زمان';
+
+  @override
+  String get clearButton => 'پاک کردن';
+
+  @override
+  String get sessionsPageTitle => 'مدیریت سشن‌های ورود';
+
+  @override
+  String get sessionsErrorLoading => 'خطا در بارگذاری سشن‌ها';
+
+  @override
+  String get sessionsCannotDeleteCurrent =>
+      'نمی‌توانید session فعلی را حذف کنید';
+
+  @override
+  String get sessionsDeleteTitle => 'حذف سشن';
+
+  @override
+  String sessionsDeleteConfirmation(String device) {
+    return 'آیا از حذف session \"$device\" اطمینان دارید؟\nاین عمل غیرقابل بازگشت است.';
+  }
+
+  @override
+  String get sessionsDeletedSuccessfully => 'Session با موفقیت حذف شد';
+
+  @override
+  String get sessionsErrorDeleting => 'خطا در حذف session';
+
+  @override
+  String get sessionsNoOtherSessions => 'هیچ session دیگری وجود ندارد';
+
+  @override
+  String get sessionsRevokeAllTitle => 'خروج از همه دستگاه‌ها';
+
+  @override
+  String sessionsRevokeAllConfirmation(int count) {
+    return 'آیا از حذف $count session دیگر اطمینان دارید؟\nاین عمل باعث خروج از تمام دستگاه‌های دیگر می‌شود.\nSession فعلی شما حفظ خواهد شد.';
+  }
+
+  @override
+  String get sessionsDeleteAll => 'حذف همه';
+
+  @override
+  String sessionsDeleted(int count) {
+    return '$count session حذف شد';
+  }
+
+  @override
+  String get sessionsNoActive => 'هیچ session فعالی وجود ندارد';
+
+  @override
+  String get sessionsThisDevice => 'این دستگاه';
+
+  @override
+  String get sessionsLastUsed => 'آخرین استفاده';
+
+  @override
+  String get sessionsCreatedAt => 'ایجاد شده';
+
+  @override
+  String get sessionsToday => 'امروز';
+
+  @override
+  String get sessionsYesterday => 'دیروز';
+
+  @override
+  String sessionsDaysAgo(int days) {
+    return '$days روز پیش';
+  }
+
+  @override
+  String sessionsWeeksAgo(int weeks) {
+    return '$weeks هفته پیش';
+  }
+
+  @override
+  String sessionsMonthsAgo(int months) {
+    return '$months ماه پیش';
+  }
 }

@@ -99,26 +99,34 @@ class _FiscalYearSettingsPageState extends State<FiscalYearSettingsPage> {
         }
 
         // پارس کردن تاریخ‌ها
-        // اولویت: start_date_formatted (Map) > start_date_raw (string Jalali) > start_date
-        final startDateFormatted = current['start_date_formatted'];
+        // اولویت: start_date_raw (ISO format میلادی) > start_date_formatted (Map) > start_date (string شمسی)
+        // start_date_raw همیشه ISO format میلادی است و می‌تواند مستقیماً با DateTime.tryParse پارس شود
         final startDateRaw = current['start_date_raw'];
+        final startDateFormatted = current['start_date_formatted'];
         final startDateStr = current['start_date'];
         
-        final endDateFormatted = current['end_date_formatted'];
         final endDateRaw = current['end_date_raw'];
+        final endDateFormatted = current['end_date_formatted'];
         final endDateStr = current['end_date'];
         
-        final DateTime? parsedStartDate = startDateFormatted != null 
-            ? _parseDate(startDateFormatted) 
-            : (startDateRaw != null 
-                ? _parseDate(startDateRaw) 
-                : (startDateStr != null ? _parseDate(startDateStr) : null));
+        // استفاده از start_date_raw که ISO format میلادی است (مثل صفحه ویرایش فاکتور)
+        DateTime? parsedStartDate;
+        if (startDateRaw != null) {
+          parsedStartDate = DateTime.tryParse(startDateRaw.toString());
+        } else if (startDateFormatted != null) {
+          parsedStartDate = _parseDate(startDateFormatted);
+        } else if (startDateStr != null) {
+          parsedStartDate = _parseDate(startDateStr);
+        }
         
-        final DateTime? parsedEndDate = endDateFormatted != null 
-            ? _parseDate(endDateFormatted) 
-            : (endDateRaw != null 
-                ? _parseDate(endDateRaw) 
-                : (endDateStr != null ? _parseDate(endDateStr) : null));
+        DateTime? parsedEndDate;
+        if (endDateRaw != null) {
+          parsedEndDate = DateTime.tryParse(endDateRaw.toString());
+        } else if (endDateFormatted != null) {
+          parsedEndDate = _parseDate(endDateFormatted);
+        } else if (endDateStr != null) {
+          parsedEndDate = _parseDate(endDateStr);
+        }
 
         setState(() {
           _currentFiscalYear = current;
@@ -150,7 +158,9 @@ class _FiscalYearSettingsPageState extends State<FiscalYearSettingsPage> {
           // اگر سال بزرگتر از 1500 است، Jalali است
           if (year > 1500) {
             final jalali = Jalali(year, month, day);
-            return jalali.toDateTime();
+            final dt = jalali.toDateTime();
+            // اطمینان از اینکه DateTime به صورت local است
+            return DateTime(dt.year, dt.month, dt.day);
           } else {
             // سال میلادی است
             return DateTime(year, month, day);
@@ -172,9 +182,11 @@ class _FiscalYearSettingsPageState extends State<FiscalYearSettingsPage> {
               
               // اگر سال بزرگتر از 1500 است، Jalali است
               if (year > 1500) {
-                // استفاده از parseFromDisplay برای پارس Jalali
-                final parsed = HesabixDateUtils.parseFromDisplay(date, true);
-                if (parsed != null) return parsed;
+                // استفاده مستقیم از Jalali برای تبدیل
+                final jalali = Jalali(year, month, day);
+                final dt = jalali.toDateTime();
+                // اطمینان از اینکه DateTime به صورت local است و فقط تاریخ دارد
+                return DateTime(dt.year, dt.month, dt.day);
               } else {
                 // سال میلادی است
                 return DateTime(year, month, day);
@@ -187,7 +199,9 @@ class _FiscalYearSettingsPageState extends State<FiscalYearSettingsPage> {
         
         // تلاش برای پارس کردن به عنوان ISO format (Gregorian)
         try {
-          return DateTime.parse(date);
+          final parsed = DateTime.parse(date);
+          // اگر فقط تاریخ است (بدون زمان)، فقط تاریخ را برگردان
+          return DateTime(parsed.year, parsed.month, parsed.day);
         } catch (e) {
           return null;
         }

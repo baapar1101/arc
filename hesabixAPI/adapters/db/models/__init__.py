@@ -98,3 +98,5 @@ from .warranty import (  # noqa: F401
     WarrantyTracking,
     WarrantyTrackingLink,
 )
+# Project models
+from .project import Project  # noqa: F401

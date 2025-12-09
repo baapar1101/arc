@@ -22,15 +22,28 @@ depends_on = None
 
 def upgrade():
     # تغییر نام ستون از metadata به extra_metadata
+    # بررسی وجود ستون قبل از تغییر نام
+    from sqlalchemy import inspect
     from sqlalchemy.dialects.mysql import JSON
-    op.alter_column(
-        'warranty_codes',
-        'metadata',
-        new_column_name='extra_metadata',
-        existing_type=JSON,
-        existing_nullable=True,
-        existing_comment='اطلاعات اضافی'
-    )
+    
+    conn = op.get_bind()
+    inspector = inspect(conn)
+    
+    # بررسی وجود جدول
+    if 'warranty_codes' in inspector.get_table_names():
+        columns = [col['name'] for col in inspector.get_columns('warranty_codes')]
+        
+        # اگر ستون metadata وجود دارد، نام آن را تغییر بده
+        if 'metadata' in columns:
+            op.alter_column(
+                'warranty_codes',
+                'metadata',
+                new_column_name='extra_metadata',
+                existing_type=JSON,
+                existing_nullable=True,
+                existing_comment='اطلاعات اضافی'
+            )
+        # اگر extra_metadata از قبل وجود دارد، کاری نکن (migration قبلاً اجرا شده)
 
 
 def downgrade():

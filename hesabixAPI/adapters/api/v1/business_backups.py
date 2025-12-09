@@ -24,7 +24,7 @@ import logging
 from app.services.job_manager import JobManager
 
 
-router = APIRouter(prefix="/businesses/{business_id}/backups", tags=["business_backups"])
+router = APIRouter(prefix="/businesses/{business_id}/backups", tags=["پشتیبان‌گیری"])
 
 
 class RestoreBackupRequest(BaseModel):

@@ -26,8 +26,18 @@ class WebhookTrigger(TriggerHandler):
                 },
                 "method": {
                     "type": "string",
-                    "description": "روش HTTP (GET/POST/PUT/DELETE)",
+                    "description": "روش HTTP",
                     "default": "POST",
+                    "enum": ["GET", "POST", "PUT", "DELETE", "PATCH"],
+                    "ui_config": {
+                        "labels": {
+                            "GET": "GET - دریافت",
+                            "POST": "POST - ارسال",
+                            "PUT": "PUT - به‌روزرسانی کامل",
+                            "DELETE": "DELETE - حذف",
+                            "PATCH": "PATCH - به‌روزرسانی جزئی"
+                        }
+                    },
                     "required": False
                 },
                 "authentication_type": {

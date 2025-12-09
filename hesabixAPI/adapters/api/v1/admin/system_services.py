@@ -16,7 +16,11 @@ router = APIRouter(prefix="/admin/system-services", tags=["admin-system-services
 logger = logging.getLogger(__name__)
 
 # لیست سرویس‌های مجاز
-ALLOWED_SERVICES = ["hesabix-api", "hesabix-rq-worker"]
+ALLOWED_SERVICES = [
+    "hesabix-api",
+    "hesabix-rq-worker",
+    "hesabix-notification-moderation"  # Worker بررسی قالب‌های نوتیفیکیشن
+]
 
 
 def _get_service_logs(service_name: str, lines: int = 100) -> Dict[str, Any]:

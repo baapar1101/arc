@@ -103,6 +103,7 @@ class _TransferDetailsDialogState extends State<TransferDetailsDialog> {
     final dateStr = widget.document['document_date'] as String? ?? '';
     final date = DateTime.tryParse(dateStr);
     final total = (widget.document['total_amount'] as num?)?.toStringAsFixed(0) ?? '0';
+    final currencyCode = widget.document['currency_code'] as String? ?? 'ریال';
     
     // Get source and destination info
     final sourceType = widget.document['source_type'] as String?;
@@ -139,7 +140,7 @@ class _TransferDetailsDialogState extends State<TransferDetailsDialog> {
                     children: [
                       Chip(label: Text('تاریخ: ${HesabixDateUtils.formatForDisplay(date, widget.calendarController.isJalali)}')),
                       const SizedBox(width: 8),
-                      Chip(label: Text('مبلغ کل: $total ریال')),
+                      Chip(label: Text('مبلغ کل: $total $currencyCode')),
                     ],
                   ),
                   const SizedBox(height: 8),
@@ -216,7 +217,7 @@ class _TransferDetailsDialogState extends State<TransferDetailsDialog> {
                     leading: Icon(isCommission ? Icons.receipt_long : Icons.account_balance_wallet),
                     title: Text(name),
                     subtitle: Text('کد: $code • سمت: $sideText'),
-                    trailing: Text('$amount ریال'),
+                    trailing: Text('$amount $currencyCode'),
                   );
                 },
               ),

@@ -67,6 +67,7 @@ def get_general_ledger_report(
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
     person_id: Optional[int] = None,
+    project_id: Optional[int] = None,  # 🆕 فیلتر پروژه
     include_proforma: bool = False,
     skip: int = 0,
     take: int = 50,
@@ -262,6 +263,10 @@ def get_general_ledger_report(
         if currency_id:
             opening_query = opening_query.filter(Document.currency_id == currency_id)
         
+        # 🆕 فیلتر پروژه برای مانده ابتدای دوره
+        if project_id:
+            opening_query = opening_query.filter(Document.project_id == project_id)
+        
         opening_result = opening_query.first()
         if opening_result:
             opening_debit_total += Decimal(str(opening_result.total_debit or 0))
@@ -302,6 +307,10 @@ def get_general_ledger_report(
     
     if person_id:
         lines_query = lines_query.filter(DocumentLine.person_id == person_id)
+    
+    # 🆕 فیلتر پروژه
+    if project_id:
+        lines_query = lines_query.filter(Document.project_id == project_id)
     
     # مرتب‌سازی بر اساس تاریخ سند و سپس شناسه سند
     lines_query = lines_query.order_by(

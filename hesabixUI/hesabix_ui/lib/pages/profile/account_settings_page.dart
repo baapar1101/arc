@@ -56,56 +56,56 @@ class AccountSettingsPage extends StatelessWidget {
                   children: [
                     _SettingsCard(
                       title: t.marketing,
-                      description: 'مدیریت لینک معرفی و گزارش‌های بازاریابی',
+                      description: t.accountSettingsMarketingDescription,
                       icon: Icons.campaign,
                       color: Colors.orange,
                       onTap: () => context.go('/user/profile/marketing'),
                     ),
                     _SettingsCard(
-                      title: 'اعلان‌ها و نوتیفیکیشن',
-                      description: 'تنظیمات کانال‌های اعلان‌رسانی و نوتیفیکیشن',
+                      title: t.accountSettingsNotificationsTitle,
+                      description: t.accountSettingsNotificationsDescription,
                       icon: Icons.notifications_active,
                       color: Colors.blue,
                       onTap: () => context.go('/user/profile/notifications'),
                     ),
                     _SettingsCard(
-                      title: 'امضا و تصویر کاربر',
-                      description: 'بارگذاری و مدیریت امضای شخصی و تصویر پروفایل',
+                      title: t.accountSettingsSignatureTitle,
+                      description: t.accountSettingsSignatureDescription,
                       icon: Icons.border_color,
                       color: Colors.purple,
                       onTap: () => context.go('/user/profile/signature'),
                     ),
                     _SettingsCard(
-                      title: 'کلیدهای API',
-                      description: 'مدیریت کلیدهای API برای دسترسی به سیستم',
+                      title: t.accountSettingsApiKeysTitle,
+                      description: t.accountSettingsApiKeysDescription,
                       icon: Icons.key,
                       color: Colors.green,
                       onTap: () => context.go('/user/profile/api-keys'),
                     ),
                     _SettingsCard(
-                      title: 'سشن‌های ورود',
-                      description: 'مشاهده و مدیریت دستگاه‌های متصل به حساب کاربری',
+                      title: t.accountSettingsLoginSessionsTitle,
+                      description: t.accountSettingsLoginSessionsDescription,
                       icon: Icons.devices,
                       color: Colors.indigo,
                       onTap: () => context.go('/user/profile/sessions'),
                     ),
                     _SettingsCard(
                       title: t.changePassword,
-                      description: 'تغییر کلمه عبور حساب کاربری',
+                      description: t.accountSettingsChangePasswordDescription,
                       icon: Icons.password,
                       color: Colors.red,
                       onTap: () => context.go('/user/profile/change-password'),
                     ),
                     _SettingsCard(
-                      title: 'تایید شماره موبایل و ایمیل',
-                      description: 'تایید شماره موبایل و ایمیل برای امنیت بیشتر',
+                      title: t.accountSettingsVerificationTitle,
+                      description: t.accountSettingsVerificationDescription,
                       icon: Icons.verified_user,
                       color: Colors.teal,
                       onTap: () => context.go('/user/profile/verification'),
                     ),
                     _SettingsCard(
-                      title: 'تاریخچه ناتیفیکیشن‌ها',
-                      description: 'مشاهده تمام ناتیفیکیشن‌های ارسال شده (OTP، فراموشی رمز، تیکت و ...)',
+                      title: t.accountSettingsNotificationHistoryTitle,
+                      description: t.accountSettingsNotificationHistoryDescription,
                       icon: Icons.history,
                       color: Colors.indigo,
                       onTap: () => context.go('/user/profile/notification-history'),
@@ -166,7 +166,7 @@ class AccountSettingsPage extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'تنظیمات حساب کاربری',
+                  t.accountSettingsTitle,
                   style: theme.textTheme.headlineSmall?.copyWith(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
@@ -174,7 +174,7 @@ class AccountSettingsPage extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'مدیریت و تنظیم تمام بخش‌های حساب کاربری شما',
+                  t.accountSettingsSubtitle,
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: Colors.white.withValues(alpha: 0.9),
                   ),
@@ -207,6 +207,7 @@ class _SettingsCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final t = AppLocalizations.of(context);
     final width = MediaQuery.of(context).size.width;
     final isDesktop = width > 800;
     final isMobile = width <= 600;
@@ -285,7 +286,7 @@ class _SettingsCard extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          'مشاهده',
+                          t.view,
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: color,
                             fontWeight: FontWeight.w600,

@@ -14,7 +14,7 @@ from adapters.db.models.account import Account
 from app.services.account_service import create_account, update_account, delete_account, get_account
 
 
-router = APIRouter(prefix="/accounts", tags=["accounts"])
+router = APIRouter(prefix="/accounts", tags=["حسابداری"])
 
 
 class SearchAccountsRequest(BaseModel):

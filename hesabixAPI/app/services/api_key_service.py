@@ -41,6 +41,30 @@ def create_personal_key(db: Session, user_id: int, name: str | None, scopes: str
 	obj.scopes = scopes
 	db.add(obj)
 	db.commit()
+	
+	# لاگ‌گیری ایجاد API Key
+	try:
+		from app.services.activity_log_service import log_user_activity
+		log_user_activity(
+			db=db,
+			user_id=user_id,
+			action="create",
+			description=f"ایجاد کلید API جدید" + (f" با نام '{name}'" if name else ""),
+			entity_id=obj.id,
+			extra_info={
+				"api_key_id": obj.id,
+				"name": name,
+				"scopes": scopes,
+				"has_expiry": expires_at is not None,
+				"has_ip_whitelist": ip_whitelist is not None
+			}
+		)
+		db.commit()
+	except Exception as e:
+		import logging
+		logger = logging.getLogger(__name__)
+		logger.warning(f"Failed to log API key creation: {e}")
+	
 	return obj.id, api_key
 
 
@@ -77,9 +101,35 @@ def revoke_key(db: Session, user_id: int, key_id: int) -> None:
 	if not obj or obj.user_id != user_id:
 		from app.core.responses import ApiError
 		raise ApiError("NOT_FOUND", "Key not found", http_status=404)
+	
+	# ذخیره اطلاعات قبل از حذف برای لاگ
+	key_name = obj.name
+	key_type = obj.key_type
+	
 	obj.revoked_at = datetime.utcnow()
 	db.add(obj)
 	db.commit()
+	
+	# لاگ‌گیری حذف API Key
+	try:
+		from app.services.activity_log_service import log_user_activity
+		log_user_activity(
+			db=db,
+			user_id=user_id,
+			action="delete",
+			description=f"حذف کلید API" + (f" '{key_name}'" if key_name else f" (ID: {key_id})"),
+			entity_id=key_id,
+			extra_info={
+				"api_key_id": key_id,
+				"name": key_name,
+				"key_type": key_type
+			}
+		)
+		db.commit()
+	except Exception as e:
+		import logging
+		logger = logging.getLogger(__name__)
+		logger.warning(f"Failed to log API key deletion: {e}")
 	
 	# Invalidate cache
 	cache = get_cache()

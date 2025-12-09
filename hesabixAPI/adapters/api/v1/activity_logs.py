@@ -199,7 +199,7 @@ def get_business_activity_logs(
 def get_entity_activity_logs(
 	request: Request,
 	entity_type: str,
-	entity_id: int,
+	entity_id: str,  # تغییر به str برای پشتیبانی از UUID
 	business_id: Optional[int] = Query(None, description="شناسه کسب و کار (اختیاری)"),
 	ctx: AuthContext = Depends(get_current_user),
 	db: Session = Depends(get_db)
@@ -214,7 +214,7 @@ def get_entity_activity_logs(
 	
 	logs = repo.get_by_entity(
 		entity_type=entity_type,
-		entity_id=entity_id,
+		entity_id=entity_id,  # حالا می‌تواند UUID (str) یا int (به صورت str) باشد
 		business_id=business_id
 	)
 	

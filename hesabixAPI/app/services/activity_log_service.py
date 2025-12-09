@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Union
 from datetime import datetime
 from sqlalchemy.orm import Session
 from adapters.db.models.activity_log import ActivityLog
@@ -15,7 +15,7 @@ def log_activity(
 	description: str,
 	business_id: Optional[int] = None,
 	entity_type: Optional[str] = None,
-	entity_id: Optional[int] = None,
+	entity_id: Optional[Union[int, str]] = None,
 	before_data: Optional[Dict[str, Any]] = None,
 	after_data: Optional[Dict[str, Any]] = None,
 	extra_info: Optional[Dict[str, Any]] = None,
@@ -32,7 +32,7 @@ def log_activity(
 		description: توضیحات قابل خواندن
 		business_id: شناسه کسب و کار (اختیاری برای فعالیت‌های شخصی)
 		entity_type: نوع موجودیت (invoice, document, product, person, etc.)
-		entity_id: شناسه موجودیت
+		entity_id: شناسه موجودیت (می‌تواند int یا str/UUID باشد)
 		before_data: داده‌های قبل از تغییر (فقط فیلدهای تغییر یافته)
 		after_data: داده‌های بعد از تغییر (فقط فیلدهای تغییر یافته)
 		extra_info: اطلاعات اضافی
@@ -51,13 +51,16 @@ def log_activity(
 		if user_agent:
 			extra_info["user_agent"] = user_agent
 	
+	# تبدیل entity_id به string اگر int است (برای سازگاری با UUID)
+	entity_id_str = str(entity_id) if entity_id is not None else None
+	
 	log = ActivityLog(
 		user_id=user_id,
 		business_id=business_id,
 		category=category,
 		action=action,
 		entity_type=entity_type,
-		entity_id=entity_id,
+		entity_id=entity_id_str,
 		description=description,
 		before_data=before_data,
 		after_data=after_data,

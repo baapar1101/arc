@@ -11593,6 +11593,672 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Manage Warranty'**
   String get warrantyManage;
+
+  /// No description provided for @identityInquiryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Identity Inquiry'**
+  String get identityInquiryTitle;
+
+  /// No description provided for @identityInquirySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Please enter national ID and birth date'**
+  String get identityInquirySubtitle;
+
+  /// No description provided for @nationalIdHint.
+  ///
+  /// In en, this message translates to:
+  /// **'10-digit national ID'**
+  String get nationalIdHint;
+
+  /// No description provided for @nationalIdRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'National ID is required'**
+  String get nationalIdRequired;
+
+  /// No description provided for @nationalIdInvalidLength.
+  ///
+  /// In en, this message translates to:
+  /// **'National ID must be 10 digits'**
+  String get nationalIdInvalidLength;
+
+  /// No description provided for @nationalIdInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid national ID'**
+  String get nationalIdInvalid;
+
+  /// No description provided for @birthDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Birth Date'**
+  String get birthDate;
+
+  /// No description provided for @birthDateHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Jalali date (YYYY-MM-DD or YYYY/MM/DD)'**
+  String get birthDateHint;
+
+  /// No description provided for @birthDateRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Birth date is required'**
+  String get birthDateRequired;
+
+  /// No description provided for @birthDateInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid date format'**
+  String get birthDateInvalid;
+
+  /// No description provided for @selectBirthDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Select Date'**
+  String get selectBirthDate;
+
+  /// No description provided for @inquire.
+  ///
+  /// In en, this message translates to:
+  /// **'Inquire'**
+  String get inquire;
+
+  /// No description provided for @inquiring.
+  ///
+  /// In en, this message translates to:
+  /// **'Inquiring...'**
+  String get inquiring;
+
+  /// No description provided for @inquiryError.
+  ///
+  /// In en, this message translates to:
+  /// **'Inquiry Error'**
+  String get inquiryError;
+
+  /// No description provided for @inquiryErrorPrefix.
+  ///
+  /// In en, this message translates to:
+  /// **'Inquiry error:'**
+  String get inquiryErrorPrefix;
+
+  /// No description provided for @unknownError.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown error'**
+  String get unknownError;
+
+  /// No description provided for @noMatch.
+  ///
+  /// In en, this message translates to:
+  /// **'No Match'**
+  String get noMatch;
+
+  /// No description provided for @noMatchDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'National ID and birth date do not match'**
+  String get noMatchDescription;
+
+  /// No description provided for @personalInformation.
+  ///
+  /// In en, this message translates to:
+  /// **'Personal Information'**
+  String get personalInformation;
+
+  /// No description provided for @fatherName.
+  ///
+  /// In en, this message translates to:
+  /// **'Father Name'**
+  String get fatherName;
+
+  /// No description provided for @alive.
+  ///
+  /// In en, this message translates to:
+  /// **'Alive'**
+  String get alive;
+
+  /// No description provided for @deceased.
+  ///
+  /// In en, this message translates to:
+  /// **'Deceased'**
+  String get deceased;
+
+  /// No description provided for @newInquiry.
+  ///
+  /// In en, this message translates to:
+  /// **'New Inquiry'**
+  String get newInquiry;
+
+  /// No description provided for @identityInquiryDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'You can inquiry personal identity information by entering national ID and birth date'**
+  String get identityInquiryDescription;
+
+  /// No description provided for @noResultAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Error: No result available'**
+  String get noResultAvailable;
+
+  /// No description provided for @accountSettingsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Account Settings'**
+  String get accountSettingsTitle;
+
+  /// No description provided for @accountSettingsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage and configure all aspects of your account'**
+  String get accountSettingsSubtitle;
+
+  /// No description provided for @accountSettingsMarketingDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage referral links and marketing reports'**
+  String get accountSettingsMarketingDescription;
+
+  /// No description provided for @accountSettingsNotificationsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Notifications'**
+  String get accountSettingsNotificationsTitle;
+
+  /// No description provided for @accountSettingsNotificationsDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Notification channel settings and configuration'**
+  String get accountSettingsNotificationsDescription;
+
+  /// No description provided for @accountSettingsSignatureTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Signature & Profile Picture'**
+  String get accountSettingsSignatureTitle;
+
+  /// No description provided for @accountSettingsSignatureDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload and manage personal signature and profile picture'**
+  String get accountSettingsSignatureDescription;
+
+  /// No description provided for @accountSettingsApiKeysTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'API Keys'**
+  String get accountSettingsApiKeysTitle;
+
+  /// No description provided for @accountSettingsApiKeysDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage API keys for system access'**
+  String get accountSettingsApiKeysDescription;
+
+  /// No description provided for @accountSettingsLoginSessionsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Login Sessions'**
+  String get accountSettingsLoginSessionsTitle;
+
+  /// No description provided for @accountSettingsLoginSessionsDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'View and manage connected devices to your account'**
+  String get accountSettingsLoginSessionsDescription;
+
+  /// No description provided for @accountSettingsChangePasswordDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Change account password'**
+  String get accountSettingsChangePasswordDescription;
+
+  /// No description provided for @accountSettingsVerificationTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Mobile & Email Verification'**
+  String get accountSettingsVerificationTitle;
+
+  /// No description provided for @accountSettingsVerificationDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Verify mobile number and email for enhanced security'**
+  String get accountSettingsVerificationDescription;
+
+  /// No description provided for @accountSettingsNotificationHistoryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Notification History'**
+  String get accountSettingsNotificationHistoryTitle;
+
+  /// No description provided for @accountSettingsNotificationHistoryDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'View all sent notifications (OTP, password reset, tickets, etc.)'**
+  String get accountSettingsNotificationHistoryDescription;
+
+  /// No description provided for @apiKeysPageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage API Keys'**
+  String get apiKeysPageTitle;
+
+  /// No description provided for @apiKeyErrorLoadingKeys.
+  ///
+  /// In en, this message translates to:
+  /// **'Error loading keys'**
+  String get apiKeyErrorLoadingKeys;
+
+  /// No description provided for @apiKeyErrorCreatingKey.
+  ///
+  /// In en, this message translates to:
+  /// **'Error creating key'**
+  String get apiKeyErrorCreatingKey;
+
+  /// No description provided for @apiKeyCreatedSuccessfully.
+  ///
+  /// In en, this message translates to:
+  /// **'API Key created'**
+  String get apiKeyCreatedSuccessfully;
+
+  /// No description provided for @apiKeySaveWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'Please save this key. This is the only time it will be displayed.'**
+  String get apiKeySaveWarning;
+
+  /// No description provided for @apiKeyClose.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get apiKeyClose;
+
+  /// No description provided for @apiKeyCopy.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy'**
+  String get apiKeyCopy;
+
+  /// No description provided for @apiKeyCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Key copied'**
+  String get apiKeyCopied;
+
+  /// No description provided for @apiKeyUpdatedSuccessfully.
+  ///
+  /// In en, this message translates to:
+  /// **'Key updated successfully'**
+  String get apiKeyUpdatedSuccessfully;
+
+  /// No description provided for @apiKeyErrorUpdating.
+  ///
+  /// In en, this message translates to:
+  /// **'Error updating key'**
+  String get apiKeyErrorUpdating;
+
+  /// No description provided for @apiKeyDeleteTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete API Key'**
+  String get apiKeyDeleteTitle;
+
+  /// No description provided for @apiKeyDeleteConfirmation.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to delete the key \"{name}\"?\nThis action is irreversible.'**
+  String apiKeyDeleteConfirmation(String name);
+
+  /// No description provided for @apiKeyDeletedSuccessfully.
+  ///
+  /// In en, this message translates to:
+  /// **'Key deleted successfully'**
+  String get apiKeyDeletedSuccessfully;
+
+  /// No description provided for @apiKeyErrorDeleting.
+  ///
+  /// In en, this message translates to:
+  /// **'Error deleting key'**
+  String get apiKeyErrorDeleting;
+
+  /// No description provided for @apiKeyFilterActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Active'**
+  String get apiKeyFilterActive;
+
+  /// No description provided for @apiKeyFilterRevoked.
+  ///
+  /// In en, this message translates to:
+  /// **'Revoked'**
+  String get apiKeyFilterRevoked;
+
+  /// No description provided for @apiKeyFilterAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get apiKeyFilterAll;
+
+  /// No description provided for @apiKeyNoActiveKeys.
+  ///
+  /// In en, this message translates to:
+  /// **'No active keys'**
+  String get apiKeyNoActiveKeys;
+
+  /// No description provided for @apiKeyNoRevokedKeys.
+  ///
+  /// In en, this message translates to:
+  /// **'No revoked keys'**
+  String get apiKeyNoRevokedKeys;
+
+  /// No description provided for @apiKeyNoKeysCreated.
+  ///
+  /// In en, this message translates to:
+  /// **'No API keys created'**
+  String get apiKeyNoKeysCreated;
+
+  /// No description provided for @apiKeyCreateNewButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Create New Key'**
+  String get apiKeyCreateNewButton;
+
+  /// No description provided for @apiKeyCreateHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Click the create button to create a new key'**
+  String get apiKeyCreateHint;
+
+  /// No description provided for @apiKeyNoRevokedHint.
+  ///
+  /// In en, this message translates to:
+  /// **'No revoked keys to display'**
+  String get apiKeyNoRevokedHint;
+
+  /// No description provided for @apiKeyUsageHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Create a key to use the API in other applications'**
+  String get apiKeyUsageHint;
+
+  /// No description provided for @apiKeyEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit'**
+  String get apiKeyEdit;
+
+  /// No description provided for @apiKeyDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get apiKeyDelete;
+
+  /// No description provided for @apiKeyCreatedAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Created'**
+  String get apiKeyCreatedAt;
+
+  /// No description provided for @apiKeyLastUsed.
+  ///
+  /// In en, this message translates to:
+  /// **'Last Used'**
+  String get apiKeyLastUsed;
+
+  /// No description provided for @apiKeyExpiresAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Expires'**
+  String get apiKeyExpiresAt;
+
+  /// No description provided for @apiKeyRevokedAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Revoked'**
+  String get apiKeyRevokedAt;
+
+  /// No description provided for @apiKeyAllowedIPs.
+  ///
+  /// In en, this message translates to:
+  /// **'Allowed IPs'**
+  String get apiKeyAllowedIPs;
+
+  /// No description provided for @apiKeyCreateNewTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Create New API Key'**
+  String get apiKeyCreateNewTitle;
+
+  /// No description provided for @apiKeyNameLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Key Name'**
+  String get apiKeyNameLabel;
+
+  /// No description provided for @apiKeyNameHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Example: Production API Key'**
+  String get apiKeyNameHint;
+
+  /// No description provided for @apiKeyScopeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Access Scope (JSON)'**
+  String get apiKeyScopeLabel;
+
+  /// No description provided for @apiKeyScopeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Optional - Example: \'{\'\"read\": true, \"write\": false\'}\''**
+  String get apiKeyScopeHint;
+
+  /// No description provided for @apiKeyIPsLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Allowed IP List'**
+  String get apiKeyIPsLabel;
+
+  /// No description provided for @apiKeyIPsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Comma separated - Example: 192.168.1.1, 10.0.0.1'**
+  String get apiKeyIPsHint;
+
+  /// No description provided for @apiKeyExpiryLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Expiry Date and Time (Optional)'**
+  String get apiKeyExpiryLabel;
+
+  /// No description provided for @apiKeyExpiryHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Select'**
+  String get apiKeyExpiryHint;
+
+  /// No description provided for @apiKeyNoExpiry.
+  ///
+  /// In en, this message translates to:
+  /// **'No expiry'**
+  String get apiKeyNoExpiry;
+
+  /// No description provided for @apiKeyEditTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit API Key'**
+  String get apiKeyEditTitle;
+
+  /// No description provided for @apiKeyWithoutName.
+  ///
+  /// In en, this message translates to:
+  /// **'Unnamed'**
+  String get apiKeyWithoutName;
+
+  /// No description provided for @datePickerSelectDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Select Date'**
+  String get datePickerSelectDate;
+
+  /// No description provided for @timePickerSelectTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Select Time'**
+  String get timePickerSelectTime;
+
+  /// No description provided for @dateTimeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Date and Time'**
+  String get dateTimeLabel;
+
+  /// No description provided for @dateLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Date'**
+  String get dateLabel;
+
+  /// No description provided for @timeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Time'**
+  String get timeLabel;
+
+  /// No description provided for @clearButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear'**
+  String get clearButton;
+
+  /// No description provided for @sessionsPageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage Login Sessions'**
+  String get sessionsPageTitle;
+
+  /// No description provided for @sessionsErrorLoading.
+  ///
+  /// In en, this message translates to:
+  /// **'Error loading sessions'**
+  String get sessionsErrorLoading;
+
+  /// No description provided for @sessionsCannotDeleteCurrent.
+  ///
+  /// In en, this message translates to:
+  /// **'Cannot delete current session'**
+  String get sessionsCannotDeleteCurrent;
+
+  /// No description provided for @sessionsDeleteTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Session'**
+  String get sessionsDeleteTitle;
+
+  /// No description provided for @sessionsDeleteConfirmation.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to delete session \"{device}\"?\nThis action is irreversible.'**
+  String sessionsDeleteConfirmation(String device);
+
+  /// No description provided for @sessionsDeletedSuccessfully.
+  ///
+  /// In en, this message translates to:
+  /// **'Session deleted successfully'**
+  String get sessionsDeletedSuccessfully;
+
+  /// No description provided for @sessionsErrorDeleting.
+  ///
+  /// In en, this message translates to:
+  /// **'Error deleting session'**
+  String get sessionsErrorDeleting;
+
+  /// No description provided for @sessionsNoOtherSessions.
+  ///
+  /// In en, this message translates to:
+  /// **'No other sessions'**
+  String get sessionsNoOtherSessions;
+
+  /// No description provided for @sessionsRevokeAllTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Logout from all devices'**
+  String get sessionsRevokeAllTitle;
+
+  /// No description provided for @sessionsRevokeAllConfirmation.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to delete {count} other sessions?\nThis will logout all other devices.\nYour current session will be preserved.'**
+  String sessionsRevokeAllConfirmation(int count);
+
+  /// No description provided for @sessionsDeleteAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete All'**
+  String get sessionsDeleteAll;
+
+  /// No description provided for @sessionsDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} sessions deleted'**
+  String sessionsDeleted(int count);
+
+  /// No description provided for @sessionsNoActive.
+  ///
+  /// In en, this message translates to:
+  /// **'No active sessions'**
+  String get sessionsNoActive;
+
+  /// No description provided for @sessionsThisDevice.
+  ///
+  /// In en, this message translates to:
+  /// **'This Device'**
+  String get sessionsThisDevice;
+
+  /// No description provided for @sessionsLastUsed.
+  ///
+  /// In en, this message translates to:
+  /// **'Last Used'**
+  String get sessionsLastUsed;
+
+  /// No description provided for @sessionsCreatedAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Created'**
+  String get sessionsCreatedAt;
+
+  /// No description provided for @sessionsToday.
+  ///
+  /// In en, this message translates to:
+  /// **'Today'**
+  String get sessionsToday;
+
+  /// No description provided for @sessionsYesterday.
+  ///
+  /// In en, this message translates to:
+  /// **'Yesterday'**
+  String get sessionsYesterday;
+
+  /// No description provided for @sessionsDaysAgo.
+  ///
+  /// In en, this message translates to:
+  /// **'{days} days ago'**
+  String sessionsDaysAgo(int days);
+
+  /// No description provided for @sessionsWeeksAgo.
+  ///
+  /// In en, this message translates to:
+  /// **'{weeks} weeks ago'**
+  String sessionsWeeksAgo(int weeks);
+
+  /// No description provided for @sessionsMonthsAgo.
+  ///
+  /// In en, this message translates to:
+  /// **'{months} months ago'**
+  String sessionsMonthsAgo(int months);
 }
 
 class _AppLocalizationsDelegate

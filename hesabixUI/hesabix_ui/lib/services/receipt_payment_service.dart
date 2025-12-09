@@ -18,6 +18,7 @@ class ReceiptPaymentService {
   /// [personLines] لیست تراکنش‌های اشخاص
   /// [accountLines] لیست تراکنش‌های حساب‌ها
   /// [description] توضیحات کلی سند (اختیاری)
+  /// [projectId] شناسه پروژه (اختیاری)
   /// [extraInfo] اطلاعات اضافی (اختیاری)
   Future<Map<String, dynamic>> createReceiptPayment({
     required int businessId,
@@ -27,6 +28,7 @@ class ReceiptPaymentService {
     required List<Map<String, dynamic>> personLines,
     required List<Map<String, dynamic>> accountLines,
     String? description,
+    int? projectId,
     Map<String, dynamic>? extraInfo,
   }) async {
     final amount = _sumLineAmounts(personLines);
@@ -47,6 +49,7 @@ class ReceiptPaymentService {
         if (description != null && description.isNotEmpty) 'description': description,
         'person_lines': personLines,
         'account_lines': accountLines,
+        if (projectId != null) 'project_id': projectId,
         if (extraInfo != null) 'extra_info': extraInfo,
       },
     );
@@ -134,6 +137,7 @@ class ReceiptPaymentService {
     required List<Map<String, dynamic>> personLines,
     required List<Map<String, dynamic>> accountLines,
     String? description,
+    int? projectId,
     Map<String, dynamic>? extraInfo,
   }) async {
     final response = await _apiClient.put(
@@ -144,6 +148,7 @@ class ReceiptPaymentService {
         if (description != null && description.isNotEmpty) 'description': description,
         'person_lines': personLines,
         'account_lines': accountLines,
+        if (projectId != null) 'project_id': projectId,
         if (extraInfo != null) 'extra_info': extraInfo,
       },
     );

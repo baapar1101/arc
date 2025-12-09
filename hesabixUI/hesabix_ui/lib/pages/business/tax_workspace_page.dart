@@ -432,7 +432,7 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
             return HesabixDateUtils.formatForDisplay(dt, widget.calendarController.isJalali);
           },
         ),
-        NumberColumn(
+        TextColumn(
           'total_amount',
           t.totalAmount,
           width: ColumnWidth.large,
@@ -440,9 +440,9 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
             final map = item as Map<String, dynamic>;
             final v = map['total_amount'];
             if (v == null) return '-';
-            return v.toString();
+            final currencyCode = map['currency_code']?.toString() ?? 'ریال';
+            return '${v.toString()} $currencyCode';
           },
-          suffix: ' ریال',
         ),
         TextColumn(
           'tax_status',

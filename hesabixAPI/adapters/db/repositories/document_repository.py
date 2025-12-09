@@ -76,6 +76,9 @@ class DocumentRepository:
             tuple: (لیست اسناد, تعداد کل)
         """
         # Query پایه
+        # Import Project model
+        from adapters.db.models.project import Project
+        
         query = self.db.query(
             Document.id,
             Document.code,
@@ -88,6 +91,7 @@ class DocumentRepository:
             Document.document_type,
             Document.is_proforma,
             Document.description,
+            Document.project_id,
             Document.created_at,
             Document.updated_at,
             Business.name.label("business_title"),
@@ -95,6 +99,7 @@ class DocumentRepository:
             Currency.code.label("currency_code"),
             Currency.symbol.label("currency_symbol"),
             (User.first_name + " " + User.last_name).label("created_by_name"),
+            Project.name.label("project_name"),
         ).select_from(Document).join(
             Business, Document.business_id == Business.id
         ).join(
@@ -103,6 +108,8 @@ class DocumentRepository:
             Currency, Document.currency_id == Currency.id
         ).join(
             User, Document.created_by_user_id == User.id
+        ).outerjoin(
+            Project, Document.project_id == Project.id
         ).filter(
             Document.business_id == business_id
         )
@@ -219,6 +226,8 @@ class DocumentRepository:
                 "document_type_name": _get_document_type_name(doc_type),
                 "is_proforma": row.is_proforma,
                 "description": row.description,
+                "project_id": row.project_id,
+                "project_name": row.project_name,
                 "created_at": row.created_at,
                 "updated_at": row.updated_at,
                 "business_title": row.business_title,
@@ -279,6 +288,7 @@ class DocumentRepository:
             "document_type": document.document_type,
             "is_proforma": document.is_proforma,
             "description": document.description,
+            "project_id": document.project_id,
             "extra_info": document.extra_info,
             "developer_settings": document.developer_settings,
             "created_at": document.created_at,

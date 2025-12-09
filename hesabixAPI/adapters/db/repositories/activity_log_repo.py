@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import List, Optional, Union
 from datetime import datetime
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, desc, func
@@ -83,14 +83,17 @@ class ActivityLogRepository(BaseRepository[ActivityLog]):
 	def get_by_entity(
 		self,
 		entity_type: str,
-		entity_id: int,
+		entity_id: Union[int, str],
 		business_id: Optional[int] = None
 	) -> List[ActivityLog]:
 		"""دریافت تاریخچه تغییرات یک موجودیت"""
+		# تبدیل entity_id به string برای مقایسه (برای پشتیبانی از UUID)
+		entity_id_str = str(entity_id) if entity_id is not None else None
+		
 		query = self.db.query(ActivityLog).filter(
 			and_(
 				ActivityLog.entity_type == entity_type,
-				ActivityLog.entity_id == entity_id
+				ActivityLog.entity_id == entity_id_str
 			)
 		)
 		

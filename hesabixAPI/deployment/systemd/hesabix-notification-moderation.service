@@ -1,0 +1,45 @@
+[Unit]
+Description=Hesabix Notification Moderation Worker
+Documentation=https://hesabix.com/docs/notification-moderation
+After=network.target mysql.service redis.service
+Requires=mysql.service
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/ark/hesabixAPI
+
+# Environment
+Environment="PYTHONUNBUFFERED=1"
+Environment="PYTHONPATH=/var/www/ark/hesabixAPI"
+
+# Virtual environment (اگر استفاده می‌شود)
+# Environment="PATH=/var/www/ark/hesabixAPI/venv/bin:$PATH"
+
+# اجرای Worker
+ExecStart=/usr/bin/python3 -m app.workers.notification_moderation_worker
+
+# Restart settings
+Restart=always
+RestartSec=10
+StartLimitInterval=5min
+StartLimitBurst=3
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=hesabix-notification-moderation
+
+# Security
+NoNewPrivileges=true
+PrivateTmp=true
+
+# Resource limits (اختیاری)
+MemoryLimit=512M
+CPUQuota=50%
+
+[Install]
+WantedBy=multi-user.target
+
+

@@ -18,6 +18,7 @@ import 'package:hesabix_ui/widgets/date_input_field.dart';
 import 'package:hesabix_ui/widgets/invoice/invoice_transactions_widget.dart';
 import 'package:hesabix_ui/widgets/invoice/check_combobox_widget.dart';
 import 'package:hesabix_ui/widgets/banking/currency_picker_widget.dart';
+import 'package:hesabix_ui/widgets/project/project_selector_widget.dart';
 import 'package:hesabix_ui/utils/number_formatters.dart' show formatWithThousands;
 import 'package:hesabix_ui/core/date_utils.dart' show HesabixDateUtils;
 import 'package:hesabix_ui/models/invoice_transaction.dart';
@@ -55,11 +56,48 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
   // کلید کنترل جدول برای دسترسی به selection و refresh
   final GlobalKey _tableKey = GlobalKey();
   int _selectedCount = 0; // تعداد سطرهای انتخاب‌شده
+  List<FilterOption> _projectFilterOptions = [];
+  bool _loadingProjects = false;
 
   @override
   void initState() {
     super.initState();
     _service = ReceiptPaymentListService(widget.apiClient);
+    _loadProjects();
+  }
+
+  /// بارگذاری لیست پروژه‌ها برای فیلتر
+  Future<void> _loadProjects() async {
+    if (!mounted) return;
+    setState(() => _loadingProjects = true);
+    
+    try {
+      final response = await widget.apiClient.post(
+        '/businesses/${widget.businessId}/projects/search',
+        data: {
+          'take': 1000,
+          'skip': 0,
+          'is_active': true,
+        },
+      );
+      
+      if (response.data['success'] == true) {
+        final List<dynamic> projects = response.data['data']['items'] ?? [];
+        if (mounted) {
+          setState(() {
+            _projectFilterOptions = projects.map((p) => FilterOption(
+              value: p['id'].toString(),
+              label: p['name'] ?? 'پروژه ${p['id']}',
+              description: p['code'],
+            )).toList();
+            _loadingProjects = false;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('خطا در بارگذاری پروژه‌ها: $e');
+      if (mounted) setState(() => _loadingProjects = false);
+    }
   }
 
   /// تازه‌سازی داده‌های جدول
@@ -302,12 +340,11 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
         ),
         
         // مبلغ کل
-        NumberColumn(
+        TextColumn(
           'total_amount',
           'مبلغ کل',
           width: ColumnWidth.large,
-          formatter: (item) => formatWithThousands(item.totalAmount),
-          suffix: ' ریال',
+          formatter: (item) => '${formatWithThousands(item.totalAmount)} ${item.currencyCode ?? 'ریال'}',
         ),
         
         // نام اشخاص
@@ -348,6 +385,17 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
           'تاریخ ثبت',
           width: ColumnWidth.medium,
           formatter: (item) => HesabixDateUtils.formatForDisplay(item.registeredAt, widget.calendarController.isJalali),
+        ),
+        
+        // پروژه
+        TextColumn(
+          'project_name',
+          'پروژه',
+          width: ColumnWidth.medium,
+          formatter: (item) => item.projectName ?? '-',
+          searchable: true,
+          filterType: ColumnFilterType.multiSelect,
+          filterOptions: _projectFilterOptions,
         ),
         
         // عملیات
@@ -763,6 +811,7 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog> {
   late DateTime _docDate;
   late bool _isReceipt;
   int? _selectedCurrencyId;
+  int? _selectedProjectId;
   final TextEditingController _descriptionController = TextEditingController();
   final List<_PersonLine> _personLines = <_PersonLine>[];
   final List<InvoiceTransaction> _centerTransactions = <InvoiceTransaction>[];
@@ -785,6 +834,7 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog> {
       _isReceipt = initial.isReceipt;
       _docDate = initial.documentDate;
       _selectedCurrencyId = initial.currencyId;
+      _selectedProjectId = initial.projectId;
       _descriptionController.text = initial.description ?? '';
       // تبدیل خطوط اشخاص
       _personLines.clear();
@@ -952,6 +1002,18 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog> {
                         onChanged: (currencyId) => setState(() => _selectedCurrencyId = currencyId),
                         label: 'ارز',
                         hintText: 'انتخاب ارز',
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    SizedBox(
+                      width: 200,
+                      child: ProjectSelectorWidget(
+                        businessId: widget.businessId,
+                        apiClient: widget.apiClient,
+                        selectedProjectId: _selectedProjectId,
+                        onChanged: (projectId) => setState(() => _selectedProjectId = projectId),
+                        allowNull: true,
+                        labelText: 'پروژه',
                       ),
                     ),
                   ],
@@ -1182,6 +1244,7 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog> {
           description: _descriptionController.text.trim().isNotEmpty ? _descriptionController.text.trim() : null,
           personLines: personLinesData,
           accountLines: accountLinesData,
+          projectId: _selectedProjectId,
           extraInfo: extraInfo,
         );
       } else {
@@ -1194,6 +1257,7 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog> {
           description: _descriptionController.text.trim().isNotEmpty ? _descriptionController.text.trim() : null,
           personLines: personLinesData,
           accountLines: accountLinesData,
+          projectId: _selectedProjectId,
           extraInfo: extraInfo,
         );
       }
@@ -2716,7 +2780,7 @@ class _ReceiptPaymentViewDialogState extends State<ReceiptPaymentViewDialog> {
             _buildInfoRow('تاریخ ثبت', HesabixDateUtils.formatForDisplay(doc.registeredAt, widget.calendarController.isJalali)),
             _buildInfoRow('ارز', doc.currencyCode ?? 'نامشخص'),
             _buildInfoRow('ایجادکننده', doc.createdByName ?? 'نامشخص'),
-            _buildInfoRow('مبلغ کل', formatWithThousands(doc.totalAmount) + ' ریال'),
+            _buildInfoRow('مبلغ کل', formatWithThousands(doc.totalAmount) + ' ${doc.currencyCode ?? 'ریال'}'),
             if (doc.description != null && doc.description!.isNotEmpty)
               _buildInfoRow('توضیحات', doc.description!),
           ],
@@ -2766,14 +2830,14 @@ class _ReceiptPaymentViewDialogState extends State<ReceiptPaymentViewDialog> {
             if (doc.personLines.isEmpty)
               const Text('هیچ خط شخصی یافت نشد')
             else
-              ...doc.personLines.map((line) => _buildPersonLineItem(line)),
+              ...doc.personLines.map((line) => _buildPersonLineItem(line, doc)),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildPersonLineItem(PersonLine line) {
+  Widget _buildPersonLineItem(PersonLine line, ReceiptPaymentDocument doc) {
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
@@ -2802,7 +2866,7 @@ class _ReceiptPaymentViewDialogState extends State<ReceiptPaymentViewDialog> {
             ),
           ),
           Text(
-            formatWithThousands(line.amount) + ' ریال',
+            formatWithThousands(line.amount) + ' ${doc.currencyCode ?? 'ریال'}',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
               fontWeight: FontWeight.w500,
             ),
@@ -2827,14 +2891,14 @@ class _ReceiptPaymentViewDialogState extends State<ReceiptPaymentViewDialog> {
             if (doc.accountLines.isEmpty)
               const Text('هیچ خط حسابی یافت نشد')
             else
-              ...doc.accountLines.map((line) => _buildAccountLineItem(line)),
+              ...doc.accountLines.map((line) => _buildAccountLineItem(line, doc)),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildAccountLineItem(AccountLine line) {
+  Widget _buildAccountLineItem(AccountLine line, ReceiptPaymentDocument doc) {
     final isCommission = line.extraInfo?['is_commission_line'] == true;
     
     return Container(
@@ -2879,7 +2943,7 @@ class _ReceiptPaymentViewDialogState extends State<ReceiptPaymentViewDialog> {
                 ),
               ),
               Text(
-                formatWithThousands(line.amount) + ' ریال',
+                formatWithThousands(line.amount) + ' ${doc.currencyCode ?? 'ریال'}',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   fontWeight: FontWeight.w500,
                 ),

@@ -1,27 +1,228 @@
 from typing import Any, List, Optional, Union, Generic, TypeVar
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, validator
 from enum import Enum
 from datetime import datetime, date
 
 T = TypeVar('T')
 
 
+class FilterOperator(str, Enum):
+	"""
+	عملگرهای موجود برای فیلتر
+	
+	### عملگرهای مقایسه:
+	- `EQUAL` (=): برابر با
+	- `NOT_EQUAL` (!=): نابرابر با
+	- `GREATER` (>): بزرگتر از
+	- `GREATER_EQUAL` (>=): بزرگتر یا مساوی
+	- `LESS` (<): کوچکتر از
+	- `LESS_EQUAL` (<=): کوچکتر یا مساوی
+	
+	### عملگرهای رشته‌ای:
+	- `CONTAINS` (*): شامل (هر جایی در متن)
+	- `STARTS_WITH` (*?): شروع با
+	- `ENDS_WITH` (?*): پایان با
+	
+	### عملگرهای آرایه:
+	- `IN` (in): موجود در لیست
+	- `NOT_IN` (not_in): موجود نیست در لیست
+	
+	### عملگرهای null:
+	- `IS_NULL` (is_null): مقدار خالی است
+	- `IS_NOT_NULL` (is_not_null): مقدار خالی نیست
+	"""
+	EQUAL = "="
+	NOT_EQUAL = "!="
+	GREATER = ">"
+	GREATER_EQUAL = ">="
+	LESS = "<"
+	LESS_EQUAL = "<="
+	CONTAINS = "*"
+	STARTS_WITH = "*?"
+	ENDS_WITH = "?*"
+	IN = "in"
+	NOT_IN = "not_in"
+	IS_NULL = "is_null"
+	IS_NOT_NULL = "is_not_null"
+
+
 class FilterItem(BaseModel):
-	property: str = Field(..., description="نام فیلد مورد نظر برای اعمال فیلتر")
-	operator: str = Field(..., description="نوع عملگر: =, >, >=, <, <=, !=, *, ?*, *?, in")
-	value: Any = Field(..., description="مقدار مورد نظر")
+	"""
+	آیتم فیلتر برای جستجوی پیشرفته
+	
+	### مثال‌های کاربردی:
+	
+	**فیلتر عددی:**
+	```json
+	{"property": "total_amount", "operator": ">=", "value": 1000000}
+	```
+	
+	**فیلتر رشته‌ای:**
+	```json
+	{"property": "name", "operator": "*", "value": "احمد"}
+	```
+	
+	**فیلتر آرایه:**
+	```json
+	{"property": "status", "operator": "in", "value": ["active", "pending"]}
+	```
+	
+	**فیلتر null:**
+	```json
+	{"property": "deleted_at", "operator": "is_null", "value": null}
+	```
+	"""
+	property: str = Field(
+		..., 
+		description="نام فیلد مورد نظر برای اعمال فیلتر",
+		example="total_amount"
+	)
+	operator: str = Field(
+		..., 
+		description="نوع عملگر: =, !=, >, >=, <, <=, *, *?, ?*, in, not_in, is_null, is_not_null",
+		example=">="
+	)
+	value: Any = Field(
+		..., 
+		description="مقدار مورد نظر - برای in و not_in باید آرایه باشد، برای is_null و is_not_null می‌تواند null باشد",
+		example=1000000
+	)
+	
+	class Config:
+		json_schema_extra = {
+			"examples": [
+				{
+					"summary": "فیلتر عددی",
+					"value": {
+						"property": "total_amount",
+						"operator": ">=",
+						"value": 1000000
+					}
+				},
+				{
+					"summary": "فیلتر رشته‌ای",
+					"value": {
+						"property": "description",
+						"operator": "*",
+						"value": "خرید"
+					}
+				},
+				{
+					"summary": "فیلتر آرایه",
+					"value": {
+						"property": "source_type",
+						"operator": "in",
+						"value": ["bank_account", "cash_register"]
+					}
+				}
+			]
+		}
 
 
 class QueryInfo(BaseModel):
-	sort_by: Optional[str] = Field(default=None, description="نام فیلد مورد نظر برای مرتب سازی")
-	sort_desc: bool = Field(default=False, description="false = مرتب سازی صعودی، true = مرتب سازی نزولی")
-	take: int = Field(default=10, ge=1, le=1000, description="حداکثر تعداد رکورد بازگشتی")
-	skip: int = Field(default=0, ge=0, description="تعداد رکوردی که از ابتدای لیست صرف نظر می شود")
-	search: Optional[str] = Field(default=None, description="عبارت جستجو")
-	search_fields: Optional[List[str]] = Field(default=None, description="آرایه ای از فیلدهایی که جستجو در آن انجام می گیرد")
-	filters: Optional[List[FilterItem]] = Field(default=None, description="آرایه ای از اشیا برای اعمال فیلتر بر روی لیست")
-	include_inventory: bool = Field(default=False, description="در صورت true، فیلدهای موجودی انبارداری و مالی محاسبه و اضافه می‌شوند")
-	inventory_as_of_date: Optional[str] = Field(default=None, description="تاریخ محاسبه موجودی (فرمت ISO: YYYY-MM-DD). پیش‌فرض: امروز")
+	"""
+	پارامترهای جستجو، فیلتر، مرتب‌سازی و صفحه‌بندی
+	
+	### قابلیت‌ها:
+	- **مرتب‌سازی**: بر اساس هر فیلدی (صعودی یا نزولی)
+	- **صفحه‌بندی**: با take و skip
+	- **جستجو**: در چندین فیلد همزمان
+	- **فیلتر پیشرفته**: با عملگرهای مختلف
+	
+	### مثال کامل:
+	```json
+	{
+	  "take": 20,
+	  "skip": 0,
+	  "sort_by": "created_at",
+	  "sort_desc": true,
+	  "search": "احمد",
+	  "search_fields": ["first_name", "last_name", "email"],
+	  "filters": [
+		{"property": "is_active", "operator": "=", "value": true},
+		{"property": "created_at", "operator": ">=", "value": "2024-01-01"}
+	  ]
+	}
+	```
+	"""
+	sort_by: Optional[str] = Field(
+		default=None, 
+		description="نام فیلد مورد نظر برای مرتب‌سازی (مثال: created_at, name, total_amount)",
+		example="created_at"
+	)
+	sort_desc: bool = Field(
+		default=False, 
+		description="نوع مرتب‌سازی: false = صعودی (A-Z, 1-9), true = نزولی (Z-A, 9-1)",
+		example=True
+	)
+	take: int = Field(
+		default=10, 
+		ge=1, 
+		le=1000, 
+		description="تعداد رکورد در هر صفحه (حداقل 1، حداکثر 1000)",
+		example=20
+	)
+	skip: int = Field(
+		default=0, 
+		ge=0, 
+		description="تعداد رکوردی که از ابتدا رد می‌شود (برای صفحه‌بندی)",
+		example=0
+	)
+	search: Optional[str] = Field(
+		default=None, 
+		description="عبارت جستجو - در تمام فیلدهای search_fields یا فیلدهای پیش‌فرض جستجو می‌شود",
+		example="احمد"
+	)
+	search_fields: Optional[List[str]] = Field(
+		default=None, 
+		description="فیلدهای مورد نظر برای جستجو. اگر ارسال نشود، فیلدهای پیش‌فرض استفاده می‌شود",
+		example=["first_name", "last_name", "email"]
+	)
+	filters: Optional[List[FilterItem]] = Field(
+		default=None, 
+		description="آرایه‌ای از فیلترهای پیشرفته. تمام فیلترها با AND به هم متصل می‌شوند",
+		example=[
+			{"property": "is_active", "operator": "=", "value": True},
+			{"property": "total_amount", "operator": ">=", "value": 1000000}
+		]
+	)
+	include_inventory: bool = Field(
+		default=False, 
+		description="محاسبه و اضافه کردن فیلدهای موجودی انبار و اطلاعات مالی (فقط برای محصولات)",
+		example=False
+	)
+	inventory_as_of_date: Optional[str] = Field(
+		default=None, 
+		description="تاریخ محاسبه موجودی (فرمت: YYYY-MM-DD یا YYYY/MM/DD). پیش‌فرض: امروز",
+		example="2024-01-15"
+	)
+	
+	@validator('take')
+	def validate_take(cls, v):
+		if v < 1:
+			raise ValueError('take باید حداقل 1 باشد')
+		if v > 1000:
+			raise ValueError('take نمی‌تواند بیشتر از 1000 باشد')
+		return v
+	
+	class Config:
+		json_schema_extra = {
+			"example": {
+				"take": 20,
+				"skip": 0,
+				"sort_by": "created_at",
+				"sort_desc": True,
+				"search": "احمد",
+				"search_fields": ["first_name", "last_name"],
+				"filters": [
+					{
+						"property": "is_active",
+						"operator": "=",
+						"value": True
+					}
+				]
+			}
+		}
 
 
 class CaptchaSolve(BaseModel):

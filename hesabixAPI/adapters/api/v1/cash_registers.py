@@ -19,7 +19,7 @@ from app.services.cash_register_service import (
 )
 
 
-router = APIRouter(prefix="/cash-registers", tags=["cash-registers"])
+router = APIRouter(prefix="/cash-registers", tags=["مدیریت مالی"])
 
 
 @router.post(
@@ -138,8 +138,12 @@ async def delete_cash_register_endpoint(
             biz_id = None
         if biz_id is not None and not ctx.can_access_business(biz_id):
             raise ApiError("FORBIDDEN", "Access denied", http_status=403)
-    ok = delete_cash_register(db, cash_id)
-    if not ok:
+    from fastapi import HTTPException
+    
+    success, error_message = delete_cash_register(db, cash_id)
+    if not success:
+        if error_message:
+            raise HTTPException(status_code=400, detail=error_message)
         raise ApiError("CASH_REGISTER_NOT_FOUND", "Cash register not found", http_status=404)
     return success_response(data=None, request=request, message="CASH_REGISTER_DELETED")
 

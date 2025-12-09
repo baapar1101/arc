@@ -13,7 +13,7 @@ from adapters.db.models.fiscal_year import FiscalYear
 from app.services.year_end_closing_service import preview_year_end_closing, close_fiscal_year
 
 
-router = APIRouter(prefix="/business", tags=["fiscal-years"])
+router = APIRouter(prefix="/business", tags=["سال مالی", "حسابداری"])
 
 
 class ShareholderDistributionItem(BaseModel):

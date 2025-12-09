@@ -120,7 +120,16 @@ class InvoiceCreatedTrigger(BaseTrigger):
                 },
                 "invoice_type": {
                     "type": "string",
-                    "description": "نوع فاکتور (sales/purchase)",
+                    "description": "نوع فاکتور",
+                    "enum": ["invoice_sales", "invoice_purchase", "invoice_return_sales", "invoice_return_purchase"],
+                    "ui_config": {
+                        "labels": {
+                            "invoice_sales": "فاکتور فروش",
+                            "invoice_purchase": "فاکتور خرید",
+                            "invoice_return_sales": "برگشت از فروش",
+                            "invoice_return_purchase": "برگشت از خرید"
+                        }
+                    },
                     "required": False
                 },
                 "min_amount": {
@@ -135,20 +144,44 @@ class InvoiceCreatedTrigger(BaseTrigger):
                 },
                 "status_filter": {
                     "type": "array",
-                    "description": "فیلتر بر اساس وضعیت فاکتور (draft/confirmed/cancelled)",
+                    "description": "فیلتر بر اساس وضعیت فاکتور",
                     "items": {
-                        "type": "string"
+                        "type": "string",
+                        "enum": ["draft", "confirmed", "cancelled", "pending"]
+                    },
+                    "ui_type": "multi_select",
+                    "ui_config": {
+                        "labels": {
+                            "draft": "پیش‌نویس",
+                            "confirmed": "تایید شده",
+                            "cancelled": "لغو شده",
+                            "pending": "در انتظار"
+                        }
                     },
                     "required": False
                 },
                 "person_type_filter": {
                     "type": "string",
-                    "description": "فیلتر بر اساس نوع شخص (customer/supplier)",
+                    "description": "فیلتر بر اساس نوع شخص",
+                    "enum": ["customer", "supplier", "employee", "other"],
+                    "ui_config": {
+                        "labels": {
+                            "customer": "مشتری",
+                            "supplier": "تامین‌کننده",
+                            "employee": "کارمند",
+                            "other": "سایر"
+                        }
+                    },
                     "required": False
                 },
                 "currency_id": {
                     "type": "integer",
                     "description": "فیلتر بر اساس ارز",
+                    "ui_type": "currency_selector",
+                    "ui_config": {
+                        "business_scoped": True,
+                        "show_all_option": True
+                    },
                     "required": False
                 },
                 "include_tax_details": {

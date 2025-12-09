@@ -166,6 +166,17 @@ def create_expense_income(
         amount=sum_items,
     )
 
+    # دریافت project_id (اختیاری)
+    project_id = data.get("project_id")
+    if project_id:
+        # اعتبارسنجی پروژه
+        from adapters.db.models.project import Project
+        project = db.query(Project).filter(
+            and_(Project.id == project_id, Project.business_id == business_id, Project.is_active == True)
+        ).first()
+        if not project:
+            raise ApiError("PROJECT_NOT_FOUND", "پروژه یافت نشد یا غیرفعال است", http_status=404)
+
     document = Document(
         code=code,
         business_id=business_id,
@@ -177,6 +188,7 @@ def create_expense_income(
         is_proforma=False,
         description=(data.get("description") or None),
         extra_info=(data.get("extra_info") if isinstance(data.get("extra_info"), dict) else None),
+        project_id=project_id,
     )
     db.add(document)
     db.flush()
@@ -478,6 +490,14 @@ def document_to_dict(db: Session, document: Document) -> Dict[str, Any]:
     currency = db.query(Currency).filter(Currency.id == document.currency_id).first()
     currency_code = getattr(currency, "code", None)
     currency_symbol = getattr(currency, "symbol", None)
+    
+    # دریافت نام پروژه
+    project_name = None
+    if document.project_id:
+        from adapters.db.models.project import Project
+        project = db.query(Project).filter(Project.id == document.project_id).first()
+        if project:
+            project_name = project.name
 
     return {
         "id": document.id,
@@ -493,6 +513,8 @@ def document_to_dict(db: Session, document: Document) -> Dict[str, Any]:
         "created_by_user_id": document.created_by_user_id,
         "created_by_name": created_by_name,
         "description": document.description,
+        "project_id": document.project_id,
+        "project_name": project_name,
         "items": items,
         "counterparties": counterparties,
     }

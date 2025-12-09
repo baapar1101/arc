@@ -29,6 +29,7 @@ import '../../widgets/warehouse/warehouse_doc_wizard_dialog.dart';
 import '../../widgets/warehouse/warehouse_document_form_dialog.dart';
 import '../../services/invoice_service.dart';
 import '../../widgets/ai/ai_chat_dialog.dart';
+import '../../utils/snackbar_helper.dart';
 import 'check_form_page.dart';
 
 class BusinessShell extends StatefulWidget {
@@ -251,6 +252,19 @@ class _BusinessShellState extends State<BusinessShell> {
         orElse: () => <String, dynamic>{},
       );
       return warrantyPlugin['is_active'] == true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  bool _isRepairShopPluginActive() {
+    // پیدا کردن پلاگین تعمیرگاه
+    try {
+      final repairShopPlugin = _businessPlugins.firstWhere(
+        (plugin) => plugin['plugin_code'] == 'repair_shop_management',
+        orElse: () => <String, dynamic>{},
+      );
+      return repairShopPlugin['is_active'] == true;
     } catch (e) {
       return false;
     }
@@ -574,6 +588,14 @@ class _BusinessShellState extends State<BusinessShell> {
         path: '/business/${widget.businessId}/warranty',
         type: _MenuItemType.simple,
         hasAddButton: false,
+      ),
+      _MenuItem(
+        label: 'تعمیرگاه',
+        icon: Icons.build_circle_outlined,
+        selectedIcon: Icons.build_circle,
+        path: '/business/${widget.businessId}/repair-shop',
+        type: _MenuItemType.simple,
+        hasAddButton: true,
       ),
       _MenuItem(
         label: 'استعلامات',
@@ -1702,6 +1724,13 @@ class _BusinessShellState extends State<BusinessShell> {
       }
     }
     
+    // بررسی فعال بودن پلاگین تعمیرگاه
+    if (section == 'repair_shop') {
+      if (!_isRepairShopPluginActive()) {
+        return false;
+      }
+    }
+    
     // اگر سکشن تعریف نشده، نمایش داده نشود
     if (section == null) {
       return false;
@@ -1775,6 +1804,7 @@ class _BusinessShellState extends State<BusinessShell> {
     if (label == t.settings) return 'settings';
     if (label == t.pluginMarketplace) return 'marketplace';
     if (label == t.warranty || label == 'گارانتی' || label == 'Warranty') return 'warranty';
+    if (label == 'تعمیرگاه' || label == 'Repair Shop') return 'repair_shop';
     if (label == 'هوش مصنوعی' || label == 'AI Tools') return 'ai';
     if (label == 'چت با AI' || label == 'AI Chat') return 'ai';
     if (label == 'اشتراک AI' || label == 'AI Subscription') return 'ai';
@@ -1982,16 +2012,27 @@ class _BusinessShellState extends State<BusinessShell> {
   }
 
   Future<void> _markNotificationRead(int id, {StateSetter? dialogSetState}) async {
-    void refreshDialog() => dialogSetState?.call(() {});
+    void refreshDialog() {
+      if (dialogSetState != null) {
+        dialogSetState(() {});
+      }
+    }
     setState(() => _busyAnnIds.add(id));
     refreshDialog();
     try {
       await AnnouncementsService(ApiClient()).markRead(id);
+      // حذف از لیست مرکز اعلان
       setState(() {
         _notifications.removeWhere((e) => (e['id'] is int ? e['id'] == id : int.tryParse('${e['id']}') == id));
       });
       refreshDialog();
-    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('به‌عنوان خوانده‌شده علامت خورد')));
+      }
+    } catch (e) {
+      if (mounted) {
+        SnackBarHelper.showError(context, message: 'خطا: $e');
+      }
     } finally {
       if (mounted) {
         setState(() => _busyAnnIds.remove(id));

@@ -9,6 +9,8 @@ class ExpenseIncomeDocument {
   final String? currencyCode;
   final double totalAmount;
   final String? description;
+  final int? projectId;
+  final String? projectName;
   final List<ItemLine> itemLines;
   final List<CounterpartyLine> counterpartyLines;
   final int itemLinesCount;
@@ -27,6 +29,8 @@ class ExpenseIncomeDocument {
     this.currencyCode,
     required this.totalAmount,
     this.description,
+    this.projectId,
+    this.projectName,
     required this.itemLines,
     required this.counterpartyLines,
     required this.itemLinesCount,
@@ -159,6 +163,8 @@ class ExpenseIncomeDocument {
       currencyCode: json['currency_code'] as String?,
       totalAmount: totalAmount,
       description: json['description'] as String?,
+      projectId: json['project_id'] as int?,
+      projectName: json['project_name'] as String?,
       itemLines: parsedItemLines,
       counterpartyLines: parsedCounterpartyLines,
       itemLinesCount: (json['item_lines_count'] as int?) ?? parsedItemLines.length,
@@ -181,6 +187,8 @@ class ExpenseIncomeDocument {
       'currency_code': currencyCode,
       'total_amount': totalAmount,
       'description': description,
+      if (projectId != null) 'project_id': projectId,
+      if (projectName != null) 'project_name': projectName,
       'item_lines': itemLines.map((line) => line.toJson()).toList(),
       'counterparty_lines': counterpartyLines.map((line) => line.toJson()).toList(),
       'item_lines_count': itemLinesCount,

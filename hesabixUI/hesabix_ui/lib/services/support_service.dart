@@ -183,6 +183,45 @@ class SupportService {
     }
   }
 
+  // حذف تیکت (فقط برای مدیر سیستم)
+  Future<void> deleteTicket(int ticketId) async {
+    try {
+      await _apiClient.delete(
+        '/api/v1/support/operator/tickets/$ticketId',
+      );
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  // حذف چندین تیکت به صورت گروهی (فقط برای مدیر سیستم)
+  Future<Map<String, dynamic>> deleteTickets(List<int> ticketIds) async {
+    try {
+      final results = <int, dynamic>{};
+      
+      for (final ticketId in ticketIds) {
+        try {
+          await deleteTicket(ticketId);
+          results[ticketId] = {'success': true};
+        } catch (e) {
+          results[ticketId] = {'success': false, 'error': e.toString()};
+        }
+      }
+      
+      final successCount = results.values.where((r) => r['success'] == true).length;
+      final failCount = results.values.where((r) => r['success'] == false).length;
+      
+      return {
+        'total': ticketIds.length,
+        'success': successCount,
+        'failed': failCount,
+        'results': results,
+      };
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
   // Error handling
   Exception _handleError(DioException e) {
     if (e.response != null) {

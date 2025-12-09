@@ -13,7 +13,7 @@ from adapters.db.repositories.notification_outbox_repository import Notification
 from app.services.notification_service import NotificationService
 from adapters.api.v1.schemas import QueryInfo
 
-router = APIRouter(prefix="/notifications", tags=["notifications"])
+router = APIRouter(prefix="/notifications", tags=["اطلاع‌رسانی"])
 
 
 class SettingsPayload(BaseModel):

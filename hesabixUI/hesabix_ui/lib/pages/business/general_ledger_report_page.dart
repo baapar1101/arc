@@ -14,6 +14,7 @@ import 'package:hesabix_ui/widgets/invoice/person_combobox_widget.dart';
 import 'package:hesabix_ui/widgets/invoice/account_tree_combobox_widget.dart';
 import 'package:hesabix_ui/models/account_model.dart';
 import 'package:hesabix_ui/models/person_model.dart';
+import 'package:hesabix_ui/widgets/reports/common_report_filters.dart';
 
 class GeneralLedgerReportPage extends StatefulWidget {
   final int businessId;
@@ -35,6 +36,7 @@ class _GeneralLedgerReportPageState extends State<GeneralLedgerReportPage> {
   DateTime? _toDate;
   int? _selectedFiscalYearId;
   int? _selectedCurrencyId;
+  int? _selectedProjectId;  // 🆕 فیلتر پروژه
   List<Account> _selectedAccounts = [];
   Account? _accountToAdd;
   Person? _selectedPerson;
@@ -158,6 +160,7 @@ class _GeneralLedgerReportPageState extends State<GeneralLedgerReportPage> {
       if (_selectedCurrencyId != null) 'currency_id': _selectedCurrencyId,
       if (_selectedAccounts.isNotEmpty) 'account_ids': _selectedAccounts.map((a) => a.id).toList(),
       if (_selectedPerson != null) 'person_id': _selectedPerson!.id,
+      if (_selectedProjectId != null) 'project_id': _selectedProjectId,  // 🆕 فیلتر پروژه
       'include_proforma': _includeProforma,
     };
   }
@@ -433,6 +436,44 @@ class _GeneralLedgerReportPageState extends State<GeneralLedgerReportPage> {
                         ),
                       ),
                     ],
+                  ),
+                  
+                  const SizedBox(height: 16),
+                  
+                  // 🆕 فیلتر پروژه
+                  CommonReportFilters(
+                    businessId: widget.businessId,
+                    apiClient: ApiClient(),
+                    calendarController: widget.calendarController,
+                    fromDate: _fromDate,
+                    toDate: _toDate,
+                    onFromDateChanged: (date) {
+                      setState(() => _fromDate = date);
+                      _refreshData();
+                    },
+                    onToDateChanged: (date) {
+                      setState(() => _toDate = date);
+                      _refreshData();
+                    },
+                    onClearDates: () {
+                      setState(() {
+                        _fromDate = null;
+                        _toDate = null;
+                      });
+                      _refreshData();
+                    },
+                    selectedFiscalYearId: _selectedFiscalYearId,
+                    fiscalYears: _fiscalYears,
+                    onFiscalYearChanged: (fyId) {
+                      setState(() => _selectedFiscalYearId = fyId);
+                      _refreshData();
+                    },
+                    selectedProjectId: _selectedProjectId,
+                    onProjectChanged: (projectId) {
+                      setState(() => _selectedProjectId = projectId);
+                      _refreshData();
+                    },
+                    showDateFilters: false,  // فیلترهای تاریخ بالاتر هستند
                   ),
                   
                   const SizedBox(height: 16),

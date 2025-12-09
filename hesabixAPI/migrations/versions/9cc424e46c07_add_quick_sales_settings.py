@@ -1,7 +1,7 @@
 """add_quick_sales_settings
 
 Revision ID: 9cc424e46c07
-Revises: add_workflow_tables
+Revises: 20250112_000000
 Create Date: 2025-01-28 12:33:00.000000
 
 """
@@ -13,7 +13,7 @@ from sqlalchemy import inspect
 
 # revision identifiers, used by Alembic.
 revision = '9cc424e46c07'
-down_revision = 'add_workflow_tables'
+down_revision = '20250112_000000'
 branch_labels = None
 depends_on = None
 

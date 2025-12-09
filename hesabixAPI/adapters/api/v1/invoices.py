@@ -54,7 +54,7 @@ from sqlalchemy import func
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/invoices", tags=["invoices"])  # Stubs only
+router = APIRouter(prefix="/invoices", tags=["اسناد فروش", "اسناد خرید"])
 
 
 @router.post("/business/{business_id}")
@@ -1223,6 +1223,14 @@ async def search_invoices_endpoint(
     if fiscal_year_id is not None:
         q = q.filter(Document.fiscal_year_id == fiscal_year_id)
 
+    # Project filter
+    project_id = body.get("project_id")
+    try:
+        if project_id is not None:
+            q = q.filter(Document.project_id == int(project_id))
+    except Exception:
+        pass
+
     # Date range from filters or flat body
     # 1) From QueryInfo.filters operators
     try:
@@ -1972,6 +1980,14 @@ async def export_invoices_excel(
     except Exception:
         pass
 
+    # Project filter
+    project_id = body.get("project_id")
+    try:
+        if project_id is not None:
+            q = q.filter(Document.project_id == int(project_id))
+    except Exception:
+        pass
+
     # Date range
     from app.services.transfer_service import _parse_iso_date as _p
     if isinstance(body.get("from_date"), str):
@@ -2334,6 +2350,14 @@ async def export_invoices_pdf(
             q = q.filter(Document.fiscal_year_id == int(fy_header))
         elif body.get("fiscal_year_id") is not None:
             q = q.filter(Document.fiscal_year_id == int(body.get("fiscal_year_id")))
+    except Exception:
+        pass
+
+    # Project filter
+    project_id = body.get("project_id")
+    try:
+        if project_id is not None:
+            q = q.filter(Document.project_id == int(project_id))
     except Exception:
         pass
 

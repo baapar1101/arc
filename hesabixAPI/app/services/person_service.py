@@ -504,19 +504,96 @@ def update_person(
     )
 
 
-def delete_person(db: Session, person_id: int, business_id: int) -> bool:
-    """حذف شخص"""
+def check_person_has_accounting_documents(db: Session, person_id: int) -> tuple[bool, list[str]]:
+    """
+    بررسی وجود اسناد حسابداری مرتبط با شخص
+    
+    Returns:
+        tuple: (has_documents, document_types)
+        - has_documents: True اگر سند مرتبطی وجود داشته باشد
+        - document_types: لیست انواع اسناد مرتبط
+    """
+    from sqlalchemy import func
+    
+    # بررسی وجود خطوط سند با person_id در اسناد قطعی (غیر پیش‌نویس)
+    document_lines_count = db.query(func.count(DocumentLine.id)).join(
+        Document, DocumentLine.document_id == Document.id
+    ).filter(
+        DocumentLine.person_id == person_id,
+        Document.is_proforma == False
+    ).scalar()
+    
+    if document_lines_count and document_lines_count > 0:
+        # دریافت انواع اسناد مرتبط
+        document_types = db.query(Document.document_type).join(
+            DocumentLine, Document.id == DocumentLine.document_id
+        ).filter(
+            DocumentLine.person_id == person_id,
+            Document.is_proforma == False
+        ).distinct().all()
+        
+        types_list = [doc_type[0] for doc_type in document_types if doc_type[0]]
+        
+        # تبدیل انواع اسناد به نام‌های فارسی
+        type_names = []
+        type_mapping = {
+            "invoice_sales": "فاکتور فروش",
+            "invoice_sales_return": "برگشت از فروش",
+            "invoice_purchase": "فاکتور خرید",
+            "invoice_purchase_return": "برگشت از خرید",
+            "invoice_direct_consumption": "مصرف مستقیم",
+            "invoice_production": "تولید",
+            "invoice_waste": "ضایعات",
+            "receipt": "دریافت",
+            "payment": "پرداخت",
+            "expense": "هزینه",
+            "income": "درآمد",
+            "transfer": "انتقال",
+            "manual": "سند دستی",
+            "check": "چک",
+        }
+        
+        for doc_type in types_list:
+            type_name = type_mapping.get(doc_type, doc_type)
+            if type_name not in type_names:
+                type_names.append(type_name)
+        
+        return True, type_names
+    
+    return False, []
+
+
+def delete_person(db: Session, person_id: int, business_id: int) -> tuple[bool, str | None]:
+    """
+    حذف شخص
+    
+    Returns:
+        tuple: (success, error_message)
+        - success: True اگر حذف موفق باشد
+        - error_message: پیام خطا در صورت عدم موفقیت
+    """
     person = db.query(Person).filter(
         and_(Person.id == person_id, Person.business_id == business_id)
     ).first()
     
     if not person:
-        return False
+        return False, "شخص یافت نشد"
     
-    db.delete(person)
-    db.commit()
+    # بررسی وجود اسناد حسابداری مرتبط
+    has_documents, document_types = check_person_has_accounting_documents(db, person_id)
     
-    return True
+    if has_documents:
+        types_str = "، ".join(document_types)
+        error_msg = f"امکان حذف این شخص وجود ندارد زیرا دارای اسناد حسابداری مرتبط است. انواع اسناد: {types_str}"
+        return False, error_msg
+    
+    try:
+        db.delete(person)
+        db.commit()
+        return True, None
+    except Exception as e:
+        db.rollback()
+        return False, f"خطا در حذف شخص: {str(e)}"
 
 
 def get_person_summary(db: Session, business_id: int) -> Dict[str, Any]:

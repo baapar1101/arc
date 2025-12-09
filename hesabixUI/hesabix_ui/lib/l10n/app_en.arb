@@ -2379,6 +2379,158 @@
   "warrantyEventReplacement": "Replacement",
   "warrantyEventExpired": "Expired",
   "warrantyEventRevoked": "Revoked",
-  "warrantyManage": "Manage Warranty"
+  "warrantyManage": "Manage Warranty",
+  
+  "identityInquiryTitle": "Identity Inquiry",
+  "identityInquirySubtitle": "Please enter national ID and birth date",
+  "nationalId": "National ID",
+  "nationalIdHint": "10-digit national ID",
+  "nationalIdRequired": "National ID is required",
+  "nationalIdInvalidLength": "National ID must be 10 digits",
+  "nationalIdInvalid": "Invalid national ID",
+  "birthDate": "Birth Date",
+  "birthDateHint": "Jalali date (YYYY-MM-DD or YYYY/MM/DD)",
+  "birthDateRequired": "Birth date is required",
+  "birthDateInvalid": "Invalid date format",
+  "selectBirthDate": "Select Date",
+  "inquire": "Inquire",
+  "inquiring": "Inquiring...",
+  "inquiryError": "Inquiry Error",
+  "inquiryErrorPrefix": "Inquiry error:",
+  "unknownError": "Unknown error",
+  "noMatch": "No Match",
+  "noMatchDescription": "National ID and birth date do not match",
+  "personalInformation": "Personal Information",
+  "fatherName": "Father Name",
+  "alive": "Alive",
+  "deceased": "Deceased",
+  "newInquiry": "New Inquiry",
+  "identityInquiryDescription": "You can inquiry personal identity information by entering national ID and birth date",
+  "copied": "Copied",
+  "noResultAvailable": "Error: No result available",
+  
+  "accountSettingsTitle": "Account Settings",
+  "accountSettingsSubtitle": "Manage and configure all aspects of your account",
+  "accountSettingsMarketingDescription": "Manage referral links and marketing reports",
+  "accountSettingsNotificationsTitle": "Notifications",
+  "accountSettingsNotificationsDescription": "Notification channel settings and configuration",
+  "accountSettingsSignatureTitle": "Signature & Profile Picture",
+  "accountSettingsSignatureDescription": "Upload and manage personal signature and profile picture",
+  "accountSettingsApiKeysTitle": "API Keys",
+  "accountSettingsApiKeysDescription": "Manage API keys for system access",
+  "accountSettingsLoginSessionsTitle": "Login Sessions",
+  "accountSettingsLoginSessionsDescription": "View and manage connected devices to your account",
+  "accountSettingsChangePasswordDescription": "Change account password",
+  "accountSettingsVerificationTitle": "Mobile & Email Verification",
+  "accountSettingsVerificationDescription": "Verify mobile number and email for enhanced security",
+  "accountSettingsNotificationHistoryTitle": "Notification History",
+  "accountSettingsNotificationHistoryDescription": "View all sent notifications (OTP, password reset, tickets, etc.)",
+  
+  "apiKeysPageTitle": "Manage API Keys",
+  "apiKeyErrorLoadingKeys": "Error loading keys",
+  "apiKeyErrorCreatingKey": "Error creating key",
+  "apiKeyCreatedSuccessfully": "API Key created",
+  "apiKeySaveWarning": "Please save this key. This is the only time it will be displayed.",
+  "apiKeyClose": "Close",
+  "apiKeyCopy": "Copy",
+  "apiKeyCopied": "Key copied",
+  "apiKeyUpdatedSuccessfully": "Key updated successfully",
+  "apiKeyErrorUpdating": "Error updating key",
+  "apiKeyDeleteTitle": "Delete API Key",
+  "apiKeyDeleteConfirmation": "Are you sure you want to delete the key \"{name}\"?\nThis action is irreversible.",
+  "@apiKeyDeleteConfirmation": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+  "apiKeyDeletedSuccessfully": "Key deleted successfully",
+  "apiKeyErrorDeleting": "Error deleting key",
+  "apiKeyFilterActive": "Active",
+  "apiKeyFilterRevoked": "Revoked",
+  "apiKeyFilterAll": "All",
+  "apiKeyNoActiveKeys": "No active keys",
+  "apiKeyNoRevokedKeys": "No revoked keys",
+  "apiKeyNoKeysCreated": "No API keys created",
+  "apiKeyCreateNewButton": "Create New Key",
+  "apiKeyCreateHint": "Click the create button to create a new key",
+  "apiKeyNoRevokedHint": "No revoked keys to display",
+  "apiKeyUsageHint": "Create a key to use the API in other applications",
+  "apiKeyEdit": "Edit",
+  "apiKeyDelete": "Delete",
+  "apiKeyCreatedAt": "Created",
+  "apiKeyLastUsed": "Last Used",
+  "apiKeyExpiresAt": "Expires",
+  "apiKeyRevokedAt": "Revoked",
+  "apiKeyAllowedIPs": "Allowed IPs",
+  "apiKeyCreateNewTitle": "Create New API Key",
+  "apiKeyNameLabel": "Key Name",
+  "apiKeyNameHint": "Example: Production API Key",
+  "apiKeyScopeLabel": "Access Scope (JSON)",
+  "apiKeyScopeHint": "Optional - Example: '{'\"read\": true, \"write\": false'}'",
+  "apiKeyIPsLabel": "Allowed IP List",
+  "apiKeyIPsHint": "Comma separated - Example: 192.168.1.1, 10.0.0.1",
+  "apiKeyExpiryLabel": "Expiry Date and Time (Optional)",
+  "apiKeyExpiryHint": "Select",
+  "apiKeyNoExpiry": "No expiry",
+  "apiKeyEditTitle": "Edit API Key",
+  "apiKeyWithoutName": "Unnamed",
+  "datePickerSelectDate": "Select Date",
+  "timePickerSelectTime": "Select Time",
+  "dateTimeLabel": "Date and Time",
+  "dateLabel": "Date",
+  "timeLabel": "Time",
+  "clearButton": "Clear",
+  
+  "sessionsPageTitle": "Manage Login Sessions",
+  "sessionsErrorLoading": "Error loading sessions",
+  "sessionsCannotDeleteCurrent": "Cannot delete current session",
+  "sessionsDeleteTitle": "Delete Session",
+  "sessionsDeleteConfirmation": "Are you sure you want to delete session \"{device}\"?\nThis action is irreversible.",
+  "@sessionsDeleteConfirmation": {
+    "placeholders": {
+      "device": {"type": "String"}
+    }
+  },
+  "sessionsDeletedSuccessfully": "Session deleted successfully",
+  "sessionsErrorDeleting": "Error deleting session",
+  "sessionsNoOtherSessions": "No other sessions",
+  "sessionsRevokeAllTitle": "Logout from all devices",
+  "sessionsRevokeAllConfirmation": "Are you sure you want to delete {count} other sessions?\nThis will logout all other devices.\nYour current session will be preserved.",
+  "@sessionsRevokeAllConfirmation": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "sessionsDeleteAll": "Delete All",
+  "sessionsDeleted": "{count} sessions deleted",
+  "@sessionsDeleted": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "sessionsNoActive": "No active sessions",
+  "sessionsThisDevice": "This Device",
+  "sessionsLastUsed": "Last Used",
+  "sessionsCreatedAt": "Created",
+  "sessionsToday": "Today",
+  "sessionsYesterday": "Yesterday",
+  "sessionsDaysAgo": "{days} days ago",
+  "@sessionsDaysAgo": {
+    "placeholders": {
+      "days": {"type": "int"}
+    }
+  },
+  "sessionsWeeksAgo": "{weeks} weeks ago",
+  "@sessionsWeeksAgo": {
+    "placeholders": {
+      "weeks": {"type": "int"}
+    }
+  },
+  "sessionsMonthsAgo": "{months} months ago",
+  "@sessionsMonthsAgo": {
+    "placeholders": {
+      "months": {"type": "int"}
+    }
+  }
 }
 

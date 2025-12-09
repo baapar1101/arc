@@ -1492,7 +1492,7 @@ def post_warehouse_document(db: Session, wh_id: int) -> Dict[str, Any]:
 			)
 		except ApiError as e:
 			# خطای کسری موجودی را به صورت واضح نمایش بده
-			raise ApiError("INSUFFICIENT_STOCK", str(e.message), http_status=409)
+			raise ApiError("INSUFFICIENT_STOCK", str(e), http_status=409)
 
 	# برای حواله‌های transfer، به‌روزرسانی instance های کالاهای یونیک
 	if wh.doc_type == "transfer":

@@ -439,12 +439,115 @@ def update_product(db: Session, product_id: int, business_id: int, payload: Prod
     return {"message": "PRODUCT_UPDATED", "data": data}
 
 
-def delete_product(db: Session, product_id: int, business_id: int) -> bool:
-    repo = ProductRepository(db)
+def check_product_has_related_documents(db: Session, product_id: int) -> tuple[bool, list[str]]:
+    """
+    بررسی وجود اسناد حسابداری، حواله‌های انبار و خطوط فاکتور مرتبط با کالا
+    
+    Returns:
+        tuple: (has_documents, document_types)
+        - has_documents: True اگر سند مرتبطی وجود داشته باشد
+        - document_types: لیست انواع اسناد مرتبط
+    """
+    from adapters.db.models.document import Document
+    from adapters.db.models.document_line import DocumentLine
+    from adapters.db.models.warehouse_document_line import WarehouseDocumentLine
+    from adapters.db.models.invoice_item_line import InvoiceItemLine
+    
+    related_types = []
+    
+    # بررسی وجود خطوط سند با product_id در اسناد قطعی (غیر پیش‌نویس)
+    document_lines_count = db.query(func.count(DocumentLine.id)).join(
+        Document, DocumentLine.document_id == Document.id
+    ).filter(
+        DocumentLine.product_id == product_id,
+        Document.is_proforma == False
+    ).scalar()
+    
+    if document_lines_count and document_lines_count > 0:
+        # دریافت انواع اسناد مرتبط
+        document_types = db.query(Document.document_type).join(
+            DocumentLine, Document.id == DocumentLine.document_id
+        ).filter(
+            DocumentLine.product_id == product_id,
+            Document.is_proforma == False
+        ).distinct().all()
+        
+        types_list = [doc_type[0] for doc_type in document_types if doc_type[0]]
+        
+        # تبدیل انواع اسناد به نام‌های فارسی
+        type_mapping = {
+            "invoice_sales": "فاکتور فروش",
+            "invoice_sales_return": "برگشت از فروش",
+            "invoice_purchase": "فاکتور خرید",
+            "invoice_purchase_return": "برگشت از خرید",
+            "invoice_direct_consumption": "مصرف مستقیم",
+            "invoice_production": "تولید",
+            "invoice_waste": "ضایعات",
+            "receipt": "دریافت",
+            "payment": "پرداخت",
+            "expense": "هزینه",
+            "income": "درآمد",
+            "transfer": "انتقال",
+            "manual": "سند دستی",
+            "check": "چک",
+        }
+        
+        for doc_type in types_list:
+            type_name = type_mapping.get(doc_type, doc_type)
+            if type_name not in related_types:
+                related_types.append(type_name)
+    
+    # بررسی وجود حواله‌های انبار مرتبط
+    warehouse_lines_count = db.query(func.count(WarehouseDocumentLine.id)).filter(
+        WarehouseDocumentLine.product_id == product_id
+    ).scalar()
+    
+    if warehouse_lines_count and warehouse_lines_count > 0:
+        if "حواله انبار" not in related_types:
+            related_types.append("حواله انبار")
+    
+    # بررسی وجود خطوط فاکتور مرتبط
+    invoice_lines_count = db.query(func.count(InvoiceItemLine.id)).filter(
+        InvoiceItemLine.product_id == product_id
+    ).scalar()
+    
+    if invoice_lines_count and invoice_lines_count > 0:
+        if "خط فاکتور" not in related_types:
+            related_types.append("خط فاکتور")
+    
+    return len(related_types) > 0, related_types
+
+
+def delete_product(db: Session, product_id: int, business_id: int) -> tuple[bool, str | None]:
+    """
+    حذف کالا
+    
+    Returns:
+        tuple: (success, error_message)
+        - success: True اگر حذف موفق باشد
+        - error_message: پیام خطا در صورت عدم موفقیت
+    """
     obj = db.get(Product, product_id)
     if not obj or obj.business_id != business_id:
-        return False
-    return repo.delete(product_id)
+        return False, "کالا یافت نشد"
+    
+    # بررسی وجود اسناد مرتبط
+    has_documents, document_types = check_product_has_related_documents(db, product_id)
+    
+    if has_documents:
+        types_str = "، ".join(document_types)
+        error_msg = f"امکان حذف این کالا وجود ندارد زیرا دارای اسناد مرتبط است. انواع اسناد: {types_str}"
+        return False, error_msg
+    
+    try:
+        repo = ProductRepository(db)
+        success = repo.delete(product_id)
+        if success:
+            return True, None
+        else:
+            return False, "خطا در حذف کالا"
+    except Exception as e:
+        return False, f"خطا در حذف کالا: {str(e)}"
 
 
 def _get_image_url(obj: Product) -> str | None:

@@ -19,7 +19,7 @@ from app.services.marketplace_service import (
 )
 
 
-router = APIRouter(prefix="/marketplace", tags=["marketplace"])
+router = APIRouter(prefix="/marketplace", tags=["یکپارچه‌سازی"])
 
 
 @router.get(

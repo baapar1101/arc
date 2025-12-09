@@ -32,6 +32,7 @@ def get_trial_balance_report(
     date_to: Optional[str] = None,
     account_type: Optional[str] = None,
     account_ids: Optional[List[int]] = None,
+    project_id: Optional[int] = None,  # 🆕 فیلتر پروژه
     include_zero_balance: bool = False,
     skip: int = 0,
     take: int = 50,
@@ -217,6 +218,10 @@ def get_trial_balance_report(
         if currency_id:
             opening_query = opening_query.filter(Document.currency_id == currency_id)
         
+        # 🆕 فیلتر پروژه برای مانده ابتدای دوره
+        if project_id:
+            opening_query = opening_query.filter(Document.project_id == project_id)
+        
         opening_query = opening_query.group_by(DocumentLine.account_id)
         opening_results = opening_query.all()
         
@@ -261,6 +266,10 @@ def get_trial_balance_report(
     
     if currency_id:
         period_query = period_query.filter(Document.currency_id == currency_id)
+    
+    # 🆕 فیلتر پروژه برای گردش دوره
+    if project_id:
+        period_query = period_query.filter(Document.project_id == project_id)
     
     period_query = period_query.group_by(DocumentLine.account_id)
     period_results = period_query.all()

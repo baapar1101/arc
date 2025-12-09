@@ -43,7 +43,14 @@ class AIService:
     
     def _get_active_subscription(self) -> Optional[UserAISubscription]:
         """دریافت اشتراک فعال کاربر"""
+        # اگر دسترسی سیستمی ندارد، business_id الزامی است
+        # چون کیف پول‌ها فقط business-specific هستند
         if not self.business_id:
+            if not (self.ctx.can_access_support_operator() or self.ctx.is_superadmin()):
+                logger.warning(
+                    f"AIService initialized without business_id for regular user {self.ctx.get_user_id()}. "
+                    f"This may cause issues with wallet charging."
+                )
             return None
         
         repo = AISubscriptionRepository(self.db)
@@ -56,6 +63,241 @@ class AIService:
         """دریافت تنظیمات AI"""
         repo = AIConfigRepository(self.db)
         return repo.get_active_config()
+    
+    def check_availability(
+        self,
+        estimated_tokens: int = 1000
+    ) -> Dict[str, Any]:
+        """
+        بررسی اینکه آیا کاربر می‌تواند از AI استفاده کند
+        (بدون ارسال واقعی پیام - برای چک پیشگیرانه)
+        
+        Returns:
+            {
+                "can_use": bool,
+                "reason": str | None,
+                "details": {
+                    "subscription": {...},
+                    "wallet": {...},
+                    "suggestions": [...]
+                }
+            }
+        """
+        # دسترسی‌های سیستمی (اپراتور/سوپرادمین) بدون نیاز به اشتراک
+        if self.ctx.can_access_support_operator() or self.ctx.is_superadmin():
+            return {
+                "can_use": True,
+                "reason": None,
+                "details": {
+                    "subscription": {
+                        "plan_name": "دسترسی سیستمی",
+                        "plan_type": "system",
+                        "is_unlimited": True
+                    },
+                    "suggestions": []
+                }
+            }
+        
+        # بررسی تنظیمات AI
+        if not self.config or not self.config.is_active:
+            return {
+                "can_use": False,
+                "reason": "AI_NOT_CONFIGURED",
+                "details": {
+                    "message": "تنظیمات AI فعال نیست",
+                    "suggestions": ["لطفاً با مدیر سیستم تماس بگیرید"]
+                }
+            }
+        
+        # بررسی اشتراک
+        if not self.subscription:
+            from adapters.db.repositories.ai_plan_repository import AIPlanRepository
+            plan_repo = AIPlanRepository(self.db)
+            available_plans = plan_repo.get_active_plans()
+            
+            return {
+                "can_use": False,
+                "reason": "NO_ACTIVE_SUBSCRIPTION",
+                "details": {
+                    "message": "اشتراک فعالی وجود ندارد",
+                    "available_plans": [
+                        {
+                            "id": p.id,
+                            "name": p.name,
+                            "plan_type": p.plan_type,
+                            "description": p.description
+                        }
+                        for p in available_plans[:3]  # نمایش ۳ پلن اول
+                    ],
+                    "suggestions": [
+                        "برای استفاده از هوش مصنوعی، ابتدا یک پلن را انتخاب کنید",
+                        "پلن رایگان با ۵۰۰۰ توکن در دسترس است"
+                    ]
+                }
+            }
+        
+        if not self.subscription.is_active:
+            return {
+                "can_use": False,
+                "reason": "SUBSCRIPTION_INACTIVE",
+                "details": {
+                    "message": "اشتراک غیرفعال است",
+                    "subscription": {
+                        "plan_name": self.subscription.plan.name if self.subscription.plan else "نامشخص",
+                        "expired_at": self.subscription.expires_at.isoformat() if self.subscription.expires_at else None
+                    },
+                    "suggestions": [
+                        "اشتراک شما منقضی شده است",
+                        "لطفاً اشتراک خود را تمدید کنید"
+                    ]
+                }
+            }
+        
+        plan = self.subscription.plan
+        if not plan:
+            return {
+                "can_use": False,
+                "reason": "PLAN_NOT_FOUND",
+                "details": {
+                    "message": "پلن اشتراک یافت نشد",
+                    "suggestions": ["لطفاً با پشتیبانی تماس بگیرید"]
+                }
+            }
+        
+        # بررسی سهمیه و موجودی
+        tokens_used = self.subscription.tokens_used or 0
+        tokens_limit = self.subscription.tokens_limit or 0
+        tokens_remaining = tokens_limit - tokens_used
+        
+        subscription_info = {
+            "plan_name": plan.name,
+            "plan_type": plan.plan_type,
+            "tokens_used": tokens_used,
+            "tokens_limit": tokens_limit,
+            "tokens_remaining": tokens_remaining,
+            "usage_percentage": round((tokens_used / tokens_limit * 100) if tokens_limit > 0 else 0, 1)
+        }
+        
+        suggestions = []
+        
+        # بررسی بر اساس نوع پلن
+        if plan.plan_type == "free":
+            if tokens_remaining < estimated_tokens:
+                return {
+                    "can_use": False,
+                    "reason": "QUOTA_EXCEEDED",
+                    "details": {
+                        "message": f"سهمیه رایگان تمام شده است. باقیمانده: {tokens_remaining} توکن",
+                        "subscription": subscription_info,
+                        "suggestions": [
+                            f"شما {tokens_used:,} از {tokens_limit:,} توکن رایگان خود را استفاده کرده‌اید",
+                            "برای استفاده بیشتر، به پلن پولی ارتقا دهید"
+                        ]
+                    }
+                }
+            
+            # هشدار اگر کمتر از 20% باقی مانده
+            if tokens_remaining < tokens_limit * 0.2:
+                suggestions.append(f"⚠️ تنها {tokens_remaining:,} توکن رایگان باقی مانده است")
+                suggestions.append("پیشنهاد می‌کنیم به پلن بالاتر ارتقا دهید")
+        
+        elif plan.plan_type == "subscription":
+            if tokens_remaining < estimated_tokens:
+                return {
+                    "can_use": False,
+                    "reason": "QUOTA_EXCEEDED",
+                    "details": {
+                        "message": f"سهمیه اشتراک تمام شده است. باقیمانده: {tokens_remaining:,} توکن",
+                        "subscription": subscription_info,
+                        "suggestions": [
+                            f"شما {tokens_used:,} از {tokens_limit:,} توکن ماهانه خود را استفاده کرده‌اید",
+                            "منتظر تمدید ماهانه بمانید یا به پلن بالاتر ارتقا دهید"
+                        ]
+                    }
+                }
+            
+            if tokens_remaining < tokens_limit * 0.2:
+                suggestions.append(f"⚠️ {tokens_remaining:,} توکن از سهمیه ماهانه شما باقی مانده")
+        
+        elif plan.plan_type in ["pay_as_go", "hybrid"]:
+            # بررسی الزامی بودن business_id چون کیف پول‌ها business-specific هستند
+            if not self.business_id:
+                return {
+                    "can_use": False,
+                    "reason": "BUSINESS_REQUIRED",
+                    "details": {
+                        "message": "برای استفاده از پلن پرداختی، انتخاب کسب‌وکار الزامی است",
+                        "suggestions": [
+                            "لطفاً ابتدا یک کسب‌وکار را انتخاب کنید",
+                            "کیف پول‌ها مختص به هر کسب‌وکار هستند"
+                        ]
+                    }
+                }
+            
+            # محاسبه هزینه تخمینی
+            import json
+            pricing_config = json.loads(plan.pricing_config or "{}")
+            pay_as_go_config = pricing_config.get("pay_as_go", {})
+            
+            input_price = Decimal(str(pay_as_go_config.get("price_per_1k_input_tokens", 0))) / 1000
+            output_price = Decimal(str(pay_as_go_config.get("price_per_1k_output_tokens", 0))) / 1000
+            
+            # تخمین: نیمی input و نیمی output
+            estimated_cost = (Decimal(estimated_tokens) / 2 * input_price) + \
+                           (Decimal(estimated_tokens) / 2 * output_price)
+            
+            # بررسی موجودی کیف پول
+            from app.services.wallet_service import get_wallet_overview
+            try:
+                wallet = get_wallet_overview(self.db, self.business_id)
+                available_balance = Decimal(str(wallet.get("available_balance", 0)))
+                
+                wallet_info = {
+                    "balance": float(available_balance),
+                    "estimated_cost": float(estimated_cost),
+                    "sufficient": available_balance >= estimated_cost
+                }
+                
+                if available_balance < estimated_cost:
+                    return {
+                        "can_use": False,
+                        "reason": "INSUFFICIENT_FUNDS",
+                        "details": {
+                            "message": "موجودی کیف پول کافی نیست",
+                            "wallet": wallet_info,
+                            "subscription": subscription_info,
+                            "suggestions": [
+                                f"موجودی فعلی: {available_balance:,.0f} ریال",
+                                f"هزینه تخمینی: {estimated_cost:,.0f} ریال",
+                                "لطفاً کیف پول خود را شارژ کنید"
+                            ]
+                        }
+                    }
+                
+                if available_balance < estimated_cost * 10:  # هشدار اگر کمتر از 10 بار استفاده باقی مانده
+                    suggestions.append(f"💰 موجودی کیف پول: {available_balance:,.0f} ریال")
+                    suggestions.append("پیشنهاد می‌کنیم کیف پول خود را شارژ کنید")
+                
+            except Exception as e:
+                logger.warning(f"Error checking wallet balance: {e}")
+                # در صورت خطا در دریافت موجودی، اجازه استفاده بده
+                wallet_info = {
+                    "balance": 0,
+                    "estimated_cost": float(estimated_cost),
+                    "sufficient": True,  # فرض می‌کنیم کافی است
+                    "error": "خطا در دریافت موجودی"
+                }
+        
+        # همه چیز OK است
+        return {
+            "can_use": True,
+            "reason": None,
+            "details": {
+                "subscription": subscription_info,
+                "wallet": wallet_info if plan.plan_type in ["pay_as_go", "hybrid"] else None,
+                "suggestions": suggestions
+            }
+        }
     
     def get_system_prompt(self, session_business_id: Optional[int] = None) -> str:
         """دریافت system prompt مناسب با business_id"""
@@ -123,10 +365,33 @@ class AIService:
             }
         
         if not self.subscription:
-            raise ApiError("NO_ACTIVE_SUBSCRIPTION", "اشتراک فعالی وجود ندارد", http_status=400)
+            from adapters.db.repositories.ai_plan_repository import AIPlanRepository
+            plan_repo = AIPlanRepository(self.db)
+            available_plans = plan_repo.get_active_plans()
+            
+            raise ApiError(
+                "NO_ACTIVE_SUBSCRIPTION",
+                "اشتراک فعالی وجود ندارد. لطفاً یک پلن را انتخاب کنید.",
+                http_status=400,
+                extra_data={
+                    "available_plans": [
+                        {"id": p.id, "name": p.name, "plan_type": p.plan_type}
+                        for p in available_plans[:3]
+                    ],
+                    "suggestion": "برای استفاده از هوش مصنوعی، ابتدا یک پلن را از بخش اشتراک انتخاب کنید"
+                }
+            )
         
         if not self.subscription.is_active:
-            raise ApiError("SUBSCRIPTION_INACTIVE", "اشتراک غیرفعال است", http_status=400)
+            raise ApiError(
+                "SUBSCRIPTION_INACTIVE",
+                "اشتراک شما منقضی شده است. لطفاً اشتراک خود را تمدید کنید.",
+                http_status=400,
+                extra_data={
+                    "expired_at": self.subscription.expires_at.isoformat() if self.subscription.expires_at else None,
+                    "plan_name": self.subscription.plan.name if self.subscription.plan else "نامشخص"
+                }
+            )
         
         plan = self.subscription.plan
         if not plan:
@@ -139,8 +404,23 @@ class AIService:
         
         if plan.plan_type == "free":
             # بررسی سهمیه رایگان
-            if self.subscription.tokens_used + total_tokens > (self.subscription.tokens_limit or 0):
-                raise ApiError("QUOTA_EXCEEDED", "سهمیه رایگان تمام شده است", http_status=400)
+            tokens_used = self.subscription.tokens_used or 0
+            tokens_limit = self.subscription.tokens_limit or 0
+            tokens_remaining = tokens_limit - tokens_used
+            
+            if tokens_used + total_tokens > tokens_limit:
+                raise ApiError(
+                    "QUOTA_EXCEEDED",
+                    f"سهمیه رایگان تمام شده است. باقیمانده: {tokens_remaining:,} توکن",
+                    http_status=400,
+                    extra_data={
+                        "tokens_used": tokens_used,
+                        "tokens_limit": tokens_limit,
+                        "tokens_remaining": tokens_remaining,
+                        "tokens_required": total_tokens,
+                        "suggestion": "برای استفاده بیشتر، به پلن پولی ارتقا دهید"
+                    }
+                )
             
             # به‌روزرسانی استفاده
             self.subscription.tokens_used += total_tokens
@@ -149,7 +429,9 @@ class AIService:
         
         elif plan.plan_type == "subscription":
             # بررسی سهمیه اشتراک
-            remaining = (self.subscription.tokens_limit or 0) - self.subscription.tokens_used
+            tokens_used = self.subscription.tokens_used or 0
+            tokens_limit = self.subscription.tokens_limit or 0
+            remaining = tokens_limit - tokens_used
             needed = total_tokens
             
             if needed <= remaining:
@@ -158,22 +440,46 @@ class AIService:
                 self.db.commit()
                 return {"payment_method": "subscription", "cost": 0, "wallet_transaction_id": None, "document_id": None}
             else:
-                # اگر hybrid و از سهمیه بیشتر استفاده شد
-                if plan.plan_type == "hybrid":
-                    extra_tokens = needed - remaining
-                    cost = self._calculate_cost(plan, input_tokens, output_tokens, extra_tokens)
-                    return self._charge_from_wallet(cost, input_tokens, output_tokens)
-                else:
-                    raise ApiError("QUOTA_EXCEEDED", "سهمیه اشتراک تمام شده است", http_status=400)
+                raise ApiError(
+                    "QUOTA_EXCEEDED",
+                    f"سهمیه اشتراک تمام شده است. باقیمانده: {remaining:,} توکن",
+                    http_status=400,
+                    extra_data={
+                        "tokens_used": tokens_used,
+                        "tokens_limit": tokens_limit,
+                        "tokens_remaining": remaining,
+                        "tokens_required": needed,
+                        "suggestion": "منتظر تمدید ماهانه بمانید یا به پلن بالاتر ارتقا دهید",
+                        "renewal_date": self.subscription.expires_at.isoformat() if self.subscription.expires_at else None
+                    }
+                )
         
         elif plan.plan_type == "pay_as_go":
+            # بررسی الزامی بودن business_id چون کیف پول‌ها business-specific هستند
+            if not self.business_id:
+                raise ApiError(
+                    "BUSINESS_REQUIRED",
+                    "برای استفاده از پلن پرداخت به ازای مصرف، انتخاب کسب‌وکار الزامی است",
+                    http_status=400
+                )
+            
             # محاسبه هزینه و کسر از کیف پول
             cost = self._calculate_cost(plan, input_tokens, output_tokens)
             return self._charge_from_wallet(cost, input_tokens, output_tokens)
         
         elif plan.plan_type == "hybrid":
+            # بررسی الزامی بودن business_id چون کیف پول‌ها business-specific هستند
+            if not self.business_id:
+                raise ApiError(
+                    "BUSINESS_REQUIRED",
+                    "برای استفاده از پلن ترکیبی، انتخاب کسب‌وکار الزامی است",
+                    http_status=400
+                )
+            
             # ترکیبی: ابتدا از سهمیه، سپس از کیف پول
-            remaining = (self.subscription.tokens_limit or 0) - self.subscription.tokens_used
+            tokens_used = self.subscription.tokens_used or 0
+            tokens_limit = self.subscription.tokens_limit or 0
+            remaining = tokens_limit - tokens_used
             needed = total_tokens
             
             if needed <= remaining:
@@ -182,7 +488,7 @@ class AIService:
                 return {"payment_method": "subscription", "cost": 0, "wallet_transaction_id": None, "document_id": None}
             else:
                 # استفاده از سهمیه + پرداخت اضافی
-                self.subscription.tokens_used = self.subscription.tokens_limit or 0
+                self.subscription.tokens_used = tokens_limit
                 extra_tokens = needed - remaining
                 cost = self._calculate_cost(plan, input_tokens, output_tokens, extra_tokens)
                 result = self._charge_from_wallet(cost, input_tokens, output_tokens)

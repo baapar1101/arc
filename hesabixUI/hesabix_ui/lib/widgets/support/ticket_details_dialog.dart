@@ -120,7 +120,11 @@ class _TicketDetailsDialogState extends State<TicketDetailsDialog> {
         'sort_by': 'created_at',
         'sort_desc': false,
       };
-      final response = await supportService.searchTicketMessages(_ticket.id, queryInfo);
+      
+      // Use appropriate endpoint based on whether user is operator or not
+      final response = widget.isOperator
+          ? await supportService.searchOperatorTicketMessages(_ticket.id, queryInfo)
+          : await supportService.searchTicketMessages(_ticket.id, queryInfo);
       final messages = response.items;
       
       setState(() {

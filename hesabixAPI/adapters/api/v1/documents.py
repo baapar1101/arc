@@ -36,7 +36,7 @@ from adapters.api.v1.schema_models.document import (
 )
 
 
-router = APIRouter(tags=["documents"])
+router = APIRouter(tags=["حسابداری"])
 
 
 @router.post(
@@ -2269,6 +2269,7 @@ async def general_ledger_report_endpoint(
     date_to = body.get('date_to')
     currency_id = body.get('currency_id')
     person_id = body.get('person_id')
+    project_id = body.get('project_id')  # 🆕 فیلتر پروژه
     include_proforma = body.get('include_proforma', False)
     
     if currency_id is not None:
@@ -2282,6 +2283,13 @@ async def general_ledger_report_endpoint(
             person_id = int(person_id)
         except (ValueError, TypeError):
             person_id = None
+    
+    # 🆕 تبدیل نوع project_id
+    if project_id is not None:
+        try:
+            project_id = int(project_id)
+        except (ValueError, TypeError):
+            project_id = None
     
     # Pagination
     skip = body.get('skip', 0)
@@ -2308,6 +2316,7 @@ async def general_ledger_report_endpoint(
         date_from=date_from,
         date_to=date_to,
         person_id=person_id,
+        project_id=project_id,  # 🆕 پاس دادن به سرویس
         include_proforma=include_proforma,
         skip=skip,
         take=take,
@@ -2363,12 +2372,20 @@ async def pnl_period_report_endpoint(
     date_from = body.get('date_from')
     date_to = body.get('date_to')
     currency_id = body.get('currency_id')
+    project_id = body.get('project_id')  # 🆕 فیلتر پروژه
     
     if currency_id is not None:
         try:
             currency_id = int(currency_id)
         except (ValueError, TypeError):
             currency_id = None
+    
+    # 🆕 تبدیل نوع project_id
+    if project_id is not None:
+        try:
+            project_id = int(project_id)
+        except (ValueError, TypeError):
+            project_id = None
     
     # Pagination
     skip = body.get('skip', 0)
@@ -2393,6 +2410,7 @@ async def pnl_period_report_endpoint(
         currency_id=currency_id,
         date_from=date_from,
         date_to=date_to,
+        project_id=project_id,  # 🆕 پاس دادن به سرویس
         skip=skip,
         take=take,
     )
@@ -2441,12 +2459,20 @@ async def pnl_cumulative_report_endpoint(
     # استخراج پارامترها از body
     date_to = body.get('date_to')  # فقط date_to (date_from همیشه ابتدای سال مالی است)
     currency_id = body.get('currency_id')
+    project_id = body.get('project_id')  # 🆕 فیلتر پروژه
     
     if currency_id is not None:
         try:
             currency_id = int(currency_id)
         except (ValueError, TypeError):
             currency_id = None
+    
+    # 🆕 تبدیل نوع project_id
+    if project_id is not None:
+        try:
+            project_id = int(project_id)
+        except (ValueError, TypeError):
+            project_id = None
     
     # Pagination
     skip = body.get('skip', 0)
@@ -2470,6 +2496,7 @@ async def pnl_cumulative_report_endpoint(
         fiscal_year_id=fiscal_year_id,
         currency_id=currency_id,
         date_to=date_to,
+        project_id=project_id,  # 🆕 پاس دادن به سرویس
         skip=skip,
         take=take,
     )

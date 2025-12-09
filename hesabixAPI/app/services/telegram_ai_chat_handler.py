@@ -626,12 +626,13 @@ async def handle_auto_reply(
 					"message_preview": message_preview
 				}
 				
-				notification_service.send(
-					user_id=ticket.user_id,
-					event_key="support.operator_reply",
-					context=context,
-					preferred_channels=["inapp", "email", "telegram", "sms"]
-				)
+			notification_service.send(
+				user_id=ticket.user_id,
+				event_key="support.operator_reply",
+				context=context,
+				preferred_channels=["inapp", "email", "telegram", "sms"],
+				broadcast_mode=True
+			)
 			except Exception as e:
 				logger.error(f"خطا در ارسال ناتیفیکیشن برای پاسخ AI به تیکت {ticket_id}: {e}")
 		

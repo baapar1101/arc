@@ -9,7 +9,7 @@ from app.core.responses import success_response, ApiError
 from adapters.db.repositories.category_repository import CategoryRepository
 
 
-router = APIRouter(prefix="/categories", tags=["categories"])
+router = APIRouter(prefix="/categories", tags=["محصولات و کالاها"])
 
 
 @router.post("/business/{business_id}/tree")

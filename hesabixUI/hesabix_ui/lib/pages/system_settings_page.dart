@@ -40,10 +40,17 @@ class _SystemSettingsPageState extends State<SystemSettingsPage> {
   void _initializeCategories() {
     _categories = SettingsCategorizationService.getCategories();
     
-    // فیلتر دسته‌ها بر اساس دسترسی
+    // فیلتر دسته‌ها و آیتم‌ها بر اساس دسترسی
     if (!_isSuperAdmin) {
       _categories = _categories
           .where((category) => !category.requiresSuperAdmin)
+          .map((category) {
+            // فیلتر کردن آیتم‌های هر دسته
+            final filteredItems = category.items
+                .where((item) => !item.requiresSuperAdmin)
+                .toList();
+            return category.copyWith(items: filteredItems);
+          })
           .toList();
     }
 

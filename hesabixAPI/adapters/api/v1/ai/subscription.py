@@ -14,7 +14,7 @@ from adapters.db.repositories.ai_usage_log_repository import AIUsageLogRepositor
 import json
 from datetime import datetime
 
-router = APIRouter(prefix="/ai/subscription", tags=["ai-subscription"])
+router = APIRouter(prefix="/ai/subscription", tags=["هوش مصنوعی"])
 
 
 def _build_subscription_response(subscription, request):

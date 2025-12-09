@@ -28,7 +28,7 @@ from cryptography import x509
 from cryptography.x509.oid import NameOID
 
 
-router = APIRouter(prefix="/tax-settings", tags=["tax-settings"])
+router = APIRouter(prefix="/tax-settings", tags=["مالیات"])
 
 @router.get("/business/{business_id}")
 @require_business_access("business_id")
@@ -105,6 +105,88 @@ def tax_data_quality_endpoint(
     report = get_tax_data_quality(db, business_id)
     data = format_tax_data_quality(report)
     return success_response(data=data, request=request, message="TAX_DATA_QUALITY_REPORT")
+
+
+@router.post("/business/{business_id}/test-connection")
+@require_business_access("business_id")
+def test_tax_connection_endpoint(
+    request: Request,
+    business_id: int,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("settings", "business")),
+):
+    """
+    تست اتصال به سامانه مودیان
+    
+    این endpoint:
+    - تنظیمات را بررسی می‌کند
+    - به سامانه متصل می‌شود
+    - اطلاعات سرور را دریافت می‌کند
+    - لاگین تست می‌کند
+    
+    Returns:
+        نتیجه تست شامل وضعیت اتصال
+    """
+    from app.services.tax_setting_service import get_tax_setting
+    from app.integrations.moadian.client import MoadianClient
+    from app.core.settings import get_settings
+    
+    # بررسی تنظیمات
+    tax_setting = get_tax_setting(db, business_id)
+    if not tax_setting:
+        raise ApiError(
+            "TAX_SETTINGS_NOT_CONFIGURED",
+            "تنظیمات سامانه مودیان یافت نشد.",
+            http_status=400,
+        )
+    
+    if not (tax_setting.tax_memory_id and tax_setting.economic_code and tax_setting.private_key):
+        raise ApiError(
+            "TAX_SETTINGS_INCOMPLETE",
+            "تنظیمات ناقص است. شناسه حافظه، کد اقتصادی و کلید خصوصی الزامی است.",
+            http_status=400,
+        )
+    
+    # تست اتصال
+    client = MoadianClient(settings=get_settings(), tax_setting=tax_setting)
+    
+    try:
+        # 1. دریافت اطلاعات سرور
+        server_info = client.get_server_information()
+        
+        # 2. تست لاگین
+        token = client.login()
+        
+        return success_response(
+            data={
+                "status": "connected",
+                "sandbox_mode": tax_setting.sandbox_mode,
+                "server_info": {
+                    "has_public_key": bool(server_info.get('publicKeys')),
+                    "key_count": len(server_info.get('publicKeys', [])),
+                },
+                "auth": {
+                    "logged_in": bool(token),
+                    "token_length": len(token) if token else 0,
+                },
+                "message": "اتصال به سامانه مودیان با موفقیت برقرار شد.",
+            },
+            request=request,
+            message="TAX_CONNECTION_SUCCESS",
+        )
+        
+    except ApiError:
+        raise
+    except Exception as exc:
+        raise ApiError(
+            "TAX_CONNECTION_FAILED",
+            f"خطا در اتصال به سامانه: {str(exc)}",
+            http_status=502,
+            details={"error": str(exc)},
+        ) from exc
+    finally:
+        client.close()
 
 
 def _generate_rsa_key_pair() -> Tuple[str, str, rsa.RSAPrivateKey]:

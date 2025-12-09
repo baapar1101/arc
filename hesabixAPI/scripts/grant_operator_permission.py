@@ -83,7 +83,7 @@ def list_operators():
     
     try:
         operators = db.query(User).filter(
-            text("app_permissions->>'support_operator' = 'true'")
+            text("JSON_EXTRACT(app_permissions, '$.support_operator') = true")
         ).all()
         
         if not operators:

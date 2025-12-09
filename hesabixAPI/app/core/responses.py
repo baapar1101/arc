@@ -88,16 +88,15 @@ def format_datetime_fields(data: Any, request: Request) -> Any:
 				else:
 					formatted_data[key] = value.isoformat()
 				
-				# Only add formatted and raw fields if not in DATE_ONLY_FIELDS
-				# For DATE_ONLY_FIELDS, we only return the string date, not the full object
-				if not is_date_only:
-					# Add formatted date as additional field
-					formatted_data[f"{key}_formatted"] = CalendarConverter.format_datetime(dt_value, calendar_type)
-					# Convert raw date to the same calendar type as the formatted date
-					if calendar_type == "jalali":
-						formatted_data[f"{key}_raw"] = CalendarConverter.to_jalali(dt_value)["date_only"]
-					else:
-						formatted_data[f"{key}_raw"] = value.isoformat()
+				# Add formatted and raw fields for all date fields (including DATE_ONLY_FIELDS)
+				# This allows frontend to properly parse dates in both formats
+				formatted_data[f"{key}_formatted"] = CalendarConverter.format_datetime(dt_value, calendar_type)
+				# Raw date should always be in ISO format (Gregorian) for parsing
+				# This allows frontend to use DateTime.tryParse() or similar methods
+				if is_date_only:
+					formatted_data[f"{key}_raw"] = value.isoformat()
+				else:
+					formatted_data[f"{key}_raw"] = dt_value.isoformat()
 			elif isinstance(value, (dict, list)):
 				formatted_data[key] = format_datetime_fields(value, request)
 			else:

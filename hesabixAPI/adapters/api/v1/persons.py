@@ -40,7 +40,7 @@ from adapters.db.models.person import Person
 from adapters.db.models.business import Business
 from adapters.db.models.fiscal_year import FiscalYear
 
-router = APIRouter(prefix="/persons", tags=["persons"])
+router = APIRouter(prefix="/persons", tags=["اشخاص و مشتریان"])
 
 
 @router.post("/businesses/{business_id}/persons/bulk-delete",
@@ -63,14 +63,16 @@ async def bulk_delete_persons_endpoint(
     """
     from sqlalchemy import and_ as _and
     from adapters.db.models.person import Person
+    from app.services.person_service import delete_person
 
     ids = body.get("ids")
     codes = body.get("codes")
     deleted = 0
     skipped = 0
+    errors = []
 
     if not ids and not codes:
-        return success_response({"deleted": 0, "skipped": 0}, request)
+        return success_response({"deleted": 0, "skipped": 0, "errors": []}, request)
 
     # Normalize inputs
     if isinstance(ids, list):
@@ -96,12 +98,21 @@ async def bulk_delete_persons_endpoint(
                 person = db.query(Person).filter(_and(Person.id == pid, Person.business_id == business_id)).first()
                 if person is None:
                     skipped += 1
+                    errors.append(f"شخص با شناسه {pid} یافت نشد")
                     continue
-                db.delete(person)
-                deleted += 1
-            except Exception:
+                
+                success, error_message = delete_person(db, pid, business_id)
+                if success:
+                    deleted += 1
+                else:
+                    skipped += 1
+                    if error_message:
+                        errors.append(f"شخص {person.alias_name or person.code or pid}: {error_message}")
+                    else:
+                        errors.append(f"شخص {person.alias_name or person.code or pid}: امکان حذف وجود ندارد")
+            except Exception as e:
                 skipped += 1
-        db.commit()
+                errors.append(f"خطا در حذف شخص با شناسه {pid}: {str(e)}")
 
     # Delete by codes
     if codes:
@@ -109,16 +120,28 @@ async def bulk_delete_persons_endpoint(
             items = db.query(Person).filter(_and(Person.business_id == business_id, Person.code.in_(codes))).all()
             for obj in items:
                 try:
-                    db.delete(obj)
-                    deleted += 1
-                except Exception:
+                    success, error_message = delete_person(db, obj.id, business_id)
+                    if success:
+                        deleted += 1
+                    else:
+                        skipped += 1
+                        if error_message:
+                            errors.append(f"شخص {obj.alias_name or obj.code or obj.id}: {error_message}")
+                        else:
+                            errors.append(f"شخص {obj.alias_name or obj.code or obj.id}: امکان حذف وجود ندارد")
+                except Exception as e:
                     skipped += 1
-            db.commit()
-        except Exception:
+                    errors.append(f"خطا در حذف شخص {obj.alias_name or obj.code or obj.id}: {str(e)}")
+        except Exception as e:
             # In case of query issues, treat all as skipped
             skipped += len(codes)
+            errors.append(f"خطا در جستجوی اشخاص: {str(e)}")
 
-    return success_response({"deleted": deleted, "skipped": skipped}, request)
+    return success_response({
+        "deleted": deleted, 
+        "skipped": skipped,
+        "errors": errors
+    }, request)
 
 
 @router.post("/businesses/{business_id}/persons/create", 
@@ -875,8 +898,10 @@ async def delete_person_endpoint(
     if not person:
         raise HTTPException(status_code=404, detail="شخص یافت نشد")
     
-    success = delete_person(db, person_id, person.business_id)
+    success, error_message = delete_person(db, person_id, person.business_id)
     if not success:
+        if error_message:
+            raise HTTPException(status_code=400, detail=error_message)
         raise HTTPException(status_code=404, detail="شخص یافت نشد")
     
     return success_response(data=None, message="شخص با موفقیت حذف شد", request=request)

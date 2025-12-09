@@ -9,7 +9,7 @@ from app.core.auth_dependency import get_current_user, AuthContext
 from app.core.permissions import require_business_access_dep
 from app.services.person_service import search_persons, count_persons, get_person_by_id
 
-router = APIRouter(prefix="/customers", tags=["customers"])
+router = APIRouter(prefix="/customers", tags=["اشخاص و مشتریان"])
 
 
 class CustomerSearchRequest(BaseModel):

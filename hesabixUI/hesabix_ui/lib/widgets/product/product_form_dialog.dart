@@ -34,11 +34,14 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
   void initState() {
     super.initState();
     _controller = ProductFormController(businessId: widget.businessId);
+    // استفاده از unawaited برای جلوگیری از warning
     _initializeForm();
   }
 
   Future<void> _initializeForm() async {
-    await _controller.initializeWithProduct(widget.product);
+    if (mounted) {
+      await _controller.initializeWithProduct(widget.product);
+    }
   }
 
   @override
@@ -77,8 +80,18 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
   Widget _buildLoadingWidget(AppLocalizations t) {
     return SizedBox(
       height: 300,
-      child: const Center(
-        child: CircularProgressIndicator(),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const CircularProgressIndicator(),
+          const SizedBox(height: 16),
+          Text(
+            'در حال بارگذاری اطلاعات...',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -96,6 +109,7 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
             Expanded(
               child: Form(
                 key: _formKey,
+                autovalidateMode: AutovalidateMode.onUserInteraction,
                 child: TabBarView(
                   children: [
                     _buildBasicInfoTab(),
@@ -199,14 +213,41 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.error_outline, color: Colors.red.shade600),
+          Icon(Icons.error_outline, color: Colors.red.shade600, size: 20),
           const SizedBox(width: 8),
           Expanded(
-            child: Text(
-              _controller.errorMessage!,
-              style: TextStyle(color: Colors.red.shade700),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'خطا',
+                  style: TextStyle(
+                    color: Colors.red.shade900,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  _controller.errorMessage!,
+                  style: TextStyle(
+                    color: Colors.red.shade700,
+                    fontSize: 13,
+                  ),
+                ),
+              ],
             ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.close, size: 18),
+            color: Colors.red.shade600,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+            onPressed: () {
+              _controller.updateFormData(_controller.formData);
+            },
           ),
         ],
       ),
@@ -216,7 +257,16 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
   List<Widget> _buildActions(AppLocalizations t) {
     return [
       TextButton(
-        onPressed: _controller.isLoading ? null : () => Navigator.of(context).pop(),
+        onPressed: _controller.isLoading 
+            ? null 
+            : () {
+                // پاک کردن فرم در صورت انصراف
+                _controller.resetForm();
+                // بستن دیالوگ
+                if (mounted) {
+                  Navigator.of(context).pop(false);
+                }
+              },
         child: Text(t.cancel),
       ),
       FilledButton(
@@ -249,7 +299,18 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
     }
 
     if (success && mounted) {
+      // نمایش پیام موفقیت
+      SnackBarHelper.show(
+        context,
+        message: widget.product != null 
+            ? 'کالا/خدمت با موفقیت ویرایش شد' 
+            : 'کالا/خدمت با موفقیت ایجاد شد',
+      );
+      // پاک کردن فرم
+      _controller.resetForm();
+      // فراخوانی callback
       widget.onSuccess?.call();
+      // بستن دیالوگ
       Navigator.of(context).pop(createdProductId ?? true);
     } else if (mounted) {
       SnackBarHelper.showError(

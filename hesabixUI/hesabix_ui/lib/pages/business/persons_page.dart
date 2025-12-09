@@ -425,22 +425,18 @@ class _PersonsPageState extends State<PersonsPage> {
                 final t = AppLocalizations.of(context);
                 try {
                   final state = _personsTableKey.currentState as dynamic;
-                  final selectedIndices = (state?.getSelectedRowIndices() as List<int>?) ?? const <int>[];
                   final items = (state?.getSelectedItems() as List<dynamic>?) ?? const <dynamic>[];
-                  if (selectedIndices.isEmpty) {
+                  if (items.isEmpty) {
                     SnackBarHelper.showError(context, message: t.noRowsSelectedError);
                     return;
                   }
                   final ids = <int>[];
-                  for (final i in selectedIndices) {
-                    if (i >= 0 && i < items.length) {
-                      final row = items[i];
-                      if (row is Person && row.id != null) {
-                        ids.add(row.id!);
-                      } else if (row is Map<String, dynamic>) {
-                        final id = row['id'];
-                        if (id is int) ids.add(id);
-                      }
+                  for (final row in items) {
+                    if (row is Person && row.id != null) {
+                      ids.add(row.id!);
+                    } else if (row is Map<String, dynamic>) {
+                      final id = row['id'];
+                      if (id is int) ids.add(id);
                     }
                   }
                   if (ids.isEmpty) return;

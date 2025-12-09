@@ -100,24 +100,133 @@ def update_cash_register(db: Session, id_: int, data: Dict[str, Any]) -> Optiona
 	return cash_register_to_dict(obj)
 
 
-def delete_cash_register(db: Session, id_: int) -> bool:
+def check_cash_register_has_accounting_documents(db: Session, cash_register_id: int) -> tuple[bool, list[str]]:
+	"""
+	بررسی وجود اسناد حسابداری مرتبط با صندوق
+	
+	Returns:
+		tuple: (has_documents, document_types)
+		- has_documents: True اگر سند مرتبطی وجود داشته باشد
+		- document_types: لیست انواع اسناد مرتبط
+	"""
+	from sqlalchemy import func
+	
+	# بررسی وجود خطوط سند با cash_register_id در اسناد قطعی (غیر پیش‌نویس)
+	document_lines_count = db.query(func.count(DocumentLine.id)).join(
+		Document, DocumentLine.document_id == Document.id
+	).filter(
+		DocumentLine.cash_register_id == cash_register_id,
+		Document.is_proforma == False
+	).scalar()
+	
+	if document_lines_count and document_lines_count > 0:
+		# دریافت انواع اسناد مرتبط
+		document_types = db.query(Document.document_type).join(
+			DocumentLine, Document.id == DocumentLine.document_id
+		).filter(
+			DocumentLine.cash_register_id == cash_register_id,
+			Document.is_proforma == False
+		).distinct().all()
+		
+		types_list = [doc_type[0] for doc_type in document_types if doc_type[0]]
+		
+		# تبدیل انواع اسناد به نام‌های فارسی
+		type_names = []
+		type_mapping = {
+			"invoice_sales": "فاکتور فروش",
+			"invoice_sales_return": "برگشت از فروش",
+			"invoice_purchase": "فاکتور خرید",
+			"invoice_purchase_return": "برگشت از خرید",
+			"invoice_direct_consumption": "مصرف مستقیم",
+			"invoice_production": "تولید",
+			"invoice_waste": "ضایعات",
+			"receipt": "دریافت",
+			"payment": "پرداخت",
+			"expense": "هزینه",
+			"income": "درآمد",
+			"transfer": "انتقال",
+			"manual": "سند دستی",
+			"check": "چک",
+		}
+		
+		for doc_type in types_list:
+			type_name = type_mapping.get(doc_type, doc_type)
+			if type_name not in type_names:
+				type_names.append(type_name)
+		
+		return True, type_names
+	
+	return False, []
+
+
+def delete_cash_register(db: Session, id_: int) -> tuple[bool, str | None]:
+	"""
+	حذف صندوق
+	
+	Returns:
+		tuple: (success, error_message)
+		- success: True اگر حذف موفق باشد
+		- error_message: پیام خطا در صورت عدم موفقیت
+	"""
 	obj = db.query(CashRegister).filter(CashRegister.id == id_).first()
 	if obj is None:
-		return False
-	db.delete(obj)
-	db.commit()
-	return True
+		return False, "صندوق یافت نشد"
+	
+	# بررسی وجود اسناد حسابداری مرتبط
+	has_documents, document_types = check_cash_register_has_accounting_documents(db, id_)
+	
+	if has_documents:
+		types_str = "، ".join(document_types)
+		error_msg = f"امکان حذف این صندوق وجود ندارد زیرا دارای اسناد حسابداری مرتبط است. انواع اسناد: {types_str}"
+		return False, error_msg
+	
+	try:
+		db.delete(obj)
+		db.commit()
+		return True, None
+	except Exception as e:
+		db.rollback()
+		return False, f"خطا در حذف صندوق: {str(e)}"
 
 
 def bulk_delete_cash_registers(db: Session, business_id: int, ids: List[int]) -> Dict[str, Any]:
-	repo = CashRegisterRepository(db)
-	result = repo.bulk_delete(business_id, ids)
-	try:
-		db.commit()
-	except Exception:
-		db.rollback()
-		raise ApiError("BULK_DELETE_FAILED", "Bulk delete failed for cash registers", http_status=500)
-	return result
+	"""
+	حذف گروهی صندوق‌ها
+	"""
+	if not ids:
+		return {"deleted": 0, "skipped": 0, "errors": []}
+	
+	# بررسی وجود صندوق‌ها و دسترسی به کسب‌وکار
+	cash_registers = db.query(CashRegister).filter(
+		CashRegister.id.in_(ids),
+		CashRegister.business_id == business_id
+	).all()
+	
+	deleted_count = 0
+	skipped_count = 0
+	errors = []
+	
+	for cash_register in cash_registers:
+		try:
+			success, error_message = delete_cash_register(db, cash_register.id)
+			if success:
+				deleted_count += 1
+			else:
+				skipped_count += 1
+				if error_message:
+					errors.append(f"صندوق {cash_register.name or cash_register.code or cash_register.id}: {error_message}")
+				else:
+					errors.append(f"صندوق {cash_register.name or cash_register.code or cash_register.id}: امکان حذف وجود ندارد")
+		except Exception as e:
+			skipped_count += 1
+			errors.append(f"خطا در حذف صندوق {cash_register.name or cash_register.code or cash_register.id}: {str(e)}")
+	
+	return {
+		"deleted": deleted_count,
+		"skipped": skipped_count,
+		"total_requested": len(ids),
+		"errors": errors
+	}
 
 
 def list_cash_registers(db: Session, business_id: int, query: Dict[str, Any]) -> Dict[str, Any]:

@@ -16,6 +16,7 @@ import 'package:hesabix_ui/services/business_dashboard_service.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../widgets/invoice/invoice_import_dialog.dart';
 import '../../utils/responsive_helper.dart';
+import '../../widgets/project/project_selector_widget.dart';
 
 /// صفحه لیست فاکتورها با ویجت جدول عمومی
 class InvoicesListPage extends StatefulWidget {
@@ -49,6 +50,10 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
 
   int? _selectedFiscalYearId;
   List<Map<String, dynamic>> _fiscalYears = [];
+  int? _selectedProjectId; // فیلتر پروژه
+  List<FilterOption> _projectFilterOptions = [];
+  bool _loadingProjects = false;
+  
   void _refreshData() {
     // استفاده از addPostFrameCallback تا بعد از rebuild اجرا شود
     // این باعث می‌شود که widget.config با مقادیر جدید فیلترها rebuild شده باشد
@@ -70,12 +75,47 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
   void initState() {
     super.initState();
     _loadFiscalYears();
+    _loadProjects();
     // بعد از اولین build، flag را set کن
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         _isInitialized = true;
       }
     });
+  }
+
+  /// بارگذاری لیست پروژه‌ها برای فیلتر
+  Future<void> _loadProjects() async {
+    if (!mounted) return;
+    setState(() => _loadingProjects = true);
+    
+    try {
+      final response = await widget.apiClient.post(
+        '/businesses/${widget.businessId}/projects/search',
+        data: {
+          'take': 1000,
+          'skip': 0,
+          'is_active': true,
+        },
+      );
+      
+      if (response.data['success'] == true) {
+        final List<dynamic> projects = response.data['data']['items'] ?? [];
+        if (mounted) {
+          setState(() {
+            _projectFilterOptions = projects.map((p) => FilterOption(
+              value: p['id'].toString(),
+              label: p['name'] ?? 'پروژه ${p['id']}',
+              description: p['code'],
+            )).toList();
+            _loadingProjects = false;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('خطا در بارگذاری پروژه‌ها: $e');
+      if (mounted) setState(() => _loadingProjects = false);
+    }
   }
 
   Future<void> _loadFiscalYears() async {
@@ -214,11 +254,13 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
             ),
           ),
           const SizedBox(height: 8),
-          // فیلتر سال مالی
+          // فیلتر سال مالی و پروژه
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
           if (_fiscalYears.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: SizedBox(
+                SizedBox(
                 width: isMobile ? double.infinity : 280,
                 child: DropdownButtonFormField<int>(
                   value: _selectedFiscalYearId,
@@ -248,6 +290,12 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
                   },
                 ),
               ),
+              // فیلتر پروژه
+              SizedBox(
+                width: isMobile ? double.infinity : 280,
+                child: _buildProjectFilter(),
+              ),
+            ],
             ),
           const SizedBox(height: 8),
           // فیلترهای تاریخ و وضعیت
@@ -383,6 +431,24 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
     );
   }
 
+  Widget _buildProjectFilter() {
+    return ProjectSelectorWidget(
+      businessId: widget.businessId,
+      apiClient: widget.apiClient,
+      selectedProjectId: _selectedProjectId,
+      onChanged: (projectId) {
+        setState(() {
+          _selectedProjectId = projectId;
+        });
+        _refreshData();
+      },
+      authStore: widget.authStore, // برای بررسی دسترسی به ایجاد پروژه
+      calendarController: widget.calendarController, // برای دیالوگ ایجاد پروژه
+      allowNull: true,
+      labelText: 'پروژه',
+    );
+  }
+
   DataTableConfig<InvoiceListItem> _buildTableConfig(AppLocalizations t) {
     return DataTableConfig<InvoiceListItem>(
       endpoint: '/invoices/business/${widget.businessId}/search',
@@ -481,12 +547,11 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
           formatter: (item) => HesabixDateUtils.formatForDisplay(item.documentDate, widget.calendarController.isJalali),
         ),
         // مبلغ کل
-        NumberColumn(
+        TextColumn(
           'total_amount',
           t.totalAmount,
           width: ColumnWidth.large,
-          formatter: (item) => item.totalAmount != null ? formatWithThousands(item.totalAmount!, decimalPlaces: 2) : '-',
-          suffix: ' ریال',
+          formatter: (item) => item.totalAmount != null ? '${formatWithThousands(item.totalAmount!, decimalPlaces: 2)} ${item.currencyCode ?? 'ریال'}' : '-',
         ),
         // اقساطی؟
         CustomColumn(
@@ -508,6 +573,16 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
         TextColumn('currency_code', t.currency, formatter: (item) => item.currencyCode ?? t.unknown, width: ColumnWidth.small),
         // ایجادکننده
         TextColumn('created_by_name', t.createdBy, formatter: (item) => item.createdByName ?? t.unknown, width: ColumnWidth.medium),
+        // پروژه
+        TextColumn(
+          'project_name',
+          'پروژه',
+          width: ColumnWidth.medium,
+          formatter: (item) => item.projectName ?? '-',
+          searchable: true,
+          filterType: ColumnFilterType.multiSelect,
+          filterOptions: _projectFilterOptions,
+        ),
         // پیش‌فاکتور (تیک برای true، خالی برای false)
         CustomColumn(
           'is_proforma',
@@ -544,6 +619,7 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
         if (_toDate != null) 'to_date': _toDate!.toUtc().toIso8601String(),
         if (_isProforma != null) 'is_proforma': _isProforma,
         if (_selectedFiscalYearId != null) 'fiscal_year_id': _selectedFiscalYearId,
+        if (_selectedProjectId != null) 'project_id': _selectedProjectId,
       },
       onRowTap: (item) => _onView(item as InvoiceListItem),
       emptyStateMessage: t.noInvoicesFound,

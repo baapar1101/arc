@@ -15,12 +15,14 @@ class PersonFormDialog extends StatefulWidget {
   final int businessId;
   final Person? person; // null برای افزودن، مقدار برای ویرایش
   final VoidCallback? onSuccess;
+  final String? initialAliasName; // مقدار اولیه برای نام مستعار
 
   const PersonFormDialog({
     super.key,
     required this.businessId,
     this.person,
     this.onSuccess,
+    this.initialAliasName,
   });
 
   @override
@@ -141,6 +143,9 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
       _commissionExcludeDiscounts = person.commissionExcludeDiscounts;
       _commissionExcludeAdditionsDeductions = person.commissionExcludeAdditionsDeductions;
       _commissionPostInInvoiceDocument = person.commissionPostInInvoiceDocument;
+    } else if (widget.initialAliasName != null && widget.initialAliasName!.isNotEmpty) {
+      // اگر در حال افزودن شخص جدید هستیم و مقدار اولیه برای نام مستعار داریم
+      _aliasNameController.text = widget.initialAliasName!;
     }
     // Load person credit override if editing
     if (widget.person?.id != null) {

@@ -613,17 +613,39 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> {
                         style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                       ),
                     ),
-                  IconButton(
-                    tooltip: 'خوانده شد',
-                    icon: busy ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.done_all, size: 20),
-                    onPressed: busy
-                        ? null
-                        : () async {
+                  if (!isRead)
+                    IconButton(
+                      tooltip: 'خوانده شد',
+                      icon: busy ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.done_all, size: 20),
+                      onPressed: busy
+                          ? null
+                          : () async {
                             try {
                               if (annId == null) return;
                               setState(() => _annBusyIds.add(annId));
                               await _markAnnouncementRead(annId);
-                              await _reloadAnnouncements(onlyUnread: _annOnlyUnread);
+                              // اگر فیلتر "فقط خوانده‌نشده" فعال است، آیتم را حذف کن
+                              if (_annOnlyUnread) {
+                                setState(() {
+                                  items.removeWhere((e) => (e['id'] is int ? e['id'] == annId : int.tryParse('${e['id']}') == annId));
+                                  _data['profile_announcements'] = {'items': items};
+                                });
+                                // اگر لیست خالی شد، دوباره لود کن
+                                if (items.isEmpty) {
+                                  await _reloadAnnouncements(onlyUnread: true);
+                                }
+                              } else {
+                                // در غیر این صورت، فقط is_read را به true تغییر بده
+                                setState(() {
+                                  final item = items.firstWhere(
+                                    (e) => (e['id'] is int ? e['id'] == annId : int.tryParse('${e['id']}') == annId),
+                                    orElse: () => <String, dynamic>{},
+                                  );
+                                  if (item.isNotEmpty) {
+                                    item['is_read'] = true;
+                                  }
+                                });
+                              }
                               if (!context.mounted) return;
                               ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('به‌عنوان خوانده‌شده علامت خورد')));
                             } catch (e) {
@@ -698,9 +720,7 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> {
 
   // --- Announcement actions ---
   Future<void> _markAnnouncementRead(int id) async {
-    try {
-      await AnnouncementsService(ApiClient()).markRead(id);
-    } catch (_) {}
+    await AnnouncementsService(ApiClient()).markRead(id);
   }
 
   String _formatNotificationTime(dynamic timeData) {

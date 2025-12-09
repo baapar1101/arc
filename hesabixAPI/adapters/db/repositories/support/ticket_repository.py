@@ -260,3 +260,22 @@ class TicketRepository(BaseRepository[Ticket]):
         self.db.commit()
         self.db.refresh(ticket)
         return ticket
+    
+    def delete_ticket(self, ticket_id: int) -> bool:
+        """
+        حذف تیکت و تمام پیام‌های مرتبط
+        
+        Args:
+            ticket_id: شناسه تیکت
+            
+        Returns:
+            True اگر تیکت حذف شد، False اگر تیکت یافت نشد
+        """
+        ticket = self.get_by_id(ticket_id)
+        if not ticket:
+            return False
+        
+        # حذف تیکت (پیام‌ها به صورت CASCADE حذف می‌شوند)
+        self.db.delete(ticket)
+        self.db.commit()
+        return True

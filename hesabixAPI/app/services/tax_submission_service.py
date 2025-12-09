@@ -10,17 +10,30 @@ from adapters.db.models.tax_setting import TaxSetting
 from app.core.responses import ApiError
 from app.core.settings import get_settings
 from app.integrations.moadian.client import MoadianClient
+from app.integrations.moadian.invoice_builder import build_invoice_for_moadian
 from app.services.invoice_service import invoice_document_to_dict
-from app.services.tax_payload_builder import build_tax_invoice_payload
 from app.services.tax_validation_service import validate_document_for_tax
 
 
 def send_document_to_tax_system(db: Session, document: Document) -> Dict[str, Any]:
     """
     نقطه ورود اصلی ارسال سند به سامانه مودیان.
-    در حال حاضر اگر force_simulation فعال باشد، خروجی به‌صورت شبیه‌سازی‌شده
-    برگردانده می‌شود؛ اما زیرساخت ارسال واقعی آماده است.
+    
+    مراحل:
+    1. اعتبارسنجی فاکتور
+    2. بررسی تنظیمات مالیاتی
+    3. ساخت DTO استاندارد
+    4. ارسال به سامانه
+    5. ذخیره نتیجه
+    
+    Args:
+        db: Database session
+        document: سند/فاکتور برای ارسال
+    
+    Returns:
+        نتیجه ارسال شامل کد رهگیری و وضعیت
     """
+    # 1. اعتبارسنجی
     validation = validate_document_for_tax(db, document)
     if not validation["valid"]:
         raise ApiError(
@@ -30,6 +43,7 @@ def send_document_to_tax_system(db: Session, document: Document) -> Dict[str, An
             details={"issues": validation["issues"]},
         )
 
+    # 2. بررسی تنظیمات
     tax_setting = (
         db.query(TaxSetting)
         .filter(TaxSetting.business_id == document.business_id)
@@ -48,20 +62,23 @@ def send_document_to_tax_system(db: Session, document: Document) -> Dict[str, An
             http_status=400,
         )
 
-    # آماده‌سازی payload استاندارد
+    # 3. ساخت DTO استاندارد
     raw_document = invoice_document_to_dict(db, document)
-    payload = build_tax_invoice_payload(raw_document, tax_setting)
+    invoice_dto = build_invoice_for_moadian(raw_document, tax_setting)
 
-    # وضعیت در حال ارسال برای جلوگیری از ارسال‌های همزمان
+    # 4. وضعیت در حال ارسال
     _mark_document_pending(document, db)
 
+    # 5. ارسال به سامانه
     client = MoadianClient(settings=get_settings(), tax_setting=tax_setting)
     try:
-        submission = client.send_invoice(payload)
+        submission = client.send_invoice(invoice_dto)
     finally:
         client.close()
 
+    # 6. ذخیره نتیجه
     _apply_submission_result(document, submission, db)
+    
     return submission
 
 

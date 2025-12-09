@@ -42,11 +42,48 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
   // کلید کنترل جدول برای دسترسی به selection و refresh
   final GlobalKey _tableKey = GlobalKey();
   int _selectedCount = 0; // تعداد سطرهای انتخاب‌شده
+  List<FilterOption> _projectFilterOptions = [];
+  bool _loadingProjects = false;
 
   @override
   void initState() {
     super.initState();
     _service = ExpenseIncomeListService(widget.apiClient);
+    _loadProjects();
+  }
+
+  /// بارگذاری لیست پروژه‌ها برای فیلتر
+  Future<void> _loadProjects() async {
+    if (!mounted) return;
+    setState(() => _loadingProjects = true);
+    
+    try {
+      final response = await widget.apiClient.post(
+        '/businesses/${widget.businessId}/projects/search',
+        data: {
+          'take': 1000,
+          'skip': 0,
+          'is_active': true,
+        },
+      );
+      
+      if (response.data['success'] == true) {
+        final List<dynamic> projects = response.data['data']['items'] ?? [];
+        if (mounted) {
+          setState(() {
+            _projectFilterOptions = projects.map((p) => FilterOption(
+              value: p['id'].toString(),
+              label: p['name'] ?? 'پروژه ${p['id']}',
+              description: p['code'],
+            )).toList();
+            _loadingProjects = false;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('خطا در بارگذاری پروژه‌ها: $e');
+      if (mounted) setState(() => _loadingProjects = false);
+    }
   }
 
   /// تازه‌سازی داده‌های جدول
@@ -281,12 +318,11 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
         ),
         
         // مبلغ کل
-        NumberColumn(
+        TextColumn(
           'total_amount',
           'مبلغ کل',
           width: ColumnWidth.large,
-          formatter: (item) => formatWithThousands(item.totalAmount),
-          suffix: ' ریال',
+          formatter: (item) => '${formatWithThousands(item.totalAmount)} ${item.currencyCode ?? 'ریال'}',
         ),
         
         // نام حساب‌ها
@@ -335,6 +371,17 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
           'تاریخ ثبت',
           width: ColumnWidth.medium,
           formatter: (item) => HesabixDateUtils.formatForDisplay(item.registeredAt, widget.calendarController.isJalali),
+        ),
+        
+        // پروژه
+        TextColumn(
+          'project_name',
+          'پروژه',
+          width: ColumnWidth.medium,
+          formatter: (item) => item.projectName ?? '-',
+          searchable: true,
+          filterType: ColumnFilterType.multiSelect,
+          filterOptions: _projectFilterOptions,
         ),
         
         // عملیات

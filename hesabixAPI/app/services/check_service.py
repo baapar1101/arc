@@ -917,7 +917,66 @@ def delete_check(db: Session, check_id: int, user_id: Optional[int] = None) -> b
         if last_action_doc and last_action_doc not in related_documents:
             related_documents.append(last_action_doc)
     
-    # 5. بررسی سال مالی اسناد
+    # 5. بررسی وجود اسناد حسابداری قطعی مرتبط (غیر پیش‌نویس)
+    # اگر چک در اسناد حسابداری قطعی استفاده شده است، نباید حذف شود
+    final_documents_with_check = []
+    for doc in related_documents:
+        if not doc.is_proforma:  # فقط اسناد قطعی
+            # اگر سند از نوع check یا manual نیست، یعنی در اسناد دیگری استفاده شده است
+            if doc.document_type not in ("check", "manual"):
+                final_documents_with_check.append(doc)
+    
+    # بررسی DocumentLine ها با check_id در اسناد قطعی
+    document_lines_with_check_final = db.query(DocumentLine).join(
+        Document, DocumentLine.document_id == Document.id
+    ).filter(
+        DocumentLine.check_id == check_id,
+        Document.is_proforma == False
+    ).all()
+    
+    if document_lines_with_check_final:
+        # دریافت انواع اسناد مرتبط
+        document_types = db.query(Document.document_type).join(
+            DocumentLine, Document.id == DocumentLine.document_id
+        ).filter(
+            DocumentLine.check_id == check_id,
+            Document.is_proforma == False
+        ).distinct().all()
+        
+        types_list = [doc_type[0] for doc_type in document_types if doc_type[0]]
+        
+        # تبدیل انواع اسناد به نام‌های فارسی
+        type_names = []
+        type_mapping = {
+            "invoice_sales": "فاکتور فروش",
+            "invoice_sales_return": "برگشت از فروش",
+            "invoice_purchase": "فاکتور خرید",
+            "invoice_purchase_return": "برگشت از خرید",
+            "invoice_direct_consumption": "مصرف مستقیم",
+            "invoice_production": "تولید",
+            "invoice_waste": "ضایعات",
+            "receipt": "دریافت",
+            "payment": "پرداخت",
+            "expense": "هزینه",
+            "income": "درآمد",
+            "transfer": "انتقال",
+            "manual": "سند دستی",
+            "check": "چک",
+        }
+        
+        for doc_type in types_list:
+            type_name = type_mapping.get(doc_type, doc_type)
+            if type_name not in type_names:
+                type_names.append(type_name)
+        
+        types_str = "، ".join(type_names)
+        raise ApiError(
+            "CHECK_HAS_ACCOUNTING_DOCUMENTS",
+            f"امکان حذف این چک وجود ندارد زیرا دارای اسناد حسابداری مرتبط است. انواع اسناد: {types_str}",
+            http_status=400
+        )
+    
+    # 6. بررسی سال مالی اسناد
     if current_fiscal_year:
         for doc in related_documents:
             if doc.fiscal_year_id != current_fiscal_year.id:
@@ -927,7 +986,7 @@ def delete_check(db: Session, check_id: int, user_id: Optional[int] = None) -> b
                     http_status=400
                 )
     
-    # 6. بررسی وضعیت اسناد (فقط اسناد قطعی قابل بررسی)
+    # 7. بررسی وضعیت اسناد (فقط اسناد قطعی قابل بررسی)
     for doc in related_documents:
         if doc.is_proforma:
             # اسناد پیش‌نویس قابل حذف هستند
@@ -938,12 +997,15 @@ def delete_check(db: Session, check_id: int, user_id: Optional[int] = None) -> b
             # اگر سند از نوع دیگری است (مثلاً invoice)، فقط لینک را حذف می‌کنیم
             continue
     
-    # 7. حذف لینک‌ها از DocumentLine
+    # 8. حذف لینک‌ها از DocumentLine (فقط برای اسناد پیش‌نویس)
     for line in document_lines_with_check:
-        line.check_id = None
-        db.flush()
+        # بررسی اینکه آیا سند مربوطه پیش‌نویس است یا نه
+        doc = db.query(Document).filter(Document.id == line.document_id).first()
+        if doc and doc.is_proforma:
+            line.check_id = None
+            db.flush()
     
-    # 8. حذف لینک‌ها از extra_info اسناد
+    # 9. حذف لینک‌ها از extra_info اسناد
     for doc in related_documents:
         if doc.extra_info:
             extra_info = dict(doc.extra_info)
@@ -974,7 +1036,7 @@ def delete_check(db: Session, check_id: int, user_id: Optional[int] = None) -> b
             doc.extra_info = extra_info
             db.flush()
     
-    # 9. حذف لینک‌ها از فاکتورها (در صورت وجود)
+    # 10. حذف لینک‌ها از فاکتورها (در صورت وجود)
     # بررسی فاکتورهایی که DocumentLine آنها به چک لینک شده است
     invoice_document_ids = {line.document_id for line in document_lines_with_check}
     if invoice_document_ids:
@@ -1020,7 +1082,7 @@ def delete_check(db: Session, check_id: int, user_id: Optional[int] = None) -> b
                     invoice_doc.extra_info = extra_info
                     db.flush()
     
-    # 10. حذف اسناد حسابداری مرتبط (فقط اسناد از نوع check)
+    # 11. حذف اسناد حسابداری مرتبط (فقط اسناد از نوع check و پیش‌نویس)
     for doc in related_documents:
         if doc.document_type == "check":
             # حذف DocumentLine ها (به صورت خودکار با cascade)
@@ -1037,7 +1099,7 @@ def delete_check(db: Session, check_id: int, user_id: Optional[int] = None) -> b
                     http_status=500
                 )
     
-    # 11. حذف چک
+    # 12. حذف چک
     try:
         db.delete(obj)
         db.commit()

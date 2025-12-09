@@ -7,6 +7,7 @@ import '../../widgets/invoice/person_combobox_widget.dart';
 import '../../widgets/invoice/invoice_transactions_widget.dart';
 import '../../widgets/invoice/check_combobox_widget.dart';
 import '../../widgets/date_input_field.dart';
+import '../../widgets/project/project_selector_widget.dart';
 import '../../models/invoice_transaction.dart';
 import '../../models/invoice_type_model.dart';
 import '../../models/person_model.dart';
@@ -224,6 +225,7 @@ class _BulkSettlementDialogState extends State<_BulkSettlementDialog> {
   late DateTime _docDate;
   late bool _isReceipt;
   int? _selectedCurrencyId;
+  int? _selectedProjectId;
   final TextEditingController _descriptionController = TextEditingController();
   final List<_PersonLine> _personLines = <_PersonLine>[];
   final List<InvoiceTransaction> _centerTransactions = <InvoiceTransaction>[];
@@ -234,6 +236,7 @@ class _BulkSettlementDialogState extends State<_BulkSettlementDialog> {
     _docDate = widget.initial?.documentDate ?? DateTime.now();
     _isReceipt = widget.initial?.isReceipt ?? widget.isReceipt;
     _selectedCurrencyId = widget.businessInfo?.defaultCurrency?.id;
+    _selectedProjectId = widget.initial?.projectId;
     if (widget.initial != null) {
       // تبدیل personLines از ReceiptPaymentDocument به _PersonLine
       // widget.initial!.personLines از نوع List<PersonLine> است (از ReceiptPaymentDocument)
@@ -303,6 +306,18 @@ class _BulkSettlementDialogState extends State<_BulkSettlementDialog> {
                         onChanged: (currencyId) => setState(() => _selectedCurrencyId = currencyId),
                         label: 'ارز',
                         hintText: 'انتخاب ارز',
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    SizedBox(
+                      width: 200,
+                      child: ProjectSelectorWidget(
+                        businessId: widget.businessId,
+                        apiClient: widget.apiClient,
+                        selectedProjectId: _selectedProjectId,
+                        onChanged: (projectId) => setState(() => _selectedProjectId = projectId),
+                        allowNull: true,
+                        labelText: 'پروژه',
                       ),
                     ),
                   ],
@@ -473,6 +488,7 @@ class _BulkSettlementDialogState extends State<_BulkSettlementDialog> {
         description: _descriptionController.text.trim().isNotEmpty ? _descriptionController.text.trim() : null,
         personLines: personLinesData,
         accountLines: accountLinesData,
+        projectId: _selectedProjectId,
       );
       
       if (!mounted) return;
@@ -1102,12 +1118,14 @@ class _BulkSettlementDraft {
   final DateTime documentDate;
   final List<_PersonLine> personLines;
   final List<InvoiceTransaction> centerTransactions;
+  final int? projectId;
   _BulkSettlementDraft({
     required this.id,
     required this.isReceipt,
     required this.documentDate,
     required this.personLines,
     required this.centerTransactions,
+    this.projectId,
   });
 }
 

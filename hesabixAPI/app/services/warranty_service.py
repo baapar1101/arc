@@ -781,3 +781,180 @@ def list_warranty_codes_by_person(
         "total_pages": total_pages,
     }
 
+
+# ========== Delete Codes ==========
+
+def delete_warranty_code(
+    db: Session,
+    business_id: int,
+    code_id: int,
+    force: bool = False
+) -> Dict[str, Any]:
+    """حذف یک کد گارانتی به صورت ایمن"""
+    if not _check_warranty_plugin_active(db, business_id):
+        raise ApiError(
+            "PLUGIN_NOT_ACTIVE",
+            "پلاگین گارانتی برای این کسب و کار فعال نیست",
+            http_status=403
+        )
+    
+    repo = WarrantyCodeRepository(db)
+    warranty_code = repo.get_by_id(code_id)
+    
+    if not warranty_code:
+        raise ApiError("WARRANTY_CODE_NOT_FOUND", "کد گارانتی یافت نشد", http_status=404)
+    
+    # بررسی تعلق به کسب و کار
+    if warranty_code.business_id != business_id:
+        raise ApiError("ACCESS_DENIED", "شما دسترسی به این کد گارانتی ندارید", http_status=403)
+    
+    # بررسی وضعیت کد برای حذف ایمن
+    if not force and warranty_code.status in ["activated", "used"]:
+        raise ApiError(
+            "WARRANTY_CODE_ACTIVE",
+            "این کد گارانتی فعال شده است. برای حذف از پارامتر force استفاده کنید.",
+            http_status=400
+        )
+    
+    # حذف رکوردهای مرتبط
+    # 1. حذف رویدادهای رهگیری
+    tracking_repo = WarrantyTrackingRepository(db)
+    tracking_events = tracking_repo.list_by_warranty_code(warranty_code.id)
+    for event in tracking_events:
+        db.delete(event)
+    
+    # 2. حذف لینک‌های رهگیری
+    link_repo = WarrantyTrackingLinkRepository(db)
+    tracking_links = link_repo.list_by_warranty_code(warranty_code.id)
+    for link in tracking_links:
+        db.delete(link)
+    
+    # 3. حذف رکورد فعال‌سازی
+    activation_repo = WarrantyActivationRepository(db)
+    activation = activation_repo.get_by_warranty_code(warranty_code.id)
+    if activation:
+        db.delete(activation)
+    
+    # 4. حذف کد گارانتی
+    code_data = {
+        "id": warranty_code.id,
+        "code": warranty_code.code,
+        "warranty_serial": warranty_code.warranty_serial,
+        "status": warranty_code.status,
+    }
+    
+    db.delete(warranty_code)
+    db.commit()
+    
+    return {
+        "success": True,
+        "message": "کد گارانتی با موفقیت حذف شد",
+        "deleted_code": code_data,
+    }
+
+
+def delete_warranty_codes_bulk(
+    db: Session,
+    business_id: int,
+    code_ids: List[int],
+    force: bool = False
+) -> Dict[str, Any]:
+    """حذف گروهی کدهای گارانتی به صورت ایمن"""
+    if not _check_warranty_plugin_active(db, business_id):
+        raise ApiError(
+            "PLUGIN_NOT_ACTIVE",
+            "پلاگین گارانتی برای این کسب و کار فعال نیست",
+            http_status=403
+        )
+    
+    if not code_ids:
+        raise ApiError("INVALID_INPUT", "لیست کدها خالی است", http_status=400)
+    
+    repo = WarrantyCodeRepository(db)
+    tracking_repo = WarrantyTrackingRepository(db)
+    link_repo = WarrantyTrackingLinkRepository(db)
+    activation_repo = WarrantyActivationRepository(db)
+    
+    deleted_codes = []
+    failed_codes = []
+    skipped_codes = []
+    
+    for code_id in code_ids:
+        try:
+            warranty_code = repo.get_by_id(code_id)
+            
+            if not warranty_code:
+                failed_codes.append({
+                    "id": code_id,
+                    "reason": "کد گارانتی یافت نشد"
+                })
+                continue
+            
+            # بررسی تعلق به کسب و کار
+            if warranty_code.business_id != business_id:
+                failed_codes.append({
+                    "id": code_id,
+                    "code": warranty_code.code,
+                    "reason": "عدم دسترسی"
+                })
+                continue
+            
+            # بررسی وضعیت کد برای حذف ایمن
+            if not force and warranty_code.status in ["activated", "used"]:
+                skipped_codes.append({
+                    "id": code_id,
+                    "code": warranty_code.code,
+                    "status": warranty_code.status,
+                    "reason": "کد فعال شده است"
+                })
+                continue
+            
+            # حذف رکوردهای مرتبط
+            # 1. حذف رویدادهای رهگیری
+            tracking_events = tracking_repo.list_by_warranty_code(warranty_code.id)
+            for event in tracking_events:
+                db.delete(event)
+            
+            # 2. حذف لینک‌های رهگیری
+            tracking_links = link_repo.list_by_warranty_code(warranty_code.id)
+            for link in tracking_links:
+                db.delete(link)
+            
+            # 3. حذف رکورد فعال‌سازی
+            activation = activation_repo.get_by_warranty_code(warranty_code.id)
+            if activation:
+                db.delete(activation)
+            
+            # 4. حذف کد گارانتی
+            deleted_codes.append({
+                "id": warranty_code.id,
+                "code": warranty_code.code,
+                "warranty_serial": warranty_code.warranty_serial,
+                "status": warranty_code.status,
+            })
+            
+            db.delete(warranty_code)
+        
+        except Exception as e:
+            logger.error(f"Error deleting warranty code {code_id}: {e}")
+            failed_codes.append({
+                "id": code_id,
+                "reason": str(e)
+            })
+    
+    db.commit()
+    
+    return {
+        "success": True,
+        "message": f"عملیات حذف گروهی انجام شد",
+        "summary": {
+            "total_requested": len(code_ids),
+            "deleted": len(deleted_codes),
+            "skipped": len(skipped_codes),
+            "failed": len(failed_codes),
+        },
+        "deleted_codes": deleted_codes,
+        "skipped_codes": skipped_codes,
+        "failed_codes": failed_codes,
+    }
+

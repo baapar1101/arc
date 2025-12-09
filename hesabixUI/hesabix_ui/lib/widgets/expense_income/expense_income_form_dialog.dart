@@ -9,6 +9,7 @@ import 'package:hesabix_ui/models/business_dashboard_models.dart';
 import 'package:hesabix_ui/services/expense_income_service.dart';
 import 'package:hesabix_ui/widgets/date_input_field.dart';
 import 'package:hesabix_ui/widgets/banking/currency_picker_widget.dart';
+import 'package:hesabix_ui/widgets/project/project_selector_widget.dart';
 import 'package:hesabix_ui/widgets/invoice/person_combobox_widget.dart';
 import 'package:hesabix_ui/widgets/invoice/account_tree_combobox_widget.dart';
 import 'package:hesabix_ui/widgets/invoice/bank_account_combobox_widget.dart';
@@ -48,6 +49,7 @@ class _ExpenseIncomeFormDialogState extends State<ExpenseIncomeFormDialog> {
   late DateTime _docDate;
   late bool _isIncome;
   int? _selectedCurrencyId;
+  int? _selectedProjectId;
   final TextEditingController _descriptionController = TextEditingController();
   final List<_ItemLine> _itemLines = <_ItemLine>[];
   final List<_CounterpartyLine> _counterpartyLines = <_CounterpartyLine>[];
@@ -62,6 +64,7 @@ class _ExpenseIncomeFormDialogState extends State<ExpenseIncomeFormDialog> {
       _isIncome = initial.isIncome;
       _docDate = initial.documentDate;
       _selectedCurrencyId = initial.currencyId;
+      _selectedProjectId = initial.projectId;
       _descriptionController.text = initial.description ?? '';
       
       // تبدیل خطوط آیتم‌ها
@@ -169,6 +172,18 @@ class _ExpenseIncomeFormDialogState extends State<ExpenseIncomeFormDialog> {
                         onChanged: (currencyId) => setState(() => _selectedCurrencyId = currencyId),
                         label: 'ارز',
                         hintText: 'انتخاب ارز',
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    SizedBox(
+                      width: 200,
+                      child: ProjectSelectorWidget(
+                        businessId: widget.businessId,
+                        apiClient: widget.apiClient,
+                        selectedProjectId: _selectedProjectId,
+                        onChanged: (projectId) => setState(() => _selectedProjectId = projectId),
+                        allowNull: true,
+                        labelText: 'پروژه',
                       ),
                     ),
                   ],
@@ -320,6 +335,7 @@ class _ExpenseIncomeFormDialogState extends State<ExpenseIncomeFormDialog> {
           documentDate: _docDate,
           currencyId: _selectedCurrencyId!,
           description: _descriptionController.text.trim().isNotEmpty ? _descriptionController.text.trim() : null,
+          projectId: _selectedProjectId,
           itemLines: itemLinesData.map((data) => ItemLineData(
             accountId: data['account_id'] as int,
             amount: (data['amount'] as num).toDouble(),
@@ -351,6 +367,7 @@ class _ExpenseIncomeFormDialogState extends State<ExpenseIncomeFormDialog> {
           documentDate: _docDate,
           currencyId: _selectedCurrencyId!,
           description: _descriptionController.text.trim().isNotEmpty ? _descriptionController.text.trim() : null,
+          projectId: _selectedProjectId,
           itemLines: itemLinesData.map((data) => ItemLineData(
             accountId: data['account_id'] as int,
             amount: (data['amount'] as num).toDouble(),

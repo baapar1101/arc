@@ -27,7 +27,7 @@ class WorkflowNodeContextMenu extends StatelessWidget {
     VoidCallback? onDelete,
     VoidCallback? onEditComment,
   }) async {
-    return showMenu<String>(
+    final result = await showMenu<String>(
       context: context,
       position: RelativeRect.fromLTRB(
         position.dx,
@@ -44,7 +44,6 @@ class WorkflowNodeContextMenu extends StatelessWidget {
             contentPadding: EdgeInsets.zero,
             visualDensity: VisualDensity.compact,
           ),
-          onTap: () => onEdit?.call(),
         ),
         PopupMenuItem<String>(
           value: 'comment',
@@ -62,7 +61,6 @@ class WorkflowNodeContextMenu extends StatelessWidget {
             contentPadding: EdgeInsets.zero,
             visualDensity: VisualDensity.compact,
           ),
-          onTap: () => onEditComment?.call(),
         ),
         PopupMenuItem<String>(
           value: 'duplicate',
@@ -72,7 +70,6 @@ class WorkflowNodeContextMenu extends StatelessWidget {
             contentPadding: EdgeInsets.zero,
             visualDensity: VisualDensity.compact,
           ),
-          onTap: () => onDuplicate?.call(),
         ),
         const PopupMenuDivider(),
         PopupMenuItem<String>(
@@ -83,10 +80,32 @@ class WorkflowNodeContextMenu extends StatelessWidget {
             contentPadding: EdgeInsets.zero,
             visualDensity: VisualDensity.compact,
           ),
-          onTap: () => onDelete?.call(),
         ),
       ],
     );
+
+    // بعد از بسته شدن menu، callback مناسب را اجرا می‌کنیم
+    if (result != null) {
+      // کمی تأخیر برای اطمینان از بسته شدن کامل menu
+      await Future.delayed(const Duration(milliseconds: 100));
+      
+      switch (result) {
+        case 'edit':
+          onEdit?.call();
+          break;
+        case 'comment':
+          onEditComment?.call();
+          break;
+        case 'duplicate':
+          onDuplicate?.call();
+          break;
+        case 'delete':
+          onDelete?.call();
+          break;
+      }
+    }
+    
+    return result;
   }
 
   @override

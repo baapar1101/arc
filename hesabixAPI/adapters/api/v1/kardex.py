@@ -14,7 +14,7 @@ from app.core.i18n import negotiate_locale
 from adapters.db.models.business import Business
 
 
-router = APIRouter(prefix="/kardex", tags=["kardex"])
+router = APIRouter(prefix="/kardex", tags=["گزارش‌ها", "انبارداری"])
 
 
 @router.post(

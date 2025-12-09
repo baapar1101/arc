@@ -16,7 +16,16 @@ class PersonCreatedTrigger(BaseTrigger):
             "config_schema": {
                 "person_type": {
                     "type": "string",
-                    "description": "نوع شخص (customer/supplier/etc)",
+                    "description": "نوع شخص",
+                    "enum": ["customer", "supplier", "employee", "other"],
+                    "ui_config": {
+                        "labels": {
+                            "customer": "مشتری",
+                            "supplier": "تامین‌کننده",
+                            "employee": "کارمند",
+                            "other": "سایر"
+                        }
+                    },
                     "required": False
                 }
             }

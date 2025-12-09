@@ -124,6 +124,8 @@ def get_service_status(
 			status = service.check_redis()
 		elif service_name == "workers":
 			status = service.check_workers()
+		elif service_name == "notification_moderation":
+			status = service.check_notification_moderation_worker()
 		else:
 			raise ApiError("NOT_FOUND", f"سرویس '{service_name}' یافت نشد", http_status=404)
 		
@@ -213,9 +215,13 @@ def get_slow_endpoints(
 @router.websocket("/stream")
 async def monitoring_stream(
 	websocket: WebSocket,
-	db: Session = Depends(get_db),
 ):
-	"""WebSocket endpoint برای دریافت داده‌های لحظه‌ای مانیتورینگ"""
+	"""
+	WebSocket endpoint برای دریافت داده‌های لحظه‌ای مانیتورینگ
+	
+	⚠️ مهم: Session را فقط برای authentication و داده‌های اولیه استفاده می‌کنیم
+	و سپس می‌بندیم تا از connection leak جلوگیری کنیم.
+	"""
 	# بررسی احراز هویت از طریق query parameter
 	api_key = websocket.query_params.get("api_key")
 	if not api_key:
@@ -226,29 +232,30 @@ async def monitoring_stream(
 	from adapters.db.repositories.api_key_repo import ApiKeyRepository
 	from app.core.security import hash_api_key
 	from adapters.db.models.user import User
+	from adapters.db.session import SessionLocal
 	
-	key_hash = hash_api_key(api_key)
-	repo = ApiKeyRepository(db)
-	obj = repo.get_by_hash(key_hash)
-	if not obj or obj.revoked_at is not None:
-		await websocket.close(code=4401, reason="Invalid API key")
-		return
-	
-	user = db.get(User, obj.user_id)
-	if not user or not user.is_active:
-		await websocket.close(code=4401, reason="User not found or inactive")
-		return
-	
-	# بررسی مجوز admin
-	if not (user.app_permissions and ("superadmin" in user.app_permissions or "system_settings" in user.app_permissions)):
-		await websocket.close(code=4403, reason="Permission denied")
-		return
-	
-	# اتصال WebSocket
-	await monitoring_realtime_manager.connect(websocket)
-	
+	# ایجاد session موقت فقط برای authentication و داده‌های اولیه
+	db: Session = SessionLocal()
+	user = None
 	try:
-		# ارسال داده‌های اولیه
+		key_hash = hash_api_key(api_key)
+		repo = ApiKeyRepository(db)
+		obj = repo.get_by_hash(key_hash)
+		if not obj or obj.revoked_at is not None:
+			await websocket.close(code=4401, reason="Invalid API key")
+			return
+		
+		user = db.get(User, obj.user_id)
+		if not user or not user.is_active:
+			await websocket.close(code=4401, reason="User not found or inactive")
+			return
+		
+		# بررسی مجوز admin
+		if not (user.app_permissions and ("superadmin" in user.app_permissions or "system_settings" in user.app_permissions)):
+			await websocket.close(code=4403, reason="Permission denied")
+			return
+		
+		# ارسال داده‌های اولیه قبل از بستن session
 		hardware_service = HardwareMonitoringService(db)
 		service_monitor = ServiceMonitoringService(db)
 		
@@ -263,7 +270,14 @@ async def monitoring_stream(
 			await monitoring_realtime_manager.broadcast_service_status(initial_services)
 		except:
 			pass
-		
+	finally:
+		# بستن session بلافاصله بعد از authentication و داده‌های اولیه
+		db.close()
+	
+	# اتصال WebSocket (بدون session)
+	await monitoring_realtime_manager.connect(websocket)
+	
+	try:
 		# نگه داشتن اتصال
 		while True:
 			# دریافت پیام از کلاینت (heartbeat)

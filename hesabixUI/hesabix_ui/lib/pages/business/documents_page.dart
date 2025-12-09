@@ -38,6 +38,8 @@ class _DocumentsPageState extends State<DocumentsPage> {
   DateTime? _toDate;
   final GlobalKey _tableKey = GlobalKey();
   int _selectedCount = 0;
+  List<FilterOption> _projectFilterOptions = [];
+  bool _loadingProjects = false;
 
   // انواع اسناد
   final Map<String, String> _documentTypes = {
@@ -55,6 +57,41 @@ class _DocumentsPageState extends State<DocumentsPage> {
   void initState() {
     super.initState();
     _service = DocumentService(widget.apiClient);
+    _loadProjects();
+  }
+
+  /// بارگذاری لیست پروژه‌ها برای فیلتر
+  Future<void> _loadProjects() async {
+    if (!mounted) return;
+    setState(() => _loadingProjects = true);
+    
+    try {
+      final response = await widget.apiClient.post(
+        '/businesses/${widget.businessId}/projects/search',
+        data: {
+          'take': 1000,
+          'skip': 0,
+          'is_active': true,
+        },
+      );
+      
+      if (response.data['success'] == true) {
+        final List<dynamic> projects = response.data['data']['items'] ?? [];
+        if (mounted) {
+          setState(() {
+            _projectFilterOptions = projects.map((p) => FilterOption(
+              value: p['id'].toString(),
+              label: p['name'] ?? 'پروژه ${p['id']}',
+              description: p['code'],
+            )).toList();
+            _loadingProjects = false;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('خطا در بارگذاری پروژه‌ها: $e');
+      if (mounted) setState(() => _loadingProjects = false);
+    }
   }
 
   /// تازه‌سازی داده‌های جدول
@@ -314,21 +351,19 @@ class _DocumentsPageState extends State<DocumentsPage> {
         ),
 
         // بدهکار
-        NumberColumn(
+        TextColumn(
           'total_debit',
           'بدهکار',
           width: ColumnWidth.large,
-          formatter: (item) => formatWithThousands(item.totalDebit.toInt()),
-          suffix: ' ریال',
+          formatter: (item) => '${formatWithThousands(item.totalDebit.toInt())} ${item.currencyCode ?? 'ریال'}',
         ),
 
         // بستانکار
-        NumberColumn(
+        TextColumn(
           'total_credit',
           'بستانکار',
           width: ColumnWidth.large,
-          formatter: (item) => formatWithThousands(item.totalCredit.toInt()),
-          suffix: ' ریال',
+          formatter: (item) => '${formatWithThousands(item.totalCredit.toInt())} ${item.currencyCode ?? 'ریال'}',
         ),
 
         // وضعیت
@@ -363,6 +398,17 @@ class _DocumentsPageState extends State<DocumentsPage> {
           'توضیحات',
           width: ColumnWidth.large,
           formatter: (item) => item.description ?? '-',
+        ),
+
+        // پروژه
+        TextColumn(
+          'project_name',
+          'پروژه',
+          width: ColumnWidth.medium,
+          formatter: (item) => item.projectName ?? '-',
+          searchable: true,
+          filterType: ColumnFilterType.multiSelect,
+          filterOptions: _projectFilterOptions,
         ),
 
         // عملیات

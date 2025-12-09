@@ -1331,16 +1331,14 @@ class _ProductsPageState extends State<ProductsPage> {
                     try {
                       // Access current table state to read selected rows and items
                       final state = _tableKey.currentState as dynamic;
-                      final selectedIndices = (state?.getSelectedRowIndices() as List<int>?) ?? const <int>[];
                       final items = (state?.getSelectedItems() as List<dynamic>?) ?? const <dynamic>[];
-                      if (selectedIndices.isEmpty) {
+                      if (items.isEmpty) {
                         SnackBarHelper.showError(context, message: t.noRowsSelectedError);
                         return;
                       }
                       final ids = <int>[];
-                      for (final i in selectedIndices) {
-                        if (i >= 0 && i < items.length) {
-                          final row = items[i] as Map<String, dynamic>;
+                      for (final row in items) {
+                        if (row is Map<String, dynamic>) {
                           final id = row['id'];
                           if (id is int) ids.add(id);
                         }

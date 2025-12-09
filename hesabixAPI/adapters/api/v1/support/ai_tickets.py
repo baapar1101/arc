@@ -16,6 +16,8 @@ import logging
 
 router = APIRouter(prefix="/support", tags=["support-ai"])
 
+logger = logging.getLogger(__name__)
+
 
 class AISuggestReplyRequest(BaseModel):
     use_ticket_history: bool = True
@@ -62,6 +64,26 @@ async def suggest_ai_reply(
     # ایجاد AI Service
     ai_service = AIService(db, ctx)
     
+    # چک اعتبار قبل از ارسال
+    try:
+        availability = ai_service.check_availability(estimated_tokens=1500)
+        if not availability["can_use"]:
+            reason = availability.get("reason")
+            details = availability.get("details", {})
+            message = details.get("message", "امکان استفاده از AI وجود ندارد")
+            
+            raise ApiError(
+                reason or "AI_UNAVAILABLE",
+                message,
+                http_status=400,
+                extra_data=details
+            )
+    except ApiError:
+        raise
+    except Exception as e:
+        logger.warning(f"Error checking AI availability: {e}")
+        # در صورت خطا، اجازه ادامه بده
+    
     # ساخت prompt برای AI
     system_prompt = f"""شما یک دستیار هوشمند برای اپراتورهای پشتیبانی هستید.
 تیکت مربوط به کاربر {ticket.user.first_name or ''} {ticket.user.last_name or ''} است.
@@ -78,7 +100,7 @@ async def suggest_ai_reply(
         {"role": "user", "content": f"لطفاً برای این تیکت پاسخ مناسبی پیشنهاد دهید:\n\n{ticket.description}"}
     ]
     
-    response = ai_service.chat_completion(ai_messages, use_function_calling=True)
+    response = await ai_service.chat_completion(ai_messages, use_function_calling=True)
     
     # بررسی سهمیه و شارژ
     usage = response.get("usage", {})
@@ -166,7 +188,8 @@ async def ai_auto_reply(
                 user_id=ticket.user_id,
                 event_key="support.operator_reply",
                 context=context,
-                preferred_channels=["inapp", "email", "telegram", "sms"]
+                preferred_channels=["inapp", "email", "telegram", "sms"],
+                broadcast_mode=True
             )
         except Exception as e:
             # در صورت خطا، لاگ می‌کنیم اما فرآیند اصلی ادامه می‌یابد

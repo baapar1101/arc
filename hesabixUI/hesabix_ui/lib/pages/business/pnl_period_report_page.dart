@@ -10,6 +10,7 @@ import 'package:hesabix_ui/services/business_dashboard_service.dart';
 import 'package:hesabix_ui/services/currency_service.dart';
 import 'package:hesabix_ui/widgets/data_table/helpers/data_table_utils.dart';
 import 'package:hesabix_ui/utils/web/web_utils.dart' as web_utils;
+import 'package:hesabix_ui/widgets/reports/common_report_filters.dart';
 
 class PnlPeriodReportPage extends StatefulWidget {
   final int businessId;
@@ -31,6 +32,7 @@ class _PnlPeriodReportPageState extends State<PnlPeriodReportPage> {
   DateTime? _toDate;
   int? _selectedFiscalYearId;
   int? _selectedCurrencyId;
+  int? _selectedProjectId;  // 🆕 فیلتر پروژه
   
   // Data
   List<Map<String, dynamic>> _fiscalYears = [];
@@ -106,6 +108,7 @@ class _PnlPeriodReportPageState extends State<PnlPeriodReportPage> {
         if (_toDate != null) 'date_to': _toDate!.toIso8601String().split('T').first,
         if (_selectedFiscalYearId != null) 'fiscal_year_id': _selectedFiscalYearId,
         if (_selectedCurrencyId != null) 'currency_id': _selectedCurrencyId,
+        if (_selectedProjectId != null) 'project_id': _selectedProjectId,  // 🆕 فیلتر پروژه
       };
       
       final res = await api.post<Map<String, dynamic>>(
@@ -155,6 +158,7 @@ class _PnlPeriodReportPageState extends State<PnlPeriodReportPage> {
         if (_toDate != null) 'date_to': _toDate!.toIso8601String().split('T').first,
         if (_selectedFiscalYearId != null) 'fiscal_year_id': _selectedFiscalYearId,
         if (_selectedCurrencyId != null) 'currency_id': _selectedCurrencyId,
+        if (_selectedProjectId != null) 'project_id': _selectedProjectId,  // 🆕 فیلتر پروژه
       };
 
       final bytes = await api.post<List<int>>(
@@ -198,6 +202,7 @@ class _PnlPeriodReportPageState extends State<PnlPeriodReportPage> {
         if (_toDate != null) 'date_to': _toDate!.toIso8601String().split('T').first,
         if (_selectedFiscalYearId != null) 'fiscal_year_id': _selectedFiscalYearId,
         if (_selectedCurrencyId != null) 'currency_id': _selectedCurrencyId,
+        if (_selectedProjectId != null) 'project_id': _selectedProjectId,  // 🆕 فیلتر پروژه
       };
 
       final bytes = await api.post<List<int>>(
@@ -354,6 +359,25 @@ class _PnlPeriodReportPageState extends State<PnlPeriodReportPage> {
                         _refreshData();
                       },
                     ),
+                  ),
+                  
+                  // 🆕 فیلتر پروژه
+                  CommonReportFilters(
+                    businessId: widget.businessId,
+                    apiClient: ApiClient(),
+                    calendarController: widget.calendarController,
+                    fromDate: null,
+                    toDate: null,
+                    onFromDateChanged: (_) {},
+                    onToDateChanged: (_) {},
+                    selectedProjectId: _selectedProjectId,
+                    onProjectChanged: (projectId) {
+                      setState(() => _selectedProjectId = projectId);
+                      _refreshData();
+                    },
+                    showDateFilters: false,
+                    showFiscalYearFilter: false,
+                    showProjectFilter: true,
                   ),
                   
                   // Currency

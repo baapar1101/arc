@@ -25,8 +25,18 @@ class ScheduledTrigger(TriggerHandler):
                 },
                 "timezone": {
                     "type": "string",
-                    "description": "Timezone",
+                    "description": "منطقه زمانی",
                     "default": "Asia/Tehran",
+                    "enum": ["Asia/Tehran", "UTC", "Asia/Dubai", "Europe/London", "America/New_York"],
+                    "ui_config": {
+                        "labels": {
+                            "Asia/Tehran": "🇮🇷 تهران (ایران)",
+                            "UTC": "🌍 UTC (جهانی)",
+                            "Asia/Dubai": "🇦🇪 دبی",
+                            "Europe/London": "🇬🇧 لندن",
+                            "America/New_York": "🇺🇸 نیویورک"
+                        }
+                    },
                     "required": False
                 },
                 "business_hours_only": {

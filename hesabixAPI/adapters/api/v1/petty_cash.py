@@ -18,7 +18,7 @@ from app.services.petty_cash_service import (
 )
 
 
-router = APIRouter(prefix="/petty-cash", tags=["petty-cash"])
+router = APIRouter(prefix="/petty-cash", tags=["مدیریت مالی"])
 
 
 @router.post(
@@ -137,8 +137,12 @@ async def delete_petty_cash_endpoint(
             biz_id = None
         if biz_id is not None and not ctx.can_access_business(biz_id):
             raise ApiError("FORBIDDEN", "Access denied", http_status=403)
-    ok = delete_petty_cash(db, petty_cash_id)
-    if not ok:
+    from fastapi import HTTPException
+    
+    success, error_message = delete_petty_cash(db, petty_cash_id)
+    if not success:
+        if error_message:
+            raise HTTPException(status_code=400, detail=error_message)
         raise ApiError("PETTY_CASH_NOT_FOUND", "Petty cash not found", http_status=404)
     return success_response(data=None, request=request, message="PETTY_CASH_DELETED")
 

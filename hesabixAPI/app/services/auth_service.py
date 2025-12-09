@@ -142,11 +142,50 @@ def login_user(*, db: Session, identifier: str, password: str, captcha_id: str, 
 	repo = UserRepository(db)
 	user = repo.get_by_email(email) if email else repo.get_by_mobile(mobile)  # type: ignore[arg-type]
 	if not user or not verify_password(password, user.password_hash):
+		# لاگ‌گیری ورود ناموفق
+		try:
+			from app.services.activity_log_service import log_activity
+			log_activity(
+				db=db,
+				user_id=user.id if user else None,
+				category="user",
+				action="login_failed",
+				description=f"تلاش ناموفق برای ورود با {'ایمیل' if email else 'موبایل'}: {email or mobile}",
+				extra_info={
+					"ip_address": ip,
+					"user_agent": user_agent,
+					"device_id": device_id,
+					"identifier": email or mobile,
+					"identifier_type": "email" if email else "mobile"
+				}
+			)
+			db.commit()
+		except Exception as e:
+			import logging
+			logger = logging.getLogger(__name__)
+			logger.warning(f"Failed to log failed login activity: {e}")
+		
 		from app.core.responses import ApiError
 		raise ApiError("INVALID_CREDENTIALS", "Invalid credentials")
 	if not user.is_active:
 		from app.core.responses import ApiError
 		raise ApiError("ACCOUNT_DISABLED", "Your account is disabled")
+
+	# تبدیل خودکار رمز bcrypt به Argon2 در صورت نیاز
+	# این کار باعث می‌شود که به تدریج تمام رمزها به Argon2 تبدیل شوند
+	if user.password_hash.startswith('$2y$') or user.password_hash.startswith('$2a$') or user.password_hash.startswith('$2b$'):
+		try:
+			user.password_hash = hash_password(password)
+			db.add(user)
+			db.commit()
+			import logging
+			logger = logging.getLogger(__name__)
+			logger.info(f"Converted bcrypt password to Argon2 for user {user.id}")
+		except Exception as e:
+			import logging
+			logger = logging.getLogger(__name__)
+			logger.warning(f"Failed to convert bcrypt password to Argon2 for user {user.id}: {e}")
+			# در صورت خطا، ادامه می‌دهیم و کاربر می‌تواند وارد شود
 
 	settings = get_settings()
 	api_key, key_hash = generate_api_key()
@@ -165,6 +204,28 @@ def login_user(*, db: Session, identifier: str, password: str, captcha_id: str, 
 		"referral_code": getattr(user, "referral_code", None),
 		"email_verified": getattr(user, "email_verified", False),
 	}
+	
+	# لاگ‌گیری ورود موفق
+	try:
+		from app.services.activity_log_service import log_user_activity
+		log_user_activity(
+			db=db,
+			user_id=user.id,
+			action="login",
+			description=f"ورود موفق به سیستم",
+			extra_info={
+				"ip_address": ip,
+				"user_agent": user_agent,
+				"device_id": device_id,
+				"identifier_type": "email" if email else "mobile"
+			}
+		)
+		db.commit()
+	except Exception as e:
+		import logging
+		logger = logging.getLogger(__name__)
+		logger.warning(f"Failed to log login activity: {e}")
+	
 	# Session keys نامحدود هستند، پس expires_at=None برمی‌گردانیم
 	return api_key, None, user_data
 

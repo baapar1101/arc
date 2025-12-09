@@ -7,6 +7,7 @@ from typing import Any, Dict, Optional
 from app.services.workflow.action_registry import ActionHandler
 from app.services.workflow.workflow_engine import WorkflowEngine
 from app.services.workflow.utils import execute_with_retry, get_retry_config_from_action_config
+from app.services.workflow.logging_decorators import log_action_execution
 
 logger = logging.getLogger(__name__)
 
@@ -58,9 +59,16 @@ class SendEmailAction(ActionHandler):
                 },
                 "priority": {
                     "type": "string",
-                    "description": "اولویت (low/normal/high)",
+                    "description": "اولویت ارسال",
                     "enum": ["low", "normal", "high"],
                     "default": "normal",
+                    "ui_config": {
+                        "labels": {
+                            "low": "🔽 کم - Low",
+                            "normal": "➖ عادی - Normal",
+                            "high": "🔼 بالا - High"
+                        }
+                    },
                     "required": False
                 },
                 "retry_on_failure": {
@@ -96,6 +104,7 @@ class SendEmailAction(ActionHandler):
             }
         }
     
+    @log_action_execution
     def execute(
         self,
         context: Dict[str, Any],
@@ -204,9 +213,16 @@ class SendTelegramAction(ActionHandler):
                 },
                 "parse_mode": {
                     "type": "string",
-                    "description": "حالت پارس (HTML/Markdown/None)",
-                    "enum": ["HTML", "Markdown", "None"],
+                    "description": "حالت پارس متن",
+                    "enum": ["None", "HTML", "Markdown"],
                     "default": "None",
+                    "ui_config": {
+                        "labels": {
+                            "None": "متن ساده",
+                            "HTML": "HTML - با فرمت HTML",
+                            "Markdown": "Markdown - با فرمت مارک‌داون"
+                        }
+                    },
                     "required": False
                 },
                 "disable_web_page_preview": {
@@ -236,6 +252,7 @@ class SendTelegramAction(ActionHandler):
             }
         }
     
+    @log_action_execution
     def execute(
         self,
         context: Dict[str, Any],
@@ -431,6 +448,7 @@ class CreateNotificationAction(ActionHandler):
             }
         }
     
+    @log_action_execution
     def execute(
         self,
         context: Dict[str, Any],

@@ -6,6 +6,8 @@
 import json
 import logging
 import time
+import traceback
+import uuid
 from typing import Any, Dict, List, Optional
 from datetime import datetime
 
@@ -35,6 +37,7 @@ class WorkflowEngine:
         self.db = db
         self.business_id = business_id
         self.user_id = user_id
+        self.correlation_id = str(uuid.uuid4())  # اضافه کردن correlation_id برای trace کردن
         self.trigger_registry = TriggerRegistry()
         self.action_registry = ActionRegistry()
         self.cache_enabled = True
@@ -66,10 +69,26 @@ class WorkflowEngine:
         self.db.commit()
         self.db.refresh(execution)
         
+        workflow_start_time = time.time()  # شروع زمان‌سنجی کلی
+        
         try:
             execution.status = WorkflowExecutionStatus.RUNNING
             execution.started_at = datetime.utcnow()
             self.db.commit()
+            
+            self._log(
+                execution,
+                WorkflowLogLevel.INFO,
+                f"Workflow '{workflow.name}' started",
+                {
+                    "workflow_id": workflow.id,
+                    "workflow_name": workflow.name,
+                    "correlation_id": self.correlation_id,
+                    "business_id": self.business_id,
+                    "user_id": self.user_id,
+                    "trigger_data_preview": str(trigger_data)[:200] if trigger_data else None
+                }
+            )
             
             # اجرای workflow
             result = self._execute_workflow_internal(workflow, execution, trigger_data or {})
@@ -79,16 +98,96 @@ class WorkflowEngine:
             execution.execution_data = result
             self.db.commit()
             
-            self._log(execution, WorkflowLogLevel.INFO, "Workflow completed successfully")
+            # محاسبه مدت زمان کلی
+            total_duration_ms = (time.time() - workflow_start_time) * 1000
+            
+            self._log(
+                execution,
+                WorkflowLogLevel.INFO,
+                f"Workflow '{workflow.name}' completed successfully",
+                {
+                    "workflow_id": workflow.id,
+                    "workflow_name": workflow.name,
+                    "correlation_id": self.correlation_id,
+                    "total_duration_ms": round(total_duration_ms, 2),
+                    "total_nodes_executed": len(result.get("executed_nodes", [])),
+                    "success": True
+                }
+            )
+            
+            # لاگ‌گیری اجرای موفق workflow در activity log
+            try:
+                from app.services.activity_log_service import log_activity
+                log_activity(
+                    db=self.db,
+                    user_id=self.user_id,
+                    business_id=self.business_id,
+                    category="workflow",
+                    action="execute",
+                    entity_type="workflow",
+                    entity_id=workflow.id,
+                    description=f"اجرای موفق گردش کار '{workflow.name}'",
+                    extra_info={
+                        "workflow_id": workflow.id,
+                        "workflow_name": workflow.name,
+                        "execution_id": execution.id,
+                        "duration_ms": round(total_duration_ms, 2),
+                        "nodes_executed": len(result.get("executed_nodes", []))
+                    }
+                )
+                self.db.commit()
+            except Exception as e:
+                logger.warning(f"Failed to log workflow execution activity: {e}")
             
         except Exception as e:
+            total_duration_ms = (time.time() - workflow_start_time) * 1000
+            
             logger.error(f"Workflow execution failed: {e}", exc_info=True)
             execution.status = WorkflowExecutionStatus.FAILED
             execution.completed_at = datetime.utcnow()
             execution.error_message = str(e)
             self.db.commit()
             
-            self._log(execution, WorkflowLogLevel.ERROR, f"Workflow failed: {str(e)}")
+            self._log(
+                execution,
+                WorkflowLogLevel.ERROR,
+                f"Workflow '{workflow.name}' failed: {str(e)}",
+                {
+                    "workflow_id": workflow.id,
+                    "workflow_name": workflow.name,
+                    "correlation_id": self.correlation_id,
+                    "total_duration_ms": round(total_duration_ms, 2),
+                    "error_type": type(e).__name__,
+                    "error_message": str(e),
+                    "stack_trace": traceback.format_exc(),
+                    "success": False
+                }
+            )
+            
+            # لاگ‌گیری اجرای ناموفق workflow در activity log
+            try:
+                from app.services.activity_log_service import log_activity
+                log_activity(
+                    db=self.db,
+                    user_id=self.user_id,
+                    business_id=self.business_id,
+                    category="workflow",
+                    action="execute_failed",
+                    entity_type="workflow",
+                    entity_id=workflow.id,
+                    description=f"خطا در اجرای گردش کار '{workflow.name}': {str(e)[:100]}",
+                    extra_info={
+                        "workflow_id": workflow.id,
+                        "workflow_name": workflow.name,
+                        "execution_id": execution.id,
+                        "duration_ms": round(total_duration_ms, 2),
+                        "error_type": type(e).__name__,
+                        "error_message": str(e)
+                    }
+                )
+                self.db.commit()
+            except Exception as log_error:
+                logger.warning(f"Failed to log workflow execution failure activity: {log_error}")
         
         return execution
     
@@ -122,6 +221,8 @@ class WorkflowEngine:
             "trigger_data": trigger_data,
             "execution_id": execution.id,
             "workflow_id": workflow.id,
+            "correlation_id": self.correlation_id,  # اضافه کردن correlation_id
+            "db": self.db,  # اضافه کردن db برای استفاده در actions
         }
         
         # اجرای nodeها به ترتیب
@@ -143,16 +244,28 @@ class WorkflowEngine:
                 continue
             
             # اجرای node
+            node_start_time = time.time()  # شروع زمان‌سنجی
             try:
                 result = self._execute_node(node, context, node_results)
                 node_results[node_id] = result
                 executed_nodes.add(node_id)
                 
+                # محاسبه مدت زمان اجرا
+                node_duration_ms = (time.time() - node_start_time) * 1000
+                
                 self._log(
                     execution,
                     WorkflowLogLevel.INFO,
                     f"Node '{node.get('label', node_id)}' executed successfully",
-                    {"node_id": node_id, "result": result}
+                    {
+                        "node_id": node_id,
+                        "node_type": node.get("type"),
+                        "node_label": node.get("label"),
+                        "duration_ms": round(node_duration_ms, 2),
+                        "correlation_id": self.correlation_id,
+                        "result_preview": str(result)[:200] if result else None,  # فقط 200 کاراکتر اول
+                        "success": True
+                    }
                 )
                 
                 # پیدا کردن nodeهای بعدی
@@ -160,12 +273,25 @@ class WorkflowEngine:
                 queue.extend(next_nodes)
                 
             except Exception as e:
+                # محاسبه مدت زمان اجرا حتی در صورت خطا
+                node_duration_ms = (time.time() - node_start_time) * 1000
+                
                 logger.error(f"Node execution failed: {e}", exc_info=True)
                 self._log(
                     execution,
                     WorkflowLogLevel.ERROR,
                     f"Node '{node.get('label', node_id)}' failed: {str(e)}",
-                    {"node_id": node_id, "error": str(e)}
+                    {
+                        "node_id": node_id,
+                        "node_type": node.get("type"),
+                        "node_label": node.get("label"),
+                        "duration_ms": round(node_duration_ms, 2),
+                        "correlation_id": self.correlation_id,
+                        "error_type": type(e).__name__,
+                        "error_message": str(e),
+                        "stack_trace": traceback.format_exc(),  # اضافه کردن stack trace کامل
+                        "success": False
+                    }
                 )
                 
                 # بررسی error handling strategy از workflow config
@@ -246,10 +372,13 @@ class WorkflowEngine:
                         next_nodes = self._get_next_nodes(node_id, connections)
                         queue.extend(next_nodes)
         
+        # حذف db از context قبل از ذخیره‌سازی (چون قابل serialize نیست)
+        context_for_storage = {k: v for k, v in context.items() if k != "db"}
+        
         return {
             "node_results": node_results,
             "executed_nodes": list(executed_nodes),
-            "context": context
+            "context": context_for_storage
         }
     
     def _execute_node(
@@ -576,7 +705,11 @@ class WorkflowEngine:
                     if isinstance(result, dict) and field in result:
                         return result[field]
             
+            # اگر reference پیدا نشد، همان value را برگردان
             return value
+        
+        # اگر value یک reference نیست، همان value را برگردان
+        return value
     
     def _resolve_value(
         self,
@@ -906,7 +1039,7 @@ class WorkflowEngine:
         data: Optional[Dict[str, Any]] = None
     ):
         """
-        ثبت لاگ
+        ثبت لاگ با قابلیت هشدار خودکار
         """
         log = WorkflowLog(
             execution_id=execution.id,
@@ -916,4 +1049,151 @@ class WorkflowEngine:
         )
         self.db.add(log)
         self.db.commit()
+        
+        # ارسال هشدار برای خطاهای حیاتی
+        if level == WorkflowLogLevel.ERROR:
+            try:
+                self._send_error_alert(execution, message, data)
+            except Exception as e:
+                logger.error(f"Failed to send error alert: {e}", exc_info=True)
+    
+    def _send_error_alert(
+        self,
+        execution: WorkflowExecution,
+        message: str,
+        data: Optional[Dict[str, Any]]
+    ):
+        """
+        ارسال هشدار برای خطاهای حیاتی
+        
+        این متد در صورت رخ دادن خطا در workflow:
+        - به admin/owner کسب‌وکار notification می‌فرستد
+        - اگر تنظیمات alert فعال باشد، از کانال‌های مختلف (email, telegram) هم استفاده می‌کند
+        """
+        try:
+            # دریافت Workflow
+            workflow = self.db.get(Workflow, execution.workflow_id)
+            if not workflow:
+                return
+            
+            # بررسی تنظیمات Alert
+            settings = workflow.settings or {}
+            alert_config = settings.get("alerts", {})
+            
+            # اگر alert غیرفعال است، خروج
+            if not alert_config.get("enabled", False):
+                return
+            
+            # دریافت کانال‌های هشدار
+            channels = alert_config.get("channels", ["inapp"])
+            
+            # تنظیم پیام هشدار
+            alert_subject = f"⚠️ خطا در اجرای workflow: {workflow.name}"
+            alert_message = f"""
+خطایی در اجرای workflow رخ داده است:
+
+📋 **Workflow:** {workflow.name}
+🔢 **Execution ID:** {execution.id}
+🔗 **Correlation ID:** {self.correlation_id}
+⚠️ **خطا:** {message}
+
+🕒 **زمان:** {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')}
+
+جزئیات بیشتر در بخش لاگ‌های workflow موجود است.
+"""
+            
+            # ارسال Notification به admin/owner
+            from app.services.notification_service import NotificationService
+            
+            notification_service = NotificationService(self.db)
+            
+            # دریافت owner کسب‌وکار
+            from adapters.db.models.business import Business
+            business = self.db.get(Business, self.business_id)
+            
+            if business and business.owner_id:
+                try:
+                    # ارسال notification داخلی
+                    if "inapp" in channels:
+                        notification_service.send(
+                            user_id=business.owner_id,
+                            event_key="workflow.error",
+                            context={
+                                "subject": alert_subject,
+                                "message": alert_message,
+                                "workflow_id": workflow.id,
+                                "workflow_name": workflow.name,
+                                "execution_id": execution.id,
+                                "correlation_id": self.correlation_id,
+                                "error_type": data.get("error_type") if data else None,
+                                "error_message": data.get("error_message") if data else message
+                            },
+                            preferred_channels=["inapp"]
+                        )
+                        logger.info(f"In-app alert sent for workflow {workflow.id} error")
+                    
+                    # ارسال ایمیل
+                    if "email" in channels:
+                        from app.services.email_service import EmailService
+                        email_service = EmailService(self.db)
+                        
+                        # دریافت ایمیل owner
+                        from adapters.db.models.user import User
+                        owner = self.db.get(User, business.owner_id)
+                        
+                        if owner and owner.email:
+                            try:
+                                email_service.send_email(
+                                    to=owner.email,
+                                    subject=alert_subject,
+                                    body=alert_message,
+                                    html_body=None
+                                )
+                                logger.info(f"Email alert sent to {owner.email} for workflow {workflow.id} error")
+                            except Exception as e:
+                                logger.error(f"Failed to send email alert: {e}")
+                    
+                    # ارسال تلگرام
+                    if "telegram" in channels:
+                        from app.services.providers.telegram_provider import TelegramProvider
+                        from app.services.system_settings_service import get_effective_notifications_settings
+                        from adapters.db.models.user import User
+                        
+                        owner = self.db.get(User, business.owner_id)
+                        
+                        if owner and owner.telegram_chat_id:
+                            try:
+                                notify_cfg = get_effective_notifications_settings(self.db)
+                                telegram = TelegramProvider(
+                                    bot_token=notify_cfg.get("telegram_bot_token"),
+                                    proxy_config=notify_cfg.get("telegram_proxy"),
+                                )
+                                
+                                if telegram.is_configured():
+                                    telegram.send_text(
+                                        chat_id=int(owner.telegram_chat_id),
+                                        text=alert_message,
+                                        parse_mode=None
+                                    )
+                                    logger.info(f"Telegram alert sent for workflow {workflow.id} error")
+                            except Exception as e:
+                                logger.error(f"Failed to send telegram alert: {e}")
+                
+                except Exception as e:
+                    logger.error(f"Error sending notifications: {e}", exc_info=True)
+            
+            # ثبت لاگ در سطح WARNING که alert ارسال شد
+            logger.warning(
+                f"Error alert triggered for workflow {workflow.id}",
+                extra={
+                    "workflow_id": workflow.id,
+                    "execution_id": execution.id,
+                    "correlation_id": self.correlation_id,
+                    "alert_channels": channels,
+                    "event": "alert_sent"
+                }
+            )
+            
+        except Exception as e:
+            logger.error(f"Failed to send error alert: {e}", exc_info=True)
 

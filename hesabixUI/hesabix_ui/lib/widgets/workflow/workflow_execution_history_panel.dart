@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../models/workflow_editor_models.dart';
 import '../../services/workflow_service.dart';
+import 'workflow_analytics_dialog.dart';
+import 'workflow_timeline_dialog.dart';
 
 /// Panel برای نمایش تاریخچه اجرای workflow
 class WorkflowExecutionHistoryPanel extends StatefulWidget {
@@ -132,6 +134,19 @@ class _WorkflowExecutionHistoryPanelState extends State<WorkflowExecutionHistory
                   ),
                 ),
                 const Spacer(),
+                IconButton(
+                  icon: const Icon(Icons.analytics_outlined),
+                  onPressed: () {
+                    showDialog(
+                      context: context,
+                      builder: (context) => WorkflowAnalyticsDialog(
+                        businessId: widget.businessId,
+                        workflowId: widget.workflowId,
+                      ),
+                    );
+                  },
+                  tooltip: 'آمار و تحلیل',
+                ),
                 IconButton(
                   icon: const Icon(Icons.refresh),
                   onPressed: _loadExecutions,
@@ -318,6 +333,23 @@ class _WorkflowExecutionHistoryPanelState extends State<WorkflowExecutionHistory
                 ),
               ),
               const Spacer(),
+              IconButton(
+                icon: const Icon(Icons.timeline, size: 18),
+                onPressed: () {
+                  final executionId = _selectedExecution!['id'] as int?;
+                  if (executionId != null) {
+                    showDialog(
+                      context: context,
+                      builder: (context) => WorkflowTimelineDialog(
+                        businessId: widget.businessId,
+                        workflowId: widget.workflowId,
+                        executionId: executionId,
+                      ),
+                    );
+                  }
+                },
+                tooltip: 'مشاهده Timeline',
+              ),
               IconButton(
                 icon: const Icon(Icons.close, size: 18),
                 onPressed: () {

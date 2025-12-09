@@ -34,6 +34,8 @@ import 'pages/admin/system_monitoring_page.dart';
 import 'pages/admin/service_logs_page.dart';
 import 'pages/admin/announcements_admin_page.dart';
 import 'pages/admin/businesses_list_page.dart';
+import 'pages/admin/support_operators_page.dart';
+import 'pages/admin/notification_moderation_queue_page.dart';
 import 'pages/business/business_shell.dart';
 import 'pages/business/dashboard/business_dashboard_page.dart';
 import 'pages/business/users_permissions_page.dart';
@@ -93,8 +95,16 @@ import 'pages/business/account_review_report_page.dart';
 import 'pages/business/persons_page.dart';
 import 'pages/business/product_attributes_page.dart';
 import 'pages/business/products_page.dart';
+import 'pages/business/projects_page.dart';
 import 'pages/business/warranty_management_page.dart';
 import 'pages/business/warranty_settings_page.dart';
+import 'pages/business/repair_shop/repair_orders_list_page.dart';
+import 'pages/business/repair_shop/repair_order_form_page.dart';
+import 'pages/business/repair_shop/repair_order_detail_page.dart';
+import 'pages/business/repair_shop/repair_technicians_page.dart';
+import 'pages/business/repair_shop/repair_settings_page.dart';
+import 'pages/business/notification_templates_page.dart';
+import 'pages/business/notification_template_form_page.dart';
 import 'pages/public/public_warranty_activation_page.dart';
 import 'pages/public/public_warranty_tracking_page.dart';
 import 'pages/business/price_lists_page.dart';
@@ -1100,6 +1110,35 @@ class _MyAppState extends State<MyApp> {
                   },
                 ),
                 GoRoute(
+                  path: 'support-operators',
+                  name: 'system_settings_support_operators',
+                  builder: (context, state) {
+                    if (_authStore == null) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    final allowed = _authStore!.isSuperAdmin;
+                    if (!allowed) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    return const SupportOperatorsPage();
+                  },
+                ),
+                // Notification Moderation Queue
+                GoRoute(
+                  path: 'notification-moderation',
+                  name: 'notification_moderation_queue',
+                  builder: (context, state) {
+                    if (_authStore == null) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    final allowed = _authStore!.isSuperAdmin;
+                    if (!allowed) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    return const NotificationModerationQueuePage();
+                  },
+                ),
+                GoRoute(
                   path: 'logs',
                   name: 'system_settings_logs',
                   builder: (context, state) {
@@ -1541,7 +1580,8 @@ class _MyAppState extends State<MyApp> {
                 final businessId = int.parse(state.pathParameters['business_id']!);
                 // workflow از extra می‌آید یا null است برای افزودن جدید
                 final workflow = state.extra as Map<String, dynamic>?;
-                return NoTransitionPage(
+                return MaterialPage(
+                  key: state.pageKey,
                   child: WorkflowVisualEditorPage(
                     businessId: businessId,
                     authStore: _authStore!,
@@ -1557,7 +1597,8 @@ class _MyAppState extends State<MyApp> {
                 final businessId = int.parse(state.pathParameters['business_id']!);
                 // workflow از extra می‌آید
                 final workflow = state.extra as Map<String, dynamic>?;
-                return NoTransitionPage(
+                return MaterialPage(
+                  key: state.pageKey,
                   child: WorkflowVisualEditorPage(
                     businessId: businessId,
                     authStore: _authStore!,
@@ -1595,14 +1636,116 @@ class _MyAppState extends State<MyApp> {
               },
             ),
             GoRoute(
+              path: '/business/:business_id/repair-shop',
+              name: 'business_repair_shop',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return NoTransitionPage(
+                  child: RepairOrdersListPage(
+                    businessId: businessId,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/repair-shop/new',
+              name: 'business_repair_shop_new',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return NoTransitionPage(
+                  child: RepairOrderFormPage(
+                    businessId: businessId,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/repair-shop/:order_id',
+              name: 'business_repair_shop_detail',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                final orderId = int.parse(state.pathParameters['order_id']!);
+                return NoTransitionPage(
+                  child: RepairOrderDetailPage(
+                    businessId: businessId,
+                    orderId: orderId,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/repair-shop-technicians',
+              name: 'business_repair_shop_technicians',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return NoTransitionPage(
+                  child: RepairTechniciansPage(
+                    businessId: businessId,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/repair-shop-settings',
+              name: 'business_repair_shop_settings',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return NoTransitionPage(
+                  child: RepairSettingsPage(
+                    businessId: businessId,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/notification-templates',
+              name: 'business_notification_templates',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return NoTransitionPage(
+                  child: NotificationTemplatesPage(
+                    businessId: businessId,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/notification-templates/new',
+              name: 'business_notification_template_new',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return NoTransitionPage(
+                  child: NotificationTemplateFormPage(
+                    businessId: businessId,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/notification-templates/:template_id/edit',
+              name: 'business_notification_template_edit',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                final templateId = int.parse(state.pathParameters['template_id']!);
+                return NoTransitionPage(
+                  child: NotificationTemplateFormPage(
+                    businessId: businessId,
+                    templateId: templateId,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
               path: '/business/:business_id/workflows',
               name: 'business_workflows',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return NoTransitionPage(
+                return MaterialPage(
+                  key: state.pageKey,
                   child: WorkflowsPage(
                     businessId: businessId,
                     authStore: _authStore!,
+                    calendarController: _calendarController!,
                   ),
                 );
               },
@@ -2447,6 +2590,21 @@ class _MyAppState extends State<MyApp> {
                   child: PersonsPage(
                     businessId: businessId,
                     authStore: _authStore!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: '/business/:business_id/projects',
+              name: 'business_projects',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return NoTransitionPage(
+                  child: ProjectsPage(
+                    businessId: businessId,
+                    calendarController: _calendarController!,
+                    authStore: _authStore!,
+                    apiClient: ApiClient(),
                   ),
                 );
               },

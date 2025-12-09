@@ -37,7 +37,19 @@ from adapters.db.models.credit import BusinessCreditSetting
 from adapters.db.models.report_template import ReportTemplate
 from adapters.db.models.document_numbering import BusinessDocumentNumberingSetting
 from adapters.db.models.support.ticket import Ticket
-from adapters.db.models.wallet import WalletAccount, WalletTransaction
+from adapters.db.models.wallet import WalletAccount, WalletTransaction, WalletPayout, WalletSetting
+from adapters.db.models.workflow import Workflow, WorkflowExecution
+from adapters.db.models.marketplace import MarketplacePlugin, MarketplaceOrder, BusinessPlugin
+from adapters.db.models.file_storage import FileStorage
+from adapters.db.models.storage_plan import StoragePlan, BusinessStorageSubscription
+from adapters.db.models.payment_gateway import PaymentGateway, BusinessPaymentGateway
+from adapters.db.models.currency import Currency, BusinessCurrency
+from adapters.db.models.product_instance import ProductInstance
+from adapters.db.models.warranty import WarrantySetting, WarrantyCode, WarrantyActivation
+from adapters.db.models.ai_subscription import UserAISubscription
+from adapters.db.models.api_key import ApiKey
+from adapters.db.models.quick_sales_settings import QuickSalesSetting
+from adapters.db.models.system_setting import SystemSetting
 
 
 # Context برای ذخیره اطلاعات کاربر جاری در session
@@ -114,6 +126,46 @@ MODEL_CATEGORY_MAP = {
 	# Wallet
 	WalletAccount: ("wallet", "wallet_account"),
 	WalletTransaction: ("wallet", "wallet_transaction"),
+	WalletPayout: ("wallet", "wallet_payout"),
+	WalletSetting: ("wallet", "wallet_setting"),
+	
+	# Workflow
+	Workflow: ("workflow", "workflow"),
+	WorkflowExecution: ("workflow", "workflow_execution"),
+	
+	# Marketplace
+	MarketplacePlugin: ("marketplace", "marketplace_plugin"),
+	MarketplaceOrder: ("marketplace", "marketplace_order"),
+	BusinessPlugin: ("marketplace", "business_plugin"),
+	
+	# Storage
+	FileStorage: ("storage", "file_storage"),
+	StoragePlan: ("storage", "storage_plan"),
+	BusinessStorageSubscription: ("storage", "storage_subscription"),
+	
+	# Payment
+	PaymentGateway: ("payment", "payment_gateway"),
+	BusinessPaymentGateway: ("payment", "business_payment_gateway"),
+	
+	# Currency
+	Currency: ("settings", "currency"),
+	BusinessCurrency: ("settings", "business_currency"),
+	
+	# Product Extended
+	ProductInstance: ("product", "product_instance"),
+	
+	# Warranty
+	WarrantySetting: ("warranty", "warranty_setting"),
+	WarrantyCode: ("warranty", "warranty_code"),
+	WarrantyActivation: ("warranty", "warranty_activation"),
+	
+	# AI
+	UserAISubscription: ("ai", "ai_subscription"),
+	
+	# API & System
+	ApiKey: ("user", "api_key"),
+	SystemSetting: ("settings", "system_setting"),
+	QuickSalesSetting: ("settings", "quick_sales_setting"),
 	
 	# User
 	User: ("user", "user"),
@@ -221,6 +273,46 @@ def build_description(instance, action: str) -> str:
 		# Wallet
 		"WalletAccount": "حساب کیف پول",
 		"WalletTransaction": "تراکنش کیف پول",
+		"WalletPayout": "برداشت از کیف پول",
+		"WalletSetting": "تنظیمات کیف پول",
+		
+		# Workflow
+		"Workflow": "گردش کار",
+		"WorkflowExecution": "اجرای گردش کار",
+		
+		# Marketplace
+		"MarketplacePlugin": "پلاگین مارکت‌پلیس",
+		"MarketplaceOrder": "سفارش مارکت‌پلیس",
+		"BusinessPlugin": "پلاگین نصب شده",
+		
+		# Storage
+		"FileStorage": "فایل",
+		"StoragePlan": "پلن ذخیره‌سازی",
+		"BusinessStorageSubscription": "اشتراک ذخیره‌سازی",
+		
+		# Payment
+		"PaymentGateway": "درگاه پرداخت",
+		"BusinessPaymentGateway": "درگاه پرداخت کسب و کار",
+		
+		# Currency
+		"Currency": "ارز",
+		"BusinessCurrency": "ارز کسب و کار",
+		
+		# Product Extended
+		"ProductInstance": "سریال محصول",
+		
+		# Warranty
+		"WarrantySetting": "تنظیمات گارانتی",
+		"WarrantyCode": "کد گارانتی",
+		"WarrantyActivation": "فعال‌سازی گارانتی",
+		
+		# AI
+		"UserAISubscription": "اشتراک هوش مصنوعی",
+		
+		# API & System
+		"ApiKey": "کلید API",
+		"SystemSetting": "تنظیمات سیستم",
+		"QuickSalesSetting": "تنظیمات فروش سریع",
 		
 		# User
 		"User": "کاربر",
@@ -420,13 +512,17 @@ def receive_after_flush(session: Session, flush_context):
 		after_data = extract_key_fields(instance)
 		extra_info = extract_extra_info(request)
 		
+		# تبدیل entity_id به string (برای پشتیبانی از UUID)
+		entity_id = getattr(instance, 'id', None)
+		entity_id_str = str(entity_id) if entity_id is not None else None
+		
 		log = ActivityLog(
 			user_id=instance_user_id,
 			business_id=instance_business_id,
 			category=category,
 			action="create",
 			entity_type=entity_type,
-			entity_id=getattr(instance, 'id', None),
+			entity_id=entity_id_str,
 			description=description,
 			after_data=after_data if after_data else None,
 			extra_info=extra_info if extra_info else None,
@@ -483,13 +579,17 @@ def receive_after_flush(session: Session, flush_context):
 			description = build_description(instance, "update")
 			extra_info = extract_extra_info(request)
 			
+			# تبدیل entity_id به string (برای پشتیبانی از UUID)
+			entity_id = getattr(instance, 'id', None)
+			entity_id_str = str(entity_id) if entity_id is not None else None
+			
 			log = ActivityLog(
 				user_id=instance_user_id,
 				business_id=instance_business_id,
 				category=category,
 				action="update",
 				entity_type=entity_type,
-				entity_id=getattr(instance, 'id', None),
+				entity_id=entity_id_str,
 				description=description,
 				before_data=before_data if before_data else None,
 				after_data=after_data if after_data else None,
@@ -519,13 +619,17 @@ def receive_after_flush(session: Session, flush_context):
 		before_data = extract_key_fields(instance)
 		extra_info = extract_extra_info(request)
 		
+		# تبدیل entity_id به string (برای پشتیبانی از UUID)
+		entity_id = getattr(instance, 'id', None)
+		entity_id_str = str(entity_id) if entity_id is not None else None
+		
 		log = ActivityLog(
 			user_id=instance_user_id,
 			business_id=instance_business_id,
 			category=category,
 			action="delete",
 			entity_type=entity_type,
-			entity_id=getattr(instance, 'id', None),
+			entity_id=entity_id_str,
 			description=description,
 			before_data=before_data if before_data else None,
 			extra_info=extra_info if extra_info else None,

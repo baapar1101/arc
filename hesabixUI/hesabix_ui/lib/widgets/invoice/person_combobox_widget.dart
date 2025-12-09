@@ -248,6 +248,9 @@ class _PersonComboboxWidgetState extends State<PersonComboboxWidget> {
   }
 
   Future<void> _addNewPerson(BuildContext bottomSheetContext) async {
+    // ذخیره متن جستجو شده
+    final searchQuery = _searchController.text.trim();
+    
     // بستن bottom sheet قبل از باز کردن dialog
     Navigator.pop(bottomSheetContext);
 
@@ -256,6 +259,7 @@ class _PersonComboboxWidgetState extends State<PersonComboboxWidget> {
       builder: (context) => PersonFormDialog(
         businessId: widget.businessId,
         onSuccess: () {},
+        initialAliasName: searchQuery.isNotEmpty ? searchQuery : null,
       ),
     );
     

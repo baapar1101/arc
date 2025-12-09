@@ -31,7 +31,7 @@ from app.services.providers.telegram_provider import TelegramProvider
 logger = structlog.get_logger()
 
 
-router = APIRouter(prefix="/admin/system-settings", tags=["admin-system-settings"])
+router = APIRouter(prefix="/admin/system-settings", tags=["مدیریت سیستم"])
 
 
 @router.get(

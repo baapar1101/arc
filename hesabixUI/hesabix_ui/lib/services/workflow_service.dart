@@ -53,6 +53,15 @@ class WorkflowService {
     return _asMap(res.data?['data']);
   }
 
+  Future<void> deleteWorkflow({
+    required int businessId,
+    required int workflowId,
+  }) async {
+    await _apiClient.delete<Map<String, dynamic>>(
+      '/businesses/$businessId/workflows/$workflowId',
+    );
+  }
+
   Future<Map<String, dynamic>> executeWorkflow({
     required int businessId,
     required int workflowId,
@@ -151,6 +160,65 @@ class WorkflowService {
             .toList() ??
         const <Map<String, dynamic>>[];
     return users;
+  }
+
+  Future<List<Map<String, dynamic>>> getBusinessCurrencies({
+    required int businessId,
+  }) async {
+    final res = await _apiClient.get<Map<String, dynamic>>(
+      '/api/v1/currencies/business/$businessId',
+    );
+    final data = res.data?['data'];
+    if (data is List) {
+      return data
+          .map<Map<String, dynamic>>((c) => Map<String, dynamic>.from(c as Map))
+          .toList();
+    }
+    return const <Map<String, dynamic>>[];
+  }
+
+  /// Analytics: دریافت آمار خطاهای workflow
+  Future<Map<String, dynamic>> getWorkflowErrorsAnalytics({
+    required int businessId,
+    int? workflowId,
+    int days = 7,
+  }) async {
+    final res = await _apiClient.get<Map<String, dynamic>>(
+      '/businesses/$businessId/workflows/analytics/errors',
+      query: {
+        'days': days,
+        if (workflowId != null) 'workflow_id': workflowId,
+      },
+    );
+    return _asMap(res.data?['data']);
+  }
+
+  /// Analytics: دریافت آمار عملکرد workflows
+  Future<Map<String, dynamic>> getWorkflowPerformanceAnalytics({
+    required int businessId,
+    int? workflowId,
+    int days = 30,
+  }) async {
+    final res = await _apiClient.get<Map<String, dynamic>>(
+      '/businesses/$businessId/workflows/analytics/performance',
+      query: {
+        'days': days,
+        if (workflowId != null) 'workflow_id': workflowId,
+      },
+    );
+    return _asMap(res.data?['data']);
+  }
+
+  /// دریافت Timeline اجرای workflow
+  Future<Map<String, dynamic>> getExecutionTimeline({
+    required int businessId,
+    required int workflowId,
+    required int executionId,
+  }) async {
+    final res = await _apiClient.get<Map<String, dynamic>>(
+      '/businesses/$businessId/workflows/$workflowId/executions/$executionId/timeline',
+    );
+    return _asMap(res.data?['data']);
   }
 
   Map<String, dynamic> _asMap(dynamic value) {

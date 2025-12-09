@@ -28,8 +28,8 @@ class ActivityLog(Base):
 	entity_type: Mapped[str | None] = mapped_column(String(50), nullable=True, index=True)
 	# مقادیر: "invoice", "document", "warehouse_document", "product", "person", "account", "business", "user", "fiscal_year", etc.
 	
-	entity_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
-	# شناسه موجودیت مرتبط (مثلاً invoice_id، product_id، person_id)
+	entity_id: Mapped[str | int | None] = mapped_column(String(36), nullable=True, index=True)
+	# شناسه موجودیت مرتبط (مثلاً invoice_id، product_id، person_id، file_storage_id که UUID است)
 	
 	# اطلاعات تغییرات
 	description: Mapped[str] = mapped_column(Text, nullable=False)

@@ -116,13 +116,95 @@ def update_bank_account(db: Session, account_id: int, data: Dict[str, Any]) -> O
 	return bank_account_to_dict(obj)
 
 
-def delete_bank_account(db: Session, account_id: int) -> bool:
+def check_bank_account_has_accounting_documents(db: Session, account_id: int) -> tuple[bool, list[str]]:
+	"""
+	بررسی وجود اسناد حسابداری مرتبط با حساب بانکی
+	
+	Returns:
+		tuple: (has_documents, document_types)
+		- has_documents: True اگر سند مرتبطی وجود داشته باشد
+		- document_types: لیست انواع اسناد مرتبط
+	"""
+	from sqlalchemy import func
+	from adapters.db.models.document import Document
+	from adapters.db.models.document_line import DocumentLine
+	
+	# بررسی وجود خطوط سند با bank_account_id در اسناد قطعی (غیر پیش‌نویس)
+	document_lines_count = db.query(func.count(DocumentLine.id)).join(
+		Document, DocumentLine.document_id == Document.id
+	).filter(
+		DocumentLine.bank_account_id == account_id,
+		Document.is_proforma == False
+	).scalar()
+	
+	if document_lines_count and document_lines_count > 0:
+		# دریافت انواع اسناد مرتبط
+		document_types = db.query(Document.document_type).join(
+			DocumentLine, Document.id == DocumentLine.document_id
+		).filter(
+			DocumentLine.bank_account_id == account_id,
+			Document.is_proforma == False
+		).distinct().all()
+		
+		types_list = [doc_type[0] for doc_type in document_types if doc_type[0]]
+		
+		# تبدیل انواع اسناد به نام‌های فارسی
+		type_names = []
+		type_mapping = {
+			"invoice_sales": "فاکتور فروش",
+			"invoice_sales_return": "برگشت از فروش",
+			"invoice_purchase": "فاکتور خرید",
+			"invoice_purchase_return": "برگشت از خرید",
+			"invoice_direct_consumption": "مصرف مستقیم",
+			"invoice_production": "تولید",
+			"invoice_waste": "ضایعات",
+			"receipt": "دریافت",
+			"payment": "پرداخت",
+			"expense": "هزینه",
+			"income": "درآمد",
+			"transfer": "انتقال",
+			"manual": "سند دستی",
+			"check": "چک",
+		}
+		
+		for doc_type in types_list:
+			type_name = type_mapping.get(doc_type, doc_type)
+			if type_name not in type_names:
+				type_names.append(type_name)
+		
+		return True, type_names
+	
+	return False, []
+
+
+def delete_bank_account(db: Session, account_id: int) -> tuple[bool, str | None]:
+	"""
+	حذف حساب بانکی
+	
+	Returns:
+		tuple: (success, error_message)
+		- success: True اگر حذف موفق باشد
+		- error_message: پیام خطا در صورت عدم موفقیت
+	"""
 	obj = db.query(BankAccount).filter(BankAccount.id == account_id).first()
 	if obj is None:
-		return False
-	db.delete(obj)
-	db.commit()
-	return True
+		return False, "حساب بانکی یافت نشد"
+	
+	# بررسی وجود اسناد حسابداری مرتبط
+	has_documents, document_types = check_bank_account_has_accounting_documents(db, account_id)
+	
+	if has_documents:
+		types_str = "، ".join(document_types)
+		error_msg = f"امکان حذف این حساب بانکی وجود ندارد زیرا دارای اسناد حسابداری مرتبط است. انواع اسناد: {types_str}"
+		return False, error_msg
+	
+	try:
+		db.delete(obj)
+		db.commit()
+		return True, None
+	except Exception as e:
+		db.rollback()
+		return False, f"خطا در حذف حساب بانکی: {str(e)}"
 
 
 def list_bank_accounts(
@@ -203,7 +285,7 @@ def bulk_delete_bank_accounts(db: Session, business_id: int, account_ids: List[i
 	حذف گروهی حساب‌های بانکی
 	"""
 	if not account_ids:
-		return {"deleted": 0, "skipped": 0}
+		return {"deleted": 0, "skipped": 0, "errors": []}
 	
 	# بررسی وجود حساب‌ها و دسترسی به کسب‌وکار
 	accounts = db.query(BankAccount).filter(
@@ -213,25 +295,28 @@ def bulk_delete_bank_accounts(db: Session, business_id: int, account_ids: List[i
 	
 	deleted_count = 0
 	skipped_count = 0
+	errors = []
 	
 	for account in accounts:
 		try:
-			db.delete(account)
-			deleted_count += 1
-		except Exception:
+			success, error_message = delete_bank_account(db, account.id)
+			if success:
+				deleted_count += 1
+			else:
+				skipped_count += 1
+				if error_message:
+					errors.append(f"حساب بانکی {account.name or account.code or account.id}: {error_message}")
+				else:
+					errors.append(f"حساب بانکی {account.name or account.code or account.id}: امکان حذف وجود ندارد")
+		except Exception as e:
 			skipped_count += 1
-	
-	# commit تغییرات
-	try:
-		db.commit()
-	except Exception:
-		db.rollback()
-		raise ApiError("BULK_DELETE_FAILED", "Bulk delete failed for bank accounts", http_status=500)
+			errors.append(f"خطا در حذف حساب بانکی {account.name or account.code or account.id}: {str(e)}")
 	
 	return {
 		"deleted": deleted_count,
 		"skipped": skipped_count,
-		"total_requested": len(account_ids)
+		"total_requested": len(account_ids),
+		"errors": errors
 	}
 
 

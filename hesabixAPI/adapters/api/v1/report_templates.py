@@ -9,7 +9,7 @@ from app.core.permissions import require_business_access
 from app.core.responses import ApiError, success_response
 from app.services.report_template_service import ReportTemplateService
 
-router = APIRouter(prefix="/report-templates", tags=["report-templates"])
+router = APIRouter(prefix="/report-templates", tags=["قالب‌های گزارش", "گزارش‌ها"])
 
 
 @router.get(

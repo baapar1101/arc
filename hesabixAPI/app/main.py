@@ -1,5 +1,8 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import HTMLResponse
+from fastapi.openapi.docs import get_swagger_ui_html
 
 from app.core.settings import get_settings
 from app.core.logging import configure_logging
@@ -48,6 +51,7 @@ from adapters.api.v1.admin.businesses_admin import router as admin_businesses_ro
 from adapters.api.v1.admin.document_monetization import router as admin_document_monetization_router
 from adapters.api.v1.admin.zohal import router as admin_zohal_router
 from adapters.api.v1.admin.marketplace import router as admin_marketplace_router
+from adapters.api.v1.admin.users_permissions import router as admin_users_permissions_router
 from adapters.api.v1.announcements import router as announcements_router
 from adapters.api.v1.admin.announcements import router as admin_announcements_router
 from adapters.api.v1.receipts_payments import router as receipts_payments_router
@@ -65,10 +69,13 @@ from adapters.api.v1.credit import router as credit_router
 from adapters.api.v1.document_numbering import router as document_numbering_router
 from adapters.api.v1.marketplace import router as marketplace_router
 from adapters.api.v1.warranty import router as warranty_router
+from adapters.api.v1.repair_shop import router as repair_shop_router
+from adapters.api.v1.business_notifications import router as business_notifications_router
 from adapters.api.v1.ping_pong import router as ping_pong_router
 from adapters.api.v1.integrations.telegram import router as telegram_integration_router
 from adapters.api.v1.notifications import router as notifications_router
 from adapters.api.v1.admin.notification_templates import router as admin_notification_templates_router
+from adapters.api.v1.admin.notification_moderation import router as admin_notification_moderation_router
 from adapters.api.v1.notifications_ws import router as notifications_ws_router
 from adapters.api.v1.public_share_links import router as public_share_links_router
 from adapters.api.v1.business_backups import router as business_backups_router
@@ -102,21 +109,300 @@ def create_app() -> FastAPI:
     app_version = settings.app_version
     try:
         # تلاش برای خواندن از DB (در startup event به‌روزرسانی می‌شود)
-        db_gen = get_db()
-        db = next(db_gen)
-        try:
+        # استفاده از context manager برای اطمینان از بسته شدن session
+        from adapters.db.session import get_db_session
+        with get_db_session() as db:
             app_name = get_app_name(db)
             app_version = get_app_version(db)
-        finally:
-            db.close()
     except Exception:
         # در صورت خطا از env استفاده می‌شود
         pass
+
+    # تعریف tags برای دسته‌بندی بهتر endpoint ها در Swagger
+    tags_metadata = [
+        {
+            "name": "احراز هویت",
+            "description": """
+عملیات مربوط به ثبت‌نام، ورود، خروج و مدیریت کلیدهای API
+
+### امکانات:
+- ثبت‌نام کاربر جدید با تایید ایمیل
+- ورود با ایمیل/موبایل و رمز عبور
+- مدیریت کلیدهای API شخصی و session
+- فراموشی و بازیابی رمز عبور
+- تغییر رمز عبور و اطلاعات کاربری
+- سیستم کپچا برای امنیت
+            """,
+            "externalDocs": {
+                "description": "راهنمای کامل احراز هویت",
+                "url": "https://docs.hesabix.ir/authentication"
+            }
+        },
+        {
+            "name": "کاربران",
+            "description": "مدیریت کاربران، پروفایل‌ها و دسترسی‌ها",
+            "externalDocs": {
+                "description": "مستندات مدیریت کاربران",
+                "url": "https://docs.hesabix.ir/users"
+            }
+        },
+        {
+            "name": "کسب‌وکارها",
+            "description": """
+مدیریت کسب‌وکارها، تنظیمات و داشبورد
+
+### قابلیت‌ها:
+- ایجاد و مدیریت چندین کسب‌وکار
+- تنظیمات شخصی‌سازی شده
+- داشبورد آماری و تحلیلی
+- مدیریت کاربران و نقش‌ها
+            """,
+            "externalDocs": {
+                "description": "راهنمای کسب‌وکارها",
+                "url": "https://docs.hesabix.ir/businesses"
+            }
+        },
+        {
+            "name": "محصولات و کالاها",
+            "description": """
+مدیریت محصولات، خدمات، دسته‌بندی‌ها و ویژگی‌ها
+
+### امکانات:
+- ثبت کالا و خدمات
+- دسته‌بندی و ویژگی‌های محصول
+- لیست قیمت‌گذاری
+- موجودی و کنترل انبار
+- بارکد و QR Code
+            """,
+            "externalDocs": {
+                "description": "مستندات محصولات",
+                "url": "https://docs.hesabix.ir/products"
+            }
+        },
+        {
+            "name": "انبارداری",
+            "description": "مدیریت انبارها، موجودی، حواله‌ها و کاردکس",
+            "externalDocs": {
+                "description": "راهنمای انبارداری",
+                "url": "https://docs.hesabix.ir/warehouse"
+            }
+        },
+        {
+            "name": "اسناد فروش",
+            "description": """
+فاکتورهای فروش، پیش‌فاکتور و اسناد مرتبط
+
+### انواع اسناد:
+- فاکتور فروش
+- پیش‌فاکتور
+- برگشت از فروش
+- فروش سریع
+            """,
+            "externalDocs": {
+                "description": "راهنمای فروش",
+                "url": "https://docs.hesabix.ir/sales"
+            }
+        },
+        {
+            "name": "اسناد خرید",
+            "description": "فاکتورهای خرید، سفارش خرید و اسناد مرتبط",
+        },
+        {
+            "name": "اسناد انتقال",
+            "description": """
+اسناد انتقال وجه بین حساب‌های بانکی، صندوق و تنخواه
+
+### کاربردها:
+- انتقال بین حساب‌های بانکی
+- انتقال به/از صندوق
+- انتقال به/از تنخواه
+- ثبت کارمزد انتقال
+            """,
+            "externalDocs": {
+                "description": "راهنمای اسناد انتقال",
+                "url": "https://docs.hesabix.ir/transfers"
+            }
+        },
+        {
+            "name": "دریافت و پرداخت",
+            "description": """
+اسناد دریافت و پرداخت نقدی، چک و سایر روش‌ها
+
+### روش‌های پرداخت:
+- نقدی
+- چک
+- کارت بانکی
+- انتقال آنلاین
+            """,
+        },
+        {
+            "name": "مدیریت مالی",
+            "description": "حساب‌های بانکی، صندوق، تنخواه، چک و سایر ابزارهای مالی",
+        },
+        {
+            "name": "اشخاص و مشتریان",
+            "description": "مدیریت اشخاص، مشتریان، تامین‌کنندگان و طرف‌حساب‌ها",
+            "externalDocs": {
+                "description": "راهنمای مدیریت اشخاص",
+                "url": "https://docs.hesabix.ir/persons"
+            }
+        },
+        {
+            "name": "حسابداری",
+            "description": """
+دفتر کل، اسناد حسابداری، حساب‌ها و طبقات
+
+### قابلیت‌ها:
+- دفتر کل
+- اسناد حسابداری
+- طرح حساب‌ها
+- تراز و میزان
+            """,
+            "externalDocs": {
+                "description": "راهنمای حسابداری",
+                "url": "https://docs.hesabix.ir/accounting"
+            }
+        },
+        {
+            "name": "گزارش‌ها",
+            "description": """
+گزارش‌های مالی، انبارداری، فروش و تحلیلی
+
+### انواع گزارش:
+- گزارش‌های مالی
+- گزارش فروش و خرید
+- گزارش موجودی و کاردکس
+- گزارش‌های تحلیلی
+- خروجی Excel و PDF
+            """,
+            "externalDocs": {
+                "description": "راهنمای گزارش‌ها",
+                "url": "https://docs.hesabix.ir/reports"
+            }
+        },
+        {
+            "name": "مالیات",
+            "description": """
+تنظیمات مالیاتی، نرخ‌ها، کدها و یکپارچه‌سازی با سامانه مودیان
+
+### امکانات:
+- تنظیمات مالیات بر ارزش افزوده
+- یکپارچه‌سازی با سامانه مودیان
+- کدهای مالیاتی محصولات
+- گزارش‌های مالیاتی
+            """,
+            "externalDocs": {
+                "description": "راهنمای مالیات و مودیان",
+                "url": "https://docs.hesabix.ir/tax"
+            }
+        },
+        {
+            "name": "سال مالی",
+            "description": "مدیریت سال‌های مالی و دوره‌های حسابداری",
+        },
+        {
+            "name": "کیف پول",
+            "description": "مدیریت کیف پول، شارژ، برداشت و تراکنش‌ها",
+        },
+        {
+            "name": "اعتبار",
+            "description": "مدیریت اعتبار و بسته‌های خریداری شده",
+        },
+        {
+            "name": "قالب‌های گزارش",
+            "description": """
+مدیریت قالب‌های سفارشی برای گزارش‌ها و چاپ
+
+### امکانات:
+- طراحی قالب سفارشی
+- قالب فاکتور
+- قالب گزارش‌ها
+- لوگو و مهر
+            """,
+        },
+        {
+            "name": "پشتیبانی",
+            "description": "سیستم تیکت‌ها، درخواست‌ها و ارتباط با پشتیبانی",
+        },
+        {
+            "name": "اطلاع‌رسانی",
+            "description": "مدیریت نوتیفیکیشن‌ها، اعلان‌ها و پیام‌ها",
+        },
+        {
+            "name": "پشتیبان‌گیری",
+            "description": """
+ایجاد، بازیابی و مدیریت نسخه‌های پشتیبان
+
+### امکانات:
+- پشتیبان‌گیری اتوماتیک
+- پشتیبان‌گیری دستی
+- بازیابی داده‌ها
+- مدیریت فضای ذخیره‌سازی
+            """,
+        },
+        {
+            "name": "فایل و ذخیره‌سازی",
+            "description": "مدیریت فایل‌ها، آپلود، دانلود و فضای ذخیره‌سازی",
+        },
+        {
+            "name": "یکپارچه‌سازی",
+            "description": """
+اتصال به سرویس‌های خارجی (تلگرام، زوهال، مارکت‌پلیس)
+
+### سرویس‌ها:
+- یکپارچه‌سازی با تلگرام
+- اتصال به سامانه زوهال
+- اتصال به مارکت‌پلیس‌ها
+            """,
+        },
+        {
+            "name": "مدیریت سیستم",
+            "description": """
+تنظیمات سیستم، مانیتورینگ، لاگ‌ها و مدیریت کلی (فقط ادمین)
+
+⚠️ این بخش فقط برای مدیران سیستم قابل دسترسی است
+            """,
+            "externalDocs": {
+                "description": "راهنمای مدیریت سیستم",
+                "url": "https://docs.hesabix.ir/admin"
+            }
+        },
+        {
+            "name": "هوش مصنوعی",
+            "description": """
+چت با هوش مصنوعی، تحلیل داده‌ها و پیشنهادات هوشمند
+
+### امکانات:
+- چت با دستیار هوشمند
+- تحلیل داده‌های مالی
+- پیشنهادات بهینه‌سازی
+- گزارش‌های هوشمند
+            """,
+            "externalDocs": {
+                "description": "راهنمای هوش مصنوعی",
+                "url": "https://docs.hesabix.ir/ai"
+            }
+        },
+    ]
 
     application = FastAPI(
         title=app_name,
         version=app_version,
         debug=settings.debug,
+        openapi_tags=tags_metadata,
+        docs_url=None,  # غیرفعال کردن docs پیش‌فرض برای سفارسی‌سازی
+        redoc_url="/redoc",
+        swagger_ui_parameters={
+            "defaultModelsExpandDepth": -1,  # بسته بودن Models به صورت پیش‌فرض
+            "docExpansion": "list",           # نمایش لیستی endpoints
+            "filter": True,                   # فعال‌سازی جستجو
+            "persistAuthorization": True,     # ذخیره توکن احراز هویت
+            "displayRequestDuration": True,   # نمایش زمان پاسخ
+            "tryItOutEnabled": True,          # فعال بودن Try it out
+            "syntaxHighlight.theme": "monokai",  # تم Syntax Highlighting
+            "deepLinking": True,              # Deep linking برای مستقیم رفتن به endpoint
+            "displayOperationId": False,      # عدم نمایش Operation ID
+        },
         description="""
         # Hesabix API
 
@@ -317,6 +603,160 @@ def create_app() -> FastAPI:
         ],
     )
 
+    # Mount کردن فایل‌های استاتیک برای Swagger UI سفارشی
+    try:
+        application.mount("/assets", StaticFiles(directory="assets"), name="assets")
+    except Exception:
+        # در صورت نبود دایرکتوری assets، خطا را نادیده بگیر
+        pass
+
+    # Swagger UI سفارشی با استایل‌های فارسی و RTL
+    @application.get("/docs", include_in_schema=False)
+    async def custom_swagger_ui_html():
+        """صفحه سفارشی Swagger UI با پشتیبانی کامل از فارسی و RTL"""
+        return get_swagger_ui_html(
+            openapi_url=application.openapi_url,
+            title=f"{app_name} - مستندات API",
+            oauth2_redirect_url=application.swagger_ui_oauth2_redirect_url,
+            swagger_js_url="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js",
+            swagger_css_url="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css",
+            swagger_favicon_url="/assets/logo-blue.png",
+            # لود CSS های سفارشی برای ظاهر حرفه‌ای و RTL
+            custom_js_url=None,
+            custom_css_url=None,  # از init_oauth استفاده می‌کنیم
+        )
+
+    # اضافه کردن CSS های سفارشی به صورت دستی
+    @application.get("/docs-custom", include_in_schema=False, response_class=HTMLResponse)
+    async def swagger_ui_custom():
+        """صفحه Swagger UI با استایل‌های سفارشی حسابیکس"""
+        return f"""
+        <!DOCTYPE html>
+        <html lang="fa" dir="rtl">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>{app_name} - مستندات API</title>
+            <link rel="icon" type="image/png" href="/assets/logo-blue.png">
+            <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css">
+            <link rel="stylesheet" type="text/css" href="/assets/swagger/custom.css">
+            <link rel="stylesheet" type="text/css" href="/assets/swagger/swagger-rtl.css">
+            <link rel="stylesheet" type="text/css" href="/assets/swagger/dark-mode.css">
+            <style>
+                html {{
+                    box-sizing: border-box;
+                    overflow: -moz-scrollbars-vertical;
+                    overflow-y: scroll;
+                }}
+                *, *:before, *:after {{
+                    box-sizing: inherit;
+                }}
+                body {{
+                    margin:0;
+                    padding:0;
+                    background: #fafafa;
+                }}
+            </style>
+        </head>
+        <body>
+            <div id="swagger-ui"></div>
+            
+            <!-- دکمه Toggle برای Dark Mode -->
+            <button id="dark-mode-toggle" class="dark-mode-toggle" title="تغییر حالت تیره/روشن" aria-label="تغییر حالت تیره/روشن">
+                <span id="dark-mode-icon">🌙</span>
+            </button>
+            <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+            <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-standalone-preset.js"></script>
+            <script>
+                window.onload = function() {{
+                    const ui = SwaggerUIBundle({{
+                        url: "{application.openapi_url}",
+                        dom_id: '#swagger-ui',
+                        deepLinking: true,
+                        presets: [
+                            SwaggerUIBundle.presets.apis,
+                            SwaggerUIStandalonePreset
+                        ],
+                        plugins: [
+                            SwaggerUIBundle.plugins.DownloadUrl
+                        ],
+                        layout: "StandaloneLayout",
+                        // پارامترهای سفارشی
+                        defaultModelsExpandDepth: -1,
+                        docExpansion: "list",
+                        filter: true,
+                        persistAuthorization: true,
+                        displayRequestDuration: true,
+                        tryItOutEnabled: true,
+                        syntaxHighlight: {{
+                            activate: true,
+                            theme: "monokai"
+                        }},
+                        displayOperationId: false,
+                        // تنظیمات OAuth (در صورت نیاز)
+                        oauth2RedirectUrl: window.location.origin + "/docs/oauth2-redirect",
+                        // پیکربندی‌های اضافی
+                        requestInterceptor: function(req) {{
+                            // می‌توانید request ها را اینجا تغییر دهید
+                            return req;
+                        }},
+                        responseInterceptor: function(res) {{
+                            // می‌توانید response ها را اینجا تغییر دهید
+                            return res;
+                        }}
+                    }});
+                    window.ui = ui;
+                    
+                    // Dark Mode Toggle
+                    const darkModeToggle = document.getElementById('dark-mode-toggle');
+                    const darkModeIcon = document.getElementById('dark-mode-icon');
+                    const swaggerContainer = document.getElementById('swagger-ui');
+                    
+                    // بررسی تنظیمات ذخیره شده
+                    const savedTheme = localStorage.getItem('swagger-theme');
+                    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                    
+                    // تنظیم theme اولیه
+                    if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {{
+                        document.body.classList.add('dark-mode');
+                        swaggerContainer.classList.add('dark-mode');
+                        darkModeIcon.textContent = '☀️';
+                    }}
+                    
+                    // Toggle Dark Mode
+                    darkModeToggle.addEventListener('click', function() {{
+                        document.body.classList.toggle('dark-mode');
+                        swaggerContainer.classList.toggle('dark-mode');
+                        
+                        if (document.body.classList.contains('dark-mode')) {{
+                            darkModeIcon.textContent = '☀️';
+                            localStorage.setItem('swagger-theme', 'dark');
+                        }} else {{
+                            darkModeIcon.textContent = '🌙';
+                            localStorage.setItem('swagger-theme', 'light');
+                        }}
+                    }});
+                    
+                    // شناسایی تغییر تنظیمات سیستم
+                    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(e) {{
+                        if (!localStorage.getItem('swagger-theme')) {{
+                            if (e.matches) {{
+                                document.body.classList.add('dark-mode');
+                                swaggerContainer.classList.add('dark-mode');
+                                darkModeIcon.textContent = '☀️';
+                            }} else {{
+                                document.body.classList.remove('dark-mode');
+                                swaggerContainer.classList.remove('dark-mode');
+                                darkModeIcon.textContent = '🌙';
+                            }}
+                        }}
+                    }});
+                }};
+            </script>
+        </body>
+        </html>
+        """
+
     # Response Cache Middleware (بعد از CORS و قبل از authentication)
     from app.core.response_cache import ResponseCacheMiddleware
     application.add_middleware(ResponseCacheMiddleware)
@@ -437,12 +877,14 @@ def create_app() -> FastAPI:
             maintenance_enabled = cached_value
         else:
             # اگر در cache نبود، از دیتابیس بخوان
-            db_gen = get_db()
-            db = next(db_gen)
+            # استفاده از context manager برای اطمینان از بسته شدن session
+            from adapters.db.session import get_db_session
             try:
-                maintenance_enabled = is_maintenance_mode_enabled(db)
-            finally:
-                db.close()
+                with get_db_session() as db:
+                    maintenance_enabled = is_maintenance_mode_enabled(db)
+            except Exception:
+                # در صورت خطا، از cache یا مقدار پیش‌فرض استفاده کن
+                maintenance_enabled = False
         
         if maintenance_enabled:
             # اجازه دسترسی به admin endpoints برای مدیریت maintenance mode
@@ -481,14 +923,13 @@ def create_app() -> FastAPI:
                 lang = cached_value
             else:
                 # اگر در cache نبود، از دیتابیس بخوان
-                db_gen = get_db()
-                db = next(db_gen)
+                # استفاده از context manager برای اطمینان از بسته شدن session
+                from adapters.db.session import get_db_session
                 try:
-                    lang = get_default_language(db)
+                    with get_db_session() as db:
+                        lang = get_default_language(db)
                 except Exception:
                     pass
-                finally:
-                    db.close()
         
         request.state.locale = lang
         request.state.translator = Translator(lang)
@@ -525,6 +966,8 @@ def create_app() -> FastAPI:
     application.include_router(invoices_router, prefix=settings.api_v1_prefix)
     application.include_router(persons_router, prefix=settings.api_v1_prefix)
     application.include_router(customers_router, prefix=settings.api_v1_prefix)
+    from adapters.api.v1.projects import router as projects_router
+    application.include_router(projects_router, prefix=settings.api_v1_prefix)
     application.include_router(bank_accounts_router, prefix=settings.api_v1_prefix)
     from adapters.api.v1.checks import router as checks_router
     application.include_router(checks_router, prefix=settings.api_v1_prefix)
@@ -553,6 +996,9 @@ def create_app() -> FastAPI:
     application.include_router(document_numbering_router, prefix=settings.api_v1_prefix)
     application.include_router(marketplace_router, prefix=settings.api_v1_prefix)
     application.include_router(warranty_router, prefix=settings.api_v1_prefix)
+    application.include_router(repair_shop_router, prefix=settings.api_v1_prefix)
+    # Business Notifications
+    application.include_router(business_notifications_router, prefix=settings.api_v1_prefix)
     # Ping Pong Game
     application.include_router(ping_pong_router, prefix=settings.api_v1_prefix)
     # Integrations
@@ -598,10 +1044,12 @@ def create_app() -> FastAPI:
     application.include_router(admin_wallet_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_storage_plans_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_businesses_router, prefix=settings.api_v1_prefix)
+    application.include_router(admin_users_permissions_router, prefix=settings.api_v1_prefix)
     from adapters.api.v1.admin.payment_gateways import router as admin_payment_gateways_router
     application.include_router(admin_payment_gateways_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_announcements_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_notification_templates_router, prefix=settings.api_v1_prefix)
+    application.include_router(admin_notification_moderation_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_document_monetization_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_zohal_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_marketplace_router, prefix=settings.api_v1_prefix)
@@ -649,10 +1097,13 @@ def create_app() -> FastAPI:
         asyncio.create_task(ai_chat_cleanup_loop(24))
         # AI subscription check: هر 6 ساعت یکبار
         asyncio.create_task(ai_subscription_check_loop(6))
-        # Monitoring metrics collection: هر 10 ثانیه
-        asyncio.create_task(monitoring_metrics_collection_loop(10))
-        # Service status check: هر 30 ثانیه
-        asyncio.create_task(monitoring_service_status_check_loop(30))
+        # Notification moderation: هر 60 ثانیه یکبار
+        from app.workers.notification_moderation_worker import run_worker_loop
+        asyncio.create_task(run_worker_loop(60))
+        # Monitoring metrics collection: هر 60 ثانیه (افزایش برای کاهش فشار روی connection pool)
+        asyncio.create_task(monitoring_metrics_collection_loop(60))
+        # Service status check: هر 120 ثانیه (افزایش برای کاهش فشار روی connection pool)
+        asyncio.create_task(monitoring_service_status_check_loop(120))
         # Business deletion check: هر 24 ساعت یکبار (فقط لاگ - حذف نمی‌کند)
         asyncio.create_task(check_expired_deleted_businesses_loop(24))
 
@@ -759,14 +1210,12 @@ def create_app() -> FastAPI:
     )
     def read_root() -> dict[str, str]:
         # خواندن از DB در هر درخواست برای به‌روز بودن
-        db_gen = get_db()
-        db = next(db_gen)
-        try:
+        # استفاده از context manager برای اطمینان از بسته شدن session
+        from adapters.db.session import get_db_session
+        with get_db_session() as db:
             current_app_name = get_app_name(db)
             current_app_version = get_app_version(db)
             return {"service": current_app_name, "version": current_app_version}
-        finally:
-            db.close()
     
     # اضافه کردن security schemes
     from fastapi.openapi.utils import get_openapi
@@ -782,15 +1231,85 @@ def create_app() -> FastAPI:
             routes=application.routes,
         )
         
-        # اضافه کردن security schemes
+        # اضافه کردن security schemes با مستندات کامل
         openapi_schema["components"]["securitySchemes"] = {
             "ApiKeyAuth": {
                 "type": "apiKey",
                 "in": "header",
                 "name": "Authorization",
-                "description": "کلید API برای احراز هویت. فرمت: ApiKey sk_your_api_key_here"
+                "description": """
+## 🔐 احراز هویت با کلید API
+
+کلید API برای دسترسی به تمام endpoint های محافظت شده استفاده می‌شود.
+
+### فرمت Header:
+```
+Authorization: Bearer sk_your_api_key_here
+```
+
+### انواع کلید API:
+
+#### 1️⃣ Session Keys (کلیدهای موقت)
+- با ورود یا ثبت‌نام ایجاد می‌شوند
+- معمولاً 30 روز اعتبار دارند
+- به صورت خودکار با خروج باطل می‌شوند
+- فرمت: `sk_session_...`
+
+#### 2️⃣ Personal Keys (کلیدهای دائمی)
+- توسط کاربر ایجاد می‌شوند
+- بدون تاریخ انقضا (تا زمان حذف توسط کاربر)
+- می‌توان محدودیت IP تعریف کرد
+- فرمت: `sk_personal_...`
+
+### نحوه دریافت کلید:
+
+**روش 1: ثبت‌نام**
+```bash
+POST /api/v1/auth/register
+```
+
+**روش 2: ورود**
+```bash
+POST /api/v1/auth/login
+```
+
+**روش 3: ایجاد کلید شخصی**
+```bash
+POST /api/v1/auth/api-keys
+```
+
+### مثال استفاده:
+```bash
+curl -X GET "https://agent.hesabix.ir/api/v1/auth/me" \\
+  -H "Authorization: Bearer sk_1234567890abcdef" \\
+  -H "Accept-Language: fa" \\
+  -H "X-Calendar-Type: jalali"
+```
+
+### نکات امنیتی:
+- ⚠️ کلید API را در کد خود hardcode نکنید
+- 🔒 از متغیرهای محیطی استفاده کنید
+- 🛡️ کلید را با دیگران به اشتراک نگذارید
+- 🔄 به صورت دوره‌ای کلیدهای قدیمی را حذف کنید
+- 📱 برای هر اپلیکیشن یک کلید جداگانه استفاده کنید
+                """,
+                "x-displayName": "کلید API (API Key)"
+            },
+            "BearerAuth": {
+                "type": "http",
+                "scheme": "bearer",
+                "bearerFormat": "API Key",
+                "description": """
+احراز هویت با Bearer Token
+
+این همان ApiKeyAuth است، فقط با فرمت استاندارد HTTP Bearer.
+                """
             }
         }
+        
+        # اضافه کردن توضیحات برای security requirements
+        if "security" not in openapi_schema:
+            openapi_schema["security"] = []
         
         # اضافه کردن security به endpoint های محافظت شده
         for path, methods in openapi_schema["paths"].items():

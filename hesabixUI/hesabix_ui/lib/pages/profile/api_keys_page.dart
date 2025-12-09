@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import '../../core/api_client.dart';
 import '../../core/calendar_controller.dart';
 import '../../core/date_utils.dart';
+import '../../l10n/app_localizations.dart';
 import '../../services/api_key_service.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../widgets/jalali_date_picker.dart';
@@ -42,7 +43,8 @@ class _ApiKeysPageState extends State<ApiKeysPage> {
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.showError(context, message: 'خطا در بارگذاری کلیدها: $e');
+        final t = AppLocalizations.of(context);
+        SnackBarHelper.showError(context, message: '${t.apiKeyErrorLoadingKeys}: $e');
       }
     } finally {
       if (mounted) {
@@ -76,13 +78,15 @@ class _ApiKeysPageState extends State<ApiKeysPage> {
         }
       } catch (e) {
         if (mounted) {
-          SnackBarHelper.showError(context, message: 'خطا در ایجاد کلید: $e');
+          final t = AppLocalizations.of(context);
+          SnackBarHelper.showError(context, message: '${t.apiKeyErrorCreatingKey}: $e');
         }
       }
     }
   }
 
   Future<void> _showApiKeyDialog(String apiKey) async {
+    final t = AppLocalizations.of(context);
     return showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -91,7 +95,7 @@ class _ApiKeysPageState extends State<ApiKeysPage> {
           children: [
             Icon(Icons.check_circle, color: Theme.of(context).colorScheme.primary),
             const SizedBox(width: 8),
-            const Expanded(child: Text('کلید API ایجاد شد')),
+            Expanded(child: Text(t.apiKeyCreatedSuccessfully)),
           ],
         ),
         content: Column(
@@ -110,7 +114,7 @@ class _ApiKeysPageState extends State<ApiKeysPage> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'لطفاً این کلید را ذخیره کنید. این تنها باری است که نمایش داده می‌شود.',
+                      t.apiKeySaveWarning,
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         color: Theme.of(context).colorScheme.onErrorContainer,
@@ -143,15 +147,15 @@ class _ApiKeysPageState extends State<ApiKeysPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('بستن'),
+            child: Text(t.apiKeyClose),
           ),
           FilledButton.icon(
             onPressed: () {
               Clipboard.setData(ClipboardData(text: apiKey));
-              SnackBarHelper.showSuccess(context, message: 'کلید کپی شد');
+              SnackBarHelper.showSuccess(context, message: t.apiKeyCopied);
             },
             icon: const Icon(Icons.copy, size: 18),
-            label: const Text('کپی'),
+            label: Text(t.apiKeyCopy),
           ),
         ],
       ),
@@ -179,17 +183,21 @@ class _ApiKeysPageState extends State<ApiKeysPage> {
         
         _loadApiKeys();
         if (mounted) {
-          SnackBarHelper.showSuccess(context, message: 'کلید با موفقیت به‌روزرسانی شد');
+          final t = AppLocalizations.of(context);
+          SnackBarHelper.showSuccess(context, message: t.apiKeyUpdatedSuccessfully);
         }
       } catch (e) {
         if (mounted) {
-          SnackBarHelper.showError(context, message: 'خطا در به‌روزرسانی کلید: $e');
+          final t = AppLocalizations.of(context);
+          SnackBarHelper.showError(context, message: '${t.apiKeyErrorUpdating}: $e');
         }
       }
     }
   }
 
   Future<void> _deleteApiKey(Map<String, dynamic> apiKey) async {
+    final t = AppLocalizations.of(context);
+    final keyName = apiKey['name'] ?? t.apiKeyWithoutName;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -198,19 +206,19 @@ class _ApiKeysPageState extends State<ApiKeysPage> {
           children: [
             Icon(Icons.delete_outline, color: Theme.of(context).colorScheme.error),
             const SizedBox(width: 8),
-            const Expanded(child: Text('حذف کلید API')),
+            Expanded(child: Text(t.apiKeyDeleteTitle)),
           ],
         ),
-        content: Text('آیا از حذف کلید "${apiKey['name'] ?? 'بدون نام'}" اطمینان دارید؟\nاین عمل غیرقابل بازگشت است.'),
+        content: Text('آیا مطمئن هستید که می‌خواهید کلید "$keyName" را حذف کنید؟'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('لغو'),
+            child: Text(t.cancel),
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
             style: FilledButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.error),
-            child: const Text('حذف'),
+            child: Text(t.delete),
           ),
         ],
       ),
@@ -221,11 +229,13 @@ class _ApiKeysPageState extends State<ApiKeysPage> {
         await _apiKeyService.deleteApiKey(apiKey['id'] as int);
         _loadApiKeys();
         if (mounted) {
-          SnackBarHelper.showSuccess(context, message: 'کلید با موفقیت حذف شد');
+          final t = AppLocalizations.of(context);
+          SnackBarHelper.showSuccess(context, message: t.apiKeyDeletedSuccessfully);
         }
       } catch (e) {
         if (mounted) {
-          SnackBarHelper.showError(context, message: 'خطا در حذف کلید: $e');
+          final t = AppLocalizations.of(context);
+          SnackBarHelper.showError(context, message: '${t.apiKeyErrorDeleting}: $e');
         }
       }
     }
@@ -246,31 +256,32 @@ class _ApiKeysPageState extends State<ApiKeysPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final t = AppLocalizations.of(context);
     final filteredKeys = _filteredApiKeys;
     
     return Scaffold(
       appBar: AppBar(
-        title: const Text('مدیریت کلیدهای API'),
+        title: Text(t.apiKeysPageTitle),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(60),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
             child: SegmentedButton<String>(
-              segments: const [
+              segments: [
                 ButtonSegment<String>(
                   value: 'active',
-                  label: Text('فعال'),
-                  icon: Icon(Icons.check_circle_outline, size: 18),
+                  label: Text(t.apiKeyFilterActive),
+                  icon: const Icon(Icons.check_circle_outline, size: 18),
                 ),
                 ButtonSegment<String>(
                   value: 'revoked',
-                  label: Text('لغو شده'),
-                  icon: Icon(Icons.cancel_outlined, size: 18),
+                  label: Text(t.apiKeyFilterRevoked),
+                  icon: const Icon(Icons.cancel_outlined, size: 18),
                 ),
                 ButtonSegment<String>(
                   value: 'all',
-                  label: Text('همه'),
-                  icon: Icon(Icons.list_outlined, size: 18),
+                  label: Text(t.apiKeyFilterAll),
+                  icon: const Icon(Icons.list_outlined, size: 18),
                 ),
               ],
               selected: {_filterType},
@@ -304,10 +315,10 @@ class _ApiKeysPageState extends State<ApiKeysPage> {
                           const SizedBox(height: 16),
                           Text(
                             _filterType == 'active'
-                                ? 'هیچ کلید فعالی وجود ندارد'
+                                ? t.apiKeyNoActiveKeys
                                 : _filterType == 'revoked'
-                                    ? 'هیچ کلید لغو شده‌ای وجود ندارد'
-                                    : 'هیچ کلید API ایجاد نشده است',
+                                    ? t.apiKeyNoRevokedKeys
+                                    : t.apiKeyNoKeysCreated,
                             style: theme.textTheme.titleMedium,
                           ),
                           const SizedBox(height: 8),
@@ -315,10 +326,10 @@ class _ApiKeysPageState extends State<ApiKeysPage> {
                             padding: const EdgeInsets.symmetric(horizontal: 32),
                             child: Text(
                               _filterType == 'active'
-                                  ? 'برای ایجاد یک کلید جدید، روی دکمه ایجاد کلیک کنید'
+                                  ? t.apiKeyCreateHint
                                   : _filterType == 'revoked'
-                                      ? 'هیچ کلید لغو شده‌ای برای نمایش وجود ندارد'
-                                      : 'برای استفاده از API در برنامه‌های دیگر، یک کلید ایجاد کنید',
+                                      ? t.apiKeyNoRevokedHint
+                                      : t.apiKeyUsageHint,
                               style: theme.textTheme.bodyMedium,
                               textAlign: TextAlign.center,
                             ),
@@ -343,7 +354,7 @@ class _ApiKeysPageState extends State<ApiKeysPage> {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _createApiKey,
         icon: const Icon(Icons.add),
-        label: const Text('ایجاد کلید جدید'),
+        label: Text(t.apiKeyCreateNewButton),
       ),
     );
   }
@@ -374,8 +385,9 @@ class _ApiKeyCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final t = AppLocalizations.of(context);
     final isActive = apiKey['is_active'] == true;
-    final name = apiKey['name'] as String? ?? 'بدون نام';
+    final name = apiKey['name'] as String? ?? t.apiKeyWithoutName;
     final created = _parseDate(apiKey['created_at'] as String?);
     final lastUsed = _parseDate(apiKey['last_used_at'] as String?);
     final expiresAt = _parseDate(apiKey['expires_at'] as String?);
@@ -422,12 +434,12 @@ class _ApiKeyCard extends StatelessWidget {
                   IconButton(
                     icon: const Icon(Icons.edit_outlined),
                     onPressed: onEdit,
-                    tooltip: 'ویرایش',
+                    tooltip: t.apiKeyEdit,
                   ),
                   IconButton(
                     icon: const Icon(Icons.delete_outline),
                     onPressed: onDelete,
-                    tooltip: 'حذف',
+                    tooltip: t.apiKeyDelete,
                     color: theme.colorScheme.error,
                   ),
                 ],
@@ -438,7 +450,7 @@ class _ApiKeyCard extends StatelessWidget {
               _buildInfoRow(
                 context,
                 icon: Icons.calendar_today_outlined,
-                label: 'ایجاد شده',
+                label: t.apiKeyCreatedAt,
                 value: HesabixDateUtils.formatDateTime(created, isJalali),
               ),
             ],
@@ -447,7 +459,7 @@ class _ApiKeyCard extends StatelessWidget {
               _buildInfoRow(
                 context,
                 icon: Icons.access_time_outlined,
-                label: 'آخرین استفاده',
+                label: t.apiKeyLastUsed,
                 value: HesabixDateUtils.formatDateTime(lastUsed, isJalali),
               ),
             ],
@@ -456,7 +468,7 @@ class _ApiKeyCard extends StatelessWidget {
               _buildInfoRow(
                 context,
                 icon: Icons.event_outlined,
-                label: 'انقضا',
+                label: t.apiKeyExpiresAt,
                 value: HesabixDateUtils.formatDateTime(expiresAt, isJalali),
                 valueColor: expiresAt.isBefore(DateTime.now()) ? theme.colorScheme.error : null,
               ),
@@ -466,7 +478,7 @@ class _ApiKeyCard extends StatelessWidget {
               _buildInfoRow(
                 context,
                 icon: Icons.block_outlined,
-                label: 'لغو شده',
+                label: t.apiKeyRevokedAt,
                 value: HesabixDateUtils.formatDateTime(revokedAt, isJalali),
                 valueColor: theme.colorScheme.error,
               ),
@@ -476,7 +488,7 @@ class _ApiKeyCard extends StatelessWidget {
               _buildInfoRow(
                 context,
                 icon: Icons.location_on_outlined,
-                label: 'IP های مجاز',
+                label: t.apiKeyAllowedIPs,
                 value: apiKey['ip'] as String,
               ),
             ],
@@ -545,6 +557,7 @@ class _CreateApiKeyDialogState extends State<_CreateApiKeyDialog> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final t = AppLocalizations.of(context);
     final now = DateTime.now();
     final maxDate = DateTime(now.year + 10, 12, 31);
 
@@ -568,7 +581,7 @@ class _CreateApiKeyDialogState extends State<_CreateApiKeyDialog> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      'ایجاد کلید API جدید',
+                      t.apiKeyCreateNewTitle,
                       style: theme.textTheme.titleLarge?.copyWith(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
@@ -595,8 +608,8 @@ class _CreateApiKeyDialogState extends State<_CreateApiKeyDialog> {
                       TextFormField(
                         controller: _nameController,
                         decoration: InputDecoration(
-                          labelText: 'نام کلید',
-                          hintText: 'مثال: Production API Key',
+                          labelText: t.apiKeyNameLabel,
+                          hintText: t.apiKeyNameHint,
                           prefixIcon: const Icon(Icons.label_outline),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
@@ -610,8 +623,8 @@ class _CreateApiKeyDialogState extends State<_CreateApiKeyDialog> {
                       TextFormField(
                         controller: _scopesController,
                         decoration: InputDecoration(
-                          labelText: 'محدوده دسترسی (JSON)',
-                          hintText: 'اختیاری - مثال: {"read": true, "write": false}',
+                          labelText: t.apiKeyScopeLabel,
+                          hintText: t.apiKeyScopeHint,
                           prefixIcon: const Icon(Icons.security_outlined),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
@@ -626,8 +639,8 @@ class _CreateApiKeyDialogState extends State<_CreateApiKeyDialog> {
                       TextFormField(
                         controller: _ipWhitelistController,
                         decoration: InputDecoration(
-                          labelText: 'لیست IP های مجاز',
-                          hintText: 'جدا شده با کاما - مثال: 192.168.1.1, 10.0.0.1',
+                          labelText: t.apiKeyIPsLabel,
+                          hintText: t.apiKeyIPsHint,
                           prefixIcon: const Icon(Icons.network_check_outlined),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
@@ -646,8 +659,8 @@ class _CreateApiKeyDialogState extends State<_CreateApiKeyDialog> {
                           });
                         },
                         calendarController: widget.calendarController,
-                        labelText: 'تاریخ و زمان انقضا (اختیاری)',
-                        hintText: 'انتخاب کنید',
+                        labelText: t.apiKeyExpiryLabel,
+                        hintText: t.apiKeyExpiryHint,
                         firstDate: now,
                         lastDate: maxDate,
                       ),
@@ -671,7 +684,7 @@ class _CreateApiKeyDialogState extends State<_CreateApiKeyDialog> {
                 children: [
                   TextButton(
                     onPressed: () => Navigator.of(context).pop(),
-                    child: const Text('لغو'),
+                    child: Text(t.cancel),
                   ),
                   const SizedBox(width: 12),
                   FilledButton.icon(
@@ -686,7 +699,7 @@ class _CreateApiKeyDialogState extends State<_CreateApiKeyDialog> {
                       }
                     },
                     icon: const Icon(Icons.add_circle_outline),
-                    label: const Text('ایجاد کلید'),
+                    label: Text(t.apiKeyCreateNewButton),
                   ),
                 ],
               ),
@@ -745,6 +758,7 @@ class _EditApiKeyDialogState extends State<_EditApiKeyDialog> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final t = AppLocalizations.of(context);
     final now = DateTime.now();
     final maxDate = DateTime(now.year + 10, 12, 31);
 
@@ -768,7 +782,7 @@ class _EditApiKeyDialogState extends State<_EditApiKeyDialog> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      'ویرایش کلید API',
+                      t.apiKeyEditTitle,
                       style: theme.textTheme.titleLarge?.copyWith(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
@@ -844,8 +858,8 @@ class _EditApiKeyDialogState extends State<_EditApiKeyDialog> {
                           });
                         },
                         calendarController: widget.calendarController,
-                        labelText: 'تاریخ و زمان انقضا',
-                        hintText: 'بدون انقضا',
+                        labelText: t.apiKeyExpiryLabel,
+                        hintText: t.apiKeyNoExpiry,
                         firstDate: now,
                         lastDate: maxDate,
                       ),
@@ -967,7 +981,7 @@ class _DateTimeInputFieldState extends State<_DateTimeInputField> {
         initialDate: initialDate,
         firstDate: firstDate,
         lastDate: lastDate,
-        helpText: widget.labelText ?? 'انتخاب تاریخ',
+        helpText: widget.labelText ?? AppLocalizations.of(context).datePickerSelectDate,
       );
     } else {
       selectedDate = await showDatePicker(
@@ -975,7 +989,7 @@ class _DateTimeInputFieldState extends State<_DateTimeInputField> {
         initialDate: initialDate,
         firstDate: firstDate,
         lastDate: lastDate,
-        helpText: widget.labelText ?? 'انتخاب تاریخ',
+        helpText: widget.labelText ?? AppLocalizations.of(context).datePickerSelectDate,
         locale: const Locale('en', 'US'),
       );
     }
@@ -992,7 +1006,7 @@ class _DateTimeInputFieldState extends State<_DateTimeInputField> {
     final selectedTime = await showTimePicker(
       context: context,
       initialTime: _selectedTime ?? TimeOfDay.now(),
-      helpText: 'انتخاب زمان',
+      helpText: AppLocalizations.of(context).timePickerSelectTime,
     );
 
     if (selectedTime != null) {
@@ -1051,7 +1065,7 @@ class _DateTimeInputFieldState extends State<_DateTimeInputField> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          widget.labelText ?? 'تاریخ و زمان',
+          widget.labelText ?? AppLocalizations.of(context).dateTimeLabel,
           style: theme.textTheme.labelMedium?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
           ),
@@ -1064,7 +1078,7 @@ class _DateTimeInputFieldState extends State<_DateTimeInputField> {
                 onTap: _selectDate,
                 child: InputDecorator(
                   decoration: InputDecoration(
-                    hintText: 'تاریخ',
+                    hintText: AppLocalizations.of(context).dateLabel,
                     prefixIcon: const Icon(Icons.calendar_today_outlined),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -1072,7 +1086,7 @@ class _DateTimeInputFieldState extends State<_DateTimeInputField> {
                     filled: true,
                     fillColor: theme.colorScheme.surfaceVariant.withOpacity(0.5),
                   ),
-                  child: Text(dateDisplay.isEmpty ? 'تاریخ' : dateDisplay),
+                  child: Text(dateDisplay.isEmpty ? AppLocalizations.of(context).dateLabel : dateDisplay),
                 ),
               ),
             ),
@@ -1082,7 +1096,7 @@ class _DateTimeInputFieldState extends State<_DateTimeInputField> {
                 onTap: _selectTime,
                 child: InputDecorator(
                   decoration: InputDecoration(
-                    hintText: 'زمان',
+                    hintText: AppLocalizations.of(context).timeLabel,
                     prefixIcon: const Icon(Icons.access_time_outlined),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -1090,14 +1104,14 @@ class _DateTimeInputFieldState extends State<_DateTimeInputField> {
                     filled: true,
                     fillColor: theme.colorScheme.surfaceVariant.withOpacity(0.5),
                   ),
-                  child: Text(timeDisplay.isEmpty ? 'زمان' : timeDisplay),
+                  child: Text(timeDisplay.isEmpty ? AppLocalizations.of(context).timeLabel : timeDisplay),
                 ),
               ),
             ),
             if (_selectedDate != null || _selectedTime != null)
               IconButton(
                 icon: const Icon(Icons.clear),
-                tooltip: 'پاک کردن',
+                tooltip: AppLocalizations.of(context).clearButton,
                 onPressed: _clearDateTime,
               ),
           ],

@@ -115,6 +115,23 @@ class AIService {
   }
 
   // ========== User: Chat ==========
+  
+  /// بررسی امکان استفاده از AI (چک پیشگیرانه)
+  Future<Map<String, dynamic>> checkAvailability({
+    int? businessId,
+    int estimatedTokens = 1000,
+  }) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/ai/chat/check-availability',
+      data: {
+        if (businessId != null) 'business_id': businessId,
+        'estimated_tokens': estimatedTokens,
+      },
+    );
+    final body = res.data as Map<String, dynamic>;
+    return body['data'] as Map<String, dynamic>;
+  }
+  
   Future<List<AIChatSession>> listChatSessions({
     int? businessId,
     int limit = 50,

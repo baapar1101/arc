@@ -251,7 +251,8 @@ async def send_operator_message(
                 user_id=ticket.user_id,
                 event_key="support.operator_reply",
                 context=context,
-                preferred_channels=["inapp", "email", "telegram", "sms"]
+                preferred_channels=["inapp", "email", "telegram", "sms"],
+                broadcast_mode=True
             )
         except Exception as e:
             # در صورت خطا، لاگ می‌کنیم اما فرآیند اصلی ادامه می‌یابد
@@ -323,3 +324,29 @@ async def search_operator_ticket_messages(
     formatted_data = format_datetime_fields(paginated_data.dict(), request)
     
     return success_response(formatted_data, request)
+
+
+@router.delete("/tickets/{ticket_id}", response_model=SuccessResponse)
+@require_app_permission("superadmin")
+async def delete_ticket(
+    request: Request,
+    ticket_id: int,
+    current_user: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """حذف تیکت (فقط برای مدیر سیستم)"""
+    ticket_repo = TicketRepository(db)
+    
+    # حذف تیکت
+    deleted = ticket_repo.delete_ticket(ticket_id)
+    
+    if not deleted:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="تیکت یافت نشد یا قبلاً حذف شده است"
+        )
+    
+    return success_response(
+        {"message": "تیکت با موفقیت حذف شد", "ticket_id": ticket_id},
+        request
+    )

@@ -18,6 +18,7 @@ import '../../widgets/invoice/commission_type_selector.dart';
 import '../../widgets/invoice/commission_amount_field.dart';
 import '../../widgets/date_input_field.dart';
 import '../../widgets/banking/currency_picker_widget.dart';
+import '../../widgets/project/project_selector_widget.dart';
 import '../../models/invoice_type_model.dart';
 import '../../models/customer_model.dart';
 import '../../models/person_model.dart';
@@ -79,6 +80,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
   DateTime? _invoiceDate;
   DateTime? _dueDate;
   int? _selectedCurrencyId;
+  int? _selectedProjectId;
   String? _invoiceTitle;
   String? _invoiceReference;
   // جمع‌های محاسباتی ردیف‌ها
@@ -1391,6 +1393,21 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                         ),
                         const SizedBox(height: 16),
                         
+                        // پروژه
+                        ProjectSelectorWidget(
+                          businessId: widget.businessId,
+                          apiClient: ApiClient(),
+                          selectedProjectId: _selectedProjectId,
+                          onChanged: (projectId) {
+                            setState(() {
+                              _selectedProjectId = projectId;
+                            });
+                          },
+                          allowNull: true,
+                          labelText: 'پروژه (اختیاری)',
+                        ),
+                        const SizedBox(height: 16),
+                        
                         // فروشنده و کارمزد (فقط برای فروش و برگشت فروش)
                         if (_selectedInvoiceType == InvoiceType.sales || _selectedInvoiceType == InvoiceType.salesReturn) ...[
                           Row(
@@ -1731,7 +1748,20 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                               ),
                             ),
                             const SizedBox(width: 12),
-                            const Expanded(child: SizedBox()), // جای خالی
+                            Expanded(
+                              child: ProjectSelectorWidget(
+                                businessId: widget.businessId,
+                                apiClient: ApiClient(),
+                                selectedProjectId: _selectedProjectId,
+                                onChanged: (projectId) {
+                                  setState(() {
+                                    _selectedProjectId = projectId;
+                                  });
+                                },
+                                allowNull: true,
+                                labelText: 'پروژه (اختیاری)',
+                              ),
+                            ),
                             const SizedBox(width: 12),
                             const Expanded(child: SizedBox()), // جای خالی
                           ],
@@ -2235,6 +2265,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
       'is_proforma': _isDraft,
       'extra_info': extraInfo,
       if (_invoiceTitle != null && _invoiceTitle!.isNotEmpty) 'description': _invoiceTitle,
+      if (_selectedProjectId != null) 'project_id': _selectedProjectId,
       'lines': _lineItems.map((e) => _serializeLineItem(e)).toList(),
     };
     

@@ -408,6 +408,17 @@ def create_manual_document(
         }
         lines_for_db.append(line_dict)
     
+    # اعتبارسنجی پروژه (اگر ارسال شده باشد)
+    project_id = data.get("project_id")
+    if project_id:
+        from adapters.db.models.project import Project
+        from sqlalchemy import and_
+        project = db.query(Project).filter(
+            and_(Project.id == project_id, Project.business_id == business_id, Project.is_active == True)
+        ).first()
+        if not project:
+            raise ApiError("PROJECT_NOT_FOUND", "پروژه یافت نشد یا غیرفعال است", http_status=404)
+    
     # آماده‌سازی داده‌های سند
     document_data = {
         "code": code,
@@ -420,6 +431,7 @@ def create_manual_document(
         "is_proforma": data.get("is_proforma", False),
         "description": data.get("description"),
         "extra_info": data.get("extra_info"),
+        "project_id": project_id,
         "lines": lines_for_db,
     }
     
@@ -503,6 +515,17 @@ def update_manual_document(
             "Cannot edit automatically generated documents. Please edit from the original source.",
             http_status=400
         )
+    
+    # اعتبارسنجی پروژه (اگر ارسال شده باشد)
+    project_id = data.get("project_id")
+    if project_id is not None:  # چک می‌کنیم که None نباشد (می‌تواند 0 یا عدد باشد)
+        from adapters.db.models.project import Project
+        from sqlalchemy import and_
+        project = db.query(Project).filter(
+            and_(Project.id == project_id, Project.business_id == document.business_id, Project.is_active == True)
+        ).first()
+        if not project:
+            raise ApiError("PROJECT_NOT_FOUND", "پروژه یافت نشد یا غیرفعال است", http_status=404)
     
     # اگر سطرها ارسال شده، اعتبارسنجی کن
     if "lines" in data and data["lines"] is not None:

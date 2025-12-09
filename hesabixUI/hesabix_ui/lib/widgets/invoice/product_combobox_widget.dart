@@ -14,6 +14,7 @@ class ProductComboboxWidget extends StatefulWidget {
   final String label;
   final String hintText;
   final AuthStore? authStore;
+  final ValueChanged<List<Map<String, dynamic>>>? onProductsLoaded;
 
   const ProductComboboxWidget({
     super.key,
@@ -23,6 +24,7 @@ class ProductComboboxWidget extends StatefulWidget {
     this.label = 'کالا/خدمت',
     this.hintText = 'جست‌وجو و انتخاب کالا/خدمت',
     this.authStore,
+    this.onProductsLoaded,
   });
 
   @override
@@ -33,15 +35,23 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
   final ProductService _service = ProductService(apiClient: ApiClient());
   final WarehouseService _warehouseService = WarehouseService();
   final TextEditingController _searchCtrl = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
   Timer? _debounce;
   bool _loading = false;
+  bool _loadingMore = false;
   List<Map<String, dynamic>> _items = const <Map<String, dynamic>>[];
+  bool _isFirstLoad = true;
+  bool _hasMore = false;
+  int _currentSkip = 0;
+  String? _currentSearchQuery;
+  static const int _pageSize = 20;
 
   @override
   void initState() {
     super.initState();
     _initializeSelectedProduct();
     _loadRecent();
+    _scrollController.addListener(_onScroll);
   }
 
   @override
@@ -107,23 +117,62 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
   void dispose() {
     _debounce?.cancel();
     _searchCtrl.dispose();
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
     super.dispose();
   }
 
+  void _onScroll() {
+    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
+      // وقتی به 200 پیکسل مانده به پایین رسیدیم، صفحه بعدی را بارگذاری کن
+      if (_hasMore && !_loadingMore && !_loading) {
+        _loadMore();
+      }
+    }
+  }
+
   Future<void> _loadRecent() async {
-    setState(() => _loading = true);
+    // Reset scroll position when loading recent
+    if (_scrollController.hasClients) {
+      _scrollController.jumpTo(0);
+    }
+    setState(() {
+      _loading = true;
+      _currentSkip = 0;
+      _currentSearchQuery = null;
+      _hasMore = false;
+    });
     try {
       final items = await _service.searchProducts(
         businessId: widget.businessId,
         searchQuery: null,
-        limit: 10,
+        limit: _pageSize,
+        skip: 0,
         searchFields: const ['code', 'name'],
       );
       if (!mounted) return;
-      setState(() => _items = items);
+      setState(() {
+        _items = items;
+        _hasMore = items.length >= _pageSize;
+        _currentSkip = items.length;
+      });
+      // فراخوانی callback فقط در بار اول
+      if (_isFirstLoad && widget.onProductsLoaded != null) {
+        _isFirstLoad = false;
+        widget.onProductsLoaded?.call(items);
+      }
     } catch (_) {
       if (!mounted) return;
-      setState(() => _items = const <Map<String, dynamic>>[]);
+      setState(() {
+        _items = const <Map<String, dynamic>>[];
+        _hasMore = false;
+        _currentSkip = 0;
+      });
+      // فراخوانی callback با لیست خالی در صورت خطا (فقط در بار اول)
+      if (_isFirstLoad && widget.onProductsLoaded != null) {
+        _isFirstLoad = false;
+        widget.onProductsLoaded?.call(const <Map<String, dynamic>>[]);
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -139,21 +188,65 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
       await _loadRecent();
       return;
     }
-    setState(() => _loading = true);
+    // Reset scroll position when starting a new search
+    if (_scrollController.hasClients) {
+      _scrollController.jumpTo(0);
+    }
+    setState(() {
+      _loading = true;
+      _currentSkip = 0;
+      _currentSearchQuery = q;
+      _hasMore = false;
+    });
     try {
       final items = await _service.searchProducts(
         businessId: widget.businessId,
         searchQuery: q,
-        limit: 20,
+        limit: _pageSize,
+        skip: 0,
         searchFields: const ['code', 'name'],
       );
       if (!mounted) return;
-      setState(() => _items = items);
+      setState(() {
+        _items = items;
+        _hasMore = items.length >= _pageSize;
+        _currentSkip = items.length;
+      });
     } catch (_) {
       if (!mounted) return;
-      setState(() => _items = const <Map<String, dynamic>>[]);
+      setState(() {
+        _items = const <Map<String, dynamic>>[];
+        _hasMore = false;
+        _currentSkip = 0;
+      });
     } finally {
       if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _loadMore() async {
+    if (_loadingMore || !_hasMore) return;
+    
+    setState(() => _loadingMore = true);
+    try {
+      final items = await _service.searchProducts(
+        businessId: widget.businessId,
+        searchQuery: _currentSearchQuery,
+        limit: _pageSize,
+        skip: _currentSkip,
+        searchFields: const ['code', 'name'],
+      );
+      if (!mounted) return;
+      setState(() {
+        _items = [..._items, ...items];
+        _hasMore = items.length >= _pageSize;
+        _currentSkip = _items.length;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _hasMore = false);
+    } finally {
+      if (mounted) setState(() => _loadingMore = false);
     }
   }
 
@@ -441,9 +534,22 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
                       child: _loading
                           ? const Center(child: CircularProgressIndicator())
                           : ListView.separated(
-                              itemCount: _items.length,
-                              separatorBuilder: (separatorContext, separatorIndex) => const Divider(height: 1),
+                              controller: _scrollController,
+                              itemCount: _items.length + (_loadingMore ? 1 : 0),
+                              separatorBuilder: (separatorContext, separatorIndex) {
+                                // نمایش separator فقط بین آیتم‌های واقعی
+                                if (separatorIndex >= _items.length - 1) {
+                                  return const SizedBox.shrink();
+                                }
+                                return const Divider(height: 1);
+                              },
                               itemBuilder: (context, index) {
+                                if (index == _items.length && _loadingMore) {
+                                  return const Padding(
+                                    padding: EdgeInsets.all(16.0),
+                                    child: Center(child: CircularProgressIndicator()),
+                                  );
+                                }
                                 final it = _items[index];
                                 final code = it['code']?.toString() ?? '';
                                 final name = it['name']?.toString() ?? '';

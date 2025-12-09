@@ -188,15 +188,19 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
 
 
 
-  Future<void> _addNewPerson() async {
+  Future<void> _addNewPerson(BuildContext bottomSheetContext) async {
+    // ذخیره متن جستجو شده
+    final searchQuery = _searchController.text.trim();
+    
     // بستن bottom sheet قبل از باز کردن dialog
-    Navigator.pop(context);
+    Navigator.pop(bottomSheetContext);
 
     final result = await showDialog<Person?>(
       context: context,
       builder: (context) => PersonFormDialog(
         businessId: widget.businessId,
         onSuccess: () {},
+        initialAliasName: searchQuery.isNotEmpty ? searchQuery : null,
       ),
     );
     
@@ -258,21 +262,21 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      builder: (context) {
+      builder: (bottomSheetContext) {
         print('[CustomerCombobox] BottomSheet builder called - _customers count: ${_customers.length}, _isLoading: $_isLoading');
         return _CustomerPickerBottomSheet(
           pickerStateNotifier: _pickerStateNotifier,
           selectedCustomer: widget.selectedCustomer,
           onCustomerSelected: (customer) {
             widget.onCustomerChanged(customer);
-            Navigator.pop(context);
+            Navigator.pop(bottomSheetContext);
           },
           searchController: _searchController,
           onSearchChanged: (query) {
             print('[CustomerCombobox] onSearchChanged callback called with: "$query"');
             _onSearchChanged(query);
           },
-          onAddNew: _addNewPerson,
+          onAddNew: () => _addNewPerson(bottomSheetContext),
         );
       },
     );

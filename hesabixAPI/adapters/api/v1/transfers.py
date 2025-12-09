@@ -1,9 +1,12 @@
 """
 API endpoints برای انتقال وجه (Transfers)
+
+این ماژول شامل endpoint های مربوط به مدیریت اسناد انتقال وجه بین حساب‌های مختلف است.
+اسناد انتقال برای جابجایی وجه بین حساب‌های بانکی، صندوق و تنخواه استفاده می‌شوند.
 """
 
 from typing import Any, Dict, Optional
-from fastapi import APIRouter, Depends, Request, Body
+from fastapi import APIRouter, Depends, Request, Body, Path, Query
 from sqlalchemy.orm import Session
 from fastapi.responses import Response
 import io, datetime, re, base64
@@ -13,7 +16,14 @@ from adapters.db.models.document import Document
 from app.core.auth_dependency import get_current_user, AuthContext
 from app.core.responses import success_response, format_datetime_fields, ApiError
 from app.core.permissions import require_business_management_dep, require_business_access, require_business_permission_dep, require_business_permission_by_entity_dep
-from adapters.api.v1.schemas import QueryInfo
+from adapters.api.v1.schemas import QueryInfo, SuccessResponse
+from adapters.api.v1.schema_models.transfer import (
+    TransferCreateRequest,
+    TransferUpdateRequest,
+    TransferResponse,
+    TransferListResponse,
+    TransferExportRequest
+)
 from app.services.transfer_service import (
     create_transfer,
     get_transfer,
@@ -27,22 +37,139 @@ from adapters.db.models.business_print_settings import BusinessPrintSettings
 from app.services.file_storage_service import FileStorageService
 
 
-router = APIRouter(tags=["transfers"])
+router = APIRouter(tags=["اسناد انتقال", "مدیریت مالی"])
 
 
 @router.post(
     "/businesses/{business_id}/transfers",
     summary="لیست اسناد انتقال",
-    description="دریافت لیست اسناد انتقال با فیلتر و جستجو",
+    description="""
+    دریافت لیست اسناد انتقال با امکانات پیشرفته فیلتر، جستجو و صفحه‌بندی
+    
+    ### قابلیت‌های جستجو:
+    - جستجو در کد سند، نام مبدا، نام مقصد و توضیحات
+    - جستجو در مبلغ و تاریخ
+    
+    ### فیلترهای موجود:
+    - **محدوده تاریخ**: `from_date`, `to_date`
+    - **نوع مبدا**: `source_type` (bank_account, cash_register, petty_cash)
+    - **نوع مقصد**: `destination_type`
+    - **محدوده مبلغ**: فیلتر با operator های `>=` و `<=` روی `total_amount`
+    - **سال مالی**: از طریق header `X-Fiscal-Year-ID`
+    
+    ### مرتب‌سازی:
+    می‌توانید بر اساس فیلدهای زیر مرتب کنید:
+    - `document_date`: تاریخ سند (پیش‌فرض)
+    - `total_amount`: مبلغ کل
+    - `created_at`: تاریخ ایجاد
+    - `code`: کد سند
+    - `source_name`: نام مبدا
+    - `destination_name`: نام مقصد
+    
+    ### نکات:
+    - نتایج به صورت صفحه‌بندی شده برمی‌گردند
+    - حداکثر 1000 رکورد در هر درخواست
+    - برای صادرات تعداد زیاد، از endpoint های export استفاده کنید
+    """,
+    response_model=SuccessResponse,
+    responses={
+        200: {
+            "description": "لیست اسناد با موفقیت دریافت شد",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "success": True,
+                        "message": "لیست اسناد انتقال دریافت شد",
+                        "data": {
+                            "items": [
+                                {
+                                    "id": 123,
+                                    "code": "T-1001",
+                                    "document_date": "1403/10/15",
+                                    "source_type_name": "حساب بانکی",
+                                    "source_name": "بانک ملت - 1234567890",
+                                    "destination_type_name": "صندوق",
+                                    "destination_name": "صندوق اصلی",
+                                    "total_amount": 1000000,
+                                    "commission": 5000,
+                                    "created_by_name": "احمد احمدی"
+                                }
+                            ],
+                            "total_count": 45,
+                            "has_more": True
+                        }
+                    }
+                }
+            }
+        },
+        400: {
+            "description": "خطا در پارامترهای درخواست",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "success": False,
+                        "error_code": "INVALID_PARAMETERS",
+                        "message": "تاریخ شروع باید قبل از تاریخ پایان باشد"
+                    }
+                }
+            }
+        },
+        403: {
+            "description": "عدم دسترسی به کسب‌وکار",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "success": False,
+                        "error_code": "FORBIDDEN",
+                        "message": "شما به این کسب‌وکار دسترسی ندارید"
+                    }
+                }
+            }
+        }
+    }
 )
 @require_business_access("business_id")
 async def list_transfers_endpoint(
     request: Request,
-    business_id: int,
-    query_info: QueryInfo = Body(...),
+    business_id: int = Path(
+        ..., 
+        description="شناسه کسب‌وکار",
+        example=1,
+        gt=0
+    ),
+    query_info: QueryInfo = Body(
+        ...,
+        description="پارامترهای جستجو، فیلتر و صفحه‌بندی",
+        example={
+            "take": 20,
+            "skip": 0,
+            "sort_by": "document_date",
+            "sort_desc": True,
+            "search": "بانک ملت",
+            "filters": [
+                {
+                    "property": "total_amount",
+                    "operator": ">=",
+                    "value": 1000000
+                }
+            ]
+        }
+    ),
+    x_fiscal_year_id: Optional[int] = Query(
+        None,
+        alias="X-Fiscal-Year-ID",
+        description="شناسه سال مالی (اگر ارسال نشود، سال مالی فعال استفاده می‌شود)",
+        example=1
+    ),
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
 ):
+    """
+    دریافت لیست اسناد انتقال
+    
+    این endpoint برای نمایش لیست اسناد انتقال با قابلیت‌های پیشرفته استفاده می‌شود.
+    شامل جستجو، فیلتر، مرتب‌سازی و صفحه‌بندی.
+    """
     query_dict: Dict[str, Any] = {
         "take": query_info.take,
         "skip": query_info.skip,
@@ -78,38 +205,293 @@ async def list_transfers_endpoint(
 @router.post(
     "/businesses/{business_id}/transfers/create",
     summary="ایجاد سند انتقال",
-    description="ایجاد سند انتقال جدید",
+    description="""
+    ایجاد سند انتقال جدید برای جابجایی وجه بین حساب‌های مختلف
+    
+    ### انواع حساب مبدا/مقصد:
+    - `bank_account`: حساب بانکی - برای انتقال از/به حساب‌های بانکی
+    - `cash_register`: صندوق - برای انتقال از/به صندوق‌های نقدی
+    - `petty_cash`: تنخواه - برای انتقال از/به تنخواه‌گردان‌ها
+    
+    ### قوانین و محدودیت‌ها:
+    - ✅ مبلغ انتقال باید بزرگتر از صفر باشد
+    - ✅ مبدا و مقصد نمی‌توانند یکسان باشند
+    - ✅ تاریخ سند باید در بازه سال مالی فعال باشد
+    - ✅ کارمزد (اختیاری) باید صفر یا مثبت باشد
+    - ✅ کاربر باید مجوز "ایجاد سند انتقال" داشته باشد
+    
+    ### فرآیند ثبت:
+    1. اعتبارسنجی مبدا و مقصد
+    2. بررسی موجودی کافی در مبدا (در صورت نیاز)
+    3. ایجاد سند انتقال
+    4. ثبت اتوماتیک در دفتر کل حسابداری
+    5. به‌روزرسانی موجودی حساب‌ها
+    
+    ### نکات:
+    - سند انتقال به صورت خودکار در دفتر کل ثبت می‌شود
+    - می‌توانید کارمزد انتقال را جداگانه ثبت کنید
+    - تاریخ را می‌توانید به فرمت ISO (YYYY-MM-DD) یا جلالی (YYYY/MM/DD) ارسال کنید
+    """,
+    response_model=SuccessResponse,
+    responses={
+        200: {
+            "description": "سند انتقال با موفقیت ایجاد شد",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "success": True,
+                        "message": "سند انتقال با موفقیت ایجاد شد",
+                        "data": {
+                            "id": 123,
+                            "code": "T-1001",
+                            "business_id": 1,
+                            "document_type_name": "انتقال",
+                            "source_type": "bank_account",
+                            "source_name": "بانک ملت - 1234567890",
+                            "destination_type": "cash_register",
+                            "destination_name": "صندوق اصلی",
+                            "total_amount": 1000000,
+                            "commission": 5000,
+                            "document_date": "1403/10/15",
+                            "created_by_name": "احمد احمدی",
+                            "created_at": "1403/10/15 14:30:00"
+                        }
+                    }
+                }
+            }
+        },
+        400: {
+            "description": "خطا در اعتبارسنجی داده‌ها",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "invalid_amount": {
+                            "summary": "مبلغ نامعتبر",
+                            "value": {
+                                "success": False,
+                                "error_code": "INVALID_AMOUNT",
+                                "message": "مبلغ باید بزرگتر از صفر باشد"
+                            }
+                        },
+                        "same_source_destination": {
+                            "summary": "مبدا و مقصد یکسان",
+                            "value": {
+                                "success": False,
+                                "error_code": "SAME_SOURCE_DESTINATION",
+                                "message": "مبدا و مقصد نمی‌توانند یکسان باشند"
+                            }
+                        },
+                        "invalid_date": {
+                            "summary": "تاریخ خارج از سال مالی",
+                            "value": {
+                                "success": False,
+                                "error_code": "DATE_OUT_OF_FISCAL_YEAR",
+                                "message": "تاریخ سند باید در بازه سال مالی فعال باشد"
+                            }
+                        },
+                        "insufficient_balance": {
+                            "summary": "موجودی ناکافی",
+                            "value": {
+                                "success": False,
+                                "error_code": "INSUFFICIENT_BALANCE",
+                                "message": "موجودی حساب مبدا کافی نیست"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        403: {
+            "description": "عدم دسترسی - کاربر مجوز ایجاد سند انتقال را ندارد",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "success": False,
+                        "error_code": "FORBIDDEN",
+                        "message": "شما مجوز ایجاد سند انتقال را ندارید"
+                    }
+                }
+            }
+        },
+        404: {
+            "description": "مبدا یا مقصد یافت نشد",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "source_not_found": {
+                            "summary": "مبدا یافت نشد",
+                            "value": {
+                                "success": False,
+                                "error_code": "SOURCE_NOT_FOUND",
+                                "message": "حساب مبدا یافت نشد"
+                            }
+                        },
+                        "destination_not_found": {
+                            "summary": "مقصد یافت نشد",
+                            "value": {
+                                "success": False,
+                                "error_code": "DESTINATION_NOT_FOUND",
+                                "message": "حساب مقصد یافت نشد"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 )
 @require_business_access("business_id")
 async def create_transfer_endpoint(
     request: Request,
-    business_id: int,
-    body: Dict[str, Any] = Body(...),
+    business_id: int = Path(
+        ..., 
+        description="شناسه کسب‌وکار",
+        example=1,
+        gt=0
+    ),
+    body: TransferCreateRequest = Body(
+        ...,
+        description="اطلاعات سند انتقال",
+        example={
+            "source_type": "bank_account",
+            "source_id": 1,
+            "destination_type": "cash_register",
+            "destination_id": 2,
+            "total_amount": 1000000,
+            "commission": 5000,
+            "document_date": "2024-01-15",
+            "description": "انتقال وجه بابت خرید مواد اولیه"
+        }
+    ),
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
     _: None = Depends(require_business_permission_dep("transfers", "add")),
 ):
-    created = create_transfer(db, business_id, ctx.get_user_id(), body)
+    """
+    ایجاد سند انتقال جدید
+    
+    این endpoint برای ثبت انتقال وجه بین حساب‌های مختلف استفاده می‌شود.
+    سند به صورت خودکار در دفتر کل ثبت شده و موجودی حساب‌ها به‌روزرسانی می‌شود.
+    """
+    # تبدیل Pydantic model به dict برای سرویس
+    body_dict = body.dict(exclude_none=True)
+    created = create_transfer(db, business_id, ctx.get_user_id(), body_dict)
     return success_response(data=format_datetime_fields(created, request), request=request, message="TRANSFER_CREATED")
 
 
 @router.get(
     "/transfers/{document_id}",
     summary="جزئیات سند انتقال",
-    description="دریافت جزئیات یک سند انتقال",
+    description="""
+    دریافت جزئیات کامل یک سند انتقال
+    
+    ### اطلاعات برگشتی:
+    - اطلاعات کامل مبدا و مقصد
+    - آیتم‌های حسابداری سند
+    - اطلاعات ایجادکننده و ویرایش‌کننده
+    - تاریخ‌های ثبت و ویرایش
+    - وضعیت سند
+    
+    ### کاربردها:
+    - نمایش جزئیات سند
+    - چاپ و دانلود PDF
+    - ویرایش سند (دریافت اطلاعات فعلی)
+    - بررسی سابقه تراکنش‌ها
+    """,
+    response_model=SuccessResponse,
+    responses={
+        200: {
+            "description": "جزئیات سند با موفقیت دریافت شد",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "success": True,
+                        "message": "جزئیات سند انتقال دریافت شد",
+                        "data": {
+                            "id": 123,
+                            "code": "T-1001",
+                            "business_id": 1,
+                            "source_type": "bank_account",
+                            "source_name": "بانک ملت - 1234567890",
+                            "destination_type": "cash_register",
+                            "destination_name": "صندوق اصلی",
+                            "total_amount": 1000000,
+                            "commission": 5000,
+                            "document_date": "1403/10/15",
+                            "description": "انتقال وجه بابت خرید مواد اولیه",
+                            "account_lines": [
+                                {
+                                    "account_code": "1201",
+                                    "account_name": "بانک ملت",
+                                    "debit": 0,
+                                    "credit": 1005000
+                                },
+                                {
+                                    "account_code": "1101",
+                                    "account_name": "صندوق",
+                                    "debit": 1000000,
+                                    "credit": 0
+                                }
+                            ],
+                            "created_by_name": "احمد احمدی",
+                            "created_at": "1403/10/15 14:30:00"
+                        }
+                    }
+                }
+            }
+        },
+        403: {
+            "description": "عدم دسترسی به سند",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "success": False,
+                        "error_code": "FORBIDDEN",
+                        "message": "شما به این سند دسترسی ندارید"
+                    }
+                }
+            }
+        },
+        404: {
+            "description": "سند یافت نشد",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "success": False,
+                        "error_code": "DOCUMENT_NOT_FOUND",
+                        "message": "سند انتقال یافت نشد"
+                    }
+                }
+            }
+        }
+    }
 )
 async def get_transfer_endpoint(
     request: Request,
-    document_id: int,
+    document_id: int = Path(
+        ..., 
+        description="شناسه سند انتقال",
+        example=123,
+        gt=0
+    ),
+    include_lines: bool = Query(
+        False,
+        description="شامل کردن آیتم‌های حسابداری سند"
+    ),
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
 ):
+    """
+    دریافت جزئیات کامل سند انتقال
+    
+    این endpoint تمام اطلاعات مربوط به یک سند انتقال را برمی‌گرداند.
+    """
     result = get_transfer(db, document_id)
     if not result:
-        raise ApiError("DOCUMENT_NOT_FOUND", "Transfer document not found", http_status=404)
+        raise ApiError("DOCUMENT_NOT_FOUND", "سند انتقال یافت نشد", http_status=404)
     business_id = result.get("business_id")
     if business_id and not ctx.can_access_business(business_id):
-        raise ApiError("FORBIDDEN", "Access denied", http_status=403)
+        raise ApiError("FORBIDDEN", "شما به این سند دسترسی ندارید", http_status=403)
     return success_response(data=format_datetime_fields(result, request), request=request, message="TRANSFER_DETAILS")
 
 
@@ -375,46 +757,263 @@ async def export_single_transfer_pdf(
 @router.delete(
     "/transfers/{document_id}",
     summary="حذف سند انتقال",
-    description="حذف یک سند انتقال",
+    description="""
+    حذف یک سند انتقال موجود
+    
+    ### عملیات حذف:
+    - سند از سیستم حذف می‌شود
+    - آیتم‌های حسابداری سند حذف می‌شوند
+    - موجودی حساب‌ها به حالت قبل برمی‌گردد
+    - عملیات قابل بازگشت نیست
+    
+    ### محدودیت‌ها:
+    - نمی‌توانید سند قفل شده را حذف کنید
+    - نمی‌توانید سند تایید شده را حذف کنید (ابتدا باید لغو تایید شود)
+    - نمی‌توانید سند مرتبط با سایر اسناد را حذف کنید
+    
+    ### هشدار:
+    ⚠️ این عملیات غیرقابل بازگشت است! سند به صورت کامل از سیستم حذف می‌شود.
+    
+    ### نکات امنیتی:
+    - نیاز به مجوز "حذف سند انتقال" دارید
+    - حذف در لاگ سیستم ثبت می‌شود
+    - اطلاعات کاربر حذف‌کننده ذخیره می‌شود
+    """,
+    response_model=SuccessResponse,
+    responses={
+        200: {
+            "description": "سند با موفقیت حذف شد",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "success": True,
+                        "message": "سند انتقال با موفقیت حذف شد",
+                        "data": {
+                            "deleted": True,
+                            "document_id": 123
+                        }
+                    }
+                }
+            }
+        },
+        400: {
+            "description": "سند قابل حذف نیست",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "locked_document": {
+                            "summary": "سند قفل شده",
+                            "value": {
+                                "success": False,
+                                "error_code": "DOCUMENT_LOCKED",
+                                "message": "سند قفل شده و قابل حذف نیست"
+                            }
+                        },
+                        "confirmed_document": {
+                            "summary": "سند تایید شده",
+                            "value": {
+                                "success": False,
+                                "error_code": "DOCUMENT_CONFIRMED",
+                                "message": "سند تایید شده است. ابتدا باید لغو تایید شود"
+                            }
+                        },
+                        "has_dependencies": {
+                            "summary": "سند دارای وابستگی",
+                            "value": {
+                                "success": False,
+                                "error_code": "HAS_DEPENDENCIES",
+                                "message": "این سند با سایر اسناد مرتبط است و قابل حذف نیست"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        403: {
+            "description": "عدم مجوز حذف",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "success": False,
+                        "error_code": "FORBIDDEN",
+                        "message": "شما مجوز حذف این سند را ندارید"
+                    }
+                }
+            }
+        },
+        404: {
+            "description": "سند یافت نشد",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "success": False,
+                        "error_code": "DOCUMENT_NOT_FOUND",
+                        "message": "سند انتقال یافت نشد"
+                    }
+                }
+            }
+        }
+    }
 )
 async def delete_transfer_endpoint(
     request: Request,
-    document_id: int,
+    document_id: int = Path(
+        ..., 
+        description="شناسه سند انتقال برای حذف",
+        example=123,
+        gt=0
+    ),
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
     _: None = Depends(require_business_permission_by_entity_dep("transfers", "delete", Document, "document_id")),
 ):
+    """
+    حذف سند انتقال
+    
+    ⚠️ هشدار: این عملیات غیرقابل بازگشت است!
+    """
     result = get_transfer(db, document_id)
     if result:
         business_id = result.get("business_id")
         if business_id and not ctx.can_access_business(business_id):
-            raise ApiError("FORBIDDEN", "Access denied", http_status=403)
+            raise ApiError("FORBIDDEN", "شما به این سند دسترسی ندارید", http_status=403)
     ok = delete_transfer(db, document_id)
     if not ok:
-        raise ApiError("DOCUMENT_NOT_FOUND", "Transfer document not found", http_status=404)
-    return success_response(data=None, request=request, message="TRANSFER_DELETED")
+        raise ApiError("DOCUMENT_NOT_FOUND", "سند انتقال یافت نشد", http_status=404)
+    return success_response(data={"deleted": True, "document_id": document_id}, request=request, message="TRANSFER_DELETED")
 
 
 @router.put(
     "/transfers/{document_id}",
     summary="ویرایش سند انتقال",
-    description="به‌روزرسانی یک سند انتقال",
+    description="""
+    ویرایش و به‌روزرسانی یک سند انتقال موجود
+    
+    ### فیلدهای قابل ویرایش:
+    - مبدا و مقصد (نوع و شناسه)
+    - مبلغ کل
+    - کارمزد
+    - تاریخ سند
+    - توضیحات
+    
+    ### محدودیت‌ها:
+    - نمی‌توانید سند قفل شده را ویرایش کنید
+    - نمی‌توانید سند تایید شده در دفتر کل را ویرایش کنید (باید ابتدا لغو تایید شود)
+    - تاریخ جدید باید در بازه سال مالی باشد
+    - مبدا و مقصد نمی‌توانند یکسان باشند
+    
+    ### نکات:
+    - فقط فیلدهایی که ارسال می‌کنید تغییر می‌کنند
+    - سایر فیلدها بدون تغییر باقی می‌مانند
+    - پس از ویرایش، موجودی حساب‌ها خودکار به‌روزرسانی می‌شود
+    - سابقه ویرایش ثبت می‌شود
+    """,
+    response_model=SuccessResponse,
+    responses={
+        200: {
+            "description": "سند با موفقیت ویرایش شد",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "success": True,
+                        "message": "سند انتقال با موفقیت ویرایش شد",
+                        "data": {
+                            "id": 123,
+                            "code": "T-1001",
+                            "total_amount": 1200000,
+                            "description": "انتقال وجه بابت خرید مواد اولیه - ویرایش شده",
+                            "updated_at": "1403/10/16 09:15:00"
+                        }
+                    }
+                }
+            }
+        },
+        400: {
+            "description": "خطا در اعتبارسنجی",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "locked_document": {
+                            "summary": "سند قفل شده",
+                            "value": {
+                                "success": False,
+                                "error_code": "DOCUMENT_LOCKED",
+                                "message": "این سند قفل شده و قابل ویرایش نیست"
+                            }
+                        },
+                        "confirmed_document": {
+                            "summary": "سند تایید شده",
+                            "value": {
+                                "success": False,
+                                "error_code": "DOCUMENT_CONFIRMED",
+                                "message": "سند تایید شده است. ابتدا باید لغو تایید شود"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        403: {
+            "description": "عدم مجوز ویرایش",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "success": False,
+                        "error_code": "FORBIDDEN",
+                        "message": "شما مجوز ویرایش این سند را ندارید"
+                    }
+                }
+            }
+        },
+        404: {
+            "description": "سند یافت نشد",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "success": False,
+                        "error_code": "DOCUMENT_NOT_FOUND",
+                        "message": "سند انتقال یافت نشد"
+                    }
+                }
+            }
+        }
+    }
 )
 async def update_transfer_endpoint(
     request: Request,
-    document_id: int,
-    body: Dict[str, Any] = Body(...),
+    document_id: int = Path(
+        ..., 
+        description="شناسه سند انتقال",
+        example=123,
+        gt=0
+    ),
+    body: TransferUpdateRequest = Body(
+        ...,
+        description="فیلدهای جدید برای ویرایش (فقط فیلدهای ارسال شده تغییر می‌کنند)",
+        example={
+            "total_amount": 1200000,
+            "description": "انتقال وجه بابت خرید مواد اولیه - ویرایش شده"
+        }
+    ),
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
     _: None = Depends(require_business_permission_by_entity_dep("transfers", "edit", Document, "document_id")),
 ):
+    """
+    ویرایش سند انتقال موجود
+    
+    فقط فیلدهایی که در body ارسال می‌شوند تغییر می‌کنند.
+    """
     result = get_transfer(db, document_id)
     if not result:
-        raise ApiError("DOCUMENT_NOT_FOUND", "Transfer document not found", http_status=404)
+        raise ApiError("DOCUMENT_NOT_FOUND", "سند انتقال یافت نشد", http_status=404)
     business_id = result.get("business_id")
     if business_id and not ctx.can_access_business(business_id):
-        raise ApiError("FORBIDDEN", "Access denied", http_status=403)
-    updated = update_transfer(db, document_id, ctx.get_user_id(), body)
+        raise ApiError("FORBIDDEN", "شما به این سند دسترسی ندارید", http_status=403)
+    
+    # تبدیل Pydantic model به dict (فقط فیلدهای set شده)
+    body_dict = body.dict(exclude_unset=True)
+    updated = update_transfer(db, document_id, ctx.get_user_id(), body_dict)
     return success_response(data=format_datetime_fields(updated, request), request=request, message="TRANSFER_UPDATED")
 
 

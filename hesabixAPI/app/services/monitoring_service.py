@@ -253,6 +253,9 @@ class ServiceMonitoringService:
 		# Background Workers (RQ)
 		services["workers"] = self.check_workers()
 		
+		# Notification Moderation Worker
+		services["notification_moderation"] = self.check_notification_moderation_worker()
+		
 		return services
 	
 	def check_api_server(self) -> Dict[str, Any]:
@@ -391,6 +394,71 @@ class ServiceMonitoringService:
 			}
 		except Exception as e:
 			logger.error(f"Error checking workers: {e}")
+			return {
+				"status": "unknown",
+				"error": str(e),
+				"last_check": datetime.utcnow().isoformat(),
+			}
+	
+	def check_notification_moderation_worker(self) -> Dict[str, Any]:
+		"""بررسی وضعیت Notification Moderation Worker"""
+		try:
+			import subprocess
+			
+			service_name = "hesabix-notification-moderation"
+			
+			# بررسی فعال بودن سرویس
+			is_active_cmd = ["systemctl", "is-active", service_name]
+			is_active_result = subprocess.run(
+				is_active_cmd,
+				capture_output=True,
+				text=True,
+				timeout=5,
+				check=False
+			)
+			
+			is_active = is_active_result.stdout.strip() == "active"
+			
+			# دریافت آمار از دیتابیس
+			from adapters.db.models.business_notification import NotificationModerationQueue
+			from sqlalchemy import func, and_
+			
+			# تعداد در صف
+			pending_count = self.db.query(func.count(NotificationModerationQueue.id)).filter(
+				NotificationModerationQueue.status.in_(['pending', 'ai_reviewing'])
+			).scalar() or 0
+			
+			# تعداد بررسی شده امروز
+			today = datetime.utcnow().date()
+			reviewed_today = self.db.query(func.count(NotificationModerationQueue.id)).filter(
+				and_(
+					NotificationModerationQueue.status == 'completed',
+					func.date(NotificationModerationQueue.completed_at) == today
+				)
+			).scalar() or 0
+			
+			# آخرین فعالیت
+			last_review = self.db.query(NotificationModerationQueue).filter(
+				NotificationModerationQueue.ai_reviewed_at.isnot(None)
+			).order_by(NotificationModerationQueue.ai_reviewed_at.desc()).first()
+			
+			last_activity = None
+			if last_review and last_review.ai_reviewed_at:
+				last_activity = last_review.ai_reviewed_at.isoformat()
+			
+			return {
+				"status": "online" if is_active else "offline",
+				"is_active": is_active,
+				"queue": {
+					"pending": pending_count,
+					"reviewed_today": reviewed_today
+				},
+				"last_activity": last_activity,
+				"service_name": service_name,
+				"last_check": datetime.utcnow().isoformat(),
+			}
+		except Exception as e:
+			logger.error(f"Error checking notification moderation worker: {e}")
 			return {
 				"status": "unknown",
 				"error": str(e),

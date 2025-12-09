@@ -24,7 +24,7 @@ from app.services.system_settings_service import get_zohal_settings
 
 logger = structlog.get_logger()
 
-router = APIRouter(prefix="/businesses/{business_id}/zohal", tags=["zohal"])
+router = APIRouter(prefix="/businesses/{business_id}/zohal", tags=["یکپارچه‌سازی", "مالیات"])
 
 
 # ==================== لیست سرویس‌ها ====================

@@ -12,7 +12,7 @@ from adapters.db.repositories.ai_prompt_repository import AIPromptRepository
 from adapters.db.models.ai_prompt import PromptRole, PromptType
 from pydantic import BaseModel
 
-router = APIRouter(prefix="/ai/prompts", tags=["ai-prompts"])
+router = APIRouter(prefix="/ai/prompts", tags=["هوش مصنوعی"])
 
 
 class CreatePromptRequest(BaseModel):

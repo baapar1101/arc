@@ -24,7 +24,7 @@ from app.services.session_service import list_user_sessions, revoke_session, rev
 from app.core.rate_limiter import rate_limit, get_client_ip
 
 
-router = APIRouter(prefix="/auth", tags=["auth"]) 
+router = APIRouter(prefix="/auth", tags=["احراز هویت"]) 
 
 
 @router.post("/captcha", 

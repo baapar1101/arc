@@ -43,7 +43,7 @@ from app.services.check_reconciliation_service import (
 )
 
 
-router = APIRouter(prefix="/checks", tags=["checks"])
+router = APIRouter(prefix="/checks", tags=["مدیریت مالی", "دریافت و پرداخت"])
 
 
 @router.post(

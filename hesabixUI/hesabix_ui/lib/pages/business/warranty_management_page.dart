@@ -39,7 +39,10 @@ class _WarrantyManagementPageState extends State<WarrantyManagementPage> {
   int? _productIdFilter;
   List<Product> _products = [];
   bool _loadingProducts = false;
-  final GlobalKey _refreshKey = GlobalKey();
+  int _refreshCounter = 0;
+  final Set<int> _selectedRowIndices = {};
+  List<WarrantyCode> _currentPageCodes = [];
+  bool _isFirstRowInNewLoad = true;
 
   @override
   void initState() {
@@ -72,12 +75,11 @@ class _WarrantyManagementPageState extends State<WarrantyManagementPage> {
     if (!mounted) return;
     
     setState(() {
-      _refreshKey.currentState;
+      _currentPageCodes.clear();
+      _selectedRowIndices.clear();
+      _isFirstRowInNewLoad = true;
+      _refreshCounter++; // تغییر counter برای rebuild کامل
     });
-    // Force rebuild by changing key
-    if (mounted) {
-      setState(() {});
-    }
   }
 
   @override
@@ -92,6 +94,12 @@ class _WarrantyManagementPageState extends State<WarrantyManagementPage> {
         backgroundColor: colorScheme.surface,
         foregroundColor: colorScheme.onSurface,
         actions: [
+          if (_selectedRowIndices.isNotEmpty)
+            IconButton(
+              icon: const Icon(Icons.delete),
+              tooltip: 'حذف موارد انتخاب شده',
+              onPressed: () => _confirmBulkDelete(context),
+            ),
           IconButton(
             icon: const Icon(Icons.link),
             tooltip: 'لینک فعال‌سازی گارانتی',
@@ -114,12 +122,42 @@ class _WarrantyManagementPageState extends State<WarrantyManagementPage> {
       body: Column(
         children: [
           _buildFilters(context, theme, t),
+          if (_selectedRowIndices.isNotEmpty)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              color: colorScheme.primaryContainer,
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline, size: 20, color: colorScheme.onPrimaryContainer),
+                  const SizedBox(width: 8),
+                  Text(
+                    '${_selectedRowIndices.length} مورد انتخاب شده',
+                    style: TextStyle(color: colorScheme.onPrimaryContainer),
+                  ),
+                  const Spacer(),
+                  TextButton(
+                    onPressed: () => setState(() => _selectedRowIndices.clear()),
+                    child: Text('لغو انتخاب', style: TextStyle(color: colorScheme.onPrimaryContainer)),
+                  ),
+                ],
+              ),
+            ),
           Expanded(
             child: DataTableWidget<WarrantyCode>(
-              key: ValueKey('warranty_codes_${_statusFilter}_${_productIdFilter}_${_refreshKey}'),
+              key: ValueKey('warranty_codes_${_statusFilter}_${_productIdFilter}_$_refreshCounter'),
               calendarController: widget.calendarController,
               config: _buildTableConfig(t, theme),
-              fromJson: (json) => WarrantyCode.fromJson(json),
+              fromJson: (json) {
+                final code = WarrantyCode.fromJson(json);
+                // ذخیره کدها برای استفاده در حذف
+                // اگر این اولین ردیف است، لیست را پاک کن
+                if (_isFirstRowInNewLoad) {
+                  _currentPageCodes.clear();
+                  _isFirstRowInNewLoad = false;
+                }
+                _currentPageCodes.add(code);
+                return code;
+              },
               onRefresh: _refreshTable,
             ),
           ),
@@ -231,7 +269,33 @@ class _WarrantyManagementPageState extends State<WarrantyManagementPage> {
       endpoint: endpoint,
       httpMethod: 'GET',
       onRowTap: (code) => _showCodeDetails(context, code as WarrantyCode),
+      enableRowSelection: true,
+      enableMultiRowSelection: true,
+      selectedRows: _selectedRowIndices,
+      onRowSelectionChanged: (selectedIndices) {
+        setState(() {
+          _selectedRowIndices.clear();
+          _selectedRowIndices.addAll(selectedIndices);
+        });
+      },
       columns: [
+        ActionColumn(
+          'actions',
+          'عملیات',
+          actions: [
+            DataTableAction(
+              icon: Icons.visibility,
+              label: 'مشاهده',
+              onTap: (item) => _showCodeDetails(context, item as WarrantyCode),
+            ),
+            DataTableAction(
+              icon: Icons.delete_outline,
+              label: 'حذف',
+              color: theme.colorScheme.error,
+              onTap: (item) => _confirmSingleDelete(context, item as WarrantyCode),
+            ),
+          ],
+        ),
         TextColumn(
           'code',
           t.warrantyCode,
@@ -396,6 +460,303 @@ class _WarrantyManagementPageState extends State<WarrantyManagementPage> {
             icon: const Icon(Icons.copy),
             label: const Text('کپی لینک'),
           ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _confirmSingleDelete(BuildContext context, WarrantyCode code) async {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    
+    // بررسی وضعیت کد
+    final isActivated = code.status == WarrantyStatus.activated || code.status == WarrantyStatus.used;
+    
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.warning, color: colorScheme.error),
+            const SizedBox(width: 8),
+            const Text('تأیید حذف'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('آیا از حذف کد گارانتی "${code.code}" اطمینان دارید؟'),
+            if (isActivated) ...[
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: colorScheme.errorContainer,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline, size: 20, color: colorScheme.onErrorContainer),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'این کد فعال شده است. حذف آن ممکن است داده‌های مشتری را تحت تأثیر قرار دهد.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: colorScheme.onErrorContainer,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('انصراف'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: colorScheme.error,
+              foregroundColor: colorScheme.onError,
+            ),
+            child: const Text('حذف'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      await _deleteSingleCode(code, isActivated);
+    }
+  }
+
+  Future<void> _deleteSingleCode(WarrantyCode code, bool force) async {
+    if (code.id == null) {
+      if (mounted) {
+        SnackBarHelper.showError(context, message: 'شناسه کد گارانتی معتبر نیست');
+      }
+      return;
+    }
+    
+    try {
+      await _warrantyService.deleteCode(
+        widget.businessId,
+        code.id!,
+        force: force,
+      );
+      
+      if (mounted) {
+        SnackBarHelper.showSuccess(context, message: 'کد گارانتی با موفقیت حذف شد');
+        _refreshTable();
+      }
+    } catch (e) {
+      if (mounted) {
+        SnackBarHelper.showError(context, message: 'خطا در حذف کد گارانتی: $e');
+      }
+    }
+  }
+
+  Future<void> _confirmBulkDelete(BuildContext context) async {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.warning, color: colorScheme.error),
+            const SizedBox(width: 8),
+            const Text('تأیید حذف گروهی'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('آیا از حذف ${_selectedRowIndices.length} کد گارانتی اطمینان دارید؟'),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: colorScheme.errorContainer,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline, size: 20, color: colorScheme.onErrorContainer),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'کدهای فعال شده به صورت خودکار حذف می‌شوند. این عملیات قابل بازگشت نیست.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: colorScheme.onErrorContainer,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('انصراف'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: colorScheme.error,
+              foregroundColor: colorScheme.onError,
+            ),
+            child: const Text('حذف همه'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      await _deleteBulkCodes();
+    }
+  }
+
+  Future<void> _deleteBulkCodes() async {
+    // تبدیل index های انتخاب شده به id های واقعی
+    final selectedCodes = _selectedRowIndices
+        .where((index) => index < _currentPageCodes.length)
+        .map((index) => _currentPageCodes[index])
+        .where((code) => code.id != null)
+        .toList();
+    
+    if (selectedCodes.isEmpty) {
+      if (mounted) {
+        SnackBarHelper.showError(context, message: 'هیچ کد معتبری برای حذف انتخاب نشده است');
+      }
+      return;
+    }
+    
+    final codeIds = selectedCodes.map((code) => code.id!).toList();
+    
+    try {
+      final result = await _warrantyService.deleteCodes(
+        widget.businessId,
+        codeIds,
+        force: true,
+      );
+      
+      if (mounted) {
+        final summary = result.summary;
+        final deleted = summary['deleted'] ?? 0;
+        final skipped = summary['skipped'] ?? 0;
+        final failed = summary['failed'] ?? 0;
+
+        if (failed > 0 || skipped > 0) {
+          _showBulkDeleteResult(context, result);
+        } else {
+          SnackBarHelper.showSuccess(
+            context,
+            message: '$deleted کد گارانتی با موفقیت حذف شد',
+          );
+        }
+        
+        setState(() {
+          _selectedRowIndices.clear();
+          _currentPageCodes.clear();
+        });
+        _refreshTable();
+      }
+    } catch (e) {
+      if (mounted) {
+        SnackBarHelper.showError(context, message: 'خطا در حذف گروهی: $e');
+      }
+    }
+  }
+
+  void _showBulkDeleteResult(BuildContext context, WarrantyBulkDeleteResponse result) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.info, color: colorScheme.primary),
+            const SizedBox(width: 8),
+            const Text('نتیجه حذف گروهی'),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildSummaryRow('موفق:', result.summary['deleted'] ?? 0, colorScheme.primary),
+              _buildSummaryRow('رد شده:', result.summary['skipped'] ?? 0, colorScheme.tertiary),
+              _buildSummaryRow('خطا:', result.summary['failed'] ?? 0, colorScheme.error),
+              const SizedBox(height: 16),
+              if (result.skippedCodes.isNotEmpty) ...[
+                Text(
+                  'کدهای رد شده:',
+                  style: TextStyle(fontWeight: FontWeight.bold, color: colorScheme.tertiary),
+                ),
+                const SizedBox(height: 8),
+                ...result.skippedCodes.take(5).map((code) => Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Text(
+                    '- ${code['code']}: ${code['reason']}',
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                )),
+                if (result.skippedCodes.length > 5)
+                  Text('... و ${result.skippedCodes.length - 5} مورد دیگر', style: const TextStyle(fontSize: 12)),
+              ],
+              if (result.failedCodes.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Text(
+                  'کدهای خطا:',
+                  style: TextStyle(fontWeight: FontWeight.bold, color: colorScheme.error),
+                ),
+                const SizedBox(height: 8),
+                ...result.failedCodes.take(5).map((code) => Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Text(
+                    '- ID ${code['id']}: ${code['reason']}',
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                )),
+                if (result.failedCodes.length > 5)
+                  Text('... و ${result.failedCodes.length - 5} مورد دیگر', style: const TextStyle(fontSize: 12)),
+              ],
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('بستن'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSummaryRow(String label, int count, Color color) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: TextStyle(color: color)),
+          Text('$count', style: TextStyle(fontWeight: FontWeight.bold, color: color)),
         ],
       ),
     );

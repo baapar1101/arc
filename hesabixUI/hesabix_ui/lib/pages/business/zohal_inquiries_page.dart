@@ -6,6 +6,7 @@ import '../../core/auth_store.dart';
 import '../../services/zohal_service.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/number_formatters.dart' show formatWithThousands;
+import '../../widgets/zohal/identity_inquiry_dialog.dart';
 
 class ZohalInquiriesPage extends StatefulWidget {
   final int businessId;
@@ -80,7 +81,15 @@ class _ZohalInquiriesPageState extends State<ZohalInquiriesPage> {
     }
   }
 
-  void _selectService(Map<String, dynamic> service) {
+  void _selectService(Map<String, dynamic> service) async {
+    final serviceCode = service['service_code']?.toString() ?? '';
+    
+    // برای استعلام اطلاعات هویتی، دیالوگ شخصی‌سازی شده را نمایش می‌دهیم
+    if (_isIdentityInquiry(serviceCode)) {
+      await _showIdentityInquiryDialog();
+      return;
+    }
+
     setState(() {
       _selectedService = service;
       _lastResult = null;
@@ -94,6 +103,33 @@ class _ZohalInquiriesPageState extends State<ZohalInquiriesPage> {
       if (!_fieldControllers.containsKey(key)) {
         _fieldControllers[key] = TextEditingController();
       }
+    }
+  }
+
+  /// بررسی اینکه آیا سرویس، استعلام اطلاعات هویتی است یا نه
+  bool _isIdentityInquiry(String serviceCode) {
+    final normalized = serviceCode.toLowerCase().replaceAll('/', '_').replaceAll('-', '_');
+    return normalized.contains('identity') || 
+           normalized.contains('national_identity') ||
+           normalized.contains('national_code') ||
+           serviceCode.contains('national_identity_inquiry');
+  }
+
+  /// نمایش دیالوگ استعلام اطلاعات هویتی
+  Future<void> _showIdentityInquiryDialog() async {
+    final result = await IdentityInquiryDialog.show(
+      context,
+      businessId: widget.businessId,
+    );
+
+    if (result != null) {
+      // به‌روزرسانی موجودی کیف پول
+      await _load();
+      
+      // نمایش نتیجه در صفحه (اختیاری)
+      setState(() {
+        _lastResult = result;
+      });
     }
   }
 

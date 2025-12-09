@@ -40,6 +40,14 @@ class _ActivityLogsPageState extends State<ActivityLogsPage> {
     'settings',
     'invoice',
     'document',
+    'workflow',
+    'marketplace',
+    'storage',
+    'payment',
+    'wallet',
+    'warranty',
+    'ai',
+    'support',
     'other',
   ];
 
@@ -101,6 +109,14 @@ class _ActivityLogsPageState extends State<ActivityLogsPage> {
       'settings': 'تنظیمات',
       'invoice': 'فاکتور',
       'document': 'سند',
+      'workflow': 'گردش کار',
+      'marketplace': 'مارکت‌پلیس',
+      'storage': 'ذخیره‌سازی',
+      'payment': 'پرداخت',
+      'wallet': 'کیف پول',
+      'warranty': 'گارانتی',
+      'ai': 'هوش مصنوعی',
+      'support': 'پشتیبانی',
       'other': 'سایر',
     };
     return labels[category] ?? category;
@@ -120,7 +136,12 @@ class _ActivityLogsPageState extends State<ActivityLogsPage> {
       'import': 'ورودی',
       'login': 'ورود',
       'logout': 'خروج',
+      'logout_all': 'خروج از همه',
+      'login_failed': 'ورود ناموفق',
       'password_change': 'تغییر رمز',
+      'execute': 'اجرا',
+      'execute_failed': 'اجرا ناموفق',
+      'restart_service': 'راه‌اندازی مجدد',
     };
     return labels[action] ?? action;
   }
@@ -137,6 +158,14 @@ class _ActivityLogsPageState extends State<ActivityLogsPage> {
       'settings': Colors.teal,
       'invoice': Colors.amber,
       'document': Colors.cyan,
+      'workflow': Colors.deepPurple,
+      'marketplace': Colors.pink,
+      'storage': Colors.brown,
+      'payment': Colors.lightGreen,
+      'wallet': Colors.lime,
+      'warranty': Colors.deepOrange,
+      'ai': Colors.blueGrey,
+      'support': Colors.lightBlue,
       'other': Colors.grey,
     };
     return colors[category] ?? Colors.grey;

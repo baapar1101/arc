@@ -25,7 +25,7 @@ from app.services.warehouse_service import (
 from adapters.db.models.warehouse import Warehouse
 
 
-router = APIRouter(prefix="/warehouses", tags=["warehouses"])
+router = APIRouter(prefix="/warehouses", tags=["انبارداری"])
 
 
 @router.post("/business/{business_id}")

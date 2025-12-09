@@ -34,7 +34,7 @@ from adapters.db.models.business import Business
 from starlette.responses import StreamingResponse
 
 
-router = APIRouter(prefix="/businesses", tags=["businesses"])
+router = APIRouter(prefix="/businesses", tags=["کسب‌وکارها"])
 
 
 @router.post("", 

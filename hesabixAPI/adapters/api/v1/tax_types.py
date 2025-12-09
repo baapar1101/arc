@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from adapters.db.models.tax_type import TaxType
 
 
-router = APIRouter(prefix="/tax-types", tags=["tax-types"])
+router = APIRouter(prefix="/tax-types", tags=["مالیات"])
 
 
 @router.get("/", 

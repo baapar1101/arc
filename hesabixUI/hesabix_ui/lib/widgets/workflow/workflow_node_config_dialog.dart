@@ -3,6 +3,7 @@ import '../../models/workflow_editor_models.dart';
 import '../../models/workflow_editor_state.dart';
 import '../../l10n/app_localizations.dart';
 import '../../services/workflow_service.dart';
+import '../../services/workflow_translation_service.dart';
 
 /// Dialog برای تنظیمات یک node
 class WorkflowNodeConfigDialog extends StatefulWidget {
@@ -30,8 +31,12 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
   final _formKey = GlobalKey<FormState>();
   Map<String, dynamic>? _configSchema;
   final WorkflowService _workflowService = WorkflowService();
+  final WorkflowTranslationService _translationService = WorkflowTranslationService();
   List<Map<String, dynamic>> _telegramUsers = [];
   bool _loadingTelegramUsers = false;
+  Map<String, dynamic>? _translations;
+  List<Map<String, dynamic>> _currencies = [];
+  bool _loadingCurrencies = false;
 
   @override
   void initState() {
@@ -65,6 +70,27 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
     
     // بارگذاری کاربران متصل به تلگرام اگر لازم باشد
     _loadTelegramUsersIfNeeded();
+    
+    // بارگذاری ارزها اگر لازم باشد
+    _loadCurrenciesIfNeeded();
+    
+    // بارگذاری ترجمه‌ها
+    _loadTranslations();
+  }
+  
+  Future<void> _loadTranslations() async {
+    try {
+      final locale = Localizations.localeOf(context);
+      final lang = locale.languageCode;
+      final translations = await _translationService.getTranslations(lang: lang);
+      if (mounted) {
+        setState(() {
+          _translations = translations;
+        });
+      }
+    } catch (e) {
+      debugPrint('خطا در بارگذاری ترجمه‌های ورک‌فلو: $e');
+    }
   }
   
   Future<void> _loadTelegramUsersIfNeeded() async {
@@ -102,10 +128,54 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
     }
   }
 
+  Future<void> _loadCurrenciesIfNeeded() async {
+    if (widget.businessId == null) return;
+    
+    // بررسی اینکه آیا فیلدی با ui_type="currency_selector" وجود دارد
+    bool needsCurrencies = false;
+    if (_configSchema != null) {
+      for (final entry in _configSchema!.entries) {
+        final schema = entry.value;
+        if (schema is Map<String, dynamic>) {
+          final uiType = schema['ui_type'] as String?;
+          if (uiType == 'currency_selector') {
+            needsCurrencies = true;
+            break;
+          }
+        }
+      }
+    }
+    
+    if (needsCurrencies) {
+      setState(() => _loadingCurrencies = true);
+      try {
+        // استفاده از CurrencyService برای لود ارزهای کسب‌وکار
+        final response = await _workflowService.getBusinessCurrencies(
+          businessId: widget.businessId!,
+        );
+        setState(() {
+          _currencies = response;
+          _loadingCurrencies = false;
+        });
+      } catch (e) {
+        debugPrint('خطا در بارگذاری ارزها: $e');
+        // در صورت خطا، از لیست پیش‌فرض استفاده می‌کنیم
+        setState(() {
+          _currencies = [
+            {'id': 1, 'code': 'IRR', 'name': 'ریال', 'symbol': '﷼', 'title': 'ریال ایران'},
+            {'id': 2, 'code': 'USD', 'name': 'دلار آمریکا', 'symbol': '\$', 'title': 'دلار آمریکا'},
+            {'id': 3, 'code': 'EUR', 'name': 'یورو', 'symbol': '€', 'title': 'یورو'},
+            {'id': 4, 'code': 'AED', 'name': 'درهم امارات', 'symbol': 'د.إ', 'title': 'درهم'},
+          ];
+          _loadingCurrencies = false;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final t = Localizations.of(context, MaterialLocalizations);
 
     return AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -161,7 +231,8 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
         ),
         FilledButton(
           onPressed: () {
-            if (_formKey.currentState?.validate() ?? true) {
+            if (_formKey.currentState?.validate() ?? false) {
+              _formKey.currentState?.save();
               Navigator.of(context).pop(_config);
             }
           },
@@ -245,10 +316,24 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
     }
     
     final fieldType = schema['type'] as String?;
-    final description = schema['description'] as String?;
+    var description = schema['description'] as String?;
     final required = schema['required'] == true;
     final defaultValue = schema['default'];
     final enumValues = schema['enum'] as List<dynamic>?;
+    
+    // دریافت ترجمه برای description (اگر موجود باشد)
+    if (_translations != null && widget.node.key != null) {
+      final actionKey = widget.node.key;
+      final descKey = 'field_${key}_desc';
+      
+      // جستجو در ترجمه‌های خاص action
+      if (_translations!.containsKey(actionKey)) {
+        final actionTrans = _translations![actionKey] as Map<String, dynamic>?;
+        if (actionTrans != null && actionTrans.containsKey(descKey)) {
+          description = actionTrans[descKey] as String;
+        }
+      }
+    }
     
     // استفاده از مقدار فعلی یا default
     final value = currentValue ?? defaultValue;
@@ -261,6 +346,10 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
     switch (fieldType) {
       case 'string':
         if (enumValues != null) {
+          // دریافت labels از ui_config (اگر وجود دارد)
+          final uiConfig = schema['ui_config'] as Map<String, dynamic>?;
+          final enumLabels = uiConfig?['labels'] as Map<String, dynamic>?;
+          
           // Dropdown برای enum
           return Padding(
             padding: const EdgeInsets.only(bottom: 16),
@@ -272,9 +361,13 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
                 helperText: description,
               ),
               items: enumValues!.map((e) {
+                final enumValue = e.toString();
+                // استفاده از label ترجمه شده (اگر موجود باشد)
+                final label = enumLabels?[enumValue] as String? ?? _getEnumLabel(enumValue, key);
+                
                 return DropdownMenuItem<String>(
-                  value: e.toString(),
-                  child: Text(e.toString()),
+                  value: enumValue,
+                  child: Text(label),
                 );
               }).toList(),
               onChanged: (newValue) {
@@ -293,6 +386,12 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
         final uiType = schema['ui_type'] as String?;
         if (uiType == 'telegram_user_selector') {
           return _buildTelegramUserSelector(key, schema, value, required, description);
+        } else if (uiType == 'person_selector') {
+          return _buildPersonSelector(key, schema, value, required, description);
+        } else if (uiType == 'product_selector') {
+          return _buildProductSelector(key, schema, value, required, description);
+        } else if (uiType == 'currency_selector') {
+          return _buildCurrencySelector(key, schema, value, required, description);
         }
         
         // Text field برای string با پشتیبانی از Reference
@@ -331,8 +430,10 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
                         ],
                       ),
                     ),
-                    validator: required && (value == null || value.toString().isEmpty)
-                        ? (v) => AppLocalizations.of(context).workflowNodeFieldRequired
+                    validator: required
+                        ? (v) => (v == null || v.isEmpty)
+                            ? AppLocalizations.of(context).workflowNodeFieldRequired
+                            : null
                         : null,
                     onSaved: (newValue) {
                       if (newValue != null && newValue.isNotEmpty) {
@@ -363,6 +464,23 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
         
       case 'number':
       case 'integer':
+        // بررسی ui_type برای فیلدهای خاص number/integer
+        final uiType = schema['ui_type'] as String?;
+        if (uiType == 'currency_selector') {
+          return _buildCurrencySelector(key, schema, value, required, description);
+        } else if (uiType == 'person_selector') {
+          return _buildPersonSelector(key, schema, value, required, description);
+        } else if (uiType == 'product_selector') {
+          return _buildProductSelector(key, schema, value, required, description);
+        } else if (uiType == 'warehouse_selector') {
+          return _buildWarehouseSelector(key, schema, value, required, description);
+        } else if (uiType == 'account_selector') {
+          return _buildAccountSelector(key, schema, value, required, description);
+        } else if (uiType == 'fiscal_year_selector') {
+          return _buildFiscalYearSelector(key, schema, value, required, description);
+        }
+        
+        // Default: TextField عددی
         return Padding(
           padding: const EdgeInsets.only(bottom: 16),
           child: TextFormField(
@@ -374,8 +492,10 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
               suffixIcon: required ? const Icon(Icons.star, size: 12, color: Colors.red) : null,
             ),
             keyboardType: TextInputType.number,
-            validator: required && value == null
-                ? (v) => AppLocalizations.of(context).workflowNodeFieldRequired
+            validator: required
+                ? (v) => (v == null || v.isEmpty)
+                    ? AppLocalizations.of(context).workflowNodeFieldRequired
+                    : null
                 : null,
             onSaved: (newValue) {
               if (newValue != null && newValue.isNotEmpty) {
@@ -405,6 +525,13 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
         );
         
       case 'array':
+        // بررسی اینکه آیا multi-select است
+        final uiType = schema['ui_type'] as String?;
+        if (uiType == 'multi_select') {
+          return _buildMultiSelect(key, schema, value, required, description);
+        }
+        
+        // Default array handling
         // برای array، نمایش ساده
         return Padding(
           padding: const EdgeInsets.only(bottom: 16),
@@ -579,11 +706,53 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
   }
 
   String _formatKey(String key) {
-    // تبدیل camelCase به عنوان خوانا
+    // بررسی ترجمه موجود
+    if (_translations != null && widget.node.key != null) {
+      final actionKey = widget.node.key;
+      final fieldKey = 'field_$key';
+      
+      // جستجو در ترجمه‌های خاص action
+      if (_translations!.containsKey(actionKey)) {
+        final actionTrans = _translations![actionKey] as Map<String, dynamic>?;
+        if (actionTrans != null && actionTrans.containsKey(fieldKey)) {
+          return actionTrans[fieldKey] as String;
+        }
+      }
+      
+      // جستجو در ترجمه‌های مشترک
+      if (_translations!.containsKey(fieldKey)) {
+        return _translations![fieldKey] as String;
+      }
+    }
+    
+    // Fallback: تبدیل camelCase به عنوان خوانا
     return key
         .replaceAllMapped(RegExp(r'([A-Z])'), (match) => ' ${match.group(0)}')
         .trim()
         .replaceRange(0, 1, key[0].toUpperCase());
+  }
+  
+  /// دریافت label برای enum
+  String _getEnumLabel(String enumValue, String fieldKey) {
+    // بررسی ترجمه موجود
+    if (_translations != null && widget.node.key != null) {
+      final actionKey = widget.node.key;
+      final labelKey = enumValue.replaceAll('-', '_').replaceAll('.', '_');
+      
+      // جستجو در ترجمه‌های خاص action
+      if (_translations!.containsKey(actionKey)) {
+        final actionTrans = _translations![actionKey] as Map<String, dynamic>?;
+        if (actionTrans != null && actionTrans.containsKey(labelKey)) {
+          return actionTrans[labelKey] as String;
+        }
+      }
+    }
+    
+    // Fallback: فرمت کردن enum value
+    return enumValue
+        .split('_')
+        .map((word) => word.isEmpty ? '' : word[0].toUpperCase() + word.substring(1))
+        .join(' ');
   }
 
   Color _getNodeColor(WorkflowNodeType type, ThemeData theme) {
@@ -779,27 +948,558 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
     );
   }
 
+  /// ساخت Person Selector
+  Widget _buildPersonSelector(
+    String key,
+    Map<String, dynamic> schema,
+    dynamic currentValue,
+    bool required,
+    String? description,
+  ) {
+    final theme = Theme.of(context);
+    
+    // برای حالت reference
+    if (currentValue?.toString().startsWith('\$') ?? false) {
+      return _buildReferenceTextField(key, schema, currentValue, required, description);
+    }
+    
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            _formatKey(key),
+            style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
+          ),
+          if (description != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 4, bottom: 8),
+              child: Text(
+                description,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          const SizedBox(height: 8),
+          // Note: PersonComboboxWidget نیاز به businessId داره که باید از context بگیریم
+          TextFormField(
+            initialValue: currentValue?.toString(),
+            decoration: InputDecoration(
+              labelText: 'شناسه طرف حساب',
+              border: OutlineInputBorder(),
+              helperText: 'می‌توانید شناسه را وارد کنید یا از نود قبلی استفاده کنید: \$node_id.person_id',
+              suffixIcon: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (widget.allNodes != null && widget.allNodes!.isNotEmpty)
+                    IconButton(
+                      icon: Icon(Icons.link, size: 18),
+                      tooltip: 'استفاده از نود قبلی',
+                      onPressed: () => _showReferenceSelector(key),
+                    ),
+                  if (required)
+                    Icon(Icons.star, size: 12, color: Colors.red),
+                ],
+              ),
+            ),
+            validator: required
+                ? (v) => (v == null || v.isEmpty)
+                    ? 'این فیلد الزامی است'
+                    : null
+                : null,
+            onSaved: (newValue) {
+              if (newValue != null && newValue.isNotEmpty) {
+                _config[key] = int.tryParse(newValue) ?? newValue;
+              } else if (!required) {
+                _config.remove(key);
+              }
+            },
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '💡 نکته: در حال حاضر باید شناسه طرف حساب را وارد کنید',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: Colors.orange,
+              fontStyle: FontStyle.italic,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// ساخت Product Selector
+  Widget _buildProductSelector(
+    String key,
+    Map<String, dynamic> schema,
+    dynamic currentValue,
+    bool required,
+    String? description,
+  ) {
+    // مشابه Person Selector - فعلاً TextField ساده
+    return _buildPersonSelector(key, schema, currentValue, required, description ?? 'شناسه محصول');
+  }
+
+  /// ساخت Warehouse Selector (stub - برای آینده)
+  Widget _buildWarehouseSelector(
+    String key,
+    Map<String, dynamic> schema,
+    dynamic currentValue,
+    bool required,
+    String? description,
+  ) {
+    // فعلاً مانند TextField عددی عمل می‌کند
+    return _buildNumberFieldWithReference(key, schema, currentValue, required, description, 'integer');
+  }
+
+  /// ساخت Account Selector (stub - برای آینده)
+  Widget _buildAccountSelector(
+    String key,
+    Map<String, dynamic> schema,
+    dynamic currentValue,
+    bool required,
+    String? description,
+  ) {
+    // فعلاً مانند TextField عددی عمل می‌کند
+    return _buildNumberFieldWithReference(key, schema, currentValue, required, description, 'integer');
+  }
+
+  /// ساخت Fiscal Year Selector (stub - برای آینده)
+  Widget _buildFiscalYearSelector(
+    String key,
+    Map<String, dynamic> schema,
+    dynamic currentValue,
+    bool required,
+    String? description,
+  ) {
+    // فعلاً مانند TextField عددی عمل می‌کند
+    return _buildNumberFieldWithReference(key, schema, currentValue, required, description, 'integer');
+  }
+
+  /// Helper: TextField عددی با پشتیبانی Reference
+  Widget _buildNumberFieldWithReference(
+    String key,
+    Map<String, dynamic> schema,
+    dynamic currentValue,
+    bool required,
+    String? description,
+    String fieldType,
+  ) {
+    final theme = Theme.of(context);
+    final isReference = currentValue?.toString().startsWith('\$') ?? false;
+    
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TextFormField(
+            initialValue: currentValue?.toString(),
+            decoration: InputDecoration(
+              labelText: _formatKey(key),
+              border: OutlineInputBorder(),
+              helperText: description,
+              prefixIcon: isReference 
+                  ? Icon(Icons.link, size: 18, color: theme.colorScheme.primary)
+                  : null,
+              suffixIcon: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (widget.allNodes != null && widget.allNodes!.isNotEmpty)
+                    IconButton(
+                      icon: Icon(Icons.select_all, size: 18),
+                      tooltip: 'انتخاب از نودهای قبلی',
+                      onPressed: () => _showReferenceSelector(key),
+                    ),
+                  if (required)
+                    Icon(Icons.star, size: 12, color: Colors.red),
+                ],
+              ),
+            ),
+            keyboardType: isReference ? TextInputType.text : TextInputType.number,
+            validator: required
+                ? (v) => (v == null || v.isEmpty)
+                    ? AppLocalizations.of(context).workflowNodeFieldRequired
+                    : null
+                : null,
+            onSaved: (newValue) {
+              if (newValue != null && newValue.isNotEmpty) {
+                // اگر reference است، به صورت string ذخیره می‌شود
+                if (newValue.startsWith('\$')) {
+                  _config[key] = newValue;
+                } else {
+                  _config[key] = fieldType == 'integer' 
+                      ? int.tryParse(newValue) ?? currentValue
+                      : double.tryParse(newValue) ?? currentValue;
+                }
+              } else if (!required) {
+                _config.remove(key);
+              }
+            },
+          ),
+          if (isReference)
+            Padding(
+              padding: const EdgeInsets.only(top: 4, right: 12),
+              child: Text(
+                'این مقدار از یک نود قبلی استفاده می‌کند',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.primary,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// ساخت Currency Selector
+  Widget _buildCurrencySelector(
+    String key,
+    Map<String, dynamic> schema,
+    dynamic currentValue,
+    bool required,
+    String? description,
+  ) {
+    final theme = Theme.of(context);
+    
+    // چک کردن اینکه آیا مقدار reference است
+    if (currentValue?.toString().startsWith('\$') ?? false) {
+      return _buildReferenceTextField(key, schema, currentValue, required, description);
+    }
+    
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (_loadingCurrencies)
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                border: Border.all(color: theme.colorScheme.outline),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                  const SizedBox(width: 12),
+                  Text('در حال بارگذاری ارزها...'),
+                ],
+              ),
+            )
+          else if (_currencies.isEmpty)
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.orange.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.orange),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.warning, color: Colors.orange, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'ارزی یافت نشد. لطفاً شناسه ارز را وارد کنید.',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: Colors.orange.shade700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else
+            DropdownButtonFormField<int>(
+              value: currentValue is int ? currentValue : null,
+              decoration: InputDecoration(
+                labelText: _formatKey(key),
+                border: OutlineInputBorder(),
+                helperText: description,
+                prefixIcon: Icon(Icons.monetization_on, size: 20),
+                suffixIcon: required ? Icon(Icons.star, size: 12, color: Colors.red) : null,
+              ),
+              items: _currencies.map((currency) {
+                final id = currency['id'] as int;
+                final symbol = currency['symbol'] as String? ?? '';
+                final name = currency['title'] as String? ?? currency['name'] as String? ?? '';
+                final code = currency['code'] as String? ?? '';
+                final isDefault = currency['is_default'] == true;
+                
+                return DropdownMenuItem<int>(
+                  value: id,
+                  child: Row(
+                    children: [
+                      Text(
+                        symbol,
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text('$name ($code)'),
+                      ),
+                      if (isDefault)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.primaryContainer,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            'پیش‌فرض',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onPrimaryContainer,
+                              fontSize: 10,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                );
+              }).toList(),
+              validator: required
+                  ? (v) => v == null ? 'این فیلد الزامی است' : null
+                  : null,
+              onChanged: (newValue) {
+                setState(() {
+                  if (newValue != null) {
+                    _config[key] = newValue;
+                  } else if (!required) {
+                    _config.remove(key);
+                  }
+                });
+              },
+            ),
+          if (widget.allNodes != null && widget.allNodes!.isNotEmpty && !_loadingCurrencies)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: OutlinedButton.icon(
+                icon: Icon(Icons.link, size: 16),
+                label: const Text('استفاده از نود قبلی'),
+                onPressed: () => _showReferenceSelector(key),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// ساخت Multi-Select Dropdown
+  Widget _buildMultiSelect(
+    String key,
+    Map<String, dynamic> schema,
+    dynamic currentValue,
+    bool required,
+    String? description,
+  ) {
+    final theme = Theme.of(context);
+    final items = schema['items'] as Map<String, dynamic>?;
+    final enumValues = items?['enum'] as List<dynamic>?;
+    
+    if (enumValues == null || enumValues.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 16),
+        child: Text(
+          'خطا: enum values برای multi-select تعریف نشده است',
+          style: TextStyle(color: Colors.red),
+        ),
+      );
+    }
+    
+    final uiConfig = schema['ui_config'] as Map<String, dynamic>?;
+    final labels = uiConfig?['labels'] as Map<String, dynamic>?;
+    
+    // مقدار فعلی باید لیست باشد
+    List<String> selectedValues = [];
+    if (currentValue is List) {
+      selectedValues = currentValue.map((e) => e.toString()).toList();
+    }
+    
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            _formatKey(key),
+            style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
+          ),
+          if (description != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                description,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: enumValues.map((enumValue) {
+              final value = enumValue.toString();
+              final label = labels?[value] as String? ?? value;
+              final isSelected = selectedValues.contains(value);
+              
+              return FilterChip(
+                label: Text(label),
+                selected: isSelected,
+                onSelected: (selected) {
+                  setState(() {
+                    if (selected) {
+                      selectedValues.add(value);
+                    } else {
+                      selectedValues.remove(value);
+                    }
+                    _config[key] = List<String>.from(selectedValues);
+                  });
+                },
+              );
+            }).toList(),
+          ),
+          if (required && selectedValues.isEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                'حداقل یک مورد را انتخاب کنید',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: Colors.red,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// ساخت Reference TextField (برای زمانی که مقدار reference است)
+  Widget _buildReferenceTextField(
+    String key,
+    Map<String, dynamic> schema,
+    dynamic currentValue,
+    bool required,
+    String? description,
+  ) {
+    final theme = Theme.of(context);
+    
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TextFormField(
+            initialValue: currentValue?.toString(),
+            decoration: InputDecoration(
+              labelText: _formatKey(key),
+              border: OutlineInputBorder(),
+              helperText: description,
+              prefixIcon: Icon(Icons.link, size: 18, color: theme.colorScheme.primary),
+              suffixIcon: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (widget.allNodes != null && widget.allNodes!.isNotEmpty)
+                    IconButton(
+                      icon: Icon(Icons.select_all, size: 18),
+                      tooltip: 'انتخاب از نودهای قبلی',
+                      onPressed: () => _showReferenceSelector(key),
+                    ),
+                  if (required)
+                    Icon(Icons.star, size: 12, color: Colors.red),
+                ],
+              ),
+            ),
+            validator: required
+                ? (v) => (v == null || v.isEmpty)
+                    ? 'این فیلد الزامی است'
+                    : null
+                : null,
+            onSaved: (newValue) {
+              if (newValue != null && newValue.isNotEmpty) {
+                _config[key] = newValue;
+              } else if (!required) {
+                _config.remove(key);
+              }
+            },
+          ),
+          Padding(
+            padding: const EdgeInsets.only(top: 4, right: 12),
+            child: Text(
+              'این مقدار از یک نود قبلی استفاده می‌کند',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.primary,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   /// دریافت placeholder برای فیلد
   String? _getPlaceholder(String key, String? description) {
     final keyLower = key.toLowerCase();
     
+    // ابتدا بررسی ترجمه‌های موجود
+    if (_translations != null && widget.node.key != null) {
+      final actionKey = widget.node.key;
+      final placeholderKey = 'field_${key}_placeholder';
+      
+      // جستجو در ترجمه‌های خاص action
+      if (_translations!.containsKey(actionKey)) {
+        final actionTrans = _translations![actionKey] as Map<String, dynamic>?;
+        if (actionTrans != null && actionTrans.containsKey(placeholderKey)) {
+          return actionTrans[placeholderKey] as String;
+        }
+      }
+    }
+    
+    // Fallback به مقادیر پیش‌فرض
+    final locale = Localizations.localeOf(context);
+    final isFarsi = locale.languageCode == 'fa';
+    
     if (keyLower.contains('email') || keyLower == 'to') {
-      return 'مثال: user@example.com یا \$node_id.email';
+      return isFarsi 
+          ? 'مثال: user@example.com یا \$node_id.email'
+          : 'Example: user@example.com or \$node_id.email';
     }
     if (keyLower.contains('amount') || keyLower.contains('price')) {
-      return 'مثال: 100000 یا \$node_id.total_amount';
+      return isFarsi
+          ? 'مثال: 100000 یا \$node_id.total_amount'
+          : 'Example: 100000 or \$node_id.total_amount';
     }
     if (keyLower.contains('subject') || keyLower.contains('title')) {
-      return 'مثال: فاکتور شماره \$node_id.invoice_number';
+      return isFarsi
+          ? 'مثال: فاکتور شماره \$node_id.invoice_number'
+          : 'Example: Invoice #\$node_id.invoice_number';
     }
     if (keyLower.contains('message') || keyLower.contains('body')) {
-      return 'مثال: متن پیام یا \$node_id.description';
+      return isFarsi
+          ? 'مثال: متن پیام یا \$node_id.description'
+          : 'Example: Message text or \$node_id.description';
     }
     if (keyLower.contains('url')) {
-      return 'مثال: https://example.com/api';
+      return isFarsi
+          ? 'مثال: https://example.com/api'
+          : 'Example: https://example.com/api';
     }
     if (description != null && description.contains('reference')) {
-      return 'مثال: \$node_id.field_name';
+      return isFarsi
+          ? 'مثال: \$node_id.field_name'
+          : 'Example: \$node_id.field_name';
     }
     
     return null;
@@ -807,7 +1507,7 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
 }
 
 /// Dialog برای انتخاب Reference از نودهای قبلی
-class _ReferenceSelectorDialog extends StatelessWidget {
+class _ReferenceSelectorDialog extends StatefulWidget {
   final List<WorkflowNodeModel> allNodes;
   final WorkflowNodeModel currentNode;
   final Function(String) onSelected;
@@ -819,56 +1519,302 @@ class _ReferenceSelectorDialog extends StatelessWidget {
   });
 
   @override
+  State<_ReferenceSelectorDialog> createState() => _ReferenceSelectorDialogState();
+}
+
+class _ReferenceSelectorDialogState extends State<_ReferenceSelectorDialog> {
+  WorkflowNodeModel? _selectedNode;
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     
     // فیلتر کردن نودهای قبل از نود فعلی
-    final availableNodes = allNodes.where((node) => node.id != currentNode.id).toList();
+    final availableNodes = widget.allNodes.where((node) => node.id != widget.currentNode.id).toList();
     
-    return AlertDialog(
-      title: const Text('انتخاب از نودهای قبلی'),
-      content: SizedBox(
-        width: 400,
-        child: availableNodes.isEmpty
-            ? const Padding(
-                padding: EdgeInsets.all(16),
-                child: Text('هیچ نودی برای انتخاب وجود ندارد'),
-              )
-            : ListView.builder(
-                shrinkWrap: true,
-                itemCount: availableNodes.length,
-                itemBuilder: (context, index) {
-                  final node = availableNodes[index];
-                  return ListTile(
-                    leading: Icon(
-                      _getNodeIcon(node.type),
-                      color: _getNodeColor(node.type, theme),
+    if (_selectedNode == null) {
+      // مرحله 1: انتخاب نود
+      return AlertDialog(
+        title: const Text('انتخاب از نودهای قبلی'),
+        content: SizedBox(
+          width: 400,
+          height: 400,
+          child: availableNodes.isEmpty
+              ? const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Text('هیچ نودی برای انتخاب وجود ندارد'),
+                )
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Text(
+                        'مرحله 1: انتخاب نود',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.primary,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
-                    title: Text(node.label),
-                    subtitle: Text('ID: ${node.id}'),
-                    trailing: IconButton(
-                      icon: const Icon(Icons.arrow_forward),
-                      onPressed: () {
-                        // ساخت reference
-                        final reference = '\$${node.id}';
-                        onSelected(reference);
-                      },
+                    Expanded(
+                      child: ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: availableNodes.length,
+                        itemBuilder: (context, index) {
+                          final node = availableNodes[index];
+                          return Card(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            child: ListTile(
+                              leading: Icon(
+                                _getNodeIcon(node.type),
+                                color: _getNodeColor(node.type, theme),
+                              ),
+                              title: Text(node.label),
+                              subtitle: Text(_getNodeTypeLabel(node.type)),
+                              trailing: const Icon(Icons.arrow_forward),
+                              onTap: () {
+                                setState(() {
+                                  _selectedNode = node;
+                                });
+                              },
+                            ),
+                          );
+                        },
+                      ),
                     ),
-                    onTap: () {
-                      final reference = '\$${node.id}';
-                      onSelected(reference);
-                    },
-                  );
-                },
-              ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('انصراف'),
+                  ],
+                ),
         ),
-      ],
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('انصراف'),
+          ),
+        ],
+      );
+    } else {
+      // مرحله 2: انتخاب فیلد یا استفاده از کل نود
+      return AlertDialog(
+        title: Text('انتخاب داده از "${_selectedNode!.label}"'),
+        content: SizedBox(
+          width: 400,
+          height: 400,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Text(
+                  'مرحله 2: انتخاب داده',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.primary,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              // گزینه استفاده از کل نود
+              Card(
+                color: theme.colorScheme.surfaceVariant.withOpacity(0.5),
+                child: ListTile(
+                  leading: Icon(Icons.dataset, color: theme.colorScheme.primary),
+                  title: const Text('استفاده از کل خروجی نود'),
+                  subtitle: const Text('تمام داده‌های خروجی نود'),
+                  trailing: const Icon(Icons.check_circle_outline),
+                  onTap: () {
+                    final reference = '\$${_selectedNode!.id}';
+                    widget.onSelected(reference);
+                    Navigator.of(context).pop();
+                  },
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'یا یک فیلد خاص را انتخاب کنید:',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Expanded(
+                child: _buildFieldsList(theme),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              setState(() {
+                _selectedNode = null;
+              });
+            },
+            child: const Text('بازگشت'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('انصراف'),
+          ),
+        ],
+      );
+    }
+  }
+
+  Widget _buildFieldsList(ThemeData theme) {
+    // لیست فیلدهای پیشنهادی بر اساس نوع نود
+    final fields = _getSuggestedFields(_selectedNode!);
+    
+    if (fields.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.info_outline, size: 48, color: theme.colorScheme.onSurfaceVariant),
+              const SizedBox(height: 12),
+              Text(
+                'فیلدهای پیشنهادی برای این نود موجود نیست',
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'می‌توانید به صورت دستی فیلد مورد نظر را تایپ کنید:\n\$${_selectedNode!.id}.field_name',
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    
+    return ListView.builder(
+      itemCount: fields.length,
+      itemBuilder: (context, index) {
+        final field = fields[index];
+        return ListTile(
+          leading: Icon(
+            _getFieldIcon(field['type'] as String?),
+            size: 20,
+            color: theme.colorScheme.secondary,
+          ),
+          title: Text(field['name'] as String),
+          subtitle: Text(field['description'] as String? ?? ''),
+          trailing: const Icon(Icons.arrow_forward, size: 18),
+          onTap: () {
+            final fieldKey = field['key'] as String;
+            final reference = '\$${_selectedNode!.id}.$fieldKey';
+            widget.onSelected(reference);
+            Navigator.of(context).pop();
+          },
+        );
+      },
     );
+  }
+
+  List<Map<String, String>> _getSuggestedFields(WorkflowNodeModel node) {
+    // فیلدهای پیشنهادی بر اساس نوع و key نود
+    final key = node.key;
+    
+    if (key == null) return [];
+    
+    // فیلدهای مشترک برای تریگرهای فاکتور
+    if (key.contains('invoice')) {
+      return [
+        {'key': 'invoice_id', 'name': 'شناسه فاکتور', 'description': 'شناسه عددی فاکتور', 'type': 'number'},
+        {'key': 'invoice_code', 'name': 'کد فاکتور', 'description': 'کد یکتا فاکتور', 'type': 'string'},
+        {'key': 'invoice_number', 'name': 'شماره فاکتور', 'description': 'شماره فاکتور', 'type': 'string'},
+        {'key': 'invoice_date', 'name': 'تاریخ فاکتور', 'description': 'تاریخ صدور فاکتور', 'type': 'date'},
+        {'key': 'total_amount', 'name': 'مبلغ کل', 'description': 'مبلغ کل فاکتور', 'type': 'number'},
+        {'key': 'discount_amount', 'name': 'مبلغ تخفیف', 'description': 'مجموع تخفیفات', 'type': 'number'},
+        {'key': 'tax_amount', 'name': 'مبلغ مالیات', 'description': 'مجموع مالیات', 'type': 'number'},
+        {'key': 'final_amount', 'name': 'مبلغ نهایی', 'description': 'مبلغ قابل پرداخت', 'type': 'number'},
+        {'key': 'customer_name', 'name': 'نام مشتری', 'description': 'نام طرف حساب', 'type': 'string'},
+        {'key': 'customer_id', 'name': 'شناسه مشتری', 'description': 'شناسه طرف حساب', 'type': 'number'},
+        {'key': 'description', 'name': 'توضیحات', 'description': 'توضیحات فاکتور', 'type': 'string'},
+        {'key': 'status', 'name': 'وضعیت', 'description': 'وضعیت فاکتور', 'type': 'string'},
+      ];
+    }
+    
+    // فیلدهای مشترک برای تریگرهای پرداخت
+    if (key.contains('payment')) {
+      return [
+        {'key': 'payment_id', 'name': 'شناسه پرداخت', 'description': 'شناسه عددی پرداخت', 'type': 'number'},
+        {'key': 'amount', 'name': 'مبلغ', 'description': 'مبلغ پرداخت', 'type': 'number'},
+        {'key': 'payment_date', 'name': 'تاریخ پرداخت', 'description': 'تاریخ پرداخت', 'type': 'date'},
+        {'key': 'payment_method', 'name': 'روش پرداخت', 'description': 'نوع روش پرداخت', 'type': 'string'},
+        {'key': 'status', 'name': 'وضعیت', 'description': 'وضعیت پرداخت', 'type': 'string'},
+        {'key': 'reference_code', 'name': 'کد پیگیری', 'description': 'کد پیگیری تراکنش', 'type': 'string'},
+      ];
+    }
+    
+    // فیلدهای مشترک برای تریگرهای مشتری
+    if (key.contains('person') || key.contains('customer')) {
+      return [
+        {'key': 'person_id', 'name': 'شناسه', 'description': 'شناسه طرف حساب', 'type': 'number'},
+        {'key': 'name', 'name': 'نام', 'description': 'نام طرف حساب', 'type': 'string'},
+        {'key': 'email', 'name': 'ایمیل', 'description': 'آدرس ایمیل', 'type': 'string'},
+        {'key': 'phone', 'name': 'تلفن', 'description': 'شماره تلفن', 'type': 'string'},
+        {'key': 'mobile', 'name': 'موبایل', 'description': 'شماره موبایل', 'type': 'string'},
+        {'key': 'person_type', 'name': 'نوع', 'description': 'نوع طرف حساب', 'type': 'string'},
+      ];
+    }
+    
+    // فیلدهای مشترک برای تریگرهای محصول
+    if (key.contains('product')) {
+      return [
+        {'key': 'product_id', 'name': 'شناسه محصول', 'description': 'شناسه عددی محصول', 'type': 'number'},
+        {'key': 'name', 'name': 'نام محصول', 'description': 'نام محصول', 'type': 'string'},
+        {'key': 'code', 'name': 'کد محصول', 'description': 'کد محصول', 'type': 'string'},
+        {'key': 'price', 'name': 'قیمت', 'description': 'قیمت فروش', 'type': 'number'},
+        {'key': 'quantity', 'name': 'تعداد', 'description': 'تعداد موجودی', 'type': 'number'},
+      ];
+    }
+    
+    // فیلدهای عمومی
+    return [
+      {'key': 'id', 'name': 'شناسه', 'description': 'شناسه رکورد', 'type': 'number'},
+      {'key': 'name', 'name': 'نام', 'description': 'نام', 'type': 'string'},
+      {'key': 'title', 'name': 'عنوان', 'description': 'عنوان', 'type': 'string'},
+      {'key': 'description', 'name': 'توضیحات', 'description': 'توضیحات', 'type': 'string'},
+      {'key': 'status', 'name': 'وضعیت', 'description': 'وضعیت', 'type': 'string'},
+      {'key': 'created_at', 'name': 'تاریخ ایجاد', 'description': 'تاریخ و زمان ایجاد', 'type': 'date'},
+    ];
+  }
+
+  IconData _getFieldIcon(String? type) {
+    switch (type) {
+      case 'number':
+        return Icons.numbers;
+      case 'string':
+        return Icons.text_fields;
+      case 'date':
+        return Icons.calendar_today;
+      case 'boolean':
+        return Icons.toggle_on;
+      default:
+        return Icons.data_object;
+    }
+  }
+
+  String _getNodeTypeLabel(WorkflowNodeType type) {
+    switch (type) {
+      case WorkflowNodeType.trigger:
+        return 'تریگر';
+      case WorkflowNodeType.action:
+        return 'اکشن';
+      case WorkflowNodeType.condition:
+        return 'شرط';
+      case WorkflowNodeType.loop:
+        return 'حلقه';
+    }
   }
 
   Color _getNodeColor(WorkflowNodeType type, ThemeData theme) {

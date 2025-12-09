@@ -11,6 +11,8 @@ class DocumentModel {
   final String documentType;
   final bool isProforma;
   final String? description;
+  final int? projectId;
+  final String? projectName;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -52,6 +54,8 @@ class DocumentModel {
     required this.documentType,
     required this.isProforma,
     this.description,
+    this.projectId,
+    this.projectName,
     required this.createdAt,
     required this.updatedAt,
     this.businessTitle,
@@ -85,6 +89,8 @@ class DocumentModel {
       documentType: json['document_type'] as String,
       isProforma: json['is_proforma'] as bool? ?? false,
       description: json['description'] as String?,
+      projectId: json['project_id'] as int?,
+      projectName: json['project_name'] as String?,
       createdAt: _parseDateTime(json['created_at']),
       updatedAt: _parseDateTime(json['updated_at']),
       businessTitle: json['business_title'] as String?,
@@ -123,6 +129,7 @@ class DocumentModel {
       'document_type': documentType,
       'is_proforma': isProforma,
       'description': description,
+      if (projectId != null) 'project_id': projectId,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
       'business_title': businessTitle,
@@ -413,6 +420,7 @@ class CreateManualDocumentRequest {
   final String? description;
   final List<DocumentLineCreateRequest> lines;
   final Map<String, dynamic>? extraInfo;
+  final int? projectId;
 
   CreateManualDocumentRequest({
     this.code,
@@ -423,6 +431,7 @@ class CreateManualDocumentRequest {
     this.description,
     required this.lines,
     this.extraInfo,
+    this.projectId,
   });
 
   Map<String, dynamic> toJson() {
@@ -435,6 +444,7 @@ class CreateManualDocumentRequest {
       if (description != null) 'description': description,
       'lines': lines.map((line) => line.toJson()).toList(),
       if (extraInfo != null) 'extra_info': extraInfo,
+      if (projectId != null) 'project_id': projectId,
     };
   }
 
@@ -484,6 +494,7 @@ class UpdateManualDocumentRequest {
   final String? description;
   final List<DocumentLineCreateRequest>? lines;
   final Map<String, dynamic>? extraInfo;
+  final int? projectId;
 
   UpdateManualDocumentRequest({
     this.code,
@@ -493,6 +504,7 @@ class UpdateManualDocumentRequest {
     this.description,
     this.lines,
     this.extraInfo,
+    this.projectId,
   });
 
   Map<String, dynamic> toJson() {
@@ -509,6 +521,7 @@ class UpdateManualDocumentRequest {
       map['lines'] = lines!.map((line) => line.toJson()).toList();
     }
     if (extraInfo != null) map['extra_info'] = extraInfo;
+    if (projectId != null) map['project_id'] = projectId;
     
     return map;
   }

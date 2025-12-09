@@ -22,7 +22,7 @@ from app.services.bank_account_service import (
     get_bank_accounts_turnover_report,
 )
 
-router = APIRouter(prefix="/bank-accounts", tags=["bank-accounts"])
+router = APIRouter(prefix="/bank-accounts", tags=["مدیریت مالی"])
 
 
 @router.post(
@@ -144,8 +144,12 @@ async def delete_bank_account_endpoint(
             biz_id = None
         if biz_id is not None and not ctx.can_access_business(biz_id):
             raise ApiError("FORBIDDEN", "Access denied", http_status=403)
-    ok = delete_bank_account(db, account_id)
-    if not ok:
+    from fastapi import HTTPException
+    
+    success, error_message = delete_bank_account(db, account_id)
+    if not success:
+        if error_message:
+            raise HTTPException(status_code=400, detail=error_message)
         raise ApiError("BANK_ACCOUNT_NOT_FOUND", "Bank account not found", http_status=404)
     return success_response(data=None, request=request, message="BANK_ACCOUNT_DELETED")
 

@@ -5,6 +5,7 @@ Actionهای کمکی (log, set variable, etc)
 from typing import Any, Dict
 import logging
 from app.services.workflow.action_registry import ActionHandler
+from app.services.workflow.logging_decorators import log_action_execution
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +31,7 @@ class SetVariableAction(ActionHandler):
             }
         }
     
+    @log_action_execution
     def execute(
         self,
         context: Dict[str, Any],
@@ -81,6 +83,7 @@ class LogAction(ActionHandler):
             }
         }
     
+    @log_action_execution
     def execute(
         self,
         context: Dict[str, Any],
@@ -236,6 +239,7 @@ class HttpRequestAction(ActionHandler):
             }
         }
     
+    @log_action_execution
     def execute(
         self,
         context: Dict[str, Any],

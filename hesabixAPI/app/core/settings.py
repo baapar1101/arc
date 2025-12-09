@@ -24,10 +24,11 @@ class Settings(BaseSettings):
 	# محاسبه: (تعداد Worker ها * اتصالات مورد نیاز per Worker) + Buffer
 	# مثال Production: 5 Workers * 100 اتصال = 500 + 300 buffer = 800
 	# برای Development: pool_size=50, max_overflow=50 = 100 max connections
+	# ⚠️ توجه: بعد از رفع connection leak در WebSocket، این مقادیر باید کاهش یابد
 	db_pool_size: int = 50  # افزایش از 20 - اتصالات پایه در Pool
 	db_max_overflow: int = 50  # افزایش از 30 - اتصالات اضافی در صورت نیاز
 	db_pool_timeout: int = 30  # افزایش از 10 - timeout بیشتر برای Pool
-	db_pool_recycle: int = 3600  # Recycle اتصالات هر ساعت (پیش‌فرض)
+	db_pool_recycle: int = 600  # Recycle اتصالات هر 10 دقیقه - کاهش برای جلوگیری از connection leak و بهبود performance
 
 	# Logging
 	log_level: str = "INFO"

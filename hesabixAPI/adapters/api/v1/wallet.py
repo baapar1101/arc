@@ -26,7 +26,7 @@ from adapters.db.models.wallet import WalletPayout
 from fastapi import Query
 
 
-router = APIRouter(prefix="/businesses/{business_id}/wallet", tags=["wallet"])
+router = APIRouter(prefix="/businesses/{business_id}/wallet", tags=["کیف پول"])
 
 
 @router.get(

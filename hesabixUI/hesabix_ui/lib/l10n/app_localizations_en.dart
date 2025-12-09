@@ -6088,4 +6088,366 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get warrantyManage => 'Manage Warranty';
+
+  @override
+  String get identityInquiryTitle => 'Identity Inquiry';
+
+  @override
+  String get identityInquirySubtitle =>
+      'Please enter national ID and birth date';
+
+  @override
+  String get nationalIdHint => '10-digit national ID';
+
+  @override
+  String get nationalIdRequired => 'National ID is required';
+
+  @override
+  String get nationalIdInvalidLength => 'National ID must be 10 digits';
+
+  @override
+  String get nationalIdInvalid => 'Invalid national ID';
+
+  @override
+  String get birthDate => 'Birth Date';
+
+  @override
+  String get birthDateHint => 'Jalali date (YYYY-MM-DD or YYYY/MM/DD)';
+
+  @override
+  String get birthDateRequired => 'Birth date is required';
+
+  @override
+  String get birthDateInvalid => 'Invalid date format';
+
+  @override
+  String get selectBirthDate => 'Select Date';
+
+  @override
+  String get inquire => 'Inquire';
+
+  @override
+  String get inquiring => 'Inquiring...';
+
+  @override
+  String get inquiryError => 'Inquiry Error';
+
+  @override
+  String get inquiryErrorPrefix => 'Inquiry error:';
+
+  @override
+  String get unknownError => 'Unknown error';
+
+  @override
+  String get noMatch => 'No Match';
+
+  @override
+  String get noMatchDescription => 'National ID and birth date do not match';
+
+  @override
+  String get personalInformation => 'Personal Information';
+
+  @override
+  String get fatherName => 'Father Name';
+
+  @override
+  String get alive => 'Alive';
+
+  @override
+  String get deceased => 'Deceased';
+
+  @override
+  String get newInquiry => 'New Inquiry';
+
+  @override
+  String get identityInquiryDescription =>
+      'You can inquiry personal identity information by entering national ID and birth date';
+
+  @override
+  String get noResultAvailable => 'Error: No result available';
+
+  @override
+  String get accountSettingsTitle => 'Account Settings';
+
+  @override
+  String get accountSettingsSubtitle =>
+      'Manage and configure all aspects of your account';
+
+  @override
+  String get accountSettingsMarketingDescription =>
+      'Manage referral links and marketing reports';
+
+  @override
+  String get accountSettingsNotificationsTitle => 'Notifications';
+
+  @override
+  String get accountSettingsNotificationsDescription =>
+      'Notification channel settings and configuration';
+
+  @override
+  String get accountSettingsSignatureTitle => 'Signature & Profile Picture';
+
+  @override
+  String get accountSettingsSignatureDescription =>
+      'Upload and manage personal signature and profile picture';
+
+  @override
+  String get accountSettingsApiKeysTitle => 'API Keys';
+
+  @override
+  String get accountSettingsApiKeysDescription =>
+      'Manage API keys for system access';
+
+  @override
+  String get accountSettingsLoginSessionsTitle => 'Login Sessions';
+
+  @override
+  String get accountSettingsLoginSessionsDescription =>
+      'View and manage connected devices to your account';
+
+  @override
+  String get accountSettingsChangePasswordDescription =>
+      'Change account password';
+
+  @override
+  String get accountSettingsVerificationTitle => 'Mobile & Email Verification';
+
+  @override
+  String get accountSettingsVerificationDescription =>
+      'Verify mobile number and email for enhanced security';
+
+  @override
+  String get accountSettingsNotificationHistoryTitle => 'Notification History';
+
+  @override
+  String get accountSettingsNotificationHistoryDescription =>
+      'View all sent notifications (OTP, password reset, tickets, etc.)';
+
+  @override
+  String get apiKeysPageTitle => 'Manage API Keys';
+
+  @override
+  String get apiKeyErrorLoadingKeys => 'Error loading keys';
+
+  @override
+  String get apiKeyErrorCreatingKey => 'Error creating key';
+
+  @override
+  String get apiKeyCreatedSuccessfully => 'API Key created';
+
+  @override
+  String get apiKeySaveWarning =>
+      'Please save this key. This is the only time it will be displayed.';
+
+  @override
+  String get apiKeyClose => 'Close';
+
+  @override
+  String get apiKeyCopy => 'Copy';
+
+  @override
+  String get apiKeyCopied => 'Key copied';
+
+  @override
+  String get apiKeyUpdatedSuccessfully => 'Key updated successfully';
+
+  @override
+  String get apiKeyErrorUpdating => 'Error updating key';
+
+  @override
+  String get apiKeyDeleteTitle => 'Delete API Key';
+
+  @override
+  String apiKeyDeleteConfirmation(String name) {
+    return 'Are you sure you want to delete the key \"$name\"?\nThis action is irreversible.';
+  }
+
+  @override
+  String get apiKeyDeletedSuccessfully => 'Key deleted successfully';
+
+  @override
+  String get apiKeyErrorDeleting => 'Error deleting key';
+
+  @override
+  String get apiKeyFilterActive => 'Active';
+
+  @override
+  String get apiKeyFilterRevoked => 'Revoked';
+
+  @override
+  String get apiKeyFilterAll => 'All';
+
+  @override
+  String get apiKeyNoActiveKeys => 'No active keys';
+
+  @override
+  String get apiKeyNoRevokedKeys => 'No revoked keys';
+
+  @override
+  String get apiKeyNoKeysCreated => 'No API keys created';
+
+  @override
+  String get apiKeyCreateNewButton => 'Create New Key';
+
+  @override
+  String get apiKeyCreateHint => 'Click the create button to create a new key';
+
+  @override
+  String get apiKeyNoRevokedHint => 'No revoked keys to display';
+
+  @override
+  String get apiKeyUsageHint =>
+      'Create a key to use the API in other applications';
+
+  @override
+  String get apiKeyEdit => 'Edit';
+
+  @override
+  String get apiKeyDelete => 'Delete';
+
+  @override
+  String get apiKeyCreatedAt => 'Created';
+
+  @override
+  String get apiKeyLastUsed => 'Last Used';
+
+  @override
+  String get apiKeyExpiresAt => 'Expires';
+
+  @override
+  String get apiKeyRevokedAt => 'Revoked';
+
+  @override
+  String get apiKeyAllowedIPs => 'Allowed IPs';
+
+  @override
+  String get apiKeyCreateNewTitle => 'Create New API Key';
+
+  @override
+  String get apiKeyNameLabel => 'Key Name';
+
+  @override
+  String get apiKeyNameHint => 'Example: Production API Key';
+
+  @override
+  String get apiKeyScopeLabel => 'Access Scope (JSON)';
+
+  @override
+  String get apiKeyScopeHint =>
+      'Optional - Example: {\"read\": true, \"write\": false}';
+
+  @override
+  String get apiKeyIPsLabel => 'Allowed IP List';
+
+  @override
+  String get apiKeyIPsHint =>
+      'Comma separated - Example: 192.168.1.1, 10.0.0.1';
+
+  @override
+  String get apiKeyExpiryLabel => 'Expiry Date and Time (Optional)';
+
+  @override
+  String get apiKeyExpiryHint => 'Select';
+
+  @override
+  String get apiKeyNoExpiry => 'No expiry';
+
+  @override
+  String get apiKeyEditTitle => 'Edit API Key';
+
+  @override
+  String get apiKeyWithoutName => 'Unnamed';
+
+  @override
+  String get datePickerSelectDate => 'Select Date';
+
+  @override
+  String get timePickerSelectTime => 'Select Time';
+
+  @override
+  String get dateTimeLabel => 'Date and Time';
+
+  @override
+  String get dateLabel => 'Date';
+
+  @override
+  String get timeLabel => 'Time';
+
+  @override
+  String get clearButton => 'Clear';
+
+  @override
+  String get sessionsPageTitle => 'Manage Login Sessions';
+
+  @override
+  String get sessionsErrorLoading => 'Error loading sessions';
+
+  @override
+  String get sessionsCannotDeleteCurrent => 'Cannot delete current session';
+
+  @override
+  String get sessionsDeleteTitle => 'Delete Session';
+
+  @override
+  String sessionsDeleteConfirmation(String device) {
+    return 'Are you sure you want to delete session \"$device\"?\nThis action is irreversible.';
+  }
+
+  @override
+  String get sessionsDeletedSuccessfully => 'Session deleted successfully';
+
+  @override
+  String get sessionsErrorDeleting => 'Error deleting session';
+
+  @override
+  String get sessionsNoOtherSessions => 'No other sessions';
+
+  @override
+  String get sessionsRevokeAllTitle => 'Logout from all devices';
+
+  @override
+  String sessionsRevokeAllConfirmation(int count) {
+    return 'Are you sure you want to delete $count other sessions?\nThis will logout all other devices.\nYour current session will be preserved.';
+  }
+
+  @override
+  String get sessionsDeleteAll => 'Delete All';
+
+  @override
+  String sessionsDeleted(int count) {
+    return '$count sessions deleted';
+  }
+
+  @override
+  String get sessionsNoActive => 'No active sessions';
+
+  @override
+  String get sessionsThisDevice => 'This Device';
+
+  @override
+  String get sessionsLastUsed => 'Last Used';
+
+  @override
+  String get sessionsCreatedAt => 'Created';
+
+  @override
+  String get sessionsToday => 'Today';
+
+  @override
+  String get sessionsYesterday => 'Yesterday';
+
+  @override
+  String sessionsDaysAgo(int days) {
+    return '$days days ago';
+  }
+
+  @override
+  String sessionsWeeksAgo(int weeks) {
+    return '$weeks weeks ago';
+  }
+
+  @override
+  String sessionsMonthsAgo(int months) {
+    return '$months months ago';
+  }
 }

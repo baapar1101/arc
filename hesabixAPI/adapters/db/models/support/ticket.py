@@ -37,4 +37,4 @@ class Ticket(Base):
     category = relationship("Category", back_populates="tickets")
     priority = relationship("Priority", back_populates="tickets")
     status = relationship("Status", back_populates="tickets")
-    messages = relationship("Message", back_populates="ticket", cascade="all, delete-orphan")
+    messages = relationship("Message", back_populates="ticket", cascade="all, delete-orphan", order_by="Message.created_at")

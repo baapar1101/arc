@@ -168,6 +168,47 @@ class WarrantyService {
       throw Exception('Failed to list warranty codes by person: $e');
     }
   }
+
+  /// حذف یک کد گارانتی
+  Future<WarrantyDeleteResponse> deleteCode(
+    int businessId,
+    int codeId, {
+    bool force = false,
+  }) async {
+    try {
+      final queryParams = <String, dynamic>{
+        'force': force,
+      };
+      final response = await _api.delete<Map<String, dynamic>>(
+        '/api/v1/warranty/business/$businessId/codes/$codeId',
+        query: queryParams,
+      );
+      return WarrantyDeleteResponse.fromJson(response.data?['data'] ?? {});
+    } catch (e) {
+      throw Exception('Failed to delete warranty code: $e');
+    }
+  }
+
+  /// حذف گروهی کدهای گارانتی
+  Future<WarrantyBulkDeleteResponse> deleteCodes(
+    int businessId,
+    List<int> codeIds, {
+    bool force = false,
+  }) async {
+    try {
+      final payload = {
+        'code_ids': codeIds,
+        'force': force,
+      };
+      final response = await _api.post<Map<String, dynamic>>(
+        '/api/v1/warranty/business/$businessId/codes/bulk-delete',
+        data: payload,
+      );
+      return WarrantyBulkDeleteResponse.fromJson(response.data?['data'] ?? {});
+    } catch (e) {
+      throw Exception('Failed to delete warranty codes: $e');
+    }
+  }
 }
 
 // Response Models
@@ -361,3 +402,61 @@ class WarrantyCheckResponse {
   }
 }
 
+// Delete Response Models
+class WarrantyDeleteResponse {
+  final bool success;
+  final String message;
+  final Map<String, dynamic>? deletedCode;
+
+  WarrantyDeleteResponse({
+    required this.success,
+    required this.message,
+    this.deletedCode,
+  });
+
+  factory WarrantyDeleteResponse.fromJson(Map<String, dynamic> json) {
+    return WarrantyDeleteResponse(
+      success: json['success'] ?? false,
+      message: json['message'] ?? '',
+      deletedCode: json['deleted_code'] as Map<String, dynamic>?,
+    );
+  }
+}
+
+class WarrantyBulkDeleteResponse {
+  final bool success;
+  final String message;
+  final Map<String, int> summary;
+  final List<Map<String, dynamic>> deletedCodes;
+  final List<Map<String, dynamic>> skippedCodes;
+  final List<Map<String, dynamic>> failedCodes;
+
+  WarrantyBulkDeleteResponse({
+    required this.success,
+    required this.message,
+    required this.summary,
+    required this.deletedCodes,
+    required this.skippedCodes,
+    required this.failedCodes,
+  });
+
+  factory WarrantyBulkDeleteResponse.fromJson(Map<String, dynamic> json) {
+    return WarrantyBulkDeleteResponse(
+      success: json['success'] ?? false,
+      message: json['message'] ?? '',
+      summary: Map<String, int>.from(json['summary'] ?? {}),
+      deletedCodes: (json['deleted_codes'] as List<dynamic>?)
+              ?.map((e) => e as Map<String, dynamic>)
+              .toList() ??
+          [],
+      skippedCodes: (json['skipped_codes'] as List<dynamic>?)
+              ?.map((e) => e as Map<String, dynamic>)
+              .toList() ??
+          [],
+      failedCodes: (json['failed_codes'] as List<dynamic>?)
+              ?.map((e) => e as Map<String, dynamic>)
+              .toList() ??
+          [],
+    );
+  }
+}

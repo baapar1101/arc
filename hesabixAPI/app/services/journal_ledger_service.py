@@ -167,6 +167,7 @@ def get_journal_ledger_report(
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
     document_type: Optional[str] = None,
+    project_id: Optional[int] = None,  # 🆕 فیلتر پروژه
     include_proforma: bool = False,
     skip: int = 0,
     take: int = 50,
@@ -249,6 +250,10 @@ def get_journal_ledger_report(
     
     if document_type:
         lines_query = lines_query.filter(Document.document_type == document_type)
+    
+    # 🆕 فیلتر پروژه
+    if project_id:
+        lines_query = lines_query.filter(Document.project_id == project_id)
     
     # مرتب‌سازی بر اساس تاریخ سند و سپس شناسه سند و خط
     lines_query = lines_query.order_by(

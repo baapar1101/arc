@@ -12,7 +12,7 @@ class WorkflowCanvas extends StatefulWidget {
   final WorkflowEditorState state;
   final Function(WorkflowNodeModel)? onNodeTap;
   final Function(WorkflowConnectionModel)? onConnectionTap;
-  final Function(WorkflowNodeModel, Offset)? onNodeLongPress;
+  final Future<void> Function(WorkflowNodeModel, Offset)? onNodeLongPress;
 
   const WorkflowCanvas({
     super.key,
@@ -245,13 +245,13 @@ class _WorkflowCanvasState extends State<WorkflowCanvas> {
                           widget.onNodeTap?.call(node);
                         }
                       },
-                      onLongPress: () {
+                      onLongPress: () async {
                         widget.state.selectNode(node.id);
                         if (widget.onNodeLongPress != null) {
                           try {
                             // استفاده از موقعیت node برای نمایش context menu
                             final position = WorkflowConstants.getNodeCenter(validPosition);
-                            widget.onNodeLongPress!.call(node, position);
+                            await widget.onNodeLongPress!.call(node, position);
                           } catch (e) {
                             debugPrint('خطا در onLongPress: $e');
                           }

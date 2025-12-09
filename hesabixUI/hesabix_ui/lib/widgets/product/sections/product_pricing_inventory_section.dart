@@ -369,7 +369,52 @@ class _ProductPricingInventorySectionState extends State<ProductPricingInventory
             margin: const EdgeInsets.symmetric(vertical: 6),
             child: ListTile(
               title: Text(_resolvePriceListTitle(it['price_list_id'])),
-              subtitle: Text('${t.currency}: ${it['currency_id'] ?? '-'} | ${t.price}: ${it['price']}'),
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Icon(Icons.currency_exchange, size: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                      const SizedBox(width: 4),
+                      Text(_resolveCurrencyTitle(it['currency_id'])),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Icon(Icons.attach_money, size: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                      const SizedBox(width: 4),
+                      Text(
+                        _formatPrice(it['price']),
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (it['tier_name'] != null && (it['tier_name'] as String).isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Icon(Icons.layers, size: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                        const SizedBox(width: 4),
+                        Text('سطح: ${it['tier_name']}'),
+                      ],
+                    ),
+                  ],
+                  if (it['min_qty'] != null && (it['min_qty'] as num) > 0) ...[
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Icon(Icons.shopping_cart, size: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                        const SizedBox(width: 4),
+                        Text('حداقل تعداد: ${it['min_qty']}'),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -402,6 +447,42 @@ class _ProductPricingInventorySectionState extends State<ProductPricingInventory
       if (pl['id'] == id) return (pl['name'] ?? '').toString();
     }
     return 'لیست ${id.toString()}';
+  }
+  
+  String _resolveCurrencyTitle(dynamic id) {
+    if (id == null) return '-';
+    for (final c in widget.currencies) {
+      if (c['id'] == id) {
+        final title = c['title'] ?? c['name'] ?? '';
+        final code = c['code'] ?? '';
+        return code.isNotEmpty ? '$title ($code)' : title;
+      }
+    }
+    return 'ارز ${id.toString()}';
+  }
+  
+  String _formatPrice(dynamic price) {
+    if (price == null) return '0';
+    final numValue = price is num ? price : num.tryParse(price.toString());
+    if (numValue == null) return '0';
+    // فرمت با جداکننده هزارگان
+    final parts = numValue.toString().split('.');
+    final integerPart = parts[0];
+    final decimalPart = parts.length > 1 ? parts[1] : '';
+    
+    String formatted = '';
+    for (int i = integerPart.length - 1; i >= 0; i--) {
+      formatted = integerPart[i] + formatted;
+      if ((integerPart.length - i) % 3 == 0 && i > 0) {
+        formatted = ',' + formatted;
+      }
+    }
+    
+    if (decimalPart.isNotEmpty) {
+      formatted += '.$decimalPart';
+    }
+    
+    return formatted;
   }
 
   void _showNoPriceListsWarning(BuildContext context) {

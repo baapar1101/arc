@@ -101,18 +101,37 @@ class BehinSmsProvider:
 		params['password'] = self.password
 		
 		try:
+			# لاگ‌گذاری درخواست
+			logger.info(
+				"behinsms_make_request",
+				service=service,
+				url=self.BASE_URL,
+				params_keys=list(params.keys()),
+				recipient_number=params.get('to'),
+				recipient_number_repr=repr(params.get('to'))
+			)
+			
 			with httpx.Client(timeout=30.0) as client:
 				response = client.get(self.BASE_URL, params=params)
 				response.raise_for_status()
 				response_text = response.text.strip()
 				
+				# لاگ‌گذاری پاسخ
+				logger.info(
+					"behinsms_response",
+					service=service,
+					status_code=response.status_code,
+					response_text=response_text,
+					request_url=str(response.request.url)
+				)
+				
 				# Parse response
 				return self._parse_response(response_text)
 		except httpx.HTTPError as e:
-			logger.error("behinsms_http_error", error=str(e), service=service)
+			logger.error("behinsms_http_error", error=str(e), service=service, params=params)
 			return False, "", f"خطا در ارتباط با سرور بهین اس ام اس: {str(e)}"
 		except Exception as e:
-			logger.error("behinsms_unexpected_error", error=str(e), service=service)
+			logger.error("behinsms_unexpected_error", error=str(e), service=service, params=params)
 			return False, "", f"خطای غیرمنتظره: {str(e)}"
 	
 	def _parse_response(self, response_text: str) -> tuple[bool, str, Optional[str]]:
@@ -190,6 +209,8 @@ class BehinSmsProvider:
 			normalized_numbers = []
 			for phone in phone_numbers:
 				normalized = normalize_phone_number(phone)
+				# API behinsms انتظار فرمت 09183282405 (با صفر اول) دارد
+				# پس صفر اول را حذف نمی‌کنیم
 				normalized_numbers.append(normalized)
 			
 			# حذف شماره‌های تکراری
@@ -197,20 +218,50 @@ class BehinSmsProvider:
 			
 			# تبدیل به رشته با کاما
 			recipient_numbers_str = ','.join(normalized_numbers)
+			
+			# لاگ‌گذاری برای دیباگ
+			logger.info(
+				"behinsms_send_text_prepare",
+				original_phones=phone_numbers,
+				normalized_numbers=normalized_numbers,
+				recipient_numbers_str=recipient_numbers_str,
+				recipient_numbers_str_length=len(recipient_numbers_str),
+				recipient_numbers_str_repr=repr(recipient_numbers_str)
+			)
+			
+			# بررسی اینکه آیا رشته خالی است
+			if not recipient_numbers_str or len(recipient_numbers_str.strip()) == 0:
+				logger.error(
+					"behinsms_empty_recipient_numbers",
+					original_phones=phone_numbers,
+					normalized_numbers=normalized_numbers
+				)
+				return False, None, "شماره گیرنده خالی است"
 		except ValueError as e:
+			logger.error("behinsms_normalize_error", error=str(e), phones=phone_numbers)
 			return False, None, str(e)
 		
 		# آماده‌سازی پارامترها
-		# استفاده از نام‌های استاندارد API behinsms
+		# استفاده از نام‌های استاندارد API behinsms (بر اساس مستندات: to, message, from)
 		params = {
-			'RecipientNumber': recipient_numbers_str,
-			'MessageBody': text,
-			'SpecialNumber': self.sender,
+			'to': recipient_numbers_str,
+			'message': text,
+			'from': self.sender,
 			'IsFlashMessage': 'true' if is_flash else 'false',
 		}
 		
 		if checking_message_id:
-			params['CheckingMessageID'] = checking_message_id
+			params['chkMessageId'] = checking_message_id
+		
+		# لاگ‌گذاری پارامترها قبل از ارسال
+		logger.debug(
+			"behinsms_send_text_params",
+			recipient_number=params.get('to'),
+			recipient_number_type=type(params.get('to')).__name__,
+			recipient_number_length=len(params.get('to', '')),
+			special_number=params.get('from'),
+			message_body_length=len(params.get('message', ''))
+		)
 		
 		# ارسال درخواست
 		success, result, error_msg = self._make_request('SendArray', params)

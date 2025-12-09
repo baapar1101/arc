@@ -11,6 +11,7 @@ import '../../../utils/product_form_validator.dart';
 import '../../../controllers/product_form_controller.dart';
 import '../../../config/app_config.dart';
 import '../../../core/auth_store.dart';
+import '../../../utils/image_cache.dart';
 
 class ProductBasicInfoSection extends StatefulWidget {
   final int businessId;
@@ -37,13 +38,14 @@ class ProductBasicInfoSection extends StatefulWidget {
 }
 
 class _ProductBasicInfoSectionState extends State<ProductBasicInfoSection> {
-  final Map<String, Uint8List?> _imageCache = {};
+  final ProductImageCache _imageCache = GlobalImageCache.instance;
   
   /// دانلود تصویر با استفاده از Dio (با headerهای authentication)
   Future<Uint8List?> _loadImageWithAuth(String url) async {
     // استفاده از cache برای جلوگیری از دانلود مجدد
-    if (_imageCache.containsKey(url)) {
-      return _imageCache[url];
+    final cached = _imageCache.get(url);
+    if (cached != null) {
+      return cached;
     }
     
     try {
@@ -103,10 +105,11 @@ class _ProductBasicInfoSectionState extends State<ProductBasicInfoSection> {
       );
       
       final imageData = Uint8List.fromList(response.data ?? []);
-      _imageCache[url] = imageData;
+      if (imageData.isNotEmpty) {
+        _imageCache.put(url, imageData);
+      }
       return imageData;
     } catch (e) {
-      _imageCache[url] = null;
       return null;
     }
   }
@@ -114,7 +117,9 @@ class _ProductBasicInfoSectionState extends State<ProductBasicInfoSection> {
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
-    final isWideScreen = MediaQuery.of(context).size.width > 1000;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isWideScreen = screenWidth > 1000;
+    final isMediumScreen = screenWidth > 700 && screenWidth <= 1000;
     
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -163,6 +168,63 @@ class _ProductBasicInfoSectionState extends State<ProductBasicInfoSection> {
                     ),
                     const SizedBox(height: 20),
                     
+                    CategoryPickerField(
+                      businessId: widget.businessId,
+                      categoriesTree: widget.categories,
+                      initialValue: widget.formData.categoryId,
+                      label: t.categories,
+                      authStore: widget.authStore,
+                      onChanged: (value) => _updateFormData(widget.formData.copyWith(categoryId: value)),
+                      onCategoriesUpdated: (updatedCategories) {
+                        widget.controller?.refreshCategories();
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ] else if (isMediumScreen) ...[
+          // دو ستون برای صفحه‌های متوسط
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  children: [
+                    _buildItemTypeSelector(context),
+                    const SizedBox(height: 20),
+                    TextFormField(
+                      initialValue: widget.formData.code,
+                      decoration: InputDecoration(labelText: '${t.code} (اختیاری)'),
+                      validator: ProductFormValidator.validateCode,
+                      onChanged: (value) => _updateFormData(widget.formData.copyWith(code: value.trim().isEmpty ? null : value.trim())),
+                    ),
+                    const SizedBox(height: 20),
+                    TextFormField(
+                      initialValue: widget.formData.name,
+                      decoration: InputDecoration(labelText: t.title),
+                      validator: ProductFormValidator.validateName,
+                      onChanged: (value) => _updateFormData(widget.formData.copyWith(name: value)),
+                    ),
+                    const SizedBox(height: 20),
+                    _buildUnitsSection(context),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  children: [
+                    _buildImagePicker(context),
+                    const SizedBox(height: 20),
+                    TextFormField(
+                      initialValue: widget.formData.description,
+                      decoration: InputDecoration(labelText: t.description),
+                      onChanged: (value) => _updateFormData(widget.formData.copyWith(description: value.trim().isEmpty ? null : value)),
+                      maxLines: 3,
+                    ),
+                    const SizedBox(height: 20),
                     CategoryPickerField(
                       businessId: widget.businessId,
                       categoriesTree: widget.categories,

@@ -1,24 +1,29 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 
 import '../../core/auth_store.dart';
+import '../../core/calendar_controller.dart';
+import '../../core/date_utils.dart';
 import '../../l10n/app_localizations.dart';
 import '../../services/workflow_service.dart';
 import '../../widgets/data_table/data_table_config.dart';
 import '../../widgets/permission/permission_widgets.dart';
+import '../../widgets/workflow/workflow_analytics_dialog.dart';
 
 class WorkflowsPage extends StatefulWidget {
   final int businessId;
   final AuthStore authStore;
+  final CalendarController calendarController;
 
   const WorkflowsPage({
     super.key,
     required this.businessId,
     required this.authStore,
+    required this.calendarController,
   });
 
   @override
@@ -28,12 +33,12 @@ class WorkflowsPage extends StatefulWidget {
 class _WorkflowsPageState extends State<WorkflowsPage> {
   final WorkflowService _workflowService = WorkflowService();
   final TextEditingController _searchController = TextEditingController();
+  Timer? _debounceTimer;
   bool _loading = true;
   bool _busy = false;
   String _statusFilter = 'all';
   List<Map<String, dynamic>> _workflows = const [];
-  List<Map<String, dynamic>> _triggerCatalog = const [];
-  List<Map<String, dynamic>> _actionCatalog = const [];
+  bool _isFirstLoad = true;
 
   static const Map<String, String> _statusApiValues = {
     'active': 'فعال',
@@ -45,22 +50,50 @@ class _WorkflowsPageState extends State<WorkflowsPage> {
   void initState() {
     super.initState();
     _searchController.addListener(_onSearchChanged);
+    widget.calendarController.addListener(_onCalendarChanged);
     _loadAll(showSpinner: true);
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // هر بار که صفحه visible می‌شود، لیست را به‌روزرسانی می‌کنیم
+    // (به جز بار اول که در initState بارگذاری شده است)
+    if (!_isFirstLoad && mounted) {
+      _loadAll(showSpinner: false);
+    }
+    _isFirstLoad = false;
+  }
+
+  @override
   void dispose() {
+    _debounceTimer?.cancel();
+    widget.calendarController.removeListener(_onCalendarChanged);
     _searchController
       ..removeListener(_onSearchChanged)
       ..dispose();
     super.dispose();
   }
 
-  void _onSearchChanged() {
-    // Debounce nhẹ: فقط وقتی طول متن صفر شد دوباره بارگذاری می‌کنیم
-    if (_searchController.text.isEmpty && !_busy) {
-      _loadAll(showSpinner: false);
+  void _onCalendarChanged() {
+    // وقتی نوع تقویم تغییر کند، صفحه را به‌روزرسانی می‌کنیم
+    if (mounted) {
+      setState(() {
+        // فقط برای rebuild کردن UI
+      });
     }
+  }
+
+  void _onSearchChanged() {
+    // لغو تایمر قبلی اگر وجود داشته باشد
+    _debounceTimer?.cancel();
+    
+    // ایجاد تایمر جدید با تاخیر 500 میلی‌ثانیه
+    _debounceTimer = Timer(const Duration(milliseconds: 500), () {
+      if (!_busy && mounted) {
+        _loadAll(showSpinner: false);
+      }
+    });
   }
 
   Future<void> _loadAll({bool showSpinner = false}) async {
@@ -90,26 +123,13 @@ class _WorkflowsPageState extends State<WorkflowsPage> {
         sortBy: 'updated_at',
         sortDesc: true,
       );
-      final workflowsFuture = _workflowService.listWorkflows(
+      final workflowsMap = await _workflowService.listWorkflows(
         businessId: widget.businessId,
         queryInfo: query,
       );
-      final futures = <Future<dynamic>>[
-        workflowsFuture,
-        if (_triggerCatalog.isEmpty) _workflowService.listTriggers() else Future.value(_triggerCatalog),
-        if (_actionCatalog.isEmpty) _workflowService.listActions() else Future.value(_actionCatalog),
-      ];
-      final results = await Future.wait(futures);
       if (!mounted) return;
       setState(() {
-        final workflowsMap = results.first as Map<String, dynamic>;
         _workflows = (workflowsMap['items'] as List<Map<String, dynamic>>?) ?? const [];
-        if (_triggerCatalog.isEmpty && results.length > 1) {
-          _triggerCatalog = (results[1] as List<Map<String, dynamic>>);
-        }
-        if (_actionCatalog.isEmpty && results.length > 2) {
-          _actionCatalog = (results[2] as List<Map<String, dynamic>>);
-        }
       });
     } catch (e, stackTrace) {
       debugPrint('خطا در بارگذاری workflows: $e');
@@ -152,6 +172,18 @@ class _WorkflowsPageState extends State<WorkflowsPage> {
         ),
         actions: [
           IconButton(
+            tooltip: 'آمار و تحلیل',
+            icon: const Icon(Icons.analytics_outlined),
+            onPressed: () {
+              showDialog(
+                context: context,
+                builder: (context) => WorkflowAnalyticsDialog(
+                  businessId: widget.businessId,
+                ),
+              );
+            },
+          ),
+          IconButton(
             tooltip: t.workflowRefresh,
             icon: const Icon(Icons.refresh),
             onPressed: _loadAll,
@@ -172,7 +204,6 @@ class _WorkflowsPageState extends State<WorkflowsPage> {
                 children: [
                   _buildFilters(t),
                   const SizedBox(height: 12),
-                  _buildCatalogSection(t),
                   if (_workflows.isEmpty)
                     _buildEmptyState(t)
                   else
@@ -213,11 +244,9 @@ class _WorkflowsPageState extends State<WorkflowsPage> {
                               icon: const Icon(Icons.clear),
                               onPressed: () {
                                 _searchController.clear();
-                                _loadAll(showSpinner: false);
                               },
                             ),
                     ),
-                    onSubmitted: (_) => _loadAll(showSpinner: false),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -259,70 +288,29 @@ class _WorkflowsPageState extends State<WorkflowsPage> {
     );
   }
 
-  Widget _buildCatalogSection(AppLocalizations t) {
-    if (_triggerCatalog.isEmpty && _actionCatalog.isEmpty) {
-      return const SizedBox.shrink();
-    }
-    return Column(
-      children: [
-        if (_triggerCatalog.isNotEmpty)
-          Card(
-            margin: const EdgeInsets.only(bottom: 12),
-            child: ExpansionTile(
-              leading: const Icon(Icons.bolt_outlined),
-              title: Text(t.workflowAvailableTriggers),
-              children: _triggerCatalog
-                  .map((trigger) => ListTile(
-                        title: Text(trigger['name']?.toString() ?? trigger['key'] as String),
-                        subtitle: Text(trigger['description']?.toString() ?? ''),
-                        trailing: Tooltip(
-                          message: trigger['key']?.toString() ?? '',
-                          child: Text(
-                            trigger['key']?.toString() ?? '',
-                            style: Theme.of(context).textTheme.labelSmall,
-                          ),
-                        ),
-                      ))
-                  .toList(),
-            ),
-          ),
-        if (_actionCatalog.isNotEmpty)
-          Card(
-            margin: const EdgeInsets.only(bottom: 12),
-            child: ExpansionTile(
-              leading: const Icon(Icons.extension_outlined),
-              title: Text(t.workflowAvailableActions),
-              children: _actionCatalog
-                  .map((action) => ListTile(
-                        title: Text(action['name']?.toString() ?? action['key'] as String),
-                        subtitle: Text(action['description']?.toString() ?? ''),
-                        trailing: Tooltip(
-                          message: action['key']?.toString() ?? '',
-                          child: Text(
-                            action['key']?.toString() ?? '',
-                            style: Theme.of(context).textTheme.labelSmall,
-                          ),
-                        ),
-                      ))
-                  .toList(),
-            ),
-          ),
-      ],
-    );
-  }
-
   Widget _buildWorkflowCard(Map<String, dynamic> workflow, AppLocalizations t) {
     final statusValue = workflow['status']?.toString() ?? _statusApiValues['draft']!;
     final isActive = statusValue == _statusApiValues['active'];
     final statusLabel = _executionStatusLabel(t, statusValue, statuses: true);
     final updatedAt = workflow['updated_at']?.toString() ?? workflow['created_at']?.toString();
-    final updatedText = updatedAt == null ? '-' : DateFormat('yyyy/MM/dd HH:mm').format(DateTime.tryParse(updatedAt)?.toLocal() ?? DateTime.now());
+    // استفاده از HesabixDateUtils برای فرمت کردن تاریخ بر اساس نوع تقویم انتخابی کاربر
+    final parsedDate = updatedAt == null ? null : DateTime.tryParse(updatedAt)?.toLocal();
+    final updatedText = parsedDate == null 
+        ? '-' 
+        : HesabixDateUtils.formatDateTime(parsedDate, widget.calendarController.isJalali);
     final nodeSummary = _buildNodeSummary(workflow, t);
     final description = (workflow['description'] as String?)?.trim();
 
     return Card(
+      elevation: 1,
       margin: const EdgeInsets.symmetric(vertical: 8),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color: Theme.of(context).colorScheme.outlineVariant.withOpacity(0.5),
+          width: 1,
+        ),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -338,27 +326,53 @@ class _WorkflowsPageState extends State<WorkflowsPage> {
                 ),
                 const SizedBox(width: 8),
                 Chip(
-                  backgroundColor: isActive ? Colors.green.withOpacity(0.1) : Theme.of(context).colorScheme.surfaceVariant,
+                  backgroundColor: isActive 
+                      ? Colors.green.withOpacity(0.15) 
+                      : statusValue == _statusApiValues['draft']!
+                          ? Colors.orange.withOpacity(0.15)
+                          : Theme.of(context).colorScheme.surfaceVariant,
                   label: Text(
                     statusLabel,
-                    style: TextStyle(color: isActive ? Colors.green.shade700 : Theme.of(context).colorScheme.onSurfaceVariant),
+                    style: TextStyle(
+                      color: isActive 
+                          ? Colors.green.shade700 
+                          : statusValue == _statusApiValues['draft']!
+                              ? Colors.orange.shade700
+                              : Theme.of(context).colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  side: BorderSide(
+                    color: isActive 
+                        ? Colors.green.shade300 
+                        : statusValue == _statusApiValues['draft']!
+                            ? Colors.orange.shade300
+                            : Colors.transparent,
+                    width: 1,
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 4),
                 IconButton(
                   tooltip: t.workflowRunNow,
                   icon: const Icon(Icons.play_arrow_rounded),
+                  color: Colors.blue.shade600,
                   onPressed: () => _runWorkflow(workflow),
                 ),
                 IconButton(
                   tooltip: t.workflowExecutionHistory,
-                  icon: const Icon(Icons.history),
+                  icon: const Icon(Icons.history_rounded),
                   onPressed: () => _showExecutions(workflow, t),
                 ),
                 IconButton(
                   tooltip: t.workflowEdit,
-                  icon: const Icon(Icons.edit_outlined),
+                  icon: const Icon(Icons.edit_rounded),
                   onPressed: () => _openWorkflowEditor(t, workflow: workflow),
+                ),
+                IconButton(
+                  tooltip: 'حذف ورک‌فلو',
+                  icon: const Icon(Icons.delete_rounded),
+                  color: Colors.red.shade600,
+                  onPressed: () => _deleteWorkflow(workflow, t),
                 ),
               ],
             ),
@@ -366,29 +380,61 @@ class _WorkflowsPageState extends State<WorkflowsPage> {
             if (description != null && description.isNotEmpty) ...[
               Text(
                 description,
-                style: Theme.of(context).textTheme.bodyMedium,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 12),
             ],
             Row(
               children: [
-                Icon(isActive ? Icons.check_circle : Icons.pause_circle, color: isActive ? Colors.green : Colors.grey, size: 18),
-                const SizedBox(width: 6),
-                Text(
-                  '${t.workflowLastUpdate}: $updatedText',
-                  style: Theme.of(context).textTheme.bodySmall,
+                Icon(
+                  isActive ? Icons.check_circle_rounded : Icons.pause_circle_rounded, 
+                  color: isActive ? Colors.green.shade600 : Colors.grey.shade400, 
+                  size: 18,
                 ),
-                const Spacer(),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '${t.workflowLastUpdate}: $updatedText',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                  ),
+                ),
                 Switch.adaptive(
                   value: isActive,
                   onChanged: (value) => _toggleWorkflowStatus(workflow, value),
                 ),
               ],
             ),
-            const SizedBox(height: 4),
-            Text(
-              nodeSummary,
-              style: Theme.of(context).textTheme.bodySmall,
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.3),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.account_tree_outlined,
+                    size: 16,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      nodeSummary,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
@@ -440,6 +486,51 @@ class _WorkflowsPageState extends State<WorkflowsPage> {
     }
   }
 
+  Future<void> _deleteWorkflow(Map<String, dynamic> workflow, AppLocalizations t) async {
+    // نمایش دیالوگ تایید
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('حذف ورک‌فلو'),
+        content: Text('آیا از حذف ورک‌فلو "${workflow['name']}" اطمینان دارید؟'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(t.workflowClose),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.red,
+            ),
+            child: const Text('حذف'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    try {
+      await _workflowService.deleteWorkflow(
+        businessId: widget.businessId,
+        workflowId: workflow['id'] as int,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('ورک‌فلو با موفقیت حذف شد')),
+      );
+      _loadAll(showSpinner: false);
+    } catch (e, stackTrace) {
+      debugPrint('خطا در حذف workflow: $e');
+      debugPrint('StackTrace: $stackTrace');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('خطا در حذف ورک‌فلو')),
+      );
+    }
+  }
+
   Future<void> _runWorkflow(Map<String, dynamic> workflow) async {
     try {
       final result = await _workflowService.executeWorkflow(
@@ -467,7 +558,7 @@ class _WorkflowsPageState extends State<WorkflowsPage> {
   }) async {
     if (workflow == null) {
       // افزودن workflow جدید
-      await context.pushNamed(
+      context.goNamed(
         'business_new_workflow',
         pathParameters: {
           'business_id': widget.businessId.toString(),
@@ -480,7 +571,7 @@ class _WorkflowsPageState extends State<WorkflowsPage> {
       if (workflowId == null) {
         return;
       }
-      await context.pushNamed(
+      context.goNamed(
         'business_edit_workflow',
         pathParameters: {
           'business_id': widget.businessId.toString(),
@@ -489,9 +580,6 @@ class _WorkflowsPageState extends State<WorkflowsPage> {
         extra: workflow,
       );
     }
-    if (mounted) {
-      _loadAll(showSpinner: true);
-    }
   }
 
   Future<void> _showExecutions(Map<String, dynamic> workflow, AppLocalizations t) async {
@@ -499,7 +587,7 @@ class _WorkflowsPageState extends State<WorkflowsPage> {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      builder: (ctx) {
+      builder: (bottomSheetContext) {
         return SafeArea(
           child: FutureBuilder<Map<String, dynamic>>(
             future: _workflowService.listExecutions(
@@ -532,32 +620,59 @@ class _WorkflowsPageState extends State<WorkflowsPage> {
                 minChildSize: 0.4,
                 maxChildSize: 0.9,
                 builder: (_, controller) {
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    child: ListView.separated(
-                      controller: controller,
-                      itemBuilder: (_, index) {
-                        final execution = executions[index];
-                        final statusValue = execution['status']?.toString() ?? '';
-                        final statusLabel = _executionStatusLabel(t, statusValue);
-                        final startedAt = execution['started_at']?.toString();
-                        final completedAt = execution['completed_at']?.toString();
-                        return ListTile(
-                          title: Text(statusLabel),
-                          subtitle: Text(
-                            '${t.workflowStarted}: ${_formatDate(startedAt)}\n'
-                            '${t.workflowCompleted}: ${_formatDate(completedAt)}',
-                          ),
-                          trailing: TextButton.icon(
-                            icon: const Icon(Icons.article_outlined),
-                            label: Text(t.workflowLogs),
-                            onPressed: () => _showExecutionLogs(workflowId, execution['id'] as int, t),
-                          ),
-                        );
-                      },
-                      separatorBuilder: (_, __) => const Divider(),
-                      itemCount: executions.length,
-                    ),
+                  return Column(
+                    children: [
+                      // Handle برای کشیدن bottom sheet
+                      Container(
+                        margin: const EdgeInsets.only(top: 8, bottom: 4),
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.4),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        child: Text(
+                          t.workflowExecutionHistory,
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
+                      ),
+                      const Divider(height: 1),
+                      Expanded(
+                        child: ListView.separated(
+                          controller: controller,
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          itemBuilder: (_, index) {
+                            final execution = executions[index];
+                            final statusValue = execution['status']?.toString() ?? '';
+                            final statusLabel = _executionStatusLabel(t, statusValue);
+                            final startedAt = execution['started_at']?.toString();
+                            final completedAt = execution['completed_at']?.toString();
+                            return ListTile(
+                              title: Text(statusLabel),
+                              subtitle: Text(
+                                '${t.workflowStarted}: ${_formatDate(startedAt)}\n'
+                                '${t.workflowCompleted}: ${_formatDate(completedAt)}',
+                              ),
+                              trailing: TextButton.icon(
+                                icon: const Icon(Icons.article_outlined),
+                                label: Text(t.workflowLogs),
+                                onPressed: () => _showExecutionLogs(
+                                  bottomSheetContext,
+                                  workflowId,
+                                  execution['id'] as int,
+                                  t,
+                                ),
+                              ),
+                            );
+                          },
+                          separatorBuilder: (_, __) => const Divider(),
+                          itemCount: executions.length,
+                        ),
+                      ),
+                    ],
                   );
                 },
               );
@@ -568,7 +683,12 @@ class _WorkflowsPageState extends State<WorkflowsPage> {
     );
   }
 
-  Future<void> _showExecutionLogs(int workflowId, int executionId, AppLocalizations t) async {
+  Future<void> _showExecutionLogs(
+    BuildContext bottomSheetContext,
+    int workflowId,
+    int executionId,
+    AppLocalizations t,
+  ) async {
     try {
       final logs = await _workflowService.getExecutionLogs(
         businessId: widget.businessId,
@@ -576,66 +696,136 @@ class _WorkflowsPageState extends State<WorkflowsPage> {
         executionId: executionId,
       );
       if (!mounted) return;
+      
       await showDialog<void>(
-        context: context,
-        builder: (_) {
-          return AlertDialog(
-            title: Text(t.workflowExecutionLogs),
-            content: ConstrainedBox(
-              constraints: const BoxConstraints(maxHeight: 420, maxWidth: 640),
-              child: logs.isEmpty
-                  ? Text(t.workflowNoLogs)
-                  : ListView.separated(
-                      shrinkWrap: true,
-                      itemCount: logs.length,
-                      separatorBuilder: (_, __) => const Divider(height: 12),
-                      itemBuilder: (_, index) {
-                        final log = logs[index];
-                        final timestamp = _formatDate(log['timestamp']?.toString());
-                        final level = log['level']?.toString() ?? 'info';
-                        final message = log['message']?.toString() ?? '';
-                        final data = log['data'];
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
+        context: bottomSheetContext,
+        builder: (dialogContext) {
+          // محاسبه عرض و ارتفاع بر اساس اندازه صفحه
+          final size = MediaQuery.of(dialogContext).size;
+          final dialogWidth = size.width > 800 ? 800.0 : size.width * 0.9;
+          final dialogHeight = size.height * 0.8;
+          
+          return Dialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Container(
+              width: dialogWidth,
+              height: dialogHeight,
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Header
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.terminal_rounded,
+                        color: Theme.of(dialogContext).colorScheme.primary,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          t.workflowExecutionLogs,
+                          style: Theme.of(dialogContext).textTheme.titleLarge,
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.of(dialogContext).pop(),
+                        tooltip: t.workflowClose,
+                      ),
+                    ],
+                  ),
+                  const Divider(height: 24),
+                  // محتوای لاگ‌ها
+                  Expanded(
+                    child: logs.isEmpty
+                        ? Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Text(timestamp, style: Theme.of(context).textTheme.labelSmall),
-                                const Spacer(),
-                                Chip(
-                                  label: Text(level.toUpperCase()),
-                                  backgroundColor: _logColor(level).withOpacity(0.15),
-                                  labelStyle: TextStyle(color: _logColor(level)),
-                                  visualDensity: VisualDensity.compact,
+                                Icon(
+                                  Icons.info_outline,
+                                  size: 48,
+                                  color: Theme.of(dialogContext).colorScheme.onSurfaceVariant,
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  t.workflowNoLogs,
+                                  style: Theme.of(dialogContext).textTheme.bodyLarge,
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 4),
-                            Text(message, style: Theme.of(context).textTheme.bodyMedium),
-                            if (data != null)
-                              Container(
-                                margin: const EdgeInsets.only(top: 6),
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: Theme.of(context).colorScheme.surfaceVariant,
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Text(
-                                  const JsonEncoder.withIndent('  ').convert(data),
-                                  style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
-                                ),
-                              ),
-                          ],
-                        );
-                      },
-                    ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: Text(t.workflowClose),
+                          )
+                        : ListView.separated(
+                            itemCount: logs.length,
+                            separatorBuilder: (_, __) => const Divider(height: 24),
+                            itemBuilder: (_, index) {
+                              final log = logs[index];
+                              final timestamp = _formatDate(log['timestamp']?.toString());
+                              final level = log['level']?.toString() ?? 'info';
+                              final message = log['message']?.toString() ?? '';
+                              final data = log['data'];
+                              
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Text(
+                                        timestamp,
+                                        style: Theme.of(dialogContext).textTheme.labelSmall?.copyWith(
+                                              color: Theme.of(dialogContext).colorScheme.onSurfaceVariant,
+                                            ),
+                                      ),
+                                      const Spacer(),
+                                      Chip(
+                                        label: Text(level.toUpperCase()),
+                                        backgroundColor: _logColor(level).withOpacity(0.15),
+                                        labelStyle: TextStyle(
+                                          color: _logColor(level),
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 11,
+                                        ),
+                                        visualDensity: VisualDensity.compact,
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    message,
+                                    style: Theme.of(dialogContext).textTheme.bodyMedium,
+                                  ),
+                                  if (data != null) ...[
+                                    const SizedBox(height: 8),
+                                    Container(
+                                      width: double.infinity,
+                                      padding: const EdgeInsets.all(12),
+                                      decoration: BoxDecoration(
+                                        color: Theme.of(dialogContext).colorScheme.surfaceVariant,
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: SingleChildScrollView(
+                                        scrollDirection: Axis.horizontal,
+                                        child: Text(
+                                          const JsonEncoder.withIndent('  ').convert(data),
+                                          style: const TextStyle(
+                                            fontFamily: 'monospace',
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              );
+                            },
+                          ),
+                  ),
+                ],
               ),
-            ],
+            ),
           );
         },
       );
@@ -686,7 +876,8 @@ class _WorkflowsPageState extends State<WorkflowsPage> {
     if (value == null || value.isEmpty) return '-';
     final date = DateTime.tryParse(value);
     if (date == null) return value;
-    return DateFormat('yyyy/MM/dd HH:mm').format(date.toLocal());
+    // استفاده از HesabixDateUtils برای فرمت کردن تاریخ بر اساس نوع تقویم انتخابی کاربر
+    return HesabixDateUtils.formatDateTime(date.toLocal(), widget.calendarController.isJalali);
   }
 
   Map<String, dynamic> _normalizeWorkflowData(dynamic data) {
@@ -718,23 +909,30 @@ class _WorkflowsPageState extends State<WorkflowsPage> {
             ?.map<Map<String, dynamic>>((node) => Map<String, dynamic>.from(node as Map))
             .toList() ??
         const <Map<String, dynamic>>[];
+    
+    // اگر هیچ نودی تعریف نشده باشد
     if (nodes.isEmpty) {
-      return 'No nodes defined.'; // TODO: اضافه کردن به localization
+      return 'هیچ گره‌ای تعریف نشده است';
     }
-    final triggers = nodes.where((n) => n['type'] == 'trigger').map((n) => n['config']?['trigger_type'] ?? n['label']).whereType<String>().toList();
-    final actions = nodes.where((n) => n['type'] == 'action').map((n) => n['config']?['action_type'] ?? n['label']).whereType<String>().toList();
-    final conditions = nodes.where((n) => n['type'] == 'condition').map((n) => n['label'] ?? 'condition').whereType<String>().toList();
+    
+    // شمارش انواع مختلف نودها
+    final triggerCount = nodes.where((n) => n['type'] == 'trigger').length;
+    final actionCount = nodes.where((n) => n['type'] == 'action').length;
+    final conditionCount = nodes.where((n) => n['type'] == 'condition').length;
+    
+    // ساخت خلاصه کوتاه و واضح
     final parts = <String>[];
-    if (triggers.isNotEmpty) {
-      parts.add('Triggers: ${triggers.join(', ')}'); // TODO: اضافه کردن به localization
+    if (triggerCount > 0) {
+      parts.add('$triggerCount تریگر');
     }
-    if (actions.isNotEmpty) {
-      parts.add('Actions: ${actions.join(', ')}'); // TODO: اضافه کردن به localization
+    if (actionCount > 0) {
+      parts.add('$actionCount اکشن');
     }
-    if (conditions.isNotEmpty) {
-      parts.add('Conditions: ${conditions.join(', ')}'); // TODO: اضافه کردن به localization
+    if (conditionCount > 0) {
+      parts.add('$conditionCount شرط');
     }
-    return parts.isEmpty ? 'This workflow definition is empty.' : parts.join(' • '); // TODO: اضافه کردن به localization
+    
+    return parts.isEmpty ? 'این ورک‌فلو خالی است' : parts.join(' • ');
   }
 
   static Map<String, dynamic> _defaultWorkflowTemplate() {

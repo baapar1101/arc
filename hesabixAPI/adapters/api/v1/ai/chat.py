@@ -18,13 +18,39 @@ from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/ai/chat", tags=["ai-chat"])
+router = APIRouter(prefix="/ai/chat", tags=["هوش مصنوعی"])
 DEFAULT_CHAT_TITLE = "گفت‌وگوی جدید"
 
 
 class ChatMessageRequest(BaseModel):
     content: str
     session_id: Optional[int] = None
+
+
+class CheckAvailabilityRequest(BaseModel):
+    business_id: Optional[int] = None
+    estimated_tokens: int = 1000
+
+
+@router.post("/check-availability", summary="بررسی امکان استفاده از AI")
+async def check_ai_availability(
+    request: Request,
+    params: CheckAvailabilityRequest = Body(...),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """
+    بررسی اینکه آیا کاربر می‌تواند از AI استفاده کند
+    (چک پیشگیرانه قبل از ارسال پیام)
+    """
+    business_id = params.business_id or ctx.business_id
+    ai_service = AIService(db, ctx, business_id)
+    
+    availability = ai_service.check_availability(
+        estimated_tokens=params.estimated_tokens
+    )
+    
+    return success_response(availability, request)
 
 
 @router.get("/sessions", summary="لیست گفت‌وگوها")
@@ -293,8 +319,15 @@ async def _stream_message_response(
     previous_messages: List[AIChatMessage],
     message_content: str
 ):
-    """Generator برای streaming response"""
+    """Generator برای streaming response
+    
+    ⚠️ مهم: Session را فقط برای خواندن استفاده می‌کنیم و بعد از streaming بسته می‌شود.
+    برای commit های بعدی از session جدید استفاده می‌کنیم.
+    """
+    from adapters.db.session import get_db_session
+    
     try:
+        # استفاده از session موجود فقط برای خواندن
         ai_service = AIService(db, ctx, session.business_id)
         accumulated_content = ""
         final_usage = None
@@ -370,60 +403,85 @@ async def _stream_message_response(
             input_tokens = final_usage.get("input_tokens", 0)
             output_tokens = final_usage.get("output_tokens", 0)
             
-            charge_result = ai_service.check_quota_and_charge(input_tokens, output_tokens)
+            # استفاده از session جدید برای commit (جلوگیری از connection leak)
+            with get_db_session() as new_db:
+                # خواندن session و message از دیتابیس
+                from adapters.db.repositories.ai_chat_repository import AIChatSessionRepository
+                session_repo = AIChatSessionRepository(new_db)
+                updated_session = session_repo.get_by_id(session_id)
+                
+                if not updated_session:
+                    logger.error(f"Session {session_id} not found for commit")
+                    yield f"data: {json.dumps({'error': 'Session not found', 'done': True})}\n\n"
+                    return
+                
+                # ایجاد AI service جدید با session جدید
+                new_ai_service = AIService(new_db, ctx, updated_session.business_id)
+                
+                charge_result = new_ai_service.check_quota_and_charge(input_tokens, output_tokens)
+                
+                # ذخیره پاسخ AI
+                assistant_message = AIChatMessage(
+                    session_id=session_id,
+                    role=MessageRole.ASSISTANT.value,
+                    content=accumulated_content,
+                    tokens_used=input_tokens + output_tokens
+                )
+                new_db.add(assistant_message)
+                
+                # ثبت لاگ استفاده
+                new_ai_service.log_usage(
+                    provider=new_ai_service.config.provider if new_ai_service.config else "openai",
+                    model=new_ai_service.config.model_name if new_ai_service.config else "gpt-4",
+                    input_tokens=input_tokens,
+                    output_tokens=output_tokens,
+                    cost=charge_result.get("cost", 0),
+                    payment_method=charge_result.get("payment_method", "free"),
+                    wallet_transaction_id=charge_result.get("wallet_transaction_id"),
+                    document_id=charge_result.get("document_id")
+                )
+                
+                # اگر عنوان پیش‌فرض است و این اولین پیام کاربر است، عنوان هوشمند بساز
+                if (not updated_session.title or updated_session.title == DEFAULT_CHAT_TITLE) and len(previous_messages) == 0:
+                    generated_title = await new_ai_service.generate_chat_title(message_content)
+                    if generated_title:
+                        updated_session.title = generated_title[:80]
+                
+                # به‌روزرسانی زمان جلسه
+                from datetime import datetime
+                updated_session.updated_at = datetime.utcnow()
+                
+                new_db.commit()
+                new_db.refresh(assistant_message)
+                message_id = assistant_message.id
             
-            # ذخیره پاسخ AI
-            assistant_message = AIChatMessage(
-                session_id=session_id,
-                role=MessageRole.ASSISTANT.value,
-                content=accumulated_content,
-                tokens_used=input_tokens + output_tokens
-            )
-            db.add(assistant_message)
-            
-            # ثبت لاگ استفاده
-            ai_service.log_usage(
-                provider=ai_service.config.provider if ai_service.config else "openai",
-                model=ai_service.config.model_name if ai_service.config else "gpt-4",
-                input_tokens=input_tokens,
-                output_tokens=output_tokens,
-                cost=charge_result.get("cost", 0),
-                payment_method=charge_result.get("payment_method", "free"),
-                wallet_transaction_id=charge_result.get("wallet_transaction_id"),
-                document_id=charge_result.get("document_id")
-            )
-            
-            # اگر عنوان پیش‌فرض است و این اولین پیام کاربر است، عنوان هوشمند بساز
-            if (not session.title or session.title == DEFAULT_CHAT_TITLE) and len(previous_messages) == 0:
-                generated_title = await ai_service.generate_chat_title(message_content)
-                if generated_title:
-                    session.title = generated_title[:80]
-            
-            # به‌روزرسانی زمان جلسه
-            from datetime import datetime
-            session.updated_at = datetime.utcnow()
-            
-            db.commit()
-            db.refresh(assistant_message)
-            
-            # ارسال chunk نهایی با usage
-            yield f"data: {json.dumps({'content': '', 'done': True, 'usage': final_usage, 'message_id': assistant_message.id})}\n\n"
+            # ارسال chunk نهایی با usage (بعد از بسته شدن session)
+            yield f"data: {json.dumps({'content': '', 'done': True, 'usage': final_usage, 'message_id': message_id})}\n\n"
         else:
-            # در صورت خطا - حداقل پیام را ذخیره کن
-            assistant_message = AIChatMessage(
-                session_id=session_id,
-                role=MessageRole.ASSISTANT.value,
-                content=accumulated_content or "خطا در دریافت پاسخ",
-                tokens_used=0
-            )
-            db.add(assistant_message)
-            from datetime import datetime
-            session.updated_at = datetime.utcnow()
-            db.commit()
-            db.refresh(assistant_message)
+            # در صورت خطا - حداقل پیام را ذخیره کن (با session جدید)
+            with get_db_session() as new_db:
+                from adapters.db.repositories.ai_chat_repository import AIChatSessionRepository
+                session_repo = AIChatSessionRepository(new_db)
+                updated_session = session_repo.get_by_id(session_id)
+                
+                if updated_session:
+                    assistant_message = AIChatMessage(
+                        session_id=session_id,
+                        role=MessageRole.ASSISTANT.value,
+                        content=accumulated_content or "خطا در دریافت پاسخ",
+                        tokens_used=0
+                    )
+                    new_db.add(assistant_message)
+                    from datetime import datetime
+                    updated_session.updated_at = datetime.utcnow()
+                    new_db.commit()
+                    new_db.refresh(assistant_message)
+                    message_id = assistant_message.id
+                else:
+                    message_id = None
             
             # ارسال chunk نهایی بدون usage (اما با message_id)
-            yield f"data: {json.dumps({'content': '', 'done': True, 'usage': None, 'message_id': assistant_message.id, 'warning': 'Usage information not available'})}\n\n"
+            yield f"data: {json.dumps({'content': '', 'done': True, 'usage': None, 'message_id': message_id, 'warning': 'Usage information not available'})}\n\n"
             
     except Exception as e:
         # ارسال خطا به صورت SSE

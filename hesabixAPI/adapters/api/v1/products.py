@@ -35,10 +35,11 @@ from adapters.db.models.business import Business
 from adapters.db.models.product import Product
 from app.core.i18n import negotiate_locale
 from fastapi import UploadFile, File, Form, HTTPException
+from adapters.api.v1.helpers.product_request_helper import process_product_request
 import os
 
 
-router = APIRouter(prefix="/products", tags=["products"])
+router = APIRouter(prefix="/products", tags=["محصولات و کالاها", "انبارداری"])
 
 
 @router.post("/business/{business_id}")
@@ -53,149 +54,18 @@ async def create_product_endpoint(
     _: None = Depends(require_business_permission_dep("products", "add")),
 ) -> Dict[str, Any]:
     
-    # بررسی اینکه آیا multipart/form-data است یا JSON
-    content_type = request.headers.get("content-type", "")
-    is_multipart = "multipart/form-data" in content_type
+    # استفاده از helper function برای پردازش درخواست
+    processed_payload, processed_file, image_file_id = await process_product_request(
+        request=request,
+        business_id=business_id,
+        ctx=ctx,
+        db=db,
+        is_update=False,
+    )
     
-    image_file_id = None
-    
-    # اگر multipart/form-data است، فایل و داده‌ها را از form می‌خوانیم
-    if is_multipart:
-        form_data = await request.form()
-        
-        # آپلود فایل اگر وجود دارد
-        if "file" in form_data:
-            file = form_data["file"]
-            if hasattr(file, 'filename') and file.filename:
-                # بررسی فرمت فایل
-                allowed_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'}
-                file_ext = os.path.splitext(file.filename)[1].lower()
-                if file_ext not in allowed_extensions:
-                    raise ApiError("INVALID_FILE_FORMAT", "فرمت فایل معتبر نیست. فقط فرمت‌های JPG, PNG, GIF, WebP و BMP پشتیبانی می‌شوند", http_status=400)
-                
-                # آپلود فایل
-                from app.services.file_storage_service import FileStorageService
-                storage_service = FileStorageService(db)
-                try:
-                    upload_result = await storage_service.upload_file(
-                        file=file,
-                        user_id=ctx.get_user_id(),  # user_id به صورت int ارسال می‌شود
-                        module_context="products",
-                        context_id=None,
-                        developer_data={"business_id": business_id},
-                        is_temporary=False,
-                        expires_in_days=3650,
-                        business_id=business_id,
-                        check_storage_limit=True,
-                    )
-                    image_file_id = upload_result.get("file_id")
-                except HTTPException as e:
-                    # اگر خطای محدودیت ذخیره‌سازی باشد، جزئیات را برمی‌گردانیم
-                    if e.status_code == 400 and isinstance(e.detail, dict) and e.detail.get("error") == "STORAGE_LIMIT_EXCEEDED":
-                        error_detail = {
-                            "success": False,
-                            "error": {
-                                "code": "STORAGE_LIMIT_EXCEEDED",
-                                "message": e.detail.get("message", "حجم فایل از محدودیت ذخیره‌سازی تجاوز می‌کند"),
-                                "total_limit_gb": e.detail.get("total_limit_gb"),
-                                "current_usage_gb": e.detail.get("current_usage_gb"),
-                                "available_gb": e.detail.get("available_gb"),
-                                "required_gb": e.detail.get("required_gb"),
-                                "over_usage_gb": e.detail.get("over_usage_gb"),
-                            }
-                        }
-                        raise HTTPException(status_code=400, detail=error_detail)
-                    raise ApiError("FILE_UPLOAD_ERROR", f"خطا در آپلود فایل: {str(e.detail)}", http_status=400)
-                except Exception as e:
-                    raise ApiError("FILE_UPLOAD_ERROR", f"خطا در آپلود فایل: {str(e)}", http_status=400)
-        
-        # ساخت payload از form data
-        import json
-        product_data = {}
-        for key, value in form_data.items():
-            if key != "file":
-                # تبدیل مقادیر به نوع مناسب
-                if isinstance(value, str):
-                    # سعی می‌کنیم به عنوان JSON parse کنیم
-                    try:
-                        parsed = json.loads(value)
-                        product_data[key] = parsed
-                    except (json.JSONDecodeError, ValueError):
-                        # اگر JSON نیست، بررسی می‌کنیم که آیا boolean یا number است
-                        value_lower = value.strip().lower()
-                        if value_lower in ('true', 'false'):
-                            product_data[key] = value_lower == 'true'
-                        elif value_lower == 'null' or value_lower == '':
-                            product_data[key] = None
-                        elif value.isdigit() or (value.startswith('-') and value[1:].isdigit()):
-                            product_data[key] = int(value)
-                        elif value.replace('.', '', 1).replace('-', '', 1).isdigit():
-                            product_data[key] = float(value)
-                        else:
-                            product_data[key] = value
-                else:
-                    product_data[key] = value
-        
-        try:
-            payload = ProductCreateRequest(**product_data)
-        except Exception as e:
-            raise ApiError("INVALID_PAYLOAD", f"خطا در پردازش داده‌ها: {str(e)}", http_status=400)
-    else:
-        # اگر JSON است، payload را از body می‌خوانیم
-        if not payload:
-            try:
-                body_data = await request.json()
-                payload = ProductCreateRequest(**body_data)
-            except Exception as e:
-                raise ApiError("INVALID_PAYLOAD", f"خطا در پردازش داده‌های JSON: {str(e)}", http_status=400)
-        
-        # اگر فایل هم ارسال شده، آن را پردازش می‌کنیم
-        if file and file.filename:
-            # بررسی فرمت فایل
-            allowed_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'}
-            file_ext = os.path.splitext(file.filename)[1].lower()
-            if file_ext not in allowed_extensions:
-                raise ApiError("INVALID_FILE_FORMAT", "فرمت فایل معتبر نیست. فقط فرمت‌های JPG, PNG, GIF, WebP و BMP پشتیبانی می‌شوند", http_status=400)
-            
-            # آپلود فایل
-            from app.services.file_storage_service import FileStorageService
-            storage_service = FileStorageService(db)
-            try:
-                upload_result = await storage_service.upload_file(
-                    file=file,
-                    user_id=ctx.get_user_id(),  # user_id به صورت int ارسال می‌شود
-                    module_context="products",
-                    context_id=None,
-                    developer_data={"business_id": business_id},
-                    is_temporary=False,
-                    expires_in_days=3650,
-                    business_id=business_id,
-                    check_storage_limit=True,
-                )
-                image_file_id = upload_result.get("file_id")
-            except HTTPException as e:
-                # اگر خطای محدودیت ذخیره‌سازی باشد، جزئیات را برمی‌گردانیم
-                if e.status_code == 400 and isinstance(e.detail, dict) and e.detail.get("error") == "STORAGE_LIMIT_EXCEEDED":
-                    error_detail = {
-                        "success": False,
-                        "error": {
-                            "code": "STORAGE_LIMIT_EXCEEDED",
-                            "message": e.detail.get("message", "حجم فایل از محدودیت ذخیره‌سازی تجاوز می‌کند"),
-                            "total_limit_gb": e.detail.get("total_limit_gb"),
-                            "current_usage_gb": e.detail.get("current_usage_gb"),
-                            "available_gb": e.detail.get("available_gb"),
-                            "required_gb": e.detail.get("required_gb"),
-                            "over_usage_gb": e.detail.get("over_usage_gb"),
-                        }
-                    }
-                    raise HTTPException(status_code=400, detail=error_detail)
-                raise ApiError("FILE_UPLOAD_ERROR", f"خطا در آپلود فایل: {str(e.detail)}", http_status=400)
-            except Exception as e:
-                raise ApiError("FILE_UPLOAD_ERROR", f"خطا در آپلود فایل: {str(e)}", http_status=400)
-    
-    # تنظیم image_file_id در payload
-    if image_file_id and payload:
-        payload.image_file_id = image_file_id
+    # اگر payload از helper آمده، از آن استفاده می‌کنیم
+    if processed_payload:
+        payload = processed_payload
     
     if not payload:
         raise ApiError("INVALID_PAYLOAD", "داده‌های محصول ارسال نشده است", http_status=400)
@@ -468,8 +338,15 @@ def delete_product_endpoint(
     db: Session = Depends(get_db),
     _: None = Depends(require_business_permission_by_entity_dep("products", "delete", Product, "product_id")),
 ) -> Dict[str, Any]:
-    ok = delete_product(db, product_id, business_id)
-    return success_response({"deleted": ok}, request)
+    from fastapi import HTTPException
+    
+    success, error_message = delete_product(db, product_id, business_id)
+    if not success:
+        if error_message:
+            raise HTTPException(status_code=400, detail=error_message)
+        raise HTTPException(status_code=404, detail="کالا یافت نشد")
+    
+    return success_response({"deleted": True}, request, message="کالا با موفقیت حذف شد")
 
 
 @router.post("/business/{business_id}/bulk-delete",
@@ -493,9 +370,10 @@ def bulk_delete_products_endpoint(
     codes = body.get("codes")
     deleted = 0
     skipped = 0
+    errors = []
 
     if not ids and not codes:
-        return success_response({"deleted": 0, "skipped": 0}, request)
+        return success_response({"deleted": 0, "skipped": 0, "errors": []}, request)
 
     # Normalize inputs
     if isinstance(ids, list):
@@ -510,24 +388,54 @@ def bulk_delete_products_endpoint(
     # Delete by IDs first
     if ids:
         for pid in ids:
-            ok = delete_product(db, pid, business_id)
-            if ok:
-                deleted += 1
-            else:
+            try:
+                product = db.get(Product, pid)
+                if not product or product.business_id != business_id:
+                    skipped += 1
+                    errors.append(f"کالا با شناسه {pid} یافت نشد")
+                    continue
+                
+                success, error_message = delete_product(db, pid, business_id)
+                if success:
+                    deleted += 1
+                else:
+                    skipped += 1
+                    if error_message:
+                        errors.append(f"کالا {product.name or product.code or pid}: {error_message}")
+                    else:
+                        errors.append(f"کالا {product.name or product.code or pid}: امکان حذف وجود ندارد")
+            except Exception as e:
                 skipped += 1
+                errors.append(f"خطا در حذف کالا با شناسه {pid}: {str(e)}")
 
     # Delete by codes
     if codes:
-        items = db.query(Product).filter(_and(Product.business_id == business_id, Product.code.in_(codes))).all()
-        for obj in items:
-            try:
-                db.delete(obj)
-                deleted += 1
-            except Exception:
-                skipped += 1
-        db.commit()
+        try:
+            items = db.query(Product).filter(_and(Product.business_id == business_id, Product.code.in_(codes))).all()
+            for obj in items:
+                try:
+                    success, error_message = delete_product(db, obj.id, business_id)
+                    if success:
+                        deleted += 1
+                    else:
+                        skipped += 1
+                        if error_message:
+                            errors.append(f"کالا {obj.name or obj.code or obj.id}: {error_message}")
+                        else:
+                            errors.append(f"کالا {obj.name or obj.code or obj.id}: امکان حذف وجود ندارد")
+                except Exception as e:
+                    skipped += 1
+                    errors.append(f"خطا در حذف کالا {obj.name or obj.code or obj.id}: {str(e)}")
+        except Exception as e:
+            # In case of query issues, treat all as skipped
+            skipped += len(codes)
+            errors.append(f"خطا در جستجوی کالاها: {str(e)}")
 
-    return success_response({"deleted": deleted, "skipped": skipped}, request)
+    return success_response({
+        "deleted": deleted, 
+        "skipped": skipped,
+        "errors": errors
+    }, request)
 
 @router.post("/business/{business_id}/export/excel",
     summary="خروجی Excel لیست محصولات",

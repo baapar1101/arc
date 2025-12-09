@@ -22,7 +22,7 @@ from app.services.credit_service import (
 )
 
 
-router = APIRouter(prefix="/businesses/{business_id}/credit", tags=["credit"])
+router = APIRouter(prefix="/businesses/{business_id}/credit", tags=["اعتبار"])
 
 
 @router.get(

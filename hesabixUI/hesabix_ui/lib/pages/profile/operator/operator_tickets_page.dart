@@ -25,11 +25,22 @@ class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
   
   // Refresh counter to force data table refresh
   int _refreshCounter = 0;
+  
+  // Check if current user is superadmin
+  bool _isSuperAdmin = false;
 
   @override
   void initState() {
     super.initState();
     _loadMetadata();
+    _checkUserPermissions();
+  }
+
+  // Helper برای setState ایمن
+  void _safeSetState(VoidCallback fn) {
+    if (mounted) {
+      setState(fn);
+    }
   }
 
   Future<void> _loadMetadata() async {
@@ -37,12 +48,27 @@ class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
       final statuses = await _supportService.getStatuses();
       final priorities = await _supportService.getPriorities();
       
-      setState(() {
+      _safeSetState(() {
         _statuses = statuses;
         _priorities = priorities;
       });
     } catch (e) {
       // Handle error silently for now, filters will just be empty
+    }
+  }
+
+  Future<void> _checkUserPermissions() async {
+    try {
+      final apiClient = ApiClient();
+      final response = await apiClient.get<Map<String, dynamic>>('/api/v1/auth/me');
+      final permissions = response.data?['data']?['permissions'] as Map<String, dynamic>?;
+      final isSuperAdmin = permissions?['is_superadmin'] as bool? ?? false;
+      
+      _safeSetState(() {
+        _isSuperAdmin = isSuperAdmin;
+      });
+    } catch (e) {
+      // Handle error silently
     }
   }
 
@@ -56,12 +82,164 @@ class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
         isOperator: true,
         onTicketUpdated: () {
           // Refresh the data table after ticket update
-          setState(() {
+          _safeSetState(() {
             _refreshCounter++;
           });
         },
       ),
     );
+  }
+
+  Future<void> _deleteTicket(int ticketId) async {
+    if (!mounted) return;
+    
+    final t = AppLocalizations.of(context);
+    
+    // نمایش دیالوگ تأیید
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('تأیید حذف'),
+        content: const Text('آیا مطمئن هستید که می‌خواهید این تیکت را حذف کنید؟'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(t.cancel),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: Text(t.delete),
+          ),
+        ],
+      ),
+    );
+    
+    if (confirmed != true || !mounted) return;
+    
+    try {
+      await _supportService.deleteTicket(ticketId);
+      
+      if (!mounted) return;
+      
+      // حذف تیکت از selectedRows اگر انتخاب شده بود و refresh
+      _safeSetState(() {
+        _selectedRows.remove(ticketId);
+        _refreshCounter++;
+      });
+      
+      // نمایش پیام موفقیت بعد از setState
+      await Future.delayed(const Duration(milliseconds: 100));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('تیکت با موفقیت حذف شد')),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('خطا در حذف تیکت: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _deleteSelectedTickets() async {
+    if (!mounted) return;
+    
+    final t = AppLocalizations.of(context);
+    
+    if (_selectedRows.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('هیچ تیکتی انتخاب نشده است')),
+      );
+      return;
+    }
+    
+    final ticketCount = _selectedRows.length;
+    
+    // نمایش دیالوگ تأیید
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('تأیید حذف گروهی'),
+        content: Text('آیا مطمئن هستید که می‌خواهید $ticketCount تیکت را حذف کنید؟'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(t.cancel),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: Text(t.delete),
+          ),
+        ],
+      ),
+    );
+    
+    if (confirmed != true || !mounted) return;
+    
+    // نمایش loading
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (loadingContext) => const Center(
+        child: CircularProgressIndicator(),
+      ),
+    );
+    
+    try {
+      final result = await _supportService.deleteTickets(_selectedRows.toList());
+      
+      // بستن loading
+      if (mounted) Navigator.of(context).pop();
+      
+      if (!mounted) return;
+      
+      final successCount = result['success'] as int;
+      final failCount = result['failed'] as int;
+      
+      // پاک کردن انتخاب‌ها و refresh
+      _safeSetState(() {
+        _selectedRows.clear();
+        _refreshCounter++;
+      });
+      
+      // نمایش پیام موفقیت بعد از setState
+      await Future.delayed(const Duration(milliseconds: 100));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '$successCount تیکت حذف شد${failCount > 0 ? ' و $failCount تیکت ناموفق بود' : ''}',
+            ),
+            backgroundColor: failCount > 0 ? Colors.orange : Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      // بستن loading
+      if (mounted) Navigator.of(context).pop();
+      
+      if (!mounted) return;
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('خطا در حذف تیکت‌ها: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
 
@@ -85,6 +263,19 @@ class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
                   ),
                 ),
                 const Spacer(),
+                // دکمه حذف گروهی (فقط برای superadmin)
+                if (_isSuperAdmin && _selectedRows.isNotEmpty) ...[
+                  ElevatedButton.icon(
+                    onPressed: _deleteSelectedTickets,
+                    icon: const Icon(Icons.delete_outline),
+                    label: Text('حذف انتخاب شده‌ها (${_selectedRows.length})'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red.shade50,
+                      foregroundColor: Colors.red.shade700,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                ],
               ],
             ),
             const SizedBox(height: 16),
@@ -191,7 +382,7 @@ class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
                   enableMultiRowSelection: true,
                   selectedRows: _selectedRows,
                   onRowSelectionChanged: (selectedRows) {
-                    setState(() {
+                    _safeSetState(() {
                       _selectedRows = selectedRows;
                     });
                   },

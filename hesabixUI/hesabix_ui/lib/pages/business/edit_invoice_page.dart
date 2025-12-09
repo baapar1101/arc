@@ -11,6 +11,7 @@ import '../../widgets/invoice/customer_combobox_widget.dart';
 import '../../widgets/invoice/person_combobox_widget.dart';
 import '../../widgets/date_input_field.dart';
 import '../../widgets/banking/currency_picker_widget.dart';
+import '../../widgets/project/project_selector_widget.dart';
 import '../../widgets/invoice/line_items_table.dart';
 import '../../widgets/invoice/invoice_transactions_widget.dart';
 import '../../utils/number_formatters.dart';
@@ -54,6 +55,7 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
   String? _invoiceNumber;
   DateTime? _invoiceDate;
   int? _selectedCurrencyId;
+  int? _selectedProjectId;
   String? _invoiceTitle;
   bool _isProforma = false; // وضعیت پیش‌فاکتور (قابل تغییر)
   bool _postInventory = true;
@@ -127,6 +129,7 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
       _isProforma = item['is_proforma'] == true;
       _invoiceDate = DateTime.tryParse(item['document_date']?.toString() ?? '') ?? DateTime.now();
       _selectedCurrencyId = (item['currency_id'] as num?)?.toInt();
+      _selectedProjectId = (item['project_id'] as num?)?.toInt();
       _invoiceTitle = item['description']?.toString();
 
       // extra_info
@@ -574,6 +577,21 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
                                 hintText: 'انتخاب ارز فاکتور',
                               ),
                             ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: ProjectSelectorWidget(
+                                businessId: widget.businessId,
+                                apiClient: ApiClient(),
+                                selectedProjectId: _selectedProjectId,
+                                onChanged: (projectId) {
+                                  setState(() {
+                                    _selectedProjectId = projectId;
+                                  });
+                                },
+                                allowNull: true,
+                                labelText: 'پروژه (اختیاری)',
+                              ),
+                            ),
                           ],
                         ),
                         const SizedBox(height: 16),
@@ -854,6 +872,7 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
       'is_proforma': _isProforma, // ارسال وضعیت پیش‌فاکتور
       'extra_info': mergedExtra,
       if ((_invoiceTitle ?? '').isNotEmpty) 'description': _invoiceTitle,
+      if (_selectedProjectId != null) 'project_id': _selectedProjectId,
       'lines': _lineItems.map((e) => _serializeLineItem(e)).toList(),
     };
     

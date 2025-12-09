@@ -193,6 +193,7 @@ class CreateManualDocumentRequest(BaseModel):
     description: Optional[str] = Field(default=None, max_length=1000, description="توضیحات سند")
     lines: List[DocumentLineCreate] = Field(..., min_items=2, description="سطرهای سند (حداقل 2)")
     extra_info: Optional[Dict[str, Any]] = Field(default=None, description="اطلاعات اضافی")
+    project_id: Optional[int] = Field(default=None, description="شناسه پروژه", gt=0)
 
 
 class UpdateManualDocumentRequest(BaseModel):
@@ -204,4 +205,5 @@ class UpdateManualDocumentRequest(BaseModel):
     description: Optional[str] = Field(default=None, max_length=1000, description="توضیحات سند")
     lines: Optional[List[DocumentLineUpdate]] = Field(default=None, min_items=2, description="سطرهای سند")
     extra_info: Optional[Dict[str, Any]] = Field(default=None, description="اطلاعات اضافی")
+    project_id: Optional[int] = Field(default=None, description="شناسه پروژه", gt=0)
 

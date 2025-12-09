@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/auth_store.dart';
@@ -186,19 +187,23 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
       canPop: false,
       onPopInvoked: (didPop) async {
         if (didPop) return;
-        // وقتی route تغییر می‌کند، صفحه را ببند
-        if (Navigator.of(context).canPop()) {
-          Navigator.of(context).pop();
-        }
+        // بازگشت به صفحه لیست ورکفلوها
+        _goBackToWorkflowsList();
       },
       child: Scaffold(
         appBar: AppBar(
           title: Text(title),
           leading: IconButton(
             icon: const Icon(Icons.arrow_back_ios_new),
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: _goBackToWorkflowsList,
           ),
           actions: [
+            // دکمه ویرایش نام و توضیحات
+            IconButton(
+              icon: const Icon(Icons.edit),
+              onPressed: _loading ? null : _editWorkflowInfo,
+              tooltip: 'ویرایش نام و توضیحات',
+            ),
             // دکمه تاریخچه اجرا (فقط برای workflowهای ذخیره شده)
             if (_workflow != null && _workflow!['id'] != null)
               IconButton(
@@ -222,26 +227,29 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
         ),
       drawer: Drawer(
         width: drawerWidth,
-        child: WorkflowNodePaletteContent(
-          triggers: _triggers,
-          actions: _actions,
-          onNodeSelected: (type, key, name) {
-            try {
-              _editorState.addNode(type, key, name);
-              Navigator.of(context).maybePop();
-            } catch (e, stackTrace) {
-              debugPrint('خطا در افزودن نود: $e');
-              debugPrint('StackTrace: $stackTrace');
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('خطا در افزودن نود: ${e.toString()}'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
+        child: Builder(
+          builder: (context) => WorkflowNodePaletteContent(
+            triggers: _triggers,
+            actions: _actions,
+            onNodeSelected: (type, key, name) {
+              try {
+                _editorState.addNode(type, key, name);
+                // بستن drawer بدون pop کردن صفحه
+                Scaffold.of(context).closeDrawer();
+              } catch (e, stackTrace) {
+                debugPrint('خطا در افزودن نود: $e');
+                debugPrint('StackTrace: $stackTrace');
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('خطا در افزودن نود: ${e.toString()}'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
               }
-            }
-          },
+            },
+          ),
         ),
       ),
       body: _loading
@@ -299,20 +307,16 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
                               _editorState.updateNodeConfig(node.id, result);
                             }
                           },
-                          onNodeLongPress: (node, position) {
-                            WorkflowNodeContextMenu.show(
+                          onNodeLongPress: (node, position) async {
+                            await WorkflowNodeContextMenu.show(
                               context,
                               position,
                               node: node,
                               onEditComment: () {
-                                Navigator.pop(context);
-                                Future.delayed(const Duration(milliseconds: 100), () {
-                                  if (mounted) _editNodeComment(node);
-                                });
+                                if (mounted) _editNodeComment(node);
                               },
                               onEdit: () async {
-                                Navigator.pop(context); // بستن context menu
-                                await Future.delayed(const Duration(milliseconds: 100));
+                                if (!mounted) return;
                                 final result = await showDialog<Map<String, dynamic>>(
                                   context: context,
                                   builder: (_) => WorkflowNodeConfigDialog(
@@ -327,16 +331,10 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
                                 }
                               },
                               onDuplicate: () {
-                                Navigator.pop(context);
-                                Future.delayed(const Duration(milliseconds: 100), () {
-                                  if (mounted) _duplicateNode(node);
-                                });
+                                if (mounted) _duplicateNode(node);
                               },
                               onDelete: () {
-                                Navigator.pop(context);
-                                Future.delayed(const Duration(milliseconds: 100), () {
-                                  if (mounted) _deleteNode(node);
-                                });
+                                if (mounted) _deleteNode(node);
                               },
                             );
                           },
@@ -388,6 +386,108 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
     );
   }
 
+  void _goBackToWorkflowsList() {
+    context.goNamed(
+      'business_workflows',
+      pathParameters: {
+        'business_id': widget.businessId.toString(),
+      },
+    );
+  }
+
+  Future<void> _editWorkflowInfo() async {
+    final nameController = TextEditingController(
+      text: _workflow?['name'] ?? '',
+    );
+    final descriptionController = TextEditingController(
+      text: _workflow?['description'] ?? '',
+    );
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('ویرایش نام و توضیحات'),
+        content: SizedBox(
+          width: 500,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                controller: nameController,
+                decoration: const InputDecoration(
+                  labelText: 'نام ورکفلو *',
+                  hintText: 'مثال: فرآیند تایید فاکتور',
+                  prefixIcon: Icon(Icons.label),
+                  border: OutlineInputBorder(),
+                ),
+                autofocus: true,
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: descriptionController,
+                decoration: const InputDecoration(
+                  labelText: 'توضیحات',
+                  hintText: 'توضیحات اختیاری در مورد این ورکفلو...',
+                  prefixIcon: Icon(Icons.description),
+                  border: OutlineInputBorder(),
+                ),
+                maxLines: 3,
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('لغو'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('تایید'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    final workflowName = nameController.text.trim();
+    if (workflowName.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('لطفاً نام ورکفلو را وارد کنید'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    // به‌روزرسانی اطلاعات محلی
+    setState(() {
+      if (_workflow == null) {
+        _workflow = {
+          'name': workflowName,
+          'description': descriptionController.text.trim(),
+        };
+      } else {
+        _workflow = {
+          ..._workflow!,
+          'name': workflowName,
+          'description': descriptionController.text.trim(),
+        };
+      }
+    });
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('اطلاعات به‌روزرسانی شد. برای ذخیره دائمی، دکمه ذخیره را بزنید.'),
+        duration: Duration(seconds: 3),
+      ),
+    );
+  }
+
   Future<void> _saveWorkflow() async {
     if (_saving) return;
 
@@ -435,33 +535,123 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
       return;
     }
 
+    // نمایش دیالوگ برای تعیین نام و توضیحات
+    final nameController = TextEditingController(
+      text: _workflow?['name'] ?? '',
+    );
+    final descriptionController = TextEditingController(
+      text: _workflow?['description'] ?? '',
+    );
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('ذخیره ورکفلو'),
+        content: SizedBox(
+          width: 500,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                controller: nameController,
+                decoration: const InputDecoration(
+                  labelText: 'نام ورکفلو *',
+                  hintText: 'مثال: فرآیند تایید فاکتور',
+                  prefixIcon: Icon(Icons.label),
+                  border: OutlineInputBorder(),
+                ),
+                autofocus: true,
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: descriptionController,
+                decoration: const InputDecoration(
+                  labelText: 'توضیحات',
+                  hintText: 'توضیحات اختیاری در مورد این ورکفلو...',
+                  prefixIcon: Icon(Icons.description),
+                  border: OutlineInputBorder(),
+                ),
+                maxLines: 3,
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('لغو'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('ذخیره'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    final workflowName = nameController.text.trim();
+    if (workflowName.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('لطفاً نام ورکفلو را وارد کنید'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
     setState(() => _saving = true);
     try {
       final payload = {
-        'name': _workflow?['name'] ?? AppLocalizations.of(context).newWorkflow,
-        'description': _workflow?['description'],
+        'name': workflowName,
+        'description': descriptionController.text.trim().isEmpty 
+            ? null 
+            : descriptionController.text.trim(),
         'status': _workflow?['status'] ?? AppLocalizations.of(context).workflowDraft,
         'workflow_data': _editorState.toBackendFormat(),
       };
 
       if (_workflow == null) {
-        await _workflowService.createWorkflow(
+        final result = await _workflowService.createWorkflow(
           businessId: widget.businessId,
           payload: payload,
         );
+        // به‌روزرسانی _workflow با نتیجه دریافتی
+        if (result is Map<String, dynamic>) {
+          setState(() {
+            _workflow = result;
+          });
+        }
       } else {
         await _workflowService.updateWorkflow(
           businessId: widget.businessId,
           workflowId: _workflow!['id'] as int,
           payload: payload,
         );
+        // به‌روزرسانی نام و توضیحات در _workflow
+        setState(() {
+          _workflow = {
+            ..._workflow!,
+            'name': workflowName,
+            'description': descriptionController.text.trim(),
+          };
+        });
       }
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(AppLocalizations.of(context).workflowSaved)),
       );
-      Navigator.of(context).pop(true);
+      // بازگشت به صفحه لیست ورکفلوها
+      context.goNamed(
+        'business_workflows',
+        pathParameters: {
+          'business_id': widget.businessId.toString(),
+        },
+      );
     } catch (e, stackTrace) {
       debugPrint('خطا در ذخیره‌سازی workflow: $e');
       debugPrint('StackTrace: $stackTrace');
@@ -663,12 +853,12 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
 
   void _deleteNode(WorkflowNodeModel node) {
     _editorState.removeNode(node.id);
-      final t = AppLocalizations.of(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(t.workflowNodeDeleted),
-          action: SnackBarAction(
-            label: t.workflowUndo,
+    final t = AppLocalizations.of(context);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(t.workflowNodeDeleted),
+        action: SnackBarAction(
+          label: t.workflowUndo,
           onPressed: () {
             if (_editorState.canUndo) {
               _editorState.undo();

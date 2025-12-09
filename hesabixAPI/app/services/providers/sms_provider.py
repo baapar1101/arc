@@ -71,23 +71,37 @@ class SmsProvider:
 		Returns:
 			(success: bool, error_message: Optional[str])
 		"""
+		success, _, error_msg = self.send_text_with_details(to_phone=to_phone, text=text)
+		return success, error_msg
+	
+	def send_text_with_details(self, *, to_phone: str, text: str) -> Tuple[bool, Optional[str], Optional[str]]:
+		"""
+		ارسال پیامک با برگرداندن جزئیات کامل (message_id و error)
+		
+		Args:
+			to_phone: شماره گیرنده
+			text: متن پیامک
+		
+		Returns:
+			(success: bool, message_id: Optional[str], error_message: Optional[str])
+		"""
 		if not self.is_configured():
-			return False, "SMS Provider پیکربندی نشده است"
+			return False, None, "SMS Provider پیکربندی نشده است"
 		
 		# نرمال‌سازی شماره موبایل
 		try:
 			normalized_phone = normalize_phone_number(to_phone)
 		except ValueError as e:
-			return False, f"فرمت شماره موبایل نامعتبر: {str(e)}"
+			return False, None, f"فرمت شماره موبایل نامعتبر: {str(e)}"
 		
 		# بررسی متن پیامک
 		if not text or not text.strip():
-			return False, "متن پیامک خالی است"
+			return False, None, "متن پیامک خالی است"
 		
 		# استفاده از BehinSmsProvider
 		if self._provider:
 			try:
-				success, _, error_msg = self._provider.send_text(
+				success, message_id, error_msg = self._provider.send_text(
 					to_phone=normalized_phone,
 					text=text,
 					is_flash=self.is_flash
@@ -96,15 +110,15 @@ class SmsProvider:
 					import structlog
 					logger = structlog.get_logger()
 					logger.error("sms_send_failed", error=error_msg, phone=normalized_phone)
-				return success, error_msg
+				return success, message_id, error_msg
 			except Exception as e:
 				import structlog
 				logger = structlog.get_logger()
 				logger.error("sms_send_exception", error=str(e), phone=normalized_phone, exc_info=True)
-				return False, f"خطای غیرمنتظره در ارسال SMS: {str(e)}"
+				return False, None, f"خطای غیرمنتظره در ارسال SMS: {str(e)}"
 		
 		# Fallback: اگر provider دیگری بود (برای آینده)
-		return False, "Provider پشتیبانی نمی‌شود"
+		return False, None, "Provider پشتیبانی نمی‌شود"
 	
 	def get_credit(self) -> tuple[bool, Optional[float], Optional[str]]:
 		"""

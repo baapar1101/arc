@@ -171,6 +171,97 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
     }
   }
 
+  Future<void> _testConnection() async {
+    final t = AppLocalizations.of(context);
+    
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    
+    try {
+      final result = await _service.testConnection(widget.businessId);
+      
+      if (!mounted) return;
+      
+      final status = result['status'] as String?;
+      final message = result['message'] as String?;
+      final sandboxMode = result['sandbox_mode'] as bool? ?? false;
+      
+      // نمایش dialog با نتیجه
+      await showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Row(
+            children: [
+              Icon(
+                status == 'connected' ? Icons.check_circle : Icons.error,
+                color: status == 'connected' ? Colors.green : Colors.red,
+              ),
+              const SizedBox(width: 8),
+              const Text('نتیجه تست اتصال'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(message ?? 'تست اتصال انجام شد'),
+              const SizedBox(height: 12),
+              if (sandboxMode)
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.shade100,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.warning_amber, color: Colors.orange),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'حالت Sandbox فعال است',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('بستن'),
+            ),
+          ],
+        ),
+      );
+      
+      if (status == 'connected') {
+        SnackBarHelper.show(
+          context,
+          message: 'اتصال به سامانه مودیان برقرار است',
+        );
+      }
+      
+    } catch (e) {
+      if (mounted) {
+        SnackBarHelper.showError(
+          context,
+          message: 'خطا در تست اتصال: ${e.toString()}',
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _saving = false;
+        });
+      }
+    }
+  }
+
   Future<void> _generateKeys() async {
     final t = AppLocalizations.of(context);
     final result = await showDialog<_GenerateKeysRequest>(
@@ -475,6 +566,13 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
                     onPressed: _saving ? null : _generateKeys,
                     icon: const Icon(Icons.vpn_key),
                     label: Text(t.taxGenerateKeys),
+                  ),
+                ),
+                wrapButton(
+                  FilledButton.tonalIcon(
+                    onPressed: (_saving || _settings == null) ? null : _testConnection,
+                    icon: const Icon(Icons.network_check),
+                    label: const Text('تست اتصال'),
                   ),
                 ),
               ],

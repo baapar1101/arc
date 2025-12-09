@@ -385,6 +385,17 @@ def create_receipt_payment(
         amount=amount_decimal,
     )
 
+    # دریافت project_id (اختیاری)
+    project_id = data.get("project_id")
+    if project_id:
+        # اعتبارسنجی پروژه
+        from adapters.db.models.project import Project
+        project = db.query(Project).filter(
+            and_(Project.id == project_id, Project.business_id == business_id, Project.is_active == True)
+        ).first()
+        if not project:
+            raise ApiError("PROJECT_NOT_FOUND", "پروژه یافت نشد یا غیرفعال است", http_status=404)
+
     # ایجاد سند
     document = Document(
         business_id=business_id,
@@ -398,6 +409,7 @@ def create_receipt_payment(
         is_proforma=False,
         description=data.get("description"),
         extra_info=data.get("extra_info"),
+        project_id=project_id,
     )
     db.add(document)
     db.flush()  # برای دریافت document.id
@@ -1222,13 +1234,14 @@ def get_receipt_payment(db: Session, document_id: int) -> Optional[Dict[str, Any
             float(line.get("debit", 0) or 0) + float(line.get("credit", 0) or 0)
             for line in result.get("lines", [])
         )
+        is_receipt = document.document_type == DOCUMENT_TYPE_RECEIPT
         trigger_receipt_payment_created(
             db=db,
-            business_id=business_id,
+            business_id=document.business_id,
             receipt_payment_id=document.id,
             type="receipt" if is_receipt else "payment",
             amount=total_amount,
-            user_id=user_id
+            user_id=document.created_by_user_id
         )
     except Exception as e:
         # عدم موفقیت در trigger نباید مانع بازگشت سند شود
@@ -2119,9 +2132,10 @@ def update_receipt_payment(
             float(line.get("debit", 0) or 0) + float(line.get("credit", 0) or 0)
             for line in result.get("lines", [])
         )
+        is_receipt = document.document_type == DOCUMENT_TYPE_RECEIPT
         trigger_receipt_payment_created(
             db=db,
-            business_id=business_id,
+            business_id=document.business_id,
             receipt_payment_id=document.id,
             type="receipt" if is_receipt else "payment",
             amount=total_amount,
@@ -2251,6 +2265,14 @@ def document_to_dict(db: Session, document: Document) -> Dict[str, Any]:
     # تعیین نام نوع سند
     document_type_name = "دریافت" if document.document_type == DOCUMENT_TYPE_RECEIPT else "پرداخت"
     
+    # دریافت نام پروژه
+    project_name = None
+    if document.project_id:
+        from adapters.db.models.project import Project
+        project = db.query(Project).filter(Project.id == document.project_id).first()
+        if project:
+            project_name = project.name
+    
     return {
         "id": document.id,
         "code": document.code,
@@ -2265,6 +2287,8 @@ def document_to_dict(db: Session, document: Document) -> Dict[str, Any]:
         "created_by_name": created_by_name,
         "is_proforma": document.is_proforma,
         "description": document.description,
+        "project_id": document.project_id,
+        "project_name": project_name,
         "extra_info": document.extra_info,
         "person_lines": person_lines,
         "account_lines": account_lines,

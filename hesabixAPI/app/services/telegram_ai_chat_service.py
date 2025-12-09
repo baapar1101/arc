@@ -250,6 +250,24 @@ class TelegramAIChatService:
 				])
 			)
 		
+		# بررسی اجباری business_id (چون کیف پول‌ها business-specific هستند)
+		if not active_session.business_id:
+			logger.warning(f"Session without business_id for user {self.user_id}, chat {self.chat_id}")
+			return self.telegram_provider.send_text(
+				chat_id=self.chat_id,
+				text="❌ کسب‌وکار انتخاب شده نامعتبر است. لطفاً دوباره کسب‌وکار را انتخاب کنید.",
+				reply_markup=self._build_inline_keyboard([
+					[{"text": "🏢 انتخاب کسب‌وکار", "callback_data": "menu:chat"}]
+				])
+			)
+		
+		# چک اعتبار قبل از ارسال (بدون try-except گسترده)
+		ai_service = AIService(self.db, user_context, active_session.business_id)
+		availability = ai_service.check_availability(estimated_tokens=len(text) * 2)
+		
+		if not availability["can_use"]:
+			return self._send_availability_error(availability)
+		
 		# ارسال پیام "در حال پردازش..."
 		self.telegram_provider.send_text(
 			chat_id=self.chat_id,
@@ -359,8 +377,110 @@ class TelegramAIChatService:
 			
 		except Exception as e:
 			logger.error(f"Error processing AI message: {e}", exc_info=True)
+			
+			# بررسی نوع خطا و نمایش پیام مناسب
+			error_message = "❌ خطا در پردازش پیام"
+			from app.core.responses import ApiError
+			
+			if isinstance(e, ApiError):
+				error_code = e.error_code
+				
+				if error_code == "NO_ACTIVE_SUBSCRIPTION":
+					error_message = """❌ اشتراک فعالی ندارید
+
+برای استفاده از هوش مصنوعی، ابتدا یک پلن را از داخل برنامه انتخاب کنید.
+
+💡 پلن‌های موجود:
+• رایگان: ۵۰۰۰ توکن
+• پایه: ۵۰٬۰۰۰ توکن ماهانه
+• حرفه‌ای: نامحدود"""
+				
+				elif error_code == "QUOTA_EXCEEDED":
+					extra_data = getattr(e, 'extra_data', {})
+					tokens_used = extra_data.get('tokens_used', 0)
+					tokens_limit = extra_data.get('tokens_limit', 0)
+					error_message = f"""⚠️ سهمیه شما تمام شده است
+
+استفاده شده: {tokens_used:,}
+سقف: {tokens_limit:,}
+
+💡 برای ادامه:
+• ارتقا به پلن بالاتر از داخل برنامه
+• منتظر تمدید ماهانه بمانید"""
+				
+				elif error_code == "INSUFFICIENT_FUNDS":
+					extra_data = getattr(e, 'extra_data', {})
+					wallet = extra_data.get('wallet', {})
+					balance = wallet.get('balance', 0)
+					estimated_cost = wallet.get('estimated_cost', 0)
+					error_message = f"""💰 موجودی کیف پول ناکافی
+
+موجودی فعلی: {balance:,.0f} ریال
+هزینه تخمینی: {estimated_cost:,.0f} ریال
+
+لطفاً از داخل برنامه، کیف پول خود را شارژ کنید."""
+				
+				else:
+					error_message = f"❌ خطا: {e.message}"
+			else:
+				error_message = f"❌ خطا در پردازش پیام: {str(e)}"
+			
 			return self.telegram_provider.send_text(
 				chat_id=self.chat_id,
-				text=f"❌ خطا در پردازش پیام: {str(e)}"
+				text=error_message
 			)
+	
+	def _send_availability_error(self, availability: Dict[str, Any]) -> bool:
+		"""ارسال پیام خطای عدم امکان استفاده از AI"""
+		reason = availability.get("reason")
+		details = availability.get("details", {})
+		message = details.get("message", "خطای نامشخص")
+		suggestions = details.get("suggestions", [])
+		
+		if reason == "NO_ACTIVE_SUBSCRIPTION":
+			text = """❌ اشتراک فعالی ندارید
+
+برای استفاده از هوش مصنوعی، ابتدا یک پلن را از داخل برنامه انتخاب کنید.
+
+💡 پلن‌های موجود:
+• رایگان: ۵۰۰۰ توکن
+• پایه: ۵۰٬۰۰۰ توکن ماهانه
+• حرفه‌ای: نامحدود"""
+		
+		elif reason == "QUOTA_EXCEEDED":
+			subscription = details.get("subscription", {})
+			tokens_used = subscription.get("tokens_used", 0)
+			tokens_limit = subscription.get("tokens_limit", 0)
+			text = f"""⚠️ سهمیه شما تمام شده است
+
+استفاده شده: {tokens_used:,}
+سقف: {tokens_limit:,}
+
+💡 برای ادامه:
+• ارتقا به پلن بالاتر از داخل برنامه
+• منتظر تمدید ماهانه بمانید"""
+		
+		elif reason == "INSUFFICIENT_FUNDS":
+			wallet = details.get("wallet", {})
+			balance = wallet.get("balance", 0)
+			estimated_cost = wallet.get("estimated_cost", 0)
+			text = f"""💰 موجودی کیف پول ناکافی
+
+موجودی فعلی: {balance:,.0f} ریال
+هزینه تخمینی: {estimated_cost:,.0f} ریال
+
+لطفاً از داخل برنامه، کیف پول خود را شارژ کنید."""
+		
+		else:
+			text = f"❌ {message}"
+			if suggestions:
+				text += "\n\n" + "\n".join(f"• {s}" for s in suggestions)
+		
+		return self.telegram_provider.send_text(
+			chat_id=self.chat_id,
+			text=text,
+			reply_markup=self._build_inline_keyboard([
+				[{"text": "🔙 بازگشت", "callback_data": "back:main"}]
+			])
+		)
 

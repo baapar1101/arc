@@ -95,15 +95,22 @@ def trigger_invoice_created(
         "document_id": invoice_id
     }
     
-    trigger_type = f"invoice.{invoice_type}.created" if invoice_type.startswith("invoice_") else f"invoice.{invoice_type}.created"
+    # تعیین نوع تریگر خاص
+    specific_trigger_type = None
     if invoice_type in ["invoice_sales", "sales"]:
-        trigger_type = "invoice.sales.created"
+        specific_trigger_type = "invoice.sales.created"
     elif invoice_type in ["invoice_purchase", "purchase"]:
-        trigger_type = "invoice.purchase.created"
-    else:
-        trigger_type = "invoice.created"
+        specific_trigger_type = "invoice.purchase.created"
     
-    return trigger_workflows(db, business_id, trigger_type, trigger_data, user_id)
+    # اجرای ورک‌فلوهای عمومی با تریگر invoice.created
+    executed_general = trigger_workflows(db, business_id, "invoice.created", trigger_data, user_id)
+    
+    # اجرای ورک‌فلوهای خاص (اگر وجود دارد)
+    executed_specific = 0
+    if specific_trigger_type:
+        executed_specific = trigger_workflows(db, business_id, specific_trigger_type, trigger_data, user_id)
+    
+    return executed_general + executed_specific
 
 
 def trigger_document_created(

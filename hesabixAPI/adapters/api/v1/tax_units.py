@@ -8,7 +8,7 @@ from adapters.api.v1.schemas import SuccessResponse
 from app.core.responses import success_response
 
 
-router = APIRouter(prefix="/tax-units", tags=["tax-units"])
+router = APIRouter(prefix="/tax-units", tags=["مالیات"])
 
 
 @router.get("/", 

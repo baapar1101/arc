@@ -28,12 +28,26 @@ class _ProductMovementHistoryReportPageState extends State<ProductMovementHistor
   DateTime? _toDate;
   Map<String, dynamic>? _selectedProduct;
   int? _selectedWarehouseId;
+  bool _hasProducts = true;
   
   @override
   void initState() {
     super.initState();
     _fromDate = DateTime.now().subtract(const Duration(days: 30));
     _toDate = DateTime.now();
+  }
+  
+  void _onProductsLoaded(List<Map<String, dynamic>> products) {
+    if (!mounted) return;
+    
+    setState(() {
+      _hasProducts = products.isNotEmpty;
+      
+      // انتخاب خودکار اولین محصول اگر هیچ محصولی انتخاب نشده باشد
+      if (_selectedProduct == null && products.isNotEmpty) {
+        _selectedProduct = products.first;
+      }
+    });
   }
 
   void _refreshData() {
@@ -180,6 +194,7 @@ class _ProductMovementHistoryReportPageState extends State<ProductMovementHistor
                         });
                         _refreshData();
                       },
+                      onProductsLoaded: _onProductsLoaded,
                       label: 'محصول',
                       hintText: 'انتخاب محصول',
                     ),
@@ -235,17 +250,44 @@ class _ProductMovementHistoryReportPageState extends State<ProductMovementHistor
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.all(8.0),
-                child: DataTableWidget<Map<String, dynamic>>(
-                  key: ValueKey({
-                    _selectedProduct?['id'],
-                    _fromDate?.toIso8601String(),
-                    _toDate?.toIso8601String(),
-                    _selectedWarehouseId,
-                  }.toString()),
-                  config: _buildTableConfig(t),
-                  fromJson: (json) => Map<String, dynamic>.from(json as Map),
-                  calendarController: widget.calendarController,
-                ),
+                child: !_hasProducts
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.inventory_2_outlined,
+                              size: 64,
+                              color: theme.colorScheme.outline.withValues(alpha: 0.5),
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'هیچ کالایی موجود نیست',
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'لطفاً ابتدا کالایی به سیستم اضافه کنید',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    : DataTableWidget<Map<String, dynamic>>(
+                        key: ValueKey({
+                          _selectedProduct?['id'],
+                          _fromDate?.toIso8601String(),
+                          _toDate?.toIso8601String(),
+                          _selectedWarehouseId,
+                        }.toString()),
+                        config: _buildTableConfig(t),
+                        fromJson: (json) => Map<String, dynamic>.from(json as Map),
+                        calendarController: widget.calendarController,
+                      ),
               ),
             ),
           ],

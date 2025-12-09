@@ -53,6 +53,8 @@ class _AIChatDialogState extends State<AIChatDialog> {
   bool _sessionsLoading = true;
   bool _sending = false;
   bool _historyCollapsed = true;
+  Map<String, dynamic>? _availabilityInfo;
+  bool _showCreditWarning = false;
 
   bool get _isJalali => widget.calendarController?.isJalali ?? true;
 
@@ -104,8 +106,33 @@ class _AIChatDialogState extends State<AIChatDialog> {
       final msgs = await _aiService.getSessionMessages(sessionId: session.id!);
       setState(() => _messages = msgs);
       _scrollToBottom();
+      // بررسی اعتبار بعد از انتخاب session
+      _checkAvailability();
     } catch (e) {
       _showError('خطا در دریافت پیام‌ها: $e');
+    }
+  }
+  
+  Future<void> _checkAvailability() async {
+    try {
+      final availability = await _aiService.checkAvailability(
+        businessId: widget.businessId,
+        estimatedTokens: 1000,
+      );
+      
+      setState(() {
+        _availabilityInfo = availability;
+        
+        // بررسی هشدار کم بودن اعتبار
+        final details = availability['details'] as Map<String, dynamic>?;
+        final subscription = details?['subscription'] as Map<String, dynamic>?;
+        final usagePercentage = subscription?['usage_percentage'] as num?;
+        
+        _showCreditWarning = usagePercentage != null && usagePercentage >= 80;
+      });
+    } catch (e) {
+      // در صورت خطا در چک اعتبار، اجازه ادامه بده
+      debugPrint('[AIChatDialog] Error checking availability: $e');
     }
   }
 
@@ -159,6 +186,23 @@ class _AIChatDialogState extends State<AIChatDialog> {
     if (_sending || _currentSession == null || _messageCtrl.text.trim().isEmpty) return;
 
     final content = _messageCtrl.text.trim();
+    
+    // چک اعتبار قبل از ارسال
+    try {
+      final availability = await _aiService.checkAvailability(
+        businessId: widget.businessId,
+        estimatedTokens: content.length * 2, // تخمین تقریبی
+      );
+      
+      if (!(availability['can_use'] as bool? ?? false)) {
+        _showDetailedError(availability);
+        return;
+      }
+    } catch (e) {
+      // در صورت خطا در چک، اجازه ادامه بده
+      debugPrint('[AIChatDialog] Error checking availability before send: $e');
+    }
+    
     _messageCtrl.clear();
 
     final userMessage = AIChatMessage(
@@ -266,6 +310,161 @@ class _AIChatDialogState extends State<AIChatDialog> {
     if (!mounted) return;
     SnackBarHelper.show(context, message: message);
   }
+  
+  void _showDetailedError(Map<String, dynamic> errorData) {
+    final reason = errorData['reason'] as String?;
+    final details = errorData['details'] as Map<String, dynamic>?;
+    
+    String title;
+    String message;
+    List<Widget> actions = [];
+    
+    switch (reason) {
+      case 'NO_ACTIVE_SUBSCRIPTION':
+        title = 'نیاز به اشتراک';
+        message = 'برای استفاده از هوش مصنوعی، ابتدا یک پلن را انتخاب کنید.';
+        final suggestions = (details?['suggestions'] as List?)?.cast<String>() ?? [];
+        if (suggestions.isNotEmpty) {
+          message += '\n\n${suggestions.join('\n')}';
+        }
+        actions = [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('بستن'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(context);
+              // TODO: Navigate to subscription page
+            },
+            child: const Text('مشاهده پلن‌ها'),
+          ),
+        ];
+        break;
+        
+      case 'QUOTA_EXCEEDED':
+        final subscription = details?['subscription'] as Map<String, dynamic>?;
+        final tokensUsed = subscription?['tokens_used'] as int? ?? 0;
+        final tokensLimit = subscription?['tokens_limit'] as int? ?? 0;
+        title = 'سهمیه تمام شده';
+        message = 'شما ${tokensUsed.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},')} از ${tokensLimit.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},')} توکن خود را استفاده کرده‌اید.';
+        final suggestions = (details?['suggestions'] as List?)?.cast<String>() ?? [];
+        if (suggestions.isNotEmpty) {
+          message += '\n\n${suggestions.join('\n')}';
+        }
+        actions = [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('بستن'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(context);
+              // TODO: Navigate to subscription page
+            },
+            child: const Text('ارتقا پلن'),
+          ),
+        ];
+        break;
+        
+      case 'INSUFFICIENT_FUNDS':
+        final wallet = details?['wallet'] as Map<String, dynamic>?;
+        final balance = wallet?['balance'] as num? ?? 0;
+        final estimatedCost = wallet?['estimated_cost'] as num? ?? 0;
+        title = 'موجودی کیف پول ناکافی';
+        message = 'موجودی: ${balance.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},')} ریال\n'
+                  'هزینه تخمینی: ${estimatedCost.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},')} ریال';
+        actions = [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('بستن'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(context);
+              // TODO: Navigate to wallet page
+            },
+            child: const Text('شارژ کیف پول'),
+          ),
+        ];
+        break;
+        
+      default:
+        title = 'خطا';
+        message = details?['message'] as String? ?? 'خطای نامشخص';
+        actions = [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('بستن'),
+          ),
+        ];
+    }
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.error_outline, color: Theme.of(context).colorScheme.error),
+            const SizedBox(width: 8),
+            Expanded(child: Text(title)),
+          ],
+        ),
+        content: Text(message),
+        actions: actions,
+      ),
+    );
+  }
+  
+  Widget _buildCreditWarning() {
+    if (!_showCreditWarning || _availabilityInfo == null) {
+      return const SizedBox.shrink();
+    }
+    
+    final details = _availabilityInfo!['details'] as Map<String, dynamic>?;
+    final subscription = details?['subscription'] as Map<String, dynamic>?;
+    final tokensRemaining = subscription?['tokens_remaining'] as int? ?? 0;
+    final suggestions = (details?['suggestions'] as List?)?.cast<String>() ?? [];
+    
+    return Container(
+      color: Colors.orange.withOpacity(0.1),
+      padding: const EdgeInsets.all(12),
+      child: Row(
+        children: [
+          const Icon(Icons.warning, color: Colors.orange, size: 20),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '⚠️ اعتبار شما رو به اتمام است',
+                  style: TextStyle(
+                    color: Colors.orange.shade900,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Text(
+                  '${tokensRemaining.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},')} توکن باقی مانده',
+                  style: TextStyle(
+                    color: Colors.orange.shade800,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          TextButton(
+            onPressed: () {
+              // TODO: Navigate to subscription page
+            },
+            child: const Text('ارتقا پلن'),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -354,6 +553,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
                                   style: theme.textTheme.titleLarge,
                                 ),
                               ),
+                              _buildCreditWarning(),
                               Expanded(
                                 child: Column(
                                   children: [

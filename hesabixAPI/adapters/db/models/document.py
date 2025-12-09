@@ -27,6 +27,7 @@ class Document(Base):
 	description: Mapped[str | None] = mapped_column(Text, nullable=True)
 	extra_info: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 	developer_settings: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+	project_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("projects.id", ondelete="SET NULL"), nullable=True, index=True)
 	created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 	updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
@@ -35,6 +36,7 @@ class Document(Base):
 	fiscal_year = relationship("FiscalYear", back_populates="documents")
 	currency = relationship("Currency", back_populates="documents")
 	created_by = relationship("User", foreign_keys=[created_by_user_id])
+	project = relationship("Project")
 	lines = relationship("DocumentLine", back_populates="document", cascade="all, delete-orphan")
 
 

@@ -24,7 +24,7 @@ engine = create_engine(
     echo=settings.sqlalchemy_echo,
     poolclass=QueuePool,  # استفاده از QueuePool برای بهتر control
     pool_pre_ping=True,  # بررسی سلامت اتصالات قبل از استفاده
-    pool_recycle=getattr(settings, 'db_pool_recycle', 1800),  # Recycle هر 30 دقیقه برای جلوگیری از connection leak
+    pool_recycle=getattr(settings, 'db_pool_recycle', 600),  # Recycle هر 10 دقیقه برای جلوگیری از connection leak و بهبود performance
     pool_size=settings.db_pool_size,
     max_overflow=settings.db_max_overflow,
     pool_timeout=settings.db_pool_timeout,
@@ -76,12 +76,14 @@ def receive_connect(dbapi_conn, connection_record):
 
 # Rate limiting برای لاگ‌های pool usage
 _last_pool_warning_time = 0
-_pool_warning_interval = 60  # فقط هر 60 ثانیه یکبار warning بده
+_pool_warning_interval = 30  # کاهش به 30 ثانیه برای monitoring بهتر
+_last_critical_warning_time = 0
+_critical_warning_interval = 10  # برای critical warnings، هر 10 ثانیه
 
 @event.listens_for(engine.pool, "checkout")
 def receive_checkout(dbapi_conn, connection_record, connection_proxy):
 	"""Log checkout اتصال از Pool و ثبت زمان برای leak detection"""
-	global _last_pool_warning_time
+	global _last_pool_warning_time, _last_critical_warning_time
 	
 	pool = engine.pool
 	total_capacity = pool.size() + pool.overflow()
@@ -92,14 +94,28 @@ def receive_checkout(dbapi_conn, connection_record, connection_proxy):
 	connection_id = id(dbapi_conn)
 	_connection_checkout_times[connection_id] = time.time()
 	
-	# Warning اگر Pool بیش از 80% استفاده شده باشد (با rate limiting)
-	if usage_percent > 80:
-		current_time = time.time()
-		# فقط هر 60 ثانیه یکبار warning بده
+	current_time = time.time()
+	
+	# Critical warning فقط اگر Pool واقعاً پر باشد (بیش از 95% و حداقل 475 connection)
+	# این از warning های غیرضروری جلوگیری می‌کند
+	if usage_percent > 95 and checked_out > 475:
+		if current_time - _last_critical_warning_time >= _critical_warning_interval:
+			_last_critical_warning_time = current_time
+			logger.error(
+				f"🚨 CRITICAL: Connection pool nearly exhausted! "
+				f"Usage: {usage_percent:.1f}%. "
+				f"Pool size: {pool.size()}, "
+				f"Checked out: {checked_out}, "
+				f"Overflow: {pool.overflow()}, "
+				f"Total capacity: {total_capacity}. "
+				f"Possible connection leak detected!"
+			)
+	# Warning اگر Pool بیش از 85% استفاده شده باشد و حداقل 425 connection (با rate limiting)
+	elif usage_percent > 85 and checked_out > 425:
 		if current_time - _last_pool_warning_time >= _pool_warning_interval:
 			_last_pool_warning_time = current_time
 			logger.warning(
-				f"High connection pool usage: {usage_percent:.1f}%. "
+				f"⚠️ High connection pool usage: {usage_percent:.1f}%. "
 				f"Pool size: {pool.size()}, "
 				f"Checked out: {checked_out}, "
 				f"Overflow: {pool.overflow()}, "
@@ -115,7 +131,36 @@ def receive_checkout(dbapi_conn, connection_record, connection_proxy):
 
 # Monitoring برای connection leak detection
 _connection_checkout_times = {}  # {connection_id: checkout_time}
-_connection_leak_threshold = 300  # 5 دقیقه - اگر connection بیشتر از این زمان checkout باشد، leak است
+_connection_leak_threshold = 30  # کاهش به 30 ثانیه برای تشخیص سریع‌تر leak ها
+_last_leak_check_time = 0
+_leak_check_interval = 15  # بررسی leak ها هر 15 ثانیه برای تشخیص سریع‌تر
+
+def _check_connection_leaks():
+	"""بررسی connection leak برای اتصالاتی که هنوز checkout هستند"""
+	global _last_leak_check_time
+	current_time = time.time()
+	
+	# فقط هر 30 ثانیه یکبار بررسی کن
+	if current_time - _last_leak_check_time < _leak_check_interval:
+		return
+	
+	_last_leak_check_time = current_time
+	
+	pool = engine.pool
+	leaked_connections = []
+	
+	for connection_id, checkout_time in list(_connection_checkout_times.items()):
+		connection_duration = current_time - checkout_time
+		if connection_duration > _connection_leak_threshold:
+			leaked_connections.append((connection_id, connection_duration))
+	
+	if leaked_connections:
+		logger.warning(
+			f"⚠️ Connection leak detected! "
+			f"Found {len(leaked_connections)} connections checked out for more than {_connection_leak_threshold}s. "
+			f"Pool size: {pool.size()}, Checked out: {pool.checkedout()}, "
+			f"Usage: {(pool.checkedout() / (pool.size() + pool.overflow()) * 100) if (pool.size() + pool.overflow()) > 0 else 0:.1f}%"
+		)
 
 @event.listens_for(engine.pool, "checkin")
 def receive_checkin(dbapi_conn, connection_record):
@@ -130,11 +175,14 @@ def receive_checkin(dbapi_conn, connection_record):
 		
 		if connection_duration > _connection_leak_threshold:
 			logger.warning(
-				f"⚠️ Potential connection leak detected! "
+				f"⚠️ Long-running connection detected! "
 				f"Connection was checked out for {connection_duration:.1f} seconds "
 				f"(threshold: {_connection_leak_threshold}s). "
 				f"Pool size: {pool.size()}, Checked out: {pool.checkedout()}"
 			)
+	
+	# بررسی leak های موجود
+	_check_connection_leaks()
 	
 	logger.debug(
 		f"Connection checked in. "

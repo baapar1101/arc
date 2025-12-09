@@ -9,6 +9,9 @@ import '../services/price_list_service.dart';
 import '../services/currency_service.dart';
 import '../services/warehouse_service.dart';
 import '../core/api_client.dart';
+import '../utils/error_extractor.dart';
+import '../utils/product_form_auto_save.dart';
+import '../utils/product_form_validator.dart';
 
 class ProductFormController extends ChangeNotifier {
   final int businessId;
@@ -44,6 +47,10 @@ class ProductFormController extends ChangeNotifier {
   // Image management
   List<int>? _selectedImageBytes;
   String? _selectedImageFilename;
+  
+  // Auto-save
+  final ProductFormAutoSave _autoSave = ProductFormAutoSave();
+  bool _autoSaveEnabled = true;
 
   ProductFormController({
     required this.businessId,
@@ -108,9 +115,12 @@ class ProductFormController extends ChangeNotifier {
   Future<void> initializeWithProduct(Map<String, dynamic>? product) async {
     _setLoading(true);
     try {
-      await _loadReferenceData();
-      await _loadPriceListsAndCurrencies();
-      await _loadWarehouses();
+      // موازی کردن بارگذاری داده‌های مرجع برای بهبود عملکرد
+      await Future.wait([
+        _loadReferenceData(),
+        _loadPriceListsAndCurrencies(),
+        _loadWarehouses(),
+      ]);
       
       if (product != null) {
         _editingProductId = product['id'] as int?;
@@ -120,12 +130,20 @@ class ProductFormController extends ChangeNotifier {
         if (_editingProductId != null) {
           await _loadExistingPriceItems(productId: _editingProductId!);
         }
+        // حذف draft ذخیره شده برای این محصول
+        await _autoSave.clearFormData(businessId, _editingProductId);
       } else {
-        _formData = ProductFormData(
-          baseSalesPrice: 0,
-          basePurchasePrice: 0,
-          unitConversionFactor: 1,
-        );
+        // تلاش برای بارگذاری draft ذخیره شده
+        final draftData = await _autoSave.loadFormData(businessId, null);
+        if (draftData != null) {
+          _formData = draftData;
+        } else {
+          _formData = ProductFormData(
+            baseSalesPrice: 0,
+            basePurchasePrice: 0,
+            unitConversionFactor: 1,
+          );
+        }
         _originalInventoryMode = 'bulk';
       }
       // دیگر واحد اصلی را به‌صورت خودکار مقداردهی نکن؛
@@ -134,41 +152,29 @@ class ProductFormController extends ChangeNotifier {
       _clearError();
       notifyListeners();
     } catch (e) {
-      _setError('خطا در بارگذاری اطلاعات: $e');
+      _setError(ErrorExtractor.extractErrorMessage(e));
     } finally {
       _setLoading(false);
     }
   }
 
-  // Load all reference data
+  // Load all reference data (موازی برای بهبود عملکرد)
   Future<void> _loadReferenceData() async {
     try {
-      // Load categories
-      _categories = await _categoryService.getTree(businessId: businessId);
+      // بارگذاری موازی تمام داده‌های مرجع
+      final results = await Future.wait([
+        _categoryService.getTree(businessId: businessId).catchError((_) => <Map<String, dynamic>>[]),
+        _attributeService.search(businessId: businessId, limit: 100)
+            .then((res) => List<Map<String, dynamic>>.from(res['items'] ?? const []))
+            .catchError((_) => <Map<String, dynamic>>[]),
+        _taxService.getTaxTypes().catchError((_) => <Map<String, dynamic>>[]),
+        _taxService.getTaxUnits().catchError((_) => <Map<String, dynamic>>[]),
+      ]);
       
-      // Load attributes
-      try {
-        final attrsRes = await _attributeService.search(businessId: businessId, limit: 100);
-        final items = List<Map<String, dynamic>>.from(attrsRes['items'] ?? const []);
-        _attributes = items;
-      } catch (_) {
-        _attributes = [];
-      }
-      
-      
-      // Load tax types
-      try {
-        _taxTypes = await _taxService.getTaxTypes();
-      } catch (_) {
-        _taxTypes = [];
-      }
-      
-      // Load tax units
-      try {
-        _taxUnits = await _taxService.getTaxUnits();
-      } catch (_) {
-        _taxUnits = [];
-      }
+      _categories = results[0] as List<Map<String, dynamic>>;
+      _attributes = results[1] as List<Map<String, dynamic>>;
+      _taxTypes = results[2] as List<Map<String, dynamic>>;
+      _taxUnits = results[3] as List<Map<String, dynamic>>;
     } catch (e) {
       throw Exception('خطا در بارگذاری اطلاعات مرجع: $e');
     }
@@ -186,19 +192,17 @@ class ProductFormController extends ChangeNotifier {
 
   Future<void> _loadPriceListsAndCurrencies() async {
     try {
-      // Price lists (first page only for selection)
-      try {
-        final res = await _priceListService.listPriceLists(businessId: businessId, page: 1, limit: 100);
-        _priceLists = List<Map<String, dynamic>>.from(res['items'] ?? const []);
-      } catch (_) {
-        _priceLists = [];
-      }
-      // Currencies: load only business default + active currencies
-      try {
-        _currencies = await _currencyService.listBusinessCurrencies(businessId: businessId);
-      } catch (_) {
-        _currencies = [];
-      }
+      // بارگذاری موازی price lists و currencies
+      final results = await Future.wait([
+        _priceListService.listPriceLists(businessId: businessId, page: 1, limit: 100)
+            .then((res) => List<Map<String, dynamic>>.from(res['items'] ?? const []))
+            .catchError((_) => <Map<String, dynamic>>[]),
+        _currencyService.listBusinessCurrencies(businessId: businessId)
+            .catchError((_) => <Map<String, dynamic>>[]),
+      ]);
+      
+      _priceLists = results[0] as List<Map<String, dynamic>>;
+      _currencies = results[1] as List<Map<String, dynamic>>;
     } catch (e) {
       // ignore; optional reference data
     }
@@ -243,12 +247,33 @@ class ProductFormController extends ChangeNotifier {
   void updateFormData(ProductFormData newData) {
     _formData = newData;
     _clearError();
+    
+    // Auto-save (فقط برای فرم جدید)
+    if (_autoSaveEnabled && _editingProductId == null) {
+      _autoSave.saveFormData(businessId, null, newData);
+    }
+    
     notifyListeners();
   }
 
   // Validate form
   bool validateForm(GlobalKey<FormState> formKey) {
-    return formKey.currentState?.validate() ?? false;
+    final formState = formKey.currentState;
+    if (formState == null) return false;
+    
+    // اعتبارسنجی فرم Flutter
+    final isValid = formState.validate();
+    
+    // اعتبارسنجی اضافی با ProductFormValidator
+    final validationErrors = ProductFormValidator.validateFormData(_formData);
+    if (validationErrors.isNotEmpty) {
+      // نمایش اولین خطا
+      final firstError = validationErrors.values.first;
+      _setError(firstError);
+      return false;
+    }
+    
+    return isValid;
   }
 
   // Submit form (create new product only). For editing, call updateProduct.
@@ -292,10 +317,13 @@ class ProductFormController extends ChangeNotifier {
       _selectedImageBytes = null;
       _selectedImageFilename = null;
       
+      // حذف draft ذخیره شده
+      await _autoSave.clearFormData(businessId, null);
+      
       _clearError();
       return true;
     } catch (e) {
-      _setError(_extractErrorMessage(e));
+      _setError(ErrorExtractor.extractErrorMessage(e));
       return false;
     } finally {
       _setLoading(false);
@@ -373,10 +401,13 @@ class ProductFormController extends ChangeNotifier {
       // به‌روزرسانی originalInventoryMode
       _originalInventoryMode = _formData.inventoryMode ?? 'bulk';
       
+      // حذف draft ذخیره شده
+      await _autoSave.clearFormData(businessId, productId);
+      
       _clearError();
       return true;
     } catch (e) {
-      _setError(_extractErrorMessage(e));
+      _setError(ErrorExtractor.extractErrorMessage(e));
       return false;
     } finally {
       _setLoading(false);
@@ -409,7 +440,7 @@ class ProductFormController extends ChangeNotifier {
       notifyListeners();
       return true;
     } catch (e) {
-      _setError(_extractErrorMessage(e));
+      _setError(ErrorExtractor.extractErrorMessage(e));
       return false;
     } finally {
       _setLoading(false);
@@ -442,70 +473,6 @@ class ProductFormController extends ChangeNotifier {
     }
   }
   
-  /// استخراج پیام خطا از exception
-  String _extractErrorMessage(Object e) {
-    if (e is dio.DioException) {
-      final response = e.response;
-      if (response != null && response.data is Map) {
-        final data = Map<String, dynamic>.from(response.data as Map);
-        final error = data['error'];
-        
-        // بررسی خطای STORAGE_LIMIT_EXCEEDED
-        if (error is Map && error['code'] == 'STORAGE_LIMIT_EXCEEDED') {
-          return error['message'] as String? ?? 'حجم فایل از محدودیت ذخیره‌سازی تجاوز می‌کند';
-        }
-        
-        // استخراج پیام خطا از error object
-        if (error is Map && error['message'] is String) {
-          final message = error['message'] as String;
-          if (message.isNotEmpty) {
-            return message;
-          }
-        }
-        
-        // استخراج پیام خطا از data
-        if (data['message'] is String) {
-          final message = data['message'] as String;
-          if (message.isNotEmpty) {
-            return message;
-          }
-        }
-      }
-      
-      // پیام خطای دیو
-      if (e.message != null && e.message!.isNotEmpty) {
-        // حذف قسمت‌های تکنیکی از پیام خطا
-        String message = e.message!;
-        if (message.contains('400:')) {
-          message = message.split('400:').last.trim();
-          // حذف JSON object از پیام
-          if (message.startsWith('{')) {
-            message = 'خطا در آپلود فایل';
-          }
-        }
-        return message;
-      }
-      
-      // نوع خطا
-      switch (e.type) {
-        case dio.DioExceptionType.connectionTimeout:
-          return 'خطا در اتصال به سرور. لطفاً دوباره تلاش کنید.';
-        case dio.DioExceptionType.receiveTimeout:
-          return 'زمان دریافت پاسخ از سرور به پایان رسید.';
-        case dio.DioExceptionType.connectionError:
-          return 'خطا در اتصال به سرور. لطفاً اتصال اینترنت خود را بررسی کنید.';
-        default:
-          return 'خطا در ارتباط با سرور';
-      }
-    }
-    
-    // پیام خطای عمومی
-    final errorMessage = e.toString();
-    if (errorMessage.contains('خطا')) {
-      return errorMessage;
-    }
-    return 'خطا در ذخیره اطلاعات';
-  }
   
   // مدیریت عکس
   void setProductImage(List<int> imageBytes, String filename) {
@@ -554,19 +521,17 @@ class ProductFormController extends ChangeNotifier {
   void resetForm() {
     _formData = ProductFormData();
     _clearError();
+    // حذف draft ذخیره شده
+    _autoSave.clearFormData(businessId, _editingProductId);
     notifyListeners();
   }
-
-  // Save form data to local storage (for auto-save)
-  void saveToLocalStorage() {
-    // Implementation for local storage persistence
-    // This could use SharedPreferences or similar
+  
+  // فعال/غیرفعال کردن auto-save
+  void setAutoSaveEnabled(bool enabled) {
+    _autoSaveEnabled = enabled;
   }
-
-  // Load form data from local storage
-  void loadFromLocalStorage() {
-    // Implementation for loading from local storage
-  }
+  
+  bool get autoSaveEnabled => _autoSaveEnabled;
 
   void _setLoading(bool loading) {
     _isLoading = loading;

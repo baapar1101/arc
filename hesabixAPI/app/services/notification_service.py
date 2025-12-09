@@ -105,7 +105,7 @@ class NotificationService:
 			# در صورت خطا، متن خام برمی‌گردانیم
 			return template_text
 
-	def send(self, *, user_id: int, event_key: str, context: Dict[str, Any], preferred_channels: Optional[Iterable[str]] = None, locale: Optional[str] = None) -> bool:
+	def send(self, *, user_id: int, event_key: str, context: Dict[str, Any], preferred_channels: Optional[Iterable[str]] = None, locale: Optional[str] = None, broadcast_mode: bool = False) -> bool:
 		"""
 		Minimal synchronous sender with basic fallback:
 		- Try Telegram if linked and requested
@@ -119,6 +119,7 @@ class NotificationService:
 			context: پارامترهای context برای جایگزینی در قالب (مثلاً {"code": "123456"})
 			preferred_channels: لیست کانال‌های ترجیحی برای ارسال
 			locale: زبان مورد نظر (اختیاری)
+		broadcast_mode: اگر True باشد، به همه کانال‌ها ارسال می‌شود (نه فقط اولین موفق)
 		
 		Returns:
 			True اگر ناتیفیکیشن با موفقیت ارسال شد، False در غیر این صورت
@@ -189,7 +190,8 @@ class NotificationService:
 						self.db.add(outbox)
 						self.db.commit()
 						sent = True
-						break
+						if not broadcast_mode:
+							break
 					else:
 						outbox.status = "failed"
 						outbox.retry_count = outbox.retry_count + 1

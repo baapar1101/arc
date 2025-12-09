@@ -300,18 +300,58 @@ fi
 echo "Full command: flutter build web --$MODE ${BUILD_FLAGS[*]} --dart-define API_BASE_URL=$API_BASE_URL"
 echo ""
 
-# Configure memory limits for dart compile js to prevent OOM
-# Increase heap size for dart2js compiler
-export DART_VM_OPTIONS="--old-gen-heap-size=4096"
-# Can also use --max-old-space-size if needed
-# But Flutter manages these settings itself
+# Configure CPU cores for parallel compilation
+# Detect available CPU cores and use 80% of them
+AVAILABLE_CORES=$(nproc)
+BUILD_WORKERS=$((AVAILABLE_CORES * 80 / 100))
+# Ensure at least 1 worker is used
+[ "$BUILD_WORKERS" -lt 1 ] && BUILD_WORKERS=1
+# Cap at 16 workers to prevent issues
+[ "$BUILD_WORKERS" -gt 16 ] && BUILD_WORKERS=16
 
-# Check available memory
-echo "Checking system memory..."
+echo "CPU Optimization:"
+echo "  Total CPU cores: $AVAILABLE_CORES"
+echo "  Using cores (80%): $BUILD_WORKERS"
+echo ""
+
+# Configure memory limits for dart compile js to prevent OOM
+# Detect total system memory and use 80% for build process
+TOTAL_RAM_MB=$(free -m | awk '/^Mem:/ {print $2}')
+AVAILABLE_RAM_MB=$(free -m | awk '/^Mem:/ {print $7}')
+
+# Calculate 80% of total RAM for heap size
+HEAP_SIZE_MB=$((TOTAL_RAM_MB * 80 / 100))
+
+# Ensure minimum 2GB and maximum 16GB for heap
+[ "$HEAP_SIZE_MB" -lt 2048 ] && HEAP_SIZE_MB=2048
+[ "$HEAP_SIZE_MB" -gt 16384 ] && HEAP_SIZE_MB=16384
+
+# If available RAM is less than calculated heap, use 80% of available RAM instead
+if [ "$AVAILABLE_RAM_MB" -lt "$HEAP_SIZE_MB" ]; then
+  HEAP_SIZE_MB=$((AVAILABLE_RAM_MB * 80 / 100))
+  # Ensure minimum 1GB in this case
+  [ "$HEAP_SIZE_MB" -lt 1024 ] && HEAP_SIZE_MB=1024
+fi
+
+echo "Memory Optimization:"
+echo "  Total RAM: ${TOTAL_RAM_MB}MB"
+echo "  Available RAM: ${AVAILABLE_RAM_MB}MB"
+echo "  Heap Size (80%): ${HEAP_SIZE_MB}MB"
+echo ""
+
+# Set Dart VM heap size
+export DART_VM_OPTIONS="--old-gen-heap-size=$HEAP_SIZE_MB"
+
+# Configure parallel workers for dart2js compiler
+# This significantly speeds up JavaScript compilation
+export DART_COMPILE_JS_WORKERS="$BUILD_WORKERS"
+
+# Check available memory details
+echo "System Memory Status:"
 free -h | head -2
 echo ""
 
-# Run build with memory settings
+# Run build with memory settings and parallel compilation
 flutter build web --"$MODE" "${BUILD_FLAGS[@]}" "${DART_DEFINE_ARGS[@]}"
 
 # Fix flutter_bootstrap.js to use local CanvasKit instead of CDN
@@ -395,10 +435,12 @@ if [ -d "$BUILD_DIR" ] && [ -n "$(ls -A "$BUILD_DIR" 2>/dev/null)" ]; then
   echo ""
   echo "Copying built files to deployment path..."
   if [ -d "$DEPLOY_DIR" ] || mkdir -p "$DEPLOY_DIR" 2>/dev/null; then
-    rsync -a --delete "$BUILD_DIR/" "$DEPLOY_DIR/" 2>/dev/null || {
+    # Use optimized rsync with light compression and progress
+    # --compress-level=1 for fast compression with minimal CPU overhead
+    rsync -azP --compress-level=1 --delete "$BUILD_DIR/" "$DEPLOY_DIR/" 2>/dev/null || {
       warn "Error copying files to $DEPLOY_DIR"
       warn "Please copy files manually:"
-      warn "  rsync -a --delete $BUILD_DIR/ $DEPLOY_DIR/"
+      warn "  rsync -azP --compress-level=1 --delete $BUILD_DIR/ $DEPLOY_DIR/"
     }
     chown -R www-data:www-data "$DEPLOY_DIR" 2>/dev/null || true
     echo "✓ Files copied to $DEPLOY_DIR"
@@ -424,7 +466,9 @@ if [ "$MODE" = "release" ]; then
   echo "✓ Applied optimizations:"
   echo "  - Mode: Production (Release)"
   echo "  - Service Worker: Enabled (offline-first strategy)"
-  echo "  - Optimization Level: 4 (maximum optimization)"
+  echo "  - Optimization Level: 2 (balanced optimization)"
+  echo "  - Parallel Workers: $BUILD_WORKERS (80% of $AVAILABLE_CORES cores)"
+  echo "  - Heap Size: ${HEAP_SIZE_MB}MB (80% of ${TOTAL_RAM_MB}MB RAM)"
   echo "  - Base Href: /"
   echo "  - API Base URL: $API_BASE_URL"
   echo ""
@@ -434,6 +478,8 @@ else
   echo "✓ Applied optimizations:"
   echo "  - Mode: $MODE"
   echo "  - Renderer: CanvasKit"
+  echo "  - Parallel Workers: $BUILD_WORKERS (80% of $AVAILABLE_CORES cores)"
+  echo "  - Heap Size: ${HEAP_SIZE_MB}MB (80% of ${TOTAL_RAM_MB}MB RAM)"
   echo "  - Base Href: /"
   echo "  - API Base URL: $API_BASE_URL"
 fi

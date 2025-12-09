@@ -48,6 +48,7 @@ def get_pnl_period_report(
     currency_id: Optional[int] = None,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
+    project_id: Optional[int] = None,  # 🆕 فیلتر پروژه
     skip: int = 0,
     take: int = 100,
 ) -> Dict[str, Any]:
@@ -150,7 +151,13 @@ def get_pnl_period_report(
             Document.document_date >= date_from_obj,
             Document.document_date <= date_to_obj,
         )
-    ).group_by(DocumentLine.account_id)
+    )
+    
+    # 🆕 فیلتر پروژه
+    if project_id:
+        turnover_query = turnover_query.filter(Document.project_id == project_id)
+    
+    turnover_query = turnover_query.group_by(DocumentLine.account_id)
     
     if currency_id:
         turnover_query = turnover_query.filter(Document.currency_id == currency_id)
@@ -235,6 +242,7 @@ def get_pnl_cumulative_report(
     fiscal_year_id: Optional[int] = None,
     currency_id: Optional[int] = None,
     date_to: Optional[str] = None,
+    project_id: Optional[int] = None,  # 🆕 فیلتر پروژه
     skip: int = 0,
     take: int = 100,
 ) -> Dict[str, Any]:
@@ -333,7 +341,13 @@ def get_pnl_cumulative_report(
             Document.document_date >= date_from_obj,
             Document.document_date <= date_to_obj,
         )
-    ).group_by(DocumentLine.account_id)
+    )
+    
+    # 🆕 فیلتر پروژه
+    if project_id:
+        turnover_query = turnover_query.filter(Document.project_id == project_id)
+    
+    turnover_query = turnover_query.group_by(DocumentLine.account_id)
     
     if currency_id:
         turnover_query = turnover_query.filter(Document.currency_id == currency_id)

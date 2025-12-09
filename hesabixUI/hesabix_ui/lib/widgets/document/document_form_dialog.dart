@@ -9,6 +9,7 @@ import 'package:hesabix_ui/services/account_service.dart';
 import 'package:hesabix_ui/widgets/date_input_field.dart';
 import 'package:hesabix_ui/widgets/document/document_line_editor.dart';
 import 'package:hesabix_ui/widgets/banking/currency_picker_widget.dart';
+import 'package:hesabix_ui/widgets/project/project_selector_widget.dart';
 import '../../utils/snackbar_helper.dart';
 
 /// دیالوگ ایجاد یا ویرایش سند حسابداری دستی
@@ -53,6 +54,7 @@ class _DocumentFormDialogState extends State<DocumentFormDialog> {
   // مقادیر فرم
   DateTime? _documentDate;
   int? _currencyId;
+  int? _projectId;
   bool _isProforma = false;
   List<DocumentLineEdit> _lines = [];
 
@@ -95,6 +97,7 @@ class _DocumentFormDialogState extends State<DocumentFormDialog> {
     _descriptionController.text = doc.description ?? '';
     _documentDate = doc.documentDate;
     _currencyId = doc.currencyId;
+    _projectId = doc.projectId;
     _isProforma = doc.isProforma;
 
     // تبدیل سطرهای سند به DocumentLineEdit
@@ -271,6 +274,7 @@ class _DocumentFormDialogState extends State<DocumentFormDialog> {
           ? null
           : _descriptionController.text,
       lines: _lines.map((line) => line.toRequest()).toList(),
+      projectId: _projectId,
     );
 
     await _service.createManualDocument(
@@ -290,6 +294,7 @@ class _DocumentFormDialogState extends State<DocumentFormDialog> {
           ? null
           : _descriptionController.text,
       lines: _lines.map((line) => line.toRequest()).toList(),
+      projectId: _projectId,
     );
 
     await _service.updateManualDocument(
@@ -453,6 +458,24 @@ class _DocumentFormDialogState extends State<DocumentFormDialog> {
                     },
                     label: 'ارز',
                     hintText: 'انتخاب ارز',
+                  ),
+                ),
+                const SizedBox(width: 16),
+
+                // پروژه
+                Expanded(
+                  flex: 2,
+                  child: ProjectSelectorWidget(
+                    businessId: widget.businessId,
+                    apiClient: widget.apiClient,
+                    selectedProjectId: _projectId,
+                    onChanged: (projectId) {
+                      setState(() {
+                        _projectId = projectId;
+                      });
+                    },
+                    allowNull: true,
+                    labelText: 'پروژه',
                   ),
                 ),
                 const SizedBox(width: 16),

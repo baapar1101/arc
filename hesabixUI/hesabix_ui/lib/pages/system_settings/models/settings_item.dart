@@ -12,6 +12,7 @@ class SettingsItem {
   final List<String> tags; // ['new', 'important', 'advanced']
   final bool isFavorite;
   final int order;
+  final bool requiresSuperAdmin; // نیاز به دسترسی superadmin
 
   const SettingsItem({
     required this.id,
@@ -24,6 +25,7 @@ class SettingsItem {
     this.tags = const [],
     this.isFavorite = false,
     this.order = 0,
+    this.requiresSuperAdmin = false,
   });
 
   SettingsItem copyWith({
@@ -37,6 +39,7 @@ class SettingsItem {
     List<String>? tags,
     bool? isFavorite,
     int? order,
+    bool? requiresSuperAdmin,
   }) {
     return SettingsItem(
       id: id ?? this.id,
@@ -49,6 +52,7 @@ class SettingsItem {
       tags: tags ?? this.tags,
       isFavorite: isFavorite ?? this.isFavorite,
       order: order ?? this.order,
+      requiresSuperAdmin: requiresSuperAdmin ?? this.requiresSuperAdmin,
     );
   }
 }

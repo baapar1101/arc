@@ -86,6 +86,22 @@ class TaxSettingsService {
     }
   }
 
+  Future<Map<String, dynamic>> testConnection(int businessId) async {
+    try {
+      final response = await _apiClient.post<Map<String, dynamic>>(
+        '/tax-settings/business/$businessId/test-connection',
+        data: const <String, dynamic>{},
+      );
+      final data = response.data?['data'];
+      if (data is Map<String, dynamic>) {
+        return data;
+      }
+      throw Exception('پاسخ نامعتبر از سرور');
+    } on DioException catch (e) {
+      throw _extractMessage(e, defaultMessage: 'خطا در تست اتصال به سامانه مودیان');
+    }
+  }
+
   Exception _extractMessage(DioException exception, {required String defaultMessage}) {
     final data = exception.response?.data;
     if (data is Map<String, dynamic>) {

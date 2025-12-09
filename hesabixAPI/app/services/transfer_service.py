@@ -706,6 +706,14 @@ def transfer_document_to_dict(db: Session, document: Document) -> Dict[str, Any]
     document_date_dt = datetime.combine(document.document_date, datetime.min.time()) if document.document_date else None
     registered_at_dt = document.registered_at if document.registered_at else None
     
+    # دریافت نام پروژه
+    project_name = None
+    if document.project_id:
+        from adapters.db.models.project import Project
+        project = db.query(Project).filter(Project.id == document.project_id).first()
+        if project:
+            project_name = project.name
+    
     return {
         "id": document.id,
         "code": document.code,
@@ -720,6 +728,8 @@ def transfer_document_to_dict(db: Session, document: Document) -> Dict[str, Any]
         "created_by_name": created_by_name,
         "is_proforma": document.is_proforma,
         "description": document.description,
+        "project_id": document.project_id,
+        "project_name": project_name,
         "source_type": source_type,
         "source_type_name": source_type_name,
         "source_name": source_name,

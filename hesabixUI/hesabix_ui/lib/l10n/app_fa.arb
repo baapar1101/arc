@@ -2423,6 +2423,158 @@
   "warrantyEventReplacement": "تعویض",
   "warrantyEventExpired": "منقضی شد",
   "warrantyEventRevoked": "لغو شد",
-  "warrantyManage": "مدیریت گارانتی"
+  "warrantyManage": "مدیریت گارانتی",
+  
+  "identityInquiryTitle": "استعلام اطلاعات هویتی",
+  "identityInquirySubtitle": "لطفاً کد ملی و تاریخ تولد را وارد کنید",
+  "nationalId": "کد ملی",
+  "nationalIdHint": "کد ملی 10 رقمی",
+  "nationalIdRequired": "کد ملی الزامی است",
+  "nationalIdInvalidLength": "کد ملی باید 10 رقم باشد",
+  "nationalIdInvalid": "کد ملی نامعتبر است",
+  "birthDate": "تاریخ تولد",
+  "birthDateHint": "تاریخ شمسی (YYYY-MM-DD یا YYYY/MM/DD)",
+  "birthDateRequired": "تاریخ تولد الزامی است",
+  "birthDateInvalid": "فرمت تاریخ نامعتبر است",
+  "selectBirthDate": "انتخاب تاریخ",
+  "inquire": "استعلام",
+  "inquiring": "در حال استعلام...",
+  "inquiryError": "خطا در استعلام",
+  "inquiryErrorPrefix": "خطا در استعلام:",
+  "unknownError": "خطای نامشخص",
+  "noMatch": "عدم تطابق",
+  "noMatchDescription": "کد ملی و تاریخ تولد با یکدیگر مطابقت ندارند",
+  "personalInformation": "اطلاعات شخصی",
+  "fatherName": "نام پدر",
+  "alive": "زنده",
+  "deceased": "فوت شده",
+  "newInquiry": "استعلام جدید",
+  "identityInquiryDescription": "با وارد کردن کد ملی و تاریخ تولد می‌توانید اطلاعات هویتی فرد را استعلام کنید",
+  "copied": "کپی شد",
+  "noResultAvailable": "خطا: نتیجه‌ای وجود ندارد",
+  
+  "accountSettingsTitle": "تنظیمات حساب کاربری",
+  "accountSettingsSubtitle": "مدیریت و تنظیم تمام بخش‌های حساب کاربری شما",
+  "accountSettingsMarketingDescription": "مدیریت لینک معرفی و گزارش‌های بازاریابی",
+  "accountSettingsNotificationsTitle": "اعلان‌ها و نوتیفیکیشن",
+  "accountSettingsNotificationsDescription": "تنظیمات کانال‌های اعلان‌رسانی و نوتیفیکیشن",
+  "accountSettingsSignatureTitle": "امضا و تصویر کاربر",
+  "accountSettingsSignatureDescription": "بارگذاری و مدیریت امضای شخصی و تصویر پروفایل",
+  "accountSettingsApiKeysTitle": "کلیدهای API",
+  "accountSettingsApiKeysDescription": "مدیریت کلیدهای API برای دسترسی به سیستم",
+  "accountSettingsLoginSessionsTitle": "سشن‌های ورود",
+  "accountSettingsLoginSessionsDescription": "مشاهده و مدیریت دستگاه‌های متصل به حساب کاربری",
+  "accountSettingsChangePasswordDescription": "تغییر کلمه عبور حساب کاربری",
+  "accountSettingsVerificationTitle": "تایید شماره موبایل و ایمیل",
+  "accountSettingsVerificationDescription": "تایید شماره موبایل و ایمیل برای امنیت بیشتر",
+  "accountSettingsNotificationHistoryTitle": "تاریخچه ناتیفیکیشن‌ها",
+  "accountSettingsNotificationHistoryDescription": "مشاهده تمام ناتیفیکیشن‌های ارسال شده (OTP، فراموشی رمز، تیکت و ...)",
+  
+  "apiKeysPageTitle": "مدیریت کلیدهای API",
+  "apiKeyErrorLoadingKeys": "خطا در بارگذاری کلیدها",
+  "apiKeyErrorCreatingKey": "خطا در ایجاد کلید",
+  "apiKeyCreatedSuccessfully": "کلید API ایجاد شد",
+  "apiKeySaveWarning": "لطفاً این کلید را ذخیره کنید. این تنها باری است که نمایش داده می‌شود.",
+  "apiKeyClose": "بستن",
+  "apiKeyCopy": "کپی",
+  "apiKeyCopied": "کلید کپی شد",
+  "apiKeyUpdatedSuccessfully": "کلید با موفقیت به‌روزرسانی شد",
+  "apiKeyErrorUpdating": "خطا در به‌روزرسانی کلید",
+  "apiKeyDeleteTitle": "حذف کلید API",
+  "apiKeyDeleteConfirmation": "آیا از حذف کلید \"{name}\" اطمینان دارید؟\nاین عمل غیرقابل بازگشت است.",
+  "@apiKeyDeleteConfirmation": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+  "apiKeyDeletedSuccessfully": "کلید با موفقیت حذف شد",
+  "apiKeyErrorDeleting": "خطا در حذف کلید",
+  "apiKeyFilterActive": "فعال",
+  "apiKeyFilterRevoked": "لغو شده",
+  "apiKeyFilterAll": "همه",
+  "apiKeyNoActiveKeys": "هیچ کلید فعالی وجود ندارد",
+  "apiKeyNoRevokedKeys": "هیچ کلید لغو شده‌ای وجود ندارد",
+  "apiKeyNoKeysCreated": "هیچ کلید API ایجاد نشده است",
+  "apiKeyCreateNewButton": "ایجاد کلید جدید",
+  "apiKeyCreateHint": "برای ایجاد یک کلید جدید، روی دکمه ایجاد کلیک کنید",
+  "apiKeyNoRevokedHint": "هیچ کلید لغو شده‌ای برای نمایش وجود ندارد",
+  "apiKeyUsageHint": "برای استفاده از API در برنامه‌های دیگر، یک کلید ایجاد کنید",
+  "apiKeyEdit": "ویرایش",
+  "apiKeyDelete": "حذف",
+  "apiKeyCreatedAt": "ایجاد شده",
+  "apiKeyLastUsed": "آخرین استفاده",
+  "apiKeyExpiresAt": "انقضا",
+  "apiKeyRevokedAt": "لغو شده",
+  "apiKeyAllowedIPs": "IP های مجاز",
+  "apiKeyCreateNewTitle": "ایجاد کلید API جدید",
+  "apiKeyNameLabel": "نام کلید",
+  "apiKeyNameHint": "مثال: Production API Key",
+  "apiKeyScopeLabel": "محدوده دسترسی (JSON)",
+  "apiKeyScopeHint": "اختیاری - مثال: '{'\"read\": true, \"write\": false'}'",
+  "apiKeyIPsLabel": "لیست IP های مجاز",
+  "apiKeyIPsHint": "جدا شده با کاما - مثال: 192.168.1.1, 10.0.0.1",
+  "apiKeyExpiryLabel": "تاریخ و زمان انقضا (اختیاری)",
+  "apiKeyExpiryHint": "انتخاب کنید",
+  "apiKeyNoExpiry": "بدون انقضا",
+  "apiKeyEditTitle": "ویرایش کلید API",
+  "apiKeyWithoutName": "بدون نام",
+  "datePickerSelectDate": "انتخاب تاریخ",
+  "timePickerSelectTime": "انتخاب زمان",
+  "dateTimeLabel": "تاریخ و زمان",
+  "dateLabel": "تاریخ",
+  "timeLabel": "زمان",
+  "clearButton": "پاک کردن",
+  
+  "sessionsPageTitle": "مدیریت سشن‌های ورود",
+  "sessionsErrorLoading": "خطا در بارگذاری سشن‌ها",
+  "sessionsCannotDeleteCurrent": "نمی‌توانید session فعلی را حذف کنید",
+  "sessionsDeleteTitle": "حذف سشن",
+  "sessionsDeleteConfirmation": "آیا از حذف session \"{device}\" اطمینان دارید؟\nاین عمل غیرقابل بازگشت است.",
+  "@sessionsDeleteConfirmation": {
+    "placeholders": {
+      "device": {"type": "String"}
+    }
+  },
+  "sessionsDeletedSuccessfully": "Session با موفقیت حذف شد",
+  "sessionsErrorDeleting": "خطا در حذف session",
+  "sessionsNoOtherSessions": "هیچ session دیگری وجود ندارد",
+  "sessionsRevokeAllTitle": "خروج از همه دستگاه‌ها",
+  "sessionsRevokeAllConfirmation": "آیا از حذف {count} session دیگر اطمینان دارید؟\nاین عمل باعث خروج از تمام دستگاه‌های دیگر می‌شود.\nSession فعلی شما حفظ خواهد شد.",
+  "@sessionsRevokeAllConfirmation": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "sessionsDeleteAll": "حذف همه",
+  "sessionsDeleted": "{count} session حذف شد",
+  "@sessionsDeleted": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "sessionsNoActive": "هیچ session فعالی وجود ندارد",
+  "sessionsThisDevice": "این دستگاه",
+  "sessionsLastUsed": "آخرین استفاده",
+  "sessionsCreatedAt": "ایجاد شده",
+  "sessionsToday": "امروز",
+  "sessionsYesterday": "دیروز",
+  "sessionsDaysAgo": "{days} روز پیش",
+  "@sessionsDaysAgo": {
+    "placeholders": {
+      "days": {"type": "int"}
+    }
+  },
+  "sessionsWeeksAgo": "{weeks} هفته پیش",
+  "@sessionsWeeksAgo": {
+    "placeholders": {
+      "weeks": {"type": "int"}
+    }
+  },
+  "sessionsMonthsAgo": "{months} ماه پیش",
+  "@sessionsMonthsAgo": {
+    "placeholders": {
+      "months": {"type": "int"}
+    }
+  }
 }
 

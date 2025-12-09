@@ -20,6 +20,7 @@ class ExpenseIncomeService {
     required List<ItemLineData> itemLines,
     required List<CounterpartyLineData> counterpartyLines,
     String? description,
+    int? projectId,
     Map<String, dynamic>? extraInfo,
   }) async {
     try {
@@ -106,6 +107,7 @@ class ExpenseIncomeService {
         if (description != null && description.isNotEmpty) 'description': description,
         'item_lines': itemLinesData,
         'counterparty_lines': counterpartyLinesData,
+        if (projectId != null) 'project_id': projectId,
         if (extraInfo != null) 'extra_info': extraInfo,
       };
 
@@ -129,6 +131,7 @@ class ExpenseIncomeService {
     required List<ItemLineData> itemLines,
     required List<CounterpartyLineData> counterpartyLines,
     String? description,
+    int? projectId,
     Map<String, dynamic>? extraInfo,
   }) async {
     try {
@@ -202,6 +205,7 @@ class ExpenseIncomeService {
         if (description != null && description.isNotEmpty) 'description': description,
         'item_lines': itemLinesData,
         'counterparty_lines': counterpartyLinesData,
+        if (projectId != null) 'project_id': projectId,
         if (extraInfo != null) 'extra_info': extraInfo,
       };
 

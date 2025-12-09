@@ -1,22 +1,38 @@
 """
 API endpoints برای دریافت و پرداخت (Receipt & Payment)
+
+این ماژول شامل endpoint های مربوط به مدیریت اسناد دریافت و پرداخت است.
+اسناد دریافت برای ثبت دریافتی از مشتریان و اسناد پرداخت برای ثبت پرداخت به تامین‌کنندگان استفاده می‌شوند.
+
+### روش‌های پرداخت پشتیبانی شده:
+- نقدی (Cash)
+- چک (Check)
+- کارت بانکی (Card)
+- انتقال آنلاین (Online)
+- سایر (Other)
 """
 
-from typing import Any, Dict, List
-from fastapi import APIRouter, Depends, Request, Body
+from typing import Any, Dict, List, Optional
+from fastapi import APIRouter, Depends, Request, Body, Path, Query
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
 import io
 import json
 import datetime
 import re
+import base64
 
 from adapters.db.session import get_db
 from adapters.db.models.document import Document
 from app.core.auth_dependency import get_current_user, AuthContext
 from app.core.responses import success_response, format_datetime_fields, ApiError
 from app.core.permissions import require_business_management_dep, require_business_access, require_business_permission_dep, require_business_permission_by_entity_dep
-from adapters.api.v1.schemas import QueryInfo
+from adapters.api.v1.schemas import QueryInfo, SuccessResponse
+from adapters.api.v1.schema_models.receipt_payment import (
+    ReceiptPaymentCreateRequest,
+    ReceiptPaymentResponse,
+    ReceiptPaymentListResponse
+)
 from app.services.receipt_payment_service import (
     create_receipt_payment,
     get_receipt_payment,
@@ -28,12 +44,10 @@ from adapters.db.models.business import Business
 from adapters.db.models.user import User
 from adapters.db.models.business_print_settings import BusinessPrintSettings
 from app.services.file_storage_service import FileStorageService
-from typing import Optional
-import base64
 from app.services.pdf.template_renderer import render_template
 
 
-router = APIRouter(tags=["receipts-payments"])
+router = APIRouter(tags=["دریافت و پرداخت", "مدیریت مالی"])
 
 
 @router.post(
@@ -97,13 +111,45 @@ async def list_receipts_payments_endpoint(
 @router.post(
     "/businesses/{business_id}/receipts-payments/create",
     summary="ایجاد سند دریافت یا پرداخت",
-    description="ایجاد سند دریافت یا پرداخت جدید",
+    description="""
+    ایجاد سند دریافت یا پرداخت جدید
+    
+    ### انواع سند:
+    - **receipt**: دریافت وجه از مشتریان
+    - **payment**: پرداخت به تامین‌کنندگان
+    
+    ### روش‌های پرداخت:
+    - `cash` - نقدی
+    - `check` - چکی (نیاز به اطلاعات چک)
+    - `card` - کارتی
+    - `online` - آنلاین
+    
+    ### نکات:
+    - برای چک، اطلاعات چک الزامی است
+    - می‌توان به فاکتور مرتبط کرد
+    - خودکار در دفتر کل ثبت می‌شود
+    """,
+    response_model=SuccessResponse,
+    responses={
+        200: {
+            "description": "سند ایجاد شد",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "success": True,
+                        "message": "سند دریافت ایجاد شد",
+                        "data": {"id": 123, "code": "REC-1001"}
+                    }
+                }
+            }
+        }
+    }
 )
 @require_business_access("business_id")
 async def create_receipt_payment_endpoint(
     request: Request,
-    business_id: int,
-    body: Dict[str, Any] = Body(...),
+    business_id: int = Path(..., description="شناسه کسب‌وکار", example=1, gt=0),
+    body: Dict[str, Any] = Body(..., description="اطلاعات سند"),
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
     _: None = Depends(require_business_permission_dep("people_transactions", "add")),

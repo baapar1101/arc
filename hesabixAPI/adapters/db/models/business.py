@@ -77,3 +77,4 @@ class Business(Base):
     default_currency = relationship("Currency", foreign_keys="[Business.default_currency_id]", uselist=False)
     documents = relationship("Document", back_populates="business", cascade="all, delete-orphan")
     accounts = relationship("Account", back_populates="business", cascade="all, delete-orphan")
+    projects = relationship("Project", back_populates="business", cascade="all, delete-orphan")

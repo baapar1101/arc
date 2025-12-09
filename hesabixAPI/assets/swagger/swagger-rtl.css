@@ -1,0 +1,342 @@
+/* 
+ * Hesabix API - Swagger UI RTL Support
+ * نسخه: 1.0.0
+ * توضیحات: پشتیبانی از راست به چپ برای محتوای فارسی
+ */
+
+/* ==================== تنظیمات پایه RTL ==================== */
+.swagger-ui .info,
+.swagger-ui .scheme-container,
+.swagger-ui section.models {
+  direction: rtl;
+  text-align: right;
+}
+
+/* ==================== توضیحات و Markdown ==================== */
+.swagger-ui .opblock-description-wrapper,
+.swagger-ui .opblock-summary-description,
+.swagger-ui .markdown p,
+.swagger-ui .info .description,
+.swagger-ui .info .markdown,
+.swagger-ui .model-box-control,
+.swagger-ui .model,
+.swagger-ui .renderedMarkdown,
+.swagger-ui .opblock-external-docs-wrapper {
+  direction: rtl !important;
+  text-align: right !important;
+}
+
+/* ==================== لیست‌های فارسی ==================== */
+.swagger-ui .markdown ul,
+.swagger-ui .markdown ol {
+  padding-right: 2rem !important;
+  padding-left: 0 !important;
+  list-style-position: inside;
+}
+
+.swagger-ui .markdown li {
+  text-align: right;
+}
+
+/* ==================== Parameters & Request Body ==================== */
+.swagger-ui .parameters-col_description,
+.swagger-ui .parameter__name,
+.swagger-ui .parameter__type,
+.swagger-ui .prop-format,
+.swagger-ui table.parameters td:first-of-type,
+.swagger-ui .response-col_description {
+  direction: rtl;
+  text-align: right;
+}
+
+/* ==================== Tables ==================== */
+.swagger-ui table.parameters,
+.swagger-ui table.model {
+  direction: rtl;
+}
+
+.swagger-ui table thead th {
+  text-align: right !important;
+}
+
+.swagger-ui table tbody td {
+  text-align: right !important;
+}
+
+/* ==================== Responses ==================== */
+.swagger-ui .responses-wrapper .response-col_description {
+  direction: rtl;
+  text-align: right;
+}
+
+.swagger-ui .response .markdown {
+  direction: rtl;
+  text-align: right;
+}
+
+/* ==================== Models ==================== */
+.swagger-ui .model-container {
+  direction: rtl;
+  text-align: right;
+}
+
+.swagger-ui .model-box {
+  direction: rtl;
+  text-align: right;
+}
+
+.swagger-ui .prop-type,
+.swagger-ui .prop-name {
+  text-align: right;
+}
+
+/* ==================== استثناها: چپ‌چین باقی بماند ==================== */
+/* کدها و JSON باید LTR باشند */
+.swagger-ui pre,
+.swagger-ui code,
+.swagger-ui .model-example,
+.swagger-ui .response-col_description code,
+.swagger-ui .highlight-code,
+.swagger-ui .microlight,
+.swagger-ui .copy-to-clipboard,
+.swagger-ui .curl,
+.swagger-ui .request-url {
+  direction: ltr !important;
+  text-align: left !important;
+}
+
+/* URLs و Paths */
+.swagger-ui .opblock-summary-path,
+.swagger-ui .opblock-summary-path__deprecated {
+  direction: ltr !important;
+  text-align: left !important;
+}
+
+/* HTTP Methods */
+.swagger-ui .opblock-summary-method {
+  direction: ltr;
+}
+
+/* ==================== Input Fields ==================== */
+.swagger-ui input[type="text"],
+.swagger-ui input[type="password"],
+.swagger-ui input[type="email"],
+.swagger-ui textarea {
+  direction: rtl;
+  text-align: right;
+}
+
+/* اما Input های مربوط به URL و کد باید LTR باشند */
+.swagger-ui input[type="text"].curl,
+.swagger-ui input[type="text"][placeholder*="http"],
+.swagger-ui input[type="text"][placeholder*="www"] {
+  direction: ltr !important;
+  text-align: left !important;
+}
+
+/* ==================== Authorization Modal ==================== */
+.swagger-ui .dialog-ux .modal-ux-content {
+  direction: rtl;
+  text-align: right;
+}
+
+.swagger-ui .dialog-ux .modal-ux-header h3 {
+  text-align: right;
+}
+
+/* ==================== Tabs ==================== */
+.swagger-ui .tab li {
+  text-align: right;
+}
+
+/* ==================== Download Button ==================== */
+.swagger-ui .download-contents {
+  direction: rtl;
+}
+
+/* ==================== Info Section Headings ==================== */
+.swagger-ui .info h1,
+.swagger-ui .info h2,
+.swagger-ui .info h3,
+.swagger-ui .info h4,
+.swagger-ui .info h5 {
+  text-align: right;
+}
+
+/* ==================== External Documentation ==================== */
+.swagger-ui .opblock-external-docs-wrapper p,
+.swagger-ui .opblock-external-docs-wrapper a {
+  direction: rtl;
+  text-align: right;
+}
+
+/* ==================== Schema Description ==================== */
+.swagger-ui .model .property {
+  direction: rtl;
+  text-align: right;
+}
+
+.swagger-ui .model .property .prop-name {
+  margin-left: 0;
+  margin-right: 10px;
+}
+
+/* ==================== Try it out Section ==================== */
+.swagger-ui .try-out__btn {
+  float: left;
+}
+
+/* ==================== Copy Button ==================== */
+.swagger-ui .copy-to-clipboard {
+  left: auto;
+  right: 10px;
+}
+
+/* ==================== Clear Button ==================== */
+.swagger-ui .btn.btn-clear {
+  margin-right: 0;
+  margin-left: 10px;
+}
+
+/* ==================== Response Headers ==================== */
+.swagger-ui .responses-header {
+  direction: rtl;
+  text-align: right;
+}
+
+/* ==================== Security Requirements ==================== */
+.swagger-ui .auth-container {
+  direction: rtl;
+  text-align: right;
+}
+
+.swagger-ui .authorization__btn {
+  margin-left: 0;
+  margin-right: 10px;
+}
+
+/* ==================== Operation Summary ==================== */
+.swagger-ui .opblock-summary {
+  direction: rtl;
+}
+
+.swagger-ui .opblock-summary-description {
+  margin-right: 10px;
+  margin-left: 0;
+}
+
+/* ==================== Parameter Description ==================== */
+.swagger-ui .parameter__name {
+  margin-left: 0;
+  margin-right: 10px;
+}
+
+/* ==================== تنظیمات Float ==================== */
+.swagger-ui .float-right {
+  float: left !important;
+}
+
+.swagger-ui .float-left {
+  float: right !important;
+}
+
+/* ==================== Margin & Padding Adjustments ==================== */
+.swagger-ui .opblock-tag {
+  padding-right: 0;
+  padding-left: 0;
+}
+
+/* ==================== Filter Input ==================== */
+.swagger-ui .filter .operation-filter-input {
+  direction: rtl;
+  text-align: right;
+}
+
+/* ==================== Deprecated Badge ==================== */
+.swagger-ui .opblock-deprecated {
+  direction: rtl;
+}
+
+/* ==================== Schema Toggle ==================== */
+.swagger-ui .model-toggle {
+  margin-left: 0;
+  margin-right: 10px;
+}
+
+/* ==================== اصلاح Icon ها ==================== */
+.swagger-ui svg {
+  margin-left: 5px;
+  margin-right: 0;
+}
+
+/* ==================== Select Dropdown ==================== */
+.swagger-ui select {
+  direction: rtl;
+  text-align: right;
+}
+
+/* ==================== Enum Values ==================== */
+.swagger-ui .prop-enum {
+  direction: rtl;
+  text-align: right;
+}
+
+/* ==================== Required Badge ==================== */
+.swagger-ui .parameter__name.required span {
+  margin-left: 0;
+  margin-right: 5px;
+}
+
+/* ==================== Server Selection ==================== */
+.swagger-ui .servers {
+  direction: rtl;
+  text-align: right;
+}
+
+.swagger-ui .servers label {
+  text-align: right;
+}
+
+.swagger-ui .servers select {
+  direction: ltr; /* URL ها باید LTR باشند */
+}
+
+/* ==================== Version Badge ==================== */
+.swagger-ui .info .title small.version-stamp {
+  margin-right: 0;
+  margin-left: 15px;
+}
+
+/* ==================== Contact & License Info ==================== */
+.swagger-ui .info .contact,
+.swagger-ui .info .license {
+  direction: rtl;
+  text-align: right;
+}
+
+/* ==================== Base URL ==================== */
+.swagger-ui .info .base-url {
+  direction: ltr;
+  text-align: left;
+}
+
+/* ==================== Wrapper Containers ==================== */
+.swagger-ui .wrapper {
+  direction: rtl;
+}
+
+/* ==================== Global ==================== */
+.swagger-ui section.models h4 {
+  text-align: right;
+}
+
+/* ==================== Schema Properties ==================== */
+.swagger-ui .property-row .prop-format {
+  float: left;
+}
+
+.swagger-ui .property-row .prop-type {
+  text-align: right;
+}
+
+

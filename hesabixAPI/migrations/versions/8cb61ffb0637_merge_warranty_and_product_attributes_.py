@@ -1,8 +1,8 @@
-"""merge warranty and product_attributes branches
+"""merge warranty and product attributes branches
 
 Revision ID: 8cb61ffb0637
 Revises: 20250120_000002, 20251202_000001
-Create Date: 2025-12-02 08:52:41.973910
+Create Date: 2025-01-20 00:00:00.000000
 
 """
 from alembic import op
@@ -17,8 +17,12 @@ depends_on = None
 
 
 def upgrade() -> None:
+    # این یک میگریشن merge است و نیازی به کد ندارد
     pass
 
 
 def downgrade() -> None:
+    # این یک میگریشن merge است و نیازی به کد ندارد
     pass
+
+

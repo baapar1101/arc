@@ -18,6 +18,8 @@ from app.services.warranty_service import (
     track_warranty_by_link,
     list_warranty_codes,
     list_warranty_codes_by_person,
+    delete_warranty_code,
+    delete_warranty_codes_bulk,
 )
 
 
@@ -300,4 +302,63 @@ def check_warranty_endpoint(
     
     formatted_data = format_datetime_fields(data, request)
     return success_response(formatted_data, request)
+
+
+# ========== Delete Endpoints ==========
+
+@router.delete(
+    "/business/{business_id}/codes/{code_id}",
+    summary="حذف یک کد گارانتی",
+)
+def delete_code_endpoint(
+    request: Request,
+    business_id: int,
+    code_id: int,
+    force: bool = False,
+    _: None = Depends(require_business_access_dep),
+    __: None = Depends(require_warranty_plugin_active("business_id")),
+    ___: None = Depends(require_business_permission_dep("warranty", "delete")),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+    """حذف یک کد گارانتی به صورت ایمن
+    
+    Args:
+        business_id: شناسه کسب و کار
+        code_id: شناسه کد گارانتی
+        force: حذف اجباری حتی اگر کد فعال شده باشد (پیش‌فرض: False)
+    """
+    result = delete_warranty_code(db, business_id, code_id, force)
+    return success_response(result, request)
+
+
+@router.post(
+    "/business/{business_id}/codes/bulk-delete",
+    summary="حذف گروهی کدهای گارانتی",
+)
+def delete_codes_bulk_endpoint(
+    request: Request,
+    business_id: int,
+    payload: Dict[str, Any] = Body(...),
+    _: None = Depends(require_business_access_dep),
+    __: None = Depends(require_warranty_plugin_active("business_id")),
+    ___: None = Depends(require_business_permission_dep("warranty", "delete")),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+    """حذف گروهی کدهای گارانتی به صورت ایمن
+    
+    Args:
+        business_id: شناسه کسب و کار
+        payload: شامل code_ids (لیست شناسه‌های کدها) و force (حذف اجباری)
+    """
+    code_ids = payload.get("code_ids", [])
+    force = payload.get("force", False)
+    
+    if not isinstance(code_ids, list):
+        from app.core.responses import ApiError
+        raise ApiError("INVALID_INPUT", "code_ids باید یک آرایه باشد", http_status=400)
+    
+    result = delete_warranty_codes_bulk(db, business_id, code_ids, force)
+    return success_response(result, request)
 
