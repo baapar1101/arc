@@ -48,9 +48,7 @@ class _PersonImportDialogState extends State<PersonImportDialog> {
     if (!_isInitialized) {
       if (mounted) {
         final t = AppLocalizations.of(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(t.loading)),
-        );
+        SnackBarHelper.show(context, message: t.loading);
       }
       return;
     }
@@ -66,9 +64,7 @@ class _PersonImportDialogState extends State<PersonImportDialog> {
     } catch (e) {
       if (mounted) {
         final t = AppLocalizations.of(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${t.pickFileError}: $e')),
-        );
+        SnackBarHelper.show(context, message: '${t.pickFileError}: $e');
       }
     }
   }
@@ -101,16 +97,12 @@ class _PersonImportDialogState extends State<PersonImportDialog> {
       await FileSaver.saveBytes((res.data as List<int>), filename);
       if (mounted) {
         final t = AppLocalizations.of(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${t.templateDownloaded}: $filename')),
-        );
+        SnackBarHelper.show(context, message: '${t.templateDownloaded}: $filename');
       }
     } catch (e) {
       if (mounted) {
         final t = AppLocalizations.of(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${t.templateDownloadError}: $e')),
-        );
+        SnackBarHelper.show(context, message: '${t.templateDownloadError}: $e');
       }
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -152,9 +144,7 @@ class _PersonImportDialogState extends State<PersonImportDialog> {
     } catch (e) {
       if (mounted) {
         final t = AppLocalizations.of(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${t.importError}: $e')),
-        );
+        SnackBarHelper.show(context, message: '${t.importError}: $e');
       }
     } finally {
       if (mounted) setState(() => _loading = false);

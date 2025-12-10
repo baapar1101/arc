@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../../services/workflow_service.dart';
+import '../../utils/snackbar_helper.dart';
+
 
 /// دیالوگ نمایش آمار و تحلیل workflow
 class WorkflowAnalyticsDialog extends StatefulWidget {
@@ -70,9 +72,7 @@ class _WorkflowAnalyticsDialogState extends State<WorkflowAnalyticsDialog> with 
     } catch (e) {
       if (mounted) {
         setState(() => _loadingPerformance = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطا در بارگذاری آمار عملکرد: $e')),
-        );
+        SnackBarHelper.show(context, message: 'خطا در بارگذاری آمار عملکرد: $e');
       }
     }
   }
@@ -94,9 +94,7 @@ class _WorkflowAnalyticsDialogState extends State<WorkflowAnalyticsDialog> with 
     } catch (e) {
       if (mounted) {
         setState(() => _loadingErrors = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطا در بارگذاری آمار خطاها: $e')),
-        );
+        SnackBarHelper.show(context, message: 'خطا در بارگذاری آمار خطاها: $e');
       }
     }
   }

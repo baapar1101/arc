@@ -180,7 +180,7 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
     final payload = _buildUpdatePayload();
     if (payload.isEmpty) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('بدون تغییر')));
+        SnackBarHelper.show(context, message: 'بدون تغییر');
       }
       return;
     }
@@ -192,7 +192,7 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
       final resp = await _apiClient.put('/api/v1/businesses/${widget.businessId}', data: payload);
       if (resp.data['success'] == true) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('با موفقیت ذخیره شد')));
+          SnackBarHelper.show(context, message: 'با موفقیت ذخیره شد');
           context.go('/business/${widget.businessId}/settings');
         }
       } else {
@@ -267,7 +267,7 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
       );
       _logoBytes = Uint8List.fromList(bytes);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('لوگو با موفقیت ذخیره شد')));
+        SnackBarHelper.show(context, message: 'لوگو با موفقیت ذخیره شد');
       }
     } catch (e) {
       if (mounted) {
@@ -299,7 +299,7 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
       );
       _stampBytes = Uint8List.fromList(bytes);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('مهر/امضا با موفقیت ذخیره شد')));
+        SnackBarHelper.show(context, message: 'مهر/امضا با موفقیت ذخیره شد');
       }
     } catch (e) {
       if (mounted) {

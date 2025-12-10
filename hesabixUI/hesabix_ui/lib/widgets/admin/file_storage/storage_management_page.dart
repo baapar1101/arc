@@ -64,12 +64,7 @@ class _StorageManagementPageState extends State<StorageManagementPage> {
           // Refresh the list
           _listKey.currentState?.loadStorageConfigs();
           // Show success message
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('تنظیمات ذخیره‌سازی ایجاد شد'),
-              backgroundColor: Colors.green,
-            ),
-          );
+          SnackBarHelper.showSuccess(context, message: 'تنظیمات ذخیره‌سازی ایجاد شد');
         },
       ),
     );

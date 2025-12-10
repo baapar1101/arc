@@ -4,6 +4,8 @@ import '../../models/workflow_editor_models.dart';
 import '../../services/workflow_service.dart';
 import 'workflow_analytics_dialog.dart';
 import 'workflow_timeline_dialog.dart';
+import '../../utils/snackbar_helper.dart';
+
 
 /// Panel برای نمایش تاریخچه اجرای workflow
 class WorkflowExecutionHistoryPanel extends StatefulWidget {
@@ -55,9 +57,7 @@ class _WorkflowExecutionHistoryPanelState extends State<WorkflowExecutionHistory
     } catch (e) {
       setState(() => _loading = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطا در بارگذاری تاریخچه: $e')),
-        );
+        SnackBarHelper.show(context, message: 'خطا در بارگذاری تاریخچه: $e');
       }
     }
   }
@@ -74,9 +74,7 @@ class _WorkflowExecutionHistoryPanelState extends State<WorkflowExecutionHistory
       });
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطا در بارگذاری لاگ‌ها: $e')),
-        );
+        SnackBarHelper.show(context, message: 'خطا در بارگذاری لاگ‌ها: $e');
       }
     }
   }

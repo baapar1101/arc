@@ -583,7 +583,7 @@ class _DocumentMonetizationBusinessPageState extends State<DocumentMonetizationB
     final ctx = context;
     final planId = plan['id'] as int?;
     if (planId == null) {
-      ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(t.invalidPackageId)));
+      SnackBarHelper.show(ctx, message: t.invalidPackageId);
       return;
     }
 

@@ -24,6 +24,7 @@ import '../../models/invoice_type_model.dart';
 import '../../utils/number_normalizer.dart';
 import '../../core/api_client.dart';
 import '../../widgets/date_input_field.dart';
+import '../../utils/snackbar_helper.dart';
 
 class InvoiceTransactionsWidget extends StatefulWidget {
   final List<InvoiceTransaction> transactions;
@@ -1531,6 +1532,47 @@ class _TransactionDialogState extends State<TransactionDialog> {
   void _saveTransaction() {
     if (!_formKey.currentState!.validate()) return;
     
+    // اعتبارسنجی انتخاب فیلدهای خاص هر نوع تراکنش
+    switch (_selectedType) {
+      case TransactionType.person:
+        if (_selectedPersonId == null || _selectedPersonId!.isEmpty) {
+          SnackBarHelper.showError(context, message: 'انتخاب شخص الزامی است');
+          return;
+        }
+        break;
+      case TransactionType.bank:
+        if (_selectedBankId == null || _selectedBankId!.isEmpty) {
+          SnackBarHelper.showError(context, message: 'انتخاب بانک الزامی است');
+          return;
+        }
+        break;
+      case TransactionType.cashRegister:
+        if (_selectedCashRegisterId == null || _selectedCashRegisterId!.isEmpty) {
+          SnackBarHelper.showError(context, message: 'انتخاب صندوق الزامی است');
+          return;
+        }
+        break;
+      case TransactionType.pettyCash:
+        if (_selectedPettyCashId == null || _selectedPettyCashId!.isEmpty) {
+          SnackBarHelper.showError(context, message: 'انتخاب تنخواه‌گردان الزامی است');
+          return;
+        }
+        break;
+      case TransactionType.check:
+      case TransactionType.checkExpense:
+        if (_selectedCheckId == null || _selectedCheckId!.isEmpty) {
+          SnackBarHelper.showError(context, message: 'انتخاب چک الزامی است');
+          return;
+        }
+        break;
+      case TransactionType.account:
+        if (_selectedAccount == null) {
+          SnackBarHelper.showError(context, message: 'انتخاب حساب الزامی است');
+          return;
+        }
+        break;
+    }
+    
     final amount = double.parse(_amountController.text.replaceAll(',', ''));
     final commission = _commissionController.text.isNotEmpty 
         ? double.parse(_commissionController.text.replaceAll(',', '')) 
@@ -1545,9 +1587,7 @@ class _TransactionDialogState extends State<TransactionDialog> {
         );
         final bankCurrencyId = int.tryParse('${bank['currency_id'] ?? bank['currencyId'] ?? ''}');
         if (bankCurrencyId != null && bankCurrencyId != invoiceCurrencyId) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('ارز بانک انتخابی با ارز فاکتور هم‌خوانی ندارد')),
-          );
+          SnackBarHelper.showError(context, message: 'ارز بانک انتخابی با ارز فاکتور هم‌خوانی ندارد');
           return;
         }
       }
@@ -1558,9 +1598,7 @@ class _TransactionDialogState extends State<TransactionDialog> {
         );
         final crCurrencyId = int.tryParse('${cr['currency_id'] ?? cr['currencyId'] ?? ''}');
         if (crCurrencyId != null && crCurrencyId != invoiceCurrencyId) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('ارز صندوق انتخابی با ارز فاکتور هم‌خوانی ندارد')),
-          );
+          SnackBarHelper.showError(context, message: 'ارز صندوق انتخابی با ارز فاکتور هم‌خوانی ندارد');
           return;
         }
       }
@@ -1571,18 +1609,14 @@ class _TransactionDialogState extends State<TransactionDialog> {
         );
         final pcCurrencyId = int.tryParse('${pc['currency_id'] ?? pc['currencyId'] ?? ''}');
         if (pcCurrencyId != null && pcCurrencyId != invoiceCurrencyId) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('ارز تنخواه‌گردان انتخابی با ارز فاکتور هم‌خوانی ندارد')),
-          );
+          SnackBarHelper.showError(context, message: 'ارز تنخواه‌گردان انتخابی با ارز فاکتور هم‌خوانی ندارد');
           return;
         }
       }
       if (_selectedType == TransactionType.check && _selectedCheckId != null) {
         final chkCurrencyId = _selectedCheckCurrencyId;
         if (chkCurrencyId != null && chkCurrencyId != invoiceCurrencyId) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('ارز چک انتخابی با ارز فاکتور هم‌خوانی ندارد')),
-          );
+          SnackBarHelper.showError(context, message: 'ارز چک انتخابی با ارز فاکتور هم‌خوانی ندارد');
           return;
         }
       }

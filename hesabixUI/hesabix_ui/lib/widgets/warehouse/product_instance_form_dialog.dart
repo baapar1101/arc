@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import '../../utils/number_normalizer.dart' show parseFormattedNumber;
 import '../../widgets/date_input_field.dart';
 import '../../core/calendar_controller.dart';
+import '../../utils/snackbar_helper.dart';
+
 
 class ProductInstanceFormDialog extends StatefulWidget {
   final int businessId;
@@ -73,9 +75,7 @@ class _ProductInstanceFormDialogState extends State<ProductInstanceFormDialog> {
     if (!_formKey.currentState!.validate()) return;
 
     if (widget.trackSerial && _serialController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('لطفاً شماره سریال را وارد کنید')),
-      );
+      SnackBarHelper.show(context, message: 'لطفاً شماره سریال را وارد کنید');
       return;
     }
 

@@ -111,14 +111,9 @@ class _WarehouseFormDialogState extends State<WarehouseFormDialog> {
       if (mounted) {
         Navigator.of(context).pop(true);
         widget.onSuccess?.call();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(widget.warehouse == null 
+        SnackBarHelper.showSuccess(context, message: widget.warehouse == null 
               ? 'انبار با موفقیت ایجاد شد'
-              : 'انبار با موفقیت به‌روزرسانی شد'),
-            backgroundColor: Colors.green,
-          ),
-        );
+              : 'انبار با موفقیت به‌روزرسانی شد');
       }
     } catch (e) {
       if (mounted) {

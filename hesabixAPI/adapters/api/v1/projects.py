@@ -10,6 +10,7 @@ from app.core.auth_dependency import get_current_user, AuthContext, get_db
 from app.core.permissions import require_business_access, require_business_permission_dep
 from app.core.responses import success_response, ApiError
 from app.core.pagination import paginate_query
+from app.core.cache import get_cache
 from app.services.project_service import (
 	create_project,
 	update_project,
@@ -300,6 +301,90 @@ async def list_project_documents_endpoint(
 		},
 		request=request,
 		message="PROJECT_DOCUMENTS_FETCHED"
+	)
+
+
+@router.post(
+	"/businesses/{business_id}/projects/search",
+	summary="جستجوی پروژه‌ها",
+	description="جستجوی پروژه‌ها با فیلترها و صفحه‌بندی (برای استفاده در فرانت)"
+)
+@require_business_access("business_id")
+async def search_projects_endpoint(
+	request: Request,
+	business_id: int = Path(..., description="شناسه کسب‌وکار", gt=0),
+	body_data: Dict[str, Any] = Body(default={}),
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user)
+):
+	"""جستجوی پروژه‌ها با body data"""
+	repo = ProjectRepository(db)
+	
+	# استخراج پارامترها از body
+	take = body_data.get('take', 50)
+	skip = body_data.get('skip', 0)
+	search = body_data.get('search')
+	is_active = body_data.get('is_active')
+	status = body_data.get('status')
+	person_id = body_data.get('person_id')
+	manager_user_id = body_data.get('manager_user_id')
+	
+	# ساخت فیلترها
+	filters = {}
+	if is_active is not None:
+		filters['is_active'] = bool(is_active)
+	if status:
+		filters['status'] = status
+	if person_id:
+		filters['person_id'] = int(person_id)
+	if manager_user_id:
+		filters['manager_user_id'] = int(manager_user_id)
+	
+	# کش نتایج جستجوی پروژه‌ها بر اساس پارامترها
+	cache = get_cache()
+	cache_key = None
+
+	if cache.enabled:
+		import json, hashlib
+		filters_json = json.dumps({
+			"search": search,
+			"filters": filters,
+			"take": take,
+			"skip": skip,
+		}, sort_keys=True, ensure_ascii=False)
+		filters_hash = hashlib.sha256(filters_json.encode("utf-8")).hexdigest()[:16]
+		cache_key = f"projects_search:{business_id}:{ctx.get_user_id()}:{filters_hash}"
+		cached = cache.get(cache_key)
+		if cached is not None:
+			return success_response(cached, request)
+
+	# جستجو
+	projects, total = repo.search(
+		business_id=business_id,
+		search_term=search,
+		filters=filters if filters else None,
+		skip=skip,
+		limit=take
+	)
+	
+	# فرمت کردن
+	items = [_format_project(p, request) for p in projects]
+	
+	response_data = {
+		'items': items,
+		'total': total,
+		'take': take,
+		'skip': skip
+	}
+
+	if cache.enabled and cache_key:
+		# TTL کوتاه چون جستجوها می‌توانند سریع عوض شوند
+		cache.set(cache_key, response_data, ttl=30)
+	
+	return success_response(
+		data=response_data,
+		request=request,
+		message="PROJECTS_SEARCHED"
 	)
 
 

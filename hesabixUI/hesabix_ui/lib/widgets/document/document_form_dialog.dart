@@ -192,34 +192,26 @@ class _DocumentFormDialogState extends State<DocumentFormDialog> {
 
     // بررسی تاریخ
     if (_documentDate == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('تاریخ سند الزامی است')),
-      );
+      SnackBarHelper.show(context, message: 'تاریخ سند الزامی است');
       return;
     }
 
     // بررسی ارز انتخابی
     if (_currencyId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('انتخاب ارز الزامی است')),
-      );
+      SnackBarHelper.show(context, message: 'انتخاب ارز الزامی است');
       return;
     }
 
     // بررسی حداقل 2 سطر
     if (_lines.length < 2) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('سند باید حداقل 2 سطر داشته باشد')),
-      );
+      SnackBarHelper.show(context, message: 'سند باید حداقل 2 سطر داشته باشد');
       return;
     }
 
     // بررسی اینکه تمام سطرها حساب داشته باشند
     for (int i = 0; i < _lines.length; i++) {
       if (_lines[i].account == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('سطر ${i + 1} باید حساب داشته باشد')),
-        );
+        SnackBarHelper.show(context, message: 'سطر ${i + 1} باید حساب داشته باشد');
         return;
       }
     }
@@ -237,23 +229,13 @@ class _DocumentFormDialogState extends State<DocumentFormDialog> {
 
       if (mounted) {
         Navigator.of(context).pop(true); // بازگشت با موفقیت
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(widget.document == null
+        SnackBarHelper.showSuccess(context, message: widget.document == null
                 ? 'سند با موفقیت ایجاد شد'
-                : 'سند با موفقیت ویرایش شد'),
-            backgroundColor: Colors.green,
-          ),
-        );
+                : 'سند با موفقیت ویرایش شد');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('خطا: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        SnackBarHelper.showError(context, message: 'خطا: $e');
       }
     } finally {
       if (mounted) {

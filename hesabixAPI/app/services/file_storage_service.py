@@ -1,7 +1,7 @@
 import os
 import hashlib
 import uuid
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Literal
 from uuid import UUID
 from fastapi import UploadFile, HTTPException
 from sqlalchemy.orm import Session
@@ -9,11 +9,14 @@ from datetime import datetime, timedelta
 import logging
 
 from adapters.db.repositories.file_storage_repository import (
-    FileStorageRepository, 
+    FileStorageRepository,
     StorageConfigRepository,
-    FileVerificationRepository
+    FileVerificationRepository,
 )
 from adapters.db.models.file_storage import FileStorage, StorageConfig
+
+from PIL import Image
+import io
 
 
 class FileStorageService:
@@ -227,6 +230,58 @@ class FileStorageService:
             "content": file_content,
             "filename": file_storage.original_name,
             "mime_type": file_storage.mime_type
+        }
+
+    async def download_image_thumbnail(
+        self,
+        file_id: UUID,
+        size: Literal["small", "medium"] = "small",
+    ) -> Dict[str, Any]:
+        """
+        دانلود thumbnail برای تصاویر.
+
+        - فقط برای فایل‌هایی که mime-type آن‌ها image است استفاده می‌شود.
+        - برای جلوگیری از فشار روی سیستم، سایزها محدود و ساده در نظر گرفته شده‌اند.
+        """
+        file_storage = await self.file_repo.get_file_by_id(file_id)
+        if not file_storage:
+            raise HTTPException(status_code=404, detail="File not found")
+
+        mime_type = (file_storage.mime_type or "").lower()
+        if not mime_type.startswith("image/"):
+            # برای غیر تصویر، همان فایل اصلی را برمی‌گردانیم
+            return await self.download_file(file_id)
+
+        # خواندن فایل اصلی
+        file_content = await self._read_file_from_storage(file_storage.file_path, file_storage.storage_type)
+
+        try:
+            # تبدیل بایت‌ها به تصویر PIL
+            with Image.open(io.BytesIO(file_content)) as img:
+                # تعیین حداکثر ضلع بر اساس سایز
+                if size == "medium":
+                    max_size = 512
+                else:
+                    max_size = 256
+
+                img = img.convert("RGB")
+                img.thumbnail((max_size, max_size))
+
+                buffer = io.BytesIO()
+                # خروجی را همیشه به صورت JPEG با کیفیت متوسط می‌فرستیم
+                img.save(buffer, format="JPEG", quality=70, optimize=True)
+                buffer.seek(0)
+
+                thumb_bytes = buffer.read()
+        except Exception as exc:  # اگر پردازش تصویر شکست خورد، fallback
+            # لاگ خطا در logger سراسری سرویس
+            self.logger.warning("thumbnail_generation_failed", extra={"error": str(exc)})
+            return await self.download_file(file_id)
+
+        return {
+            "content": thumb_bytes,
+            "filename": file_storage.original_name,
+            "mime_type": "image/jpeg",
         }
 
     async def delete_file(self, file_id: UUID) -> bool:

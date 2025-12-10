@@ -205,11 +205,7 @@ class _DetailSelectorWidgetState extends State<DetailSelectorWidget> {
         break;
       default:
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('انتخاب ${_getDetailTypeLabel()} هنوز پیاده‌سازی نشده است'),
-            ),
-          );
+          SnackBarHelper.show(context, message: 'انتخاب ${_getDetailTypeLabel()} الزامی است');
         }
     }
   }
@@ -250,9 +246,7 @@ class _DetailSelectorWidgetState extends State<DetailSelectorWidget> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطا در بارگذاری اشخاص: $e')),
-        );
+        SnackBarHelper.show(context, message: 'خطا در بارگذاری اشخاص: $e');
       }
     } finally {
       if (mounted) {
@@ -295,9 +289,7 @@ class _DetailSelectorWidgetState extends State<DetailSelectorWidget> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطا در بارگذاری کالاها: $e')),
-        );
+        SnackBarHelper.show(context, message: 'خطا در بارگذاری کالاها: $e');
       }
     } finally {
       if (mounted) {
@@ -343,9 +335,7 @@ class _DetailSelectorWidgetState extends State<DetailSelectorWidget> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطا در بارگذاری حساب‌های بانکی: $e')),
-        );
+        SnackBarHelper.show(context, message: 'خطا در بارگذاری حساب‌های بانکی: $e');
       }
     } finally {
       if (mounted) {
@@ -391,9 +381,7 @@ class _DetailSelectorWidgetState extends State<DetailSelectorWidget> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطا در بارگذاری صندوق‌ها: $e')),
-        );
+        SnackBarHelper.show(context, message: 'خطا در بارگذاری صندوق‌ها: $e');
       }
     } finally {
       if (mounted) {
@@ -439,9 +427,7 @@ class _DetailSelectorWidgetState extends State<DetailSelectorWidget> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطا در بارگذاری تنخواه‌ها: $e')),
-        );
+        SnackBarHelper.show(context, message: 'خطا در بارگذاری تنخواه‌ها: $e');
       }
     } finally {
       if (mounted) {
@@ -487,9 +473,7 @@ class _DetailSelectorWidgetState extends State<DetailSelectorWidget> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطا در بارگذاری چک‌ها: $e')),
-        );
+        SnackBarHelper.show(context, message: 'خطا در بارگذاری چک‌ها: $e');
       }
     } finally {
       if (mounted) {

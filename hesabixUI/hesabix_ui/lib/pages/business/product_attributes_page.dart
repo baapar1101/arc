@@ -357,9 +357,7 @@ class _ProductAttributesPageState extends State<ProductAttributesPage> {
               onPressed: () {
                 // اعتبارسنجی
                 if (titleCtrl.text.trim().isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('لطفاً عنوان را وارد کنید')),
-                  );
+                  SnackBarHelper.show(context, message: 'لطفاً عنوان را وارد کنید');
                   return;
                 }
                 if (selectedDataType == 'select') {
@@ -368,9 +366,7 @@ class _ProductAttributesPageState extends State<ProductAttributesPage> {
                       .where((text) => text.isNotEmpty)
                       .toList();
                   if (validOptions.isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('برای نوع انتخابی باید حداقل یک گزینه وارد کنید')),
-                    );
+                    SnackBarHelper.show(context, message: 'برای نوع انتخابی باید حداقل یک گزینه وارد کنید');
                     return;
                   }
                 }

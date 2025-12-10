@@ -99,12 +99,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
         );
         
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('فایل با موفقیت الصاق شد'),
-              backgroundColor: Colors.green,
-            ),
-          );
+          SnackBarHelper.showSuccess(context, message: 'فایل با موفقیت الصاق شد');
           // رفرش لیست فایل‌ها
           _attachedFilesKey.refresh();
         }
@@ -114,12 +109,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('خطا در آپلود فایل: $e'),
-              backgroundColor: Colors.red,
-            ),
-          );
+          SnackBarHelper.showError(context, message: 'خطا در آپلود فایل: $e');
         }
       } finally {
         if (mounted) {
@@ -128,12 +118,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('خطا: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        SnackBarHelper.showError(context, message: 'خطا: $e');
         setState(() => _uploadingFile = false);
       }
     }
@@ -778,15 +763,11 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                                   docId: it['id'],
                                 );
                                 if (!context.mounted) return;
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('حواله پست شد')),
-                                );
+                                SnackBarHelper.show(context, message: 'حواله پست شد');
                                 _loadDocument();
                               } catch (e) {
                                 if (!context.mounted) return;
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('خطا در پست حواله: $e')),
-                                );
+                                SnackBarHelper.show(context, message: 'خطا در پست حواله: $e');
                               }
                             },
                             tooltip: 'پست',

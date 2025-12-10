@@ -30,15 +30,15 @@ engine = create_engine(
     echo=settings.sqlalchemy_echo,
     poolclass=QueuePool,  # استفاده از QueuePool برای بهتر control
     pool_pre_ping=True,  # بررسی سلامت اتصالات قبل از استفاده
-    pool_recycle=getattr(settings, 'db_pool_recycle', 600),  # Recycle هر 10 دقیقه برای جلوگیری از connection leak و بهبود performance
+    pool_recycle=getattr(settings, 'db_pool_recycle', 300),  # Recycle هر 5 دقیقه برای جلوگیری از connection leak و بهبود performance
     pool_size=settings.db_pool_size,
     max_overflow=settings.db_max_overflow,
     pool_timeout=settings.db_pool_timeout,
     # تنظیمات اضافی برای بهبود عملکرد
     connect_args={
         "connect_timeout": 10,
-        "read_timeout": 60,  # افزایش برای Query های طولانی
-        "write_timeout": 60,
+        "read_timeout": 30,  # کاهش برای جلوگیری از query های طولانی و connection leak
+        "write_timeout": 30,
         "charset": "utf8mb4",
         "init_command": "SET sql_mode='STRICT_TRANS_TABLES,NO_ZERO_DATE,NO_ZERO_IN_DATE,ERROR_FOR_DIVISION_BY_ZERO'",
     },
@@ -63,9 +63,10 @@ def set_mysql_session_params(dbapi_conn, connection_record):
 			cursor.execute("SET SESSION transaction_isolation = 'READ-COMMITTED'")
 			# بهینه‌سازی برای Query Performance
 			cursor.execute("SET SESSION sql_mode = 'STRICT_TRANS_TABLES,NO_ZERO_DATE,NO_ZERO_IN_DATE,ERROR_FOR_DIVISION_BY_ZERO'")
-			# تنظیم timeout برای query ها (120 ثانیه = 120000 میلی‌ثانیه)
-			# این باعث می‌شود query های طولانی‌تر از 2 دقیقه timeout شوند
-			cursor.execute("SET SESSION max_execution_time = 120000")
+			# تنظیم timeout برای query ها (60 ثانیه = 60000 میلی‌ثانیه)
+			# این باعث می‌شود query های طولانی‌تر از 1 دقیقه timeout شوند
+			# کاهش از 120 ثانیه برای جلوگیری از connection leak
+			cursor.execute("SET SESSION max_execution_time = 60000")
 	except Exception as e:
 		logger.warning(f"Error setting MySQL session variables: {e}")
 

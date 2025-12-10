@@ -1115,19 +1115,21 @@ def create_app() -> FastAPI:
         if request.url.path in ["/", "/health", "/api/v1/health"] or \
            request.url.path.startswith("/docs") or \
            request.url.path.startswith("/redoc") or \
-           request.url.path.startswith("/openapi.json"):
+           request.url.path.startswith("/openapi.json") or \
+           request.url.path.startswith("/assets"):
             return await call_next(request)
         
         from app.core.rate_limiter import get_rate_limiter, get_client_ip
         
-        # Rate limiting عمومی: 100 request در دقیقه برای هر IP
+        # Rate limiting عمومی: 500 request در دقیقه برای هر IP
+        # افزایش از 100 به 500 برای پشتیبانی از SPA های Flutter که چندین درخواست همزمان می‌فرستند
         client_ip = get_client_ip(request)
         rate_limit_key = f"global:{client_ip}"
         
         limiter = get_rate_limiter()
         allowed, remaining, reset_after = limiter.check_rate_limit(
             rate_limit_key,
-            max_requests=100,
+            max_requests=500,
             window_seconds=60,
         )
         
@@ -1141,7 +1143,7 @@ def create_app() -> FastAPI:
                     "message": "تعداد درخواست‌های شما بیش از حد مجاز است. لطفاً کمی صبر کنید."
                 },
                 headers={
-                    "X-RateLimit-Limit": "100",
+                    "X-RateLimit-Limit": "500",
                     "X-RateLimit-Remaining": "0",
                     "X-RateLimit-Reset": str(int(time.time()) + reset_after),
                     "Retry-After": str(reset_after),
@@ -1152,7 +1154,7 @@ def create_app() -> FastAPI:
         
         # اضافه کردن rate limit headers
         if hasattr(response, 'headers'):
-            response.headers["X-RateLimit-Limit"] = "100"
+            response.headers["X-RateLimit-Limit"] = "500"
             response.headers["X-RateLimit-Remaining"] = str(remaining)
             response.headers["X-RateLimit-Reset"] = str(int(time.time()) + reset_after)
         

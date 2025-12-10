@@ -6,6 +6,8 @@ import '../../services/warehouse_service.dart';
 import '../../core/api_client.dart';
 import '../../core/auth_store.dart';
 import '../../widgets/product/product_form_dialog.dart';
+import '../../utils/snackbar_helper.dart';
+
 
 class ProductComboboxWidget extends StatefulWidget {
   final int businessId;
@@ -401,9 +403,7 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
       final productId = selectedInstance['product_id'] as int?;
       if (productId == null) {
         if (dialogContext.mounted) {
-          ScaffoldMessenger.of(dialogContext).showSnackBar(
-            const SnackBar(content: Text('کالای یونیکی با این بارکد/سریال یافت نشد')),
-          );
+          SnackBarHelper.show(dialogContext, message: 'کالای یونیکی با این بارکد/سریال یافت نشد');
         }
         return;
       }
@@ -461,15 +461,11 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
         }
       }
       if (dialogContext.mounted) {
-        ScaffoldMessenger.of(dialogContext).showSnackBar(
-          SnackBar(content: Text(errorMessage)),
-        );
+        SnackBarHelper.show(dialogContext, message: errorMessage);
       }
     } catch (e) {
       if (dialogContext.mounted) {
-        ScaffoldMessenger.of(dialogContext).showSnackBar(
-          SnackBar(content: Text('خطا در جستجو: $e')),
-        );
+        SnackBarHelper.show(dialogContext, message: 'خطا در جستجو: $e');
       }
     }
   }

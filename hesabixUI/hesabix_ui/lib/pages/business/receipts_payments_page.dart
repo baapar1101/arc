@@ -258,156 +258,315 @@ class _BulkSettlementDialogState extends State<_BulkSettlementDialog> {
     final sumPersons = _personLines.fold<double>(0, (p, e) => p + e.amount);
     final sumCenters = _centerTransactions.fold<double>(0, (p, e) => p + (e.amount.toDouble()));
     final diff = (_isReceipt ? sumCenters - sumPersons : sumPersons - sumCenters).toDouble();
+    final bool isEdit = widget.initial != null;
 
-    return Dialog(
-      insetPadding: const EdgeInsets.all(16),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 1100, maxHeight: 720),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        t.receiptsAndPayments,
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
-                    ),
-                    SegmentedButton<bool>(
-                      segments: [
-                        ButtonSegment<bool>(value: true, label: Text(t.receipts)),
-                        ButtonSegment<bool>(value: false, label: Text(t.payments)),
-                      ],
-                      selected: {_isReceipt},
-                      onSelectionChanged: (s) => setState(() => _isReceipt = s.first),
-                    ),
-                    const SizedBox(width: 12),
-                    SizedBox(
-                      width: 200,
-                      child: DateInputField(
-                        value: _docDate,
-                        calendarController: widget.calendarController,
-                        onChanged: (d) => setState(() => _docDate = d ?? DateTime.now()),
-                        labelText: 'تاریخ سند',
-                        hintText: 'انتخاب تاریخ',
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    SizedBox(
-                      width: 200,
-                      child: CurrencyPickerWidget(
-                        businessId: widget.businessId,
-                        selectedCurrencyId: _selectedCurrencyId,
-                        onChanged: (currencyId) => setState(() => _selectedCurrencyId = currencyId),
-                        label: 'ارز',
-                        hintText: 'انتخاب ارز',
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    SizedBox(
-                      width: 200,
-                      child: ProjectSelectorWidget(
-                        businessId: widget.businessId,
-                        apiClient: widget.apiClient,
-                        selectedProjectId: _selectedProjectId,
-                        onChanged: (projectId) => setState(() => _selectedProjectId = projectId),
-                        allowNull: true,
-                        labelText: 'پروژه',
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                child: TextField(
-                  controller: _descriptionController,
-                  decoration: const InputDecoration(
-                    labelText: 'توضیحات کلی سند',
-                    hintText: 'توضیحات اختیاری...',
-                    border: OutlineInputBorder(),
-                  ),
-                  maxLines: 2,
-                ),
-              ),
-              const Divider(height: 1),
-              Expanded(
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: _PersonsPanel(
-                        businessId: widget.businessId,
-                        isReceipt: _isReceipt,
-                        lines: _personLines,
-                        selectedCurrencyId: _selectedCurrencyId,
-                        onChanged: (ls) => setState(() {
-                          _personLines.clear();
-                          _personLines.addAll(ls);
-                        }),
-                      ),
-                    ),
-                    const VerticalDivider(width: 1),
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: InvoiceTransactionsWidget(
-                          transactions: _centerTransactions,
-                          onChanged: (txs) => setState(() {
-                            _centerTransactions.clear();
-                            _centerTransactions.addAll(txs);
-                          }),
-                          businessId: widget.businessId,
-                          calendarController: widget.calendarController,
-                          invoiceType: InvoiceType.sales,
-                          checkPickerMode: _isReceipt ? CheckPickerMode.receipt : CheckPickerMode.payment,
-                          authStore: widget.authStore,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final bool isWide = constraints.maxWidth >= 900;
+        final bool isSmall = constraints.maxWidth < 600;
+
+        final Widget personsPanel = _PersonsPanel(
+          businessId: widget.businessId,
+          isReceipt: _isReceipt,
+          lines: _personLines,
+          selectedCurrencyId: _selectedCurrencyId,
+          onChanged: (ls) => setState(() {
+            _personLines
+              ..clear()
+              ..addAll(ls);
+          }),
+        );
+
+        final Widget transactionsPanel = Padding(
+          padding: const EdgeInsets.all(12),
+          child: Card(
+            elevation: 0,
+            clipBehavior: Clip.antiAlias,
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          t.accounts,
+                          style: Theme.of(context).textTheme.titleMedium,
                         ),
                       ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Expanded(
+                    child: InvoiceTransactionsWidget(
+                      transactions: _centerTransactions,
+                      onChanged: (txs) => setState(() {
+                        _centerTransactions
+                          ..clear()
+                          ..addAll(txs);
+                      }),
+                      businessId: widget.businessId,
+                      calendarController: widget.calendarController,
+                      invoiceType: InvoiceType.sales,
+                      checkPickerMode: _isReceipt ? CheckPickerMode.receipt : CheckPickerMode.payment,
+                      authStore: widget.authStore,
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-              const Divider(height: 1),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Wrap(
-                        spacing: 16,
-                        runSpacing: 8,
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        children: [
-                          _TotalChip(label: t.people, value: sumPersons),
-                          _TotalChip(label: t.accounts, value: sumCenters),
-                          _TotalChip(label: 'اختلاف', value: diff, isError: diff != 0),
-                        ],
+            ),
+          ),
+        );
+
+        return Dialog(
+          insetPadding: const EdgeInsets.all(16),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: isWide ? 1100 : constraints.maxWidth,
+              maxHeight: constraints.maxHeight,
+            ),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                    child: Card(
+                      elevation: 0,
+                      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: isWide
+                            ? Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              t.receiptsAndPayments,
+                                              style: Theme.of(context).textTheme.titleLarge,
+                                            ),
+                                            const SizedBox(height: 4),
+                                            Text(
+                                              isEdit ? 'ویرایش سند دریافت/پرداخت' : 'ثبت سند دریافت/پرداخت جدید',
+                                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                                  ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      const SizedBox(width: 16),
+                                      SegmentedButton<bool>(
+                                        segments: [
+                                          ButtonSegment<bool>(value: true, label: Text(t.receipts)),
+                                          ButtonSegment<bool>(value: false, label: Text(t.payments)),
+                                        ],
+                                        selected: {_isReceipt},
+                                        onSelectionChanged: (s) => setState(() => _isReceipt = s.first),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Row(
+                                    children: [
+                                      SizedBox(
+                                        width: 220,
+                                        child: DateInputField(
+                                          value: _docDate,
+                                          calendarController: widget.calendarController,
+                                          onChanged: (d) => setState(() => _docDate = d ?? DateTime.now()),
+                                          labelText: 'تاریخ سند',
+                                          hintText: 'انتخاب تاریخ',
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      SizedBox(
+                                        width: 220,
+                                        child: CurrencyPickerWidget(
+                                          businessId: widget.businessId,
+                                          selectedCurrencyId: _selectedCurrencyId,
+                                          onChanged: (currencyId) => setState(() => _selectedCurrencyId = currencyId),
+                                          label: 'ارز',
+                                          hintText: 'انتخاب ارز',
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: ProjectSelectorWidget(
+                                          businessId: widget.businessId,
+                                          apiClient: widget.apiClient,
+                                          selectedProjectId: _selectedProjectId,
+                                          onChanged: (projectId) => setState(() => _selectedProjectId = projectId),
+                                          allowNull: true,
+                                          labelText: 'پروژه',
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              )
+                            : Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Text(
+                                    t.receiptsAndPayments,
+                                    style: Theme.of(context).textTheme.titleLarge,
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    isEdit ? 'ویرایش سند دریافت/پرداخت' : 'ثبت سند دریافت/پرداخت جدید',
+                                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                        ),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  Align(
+                                    alignment: AlignmentDirectional.centerEnd,
+                                    child: SegmentedButton<bool>(
+                                      segments: [
+                                        ButtonSegment<bool>(value: true, label: Text(t.receipts)),
+                                        ButtonSegment<bool>(value: false, label: Text(t.payments)),
+                                      ],
+                                      selected: {_isReceipt},
+                                      onSelectionChanged: (s) => setState(() => _isReceipt = s.first),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  DateInputField(
+                                    value: _docDate,
+                                    calendarController: widget.calendarController,
+                                    onChanged: (d) => setState(() => _docDate = d ?? DateTime.now()),
+                                    labelText: 'تاریخ سند',
+                                    hintText: 'انتخاب تاریخ',
+                                  ),
+                                  const SizedBox(height: 8),
+                                  CurrencyPickerWidget(
+                                    businessId: widget.businessId,
+                                    selectedCurrencyId: _selectedCurrencyId,
+                                    onChanged: (currencyId) => setState(() => _selectedCurrencyId = currencyId),
+                                    label: 'ارز',
+                                    hintText: 'انتخاب ارز',
+                                  ),
+                                  const SizedBox(height: 8),
+                                  ProjectSelectorWidget(
+                                    businessId: widget.businessId,
+                                    apiClient: widget.apiClient,
+                                    selectedProjectId: _selectedProjectId,
+                                    onChanged: (projectId) => setState(() => _selectedProjectId = projectId),
+                                    allowNull: true,
+                                    labelText: 'پروژه',
+                                  ),
+                                ],
+                              ),
                       ),
                     ),
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: Text(t.cancel),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                    child: TextField(
+                      controller: _descriptionController,
+                      decoration: const InputDecoration(
+                        labelText: 'توضیحات کلی سند',
+                        hintText: 'توضیحات اختیاری...',
+                        border: OutlineInputBorder(),
+                      ),
+                      maxLines: 2,
                     ),
-                    const SizedBox(width: 8),
-                    FilledButton.icon(
-                      onPressed: diff == 0 && _personLines.isNotEmpty && _centerTransactions.isNotEmpty
-                          ? _onSave
-                          : null,
-                      icon: const Icon(Icons.save),
-                      label: Text(t.save),
-                    ),
-                  ],
-                ),
+                  ),
+                  const Divider(height: 1),
+                  Expanded(
+                    child: isWide
+                        ? Row(
+                            children: [
+                              Expanded(child: personsPanel),
+                              const VerticalDivider(width: 1),
+                              Expanded(child: transactionsPanel),
+                            ],
+                          )
+                        : SingleChildScrollView(
+                            child: Column(
+                              children: [
+                                personsPanel,
+                                const Divider(height: 16),
+                                transactionsPanel,
+                              ],
+                            ),
+                          ),
+                  ),
+                  const Divider(height: 1),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                    child: isSmall
+                        ? Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Wrap(
+                                spacing: 16,
+                                runSpacing: 8,
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                children: [
+                                  _TotalChip(label: t.people, value: sumPersons),
+                                  _TotalChip(label: t.accounts, value: sumCenters),
+                                  _TotalChip(label: 'اختلاف', value: diff, isError: diff != 0),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              TextButton(
+                                onPressed: () => Navigator.pop(context),
+                                child: Text(t.cancel),
+                              ),
+                              const SizedBox(height: 8),
+                              FilledButton.icon(
+                                onPressed: diff == 0 && _personLines.isNotEmpty && _centerTransactions.isNotEmpty
+                                    ? _onSave
+                                    : null,
+                                icon: const Icon(Icons.save),
+                                label: Text(t.save),
+                              ),
+                            ],
+                          )
+                        : Row(
+                            children: [
+                              Expanded(
+                                child: Wrap(
+                                  spacing: 16,
+                                  runSpacing: 8,
+                                  crossAxisAlignment: WrapCrossAlignment.center,
+                                  children: [
+                                    _TotalChip(label: t.people, value: sumPersons),
+                                    _TotalChip(label: t.accounts, value: sumCenters),
+                                    _TotalChip(label: 'اختلاف', value: diff, isError: diff != 0),
+                                  ],
+                                ),
+                              ),
+                              TextButton(
+                                onPressed: () => Navigator.pop(context),
+                                child: Text(t.cancel),
+                              ),
+                              const SizedBox(width: 8),
+                              FilledButton.icon(
+                                onPressed: diff == 0 && _personLines.isNotEmpty && _centerTransactions.isNotEmpty
+                                    ? _onSave
+                                    : null,
+                                icon: const Icon(Icons.save),
+                                label: Text(t.save),
+                              ),
+                            ],
+                          ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -500,16 +659,9 @@ class _BulkSettlementDialogState extends State<_BulkSettlementDialog> {
       Navigator.pop(context, null);
       
       // نمایش پیام موفقیت
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            _isReceipt 
+      SnackBarHelper.showSuccess(context, message: _isReceipt 
               ? 'سند دریافت با موفقیت ثبت شد'
-              : 'سند پرداخت با موفقیت ثبت شد',
-          ),
-          backgroundColor: Colors.green,
-        ),
-      );
+              : 'سند پرداخت با موفقیت ثبت شد',);
     } catch (e) {
       if (!mounted) return;
       
@@ -517,12 +669,7 @@ class _BulkSettlementDialogState extends State<_BulkSettlementDialog> {
       Navigator.pop(context);
       
       // نمایش خطا
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('خطا: ${e.toString()}'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      SnackBarHelper.showError(context, message: 'خطا: ${e.toString()}');
     }
   }
 }
@@ -551,52 +698,77 @@ class _PersonsPanelState extends State<_PersonsPanel> {
     final t = AppLocalizations.of(context);
     return Padding(
       padding: const EdgeInsets.all(12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final bool hasBoundedHeight = constraints.maxHeight < double.infinity;
+
+          final listView = widget.lines.isEmpty
+              ? Center(child: Text(t.noDataFound))
+              : ListView.separated(
+                  shrinkWrap: !hasBoundedHeight,
+                  physics: hasBoundedHeight ? null : const NeverScrollableScrollPhysics(),
+                  itemCount: widget.lines.length,
+                  separatorBuilder: (_, _) => const SizedBox(height: 8),
+                  itemBuilder: (ctx, i) {
+                    final line = widget.lines[i];
+                    return _PersonLineTile(
+                      businessId: widget.businessId,
+                      isReceipt: widget.isReceipt,
+                      line: line,
+                      selectedCurrencyId: widget.selectedCurrencyId,
+                      onChanged: (l) {
+                        final newLines = List<_PersonLine>.from(widget.lines);
+                        newLines[i] = l;
+                        widget.onChanged(newLines);
+                      },
+                      onDelete: () {
+                        final newLines = List<_PersonLine>.from(widget.lines);
+                        newLines.removeAt(i);
+                        widget.onChanged(newLines);
+                      },
+                    );
+                  },
+                );
+
+          final content = Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Expanded(child: Text(t.people, style: Theme.of(context).textTheme.titleMedium)),
-              IconButton(
-                onPressed: () {
-                  final newLines = List<_PersonLine>.from(widget.lines);
-                  newLines.add(_PersonLine.empty());
-                  widget.onChanged(newLines);
-                },
-                icon: const Icon(Icons.add),
-                tooltip: t.add,
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Expanded(
-            child: widget.lines.isEmpty
-                ? Center(child: Text(t.noDataFound))
-                : ListView.separated(
-                    itemCount: widget.lines.length,
-                    separatorBuilder: (_, _) => const SizedBox(height: 8),
-                    itemBuilder: (ctx, i) {
-                      final line = widget.lines[i];
-                      return _PersonLineTile(
-                        businessId: widget.businessId,
-                        isReceipt: widget.isReceipt,
-                        line: line,
-                        selectedCurrencyId: widget.selectedCurrencyId,
-                        onChanged: (l) {
-                          final newLines = List<_PersonLine>.from(widget.lines);
-                          newLines[i] = l;
-                          widget.onChanged(newLines);
-                        },
-                        onDelete: () {
-                          final newLines = List<_PersonLine>.from(widget.lines);
-                          newLines.removeAt(i);
-                          widget.onChanged(newLines);
-                        },
-                      );
-                    },
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      t.people,
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
                   ),
-          ),
-        ],
+                  IconButton(
+                    onPressed: () {
+                      final newLines = List<_PersonLine>.from(widget.lines);
+                      newLines.add(_PersonLine.empty());
+                      widget.onChanged(newLines);
+                    },
+                    icon: const Icon(Icons.add),
+                    tooltip: t.add,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              if (hasBoundedHeight)
+                Expanded(child: listView)
+              else
+                listView,
+            ],
+          );
+
+          return Card(
+            elevation: 0,
+            clipBehavior: Clip.antiAlias,
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: content,
+            ),
+          );
+        },
       ),
     );
   }

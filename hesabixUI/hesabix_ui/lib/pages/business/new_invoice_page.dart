@@ -38,7 +38,8 @@ import '../../models/invoice_transaction.dart';
 import '../../models/invoice_line_item.dart';
 import '../../services/invoice_service.dart';
 import '../../services/credit_api_service.dart';
-import '../../models/credit_models.dart';
+import '../../models/credit_models.dart';import '../../utils/snackbar_helper.dart';
+
 
 class NewInvoicePage extends StatefulWidget {
   final int businessId;
@@ -877,9 +878,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                         newPrincipal + ((_installmentRows[idx]['interest'] as num?)?.toDouble() ?? 0.0);
                   }
                   setState(() {});
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('اختلاف اصل اقساط تراز شد')),
-                  );
+                  SnackBarHelper.show(context, message: 'اختلاف اصل اقساط تراز شد');
                 },
                 icon: const Icon(Icons.tune),
                 label: const Text('تراز اختلاف اصل'),
@@ -1915,13 +1914,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
         return;
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(t.invoiceCreatedSuccess),
-          backgroundColor: Theme.of(context).colorScheme.primary,
-          duration: const Duration(seconds: 2),
-        ),
-      );
+      SnackBarHelper.show(context, message: t.invoiceCreatedSuccess);
 
       if (_printAfterSave) {
         if (invoiceId == null) {
@@ -1978,12 +1971,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
       await _saveInvoicePdf(bytes, invoiceCode ?? 'invoice_$invoiceId');
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('فایل PDF فاکتور دانلود شد'),
-          backgroundColor: Theme.of(context).colorScheme.primary,
-        ),
-      );
+      SnackBarHelper.showSuccess(context, message: 'فایل PDF فاکتور دانلود شد');
     } catch (e) {
       if (!mounted) return;
       _showError('خطا در چاپ فاکتور: $e');
@@ -2357,12 +2345,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
   }
 
   void _showError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Theme.of(context).colorScheme.error,
-      ),
-    );
+    SnackBarHelper.showError(context, message: message);
   }
 
   Widget _buildProductsTab() {

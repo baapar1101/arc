@@ -226,7 +226,7 @@ class _ChecksPageState extends State<ChecksPage> {
               if (can) {
                 _openEndorseDialog(context, row as Map<String, dynamic>);
               } else {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('این عملیات برای وضعیت فعلی مجاز نیست')));
+                SnackBarHelper.show(context, message: 'این عملیات برای وضعیت فعلی مجاز نیست');
               }
             },
           ),
@@ -239,7 +239,7 @@ class _ChecksPageState extends State<ChecksPage> {
               if (type == 'received' && status != 'CLEARED') {
                 _openClearDialog(context, row as Map<String, dynamic>);
               } else {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('این عملیات برای این چک قابل انجام نیست')));
+                SnackBarHelper.show(context, message: 'این عملیات برای این چک قابل انجام نیست');
               }
             },
           ),
@@ -252,7 +252,7 @@ class _ChecksPageState extends State<ChecksPage> {
               if (type == 'transferred' && status != 'CLEARED') {
                 _openPayDialog(context, row as Map<String, dynamic>);
               } else {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('این عملیات برای این چک قابل انجام نیست')));
+                SnackBarHelper.show(context, message: 'این عملیات برای این چک قابل انجام نیست');
               }
             },
           ),
@@ -264,7 +264,7 @@ class _ChecksPageState extends State<ChecksPage> {
               if (status != 'CLEARED') {
                 _confirmReturn(context, row as Map<String, dynamic>);
               } else {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('این چک قبلاً پاس شده است')));
+                SnackBarHelper.show(context, message: 'این چک قبلاً پاس شده است');
               }
             },
           ),
@@ -276,7 +276,7 @@ class _ChecksPageState extends State<ChecksPage> {
               if (status != 'CLEARED') {
                 _confirmBounce(context, row as Map<String, dynamic>);
               } else {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('این چک قبلاً پاس شده است')));
+                SnackBarHelper.show(context, message: 'این چک قبلاً پاس شده است');
               }
             },
           ),
@@ -289,7 +289,7 @@ class _ChecksPageState extends State<ChecksPage> {
               if (type == 'received' && (status.isEmpty || status == 'RECEIVED_ON_HAND')) {
                 _confirmDeposit(context, row as Map<String, dynamic>);
               } else {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('این عملیات برای وضعیت فعلی مجاز نیست')));
+                SnackBarHelper.show(context, message: 'این عملیات برای وضعیت فعلی مجاز نیست');
               }
             },
           ),
@@ -569,16 +569,12 @@ class _ChecksPageState extends State<ChecksPage> {
     
     // بررسی وضعیت چک
     if (status == 'CLEARED') {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('نمی‌توان چک پاس شده را حذف کرد')),
-      );
+      SnackBarHelper.show(context, message: 'نمی‌توان چک پاس شده را حذف کرد');
       return;
     }
     
     if (status == 'DEPOSITED') {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('نمی‌توان چک سپرده شده را حذف کرد. لطفاً ابتدا چک را از سپرده خارج کنید')),
-      );
+      SnackBarHelper.show(context, message: 'نمی‌توان چک سپرده شده را حذف کرد. لطفاً ابتدا چک را از سپرده خارج کنید');
       return;
     }
     
@@ -607,15 +603,11 @@ class _ChecksPageState extends State<ChecksPage> {
     try {
       await _checkService.delete(row['id'] as int);
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('چک با موفقیت حذف شد')),
-      );
+      SnackBarHelper.show(context, message: 'چک با موفقیت حذف شد');
       _refresh();
     } catch (e) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('خطا در حذف چک: $e')),
-      );
+      SnackBarHelper.show(context, message: 'خطا در حذف چک: $e');
     }
   }
 

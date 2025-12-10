@@ -8,6 +8,7 @@ from adapters.db.session import get_db
 from app.core.auth_dependency import get_current_user, AuthContext
 from app.core.permissions import require_business_access, require_business_permission_dep
 from app.core.responses import success_response, ApiError, format_datetime_fields
+from app.core.cache import get_cache
 from adapters.db.repositories.fiscal_year_repo import FiscalYearRepository
 from adapters.db.models.fiscal_year import FiscalYear
 from app.services.year_end_closing_service import preview_year_end_closing, close_fiscal_year
@@ -83,6 +84,14 @@ def list_fiscal_years(
     db: Session = Depends(get_db),
     _: None = Depends(require_business_permission_dep("fiscal_years", "view")),
 ) -> Dict[str, Any]:
+    cache = get_cache()
+    cache_key = f"fiscal_years:{business_id}"
+
+    if cache.enabled:
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return success_response(data=cached, request=request, message="FISCAL_YEARS_LIST_FETCHED")
+
     repo = FiscalYearRepository(db)
 
     items = repo.list_by_business(business_id)
@@ -98,7 +107,12 @@ def list_fiscal_years(
         for fy in items
     ]
 
-    return success_response(data=format_datetime_fields({"items": data}, request), request=request, message="FISCAL_YEARS_LIST_FETCHED")
+    formatted = format_datetime_fields({"items": data}, request)
+
+    if cache.enabled:
+        cache.set(cache_key, formatted, ttl=120)
+
+    return success_response(data=formatted, request=request, message="FISCAL_YEARS_LIST_FETCHED")
 
 
 @router.get("/{business_id}/fiscal-years/current")

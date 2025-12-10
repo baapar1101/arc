@@ -97,6 +97,7 @@ def require_business_access(business_id_param: str = "business_id"):
         async def wrapper(*args, **kwargs) -> Any:
             import logging
             from fastapi import Request
+            from adapters.db.session import get_db_session
             logger = logging.getLogger(__name__)
 
             # یافتن Request در args/kwargs
@@ -111,37 +112,28 @@ def require_business_access(business_id_param: str = "business_id"):
                 logger.error("Request not found in function arguments")
                 raise ApiError("INTERNAL_ERROR", "Request not found", http_status=500)
 
-            # دسترسی به DB و کاربر
-            from adapters.db.session import get_db
-            db = next(get_db())
-            ctx = get_current_user(request, db)
+            # دسترسی به DB و کاربر با استفاده از context manager برای جلوگیری از connection leak
+            with get_db_session() as db:
+                ctx = get_current_user(request, db)
 
-            # استخراج business_id از kwargs یا path params
-            business_id = kwargs.get(business_id_param)
-            if business_id is None:
-                try:
-                    business_id = request.path_params.get(business_id_param)
-                except Exception:
-                    business_id = None
+                # استخراج business_id از kwargs یا path params
+                business_id = kwargs.get(business_id_param)
+                if business_id is None:
+                    try:
+                        business_id = request.path_params.get(business_id_param)
+                    except Exception:
+                        business_id = None
 
-            if business_id:
-                logger.info(f"=== require_business_access decorator ===")
-                logger.info(f"Checking access for user {ctx.get_user_id()} to business {business_id}")
-                logger.info(f"User context business_id: {ctx.business_id}")
-                logger.info(f"Is superadmin: {ctx.is_superadmin()}")
-                
-                has_access = ctx.can_access_business(int(business_id))
-                logger.info(f"Access check result: {has_access}")
-                
-                if not has_access:
-                    logger.warning(f"User {ctx.get_user_id()} does not have access to business {business_id}")
-                    raise ApiError("FORBIDDEN", f"No access to business {business_id}", http_status=403)
-                else:
-                    logger.info(f"User {ctx.get_user_id()} has access to business {business_id}")
-            else:
-                logger.info("No business_id provided, skipping access check")
+                if business_id:
+                    logger.debug(f"require_business_access: Checking access for user {ctx.get_user_id()} to business {business_id}")
+                    
+                    has_access = ctx.can_access_business(int(business_id))
+                    
+                    if not has_access:
+                        logger.warning(f"User {ctx.get_user_id()} does not have access to business {business_id}")
+                        raise ApiError("FORBIDDEN", f"No access to business {business_id}", http_status=403)
 
-            # فراخوانی تابع اصلی و await در صورت نیاز
+            # فراخوانی تابع اصلی و await در صورت نیاز (خارج از context manager)
             result = func(*args, **kwargs)
             if inspect.isawaitable(result):
                 result = await result

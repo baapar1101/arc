@@ -17,6 +17,7 @@ from adapters.api.v1.support.schemas import (
 from app.core.auth_dependency import get_current_user, AuthContext
 from app.core.responses import success_response, format_datetime_fields
 from app.services.notification_service import NotificationService
+from app.core.cache import get_cache
 import logging
 
 router = APIRouter()
@@ -35,6 +36,29 @@ async def search_user_tickets(
     # تنظیم فیلدهای قابل جستجو
     if not query_info.search_fields:
         query_info.search_fields = ["title", "description"]
+
+    # کش نتایج جستجوی تیکت‌های کاربر
+    cache = get_cache()
+    cache_key = None
+
+    if cache.enabled:
+        import json, hashlib
+        key_payload = {
+            "user_id": current_user.get_user_id(),
+            "take": query_info.take,
+            "skip": query_info.skip,
+            "sort_by": query_info.sort_by,
+            "sort_desc": query_info.sort_desc,
+            "search": query_info.search,
+            "search_fields": query_info.search_fields,
+            "filters": query_info.filters,
+        }
+        key_str = json.dumps(key_payload, sort_keys=True, ensure_ascii=False)
+        key_hash = hashlib.sha256(key_str.encode("utf-8")).hexdigest()[:16]
+        cache_key = f"support_tickets_search:{key_hash}"
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return success_response(cached, request)
     
     tickets, total = ticket_repo.get_user_tickets(current_user.get_user_id(), query_info)
     
@@ -92,6 +116,9 @@ async def search_user_tickets(
     
     # Format datetime fields based on calendar type
     formatted_data = format_datetime_fields(paginated_data.dict(), request)
+
+    if cache.enabled and cache_key:
+        cache.set(cache_key, formatted_data, ttl=30)
     
     return success_response(formatted_data, request)
 

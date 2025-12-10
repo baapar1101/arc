@@ -584,21 +584,17 @@ class _PersonsPageState extends State<PersonsPage> {
     try {
       await _personService.deletePerson(person.id!);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(AppLocalizations.of(context).personDeletedSuccessfully),
-            backgroundColor: Colors.green,
-          ),
+        SnackBarHelper.showSuccess(
+          context,
+          message: AppLocalizations.of(context).personDeletedSuccessfully,
         );
         // DataTableWidget will automatically refresh
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('خطا در حذف شخص: $e'),
-            backgroundColor: Colors.red,
-          ),
+        SnackBarHelper.showError(
+          context,
+          message: 'خطا در حذف شخص: $e',
         );
       }
     }

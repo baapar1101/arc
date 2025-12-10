@@ -12,6 +12,7 @@ from app.services.kardex_service import list_kardex_lines
 from app.services.pdf.template_renderer import render_template
 from app.core.i18n import negotiate_locale
 from adapters.db.models.business import Business
+from app.core.cache import get_cache
 
 
 router = APIRouter(prefix="/kardex", tags=["گزارش‌ها", "انبارداری"])
@@ -65,6 +66,23 @@ async def list_kardex_lines_endpoint(
     except Exception:
         pass
 
+    # کش نتایج لیست کاردکس (خطوط اسناد)
+    cache = get_cache()
+    cache_key = None
+
+    if cache.enabled:
+        import json, hashlib
+        key_payload = {
+            "business_id": business_id,
+            "query": query_dict,
+        }
+        key_str = json.dumps(key_payload, sort_keys=True, ensure_ascii=False)
+        key_hash = hashlib.sha256(key_str.encode("utf-8")).hexdigest()[:16]
+        cache_key = f"kardex_lines:{key_hash}"
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return success_response(data=cached, request=request, message="KARDEX_LINES")
+
     result = list_kardex_lines(db, business_id, query_dict)
 
     # Format date fields in response items (document_date)
@@ -75,6 +93,9 @@ async def list_kardex_lines_endpoint(
             item.update(format_datetime_fields({"document_date": item.get("document_date")}, request))
     except Exception:
         pass
+
+    if cache.enabled and cache_key:
+        cache.set(cache_key, result, ttl=60)
 
     return success_response(data=result, request=request, message="KARDEX_LINES")
 

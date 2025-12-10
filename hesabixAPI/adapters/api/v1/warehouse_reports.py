@@ -12,6 +12,7 @@ from adapters.db.session import get_db
 from app.core.auth_dependency import get_current_user, AuthContext
 from app.core.permissions import require_business_access, require_business_permission_dep
 from app.core.responses import success_response, format_datetime_fields
+from app.core.response_cache import cache_response
 from app.core.i18n import negotiate_locale
 from app.services.warehouse_reports_service import (
     get_warehouse_documents_summary_report,
@@ -135,6 +136,7 @@ def _create_excel_export(items: List[Dict[str, Any]], headers: List[tuple], file
     description="خلاصه حواله‌های انبار به تفکیک نوع با آمار ورود و خروج",
 )
 @require_business_access("business_id")
+@cache_response(ttl=60, vary_by=["business_id"])
 async def warehouse_documents_summary_endpoint(
     request: Request,
     business_id: int,
@@ -219,6 +221,7 @@ async def export_warehouse_documents_summary_excel(
     description="کالاهایی که در بازه زمانی مشخص شده هیچ حرکتی نداشته‌اند",
 )
 @require_business_access("business_id")
+@cache_response(ttl=120, vary_by=["business_id"])
 async def slow_moving_items_endpoint(
     request: Request,
     business_id: int,

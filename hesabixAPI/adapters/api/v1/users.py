@@ -11,6 +11,7 @@ from adapters.api.v1.schemas import QueryInfo, SuccessResponse, UsersListRespons
 from app.core.responses import success_response, format_datetime_fields
 from app.core.auth_dependency import get_current_user, AuthContext
 from app.core.permissions import require_user_management
+from app.core.cache import get_cache
 from app.services.file_storage_service import FileStorageService
 from app.services.auth_service import _hash_reset_token
 from app.core.settings import get_settings
@@ -170,6 +171,31 @@ def list_users(
 	else:
 		users, total = repo.query_with_filters(query_info)
 	
+	# کش لیست کاربران مدیریت‌شده
+	cache = get_cache()
+	cache_key = None
+
+	if cache.enabled:
+		import json, hashlib
+		key_payload = {
+			"admin_user_id": ctx.get_user_id(),
+			"query": {
+				"sort_by": query_info.sort_by,
+				"sort_desc": query_info.sort_desc,
+				"take": query_info.take,
+				"skip": query_info.skip,
+				"search": query_info.search,
+				"search_fields": query_info.search_fields,
+				"filters": [f.model_dump() for f in (query_info.filters or [])],
+			},
+		}
+		key_str = json.dumps(key_payload, sort_keys=True, ensure_ascii=False)
+		key_hash = hashlib.sha256(key_str.encode("utf-8")).hexdigest()[:16]
+		cache_key = f"users_list:{key_hash}"
+		cached = cache.get(cache_key)
+		if cached is not None:
+			return success_response(cached, request)
+	
 	# اعمال فیلتر role بعد از دریافت داده‌ها
 	if query_info.filters:
 		role_filters = [f for f in query_info.filters if f.property == "role"]
@@ -232,6 +258,9 @@ def list_users(
 			"filters": [{"property": f.property, "operator": f.operator, "value": f.value} for f in (query_info.filters or [])]
 		}
 	}
+	
+	if cache.enabled and cache_key:
+		cache.set(cache_key, response_data, ttl=60)
 	
 	return success_response(response_data, request)
 

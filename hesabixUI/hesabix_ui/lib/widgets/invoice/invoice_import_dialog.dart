@@ -4,6 +4,8 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../person/file_picker_bridge.dart';
 import '../../services/invoice_service.dart';
 import '../data_table/helpers/file_saver.dart';
+import '../../utils/snackbar_helper.dart';
+
 
 class InvoiceImportDialog extends StatefulWidget {
   final int businessId;
@@ -45,9 +47,7 @@ class _InvoiceImportDialogState extends State<InvoiceImportDialog> {
     if (!_isInitialized) {
       if (mounted) {
         final t = AppLocalizations.of(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(t.loading)),
-        );
+        SnackBarHelper.show(context, message: t.loading);
       }
       return;
     }
@@ -63,9 +63,7 @@ class _InvoiceImportDialogState extends State<InvoiceImportDialog> {
     } catch (e) {
       if (mounted) {
         final t = AppLocalizations.of(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${t.pickFileError}: $e')),
-        );
+        SnackBarHelper.show(context, message: '${t.pickFileError}: $e');
       }
     }
   }
@@ -80,16 +78,12 @@ class _InvoiceImportDialogState extends State<InvoiceImportDialog> {
       await FileSaver.saveBytes(bytes, filename);
       if (mounted) {
         final t = AppLocalizations.of(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${t.templateDownloaded}: $filename')),
-        );
+        SnackBarHelper.show(context, message: '${t.templateDownloaded}: $filename');
       }
     } catch (e) {
       if (mounted) {
         final t = AppLocalizations.of(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${t.templateDownloadError}: $e')),
-        );
+        SnackBarHelper.show(context, message: '${t.templateDownloadError}: $e');
       }
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -134,9 +128,7 @@ class _InvoiceImportDialogState extends State<InvoiceImportDialog> {
     } catch (e) {
       if (mounted) {
         final t = AppLocalizations.of(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${t.importError}: $e')),
-        );
+        SnackBarHelper.show(context, message: '${t.importError}: $e');
       }
     } finally {
       if (mounted) setState(() => _loading = false);

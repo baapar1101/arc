@@ -8,6 +8,7 @@ from app.core.permissions import require_business_access
 from adapters.db.session import get_db
 from adapters.db.repositories.activity_log_repo import ActivityLogRepository
 from adapters.db.models.activity_log import ActivityLog
+from app.core.cache import get_cache
 
 router = APIRouter(prefix="/activity-logs", tags=["activity-logs"])
 
@@ -143,6 +144,27 @@ def get_business_activity_logs(
 	db: Session = Depends(get_db)
 ) -> dict:
 	"""دریافت لاگ‌های فعالیت یک کسب و کار"""
+	cache = get_cache()
+	cache_key = None
+
+	if cache.enabled:
+		import json, hashlib
+		key_payload = {
+			"business_id": business_id,
+			"category": category,
+			"entity_type": entity_type,
+			"start_date": start_date.isoformat() if start_date else None,
+			"end_date": end_date.isoformat() if end_date else None,
+			"page": page,
+			"per_page": per_page,
+		}
+		key_str = json.dumps(key_payload, sort_keys=True, ensure_ascii=False)
+		key_hash = hashlib.sha256(key_str.encode("utf-8")).hexdigest()[:16]
+		cache_key = f"activity_logs:{key_hash}"
+		cached = cache.get(cache_key)
+		if cached is not None:
+			return success_response(data=cached, request=request)
+
 	repo = ActivityLogRepository(db)
 	offset = (page - 1) * per_page
 	
@@ -182,15 +204,21 @@ def get_business_activity_logs(
 			"extra_info": log.extra_info,
 			"created_at": log.created_at.isoformat()
 		})
+
+	response_data = {
+		"items": logs_data,
+		"page": page,
+		"per_page": per_page,
+		"total": total,
+		"total_pages": (total + per_page - 1) // per_page if total > 0 else 0
+	}
+
+	if cache.enabled and cache_key:
+		# لاگ‌ها نسبتا سریع تغییر می‌کنند → TTL کوتاه
+		cache.set(cache_key, response_data, ttl=30)
 	
 	return success_response(
-		data={
-			"items": logs_data,
-			"page": page,
-			"per_page": per_page,
-			"total": total,
-			"total_pages": (total + per_page - 1) // per_page if total > 0 else 0
-		},
+		data=response_data,
 		request=request
 	)
 

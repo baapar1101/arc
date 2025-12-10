@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'identity_inquiry_dialog.dart';
+import '../../utils/snackbar_helper.dart';
+
 
 /// مثال استفاده از دیالوگ استعلام اطلاعات هویتی
 /// Example usage of Identity Inquiry Dialog
@@ -99,12 +101,7 @@ class IdentityInquiryDialogExample extends StatelessWidget {
         final firstName = data?['first_name']?.toString() ?? '';
         final lastName = data?['last_name']?.toString() ?? '';
         
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('استعلام موفق: $firstName $lastName'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        SnackBarHelper.showSuccess(context, message: 'استعلام موفق: $firstName $lastName');
       }
     }
   }

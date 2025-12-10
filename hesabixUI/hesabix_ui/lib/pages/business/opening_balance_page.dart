@@ -94,8 +94,9 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
       });
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطا در دریافت تراز افتتاحیه: $e')),
+        SnackBarHelper.showError(
+          context,
+          message: 'خطا در دریافت تراز افتتاحیه: $e',
         );
       }
     } finally {
@@ -590,11 +591,11 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
                   if (opt == null) return;
                   if (_isBankCashPettyDuplicate('bank', opt.id)) {
                     if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('این حساب بانکی قبلاً اضافه شده است'),
-                          backgroundColor: Theme.of(context).colorScheme.error,
-                        ),
+                      SnackBarHelper.show(
+                        context,
+                        message: 'این حساب بانکی قبلاً اضافه شده است',
+                        backgroundColor: Theme.of(context).colorScheme.error,
+                        isError: true,
                       );
                     }
                     return;
@@ -624,11 +625,11 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
                   if (opt == null) return;
                   if (_isBankCashPettyDuplicate('cash', opt.id)) {
                     if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('این صندوق قبلاً اضافه شده است'),
-                          backgroundColor: Theme.of(context).colorScheme.error,
-                        ),
+                      SnackBarHelper.show(
+                        context,
+                        message: 'این صندوق قبلاً اضافه شده است',
+                        backgroundColor: Theme.of(context).colorScheme.error,
+                        isError: true,
                       );
                     }
                     return;
@@ -658,11 +659,11 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
                   if (opt == null) return;
                   if (_isBankCashPettyDuplicate('petty', opt.id)) {
                     if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('این تنخواه قبلاً اضافه شده است'),
-                          backgroundColor: Theme.of(context).colorScheme.error,
-                        ),
+                      SnackBarHelper.show(
+                        context,
+                        message: 'این تنخواه قبلاً اضافه شده است',
+                        backgroundColor: Theme.of(context).colorScheme.error,
+                        isError: true,
                       );
                     }
                     return;
@@ -702,14 +703,12 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
                 subtitle: Row(
                   children: [
                     Expanded(
-                      child: TextField(
-                        controller: TextEditingController(
-                          text: formatNumberForInput(m['debit'] as double?, decimalPlaces: 2),
-                        ),
+                      child: TextFormField(
+                        initialValue: formatNumberForInput(m['debit'] as double?, decimalPlaces: 0),
                         decoration: const InputDecoration(isDense: true, labelText: 'بدهکار'),
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        inputFormatters: [
-                          NumberInputFormatter(allowDecimal: true),
+                        keyboardType: TextInputType.number,
+                        inputFormatters: const [
+                          NumberInputFormatter(allowDecimal: false),
                         ],
                         onChanged: (v) {
                           m['debit'] = parseFormattedDouble(v) ?? 0.0;
@@ -719,14 +718,12 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
                     ),
                     const SizedBox(width: 8),
                     Expanded(
-                      child: TextField(
-                        controller: TextEditingController(
-                          text: formatNumberForInput(m['credit'] as double?, decimalPlaces: 2),
-                        ),
+                      child: TextFormField(
+                        initialValue: formatNumberForInput(m['credit'] as double?, decimalPlaces: 0),
                         decoration: const InputDecoration(isDense: true, labelText: 'بستانکار'),
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        inputFormatters: [
-                          NumberInputFormatter(allowDecimal: true),
+                        keyboardType: TextInputType.number,
+                        inputFormatters: const [
+                          NumberInputFormatter(allowDecimal: false),
                         ],
                         onChanged: (v) {
                           m['credit'] = parseFormattedDouble(v) ?? 0.0;
@@ -761,11 +758,11 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
               if (p == null) return;
               if (_isPersonDuplicate(p.id)) {
                 if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('این شخص قبلاً اضافه شده است'),
-                      backgroundColor: Theme.of(context).colorScheme.error,
-                    ),
+                  SnackBarHelper.show(
+                    context,
+                    message: 'این شخص قبلاً اضافه شده است',
+                    backgroundColor: Theme.of(context).colorScheme.error,
+                    isError: true,
                   );
                 }
                 return;
@@ -798,14 +795,12 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
                 subtitle: Row(
                   children: [
                     Expanded(
-                      child: TextField(
-                        controller: TextEditingController(
-                          text: formatNumberForInput(m['debit'] as double?, decimalPlaces: 2),
-                        ),
+                      child: TextFormField(
+                        initialValue: formatNumberForInput(m['debit'] as double?, decimalPlaces: 0),
                         decoration: const InputDecoration(isDense: true, labelText: 'بدهکار'),
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        inputFormatters: [
-                          NumberInputFormatter(allowDecimal: true),
+                        keyboardType: TextInputType.number,
+                        inputFormatters: const [
+                          NumberInputFormatter(allowDecimal: false),
                         ],
                         onChanged: (v) {
                           m['debit'] = parseFormattedDouble(v) ?? 0.0;
@@ -815,14 +810,12 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
                     ),
                     const SizedBox(width: 8),
                     Expanded(
-                      child: TextField(
-                        controller: TextEditingController(
-                          text: formatNumberForInput(m['credit'] as double?, decimalPlaces: 2),
-                        ),
+                      child: TextFormField(
+                        initialValue: formatNumberForInput(m['credit'] as double?, decimalPlaces: 0),
                         decoration: const InputDecoration(isDense: true, labelText: 'بستانکار'),
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        inputFormatters: [
-                          NumberInputFormatter(allowDecimal: true),
+                        keyboardType: TextInputType.number,
+                        inputFormatters: const [
+                          NumberInputFormatter(allowDecimal: false),
                         ],
                         onChanged: (v) {
                           m['credit'] = parseFormattedDouble(v) ?? 0.0;
@@ -866,11 +859,11 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
                   // چک می‌کنیم که آیا این کالا با انبار null قبلاً اضافه شده یا نه
                   if (_isInventoryDuplicate(productId, null)) {
                     if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('این کالا قبلاً اضافه شده است. لطفاً مورد موجود را ویرایش کنید یا حذف کنید'),
-                          backgroundColor: Theme.of(context).colorScheme.error,
-                        ),
+                      SnackBarHelper.show(
+                        context,
+                        message: 'این کالا قبلاً اضافه شده است. لطفاً مورد موجود را ویرایش کنید یا حذف کنید',
+                        backgroundColor: Theme.of(context).colorScheme.error,
+                        isError: true,
                       );
                     }
                     return;
@@ -931,11 +924,11 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
                             });
                             if (isDuplicate) {
                               if (mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text('این کالا با این انبار قبلاً اضافه شده است'),
-                                    backgroundColor: Theme.of(context).colorScheme.error,
-                                  ),
+                                SnackBarHelper.show(
+                                  context,
+                                  message: 'این کالا با این انبار قبلاً اضافه شده است',
+                                  backgroundColor: Theme.of(context).colorScheme.error,
+                                  isError: true,
                                 );
                               }
                               return;
@@ -1012,11 +1005,11 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
                   if (acc != null) {
                     if (_isAccountDuplicate(acc.id)) {
                       if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('این حساب قبلاً اضافه شده است'),
-                            backgroundColor: Theme.of(context).colorScheme.error,
-                          ),
+                        SnackBarHelper.show(
+                          context,
+                          message: 'این حساب قبلاً اضافه شده است',
+                          backgroundColor: Theme.of(context).colorScheme.error,
+                          isError: true,
                         );
                       }
                       return;
@@ -1059,14 +1052,12 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
                 subtitle: Row(
                   children: [
                     Expanded(
-                      child: TextField(
-                        controller: TextEditingController(
-                          text: formatNumberForInput(m['debit'] as double?, decimalPlaces: 2),
-                        ),
+                      child: TextFormField(
+                        initialValue: formatNumberForInput(m['debit'] as double?, decimalPlaces: 0),
                         decoration: const InputDecoration(isDense: true, labelText: 'بدهکار'),
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        inputFormatters: [
-                          NumberInputFormatter(allowDecimal: true),
+                        keyboardType: TextInputType.number,
+                        inputFormatters: const [
+                          NumberInputFormatter(allowDecimal: false),
                         ],
                         onChanged: (v) {
                           m['debit'] = parseFormattedDouble(v) ?? 0.0;
@@ -1076,14 +1067,12 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
                     ),
                     const SizedBox(width: 8),
                     Expanded(
-                      child: TextField(
-                        controller: TextEditingController(
-                          text: formatNumberForInput(m['credit'] as double?, decimalPlaces: 2),
-                        ),
+                      child: TextFormField(
+                        initialValue: formatNumberForInput(m['credit'] as double?, decimalPlaces: 0),
                         decoration: const InputDecoration(isDense: true, labelText: 'بستانکار'),
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        inputFormatters: [
-                          NumberInputFormatter(allowDecimal: true),
+                        keyboardType: TextInputType.number,
+                        inputFormatters: const [
+                          NumberInputFormatter(allowDecimal: false),
                         ],
                         onChanged: (v) {
                           m['credit'] = parseFormattedDouble(v) ?? 0.0;
@@ -1385,8 +1374,9 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
       if (accountId == null) {
         final typeLabel = m['type'] == 'bank' ? 'بانک' : (m['type'] == 'cash' ? 'صندوق' : 'تنخواه');
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('برای ثبت $typeLabel، انتخاب حساب کنترل الزامی است')),
+          SnackBarHelper.showError(
+            context,
+            message: 'برای ثبت $typeLabel، انتخاب حساب کنترل الزامی است',
           );
         }
         return;
@@ -1408,8 +1398,9 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
       final accountId = _inferPersonAccountId(d, c);
       if (accountId == null) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('برای ثبت اشخاص، انتخاب حساب دریافتنی یا پرداختنی الزامی است')),
+          SnackBarHelper.showError(
+            context,
+            message: 'برای ثبت اشخاص، انتخاب حساب دریافتنی یا پرداختنی الزامی است',
           );
         }
         return;
@@ -1435,16 +1426,18 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
       
       if (pid == null) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('شناسه کالا نامعتبر است')),
+          SnackBarHelper.showError(
+            context,
+            message: 'شناسه کالا نامعتبر است',
           );
         }
         return;
       }
       if (wid == null) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('برای ثبت موجودی، انتخاب انبار الزامی است')),
+          SnackBarHelper.showError(
+            context,
+            message: 'برای ثبت موجودی، انتخاب انبار الزامی است',
           );
         }
         return;
@@ -1476,20 +1469,19 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
       final saved = await _service.save(businessId: widget.businessId, payload: payload);
       setState(() => _document = saved);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('ذخیره شد'),
-            backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-          ),
+        SnackBarHelper.show(
+          context,
+          message: 'ذخیره شد',
+          backgroundColor: Theme.of(context).colorScheme.primaryContainer,
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('خطا در ذخیره: ${e.toString()}'),
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
+        SnackBarHelper.show(
+          context,
+          message: 'خطا در ذخیره: ${e.toString()}',
+          backgroundColor: Theme.of(context).colorScheme.error,
+          isError: true,
         );
       }
     }
@@ -1522,20 +1514,19 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
       final posted = await _service.post(businessId: widget.businessId);
       setState(() => _document = posted);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('تراز افتتاحیه نهایی شد'),
-            backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-          ),
+        SnackBarHelper.show(
+          context,
+          message: 'تراز افتتاحیه نهایی شد',
+          backgroundColor: Theme.of(context).colorScheme.primaryContainer,
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('خطا در نهایی‌سازی: ${e.toString()}'),
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
+        SnackBarHelper.show(
+          context,
+          message: 'خطا در نهایی‌سازی: ${e.toString()}',
+          backgroundColor: Theme.of(context).colorScheme.error,
+          isError: true,
         );
       }
     }

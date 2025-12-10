@@ -9,7 +9,8 @@ import 'package:hesabix_ui/models/person_model.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/widgets/date_input_field.dart';
-import 'package:hesabix_ui/services/invoice_service.dart';
+import 'package:hesabix_ui/services/invoice_service.dart';import '../../utils/snackbar_helper.dart';
+
 
 class InstallmentsReportPage extends StatefulWidget {
   final int businessId;
@@ -389,9 +390,7 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
     } catch (e) {
       if (!mounted) return;
       final t = AppLocalizations.of(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${t.installmentsFetchError}: ${e.toString()}'), backgroundColor: Colors.red),
-      );
+      SnackBarHelper.showError(context, message: '${t.installmentsFetchError}: ${e.toString()}');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -592,17 +591,13 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
       } else {
         if (mounted) {
           final t = AppLocalizations.of(context);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(t.installmentsExportWebOnly)),
-          );
+          SnackBarHelper.show(context, message: t.installmentsExportWebOnly);
         }
       }
     } catch (e) {
       if (!mounted) return;
       final t = AppLocalizations.of(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${t.installmentsExportError}: ${e.toString()}'), backgroundColor: Colors.red),
-      );
+      SnackBarHelper.showError(context, message: '${t.installmentsExportError}: ${e.toString()}');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -638,17 +633,13 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
       } else {
         if (mounted) {
           final t = AppLocalizations.of(context);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(t.installmentsExportWebOnly)),
-          );
+          SnackBarHelper.show(context, message: t.installmentsExportWebOnly);
         }
       }
     } catch (e) {
       if (!mounted) return;
       final t = AppLocalizations.of(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${t.installmentsExportError}: ${e.toString()}'), backgroundColor: Colors.red),
-      );
+      SnackBarHelper.showError(context, message: '${t.installmentsExportError}: ${e.toString()}');
     } finally {
       if (mounted) setState(() => _loading = false);
     }

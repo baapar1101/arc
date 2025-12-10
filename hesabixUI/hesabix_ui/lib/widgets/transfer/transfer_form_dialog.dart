@@ -119,32 +119,17 @@ class _TransferFormDialogState extends State<TransferFormDialog> {
     if (!_formKey.currentState!.validate()) return;
     
     if (_fromType == null || _toType == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('لطفاً مبدا و مقصد انتقال را انتخاب کنید'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      SnackBarHelper.showError(context, message: 'لطفاً مبدا و مقصد انتقال را انتخاب کنید');
       return;
     }
 
     if (_fromId == null || _toId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('لطفاً مبدا و مقصد انتقال را انتخاب کنید'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      SnackBarHelper.showError(context, message: 'لطفاً مبدا و مقصد انتقال را انتخاب کنید');
       return;
     }
 
     if (_fromType == _toType && _fromId == _toId) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('مبدا و مقصد نمی‌توانند یکسان باشند'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      SnackBarHelper.showError(context, message: 'مبدا و مقصد نمی‌توانند یکسان باشند');
       return;
     }
 
@@ -199,23 +184,13 @@ class _TransferFormDialogState extends State<TransferFormDialog> {
       }
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(isEdit ? 'ویرایش با موفقیت انجام شد' : 'انتقال با موفقیت ثبت شد'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        SnackBarHelper.showSuccess(context, message: isEdit ? 'ویرایش با موفقیت انجام شد' : 'انتقال با موفقیت ثبت شد');
         Navigator.of(context).pop(true);
         widget.onSuccess?.call();
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('خطا در ثبت انتقال: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        SnackBarHelper.showError(context, message: 'خطا در ثبت انتقال: $e');
       }
     } finally {
       setState(() {

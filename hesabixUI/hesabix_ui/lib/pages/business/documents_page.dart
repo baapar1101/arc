@@ -10,7 +10,8 @@ import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
 import 'package:hesabix_ui/widgets/date_input_field.dart';
 import 'package:hesabix_ui/utils/number_formatters.dart' show formatWithThousands;
 import 'package:hesabix_ui/widgets/document/document_details_dialog.dart';
-import 'package:hesabix_ui/widgets/document/document_form_dialog.dart';
+import 'package:hesabix_ui/widgets/document/document_form_dialog.dart';import '../../utils/snackbar_helper.dart';
+
 
 /// صفحه لیست اسناد حسابداری (عمومی و اتوماتیک)
 class DocumentsPage extends StatefulWidget {
@@ -505,12 +506,7 @@ class _DocumentsPageState extends State<DocumentsPage> {
   /// ویرایش سند
   Future<void> _editDocument(DocumentModel doc) async {
     if (!doc.isEditable) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('فقط اسناد دستی قابل ویرایش هستند'),
-          backgroundColor: Colors.orange,
-        ),
-      );
+      SnackBarHelper.show(context, message: 'فقط اسناد دستی قابل ویرایش هستند');
       return;
     }
 
@@ -539,12 +535,7 @@ class _DocumentsPageState extends State<DocumentsPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('خطا در بارگذاری سند: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        SnackBarHelper.showError(context, message: 'خطا در بارگذاری سند: $e');
       }
     }
   }
@@ -552,12 +543,7 @@ class _DocumentsPageState extends State<DocumentsPage> {
   /// حذف سند
   Future<void> _deleteDocument(DocumentModel doc) async {
     if (!doc.isDeletable) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('فقط اسناد دستی قابل حذف هستند'),
-          backgroundColor: Colors.orange,
-        ),
-      );
+      SnackBarHelper.show(context, message: 'فقط اسناد دستی قابل حذف هستند');
       return;
     }
 
@@ -587,19 +573,12 @@ class _DocumentsPageState extends State<DocumentsPage> {
       try {
         await _service.deleteDocument(doc.id);
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('سند با موفقیت حذف شد')),
-          );
+          SnackBarHelper.show(context, message: 'سند با موفقیت حذف شد');
           _refreshData();
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('خطا در حذف سند: $e'),
-              backgroundColor: Colors.red,
-            ),
-          );
+          SnackBarHelper.showError(context, message: 'خطا در حذف سند: $e');
         }
       }
     }
@@ -651,21 +630,14 @@ class _DocumentsPageState extends State<DocumentsPage> {
                 message += '\n${skipped.length} سند اتوماتیک نادیده گرفته شد';
               }
 
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(message)),
-              );
+              SnackBarHelper.show(context, message: message);
               _refreshData();
             }
           }
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('خطا در حذف گروهی: $e'),
-              backgroundColor: Colors.red,
-            ),
-          );
+          SnackBarHelper.showError(context, message: 'خطا در حذف گروهی: $e');
         }
       }
     }

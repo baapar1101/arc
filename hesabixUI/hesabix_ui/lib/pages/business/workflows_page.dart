@@ -136,9 +136,7 @@ class _WorkflowsPageState extends State<WorkflowsPage> {
       debugPrint('خطا در بارگذاری workflows: $e');
       debugPrint('StackTrace: $stackTrace');
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppLocalizations.of(context).workflowErrorLoading)),
-      );
+      SnackBarHelper.showError(context, message: AppLocalizations.of(context).workflowErrorLoading);
     } finally {
       if (!mounted) return;
       setState(() {
@@ -473,17 +471,13 @@ class _WorkflowsPageState extends State<WorkflowsPage> {
         payload: {'status': statusValue},
       );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppLocalizations.of(context).workflowStatusUpdated)),
-      );
+      SnackBarHelper.showSuccess(context, message: AppLocalizations.of(context).workflowStatusUpdated);
       _loadAll(showSpinner: false);
     } catch (e, stackTrace) {
       debugPrint('خطا در تغییر وضعیت workflow: $e');
       debugPrint('StackTrace: $stackTrace');
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppLocalizations.of(context).workflowErrorUpdatingStatus)),
-      );
+      SnackBarHelper.showError(context, message: AppLocalizations.of(context).workflowErrorUpdatingStatus);
     }
   }
 
@@ -518,17 +512,13 @@ class _WorkflowsPageState extends State<WorkflowsPage> {
         workflowId: workflow['id'] as int,
       );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('ورک‌فلو با موفقیت حذف شد')),
-      );
+      SnackBarHelper.showSuccess(context, message: 'ورک‌فلو با موفقیت حذف شد');
       _loadAll(showSpinner: false);
     } catch (e, stackTrace) {
       debugPrint('خطا در حذف workflow: $e');
       debugPrint('StackTrace: $stackTrace');
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('خطا در حذف ورک‌فلو')),
-      );
+      SnackBarHelper.showError(context, message: 'خطا در حذف ورک‌فلو');
     }
   }
 
@@ -832,9 +822,7 @@ class _WorkflowsPageState extends State<WorkflowsPage> {
       debugPrint('خطا در دریافت لاگ‌های اجرا: $e');
       debugPrint('StackTrace: $stackTrace');
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppLocalizations.of(context).workflowErrorLoadingLogs)),
-      );
+      SnackBarHelper.showError(context, message: AppLocalizations.of(context).workflowErrorLoadingLogs);
     }
   }
 

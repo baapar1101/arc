@@ -142,9 +142,7 @@ class _BusinessPrintSettingsPageState extends State<BusinessPrintSettingsPage> {
 
       if (!mounted) return;
       final t = AppLocalizations.of(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(t.savedSuccessfully)),
-      );
+      SnackBarHelper.show(context, message: t.savedSuccessfully);
     } catch (e) {
       if (!mounted) return;
       setState(() {

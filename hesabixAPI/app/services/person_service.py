@@ -37,6 +37,14 @@ def create_person(db: Session, business_id: int, person_data: PersonCreateReques
         t = person_data.person_type
         types_list = [t.value if hasattr(t, 'value') else str(t)]
 
+    # حداقل یک نوع شخص الزامی است
+    if not types_list:
+        raise ApiError(
+            "PERSON_TYPE_REQUIRED",
+            "نوع شخص الزامی است",
+            http_status=400,
+        )
+
     # نوع تکی برای استفاده‌های بعدی (قبل از هر استفاده تعریف شود)
     incoming_single_type = getattr(person_data, 'person_type', None)
 

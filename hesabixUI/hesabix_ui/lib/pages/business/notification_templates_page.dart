@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../../core/api_client.dart';
+import '../../core/api_client.dart';import '../../utils/snackbar_helper.dart';
+
 
 /// صفحه مدیریت قالب‌های نوتیفیکیشن کسب‌وکار
 class NotificationTemplatesPage extends StatefulWidget {
@@ -455,19 +456,12 @@ class _NotificationTemplatesPageState extends State<NotificationTemplatesPage> {
       );
       
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('✅ قالب برای تایید ارسال شد و به زودی بررسی خواهد شد'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        SnackBarHelper.showSuccess(context, message: '✅ قالب برای تایید ارسال شد و به زودی بررسی خواهد شد');
         _loadTemplates();
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطا: $e'), backgroundColor: Colors.red),
-        );
+        SnackBarHelper.showError(context, message: 'خطا: $e');
       }
     }
   }

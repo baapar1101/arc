@@ -16,6 +16,7 @@ from adapters.api.v1.schema_models.person import (
 )
 from adapters.api.v1.schemas import QueryInfo, SuccessResponse
 from app.core.responses import success_response, format_datetime_fields, ApiError
+from app.core.cache import get_cache
 from app.core.auth_dependency import get_current_user, AuthContext
 from app.core.permissions import require_business_management_dep, require_business_access, require_business_permission_dep, require_business_permission_by_entity_dep, require_business_access_dep
 from app.core.i18n import negotiate_locale
@@ -262,12 +263,38 @@ async def get_persons_endpoint(
         "search_fields": query_info.search_fields,
         "filters": query_info.filters,
     }
+
+    # کش نتایج لیست اشخاص بر اساس پارامترها
+    cache = get_cache()
+    cache_key = None
+
+    if cache.enabled:
+        import json, hashlib
+        key_payload = {
+            "business_id": business_id,
+            "fiscal_year_id": fiscal_year_id,
+            "query": query_dict,
+        }
+        key_str = json.dumps(key_payload, sort_keys=True, ensure_ascii=False)
+        key_hash = hashlib.sha256(key_str.encode("utf-8")).hexdigest()[:16]
+        cache_key = f"persons_list:{key_hash}"
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return success_response(
+                data=cached,
+                request=request,
+                message="لیست اشخاص با موفقیت دریافت شد",
+            )
+
     result = get_persons_by_business(db, business_id, query_dict, fiscal_year_id)
     
     # فرمت کردن تاریخ‌ها
     result['items'] = [
         format_datetime_fields(item, request) for item in result['items']
     ]
+
+    if cache.enabled and cache_key:
+        cache.set(cache_key, result, ttl=60)
     
     return success_response(
         data=result,

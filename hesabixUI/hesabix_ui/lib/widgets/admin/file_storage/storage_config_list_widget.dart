@@ -64,31 +64,16 @@ class StorageConfigListWidgetState extends State<StorageConfigListWidget> {
       if (response.data != null && response.data['success'] == true) {
         final testResult = response.data['data']['test_result'];
         if (testResult['success'] == true) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('اتصال موفقیت‌آمیز بود'),
-              backgroundColor: Colors.green,
-            ),
-          );
+          SnackBarHelper.showSuccess(context, message: 'اتصال موفقیت‌آمیز بود');
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('اتصال ناموفق: ${testResult['error']}'),
-              backgroundColor: Colors.red,
-            ),
-          );
+          SnackBarHelper.showError(context, message: 'اتصال ناموفق: ${testResult['error']}');
         }
       } else {
         throw Exception(response.data?['message'] ?? 'خطا در تست اتصال');
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('اتصال ناموفق: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      SnackBarHelper.showError(context, message: 'اتصال ناموفق: $e');
     }
   }
 
@@ -118,12 +103,7 @@ class StorageConfigListWidgetState extends State<StorageConfigListWidget> {
         
         if (!mounted) return;
         if (response.data != null && response.data['success'] == true) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('فایل حذف شد'),
-              backgroundColor: Colors.green,
-            ),
-          );
+          SnackBarHelper.showSuccess(context, message: 'فایل حذف شد');
           
           // Refresh the list
           loadStorageConfigs();
@@ -149,13 +129,7 @@ class StorageConfigListWidgetState extends State<StorageConfigListWidget> {
           errorMessage = e.toString().replaceFirst('Exception: ', '');
         }
         
-        ScaffoldMessenger.of(ctx).showSnackBar(
-          SnackBar(
-            content: Text(errorMessage),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 5),
-          ),
-        );
+        SnackBarHelper.showError(ctx, message: errorMessage);
       }
     }
   }
@@ -168,12 +142,8 @@ class StorageConfigListWidgetState extends State<StorageConfigListWidget> {
       if (!context.mounted) return;
       final ctx = context;
       if (response.data != null && response.data['success'] == true) {
-          ScaffoldMessenger.of(ctx).showSnackBar(
-            SnackBar(
-              content: Text(AppLocalizations.of(ctx).defaultSetSuccessfully),
-              backgroundColor: Colors.green,
-            ),
-          );
+          final t = AppLocalizations.of(ctx);
+          SnackBarHelper.showSuccess(ctx, message: t.defaultSetSuccessfully);
         
         // Refresh the list
         loadStorageConfigs();
@@ -183,12 +153,8 @@ class StorageConfigListWidgetState extends State<StorageConfigListWidget> {
     } catch (e) {
       if (!context.mounted) return;
       final ctx2 = context;
-      ScaffoldMessenger.of(ctx2).showSnackBar(
-        SnackBar(
-          content: Text('${AppLocalizations.of(ctx2).defaultSetFailed}: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      final t2 = AppLocalizations.of(ctx2);
+      SnackBarHelper.showError(ctx2, message: '${t2.defaultSetFailed}: $e');
     }
   }
 
@@ -200,12 +166,7 @@ class StorageConfigListWidgetState extends State<StorageConfigListWidget> {
         onSaved: () {
           loadStorageConfigs();
           // Show success message
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('تنظیمات ذخیره‌سازی به‌روزرسانی شد'),
-              backgroundColor: Colors.green,
-            ),
-          );
+          SnackBarHelper.showSuccess(context, message: 'تنظیمات ذخیره‌سازی به‌روزرسانی شد');
         },
       ),
     );

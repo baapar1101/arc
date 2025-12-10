@@ -293,7 +293,7 @@ class _ExpenseIncomePageState extends State<ExpenseIncomePage> {
       );
       if (!mounted) return;
       Navigator.pop(context); // loading
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('سند با موفقیت ثبت شد'), backgroundColor: Colors.green));
+      SnackBarHelper.showSuccess(context, message: 'سند با موفقیت ثبت شد');
     } catch (e) {
       if (!mounted) return;
       Navigator.pop(context); // loading

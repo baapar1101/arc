@@ -144,20 +144,13 @@ class _AttachedFilesWidgetState extends State<AttachedFilesWidget> {
           );
         } else {
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('دانلود فایل فقط در نسخه وب پشتیبانی می‌شود')),
-            );
+            SnackBarHelper.show(context, message: 'دانلود فایل فقط در نسخه وب پشتیبانی می‌شود');
           }
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('خطا در دانلود فایل: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        SnackBarHelper.showError(context, message: 'خطا در دانلود فایل: $e');
       }
     }
   }
@@ -180,21 +173,11 @@ class _AttachedFilesWidgetState extends State<AttachedFilesWidget> {
         
         widget.onFileDeleted?.call(fileId);
         
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('فایل با موفقیت حذف شد'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        SnackBarHelper.showSuccess(context, message: 'فایل با موفقیت حذف شد');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('خطا در حذف فایل: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        SnackBarHelper.showError(context, message: 'خطا در حذف فایل: $e');
       }
     }
   }

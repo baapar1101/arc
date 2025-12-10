@@ -80,12 +80,7 @@ class _SellerPickerWidgetState extends State<SellerPickerWidget> {
         setState(() {
           _isLoading = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('خطا در دریافت لیست فروشندگان: $e'),
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
-        );
+        SnackBarHelper.showError(context, message: 'خطا در دریافت لیست فروشندگان: $e');
       }
     }
   }
@@ -147,12 +142,7 @@ class _SellerPickerWidgetState extends State<SellerPickerWidget> {
           }
         });
         _setModalState?.call(() {});
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('خطا در جست‌وجو: $e'),
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
-        );
+        SnackBarHelper.showError(context, message: 'خطا در جست‌وجو: $e');
       }
     }
   }

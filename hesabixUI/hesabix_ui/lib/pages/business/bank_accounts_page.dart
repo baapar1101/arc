@@ -353,12 +353,7 @@ class _BankAccountsPageState extends State<BankAccountsPage> {
     try {
       await _bankAccountService.delete(account.id!);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(t.bankAccountDeletedSuccessfully),
-            backgroundColor: Colors.green,
-          ),
-        );
+        SnackBarHelper.showSuccess(context, message: t.bankAccountDeletedSuccessfully);
         // Refresh the table after successful deletion
         try { 
           (_bankAccountsTableKey.currentState as dynamic)?.refresh(); 
@@ -366,12 +361,7 @@ class _BankAccountsPageState extends State<BankAccountsPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('${t.error}: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        SnackBarHelper.showError(context, message: '${t.error}: $e');
       }
     }
   }

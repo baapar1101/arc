@@ -12,6 +12,8 @@ import '../../../controllers/product_form_controller.dart';
 import '../../../config/app_config.dart';
 import '../../../core/auth_store.dart';
 import '../../../utils/image_cache.dart';
+import '../../../utils/snackbar_helper.dart';
+
 
 class ProductBasicInfoSection extends StatefulWidget {
   final int businessId;
@@ -630,9 +632,7 @@ class _ProductBasicInfoSectionState extends State<ProductBasicInfoSection> {
   Future<void> _pickImage(BuildContext context) async {
     if (widget.controller == null) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('خطا: کنترلر فرم در دسترس نیست')),
-        );
+        SnackBarHelper.show(context, message: 'خطا: کنترلر فرم در دسترس نیست');
       }
       return;
     }
@@ -655,9 +655,7 @@ class _ProductBasicInfoSectionState extends State<ProductBasicInfoSection> {
       // بررسی وجود bytes
       if (file.bytes == null || file.bytes!.isEmpty) {
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('خطا: فایل انتخاب شده خالی است')),
-          );
+          SnackBarHelper.show(context, message: 'خطا: فایل انتخاب شده خالی است');
         }
         return;
       }
@@ -669,11 +667,7 @@ class _ProductBasicInfoSectionState extends State<ProductBasicInfoSection> {
       
       if (!hasValidExtension) {
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('فرمت فایل معتبر نیست. لطفاً یک فایل تصویری انتخاب کنید (JPG, PNG, GIF, WebP, BMP)'),
-            ),
-          );
+          SnackBarHelper.show(context, message: 'فرمت فایل معتبر نیست. لطفاً یک فایل تصویری انتخاب کنید (JPG, PNG, GIF, WebP, BMP)');
         }
         return;
       }
@@ -684,22 +678,12 @@ class _ProductBasicInfoSectionState extends State<ProductBasicInfoSection> {
     } on PlatformException catch (e) {
       // خطای خاص پلتفرم (مثلاً دسترسی رد شده)
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('خطا در دسترسی به فایل: ${e.message ?? "خطای نامشخص"}'),
-            backgroundColor: Colors.orange,
-          ),
-        );
+        SnackBarHelper.show(context, message: 'خطا در دسترسی به فایل: ${e.message ?? "خطای نامشخص"}');
       }
     } catch (e) {
       // خطای عمومی
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('خطا در انتخاب فایل: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        SnackBarHelper.showError(context, message: 'خطا در انتخاب فایل: ${e.toString()}');
       }
     }
   }

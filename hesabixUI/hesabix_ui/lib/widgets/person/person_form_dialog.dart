@@ -225,6 +225,17 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
   }
 
   Future<void> _savePerson() async {
+    final t = AppLocalizations.of(context);
+
+    // حداقل یک نوع شخص باید انتخاب شود
+    if (_selectedPersonTypes.isEmpty) {
+      SnackBarHelper.showError(
+        context,
+        message: t.personTypeRequired,
+      );
+      return;
+    }
+
     if (!_formKey.currentState!.validate()) return;
 
     setState(() {

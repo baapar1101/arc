@@ -3,6 +3,8 @@ import '../../../services/repair_shop_service.dart';
 import '../../../models/person_model.dart';
 import '../../../core/api_client.dart';
 import '../../../widgets/invoice/person_combobox_widget.dart';
+import '../../../utils/snackbar_helper.dart';
+
 
 /// صفحه فرم ثبت/ویرایش سفارش تعمیر
 class RepairOrderFormPage extends StatefulWidget {
@@ -64,9 +66,7 @@ class _RepairOrderFormPageState extends State<RepairOrderFormPage> {
     }
 
     if (_selectedCustomer == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('لطفاً مشتری را انتخاب کنید')),
-      );
+      SnackBarHelper.show(context, message: 'لطفاً مشتری را انتخاب کنید');
       return;
     }
 
@@ -88,16 +88,12 @@ class _RepairOrderFormPageState extends State<RepairOrderFormPage> {
       );
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('سفارش تعمیر با موفقیت ثبت شد')),
-        );
+        SnackBarHelper.show(context, message: 'سفارش تعمیر با موفقیت ثبت شد');
         Navigator.of(context).pop(true); // برگشت با موفقیت
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطا در ثبت سفارش: $e')),
-        );
+        SnackBarHelper.show(context, message: 'خطا در ثبت سفارش: $e');
       }
     } finally {
       if (mounted) {

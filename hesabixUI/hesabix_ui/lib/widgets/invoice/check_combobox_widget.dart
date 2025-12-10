@@ -266,9 +266,7 @@ class _CheckComboboxWidgetState extends State<CheckComboboxWidget> {
 
   Future<void> _addNewCheck() async {
     if (widget.authStore == null || widget.calendarController == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('برای افزودن چک جدید، AuthStore و CalendarController مورد نیاز است')),
-      );
+      SnackBarHelper.show(context, message: 'برای افزودن چک جدید، AuthStore و CalendarController مورد نیاز است');
       return;
     }
 
@@ -413,9 +411,7 @@ class _CheckPickerBottomSheet extends StatelessWidget {
               const Spacer(),
               IconButton(
                 onPressed: onAddNew ?? () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('برای افزودن چک جدید، AuthStore و CalendarController مورد نیاز است')),
-                  );
+                  SnackBarHelper.show(context, message: 'برای افزودن چک جدید، AuthStore و CalendarController مورد نیاز است');
                 },
                 icon: const Icon(Icons.add),
                 tooltip: 'افزودن چک جدید',

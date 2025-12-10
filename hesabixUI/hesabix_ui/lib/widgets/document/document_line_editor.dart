@@ -98,9 +98,7 @@ class _DocumentLinesEditorState extends State<DocumentLinesEditor> {
 
   void _removeLine(int index) {
     if (_lines.length <= 2) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('سند باید حداقل 2 سطر داشته باشد')),
-      );
+      SnackBarHelper.show(context, message: 'سند باید حداقل 2 سطر داشته باشد');
       return;
     }
 

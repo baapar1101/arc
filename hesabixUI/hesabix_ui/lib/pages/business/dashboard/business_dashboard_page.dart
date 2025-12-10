@@ -1632,7 +1632,7 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
         items: profile.items,
       );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('چیدمان پیش‌فرض کسب‌وکار منتشر شد')));
+      SnackBarHelper.show(context, message: 'چیدمان پیش‌فرض کسب‌وکار منتشر شد');
     } catch (e) {
       if (!mounted) return;
       SnackBarHelper.showError(context, message: 'خطا در انتشار: $e');

@@ -9,6 +9,7 @@ from adapters.db.session import get_db
 from app.core.auth_dependency import get_current_user, AuthContext
 from app.core.permissions import require_business_access, require_business_permission_dep, require_business_permission_by_entity_dep
 from app.core.responses import success_response, ApiError, format_datetime_fields
+from app.core.cache import get_cache
 from adapters.api.v1.schemas import QueryInfo
 from adapters.api.v1.schema_models.product import (
     ProductCreateRequest,
@@ -95,10 +96,34 @@ def search_products_endpoint(
 ) -> Dict[str, Any]:
 	import logging
 	from app.core.responses import ApiError
-	from sqlalchemy.exc import SQLAlchemyError
+	from sqlalchemy.exc import SQLAlchemyError, OperationalError, TimeoutError as SQLTimeoutError
 	
 	logger = logging.getLogger(__name__)
 	
+	# کش نتایج جستجوی محصولات بر اساس پارامترها
+	cache = get_cache()
+	cache_key = None
+
+	if cache.enabled:
+		import json, hashlib
+		key_payload = {
+			"business_id": business_id,
+			"take": query_info.take,
+			"skip": query_info.skip,
+			"sort_by": query_info.sort_by,
+			"sort_desc": query_info.sort_desc,
+			"search": query_info.search,
+			"filters": query_info.filters,
+			"include_inventory": query_info.include_inventory,
+			"inventory_as_of_date": query_info.inventory_as_of_date,
+		}
+		key_str = json.dumps(key_payload, sort_keys=True, ensure_ascii=False)
+		key_hash = hashlib.sha256(key_str.encode("utf-8")).hexdigest()[:16]
+		cache_key = f"products_search:{business_id}:{ctx.get_user_id()}:{key_hash}"
+		cached = cache.get(cache_key)
+		if cached is not None:
+			return success_response(data=cached, request=request)
+
 	try:
 		result = list_products(db, business_id, {
 			"take": query_info.take,
@@ -110,7 +135,33 @@ def search_products_endpoint(
 			"include_inventory": query_info.include_inventory,
 			"inventory_as_of_date": query_info.inventory_as_of_date,
 		})
-		return success_response(data=format_datetime_fields(result, request), request=request)
+		formatted = format_datetime_fields(result, request)
+
+		if cache.enabled and cache_key:
+			# چون موجودی و قیمت ممکن است سریع تغییر کند، TTL کوتاه
+			cache.set(cache_key, formatted, ttl=30)
+
+		return success_response(data=formatted, request=request)
+	except (OperationalError, SQLTimeoutError) as e:
+		# Timeout یا خطای اتصال - rollback و بستن session
+		logger.error(
+			f"Database timeout/connection error in search_products for business_id={business_id}: {str(e)}",
+			exc_info=True,
+			extra={
+				"business_id": business_id,
+				"user_id": ctx.get_user_id() if ctx else None,
+				"path": request.url.path,
+			}
+		)
+		try:
+			db.rollback()
+		except Exception:
+			pass
+		raise ApiError(
+			"DATABASE_TIMEOUT",
+			"زمان اجرای درخواست به پایان رسید. لطفاً فیلترهای جستجو را محدودتر کنید یا بعداً تلاش کنید.",
+			http_status=504
+		)
 	except SQLAlchemyError as e:
 		logger.error(
 			f"Database error in search_products for business_id={business_id}",
@@ -126,7 +177,10 @@ def search_products_endpoint(
 				}
 			}
 		)
-		db.rollback()
+		try:
+			db.rollback()
+		except Exception:
+			pass
 		raise ApiError(
 			"DATABASE_ERROR",
 			"خطا در ارتباط با پایگاه داده. لطفاً بعداً تلاش کنید.",
@@ -142,6 +196,10 @@ def search_products_endpoint(
 				"path": request.url.path,
 			}
 		)
+		try:
+			db.rollback()
+		except Exception:
+			pass
 		raise ApiError(
 			"INTERNAL_SERVER_ERROR",
 			"خطای داخلی سرور رخ داد. لطفاً با پشتیبانی تماس بگیرید.",

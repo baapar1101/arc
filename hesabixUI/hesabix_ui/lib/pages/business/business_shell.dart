@@ -69,6 +69,8 @@ class _BusinessShellState extends State<BusinessShell> {
   NotificationsWsClient? _ws;
   List<Map<String, dynamic>> _businessPlugins = [];
   bool _pluginsLoaded = false;
+  bool _isBusinessLoading = false;
+  String? _businessLoadError;
 
   @override
   void initState() {
@@ -202,23 +204,35 @@ class _BusinessShellState extends State<BusinessShell> {
     }
 
   Future<void> _loadBusinessInfo() async {
-    
     if (widget.authStore.currentBusiness?.id == widget.businessId) {
       return; // اطلاعات قبلاً بارگذاری شده
     }
 
+    if (mounted) {
+      setState(() {
+        _isBusinessLoading = true;
+        _businessLoadError = null;
+      });
+    }
+
     try {
       final businessData = await _businessService.getBusinessWithPermissions(widget.businessId);
-      
       await widget.authStore.setCurrentBusiness(businessData);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(Navigator.of(context, rootNavigator: true).context).showSnackBar(
-          SnackBar(
-            content: Text('خطا در بارگذاری اطلاعات کسب و کار: $e'),
-            backgroundColor: Colors.red,
-          ),
+        setState(() {
+          _businessLoadError = e.toString();
+        });
+        SnackBarHelper.showError(
+          context,
+          message: 'خطا در بارگذاری اطلاعات کسب و کار: $e',
         );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isBusinessLoading = false;
+        });
       }
     }
   }
@@ -272,6 +286,80 @@ class _BusinessShellState extends State<BusinessShell> {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
+    final currentBusiness = widget.authStore.currentBusiness;
+    final bool isCorrectBusiness = currentBusiness != null && currentBusiness.id == widget.businessId;
+    final bool hasPermissions = widget.authStore.businessPermissions != null;
+
+    // اگر در بارگذاری اطلاعات کسب‌وکار خطا داشتیم و هنوز کسب‌وکار فعلی با این صفحه هم‌خوان نیست،
+    // به‌جای نمایش پیام «دسترسی ندارید»، یک صفحه خطای شفاف نمایش می‌دهیم.
+    if (_businessLoadError != null && !isCorrectBusiness) {
+      return Scaffold(
+        appBar: AppBar(
+          title: Text(t.businessDashboard),
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.error_outline,
+                  size: 64,
+                  color: Colors.redAccent,
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  'خطا در بارگذاری اطلاعات کسب و کار یا دسترسی‌ها.',
+                  style: Theme.of(context).textTheme.titleMedium,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  _businessLoadError ?? '',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton.icon(
+                  onPressed: () {
+                    _loadBusinessInfo();
+                  },
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('تلاش مجدد برای بارگذاری'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    // تا زمانی که اطلاعات کسب‌وکار و دسترسی‌ها به‌طور کامل بارگذاری نشده‌اند،
+    // صفحه اصلی را با یک لودر ساده نمایش می‌دهیم تا پیام «عدم دسترسی» به‌صورت موقت دیده نشود.
+    if (_isBusinessLoading || !isCorrectBusiness || !hasPermissions) {
+      return Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const CircularProgressIndicator(),
+              const SizedBox(height: 16),
+              Text(
+                'در حال بارگذاری اطلاعات کسب و کار و دسترسی‌ها...',
+                style: Theme.of(context).textTheme.bodyMedium,
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     final width = MediaQuery.of(context).size.width;
     final bool useRail = width >= 700;
     final bool railExtended = width >= 1100;
@@ -287,7 +375,6 @@ class _BusinessShellState extends State<BusinessShell> {
         ? 'assets/images/logo-light.png'
         : 'assets/images/logo-light.png';
 
-    final t = AppLocalizations.of(context);
     final workflowLabel = _workflowMenuLabel(t);
     
     // ساختار متمرکز منو
@@ -753,23 +840,22 @@ class _BusinessShellState extends State<BusinessShell> {
     Future<void> onLogout() async {
       await widget.authStore.saveApiKey(null);
       if (!context.mounted) return;
-      ScaffoldMessenger.of(Navigator.of(context, rootNavigator: true).context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text(t.logoutDone)));
+      // از SnackBarHelper برای نمایش پیام خروج استفاده می‌کنیم تا روی همه لایه‌ها نمایش داده شود
+      SnackBarHelper.showSuccess(
+        context,
+        message: t.logoutDone,
+      );
       context.go('/login');
     }
 
     Future<void> showAddPersonDialog() async {
-      final result = await showDialog<bool>(
+      // نتیجه دیالوگ در اینجا استفاده نمی‌شود؛ نوع generic لازم نیست.
+      await showDialog(
         context: context,
         builder: (context) => PersonFormDialog(
           businessId: widget.businessId,
         ),
       );
-      if (result == true) {
-        // Refresh the persons page if it's currently open
-        // This will be handled by the PersonsPage itself
-      }
     }
 
     void _refreshProductsPageIfOpen() {
@@ -1611,8 +1697,9 @@ class _BusinessShellState extends State<BusinessShell> {
       final initialLines = _extractLinesFromInvoice(invoiceItem, wizardResult.docType ?? 'issue');
       
       if (initialLines.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('هیچ کالایی برای این فاکتور ثبت نشده است')),
+        SnackBarHelper.showInfo(
+          context,
+          message: 'هیچ کالایی برای این فاکتور ثبت نشده است',
         );
         return;
       }
@@ -1639,8 +1726,9 @@ class _BusinessShellState extends State<BusinessShell> {
     } catch (e) {
       dismissLoader();
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('خطا در دریافت فاکتور: $e')),
+      SnackBarHelper.showError(
+        context,
+        message: 'خطا در دریافت فاکتور: $e',
       );
     } finally {
       dismissLoader();
@@ -1794,6 +1882,7 @@ class _BusinessShellState extends State<BusinessShell> {
     if (label == t.expenseAndIncome) return 'expenses_income';
     if (label == t.transfers) return 'transfers';
     if (label == t.documents) return 'accounting_documents';
+    if (label == t.yearEndClosing) return 'fiscal_years';
     if (label == t.chartOfAccounts) return 'chart_of_accounts';
     if (label == t.openingBalance) return 'opening_balance';
     if (label == t.reports) return 'reports';
@@ -1864,13 +1953,12 @@ class _BusinessShellState extends State<BusinessShell> {
                   _unreadCount = (_unreadCount + 1).clamp(0, 99);
                 });
                 if (mounted) {
-                  // استفاده از rootNavigator برای نمایش پیام روی دیالوگ‌ها
-                  ScaffoldMessenger.of(Navigator.of(context, rootNavigator: true).context)
-                    ..hideCurrentSnackBar()
-                    ..showSnackBar(SnackBar(
-                      content: Text('$title: $body'),
-                      duration: const Duration(seconds: 4),
-                    ));
+                  // استفاده از SnackBarHelper برای نمایش پیام نوتیفیکیشن روی تمام لایه‌ها
+                  SnackBarHelper.show(
+                    context,
+                    message: '$title: $body',
+                    duration: const Duration(seconds: 4),
+                  );
                 }
               }
             } catch (_) {

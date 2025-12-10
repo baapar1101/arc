@@ -19,7 +19,8 @@
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="description" content="Hesabix - سیستم مدیریت مالی">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- viewport-fit=cover برای مدیریت بهتر فضای پایین صفحه روی موبایل (خصوصاً iOS) -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
@@ -99,16 +100,38 @@
       50% { opacity: 0.8; transform: scale(0.95); }
     }
     
-    /* برای جلوگیری از flash محتوا */
-    body {
+    /* تنظیم پایه‌ای ارتفاع صفحه برای هماهنگی بهتر با موبایل */
+    html, body {
       margin: 0;
       padding: 0;
+      height: 100%;
+    }
+
+    /* برای جلوگیری از flash محتوا و کنترل اسکرول اولیه */
+    body {
       overflow: hidden;
+      /* در صورت بروز فضای سفید، حداقل پس‌زمینه یکدست داشته باشیم */
+      background-color: #ffffff;
+      /* استفاده از height پویا بر اساس متغیر محاسبه‌شده برای موبایل */
+      min-height: var(--app-height, 100vh);
     }
     
-    /* وقتی Flutter لود شد، body را visible می‌کنیم */
+    /* وقتی Flutter لود شد، body را دوباره قابل اسکرول می‌کنیم */
     body.flutter-ready {
       overflow: auto;
+    }
+
+    /* اطمینان از اینکه ریشه‌ی Flutter تمام ارتفاع در دسترس را پوشش می‌دهد */
+    flt-glass-pane, flt-scene-host {
+      width: 100% !important;
+      height: 100% !important;
+    }
+
+    /* در مرورگرهای مدرن، از 100dvh که با کیبورد سازگارتر است استفاده می‌کنیم */
+    @supports (height: 100dvh) {
+      body {
+        min-height: 100dvh;
+      }
     }
   </style>
   
@@ -134,6 +157,33 @@
   </div>
   
   <script>
+    // همگام‌سازی ارتفاع صفحه با visual viewport برای جلوگیری از فضای سفید زیرین هنگام نمایش کیبورد
+    (function() {
+      function updateAppHeight() {
+        try {
+          var height;
+          if (window.visualViewport && window.visualViewport.height) {
+            height = window.visualViewport.height;
+          } else {
+            height = window.innerHeight || document.documentElement.clientHeight;
+          }
+          document.documentElement.style.setProperty('--app-height', height + 'px');
+        } catch (e) {
+          // در صورت بروز خطا، تغییری اعمال نکنیم تا رفتار پیش‌فرض حفظ شود
+          console.warn('[Hesabix] Failed to update app height', e);
+        }
+      }
+
+      // اجرای اولیه
+      window.addEventListener('load', updateAppHeight);
+      // تغییر اندازه (چرخش، باز و بسته شدن کیبورد و غیره)
+      window.addEventListener('resize', updateAppHeight);
+      if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', updateAppHeight);
+        window.visualViewport.addEventListener('scroll', updateAppHeight);
+      }
+    })();
+
     // پنهان کردن loading screen وقتی Flutter آماده شد
     function hideLoadingScreen() {
       const loadingScreen = document.getElementById('flutter-loading-screen');
@@ -204,6 +254,143 @@
       configurable: true
     });
   </script>
+
+  <!-- App update notification & auto-reload when a new Service Worker version is available -->
+  <script>
+    (function() {
+      if (!('serviceWorker' in navigator)) {
+        return;
+      }
+
+      var UPDATE_BANNER_ID = 'flutter-update-banner';
+      var hasReloadedForUpdate = false;
+
+      function createUpdateBanner() {
+        if (document.getElementById(UPDATE_BANNER_ID)) {
+          return;
+        }
+
+        var banner = document.createElement('div');
+        banner.id = UPDATE_BANNER_ID;
+        banner.style.position = 'fixed';
+        banner.style.bottom = '16px';
+        banner.style.left = '50%';
+        banner.style.transform = 'translateX(-50%)';
+        banner.style.background = '#0175C2';
+        banner.style.color = '#ffffff';
+        banner.style.padding = '10px 16px';
+        banner.style.borderRadius = '999px';
+        banner.style.boxShadow = '0 8px 24px rgba(0, 0, 0, 0.25)';
+        banner.style.zIndex = '10000';
+        banner.style.display = 'flex';
+        banner.style.alignItems = 'center';
+        banner.style.gap = '10px';
+        banner.style.fontFamily = "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif";
+        banner.style.fontSize = '14px';
+        banner.style.direction = 'rtl';
+
+        var text = document.createElement('span');
+        text.textContent = 'نسخه جدید حسابیکس آماده استفاده است.';
+
+        var refreshBtn = document.createElement('button');
+        refreshBtn.textContent = 'به\u200cروزرسانی';
+        refreshBtn.style.background = '#ffffff';
+        refreshBtn.style.color = '#0175C2';
+        refreshBtn.style.border = 'none';
+        refreshBtn.style.borderRadius = '999px';
+        refreshBtn.style.padding = '6px 14px';
+        refreshBtn.style.cursor = 'pointer';
+        refreshBtn.style.fontWeight = '600';
+        refreshBtn.style.fontSize = '13px';
+
+        var laterBtn = document.createElement('button');
+        laterBtn.textContent = 'بعداً';
+        laterBtn.style.background = 'transparent';
+        laterBtn.style.color = '#ffffff';
+        laterBtn.style.border = 'none';
+        laterBtn.style.cursor = 'pointer';
+        laterBtn.style.fontSize = '13px';
+        laterBtn.style.opacity = '0.9';
+
+        refreshBtn.addEventListener('click', function() {
+          try {
+            document.body.removeChild(banner);
+          } catch (e) {}
+          requestAppUpdate();
+        });
+
+        laterBtn.addEventListener('click', function() {
+          try {
+            document.body.removeChild(banner);
+          } catch (e) {}
+        });
+
+        banner.appendChild(text);
+        banner.appendChild(refreshBtn);
+        banner.appendChild(laterBtn);
+        document.body.appendChild(banner);
+      }
+
+      function requestAppUpdate() {
+        navigator.serviceWorker.getRegistration().then(function(reg) {
+          if (reg && reg.waiting) {
+            // به Service Worker می‌گوییم فوراً نسخه جدید را فعال کند
+            reg.waiting.postMessage('skipWaiting');
+          } else {
+            // اگر به هر دلیل waiting نداریم، fallback به reload ساده
+            window.location.reload();
+          }
+        }).catch(function() {
+          window.location.reload();
+        });
+      }
+
+      function setupUpdateFlow() {
+        // وقتی Service Worker کنترل صفحه را عوض کرد، یک بار صفحه را ریفرش کن
+        navigator.serviceWorker.addEventListener('controllerchange', function() {
+          if (hasReloadedForUpdate) return;
+          hasReloadedForUpdate = true;
+          window.location.reload();
+        });
+
+        navigator.serviceWorker.ready
+          .then(function(reg) {
+            if (!reg) return;
+
+            function handleWaiting(worker) {
+              if (!worker) return;
+              // اگر صفحه فعلی از قبل توسط یک SW کنترل می‌شود، یعنی نسخه جدید نسبت به نسخه فعلی است
+              if (navigator.serviceWorker.controller) {
+                createUpdateBanner();
+              }
+            }
+
+            // اگر از قبل یک SW در حالت waiting داریم (مثلاً کاربر بعد از دیپلوی برگشته)
+            if (reg.waiting) {
+              handleWaiting(reg.waiting);
+            }
+
+            // وقتی نسخه جدید Service Worker پیدا شد
+            reg.addEventListener('updatefound', function() {
+              var newWorker = reg.installing;
+              if (!newWorker) return;
+
+              newWorker.addEventListener('statechange', function() {
+                if (newWorker.state === 'installed') {
+                  handleWaiting(reg.waiting || newWorker);
+                }
+              });
+            });
+          })
+          .catch(function() {
+            // مشکلی در SW نباید باعث ارور مرئی در UI شود
+          });
+      }
+
+      window.addEventListener('load', setupUpdateFlow);
+    })();
+  </script>
+
   <script src="flutter_bootstrap.js" defer></script>
 </body>
 </html>

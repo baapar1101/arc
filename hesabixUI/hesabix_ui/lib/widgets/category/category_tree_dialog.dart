@@ -6,6 +6,8 @@ import '../../core/api_client.dart';
 import '../../core/auth_store.dart';
 import '../../utils/number_formatters.dart';
 import 'category_picker_field.dart';
+import '../../utils/snackbar_helper.dart';
+
 
 class CategoryTreeDialog extends StatefulWidget {
   final int businessId;
@@ -817,12 +819,7 @@ class _CategoryTreeDialogState extends State<CategoryTreeDialog> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(t.operationFailed),
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
-        );
+        SnackBarHelper.showError(context, message: t.operationFailed);
       }
     }
   }

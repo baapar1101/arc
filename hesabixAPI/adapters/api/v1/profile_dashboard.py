@@ -13,6 +13,7 @@ from app.services.profile_dashboard_widgets_service import (
     save_profile_dashboard_layout_profile,
     get_profile_widgets_batch_data,
 )
+from app.core.cache import get_cache
 
 router = APIRouter(prefix="/profile", tags=["profile-dashboard"])
 
@@ -27,7 +28,20 @@ def list_profile_dashboard_widget_definitions(
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> dict:
+    cache = get_cache()
+    cache_key = None
+
+    if cache.enabled:
+        cache_key = f"profile_widgets_definitions:{ctx.get_user_id()}"
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return success_response(cached, request)
+
     data = get_profile_widget_definitions(db=db, user_id=ctx.get_user_id())
+
+    if cache.enabled and cache_key:
+        cache.set(cache_key, data, ttl=300)
+
     return success_response(data, request)
 
 
@@ -42,11 +56,24 @@ def get_profile_dashboard_layout(
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> dict:
+    cache = get_cache()
+    cache_key = None
+
+    if cache.enabled:
+        cache_key = f"profile_dashboard_layout:{ctx.get_user_id()}:{breakpoint}"
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return success_response(cached, request)
+
     profile = get_profile_dashboard_layout_profile(
         db=db,
         user_id=ctx.get_user_id(),
         breakpoint=breakpoint,
     )
+
+    if cache.enabled and cache_key:
+        cache.set(cache_key, profile, ttl=300)
+
     return success_response(profile, request)
 
 
@@ -69,6 +96,13 @@ def put_profile_dashboard_layout(
         breakpoint=breakpoint,
         items=items,
     )
+
+    # Invalidate cache برای layout پروفایل کاربر
+    cache = get_cache()
+    if cache.enabled:
+        cache_key = f"profile_dashboard_layout:{ctx.get_user_id()}:{breakpoint}"
+        cache.delete(cache_key)
+
     return success_response(result, request)
 
 
@@ -85,6 +119,20 @@ def post_profile_dashboard_widgets_data(
 ) -> dict:
     widget_keys = payload.get("widget_keys") or []
     filters = payload.get("filters") or {}
+
+    cache = get_cache()
+    cache_key = None
+
+    if cache.enabled:
+        import json, hashlib
+        widgets_part = ",".join(sorted(str(k) for k in widget_keys))
+        filters_json = json.dumps(filters, sort_keys=True, ensure_ascii=False)
+        filters_hash = hashlib.sha256(filters_json.encode("utf-8")).hexdigest()[:16]
+        cache_key = f"profile_dashboard_data:{ctx.get_user_id()}:{widgets_part}:{filters_hash}"
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return success_response(cached, request)
+
     data = get_profile_widgets_batch_data(
         db=db,
         user_id=ctx.get_user_id(),
@@ -92,5 +140,9 @@ def post_profile_dashboard_widgets_data(
         filters=filters,
     )
     formatted = format_datetime_fields(data, request)
+
+    if cache.enabled and cache_key:
+        cache.set(cache_key, formatted, ttl=30)
+
     return success_response(formatted, request)
 

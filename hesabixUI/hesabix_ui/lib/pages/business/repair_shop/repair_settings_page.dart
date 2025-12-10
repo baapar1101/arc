@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../../../services/repair_shop_service.dart';
 import '../../../models/repair_settings_model.dart';
 import '../../../core/api_client.dart';
+import '../../../utils/snackbar_helper.dart';
+
 
 /// صفحه تنظیمات تعمیرگاه
 class RepairSettingsPage extends StatefulWidget {
@@ -94,16 +96,12 @@ class _RepairSettingsPageState extends State<RepairSettingsPage> {
       );
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('تنظیمات با موفقیت ذخیره شد')),
-        );
+        SnackBarHelper.show(context, message: 'تنظیمات با موفقیت ذخیره شد');
         _loadSettings();
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطا در ذخیره تنظیمات: $e')),
-        );
+        SnackBarHelper.show(context, message: 'خطا در ذخیره تنظیمات: $e');
       }
     } finally {
       if (mounted) {

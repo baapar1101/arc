@@ -8,6 +8,7 @@ from adapters.db.session import get_db
 from app.core.auth_dependency import get_current_user, AuthContext
 from app.core.responses import success_response, ApiError
 from app.services.announcement_service import user_list, mark_read, dismiss
+from app.core.cache import get_cache
 
 router = APIRouter(prefix="/announcements", tags=["announcements"])
 
@@ -23,7 +24,32 @@ def list_announcements_endpoint(
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
 ) -> Dict[str, Any]:
+	cache = get_cache()
+	cache_key = None
+
+	if cache.enabled:
+		import json, hashlib
+		key_payload = {
+			"user_id": ctx.get_user_id(),
+			"page": page,
+			"limit": limit,
+			"level": level,
+			"only_unread": only_unread,
+			"locale": locale,
+		}
+		key_str = json.dumps(key_payload, sort_keys=True, ensure_ascii=False)
+		key_hash = hashlib.sha256(key_str.encode("utf-8")).hexdigest()[:16]
+		cache_key = f"announcements:{key_hash}"
+		cached = cache.get(cache_key)
+		if cached is not None:
+			return success_response(cached, request)
+
 	data = user_list(db, ctx.get_user_id(), page=page, limit=limit, level=level, only_unread=only_unread, locale=locale)
+
+	if cache.enabled and cache_key:
+		# وضعیت خوانده‌بودن ممکن است سریع تغییر کند → TTL کوتاه
+		cache.set(cache_key, data, ttl=30)
+
 	return success_response(data, request)
 
 

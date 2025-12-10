@@ -705,12 +705,7 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
     // بررسی کارپوشه مودیان
     if (deleteInfo['is_in_tax_workspace'] == true) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(t.deleteInvoiceTaxWorkspaceError),
-          backgroundColor: Colors.red,
-        ),
-      );
+      SnackBarHelper.showError(context, message: t.deleteInvoiceTaxWorkspaceError);
       return;
     }
     
@@ -906,12 +901,7 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
       if (!mounted) return;
 
       if (success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(t.deletedInvoiceSuccess(item.code)),
-            backgroundColor: Colors.green,
-          ),
-        );
+        SnackBarHelper.showSuccess(context, message: t.deletedInvoiceSuccess(item.code));
         _refreshData();
       } else {
         throw Exception(t.deleteInvoiceError);
@@ -932,12 +922,7 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
     // فقط برای فاکتورهای فروش و برگشت از فروش و غیر پیش‌نویس
     final isSalesOrReturn = item.documentType == 'invoice_sales' || item.documentType == 'invoice_sales_return';
     if (!isSalesOrReturn || item.isProforma) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(t.taxAddToWorkspaceNotAllowed),
-          backgroundColor: Colors.orange,
-        ),
-      );
+      SnackBarHelper.showWarning(context, message: t.taxAddToWorkspaceNotAllowed);
       return;
     }
 
@@ -983,12 +968,7 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
       if (!mounted) return;
 
       if (success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(t.taxAddToWorkspaceSuccess(item.code)),
-            backgroundColor: Colors.green,
-          ),
-        );
+        SnackBarHelper.showSuccess(context, message: t.taxAddToWorkspaceSuccess(item.code));
         _refreshData();
       } else {
         throw Exception(t.taxAddToWorkspaceError);
@@ -1047,12 +1027,7 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
       if (!mounted) return;
 
       if (success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(t.taxRemoveFromWorkspaceSuccess),
-            backgroundColor: Colors.green,
-          ),
-        );
+        SnackBarHelper.showSuccess(context, message: t.taxRemoveFromWorkspaceSuccess);
         _refreshData();
       } else {
         throw Exception(t.taxRemoveFromWorkspaceError);

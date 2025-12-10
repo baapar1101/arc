@@ -8,6 +8,8 @@ import 'package:dio/dio.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/services/backup_service.dart';
 import 'package:hesabix_ui/services/errors/api_error.dart';
+import '../../../utils/snackbar_helper.dart';
+
 
 enum _RestoreSource { stored, file }
 
@@ -263,10 +265,7 @@ class _BusinessRestorePageState extends State<BusinessRestorePage> {
 
   void _showSnackBar(String message) {
     if (!mounted) return;
-    final messenger = ScaffoldMessenger.of(context);
-    messenger
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(message)));
+    SnackBarHelper.show(context, message: message);
   }
 
   Widget _buildBody(AppLocalizations t) {

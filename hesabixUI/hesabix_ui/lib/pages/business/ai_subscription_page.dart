@@ -58,9 +58,7 @@ class _AISubscriptionPageState extends State<AISubscriptionPage> {
         _isRefreshing = false;
       });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطا: $e')),
-        );
+        SnackBarHelper.show(context, message: 'خطا: $e');
       }
     }
   }
@@ -72,16 +70,12 @@ class _AISubscriptionPageState extends State<AISubscriptionPage> {
         businessId: widget.businessId,
       );
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('اشتراک با موفقیت فعال شد')),
-        );
+        SnackBarHelper.show(context, message: 'اشتراک با موفقیت فعال شد');
         _load();
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطا: $e')),
-        );
+        SnackBarHelper.show(context, message: 'خطا: $e');
       }
     }
   }
@@ -93,16 +87,12 @@ class _AISubscriptionPageState extends State<AISubscriptionPage> {
         businessId: widget.businessId,
       );
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('اشتراک با موفقیت ارتقا یافت')),
-        );
+        SnackBarHelper.show(context, message: 'اشتراک با موفقیت ارتقا یافت');
         _load();
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطا: $e')),
-        );
+        SnackBarHelper.show(context, message: 'خطا: $e');
       }
     }
   }
@@ -129,16 +119,12 @@ class _AISubscriptionPageState extends State<AISubscriptionPage> {
       try {
         await _aiService.cancelSubscription(businessId: widget.businessId);
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('اشتراک لغو شد')),
-          );
+          SnackBarHelper.show(context, message: 'اشتراک لغو شد');
           _load();
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('خطا: $e')),
-          );
+          SnackBarHelper.show(context, message: 'خطا: $e');
         }
       }
     }

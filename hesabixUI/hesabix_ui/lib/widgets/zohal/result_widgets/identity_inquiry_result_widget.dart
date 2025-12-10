@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../../zohal_result_widget.dart';
+import '../../zohal_result_widget.dart';import '../utils/snackbar_helper.dart';
+
 
 /// ویجت نمایش نتیجه برای استعلام اطلاعات هویتی
 class IdentityInquiryResultWidget extends ZohalResultWidget {
@@ -340,13 +341,7 @@ class IdentityInquiryResultWidget extends ZohalResultWidget {
 
   void _copyToClipboard(BuildContext context, String text) {
     Clipboard.setData(ClipboardData(text: text));
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('کپی شد: $text'),
-        duration: const Duration(seconds: 2),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+    SnackBarHelper.show(context, message: 'کپی شد: $text');
   }
 }
 

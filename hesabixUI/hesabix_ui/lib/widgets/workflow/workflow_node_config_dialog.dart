@@ -4,6 +4,8 @@ import '../../models/workflow_editor_state.dart';
 import '../../l10n/app_localizations.dart';
 import '../../services/workflow_service.dart';
 import '../../services/workflow_translation_service.dart';
+import '../../utils/snackbar_helper.dart';
+
 
 /// Dialog برای تنظیمات یک node
 class WorkflowNodeConfigDialog extends StatefulWidget {
@@ -784,9 +786,7 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
   /// نمایش Reference Selector
   void _showReferenceSelector(String fieldKey) {
     if (widget.allNodes == null || widget.allNodes!.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('هیچ نودی برای انتخاب وجود ندارد')),
-      );
+      SnackBarHelper.show(context, message: 'هیچ نودی برای انتخاب وجود ندارد');
       return;
     }
 

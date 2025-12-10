@@ -28,7 +28,7 @@ class Settings(BaseSettings):
 	db_pool_size: int = 50  # افزایش از 20 - اتصالات پایه در Pool
 	db_max_overflow: int = 50  # افزایش از 30 - اتصالات اضافی در صورت نیاز
 	db_pool_timeout: int = 30  # افزایش از 10 - timeout بیشتر برای Pool
-	db_pool_recycle: int = 600  # Recycle اتصالات هر 10 دقیقه - کاهش برای جلوگیری از connection leak و بهبود performance
+	db_pool_recycle: int = 300  # Recycle اتصالات هر 5 دقیقه - کاهش برای جلوگیری از connection leak و بهبود performance
 
 	# Logging
 	log_level: str = "INFO"
@@ -95,7 +95,7 @@ class Settings(BaseSettings):
 	default_page_size: int = 20  # اندازه پیش‌فرض صفحه
 	
 	# Query Timeout
-	query_timeout_seconds: int = 30  # Timeout برای query های طولانی
+	query_timeout_seconds: int = 60  # Timeout برای query های طولانی (60 ثانیه)
 
 	@property
 	def mysql_dsn(self) -> str:

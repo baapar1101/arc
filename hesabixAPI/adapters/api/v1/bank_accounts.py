@@ -21,6 +21,7 @@ from app.services.bank_account_service import (
     bulk_delete_bank_accounts,
     get_bank_accounts_turnover_report,
 )
+from app.core.cache import get_cache
 
 router = APIRouter(prefix="/bank-accounts", tags=["مدیریت مالی"])
 
@@ -47,8 +48,30 @@ async def list_bank_accounts_endpoint(
         "search_fields": query_info.search_fields,
         "filters": query_info.filters,
     }
+
+    # کش لیست حساب‌های بانکی
+    cache = get_cache()
+    cache_key = None
+
+    if cache.enabled:
+        import json, hashlib
+        key_payload = {
+            "business_id": business_id,
+            "query": query_dict,
+        }
+        key_str = json.dumps(key_payload, sort_keys=True, ensure_ascii=False)
+        key_hash = hashlib.sha256(key_str.encode("utf-8")).hexdigest()[:16]
+        cache_key = f"bank_accounts_list:{key_hash}"
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return success_response(data=cached, request=request, message="BANK_ACCOUNTS_LIST_FETCHED")
+
     result = list_bank_accounts(db, business_id, query_dict)
     result["items"] = [format_datetime_fields(item, request) for item in result.get("items", [])]
+
+    if cache.enabled and cache_key:
+        cache.set(cache_key, result, ttl=60)
+
     return success_response(data=result, request=request, message="BANK_ACCOUNTS_LIST_FETCHED")
 
 

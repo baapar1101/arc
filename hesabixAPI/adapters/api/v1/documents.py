@@ -12,6 +12,8 @@ from adapters.db.models.document import Document
 from app.core.auth_dependency import get_current_user, AuthContext
 from app.core.permissions import require_business_access, require_business_management_dep, require_business_permission_dep, require_business_permission_by_entity_dep
 from app.core.responses import success_response, format_datetime_fields, ApiError
+from app.core.cache import get_cache
+from app.core.response_cache import cache_response
 from app.services.document_service import (
     list_documents,
     get_document,
@@ -28,6 +30,7 @@ from app.services.general_ledger_service import get_general_ledger_report
 from app.services.pnl_service import get_pnl_period_report, get_pnl_cumulative_report
 from app.services.account_review_service import get_accounts_review_report
 from app.services.journal_ledger_service import get_journal_ledger_report
+from app.core.cache import get_cache
 from app.core.i18n import negotiate_locale
 from app.services.pdf.template_renderer import render_template
 from adapters.api.v1.schema_models.document import (
@@ -91,12 +94,36 @@ async def list_documents_endpoint(
     except Exception:
         pass
 
+    # کش نتایج لیست اسناد بر اساس پارامترها
+    cache = get_cache()
+    cache_key = None
+
+    if cache.enabled:
+        import json, hashlib
+        key_payload = {
+            "business_id": business_id,
+            "query": query_dict,
+        }
+        key_str = json.dumps(key_payload, sort_keys=True, ensure_ascii=False)
+        key_hash = hashlib.sha256(key_str.encode("utf-8")).hexdigest()[:16]
+        cache_key = f"documents_list:{key_hash}"
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return success_response(
+                data=cached,
+                request=request,
+                message="DOCUMENTS_LIST_FETCHED"
+            )
+
     result = list_documents(db, business_id, query_dict)
     
     # فرمت کردن تاریخ‌ها
     result["items"] = [
         format_datetime_fields(item, request) for item in result.get("items", [])
     ]
+
+    if cache.enabled and cache_key:
+        cache.set(cache_key, result, ttl=60)
     
     return success_response(
         data=result,
@@ -2687,7 +2714,36 @@ async def journal_ledger_report_endpoint(
     except (ValueError, TypeError):
         skip = 0
         take = 50
-    
+
+    # کش نتایج گزارش دفتر روزنامه
+    cache = get_cache()
+    cache_key = None
+
+    if cache.enabled:
+        import json, hashlib
+        key_payload = {
+            "business_id": business_id,
+            "fiscal_year_id": fiscal_year_id,
+            "currency_id": currency_id,
+            "date_from": date_from,
+            "date_to": date_to,
+            "document_type": document_type,
+            "include_proforma": include_proforma,
+            "skip": skip,
+            "take": take,
+        }
+        key_str = json.dumps(key_payload, sort_keys=True, ensure_ascii=False)
+        key_hash = hashlib.sha256(key_str.encode("utf-8")).hexdigest()[:16]
+        cache_key = f"journal_ledger:{key_hash}"
+        cached = cache.get(cache_key)
+        if cached is not None:
+            locale = negotiate_locale(request.headers.get("Accept-Language"))
+            return success_response(
+                data=cached,
+                message="Journal ledger report retrieved successfully" if locale != 'fa' else "گزارش دفتر روزنامه با موفقیت دریافت شد",
+                request=request
+            )
+
     result = get_journal_ledger_report(
         db=db,
         business_id=business_id,
@@ -2705,6 +2761,9 @@ async def journal_ledger_report_endpoint(
     items = [format_datetime_fields(item, request) for item in items]
     
     result['items'] = items
+
+    if cache.enabled and cache_key:
+        cache.set(cache_key, result, ttl=60)
     
     locale = negotiate_locale(request.headers.get("Accept-Language"))
     return success_response(

@@ -24,7 +24,8 @@ import '../../services/invoice_service.dart';
 import '../../services/receipt_payment_service.dart';
 import '../../core/api_client.dart';
 import '../../services/person_service.dart';
-import '../../utils/responsive_helper.dart';
+import '../../utils/responsive_helper.dart';import '../../utils/snackbar_helper.dart';
+
 
 class EditInvoicePage extends StatefulWidget {
   final int businessId;
@@ -757,9 +758,7 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
     final payloadOrError = _validateAndBuildPayload();
     if (payloadOrError is String) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(payloadOrError)),
-      );
+      SnackBarHelper.show(context, message: payloadOrError);
       return;
     }
     final payload = payloadOrError as Map<String, dynamic>;
@@ -780,9 +779,7 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
         payload: payload,
       );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('تغییرات فاکتور با موفقیت ذخیره شد')),
-      );
+      SnackBarHelper.show(context, message: 'تغییرات فاکتور با موفقیت ذخیره شد');
       // بازگشت به لیست فاکتورها بعد از ذخیره موفق
       if (mounted) {
         // هدایت به لیست فاکتورها بعد از ویرایش موفق
@@ -795,9 +792,7 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('خطا در ذخیره تغییرات: $e')),
-      );
+      SnackBarHelper.show(context, message: 'خطا در ذخیره تغییرات: $e');
     }
   }
 

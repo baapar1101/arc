@@ -8,7 +8,8 @@ import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/widgets/date_input_field.dart';
 import 'package:hesabix_ui/services/business_dashboard_service.dart';
 import 'package:hesabix_ui/services/currency_service.dart';
-import 'package:hesabix_ui/widgets/data_table/helpers/data_table_utils.dart';
+import 'package:hesabix_ui/widgets/data_table/helpers/data_table_utils.dart';import '../../utils/snackbar_helper.dart';
+
 import 'package:hesabix_ui/utils/web/web_utils.dart' as web_utils;
 
 class PnlCumulativeReportPage extends StatefulWidget {
@@ -171,16 +172,12 @@ class _PnlCumulativeReportPageState extends State<PnlCumulativeReportPage> {
         );
       } else {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Export only available on web')),
-          );
+          SnackBarHelper.show(context, message: 'Export only available on web');
         }
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Export error: ${e.toString()}'), backgroundColor: Colors.red),
-      );
+      SnackBarHelper.showError(context, message: 'Export error: ${e.toString()}');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -213,16 +210,12 @@ class _PnlCumulativeReportPageState extends State<PnlCumulativeReportPage> {
         );
       } else {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Export only available on web')),
-          );
+          SnackBarHelper.show(context, message: 'Export only available on web');
         }
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Export error: ${e.toString()}'), backgroundColor: Colors.red),
-      );
+      SnackBarHelper.showError(context, message: 'Export error: ${e.toString()}');
     } finally {
       if (mounted) setState(() => _loading = false);
     }

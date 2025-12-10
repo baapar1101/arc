@@ -3,7 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/core/auth_store.dart';
-import 'package:hesabix_ui/services/account_service.dart';
+import 'package:hesabix_ui/services/account_service.dart';import '../../utils/snackbar_helper.dart';
+
 
 class AccountNode {
 	final String id;
@@ -320,9 +321,7 @@ class _AccountsPageState extends State<AccountsPage> {
 									Navigator.of(ctx).pop(true);
 								} catch (e) {
 									if (!ctx.mounted) return;
-									ScaffoldMessenger.of(ctx).showSnackBar(
-										SnackBar(content: Text('خطا در ایجاد حساب: $e')),
-									);
+         SnackBarHelper.show(ctx, message: 'خطا در ایجاد حساب: $e');
 								}
 							},
 							child: Text(t.add),
@@ -434,9 +433,7 @@ class _AccountsPageState extends State<AccountsPage> {
 									Navigator.of(ctx).pop(true);
 								} catch (e) {
 									if (!ctx.mounted) return;
-									ScaffoldMessenger.of(ctx).showSnackBar(
-										SnackBar(content: Text('خطا در ویرایش حساب: $e')),
-									);
+         SnackBarHelper.show(ctx, message: 'خطا در ویرایش حساب: $e');
 								}
 							},
 							child: Text(t.save),
@@ -482,9 +479,7 @@ class _AccountsPageState extends State<AccountsPage> {
 				}
 			} catch (e) {
 				if (!ctx.mounted) return;
-				ScaffoldMessenger.of(ctx).showSnackBar(
-					SnackBar(content: Text('خطا در حذف حساب: $e')),
-				);
+    SnackBarHelper.show(ctx, message: 'خطا در حذف حساب: $e');
 			}
 		}
 	}

@@ -183,7 +183,7 @@ class _ExpenseIncomeDialogState extends State<ExpenseIncomeDialog> {
       if (!mounted) return;
       Navigator.pop(context); // loading
       Navigator.pop(context, true); // dialog success
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('سند با موفقیت ثبت شد'), backgroundColor: Colors.green));
+      SnackBarHelper.showSuccess(context, message: 'سند با موفقیت ثبت شد');
     } catch (e) {
       if (!mounted) return;
       Navigator.pop(context); // loading

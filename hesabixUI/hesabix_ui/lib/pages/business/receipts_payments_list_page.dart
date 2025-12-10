@@ -194,91 +194,107 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
 
   /// ساخت بخش فیلترها
   Widget _buildFilters(AppLocalizations t) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+    final width = MediaQuery.sizeOf(context).width;
+    final bool isSmall = width < 720;
+
+    final Widget typeFilter = Expanded(
+      flex: 2,
+      child: SegmentedButton<String?>(
+        segments: [
+          ButtonSegment<String?>(
+            value: null,
+            label: Text('همه'),
+            icon: const Icon(Icons.all_inclusive),
+          ),
+          ButtonSegment<String?>(
+            value: 'receipt',
+            label: Text(t.receipts),
+            icon: const Icon(Icons.download_done_outlined),
+          ),
+          ButtonSegment<String?>(
+            value: 'payment',
+            label: Text(t.payments),
+            icon: const Icon(Icons.upload_outlined),
+          ),
+        ],
+        selected: {_selectedDocumentType},
+        onSelectionChanged: (set) {
+          setState(() {
+            _selectedDocumentType = set.first;
+          });
+          // refresh data when filter changes
+          _refreshData();
+        },
+      ),
+    );
+
+    final Widget dateFilter = Expanded(
+      flex: 3,
       child: Row(
         children: [
-          // فیلتر نوع سند
           Expanded(
-            flex: 2,
-            child: SegmentedButton<String?>(
-              segments: [
-                ButtonSegment<String?>(
-                  value: null,
-                  label: Text('همه'),
-                  icon: const Icon(Icons.all_inclusive),
-                ),
-                ButtonSegment<String?>(
-                  value: 'receipt',
-                  label: Text(t.receipts),
-                  icon: const Icon(Icons.download_done_outlined),
-                ),
-                ButtonSegment<String?>(
-                  value: 'payment',
-                  label: Text(t.payments),
-                  icon: const Icon(Icons.upload_outlined),
-                ),
-              ],
-              selected: {_selectedDocumentType},
-              onSelectionChanged: (set) {
-                setState(() {
-                  _selectedDocumentType = set.first;
-                });
-                // refresh data when filter changes
+            child: DateInputField(
+              value: _fromDate,
+              calendarController: widget.calendarController,
+              onChanged: (date) {
+                setState(() => _fromDate = date);
                 _refreshData();
               },
+              labelText: 'از تاریخ',
+              hintText: 'انتخاب تاریخ شروع',
             ),
           ),
-          
-          const SizedBox(width: 16),
-          
-          // فیلتر تاریخ
+          const SizedBox(width: 8),
           Expanded(
-            flex: 3,
-            child: Row(
-              children: [
-                Expanded(
-                  child: DateInputField(
-                    value: _fromDate,
-                    calendarController: widget.calendarController,
-                    onChanged: (date) {
-                      setState(() => _fromDate = date);
-                      _refreshData();
-                    },
-                    labelText: 'از تاریخ',
-                    hintText: 'انتخاب تاریخ شروع',
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: DateInputField(
-                    value: _toDate,
-                    calendarController: widget.calendarController,
-                    onChanged: (date) {
-                      setState(() => _toDate = date);
-                      _refreshData();
-                    },
-                    labelText: 'تا تاریخ',
-                    hintText: 'انتخاب تاریخ پایان',
-                  ),
-                ),
-                const SizedBox(width: 8),
-                IconButton(
-                  onPressed: () {
-                    setState(() {
-                      _fromDate = null;
-                      _toDate = null;
-                    });
-                    _refreshData();
-                  },
-                  icon: const Icon(Icons.clear),
-                  tooltip: 'پاک کردن فیلتر تاریخ',
-                ),
-              ],
+            child: DateInputField(
+              value: _toDate,
+              calendarController: widget.calendarController,
+              onChanged: (date) {
+                setState(() => _toDate = date);
+                _refreshData();
+              },
+              labelText: 'تا تاریخ',
+              hintText: 'انتخاب تاریخ پایان',
             ),
+          ),
+          const SizedBox(width: 8),
+          IconButton(
+            onPressed: () {
+              setState(() {
+                _fromDate = null;
+                _toDate = null;
+              });
+              _refreshData();
+            },
+            icon: const Icon(Icons.clear),
+            tooltip: 'پاک کردن فیلتر تاریخ',
           ),
         ],
       ),
+    );
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: isSmall
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // فیلتر نوع سند
+                typeFilter,
+                const SizedBox(height: 8),
+                // فیلتر تاریخ
+                dateFilter,
+              ],
+            )
+          : Row(
+              children: [
+                // فیلتر نوع سند
+                typeFilter,
+                const SizedBox(width: 16),
+                // فیلتر تاریخ
+                dateFilter,
+              ],
+            ),
     );
   }
 
@@ -485,9 +501,7 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
       final fullDoc = await _service.getById(document.id);
       if (fullDoc == null) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('سند یافت نشد')),
-        );
+        SnackBarHelper.show(context, message: 'سند یافت نشد');
         return;
       }
 
@@ -505,9 +519,7 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('خطا در بارگذاری جزئیات: $e')),
-      );
+      SnackBarHelper.show(context, message: 'خطا در بارگذاری جزئیات: $e');
     }
   }
 
@@ -518,9 +530,7 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
       final fullDoc = await _service.getById(document.id);
       if (fullDoc == null) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('سند یافت نشد')),
-        );
+        SnackBarHelper.show(context, message: 'سند یافت نشد');
         return;
       }
 
@@ -544,9 +554,7 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('خطا در آماده‌سازی ویرایش: $e')),
-      );
+      SnackBarHelper.show(context, message: 'خطا در آماده‌سازی ویرایش: $e');
     }
   }
 
@@ -606,12 +614,7 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
         });
         
         // نمایش پیام موفقیت
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('سند ${document.code} با موفقیت حذف شد'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        SnackBarHelper.showSuccess(context, message: 'سند ${document.code} با موفقیت حذف شد');
       } else {
         throw Exception('خطا در حذف سند');
       }
@@ -663,12 +666,7 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
         message = e.toString();
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(message),
-          backgroundColor: Colors.red,
-        ),
-      );
+      SnackBarHelper.showError(context, message: message);
     }
   }
 
@@ -752,12 +750,7 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
       });
       
       // نمایش پیام موفقیت
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('${ids.length} سند با موفقیت حذف شد'),
-          backgroundColor: Colors.green,
-        ),
-      );
+      SnackBarHelper.showSuccess(context, message: '${ids.length} سند با موفقیت حذف شد');
     } catch (e) {
       if (!mounted) return;
       
@@ -772,12 +765,7 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
       } else {
         message = e.toString();
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(message),
-          backgroundColor: Colors.red,
-        ),
-      );
+      SnackBarHelper.showError(context, message: message);
     }
   }
 }
@@ -1125,13 +1113,7 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog> {
     // بررسی اعتبارسنجی: اگر سویچ اقساط روشن است، باید فاکتور انتخاب شده باشد
     for (final line in _personLines) {
       if (line.installmentsEnabled == true && line.installmentInvoiceId == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('برای ${line.personName ?? 'شخص انتخاب شده'} سویچ اقساط روشن است اما فاکتوری انتخاب نشده است. لطفاً فاکتور را انتخاب کنید یا سویچ اقساط را خاموش کنید.'),
-            backgroundColor: Colors.orange,
-            duration: const Duration(seconds: 5),
-          ),
-        );
+        SnackBarHelper.show(context, message: 'برای ${line.personName ?? 'شخص انتخاب شده'} سویچ اقساط روشن است اما فاکتوری انتخاب نشده است. لطفاً فاکتور را انتخاب کنید یا سویچ اقساط را خاموش کنید.');
         return;
       }
     }
@@ -1213,12 +1195,7 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog> {
         final allocSum = line.installmentAllocations!.values.fold<double>(0, (p, e) => p + (e > 0 ? e : 0));
         if (allocSum > (line.amount + 0.0001)) {
           Navigator.pop(context);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('جمع تخصیص اقساط برای ${line.personName ?? ''} از مبلغ خط همان شخص بیشتر است'),
-              backgroundColor: Colors.red,
-            ),
-          );
+          SnackBarHelper.showError(context, message: 'جمع تخصیص اقساط برای ${line.personName ?? ''} از مبلغ خط همان شخص بیشتر است');
           return;
         }
         final allocations = line.installmentAllocations!.entries
@@ -1271,15 +1248,11 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog> {
       Navigator.pop(context, true);
       
       // نمایش پیام موفقیت
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            widget.initialDocument != null
-              ? 'سند با موفقیت ویرایش شد'
-              : (_isReceipt ? 'سند دریافت با موفقیت ثبت شد' : 'سند پرداخت با موفقیت ثبت شد'),
-          ),
-          backgroundColor: Colors.green,
-        ),
+      SnackBarHelper.showSuccess(
+        context,
+        message: widget.initialDocument != null
+            ? 'سند با موفقیت ویرایش شد'
+            : (_isReceipt ? 'سند دریافت با موفقیت ثبت شد' : 'سند پرداخت با موفقیت ثبت شد'),
       );
     } catch (e) {
       if (!mounted) return;
@@ -1288,12 +1261,7 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog> {
       Navigator.pop(context);
       
       // نمایش خطا
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('خطا: ${e.toString()}'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      SnackBarHelper.showError(context, message: 'خطا: ${e.toString()}');
     }
   }
 
@@ -1309,12 +1277,7 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog> {
       final planCurrencyId = (data['currency_id'] as num?)?.toInt();
       if (_selectedCurrencyId != null && planCurrencyId != null && _selectedCurrencyId != planCurrencyId) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('ارز فاکتور اقساط با ارز سند دریافت متفاوت است. لطفاً ارزی همسان انتخاب کنید.'),
-            backgroundColor: Colors.orange,
-          ),
-        );
+        SnackBarHelper.show(context, message: 'ارز فاکتور اقساط با ارز سند دریافت متفاوت است. لطفاً ارزی همسان انتخاب کنید.');
         final idx = _personLines.indexOf(line);
         if (idx >= 0) {
           final updated = _personLines[idx].copyWith(
@@ -2104,13 +2067,7 @@ class _PersonLineTileState extends State<_PersonLineTile> {
                   ? (value) {
                       if (value && widget.line.installmentsEnabled) {
                         // نباید همزمان فعال شود
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('نمی‌توان همزمان لینک به فاکتور و اقساط را فعال کرد. لطفاً ابتدا اقساط را غیرفعال کنید.'),
-                            backgroundColor: Colors.orange,
-                            duration: Duration(seconds: 3),
-                          ),
-                        );
+                        SnackBarHelper.show(context, message: 'نمی‌توان همزمان لینک به فاکتور و اقساط را فعال کرد. لطفاً ابتدا اقساط را غیرفعال کنید.');
                         return;
                       }
                       widget.onChanged(widget.line.copyWith(
@@ -2233,13 +2190,7 @@ class _PersonLineTileState extends State<_PersonLineTile> {
                     onChanged: (enabled) {
                       if (enabled && widget.line.linkToInvoice) {
                         // نباید همزمان فعال شود
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('نمی‌توان همزمان اقساط و لینک به فاکتور را فعال کرد. لطفاً ابتدا لینک به فاکتور را غیرفعال کنید.'),
-                            backgroundColor: Colors.orange,
-                            duration: Duration(seconds: 3),
-                          ),
-                        );
+                        SnackBarHelper.show(context, message: 'نمی‌توان همزمان اقساط و لینک به فاکتور را فعال کرد. لطفاً ابتدا لینک به فاکتور را غیرفعال کنید.');
                         return;
                       }
                       final ancestor = context.findAncestorStateOfType<_BulkSettlementDialogState>();
@@ -3038,21 +2989,13 @@ class _ReceiptPaymentViewDialogState extends State<ReceiptPaymentViewDialog> {
       await _savePdfFile(pdfBytes, widget.document.code);
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(AppLocalizations.of(context).pdfSuccess),
-            backgroundColor: Colors.green,
-          ),
-        );
+        final t = AppLocalizations.of(context);
+        SnackBarHelper.showSuccess(context, message: t.exportSuccess);
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('${AppLocalizations.of(context).pdfError}: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        final t = AppLocalizations.of(context);
+        SnackBarHelper.showError(context, message: '${t.exportError}: $e');
       }
     } finally {
       if (mounted) {

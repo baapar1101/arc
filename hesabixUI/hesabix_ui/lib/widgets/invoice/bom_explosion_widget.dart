@@ -68,33 +68,25 @@ class _BomExplosionWidgetState extends State<BomExplosionWidget> {
         _loadingBoms = false;
       });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطا در بارگذاری فرمول‌ها: $e')),
-        );
+        SnackBarHelper.show(context, message: 'خطا در بارگذاری فرمول‌ها: $e');
       }
     }
   }
 
   Future<void> _explodeAndAdd() async {
     if (_selectedProduct == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('لطفاً کالای تولیدی را انتخاب کنید')),
-      );
+      SnackBarHelper.show(context, message: 'لطفاً کالای تولیدی را انتخاب کنید');
       return;
     }
 
     if (_boms.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('برای این کالا فرمول تولیدی تعریف نشده است')),
-      );
+      SnackBarHelper.show(context, message: 'برای این کالا فرمول تولیدی تعریف نشده است');
       return;
     }
 
     final quantity = double.tryParse(_quantityController.text.replaceAll(',', '.')) ?? 0;
     if (quantity <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('مقدار تولید باید بزرگ‌تر از صفر باشد')),
-      );
+      SnackBarHelper.show(context, message: 'مقدار تولید باید بزرگ‌تر از صفر باشد');
       return;
     }
 
@@ -105,9 +97,7 @@ class _BomExplosionWidgetState extends State<BomExplosionWidget> {
     try {
       final bomId = _selectedBom?.id;
       if (bomId == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('لطفاً یک فرمول تولید را انتخاب کنید')),
-        );
+        SnackBarHelper.show(context, message: 'لطفاً یک فرمول تولید را انتخاب کنید');
         return;
       }
 
@@ -265,12 +255,7 @@ class _BomExplosionWidgetState extends State<BomExplosionWidget> {
       widget.onExploded(lineItems, bomId);
 
       // نمایش پیام موفقیت
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('${lineItems.length} ردیف به فاکتور اضافه شد'),
-          backgroundColor: Colors.green,
-        ),
-      );
+      SnackBarHelper.showSuccess(context, message: '${lineItems.length} ردیف به فاکتور اضافه شد');
 
       // پاک کردن فرم
       setState(() {
@@ -281,9 +266,7 @@ class _BomExplosionWidgetState extends State<BomExplosionWidget> {
       });
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('خطا در انفجار فرمول: $e')),
-      );
+      SnackBarHelper.show(context, message: 'خطا در انفجار فرمول: $e');
     } finally {
       if (mounted) {
         setState(() {

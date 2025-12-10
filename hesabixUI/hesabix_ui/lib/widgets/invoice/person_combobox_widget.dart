@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../services/person_service.dart';
 import '../../models/person_model.dart';
 import '../../widgets/person/person_form_dialog.dart';
+import '../../utils/snackbar_helper.dart';
 
 class _PersonPickerState {
   final List<Person> persons;
@@ -225,15 +226,9 @@ class _PersonComboboxWidgetState extends State<PersonComboboxWidget> {
   }
 
   void _showErrorSnackBar(String message) {
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(message),
-          backgroundColor: Theme.of(context).colorScheme.error,
-          duration: const Duration(seconds: 3),
-        ),
-      );
-    }
+    if (!mounted) return;
+    // استفاده از SnackBarHelper تا پیام خطا روی تمام لایه‌ها (دیالوگ/باتم‌شیت) نمایش داده شود
+    SnackBarHelper.showError(context, message: message);
   }
 
   void _selectPerson(Person? person) {

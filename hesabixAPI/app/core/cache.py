@@ -31,21 +31,17 @@ def get_redis_client(force_reconnect: bool = False) -> Optional[redis.Redis]:
 	redis_db = getattr(settings, 'redis_db', 0)
 	redis_password = getattr(settings, 'redis_password', None)
 	
-	# خواندن از DB اگر در دسترس باشد
+	# خواندن از DB اگر در دسترس باشد - استفاده از context manager برای جلوگیری از connection leak
 	try:
-		from adapters.db.session import get_db
+		from adapters.db.session import get_db_session
 		from app.services.system_settings_service import get_redis_configuration
-		db_gen = get_db()
-		db = next(db_gen)
-		try:
+		with get_db_session() as db:
 			redis_config = get_redis_configuration(db)
 			redis_enabled = redis_config.get('enabled', False)
 			redis_host = redis_config.get('host', 'localhost')
 			redis_port = redis_config.get('port', 6379)
 			redis_db = redis_config.get('db', 0)
 			redis_password = redis_config.get('password')
-		finally:
-			db.close()
 	except Exception:
 		# اگر DB در دسترس نبود، از env استفاده می‌کنیم
 		pass

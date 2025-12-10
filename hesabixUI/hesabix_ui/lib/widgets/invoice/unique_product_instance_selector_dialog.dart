@@ -4,6 +4,8 @@ import '../../services/product_service.dart';
 import '../../services/product_attribute_service.dart';
 import '../../core/calendar_controller.dart';
 import '../../utils/attribute_formatter.dart';
+import '../../utils/snackbar_helper.dart';
+
 
 /// Dialog for selecting unique product instances in invoice
 class UniqueProductInstanceSelectorDialog extends StatefulWidget {
@@ -164,14 +166,7 @@ class _UniqueProductInstanceSelectorDialogState
         if (_selectedIds.length < widget.requiredQuantity) {
           _selectedIds.add(instanceId);
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'شما فقط می‌توانید ${widget.requiredQuantity} کالا انتخاب کنید',
-              ),
-              backgroundColor: Colors.orange,
-            ),
-          );
+          SnackBarHelper.show(context, message: 'شما فقط می‌توانید ${widget.requiredQuantity} کالا انتخاب کنید',);
         }
       }
     });
@@ -179,20 +174,12 @@ class _UniqueProductInstanceSelectorDialogState
 
   void _confirmSelection() {
     if (_selectedIds.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('لطفاً حداقل یک کالا انتخاب کنید')),
-      );
+      SnackBarHelper.show(context, message: 'لطفاً حداقل یک کالا انتخاب کنید');
       return;
     }
 
     if (_selectedIds.length != widget.requiredQuantity) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'لطفاً دقیقاً ${widget.requiredQuantity} کالا انتخاب کنید (${_selectedIds.length} انتخاب شده)',
-          ),
-        ),
-      );
+      SnackBarHelper.show(context, message: 'لطفاً دقیقاً ${widget.requiredQuantity} کالا انتخاب کنید (${_selectedIds.length} انتخاب شده)');
       return;
     }
 

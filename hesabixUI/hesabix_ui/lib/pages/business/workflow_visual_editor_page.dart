@@ -23,7 +23,8 @@ import '../../widgets/workflow/workflow_execution_history_panel.dart';
 import '../../widgets/workflow/workflow_templates.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'package:uuid/uuid.dart';
+import 'package:uuid/uuid.dart';import '../../utils/snackbar_helper.dart';
+
 
 class WorkflowVisualEditorPage extends StatefulWidget {
   final int businessId;
@@ -150,9 +151,8 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
       debugPrint('خطا در بارگذاری داده‌های workflow: $e');
       debugPrint('StackTrace: $stackTrace');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(AppLocalizations.of(context).workflowErrorLoading)),
-        );
+        final t = AppLocalizations.of(context);
+        SnackBarHelper.showError(context, message: t.workflowErrorLoading);
       }
     } finally {
       if (mounted) {
@@ -240,12 +240,7 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
                 debugPrint('خطا در افزودن نود: $e');
                 debugPrint('StackTrace: $stackTrace');
                 if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('خطا در افزودن نود: ${e.toString()}'),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
+                  SnackBarHelper.showError(context, message: 'خطا در افزودن نود: ${e.toString()}');
                 }
               }
             },
@@ -374,16 +369,9 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
     }
 
     final t = AppLocalizations.of(context);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          layoutType == WorkflowAutoLayoutType.hierarchical
+    SnackBarHelper.show(context, message: layoutType == WorkflowAutoLayoutType.hierarchical
               ? t.workflowHierarchicalLayoutApplied
-              : t.workflowForceDirectedLayoutApplied,
-        ),
-        duration: const Duration(seconds: 2),
-      ),
-    );
+              : t.workflowForceDirectedLayoutApplied,);
   }
 
   void _goBackToWorkflowsList() {
@@ -454,12 +442,7 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
     final workflowName = nameController.text.trim();
     if (workflowName.isEmpty) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('لطفاً نام ورکفلو را وارد کنید'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      SnackBarHelper.showError(context, message: 'لطفاً نام ورکفلو را وارد کنید');
       return;
     }
 
@@ -480,12 +463,7 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
     });
 
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('اطلاعات به‌روزرسانی شد. برای ذخیره دائمی، دکمه ذخیره را بزنید.'),
-        duration: Duration(seconds: 3),
-      ),
-    );
+    SnackBarHelper.show(context, message: 'اطلاعات به‌روزرسانی شد. برای ذخیره دائمی، دکمه ذخیره را بزنید.');
   }
 
   Future<void> _saveWorkflow() async {
@@ -594,12 +572,7 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
     final workflowName = nameController.text.trim();
     if (workflowName.isEmpty) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('لطفاً نام ورکفلو را وارد کنید'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      SnackBarHelper.showError(context, message: 'لطفاً نام ورکفلو را وارد کنید');
       return;
     }
 
@@ -642,9 +615,8 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
       }
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppLocalizations.of(context).workflowSaved)),
-      );
+      final t = AppLocalizations.of(context);
+      SnackBarHelper.showSuccess(context, message: t.workflowSaved);
       // بازگشت به صفحه لیست ورکفلوها
       context.goNamed(
         'business_workflows',
@@ -656,9 +628,8 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
       debugPrint('خطا در ذخیره‌سازی workflow: $e');
       debugPrint('StackTrace: $stackTrace');
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppLocalizations.of(context).workflowErrorSaving)),
-      );
+      final t = AppLocalizations.of(context);
+      SnackBarHelper.showError(context, message: t.workflowErrorSaving);
     } finally {
       if (mounted) {
         setState(() => _saving = false);
@@ -710,12 +681,7 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
       if (isCtrlPressed && event.logicalKey == LogicalKeyboardKey.keyC) {
         _editorState.copySelectedNodes();
         if (_editorState.selectedNodeIds.isNotEmpty) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('${_editorState.selectedNodeIds.length} نود کپی شد'),
-              duration: const Duration(seconds: 1),
-            ),
-          );
+          SnackBarHelper.show(context, message: '${_editorState.selectedNodeIds.length} نود کپی شد');
         }
         return;
       }
@@ -724,12 +690,7 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
       if (isCtrlPressed && event.logicalKey == LogicalKeyboardKey.keyX) {
         _editorState.cutSelectedNodes();
         if (_editorState.hasClipboardContent) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('${_editorState.selectedNodeIds.length} نود برش خورد'),
-              duration: const Duration(seconds: 1),
-            ),
-          );
+          SnackBarHelper.show(context, message: '${_editorState.selectedNodeIds.length} نود برش خورد');
         }
         return;
       }
@@ -738,12 +699,7 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
       if (isCtrlPressed && event.logicalKey == LogicalKeyboardKey.keyV) {
         if (_editorState.hasClipboardContent) {
           _editorState.pasteNodes();
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('نودها چسبانده شدند'),
-              duration: Duration(seconds: 1),
-            ),
-          );
+          SnackBarHelper.show(context, message: 'نودها چسبانده شدند');
         }
         return;
       }
@@ -835,38 +791,14 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
       final count = _editorState.selectedNodeIds.length;
       _editorState.deleteSelectedNodes();
       
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('$count ${t.workflowNodeDeleted}'),
-          action: SnackBarAction(
-            label: t.workflowUndo,
-            onPressed: () {
-              if (_editorState.canUndo) {
-                _editorState.undo();
-              }
-            },
-          ),
-        ),
-      );
+      SnackBarHelper.show(context, message: '$count ${t.workflowNodeDeleted}');
     }
   }
 
   void _deleteNode(WorkflowNodeModel node) {
     _editorState.removeNode(node.id);
     final t = AppLocalizations.of(context);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(t.workflowNodeDeleted),
-        action: SnackBarAction(
-          label: t.workflowUndo,
-          onPressed: () {
-            if (_editorState.canUndo) {
-              _editorState.undo();
-            }
-          },
-        ),
-      ),
-    );
+    SnackBarHelper.show(context, message: t.workflowNodeDeleted);
   }
 
   void _duplicateNode(WorkflowNodeModel node) {
@@ -888,11 +820,7 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
     );
     // اضافه کردن node با موقعیت
     _editorState.addNodeWithPosition(newNode);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(t.workflowNodeDuplicated),
-      ),
-    );
+    SnackBarHelper.show(context, message: t.workflowNodeDuplicated);
   }
 
   void _editNodeComment(WorkflowNodeModel node) {
@@ -927,9 +855,7 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
                   _editorState.addNodeWithPosition(updatedNode);
                 }
                 Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('یادداشت حذف شد')),
-                );
+                SnackBarHelper.show(context, message: 'یادداشت حذف شد');
               },
               child: const Text('حذف', style: TextStyle(color: Colors.red)),
             ),
@@ -945,13 +871,9 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
                 _editorState.addNodeWithPosition(updatedNode);
               }
               Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(newComment.isEmpty 
+              SnackBarHelper.show(context, message: newComment.isEmpty 
                       ? 'یادداشت پاک شد' 
-                      : 'یادداشت ذخیره شد'),
-                ),
-              );
+                      : 'یادداشت ذخیره شد');
             },
             child: const Text('ذخیره'),
           ),
@@ -1012,16 +934,12 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
       await prefs.setString(templatesKey, jsonEncode(templates));
       
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('قالب "$templateName" ذخیره شد')),
-        );
+        SnackBarHelper.show(context, message: 'قالب "$templateName" ذخیره شد');
       }
     } catch (e) {
       debugPrint('خطا در ذخیره template: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('خطا در ذخیره قالب')),
-        );
+        SnackBarHelper.show(context, message: 'خطا در ذخیره قالب');
       }
     }
   }
@@ -1068,20 +986,14 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
         if (workflowData != null) {
           _editorState.loadWorkflow(workflowData);
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('قالب "${selectedTemplate['name'] ?? 'قالب'}" بارگذاری شد'),
-              ),
-            );
+            SnackBarHelper.show(context, message: 'قالب "${selectedTemplate['name'] ?? 'قالب'}" بارگذاری شد');
           }
         }
       }
     } catch (e) {
       debugPrint('خطا در بارگذاری template: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطا در بارگذاری قالب: $e')),
-        );
+        SnackBarHelper.show(context, message: 'خطا در بارگذاری قالب: $e');
       }
     }
   }

@@ -57,9 +57,7 @@ class _PingPongDialogState extends State<PingPongDialog> {
         _isLoading = false;
       });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطا در بارگذاری بهترین امتیاز: $e')),
-        );
+        SnackBarHelper.show(context, message: 'خطا در بارگذاری بهترین امتیاز: $e');
       }
     }
   }
@@ -108,21 +106,11 @@ class _PingPongDialogState extends State<PingPongDialog> {
       await _loadBestScore();
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('امتیاز شما با موفقیت ذخیره شد!'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        SnackBarHelper.showSuccess(context, message: 'امتیاز شما با موفقیت ذخیره شد!');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('خطا در ذخیره امتیاز: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        SnackBarHelper.showError(context, message: 'خطا در ذخیره امتیاز: $e');
       }
     } finally {
       if (mounted) {

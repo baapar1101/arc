@@ -7,7 +7,8 @@ import '../../core/calendar_controller.dart';
 import '../../services/business_user_service.dart';
 import '../../models/business_user_model.dart';
 import '../../utils/number_normalizer.dart';
-import '../../utils/responsive_helper.dart';
+import '../../utils/responsive_helper.dart';import '../../utils/snackbar_helper.dart';
+
 
 class UsersPermissionsPage extends StatefulWidget {
   final String businessId;
@@ -176,21 +177,11 @@ class _UsersPermissionsPageState extends State<UsersPermissionsPage> {
   }
 
   void _showErrorSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red,
-      ),
-    );
+    SnackBarHelper.showError(context, message: message);
   }
 
   void _showSuccessSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.green,
-      ),
-    );
+    SnackBarHelper.showSuccess(context, message: message);
   }
 
   bool _isTryingToAddOwner(String emailOrPhone) {
@@ -1207,21 +1198,11 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
   }
 
   void _showErrorSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red,
-      ),
-    );
+    SnackBarHelper.showError(context, message: message);
   }
 
   void _showSuccessSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.green,
-      ),
-    );
+    SnackBarHelper.showSuccess(context, message: message);
   }
 
   @override

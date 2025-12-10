@@ -4,6 +4,8 @@ import '../../../services/person_service.dart';
 import '../../../models/repair_technician_model.dart';
 import '../../../models/person_model.dart';
 import '../../../core/api_client.dart';
+import '../../../utils/snackbar_helper.dart';
+
 
 /// صفحه مدیریت تعمیرکاران
 class RepairTechniciansPage extends StatefulWidget {
@@ -120,16 +122,12 @@ class _RepairTechniciansPageState extends State<RepairTechniciansPage> {
       );
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('تعمیرکار غیرفعال شد')),
-        );
+        SnackBarHelper.show(context, message: 'تعمیرکار غیرفعال شد');
         _loadTechnicians();
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطا: $e')),
-        );
+        SnackBarHelper.show(context, message: 'خطا: $e');
       }
     }
   }
@@ -387,9 +385,7 @@ class _TechnicianFormDialogState extends State<_TechnicianFormDialog> {
     if (!_formKey.currentState!.validate()) return;
 
     if (_selectedPerson == null && widget.technician == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('لطفاً فرد را انتخاب کنید')),
-      );
+      SnackBarHelper.show(context, message: 'لطفاً فرد را انتخاب کنید');
       return;
     }
 
@@ -424,9 +420,7 @@ class _TechnicianFormDialogState extends State<_TechnicianFormDialog> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطا: $e')),
-        );
+        SnackBarHelper.show(context, message: 'خطا: $e');
       }
     } finally {
       if (mounted) {

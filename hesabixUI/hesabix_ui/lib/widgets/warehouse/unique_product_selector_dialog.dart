@@ -4,6 +4,8 @@ import '../../services/product_service.dart';
 import '../../services/product_attribute_service.dart';
 import '../../core/calendar_controller.dart';
 import '../../utils/attribute_formatter.dart';
+import '../../utils/snackbar_helper.dart';
+
 
 class UniqueProductSelectorDialog extends StatefulWidget {
   final int businessId;
@@ -172,16 +174,12 @@ class _UniqueProductSelectorDialogState extends State<UniqueProductSelectorDialo
 
   void _confirmSelection() {
     if (_selectedIds.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('لطفاً حداقل یک کالا انتخاب کنید')),
-      );
+      SnackBarHelper.show(context, message: 'لطفاً حداقل یک کالا انتخاب کنید');
       return;
     }
     
     if (widget.requiredQuantity != null && _selectedIds.length != widget.requiredQuantity) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('لطفاً دقیقاً ${widget.requiredQuantity} کالا انتخاب کنید')),
-      );
+      SnackBarHelper.show(context, message: 'لطفاً دقیقاً ${widget.requiredQuantity} کالا انتخاب کنید');
       return;
     }
     

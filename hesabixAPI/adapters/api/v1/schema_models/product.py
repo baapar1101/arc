@@ -319,6 +319,7 @@ class ProductResponse(BaseModel):
     
     image_file_id: Optional[str] = None
     image_url: Optional[str] = None
+    thumbnail_url: Optional[str] = None
     
     barcode: Optional[str] = None
     is_active: bool

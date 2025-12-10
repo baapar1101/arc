@@ -309,7 +309,7 @@ class _KardexPageState extends State<KardexPage> {
       if (!context.mounted) return;
       final ctx = context;
       final t = AppLocalizations.of(ctx);
-      ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(t.presetApplyError('$e'))));
+      SnackBarHelper.showError(ctx, message: t.presetApplyError('$e'));
     }
   }
 

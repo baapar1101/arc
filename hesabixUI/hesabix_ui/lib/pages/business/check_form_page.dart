@@ -238,11 +238,7 @@ class _CheckFormDialogState extends State<CheckFormDialog> {
       }
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(widget.checkId == null ? 'چک ثبت شد' : 'چک ویرایش شد'),
-        ),
-      );
+      SnackBarHelper.show(context, message: widget.checkId == null ? 'چک ثبت شد' : 'چک ویرایش شد');
       Navigator.of(context).pop(true);
       widget.onSuccess?.call();
     } catch (e) {
@@ -253,12 +249,7 @@ class _CheckFormDialogState extends State<CheckFormDialog> {
   }
 
   void _showError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Theme.of(context).colorScheme.error,
-      ),
-    );
+    SnackBarHelper.showError(context, message: message);
   }
 
   @override

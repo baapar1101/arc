@@ -7,7 +7,8 @@ import '../core/calendar_controller.dart';
 import '../theme/theme_controller.dart';
 import 'calendar_switcher.dart';
 import 'language_switcher.dart';
-import 'theme_mode_switcher.dart';
+import 'theme_mode_switcher.dart';import '../utils/snackbar_helper.dart';
+
 
 class CombinedUserMenuButton extends StatelessWidget {
   final AuthStore authStore;
@@ -457,9 +458,7 @@ class CombinedUserMenuButton extends StatelessWidget {
                           context.pop();
                           await authStore.saveApiKey(null);
                           if (!context.mounted) return;
-                          ScaffoldMessenger.of(context)
-                            ..hideCurrentSnackBar()
-                            ..showSnackBar(SnackBar(content: Text(t.logoutDone)));
+                          SnackBarHelper.show(context, message: t.logoutDone);
                           context.go('/login');
                         },
                         style: FilledButton.styleFrom(

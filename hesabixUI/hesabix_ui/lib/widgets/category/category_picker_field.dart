@@ -4,6 +4,8 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../services/category_service.dart';
 import '../../core/api_client.dart';
 import '../../core/auth_store.dart';
+import '../../utils/snackbar_helper.dart';
+
 
 class CategoryPickerField extends FormField<int?> {
   CategoryPickerField({
@@ -318,9 +320,7 @@ class _CategoryPickerDialogState extends State<_CategoryPickerDialog> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطا در به‌روزرسانی لیست: $e')),
-        );
+        SnackBarHelper.show(context, message: 'خطا در به‌روزرسانی لیست: $e');
       }
     }
   }
@@ -406,15 +406,11 @@ class _CategoryPickerDialogState extends State<_CategoryPickerDialog> {
       );
       await _refreshCategories();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${t.addCategory} با موفقیت انجام شد')),
-        );
+        SnackBarHelper.show(context, message: '${t.addCategory} با موفقیت انجام شد');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطا: $e')),
-        );
+        SnackBarHelper.show(context, message: 'خطا: $e');
       }
     }
   }
@@ -503,15 +499,11 @@ class _CategoryPickerDialogState extends State<_CategoryPickerDialog> {
       );
       await _refreshCategories();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${t.updateCategory} با موفقیت انجام شد')),
-        );
+        SnackBarHelper.show(context, message: '${t.updateCategory} با موفقیت انجام شد');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطا: $e')),
-        );
+        SnackBarHelper.show(context, message: 'خطا: $e');
       }
     }
   }
@@ -548,15 +540,11 @@ class _CategoryPickerDialogState extends State<_CategoryPickerDialog> {
         setState(() => _selectedId = null);
       }
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(t.deleteCategorySuccess)),
-        );
+        SnackBarHelper.show(context, message: t.deleteCategorySuccess);
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطا: $e')),
-        );
+        SnackBarHelper.show(context, message: 'خطا: $e');
       }
     }
   }

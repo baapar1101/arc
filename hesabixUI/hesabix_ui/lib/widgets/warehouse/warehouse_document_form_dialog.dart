@@ -14,6 +14,8 @@ import '../../utils/number_formatters.dart' show formatWithThousands;
 import '../../utils/attribute_formatter.dart';
 import 'product_instance_form_dialog.dart';
 import 'unique_product_selector_dialog.dart';
+import '../../utils/snackbar_helper.dart';
+
 
 class WarehouseDocumentFormDialog extends StatefulWidget {
   final int businessId;
@@ -479,12 +481,7 @@ class _WarehouseDocumentFormDialogState extends State<WarehouseDocumentFormDialo
       _documentStatus = status;
       if (status != 'draft' && status != 'posted') {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('فقط حواله‌های پیش‌نویس و قطعی شده قابل ویرایش هستند'),
-              backgroundColor: Colors.orange,
-            ),
-          );
+          SnackBarHelper.show(context, message: 'فقط حواله‌های پیش‌نویس و قطعی شده قابل ویرایش هستند');
           Navigator.of(context).pop();
         }
         return;
@@ -493,13 +490,7 @@ class _WarehouseDocumentFormDialogState extends State<WarehouseDocumentFormDialo
       // برای حواله‌های posted، فقط اطلاعات کالاهای یونیک قابل ویرایش است
       if (status == 'posted') {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('برای حواله‌های قطعی شده، فقط اطلاعات کالاهای یونیک قابل ویرایش است'),
-              backgroundColor: Colors.blue,
-              duration: Duration(seconds: 3),
-            ),
-          );
+          SnackBarHelper.show(context, message: 'برای حواله‌های قطعی شده، فقط اطلاعات کالاهای یونیک قابل ویرایش است');
         }
       }
       
@@ -555,12 +546,7 @@ class _WarehouseDocumentFormDialogState extends State<WarehouseDocumentFormDialo
       debugPrint('Error loading document for edit: $e');
       if (mounted) {
         setState(() => _loadingDocument = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('خطا در بارگذاری حواله: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        SnackBarHelper.showError(context, message: 'خطا در بارگذاری حواله: $e');
         Navigator.of(context).pop();
       }
     }
@@ -942,9 +928,7 @@ class _WarehouseDocumentFormDialogState extends State<WarehouseDocumentFormDialo
     
     final quantity = (line['quantity'] as num?)?.toInt() ?? 0;
     if (quantity <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('لطفاً ابتدا تعداد را وارد کنید')),
-      );
+      SnackBarHelper.show(context, message: 'لطفاً ابتدا تعداد را وارد کنید');
       return;
     }
     
@@ -970,12 +954,7 @@ class _WarehouseDocumentFormDialogState extends State<WarehouseDocumentFormDialo
     if (result != null) {
       // بررسی اینکه تعداد instance_data از quantity بیشتر نشود
       if (result.length > quantity) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('تعداد کالاهای یونیک ثبت شده (${result.length}) نمی‌تواند از تعداد وارد شده ($quantity) بیشتر باشد'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        SnackBarHelper.showError(context, message: 'تعداد کالاهای یونیک ثبت شده (${result.length}) نمی‌تواند از تعداد (${quantity}) بیشتر باشد');
         return;
       }
       
@@ -998,9 +977,7 @@ class _WarehouseDocumentFormDialogState extends State<WarehouseDocumentFormDialo
     await _loadProductInfo(productId);
     
     if (!_isProductUnique(productId)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('این کالا در حالت یونیک نیست')),
-      );
+      SnackBarHelper.show(context, message: 'این کالا در حالت یونیک نیست');
       return;
     }
     
@@ -1032,12 +1009,7 @@ class _WarehouseDocumentFormDialogState extends State<WarehouseDocumentFormDialo
       final currentQuantity = (line['quantity'] as num?)?.toInt();
       if (currentQuantity != null && currentQuantity > 0) {
         if (selectedIds.length > currentQuantity) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('تعداد کالاهای یونیک انتخاب شده (${selectedIds.length}) نمی‌تواند از تعداد وارد شده ($currentQuantity) بیشتر باشد'),
-              backgroundColor: Colors.red,
-            ),
-          );
+          SnackBarHelper.showError(context, message: 'تعداد کالاهای یونیک انتخاب شده (${selectedIds.length}) نمی‌تواند از تعداد (${currentQuantity}) بیشتر باشد');
           return;
         }
         // اگر quantity از قبل تنظیم شده، آن را حفظ می‌کنیم
@@ -1087,44 +1059,32 @@ class _WarehouseDocumentFormDialogState extends State<WarehouseDocumentFormDialo
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
     if (_docType == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('لطفاً نوع حواله را انتخاب کنید')),
-      );
+      SnackBarHelper.show(context, message: 'لطفاً نوع حواله را انتخاب کنید');
       return;
     }
     if (_lines.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('لطفاً حداقل یک خط اضافه کنید')),
-      );
+      SnackBarHelper.show(context, message: 'لطفاً حداقل یک خط اضافه کنید');
       return;
     }
 
     // اعتبارسنجی انبارها
     if (_docType == 'transfer') {
       if (_warehouseIdFrom == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('لطفاً انبار مبدا را انتخاب کنید')),
-        );
+        SnackBarHelper.show(context, message: 'لطفاً انبار مبدا را انتخاب کنید');
         return;
       }
       if (_warehouseIdTo == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('لطفاً انبار مقصد را انتخاب کنید')),
-        );
+        SnackBarHelper.show(context, message: 'لطفاً انبار مقصد را انتخاب کنید');
         return;
       }
     } else if (_docType == 'issue' || _docType == 'production_out') {
       if (_warehouseIdFrom == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('لطفاً انبار را انتخاب کنید')),
-        );
+        SnackBarHelper.show(context, message: 'لطفاً انبار را انتخاب کنید');
         return;
       }
     } else if (_docType == 'receipt' || _docType == 'production_in') {
       if (_warehouseIdTo == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('لطفاً انبار را انتخاب کنید')),
-        );
+        SnackBarHelper.show(context, message: 'لطفاً انبار را انتخاب کنید');
         return;
       }
     }
@@ -1133,15 +1093,11 @@ class _WarehouseDocumentFormDialogState extends State<WarehouseDocumentFormDialo
     for (var i = 0; i < _lines.length; i++) {
       final line = _lines[i];
       if (line['product_id'] == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خط ${i + 1}: لطفاً محصول را انتخاب کنید')),
-        );
+        SnackBarHelper.show(context, message: 'خط ${i + 1}: لطفاً محصول را انتخاب کنید');
         return;
       }
       if ((line['quantity'] as num?) == null || (line['quantity'] as num) <= 0) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خط ${i + 1}: تعداد باید مثبت باشد')),
-        );
+        SnackBarHelper.show(context, message: 'خط ${i + 1}: تعداد باید مثبت باشد');
         return;
       }
       
@@ -1156,24 +1112,14 @@ class _WarehouseDocumentFormDialogState extends State<WarehouseDocumentFormDialo
           
           if (instanceIds != null && instanceIds.isNotEmpty) {
             if (instanceIds.length > quantity) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('خط ${i + 1}: تعداد کالاهای یونیک انتخاب شده (${instanceIds.length}) نمی‌تواند از تعداد وارد شده ($quantity) بیشتر باشد'),
-                  backgroundColor: Colors.red,
-                ),
-              );
+              SnackBarHelper.showError(context, message: 'خط ${i + 1}: تعداد کالاهای یونیک انتخاب شده (${instanceIds.length}) نمی‌تواند از تعداد (${quantity}) بیشتر باشد');
               return;
             }
           }
           
           if (instanceData != null && instanceData.isNotEmpty) {
             if (instanceData.length > quantity) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('خط ${i + 1}: تعداد کالاهای یونیک ثبت شده (${instanceData.length}) نمی‌تواند از تعداد وارد شده ($quantity) بیشتر باشد'),
-                  backgroundColor: Colors.red,
-                ),
-              );
+              SnackBarHelper.showError(context, message: 'خط ${i + 1}: تعداد کالاهای یونیک ثبت شده (${instanceData.length}) نمی‌تواند از تعداد (${quantity}) بیشتر باشد');
               return;
             }
           }
@@ -1183,9 +1129,7 @@ class _WarehouseDocumentFormDialogState extends State<WarehouseDocumentFormDialo
       // اعتبارسنجی انبار با استفاده از تابع مرکزی
       final warehouseError = _validateLineWarehouse(line, i);
       if (warehouseError != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(warehouseError)),
-        );
+        SnackBarHelper.show(context, message: warehouseError);
         return;
       }
     }
@@ -1202,9 +1146,7 @@ class _WarehouseDocumentFormDialogState extends State<WarehouseDocumentFormDialo
       final errorMessage = e.toString().contains('Exception:')
           ? e.toString().split('Exception:').last.trim()
           : 'خطا در ذخیره حواله. لطفاً دوباره تلاش کنید.';
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(errorMessage)),
-      );
+      SnackBarHelper.show(context, message: errorMessage);
     } finally {
       if (mounted) {
         setState(() => _saving = false);
@@ -1236,16 +1178,12 @@ class _WarehouseDocumentFormDialogState extends State<WarehouseDocumentFormDialo
         payload: payload,
       );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('حواله ویرایش شد')),
-      );
+      SnackBarHelper.show(context, message: 'حواله ویرایش شد');
     } else {
       // حالت ایجاد جدید
       await _svc.createManual(businessId: widget.businessId, payload: payload);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('حواله ایجاد شد')),
-      );
+      SnackBarHelper.show(context, message: 'حواله ایجاد شد');
     }
     
     Navigator.of(context).pop(true);
@@ -1271,9 +1209,7 @@ class _WarehouseDocumentFormDialogState extends State<WarehouseDocumentFormDialo
       body: payload,
     );
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('حواله از فاکتور ثبت شد')),
-    );
+    SnackBarHelper.show(context, message: 'حواله از فاکتور ثبت شد');
     Navigator.of(context).pop();
     widget.onSuccess?.call();
   }

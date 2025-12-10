@@ -70,9 +70,7 @@ class _PettyCashFormDialogState extends State<PettyCashFormDialog> {
 
 		if (_currencyId == null) {
 			final t = AppLocalizations.of(context);
-			ScaffoldMessenger.of(context).showSnackBar(
-				SnackBar(content: Text(t.currency), backgroundColor: Colors.red),
-			);
+   SnackBarHelper.showError(context, message: t.currency);
 			return;
 		}
 
@@ -107,9 +105,7 @@ class _PettyCashFormDialogState extends State<PettyCashFormDialog> {
 		} catch (e) {
 			if (mounted) {
 				final t = AppLocalizations.of(context);
-				ScaffoldMessenger.of(context).showSnackBar(
-					SnackBar(content: Text('${t.error}: $e'), backgroundColor: Colors.red),
-				);
+    SnackBarHelper.showError(context, message: '${t.error}: $e');
 			}
 		} finally {
 			if (mounted) {

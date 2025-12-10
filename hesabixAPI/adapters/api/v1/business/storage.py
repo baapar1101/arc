@@ -635,6 +635,42 @@ async def upload_file_endpoint(
 			raise
 
 
+@router.get(
+	"/files/{file_id}/thumbnail",
+	summary="دانلود thumbnail فایل تصویر",
+	description="دانلود نسخه کم‌حجم (thumbnail) برای فایل‌های تصویری الصاق شده به کسب‌وکار",
+)
+async def download_file_thumbnail_endpoint(
+	business_id: int,
+	file_id: str,
+	request: Request,
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+	size: str = Query(
+		"small",
+		description="سایز thumbnail برای تصاویر (small یا medium). در صورت عدم پشتیبانی، نادیده گرفته می‌شود.",
+	),
+) -> Response:
+	"""دانلود thumbnail برای فایل‌های تصویری"""
+	# بررسی دسترسی به کسب‌وکار
+	if not ctx.can_access_business(business_id):
+		raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار ندارید", http_status=403)
+
+	storage = FileStorageService(db)
+	try:
+		thumb_size = "medium" if size == "medium" else "small"
+		file_data = await storage.download_image_thumbnail(UUID(file_id), size=thumb_size)  # type: ignore[arg-type]
+	except Exception as e:
+		raise ApiError("FILE_NOT_FOUND", f"فایل یافت نشد: {str(e)}", http_status=404)
+
+	filename = file_data.get("filename") or "file"
+	return StreamingResponse(
+		io.BytesIO(file_data["content"]),
+		media_type=file_data.get("mime_type") or "application/octet-stream",
+		headers={"Content-Disposition": f'inline; filename=\"{filename}\"'},
+	)
+
+
 @router.put(
 	"/files/{file_id}/rename",
 	summary="تغییر نام فایل",

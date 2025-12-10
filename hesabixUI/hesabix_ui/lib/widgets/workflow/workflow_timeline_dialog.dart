@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../services/workflow_service.dart';
+import '../../utils/snackbar_helper.dart';
+
 
 /// دیالوگ نمایش Timeline اجرای workflow
 class WorkflowTimelineDialog extends StatefulWidget {
@@ -51,9 +53,7 @@ class _WorkflowTimelineDialogState extends State<WorkflowTimelineDialog> {
     } catch (e) {
       if (mounted) {
         setState(() => _loading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطا در بارگذاری timeline: $e')),
-        );
+        SnackBarHelper.show(context, message: 'خطا در بارگذاری timeline: $e');
       }
     }
   }

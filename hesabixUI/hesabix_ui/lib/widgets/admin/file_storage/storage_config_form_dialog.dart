@@ -129,28 +129,18 @@ class _StorageConfigFormDialogState extends State<StorageConfigFormDialog> {
         
         // Only show SnackBar if there's no onSaved callback (parent will handle notification)
         if (widget.onSaved == null) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                widget.config != null 
-                    ? AppLocalizations.of(context).emailConfigUpdatedSuccessfully
-                    : AppLocalizations.of(context).emailConfigSavedSuccessfully,
-              ),
-              backgroundColor: Colors.green,
-            ),
-          );
+          final t = AppLocalizations.of(context);
+          SnackBarHelper.showSuccess(context, message: widget.config != null 
+                    ? t.storageConfigUpdated
+                    : t.storageConfigCreated);
         }
         
         widget.onSaved?.call();
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('${AppLocalizations.of(context).error}: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        final t = AppLocalizations.of(context);
+        SnackBarHelper.showError(context, message: '${t.error}: $e');
       }
     } finally {
       if (mounted) {

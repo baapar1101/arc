@@ -6,6 +6,8 @@ import '../../../models/product_form_data.dart';
 import '../../../utils/number_normalizer.dart';
 import '../../../utils/product_form_validator.dart';
 import '../../../widgets/invoice/warehouse_combobox_widget.dart';
+import '../../../utils/snackbar_helper.dart';
+
 
 class ProductPricingInventorySection extends StatefulWidget {
   final int businessId;
@@ -365,6 +367,7 @@ class _ProductPricingInventorySectionState extends State<ProductPricingInventory
         ),
         const SizedBox(height: 12),
         ...widget.draftPriceItems.map((it) {
+          final minQty = _toNum(it['min_qty']);
           return Card(
             margin: const EdgeInsets.symmetric(vertical: 6),
             child: ListTile(
@@ -403,13 +406,13 @@ class _ProductPricingInventorySectionState extends State<ProductPricingInventory
                       ],
                     ),
                   ],
-                  if (it['min_qty'] != null && (it['min_qty'] as num) > 0) ...[
+                  if (minQty != null && minQty > 0) ...[
                     const SizedBox(height: 4),
                     Row(
                       children: [
                         Icon(Icons.shopping_cart, size: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
                         const SizedBox(width: 4),
-                        Text('حداقل تعداد: ${it['min_qty']}'),
+                        Text('حداقل تعداد: ${minQty.toStringAsFixed(0)}'),
                       ],
                     ),
                   ],
@@ -443,16 +446,24 @@ class _ProductPricingInventorySectionState extends State<ProductPricingInventory
 
   String _resolvePriceListTitle(dynamic id) {
     if (id == null) return '-';
+    final idNum = _toNum(id);
+    if (idNum == null) return 'لیست ${id.toString()}';
     for (final pl in widget.priceLists) {
-      if (pl['id'] == id) return (pl['name'] ?? '').toString();
+      final plId = _toNum(pl['id']);
+      if (plId != null && plId == idNum) {
+        return (pl['name'] ?? '').toString();
+      }
     }
     return 'لیست ${id.toString()}';
   }
   
   String _resolveCurrencyTitle(dynamic id) {
     if (id == null) return '-';
+    final idNum = _toNum(id);
+    if (idNum == null) return 'ارز ${id.toString()}';
     for (final c in widget.currencies) {
-      if (c['id'] == id) {
+      final cId = _toNum(c['id']);
+      if (cId != null && cId == idNum) {
         final title = c['title'] ?? c['name'] ?? '';
         final code = c['code'] ?? '';
         return code.isNotEmpty ? '$title ($code)' : title;
@@ -538,26 +549,42 @@ class _ProductPricingInventorySectionState extends State<ProductPricingInventory
     );
   }
 
+  // Helper function to safely convert dynamic value to num
+  num? _toNum(dynamic value) {
+    if (value == null) return null;
+    if (value is num) return value;
+    if (value is String) {
+      return num.tryParse(value);
+    }
+    return null;
+  }
+
+  // Helper function to safely convert dynamic value to int
+  int? _toInt(dynamic value) {
+    final numValue = _toNum(value);
+    return numValue?.toInt();
+  }
+
   Future<void> _openEditorDialog(BuildContext context, {Map<String, dynamic>? existing}) async {
     final formKey = GlobalKey<FormState>();
-    int? priceListId = (existing?['price_list_id'] as num?)?.toInt();
-    int? currencyId = (existing?['currency_id'] as num?)?.toInt();
+    int? priceListId = _toInt(existing?['price_list_id']);
+    int? currencyId = _toInt(existing?['currency_id']);
     
     // Set first price list as default if none provided and price lists exist
     if (priceListId == null && widget.priceLists.isNotEmpty) {
-      priceListId = (widget.priceLists.first['id'] as num).toInt();
+      priceListId = _toInt(widget.priceLists.first['id']);
     }
     
     // Default select business default currency if none provided
     if (currencyId == null && widget.currencies.isNotEmpty) {
       try {
         final def = widget.currencies.firstWhere((c) => (c['is_default'] == true));
-        currencyId = (def['id'] as num?)?.toInt() ?? currencyId;
+        currencyId = _toInt(def['id']) ?? currencyId;
       } catch (_) {
         // If no explicit default flagged, keep null to force selection
       }
     }
-    num price = (existing?['price'] as num?) ?? 0;
+    num price = _toNum(existing?['price']) ?? 0;
 
     final t = AppLocalizations.of(context);
     await showDialog<bool>(
@@ -574,10 +601,15 @@ class _ProductPricingInventorySectionState extends State<ProductPricingInventory
                 DropdownButtonFormField<int>(
                   initialValue: priceListId,
                   items: widget.priceLists
-                      .map((pl) => DropdownMenuItem<int>(
-                            value: (pl['id'] as num).toInt(),
-                            child: Text((pl['name'] ?? '').toString()),
-                          ))
+                      .map((pl) {
+                        final id = _toInt(pl['id']);
+                        if (id == null) return null;
+                        return DropdownMenuItem<int>(
+                          value: id,
+                          child: Text((pl['name'] ?? '').toString()),
+                        );
+                      })
+                      .whereType<DropdownMenuItem<int>>()
                       .toList(),
                   onChanged: (v) => priceListId = v,
                   decoration: InputDecoration(labelText: t.priceList),
@@ -587,10 +619,15 @@ class _ProductPricingInventorySectionState extends State<ProductPricingInventory
                 DropdownButtonFormField<int>(
                   initialValue: currencyId,
                   items: widget.currencies
-                      .map((c) => DropdownMenuItem<int>(
-                            value: (c['id'] as num).toInt(),
-                            child: Text('${c['title'] ?? c['name']} (${c['code']})'),
-                          ))
+                      .map((c) {
+                        final id = _toInt(c['id']);
+                        if (id == null) return null;
+                        return DropdownMenuItem<int>(
+                          value: id,
+                          child: Text('${c['title'] ?? c['name']} (${c['code']})'),
+                        );
+                      })
+                      .whereType<DropdownMenuItem<int>>()
                       .toList(),
                   onChanged: (v) => currencyId = v,
                   decoration: InputDecoration(labelText: t.currency),
@@ -706,21 +743,11 @@ class _ProductPricingInventorySectionState extends State<ProductPricingInventory
                       // تبدیل کالا
                       final success = await controller?.convertProductToUnique(widget.productId!);
                       if (success == true && mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('کالا با موفقیت به حالت یونیک تبدیل شد'),
-                            backgroundColor: Colors.green,
-                          ),
-                        );
+                        SnackBarHelper.showSuccess(context, message: 'کالا با موفقیت به حالت یونیک تبدیل شد');
                         // به‌روزرسانی فرم
                         setState(() {});
                       } else if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(controller?.errorMessage ?? 'خطا در تبدیل کالا'),
-                            backgroundColor: Colors.red,
-                          ),
-                        );
+                        SnackBarHelper.showError(context, message: controller?.errorMessage ?? 'خطا در تبدیل کالا');
                       }
                     },
                     icon: const Icon(Icons.transform),

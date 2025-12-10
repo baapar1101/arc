@@ -94,10 +94,12 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
   late ScrollController _horizontalScrollController;
   
   // Density (row height)
-  bool _dense = true;
+  // Default: non-dense (normal) rows
+  bool _dense = false;
   
   // Keyboard focus and navigation
   final FocusNode _tableFocusNode = FocusNode(debugLabel: 'DataTableFocus');
+  final FocusNode _searchFocusNode = FocusNode(debugLabel: 'SearchFieldFocus');
   int _activeRowIndex = -1;
   int? _lastSelectedRowIndex;
   
@@ -144,6 +146,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     _searchDebounce?.cancel();
     _horizontalScrollController.dispose();
     _tableFocusNode.dispose();
+    _searchFocusNode.dispose();
     for (var controller in _columnSearchControllers.values) {
       controller.dispose();
     }
@@ -164,7 +167,8 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final key = 'data_table_density_${widget.config.effectiveTableId}';
-      final dense = prefs.getBool(key) ?? true; // Default to dense mode
+      // Default to non-dense mode when no preference is stored
+      final dense = prefs.getBool(key) ?? false;
       if (mounted) setState(() => _dense = dense);
     } catch (_) {}
   }
@@ -731,13 +735,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
       debugPrint('Error saving column settings: $e');
       if (mounted) {
         final t = Localizations.of<AppLocalizations>(context, AppLocalizations)!;
-        final messenger = ScaffoldMessenger.of(context);
-        messenger.showSnackBar(
-          SnackBar(
-            content: Text('${t.error}: $e'),
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
-        );
+        SnackBarHelper.showError(context, message: '${t.error}: $e');
       }
     }
   }
@@ -905,24 +903,12 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
         }
         
         if (mounted) {
-          final messenger = ScaffoldMessenger.of(context);
-          messenger.showSnackBar(
-            SnackBar(
-              content: Text(t.exportSuccess),
-              backgroundColor: Theme.of(context).colorScheme.primary,
-            ),
-          );
+          SnackBarHelper.showSuccess(context, message: t.exportSuccess);
         }
       }
     } catch (e) {
       if (mounted) {
-        final messenger = ScaffoldMessenger.of(context);
-        messenger.showSnackBar(
-          SnackBar(
-            content: Text('${t.exportError}: $e'),
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
-        );
+        SnackBarHelper.showError(context, message: '${t.exportError}: $e');
       }
     } finally {
       if (mounted) {
@@ -1075,6 +1061,10 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
         child: Actions(
           actions: <Type, Action<Intent>>{
             MoveRowIntent: CallbackAction<MoveRowIntent>(onInvoke: (intent) {
+              // اگر فیلد جست‌وجو focus دارد، کلیدها را به عنوان متن وارد کن
+              if (_searchFocusNode.hasFocus) {
+                return null; // اجازه می‌دهد کلید به صورت عادی پردازش شود
+              }
               if (_items.isEmpty) return null;
               setState(() {
                 final next = (_activeRowIndex == -1 ? 0 : _activeRowIndex) + intent.delta;
@@ -1875,6 +1865,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
           Expanded(
             child: TextField(
               controller: _searchCtrl,
+              focusNode: _searchFocusNode,
               decoration: InputDecoration(
                 prefixIcon: const Icon(Icons.search, size: 18),
                 hintText: t.searchInNameEmail,

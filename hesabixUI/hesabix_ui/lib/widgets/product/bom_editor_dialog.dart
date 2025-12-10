@@ -1329,11 +1329,11 @@ class _BomEditorDialogState extends State<BomEditorDialog> with SingleTickerProv
   bool _validateBeforeSave() {
     // اعتبارسنجی نسخه و نام
     if (_versionController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('نسخه نمی‌تواند خالی باشد')));
+      SnackBarHelper.show(context, message: 'نسخه نمی‌تواند خالی باشد');
       return false;
     }
     if (_nameController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('عنوان نمی‌تواند خالی باشد')));
+      SnackBarHelper.show(context, message: 'عنوان نمی‌تواند خالی باشد');
       return false;
     }
 
@@ -1341,14 +1341,14 @@ class _BomEditorDialogState extends State<BomEditorDialog> with SingleTickerProv
     if (_yieldController.text.trim().isNotEmpty) {
       final yield = double.tryParse(_yieldController.text.replaceAll(',', '.'));
       if (yield == null || yield < 0 || yield > 100) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('درصد بازده باید بین 0 تا 100 باشد')));
+        SnackBarHelper.show(context, message: 'درصد بازده باید بین 0 تا 100 باشد');
         return false;
       }
     }
     if (_wastageController.text.trim().isNotEmpty) {
       final wastage = double.tryParse(_wastageController.text.replaceAll(',', '.'));
       if (wastage == null || wastage < 0 || wastage > 100) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('درصد پرت باید بین 0 تا 100 باشد')));
+        SnackBarHelper.show(context, message: 'درصد پرت باید بین 0 تا 100 باشد');
         return false;
       }
     }

@@ -474,9 +474,7 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
       final fullDoc = await _service.getById(document.id);
       if (fullDoc == null) {
         if (!ctx.mounted) return;
-        ScaffoldMessenger.of(ctx).showSnackBar(
-          const SnackBar(content: Text('سند یافت نشد')),
-        );
+        SnackBarHelper.show(ctx, message: 'سند یافت نشد');
         return;
       }
 
@@ -493,9 +491,7 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
       );
     } catch (e) {
       if (!ctx.mounted) return;
-      ScaffoldMessenger.of(ctx).showSnackBar(
-        SnackBar(content: Text('خطا در بارگذاری جزئیات: $e')),
-      );
+      SnackBarHelper.show(ctx, message: 'خطا در بارگذاری جزئیات: $e');
     }
   }
 
@@ -508,9 +504,7 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
       final fullDoc = await _service.getById(document.id);
       if (fullDoc == null) {
         if (!ctx.mounted) return;
-        ScaffoldMessenger.of(ctx).showSnackBar(
-          const SnackBar(content: Text('سند یافت نشد')),
-        );
+        SnackBarHelper.show(ctx, message: 'سند یافت نشد');
         return;
       }
       if (!ctx.mounted) return;
@@ -531,9 +525,7 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
       }
     } catch (e) {
       if (!ctx.mounted) return;
-      ScaffoldMessenger.of(ctx).showSnackBar(
-        SnackBar(content: Text('خطا در آماده‌سازی ویرایش: $e')),
-      );
+      SnackBarHelper.show(ctx, message: 'خطا در آماده‌سازی ویرایش: $e');
     }
   }
 
@@ -575,12 +567,7 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
       if (success) {
         if (mounted) {
           Navigator.pop(context); // بستن لودینگ
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('سند ${document.code} با موفقیت حذف شد'),
-              backgroundColor: Colors.green,
-            ),
-          );
+          SnackBarHelper.showSuccess(context, message: 'سند ${document.code} با موفقیت حذف شد');
           setState(() {
             _selectedCount = 0; // پاک‌سازی شمارنده انتخاب پس از حذف
           });
@@ -630,12 +617,7 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
           message = e.toString();
         }
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(message),
-            backgroundColor: Colors.red,
-          ),
-        );
+        SnackBarHelper.showError(context, message: message);
       }
     }
   }
@@ -701,12 +683,7 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
       await _service.deleteMultiple(ids);
       if (!ctx.mounted) return;
       Navigator.pop(ctx); // بستن لودینگ
-      ScaffoldMessenger.of(ctx).showSnackBar(
-        SnackBar(
-          content: Text('${ids.length} سند با موفقیت حذف شد'),
-          backgroundColor: Colors.green,
-        ),
-      );
+      SnackBarHelper.showSuccess(ctx, message: '${ids.length} سند با موفقیت حذف شد');
       setState(() {
         _selectedCount = 0; // پاک‌سازی شمارنده انتخاب پس از حذف گروهی
       });
@@ -720,12 +697,7 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
       } else {
         message = e.toString();
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(message),
-          backgroundColor: Colors.red,
-        ),
-      );
+      SnackBarHelper.showError(context, message: message);
     }
   }
 }

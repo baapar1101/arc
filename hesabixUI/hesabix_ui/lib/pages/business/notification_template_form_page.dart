@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../../core/api_client.dart';
+import '../../core/api_client.dart';import '../../utils/snackbar_helper.dart';
+
 
 /// صفحه فرم ایجاد/ویرایش قالب نوتیفیکیشن
 class NotificationTemplateFormPage extends StatefulWidget {
@@ -87,12 +88,7 @@ class _NotificationTemplateFormPageState extends State<NotificationTemplateFormP
       _loadDefaultEventTypes();
       
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('⚠️ رویدادها از حافظه محلی بارگذاری شدند. جداول سیستم ممکن است ایجاد نشده باشند.'),
-            duration: const Duration(seconds: 5),
-          ),
-        );
+        SnackBarHelper.show(context, message: '⚠️ رویدادها از حافظه محلی بارگذاری شدند. جداول سیستم ممکن است ایجاد نشده باشند.');
       }
     }
   }
@@ -209,9 +205,7 @@ class _NotificationTemplateFormPageState extends State<NotificationTemplateFormP
     } catch (e) {
       setState(() => _isLoading = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطا در بارگذاری قالب: $e')),
-        );
+        SnackBarHelper.show(context, message: 'خطا در بارگذاری قالب: $e');
       }
     }
   }
@@ -220,9 +214,7 @@ class _NotificationTemplateFormPageState extends State<NotificationTemplateFormP
     if (!_formKey.currentState!.validate()) return;
     
     if (_selectedEventType == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('لطفاً نوع رویداد را انتخاب کنید')),
-      );
+      SnackBarHelper.show(context, message: 'لطفاً نوع رویداد را انتخاب کنید');
       return;
     }
 
@@ -258,9 +250,7 @@ class _NotificationTemplateFormPageState extends State<NotificationTemplateFormP
         );
         
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('✅ قالب ایجاد شد. برای فعال‌سازی باید آن را برای تایید ارسال کنید.')),
-          );
+          SnackBarHelper.show(context, message: '✅ قالب ایجاد شد. برای فعال‌سازی باید آن را برای تایید ارسال کنید.');
           context.pop(true);
         }
       } else {
@@ -271,17 +261,13 @@ class _NotificationTemplateFormPageState extends State<NotificationTemplateFormP
         );
         
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('✅ قالب به‌روزرسانی شد')),
-          );
+          SnackBarHelper.show(context, message: '✅ قالب به‌روزرسانی شد');
           context.pop(true);
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطا: $e'), backgroundColor: Colors.red),
-        );
+        SnackBarHelper.showError(context, message: 'خطا: $e');
       }
     } finally {
       if (mounted) {
@@ -292,9 +278,7 @@ class _NotificationTemplateFormPageState extends State<NotificationTemplateFormP
 
   Future<void> _generatePreview() async {
     if (_selectedEventType == null || _bodyController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('لطفاً رویداد و محتوای قالب را وارد کنید')),
-      );
+      SnackBarHelper.show(context, message: 'لطفاً رویداد و محتوای قالب را وارد کنید');
       return;
     }
 
@@ -347,9 +331,7 @@ class _NotificationTemplateFormPageState extends State<NotificationTemplateFormP
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطا در پیش‌نمایش: $e')),
-        );
+        SnackBarHelper.show(context, message: 'خطا در پیش‌نمایش: $e');
       }
     }
   }

@@ -253,22 +253,12 @@ class _StorageFileManagerPageState extends State<StorageFileManagerPage> {
         );
 
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('فایل با موفقیت آپلود شد'),
-              backgroundColor: Colors.green,
-            ),
-          );
+          SnackBarHelper.showSuccess(context, message: 'فایل با موفقیت آپلود شد');
           _load();
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('خطا در آپلود فایل: $e'),
-              backgroundColor: Colors.red,
-            ),
-          );
+          SnackBarHelper.showError(context, message: 'خطا در آپلود فایل: $e');
         }
       } finally {
         if (mounted) {
@@ -277,12 +267,7 @@ class _StorageFileManagerPageState extends State<StorageFileManagerPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('خطا: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        SnackBarHelper.showError(context, message: 'خطا: $e');
         setState(() => _uploading = false);
       }
     }
@@ -301,21 +286,11 @@ class _StorageFileManagerPageState extends State<StorageFileManagerPage> {
       );
       if (mounted) {
         _load();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('فایل با موفقیت حذف شد'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        SnackBarHelper.showSuccess(context, message: 'فایل با موفقیت حذف شد');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('خطا: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        SnackBarHelper.showError(context, message: 'خطا: $e');
       }
     }
   }
@@ -487,21 +462,11 @@ class _StorageFileManagerPageState extends State<StorageFileManagerPage> {
       );
       if (mounted) {
         _load();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('نام فایل با موفقیت تغییر یافت'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        SnackBarHelper.showSuccess(context, message: 'نام فایل با موفقیت تغییر یافت');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('خطا در تغییر نام: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        SnackBarHelper.showError(context, message: 'خطا در تغییر نام: $e');
       }
     }
   }
@@ -564,22 +529,12 @@ class _StorageFileManagerPageState extends State<StorageFileManagerPage> {
           ext: safeExt,
         );
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('فایل با موفقیت ذخیره شد'),
-              backgroundColor: Colors.green,
-            ),
-          );
+          SnackBarHelper.showSuccess(context, message: 'فایل با موفقیت ذخیره شد');
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('خطا در دانلود فایل: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        SnackBarHelper.showError(context, message: 'خطا در دانلود فایل: $e');
       }
     }
   }

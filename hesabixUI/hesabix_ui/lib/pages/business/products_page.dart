@@ -17,6 +17,7 @@ import '../../core/auth_store.dart';
 import '../../utils/number_formatters.dart';
 import '../../utils/date_formatters.dart';
 import '../../services/warehouse_service.dart';
+import '../../utils/image_cache.dart';
 import 'price_lists_page.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/responsive_helper.dart';
@@ -47,6 +48,7 @@ class _ProductsPageState extends State<ProductsPage> {
   static const _productModuleContext = 'products';
   final GlobalKey _tableKey = GlobalKey();
   late final BusinessStorageService _storageService;
+  final ProductImageCache _imageCache = GlobalImageCache.instance;
   
   @override
   void initState() {
@@ -455,9 +457,7 @@ class _ProductsPageState extends State<ProductsPage> {
     final productId = product['id'];
     if (productId == null) {
       if (mounted) {
-        ScaffoldMessenger.of(dialogContext).showSnackBar(
-          const SnackBar(content: Text('برای الصاق فایل، ابتدا کالا باید ذخیره شود')),
-        );
+        SnackBarHelper.showError(dialogContext, message: 'برای الصاق فایل، ابتدا کالا باید ذخیره شود');
       }
       return;
     }
@@ -482,24 +482,14 @@ class _ProductsPageState extends State<ProductsPage> {
         contextId: productId.toString(),
       );
       if (!mounted) return;
-      ScaffoldMessenger.of(dialogContext).showSnackBar(
-        const SnackBar(
-          content: Text('فایل با موفقیت الصاق شد'),
-          backgroundColor: Colors.green,
-        ),
-      );
+      SnackBarHelper.showSuccess(dialogContext, message: 'فایل با موفقیت الصاق شد');
       refreshKey.refresh();
     } on DioException catch (e) {
       if (!mounted) return;
       await _handleProductFileUploadError(dialogContext, e);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(dialogContext).showSnackBar(
-        SnackBar(
-          content: Text('خطا در آپلود فایل: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      SnackBarHelper.showError(dialogContext, message: 'خطا در آپلود فایل: $e');
     } finally {
       onUploadingChanged(false);
     }
@@ -520,21 +510,11 @@ class _ProductsPageState extends State<ProductsPage> {
       } else if (error is Map && error['message'] is String) {
         message = error['message'] as String;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(message),
-          backgroundColor: Colors.red,
-        ),
-      );
+      SnackBarHelper.showError(context, message: message);
       return;
     }
     
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('خطا در آپلود فایل: ${e.message}'),
-        backgroundColor: Colors.red,
-      ),
-    );
+    SnackBarHelper.showError(context, message: 'خطا در آپلود فایل: ${e.message}');
   }
   
   Future<void> _showStorageLimitDialog(BuildContext context, Map<String, dynamic> error) async {
@@ -663,7 +643,10 @@ class _ProductsPageState extends State<ProductsPage> {
 
   Future<void> _showProductDetailsDialog(Map<String, dynamic> product) async {
     final t = AppLocalizations.of(context);
-    final fullImageUrl = _buildFullImageUrl(product['image_url'] as String?);
+    // در صورت وجود thumbnail، می‌توان از آن برای پیش‌نمایش استفاده کرد؛ در غیر این صورت تصویر اصلی
+    final fullImageUrl = _buildFullImageUrl(
+      (product['image_url'] ?? product['thumbnail_url']) as String?,
+    );
     final attachmentsKey = AttachedFilesWidgetKey();
     bool uploadingFile = false;
     
@@ -923,6 +906,12 @@ class _ProductsPageState extends State<ProductsPage> {
 
   /// دانلود تصویر با استفاده از Dio (با headerهای authentication)
   Future<List<int>> _loadImageWithAuth(String url) async {
+    // استفاده از cache برای جلوگیری از دانلود مجدد
+    final cached = _imageCache.get(url);
+    if (cached != null) {
+      return cached;
+    }
+
     try {
       // تشخیص اینکه آیا URL کامل است یا نسبی
       final isFullUrl = url.startsWith('http://') || url.startsWith('https://');
@@ -969,7 +958,12 @@ class _ProductsPageState extends State<ProductsPage> {
           responseType: ResponseType.bytes,
         ),
       );
-      return response.data ?? [];
+      final data = response.data ?? <int>[];
+      final bytes = Uint8List.fromList(data);
+      if (bytes.isNotEmpty) {
+        _imageCache.put(url, bytes);
+      }
+      return bytes;
     } catch (e) {
       return [];
     }
@@ -1016,7 +1010,9 @@ class _ProductsPageState extends State<ProductsPage> {
               sortable: false,
               searchable: false,
               builder: (item, index) {
-                final fullUrl = _buildFullImageUrl(item['image_url'] as String?);
+                // در لیست، در صورت وجود thumbnail از آن استفاده می‌کنیم؛ در غیر این صورت از تصویر اصلی
+                final rawUrl = (item['thumbnail_url'] ?? item['image_url']) as String?;
+                final fullUrl = _buildFullImageUrl(rawUrl);
                 if (fullUrl == null) {
                   return const Center(child: SizedBox.shrink());
                 }
@@ -1556,12 +1552,7 @@ class _ProductStockTabWidgetState extends State<_ProductStockTabWidget> {
         setState(() {
           _stockLoading = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('خطا در بارگذاری موجودی: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        SnackBarHelper.showError(context, message: 'خطا در بارگذاری موجودی: $e');
       }
     }
   }

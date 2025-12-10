@@ -555,11 +555,17 @@ def delete_product(db: Session, product_id: int, business_id: int) -> tuple[bool
 
 
 def _get_image_url(obj: Product) -> str | None:
-    """تولید URL برای نمایش عکس محصول"""
+    """تولید URL برای نمایش عکس محصول (فایل اصلی)"""
     if not obj.image_file_id:
         return None
-    # URL برای دانلود عکس از طریق storage endpoint
     return f"/api/v1/business/{obj.business_id}/storage/files/{obj.image_file_id}/download"
+
+
+def _get_thumbnail_url(obj: Product) -> str | None:
+    """تولید URL برای نمایش thumbnail عکس محصول"""
+    if not obj.image_file_id:
+        return None
+    return f"/api/v1/business/{obj.business_id}/storage/files/{obj.image_file_id}/thumbnail?size=small"
 
 
 def _to_dict(obj: Product, db: Optional[Session] = None) -> Dict[str, Any]:
@@ -601,6 +607,7 @@ def _to_dict(obj: Product, db: Optional[Session] = None) -> Dict[str, Any]:
         "attribute_ids": attribute_ids,
         "image_file_id": obj.image_file_id,
         "image_url": _get_image_url(obj) if obj.image_file_id else None,
+        "thumbnail_url": _get_thumbnail_url(obj) if obj.image_file_id else None,
         "default_warehouse_id": obj.default_warehouse_id,
         "default_warehouse_name": obj.default_warehouse.name if obj.default_warehouse else None,
         "default_warehouse_code": obj.default_warehouse.code if obj.default_warehouse else None,

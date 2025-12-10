@@ -100,9 +100,7 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
     } catch (e) {
       setState(() => _loadingPlans = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطا در دریافت پلن‌ها: $e'), backgroundColor: Colors.red),
-        );
+        SnackBarHelper.showError(context, message: 'خطا در دریافت پلن‌ها: $e');
       }
     }
   }
@@ -118,9 +116,7 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
     } catch (e) {
       setState(() => _loadingInvoices = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطا در دریافت صورتحساب‌ها: $e'), backgroundColor: Colors.red),
-        );
+        SnackBarHelper.showError(context, message: 'خطا در دریافت صورتحساب‌ها: $e');
       }
     }
   }
@@ -139,9 +135,7 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
         final message = isPaid
             ? 'پلن با موفقیت خریداری و پرداخت شد.'
             : 'اشتراک با موفقیت ایجاد شد. لطفاً صورتحساب را پرداخت کنید.';
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(message), backgroundColor: Colors.green),
-        );
+        SnackBarHelper.showSuccess(context, message: message);
         _load();
         _loadInvoices();
         if (!isPaid) {
@@ -164,15 +158,11 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
             }
           }
         }
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(errorMessage), backgroundColor: Colors.red),
-        );
+        SnackBarHelper.showError(context, message: errorMessage);
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطا در اشتراک: $e'), backgroundColor: Colors.red),
-        );
+        SnackBarHelper.showError(context, message: 'خطا در اشتراک: $e');
       }
     }
   }
@@ -185,12 +175,7 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
       );
       
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('صورتحساب با موفقیت پرداخت شد'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        SnackBarHelper.showSuccess(context, message: 'صورتحساب با موفقیت پرداخت شد');
         _loadInvoices();
         _load();
       }
@@ -200,9 +185,7 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
         if (e.toString().contains('insufficient_funds')) {
           errorMessage = 'موجودی کیف پول کافی نیست';
         }
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(errorMessage), backgroundColor: Colors.red),
-        );
+        SnackBarHelper.showError(context, message: errorMessage);
       }
     }
   }
@@ -230,12 +213,7 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
         );
 
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('فایل با موفقیت آپلود شد'),
-              backgroundColor: Colors.green,
-            ),
-          );
+          SnackBarHelper.showSuccess(context, message: 'فایل با موفقیت آپلود شد');
           _load();
         }
       } on DioException catch (e) {
@@ -244,12 +222,7 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('خطا در آپلود فایل: $e'),
-              backgroundColor: Colors.red,
-            ),
-          );
+          SnackBarHelper.showError(context, message: 'خطا در آپلود فایل: $e');
         }
       } finally {
         if (mounted) {
@@ -258,12 +231,7 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('خطا: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        SnackBarHelper.showError(context, message: 'خطا: $e');
         setState(() => _uploading = false);
       }
     }
@@ -294,12 +262,7 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
       }
     }
     
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(errorMessage),
-        backgroundColor: Colors.red,
-      ),
-    );
+    SnackBarHelper.showError(context, message: errorMessage);
   }
   
   Future<void> _showStorageLimitDialog(Map<String, dynamic> error) async {
@@ -504,12 +467,7 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
     try {
       // نمایش پیغام در حال دانلود
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('در حال آماده‌سازی فایل ZIP...'),
-            duration: Duration(seconds: 2),
-          ),
-        );
+        SnackBarHelper.show(context, message: 'در حال آماده‌سازی فایل ZIP...');
       }
 
       final baseUrl = '/api/v1/business/${widget.businessId}/storage/export-zip';
@@ -539,31 +497,17 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
           );
           
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('فایل ZIP با موفقیت دانلود شد'),
-                backgroundColor: Colors.green,
-              ),
-            );
+            SnackBarHelper.showSuccess(context, message: 'فایل ZIP با موفقیت دانلود شد');
           }
         }
       } else {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('دانلود فایل فقط در نسخه وب پشتیبانی می‌شود'),
-            ),
-          );
+          SnackBarHelper.show(context, message: 'دانلود فایل فقط در نسخه وب پشتیبانی می‌شود');
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('خطا در دانلود: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        SnackBarHelper.showError(context, message: 'خطا در دانلود: $e');
       }
     }
   }
@@ -2082,21 +2026,11 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
       );
       if (mounted) {
         _load();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('فایل با موفقیت حذف شد'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        SnackBarHelper.showSuccess(context, message: 'فایل با موفقیت حذف شد');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('خطا: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        SnackBarHelper.showError(context, message: 'خطا: $e');
       }
     }
   }

@@ -13,6 +13,7 @@ import 'package:hesabix_ui/models/account_model.dart';
 import 'package:hesabix_ui/services/person_service.dart';
 import 'package:hesabix_ui/models/person_model.dart';
 import 'package:hesabix_ui/widgets/date_input_field.dart';
+import 'package:hesabix_ui/utils/snackbar_helper.dart';
 
 class YearEndClosingPage extends StatefulWidget {
   final int businessId;
@@ -138,14 +139,13 @@ class _YearEndClosingPageState extends State<YearEndClosingPage> {
         setState(() {
           _error = 'خطا در دریافت سال مالی جاری: $e';
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('خطا در دریافت اطلاعات: $e'),
-            backgroundColor: Theme.of(context).colorScheme.error,
-            action: SnackBarAction(
-              label: 'تلاش مجدد',
-              onPressed: _loadCurrentFiscalYear,
-            ),
+        SnackBarHelper.show(
+          context,
+          message: 'خطا در دریافت اطلاعات: $e',
+          isError: true,
+          action: SnackBarAction(
+            label: 'تلاش مجدد',
+            onPressed: _loadCurrentFiscalYear,
           ),
         );
       }
@@ -277,14 +277,13 @@ class _YearEndClosingPageState extends State<YearEndClosingPage> {
           _error = 'خطا در دریافت پیش‌نمایش: $e';
           _loading = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('خطا در دریافت پیش‌نمایش: $e'),
-            backgroundColor: Theme.of(context).colorScheme.error,
-            action: SnackBarAction(
-              label: 'تلاش مجدد',
-              onPressed: _loadPreview,
-            ),
+        SnackBarHelper.show(
+          context,
+          message: 'خطا در دریافت پیش‌نمایش: $e',
+          isError: true,
+          action: SnackBarAction(
+            label: 'تلاش مجدد',
+            onPressed: _loadPreview,
           ),
         );
       }
@@ -294,13 +293,7 @@ class _YearEndClosingPageState extends State<YearEndClosingPage> {
   Future<void> _closeFiscalYear() async {
     if (_currentFiscalYearId == null) return;
     if (_newFiscalYearTitleController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('لطفاً عنوان سال مالی جدید را وارد کنید'),
-          backgroundColor: Theme.of(context).colorScheme.error,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      SnackBarHelper.showError(context, message: 'لطفاً عنوان سال مالی جدید را وارد کنید');
       return;
     }
 
@@ -867,7 +860,15 @@ class _YearEndClosingPageState extends State<YearEndClosingPage> {
     
     // بررسی وجود فیلدهای فرمت شده از API
     if (fiscalYear['start_date_formatted'] != null) {
-      startDateFormatted = fiscalYear['start_date_formatted'].toString();
+      final startDateFormattedObj = fiscalYear['start_date_formatted'];
+      // اگر آبجکت است، از فیلد date_only استفاده می‌کنیم
+      if (startDateFormattedObj is Map<String, dynamic>) {
+        startDateFormatted = startDateFormattedObj['date_only']?.toString() ?? 
+                            startDateFormattedObj['formatted']?.toString() ?? 
+                            startDateFormattedObj.toString();
+      } else {
+        startDateFormatted = startDateFormattedObj.toString();
+      }
     } else if (fiscalYear['start_date'] != null) {
       // اگر فرمت شده نبود، خودمان فرمت می‌کنیم
       final startDateStr = fiscalYear['start_date'].toString();
@@ -880,7 +881,15 @@ class _YearEndClosingPageState extends State<YearEndClosingPage> {
     }
     
     if (fiscalYear['end_date_formatted'] != null) {
-      endDateFormatted = fiscalYear['end_date_formatted'].toString();
+      final endDateFormattedObj = fiscalYear['end_date_formatted'];
+      // اگر آبجکت است، از فیلد date_only استفاده می‌کنیم
+      if (endDateFormattedObj is Map<String, dynamic>) {
+        endDateFormatted = endDateFormattedObj['date_only']?.toString() ?? 
+                          endDateFormattedObj['formatted']?.toString() ?? 
+                          endDateFormattedObj.toString();
+      } else {
+        endDateFormatted = endDateFormattedObj.toString();
+      }
     } else if (fiscalYear['end_date'] != null) {
       // اگر فرمت شده نبود، خودمان فرمت می‌کنیم
       final endDateStr = fiscalYear['end_date'].toString();

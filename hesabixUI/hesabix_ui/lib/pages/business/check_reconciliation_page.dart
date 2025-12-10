@@ -880,9 +880,7 @@ class _CheckReconciliationPageState extends State<CheckReconciliationPage> with 
           FilledButton(
             onPressed: () {
               if (nameController.text.trim().isEmpty) {
-                ScaffoldMessenger.of(ctx).showSnackBar(
-                  const SnackBar(content: Text('نام جلسه الزامی است')),
-                );
+                SnackBarHelper.show(ctx, message: 'نام جلسه الزامی است');
                 return;
               }
               Navigator.pop(ctx, true);
@@ -909,18 +907,14 @@ class _CheckReconciliationPageState extends State<CheckReconciliationPage> with 
       );
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('جلسه راس‌گیری با موفقیت ذخیره شد')),
-        );
+        SnackBarHelper.show(context, message: 'جلسه راس‌گیری با موفقیت ذخیره شد');
         _tabController.animateTo(1);
         _refreshHistory();
       }
       return true;
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطا در ذخیره: $e')),
-        );
+        SnackBarHelper.show(context, message: 'خطا در ذخیره: $e');
       }
       return false;
     }
@@ -1146,16 +1140,12 @@ class _CheckReconciliationPageState extends State<CheckReconciliationPage> with 
     try {
       await _checkService.deleteReconciliation(id);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('جلسه راس‌گیری با موفقیت حذف شد')),
-        );
+        SnackBarHelper.show(context, message: 'جلسه راس‌گیری با موفقیت حذف شد');
         _refreshHistory();
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطا در حذف: $e')),
-        );
+        SnackBarHelper.show(context, message: 'خطا در حذف: $e');
       }
     }
   }

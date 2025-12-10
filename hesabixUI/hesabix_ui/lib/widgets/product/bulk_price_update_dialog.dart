@@ -113,9 +113,7 @@ class _BulkPriceUpdateDialogState extends State<BulkPriceUpdateDialog> {
       setState(() => _isLoading = false);
       if (mounted) {
         final t = AppLocalizations.of(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${t.dataLoadingError}: $e')),
-        );
+        SnackBarHelper.show(context, message: '${t.dataLoadingError}: $e');
       }
     }
   }
@@ -152,9 +150,7 @@ class _BulkPriceUpdateDialogState extends State<BulkPriceUpdateDialog> {
       setState(() => _isPreviewLoading = false);
       if (mounted) {
         final t = AppLocalizations.of(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${t.operationFailed}: $e')),
-        );
+        SnackBarHelper.show(context, message: '${t.operationFailed}: $e');
       }
     }
   }
@@ -244,9 +240,7 @@ class _BulkPriceUpdateDialogState extends State<BulkPriceUpdateDialog> {
       setState(() => _isLoading = false);
       if (mounted) {
         final t = AppLocalizations.of(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${t.operationFailed}: $e')),
-        );
+        SnackBarHelper.show(context, message: '${t.operationFailed}: $e');
       }
     }
   }

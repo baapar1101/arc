@@ -242,23 +242,13 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
       setState(() {
         _shareLink = link;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('لینک اشتراک با موفقیت ایجاد شد'),
-          backgroundColor: Colors.green,
-        ),
-      );
+      SnackBarHelper.showSuccess(context, message: 'لینک اشتراک با موفقیت ایجاد شد');
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _shareLinkError = e.toString();
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('خطا در ایجاد لینک: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      SnackBarHelper.showError(context, message: 'خطا در ایجاد لینک: $e');
     } finally {
       if (mounted) {
         setState(() => _creatingShareLink = false);
@@ -277,20 +267,10 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
         _shareLink = null;
         _maxViewsController.clear();
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('لینک اشتراک لغو شد'),
-          backgroundColor: Colors.orange,
-        ),
-      );
+      SnackBarHelper.show(context, message: 'لینک اشتراک لغو شد');
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('خطا در لغو لینک: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      SnackBarHelper.showError(context, message: 'خطا در لغو لینک: $e');
     } finally {
       if (mounted) {
         setState(() => _revokingShareLink = false);
@@ -303,12 +283,7 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
     if (link == null || link.isEmpty) return;
     await Clipboard.setData(ClipboardData(text: link));
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('لینک در کلیپ‌بورد کپی شد'),
-        backgroundColor: Colors.green,
-      ),
-    );
+    SnackBarHelper.showSuccess(context, message: 'لینک در کلیپ‌بورد کپی شد');
   }
 
   Future<_FinancialSummaryResult> _fetchLedgerTotals(int personId, int? fiscalYearId) async {
@@ -1467,18 +1442,14 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
           contextId: personId.toString(),
         );
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('فایل با موفقیت الصاق شد'), backgroundColor: Colors.green),
-        );
+        SnackBarHelper.showSuccess(context, message: 'فایل با موفقیت الصاق شد');
         _attachedFilesKey.refresh();
       } on DioException catch (e) {
         if (!mounted) return;
         await _handleUploadError(e);
       } catch (e) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطا در آپلود فایل: $e'), backgroundColor: Colors.red),
-        );
+        SnackBarHelper.showError(context, message: 'خطا در آپلود فایل: $e');
       } finally {
         if (mounted) {
           setState(() => _uploadingFile = false);
@@ -1487,9 +1458,7 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
     } catch (e) {
       if (!mounted) return;
       setState(() => _uploadingFile = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('خطا: $e'), backgroundColor: Colors.red),
-      );
+      SnackBarHelper.showError(context, message: 'خطا: $e');
     }
   }
 
@@ -1505,16 +1474,12 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
       final message = error is Map<String, dynamic> ? error['message']?.toString() : null;
       if (message != null) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(message), backgroundColor: Colors.red),
-        );
+        SnackBarHelper.showError(context, message: message);
         return;
       }
     }
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('خطا در آپلود فایل'), backgroundColor: Colors.red),
-    );
+    SnackBarHelper.showError(context, message: 'خطا در آپلود فایل');
   }
 
   Future<void> _showStorageLimitDialog(Map<String, dynamic> error) async {

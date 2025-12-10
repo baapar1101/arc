@@ -13,6 +13,8 @@ import '../../utils/number_normalizer.dart';
 import '../../core/calendar_controller.dart';
 import './unique_product_instance_selector_dialog.dart';
 import '../../services/product_service.dart';
+import '../../utils/snackbar_helper.dart';
+
 
 class InvoiceLineItemsTable extends StatefulWidget {
   final int businessId;
@@ -97,16 +99,12 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
     await _loadProductInfo(item.productId!);
     
     if (!_shouldShowInstanceSelector(item)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('این کالا در حالت یونیک نیست')),
-      );
+      SnackBarHelper.show(context, message: 'این کالا در حالت یونیک نیست');
       return;
     }
     
     if (widget.calendarController == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('خطا: CalendarController در دسترس نیست')),
-      );
+      SnackBarHelper.show(context, message: 'خطا: CalendarController در دسترس نیست');
       return;
     }
     
@@ -114,9 +112,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
     final quantity = item.quantity.toInt();
     
     if (quantity <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('لطفاً ابتدا تعداد را وارد کنید')),
-      );
+      SnackBarHelper.show(context, message: 'لطفاً ابتدا تعداد را وارد کنید');
       return;
     }
     

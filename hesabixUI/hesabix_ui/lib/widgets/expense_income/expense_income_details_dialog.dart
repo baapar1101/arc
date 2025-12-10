@@ -374,21 +374,11 @@ class _ExpenseIncomeDetailsDialogState extends State<ExpenseIncomeDetailsDialog>
       await _savePdfFile(pdfBytes, widget.document.code);
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('فایل PDF با موفقیت تولید شد'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        SnackBarHelper.showSuccess(context, message: 'فایل PDF با موفقیت تولید شد');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('خطا در تولید PDF: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        SnackBarHelper.showError(context, message: 'خطا در تولید PDF: $e');
       }
     } finally {
       if (mounted) {

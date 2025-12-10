@@ -105,9 +105,7 @@ class _CheckDetailsDialogState extends State<CheckDetailsDialog> with SingleTick
         setState(() {
           _loadingHistory = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطا در بارگذاری سوابق: $e')),
-        );
+        SnackBarHelper.show(context, message: 'خطا در بارگذاری سوابق: $e');
       }
     }
   }
@@ -136,12 +134,7 @@ class _CheckDetailsDialogState extends State<CheckDetailsDialog> with SingleTick
         );
         
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('فایل با موفقیت الصاق شد'),
-              backgroundColor: Colors.green,
-            ),
-          );
+          SnackBarHelper.showSuccess(context, message: 'فایل با موفقیت الصاق شد');
           _attachedFilesKey.refresh();
         }
       } on DioException catch (e) {
@@ -150,12 +143,7 @@ class _CheckDetailsDialogState extends State<CheckDetailsDialog> with SingleTick
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('خطا در آپلود فایل: $e'),
-              backgroundColor: Colors.red,
-            ),
-          );
+          SnackBarHelper.showError(context, message: 'خطا در آپلود فایل: $e');
         }
       } finally {
         if (mounted) {
@@ -164,12 +152,7 @@ class _CheckDetailsDialogState extends State<CheckDetailsDialog> with SingleTick
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('خطا: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        SnackBarHelper.showError(context, message: 'خطا: $e');
         setState(() => _uploadingFile = false);
       }
     }
@@ -200,12 +183,7 @@ class _CheckDetailsDialogState extends State<CheckDetailsDialog> with SingleTick
       }
     }
     
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(errorMessage),
-        backgroundColor: Colors.red,
-      ),
-    );
+    SnackBarHelper.showError(context, message: errorMessage);
   }
 
   Future<void> _showStorageLimitDialog(Map<String, dynamic> error) async {

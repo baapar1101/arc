@@ -4,6 +4,8 @@ import '../../../services/repair_shop_service.dart';
 import '../../../models/repair_order_model.dart';
 import '../../../models/repair_technician_model.dart';
 import '../../../core/api_client.dart';
+import '../../../utils/snackbar_helper.dart';
+
 
 /// صفحه جزئیات و عملیات سفارش تعمیر
 class RepairOrderDetailPage extends StatefulWidget {
@@ -150,15 +152,11 @@ class _RepairOrderDetailPageState extends State<RepairOrderDetailPage> {
 
       if (mounted) {
         Navigator.of(context).pop(); // بازگشت به لیست
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('سفارش لغو شد')),
-        );
+        SnackBarHelper.show(context, message: 'سفارش لغو شد');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطا: $e')),
-        );
+        SnackBarHelper.show(context, message: 'خطا: $e');
       }
     }
   }
@@ -198,16 +196,12 @@ class _RepairOrderDetailPageState extends State<RepairOrderDetailPage> {
       );
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('تعمیرکار با موفقیت اختصاص یافت')),
-        );
+        SnackBarHelper.show(context, message: 'تعمیرکار با موفقیت اختصاص یافت');
         _loadOrder();
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطا: $e')),
-        );
+        SnackBarHelper.show(context, message: 'خطا: $e');
       }
     }
   }
@@ -231,16 +225,12 @@ class _RepairOrderDetailPageState extends State<RepairOrderDetailPage> {
       );
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('وضعیت با موفقیت تغییر کرد')),
-        );
+        SnackBarHelper.show(context, message: 'وضعیت با موفقیت تغییر کرد');
         _loadOrder();
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطا: $e')),
-        );
+        SnackBarHelper.show(context, message: 'خطا: $e');
       }
     }
   }
@@ -265,16 +255,12 @@ class _RepairOrderDetailPageState extends State<RepairOrderDetailPage> {
       );
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('تعمیر با موفقیت تکمیل شد')),
-        );
+        SnackBarHelper.show(context, message: 'تعمیر با موفقیت تکمیل شد');
         _loadOrder();
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطا: $e')),
-        );
+        SnackBarHelper.show(context, message: 'خطا: $e');
       }
     }
   }
@@ -307,16 +293,12 @@ class _RepairOrderDetailPageState extends State<RepairOrderDetailPage> {
       );
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('فاکتور با موفقیت صادر شد')),
-        );
+        SnackBarHelper.show(context, message: 'فاکتور با موفقیت صادر شد');
         _loadOrder();
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطا: $e')),
-        );
+        SnackBarHelper.show(context, message: 'خطا: $e');
       }
     }
   }

@@ -6,6 +6,8 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/services/backup_service.dart';
 import 'package:file_saver/file_saver.dart';
 import 'package:dio/dio.dart';
+import '../../../utils/snackbar_helper.dart';
+
 
 class BusinessBackupPage extends StatefulWidget {
   final int businessId;
@@ -211,10 +213,7 @@ class _BusinessBackupPageState extends State<BusinessBackupPage> {
 
   void _showSnackBar(String message) {
     if (!mounted) return;
-    final messenger = ScaffoldMessenger.of(context);
-    messenger
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(message)));
+    SnackBarHelper.show(context, message: message);
   }
 
   Widget _buildBody(AppLocalizations t) {

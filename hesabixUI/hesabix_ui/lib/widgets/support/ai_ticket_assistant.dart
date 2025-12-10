@@ -69,9 +69,7 @@ class _AITicketAssistantState extends State<AITicketAssistant>
         _suggesting = false;
       });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطا در دریافت پیشنهاد: $e')),
-        );
+        SnackBarHelper.show(context, message: 'خطا در دریافت پیشنهاد: $e');
       }
     }
   }
@@ -123,9 +121,7 @@ class _AITicketAssistantState extends State<AITicketAssistant>
         }
 
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('پاسخ با موفقیت ارسال شد')),
-          );
+          SnackBarHelper.show(context, message: 'پاسخ با موفقیت ارسال شد');
         }
       } catch (e) {
         setState(() {
@@ -133,9 +129,7 @@ class _AITicketAssistantState extends State<AITicketAssistant>
           _autoReplying = false;
         });
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('خطا در ارسال پاسخ: $e')),
-          );
+          SnackBarHelper.show(context, message: 'خطا در ارسال پاسخ: $e');
         }
       }
     }

@@ -554,12 +554,7 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(t.taxSendSuccess),
-          backgroundColor: Colors.green,
-        ),
-      );
+      SnackBarHelper.showSuccess(context, message: t.taxSendSuccess);
       _refreshData();
     } catch (e) {
       if (navigator.canPop()) {
@@ -616,12 +611,7 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(t.taxRemoveFromWorkspaceSuccess),
-          backgroundColor: Colors.green,
-        ),
-      );
+      SnackBarHelper.showSuccess(context, message: t.taxRemoveFromWorkspaceSuccess);
       _refreshData();
     } catch (e) {
       if (navigator.canPop()) {
@@ -693,12 +683,7 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
       if (!mounted) return;
 
       if (failed.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(t.taxSendSelectedSuccess),
-            backgroundColor: Colors.green,
-          ),
-        );
+        SnackBarHelper.showSuccess(context, message: t.taxSendSelectedSuccess);
       } else {
         _showBatchResultDialog(succeeded.length, failed);
       }
@@ -770,12 +755,7 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(t.taxRemoveSelectedSuccess),
-          backgroundColor: Colors.green,
-        ),
-      );
+      SnackBarHelper.showSuccess(context, message: t.taxRemoveSelectedSuccess);
       _refreshData();
     } catch (e) {
       if (navigator.canPop()) {

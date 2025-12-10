@@ -7,6 +7,8 @@ from sqlalchemy.orm import Session
 from adapters.db.session import get_db
 from adapters.api.v1.schemas import SuccessResponse
 from app.core.responses import success_response, format_datetime_fields
+from app.core.response_cache import cache_response
+from app.core.cache import get_cache
 from app.core.auth_dependency import get_current_user, AuthContext
 from app.core.permissions import require_business_access
 from app.services.business_dashboard_service import (
@@ -79,7 +81,8 @@ router = APIRouter(prefix="/business", tags=["business-dashboard"])
     }
 )
 @require_business_access("business_id")
-def get_business_dashboard(
+@cache_response(ttl=60, vary_by=["business_id"])
+async def get_business_dashboard(
     request: Request,
     business_id: int,
     ctx: AuthContext = Depends(get_current_user),
@@ -369,7 +372,19 @@ def list_dashboard_widget_definitions(
         # Lazy load business_permissions فقط اگر نیاز باشد
         ctx.business_permissions = ctx._get_business_permissions()
     
+    cache = get_cache()
+    cache_key = f"dashboard_widgets_definitions:{business_id}:{ctx.get_user_id()}"
+
+    if cache.enabled:
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return success_response(cached, request)
+    
     data = get_widget_definitions(db=db, business_id=business_id, user_id=ctx.get_user_id(), ctx=ctx)
+
+    if cache.enabled:
+        cache.set(cache_key, data, ttl=300)
+
     return success_response(data, request)
 
 
@@ -386,12 +401,24 @@ def get_dashboard_layout(
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> dict:
+    cache = get_cache()
+    cache_key = f"dashboard_layout:{business_id}:{ctx.get_user_id()}:{breakpoint}"
+
+    if cache.enabled:
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return success_response(cached, request)
+
     profile = get_dashboard_layout_profile(
         db=db,
         business_id=business_id,
         user_id=ctx.get_user_id(),
         breakpoint=breakpoint,
     )
+
+    if cache.enabled:
+        cache.set(cache_key, profile, ttl=300)
+
     return success_response(profile, request)
 
 
@@ -417,6 +444,13 @@ def put_dashboard_layout(
         breakpoint=breakpoint,
         items=items,
     )
+
+    # Invalidate cache برای layout همین کاربر/کسب‌وکار
+    cache = get_cache()
+    if cache.enabled:
+        cache_key = f"dashboard_layout:{business_id}:{ctx.get_user_id()}:{breakpoint}"
+        cache.delete(cache_key)
+
     return success_response(result, request)
 
 
@@ -438,12 +472,12 @@ def post_dashboard_widgets_data(
     به صورت خودکار تصمیم می‌گیرد که از background job استفاده کند یا نه
     """
     from fastapi import Query
-    
+    cache = get_cache()
     widget_keys = payload.get("widget_keys") or []
     filters = payload.get("filters") or {}
     calendar_type = ctx.calendar_type if hasattr(ctx, 'calendar_type') else "gregorian"
     use_queue = payload.get("use_queue", False)  # پارامتر اختیاری از payload
-    
+
     # تصمیم‌گیری خودکار: اگر تعداد widget ها زیاد است یا query های سنگین داریم، از queue استفاده کن
     # ویجت‌های سنگین: top_selling_products, sales_bar_chart
     heavy_widgets = {"top_selling_products", "sales_bar_chart"}
@@ -480,20 +514,33 @@ def post_dashboard_widgets_data(
         # اگر queue در دسترس نبود، به صورت sync اجرا کن (fallback)
     
     # اجرای sync برای query های سریع
-    try:
-        data = get_widgets_batch_data(
-            db=db,
-            business_id=business_id,
-            user_id=ctx.get_user_id(),
-            widget_keys=[str(k) for k in widget_keys],
-            filters=filters,
-            calendar_type=calendar_type,
-        )
-        formatted = format_datetime_fields(data, request)
-        return success_response(formatted, request)
-    finally:
-        # بستن session بلافاصله بعد از استفاده
-        db.close()
+    # توجه: FastAPI خودش session را مدیریت می‌کند، نیازی به close دستی نیست
+    cache_key = None
+    if cache.enabled and not use_background:
+        # ساخت کلید کش بر اساس بیزنس، کاربر، نوع تقویم، ویجت‌ها و فیلترها
+        import json, hashlib
+        widgets_part = ",".join(sorted(str(k) for k in widget_keys))
+        filters_json = json.dumps(filters, sort_keys=True, ensure_ascii=False)
+        filters_hash = hashlib.sha256(filters_json.encode("utf-8")).hexdigest()[:16]
+        cache_key = f"dashboard_data:{business_id}:{ctx.get_user_id()}:{calendar_type}:{widgets_part}:{filters_hash}"
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return success_response(cached, request)
+
+    data = get_widgets_batch_data(
+        db=db,
+        business_id=business_id,
+        user_id=ctx.get_user_id(),
+        widget_keys=[str(k) for k in widget_keys],
+        filters=filters,
+        calendar_type=calendar_type,
+    )
+    formatted = format_datetime_fields(data, request)
+
+    if cache.enabled and cache_key:
+        cache.set(cache_key, formatted, ttl=30)
+
+    return success_response(formatted, request)
 
 
 @router.get("/{business_id}/dashboard/layout/default",

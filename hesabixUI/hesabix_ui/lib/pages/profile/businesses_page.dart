@@ -260,23 +260,24 @@ class _BusinessesPageState extends State<BusinessesPage> {
         
         if (ResponsiveHelper.isMobile(context)) {
           crossAxisCount = 1;
-          childAspectRatio = 4.0; // wide card
+          // نسبت کمتر برای ارتفاع بیشتر کارت روی موبایل و جلوگیری از به‌هم‌ریختگی محتوا
+          childAspectRatio = 2.4; // wide card با ارتفاع مناسب‌تر
         } else if (ResponsiveHelper.isTablet(context)) {
           final bp = ResponsiveHelper.breakpoint(context);
           if (bp == 'sm') {
             crossAxisCount = 2;
-            childAspectRatio = 1.4;
+            childAspectRatio = 1.35;
           } else {
             // md
             crossAxisCount = 2;
-            childAspectRatio = 1.3;
+            childAspectRatio = 1.25;
           }
         } else {
           // Desktop
           final bp = ResponsiveHelper.breakpoint(context);
           if (bp == 'lg') {
             crossAxisCount = 3;
-            childAspectRatio = 1.3;
+            childAspectRatio = 1.25;
           } else {
             // xl
             crossAxisCount = 4;
@@ -506,19 +507,17 @@ class _BusinessCardState extends State<_BusinessCard> {
               
               SizedBox(height: cardPadding * 0.75),
               
-              // Footer with restore button (for deleted businesses) or currency selector and leave button
+              // Footer with restore button (for deleted businesses)
+              // یا چینش مرتب‌تر ارز و دکمه خروج در دو ردیف برای جلوگیری از شلوغی
               if (widget.business.isDeletionPending && widget.business.isOwner)
                 _buildRestoreButton(context, cardPadding)
-              else
+              else ...[
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     Expanded(
                       child: _buildCurrencyDropdown(context),
                     ),
-                    if (!widget.business.isOwner) ...[
-                      SizedBox(width: cardPadding * 0.5),
-                      _buildLeaveButton(context, cardPadding),
-                    ],
                     SizedBox(width: cardPadding * 0.5),
                     Icon(
                       Icons.arrow_forward_ios,
@@ -532,6 +531,14 @@ class _BusinessCardState extends State<_BusinessCard> {
                     ),
                   ],
                 ),
+                if (!widget.business.isOwner) ...[
+                  SizedBox(height: cardPadding * 0.5),
+                  Align(
+                    alignment: AlignmentDirectional.centerEnd,
+                    child: _buildLeaveButton(context, cardPadding),
+                  ),
+                ],
+              ],
             ],
           ),
         ),

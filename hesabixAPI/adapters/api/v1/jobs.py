@@ -5,8 +5,9 @@ from typing import Optional, Dict, Any
 
 from app.services.job_manager import JobManager
 from app.core.responses import success_response, ApiError
-from app.core.queue import get_queue_service, QUEUE_DEFAULT
+from app.core.queue import get_queue_service, QUEUE_DEFAULT, QUEUE_REPORTS
 from app.core.auth_dependency import get_current_user, AuthContext
+from app.services.jobs import generate_report_job
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 
@@ -105,5 +106,56 @@ async def get_failed_jobs(
     
     failed_jobs = queue_service.get_failed_jobs(limit=limit)
     return success_response({"jobs": failed_jobs}, request=request)
+
+
+@router.post("/reports")
+async def enqueue_report_job(
+    request: Request,
+    payload: Dict[str, Any] = Body(...),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    """
+    ثبت یک job گزارش سنگین در صف Redis (QUEUE_REPORTS).
+    
+    Body:
+      - report_type: نوع گزارش (مثلاً general_ledger, trial_balance, pnl و ...)
+      - business_id: شناسه کسب‌وکار
+      - params: پارامترهای گزارش (اختیاری)
+    """
+    queue_service = get_queue_service()
+    if not queue_service or not queue_service.enabled:
+        raise ApiError("QUEUE_DISABLED", "Queue service is disabled", http_status=503)
+    
+    report_type = str(payload.get("report_type") or "").strip()
+    business_id = payload.get("business_id")
+    params: Dict[str, Any] = payload.get("params") or {}
+    
+    if not report_type or not business_id:
+        raise ApiError("VALIDATION_ERROR", "report_type و business_id الزامی هستند", http_status=400)
+    
+    user_id = ctx.get_user_id()
+    
+    job = queue_service.enqueue(
+        generate_report_job,
+        report_type,
+        int(business_id),
+        int(user_id),
+        params=params,
+        queue_name=QUEUE_REPORTS,
+        timeout=1800,
+        result_ttl=86400,
+    )
+    if not job:
+        raise ApiError("JOB_ENQUEUE_FAILED", "ثبت job گزارش در صف ناموفق بود", http_status=500)
+    
+    return success_response(
+        {
+            "job_id": job.id,
+            "queue": QUEUE_REPORTS,
+            "report_type": report_type,
+        },
+        request=request,
+        message="REPORT_JOB_ENQUEUED",
+    )
 
 

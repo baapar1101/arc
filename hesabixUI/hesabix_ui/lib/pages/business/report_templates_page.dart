@@ -230,7 +230,7 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                       );
                       if (!ctx.mounted) return;
                       Navigator.pop(ctx);
-                      ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(t.createdWithId(id))));
+                      SnackBarHelper.showSuccess(ctx, message: t.createdWithId(id));
                     } else {
                       await _service.updateTemplate(
                         businessId: widget.businessId,
@@ -239,7 +239,7 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                       );
                       if (!ctx.mounted) return;
                       Navigator.pop(ctx);
-                      ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(t.updated)));
+                      SnackBarHelper.show(ctx, message: t.updated);
                     }
                     await _fetch();
                   } catch (e) {
@@ -1296,11 +1296,11 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                   );
                   if (!ctx.mounted) return;
                   Navigator.pop(ctx);
-                  ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(t.templateCreatedWithId(id))));
+                  SnackBarHelper.showSuccess(ctx, message: t.templateCreatedWithId(id));
                   await _fetch();
                 } catch (e) {
                   if (!ctx.mounted) return;
-                  ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(t.createError(e.toString()))));
+                  SnackBarHelper.showError(ctx, message: t.createError(e.toString()));
                 }
               },
               child: Text(t.create),
@@ -1634,7 +1634,7 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                   await _fetch();
                 } catch (e) {
                   if (!ctx.mounted) return;
-                  ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text('خطا در ویرایش: $e')));
+                  SnackBarHelper.show(ctx, message: 'خطا در ویرایش: $e');
                 }
               },
               child: const Text('ذخیره'),
@@ -1731,7 +1731,7 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
             onPressed: () async {
               // Export: از آیتم انتخاب‌شده‌ای وجود ندارد؛ ساده‌ترین حالت: اگر تنها یک آیتم انتخاب نیست، پیغام
               if (_items.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('موردی برای خروجی وجود ندارد')));
+                SnackBarHelper.show(context, message: 'موردی برای خروجی وجود ندارد');
                 return;
               }
               try {
@@ -1831,10 +1831,10 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                   _marginBottomCtrl.text = (margins['bottom']?.toString() ?? _marginBottomCtrl.text);
                   _marginLeftCtrl.text = (margins['left']?.toString() ?? _marginLeftCtrl.text);
                   if (!ctx.mounted) return;
-                  ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('وارد شد. می‌توانید ذخیره کنید.')));
+                  SnackBarHelper.show(ctx, message: 'وارد شد. می‌توانید ذخیره کنید.');
                 } catch (e) {
                   if (!ctx.mounted) return;
-                  ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text('JSON نامعتبر: $e')));
+                  SnackBarHelper.show(ctx, message: 'JSON نامعتبر: $e');
                 }
               }
             },
@@ -1917,7 +1917,7 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                       );
                     } catch (e) {
                       if (!ctx.mounted) return;
-                      ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text('خطا در دریافت schema: $e')));
+                      SnackBarHelper.show(ctx, message: 'خطا در دریافت schema: $e');
                     }
                   },
                   icon: const Icon(Icons.help_outline),

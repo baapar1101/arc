@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../core/auth_store.dart';
-import 'package:hesabix_ui/l10n/app_localizations.dart';
+import 'package:hesabix_ui/l10n/app_localizations.dart';import '../utils/snackbar_helper.dart';
+
 
 class LogoutButton extends StatelessWidget {
   final AuthStore authStore;
@@ -28,9 +29,7 @@ class LogoutButton extends StatelessWidget {
 
     await authStore.saveApiKey(null);
     if (!context.mounted) return;
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(t.logoutDone)));
+    SnackBarHelper.show(context, message: t.logoutDone);
     context.go('/login');
   }
 

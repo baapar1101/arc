@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from typing import Any, Dict, Optional
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import select, and_, or_, func
+from sqlalchemy import select, and_, or_, func, text
+from app.core.query_timeout import query_timeout
 
 from .base_repo import BaseRepository
 from ..models.product import Product
@@ -81,22 +82,24 @@ class ProductRepository(BaseRepository[Product]):
                             pass
                     continue
 
-        total = self.db.execute(select(func.count()).select_from(stmt.subquery())).scalar() or 0
+        # استفاده از timeout برای query های طولانی
+        with query_timeout(self.db, timeout_seconds=60):
+            total = self.db.execute(select(func.count()).select_from(stmt.subquery())).scalar() or 0
 
-        # Sorting
-        if sort_by in {"name", "code", "created_at"}:
-            col = getattr(Product, sort_by)
-            stmt = stmt.order_by(col.desc() if sort_desc else col.asc())
-        else:
-            stmt = stmt.order_by(Product.id.desc() if sort_desc else Product.id.asc())
+            # Sorting
+            if sort_by in {"name", "code", "created_at"}:
+                col = getattr(Product, sort_by)
+                stmt = stmt.order_by(col.desc() if sort_desc else col.asc())
+            else:
+                stmt = stmt.order_by(Product.id.desc() if sort_desc else Product.id.asc())
 
-        stmt = stmt.offset(skip).limit(take)
-        # Load relationships
-        stmt = stmt.options(
-            joinedload(Product.default_warehouse),
-            joinedload(Product.category)
-        )
-        rows = list(self.db.execute(stmt).unique().scalars().all())
+            stmt = stmt.offset(skip).limit(take)
+            # Load relationships
+            stmt = stmt.options(
+                joinedload(Product.default_warehouse),
+                joinedload(Product.category)
+            )
+            rows = list(self.db.execute(stmt).unique().scalars().all())
 
         # محاسبه موجودی‌ها اگر include_inventory فعال باشد
         inventory_data = {}
@@ -126,23 +129,25 @@ class ProductRepository(BaseRepository[Product]):
                 try:
                     from adapters.db.models.product_instance import ProductInstance
                     
-                    # شمارش ProductInstance های available برای موجودی حسابداری
-                    # (برای unique، موجودی حسابداری و انبارداری یکسان است - تعداد instance های available)
-                    accounting_counts = (
-                        self.db.query(
-                            ProductInstance.product_id,
-                            func.count(ProductInstance.id).label('count')
-                        )
-                        .filter(
-                            and_(
-                                ProductInstance.business_id == business_id,
-                                ProductInstance.product_id.in_(unique_product_ids),
-                                ProductInstance.status == "available",
+                    # استفاده از timeout برای query های موجودی
+                    with query_timeout(self.db, timeout_seconds=30):
+                        # شمارش ProductInstance های available برای موجودی حسابداری
+                        # (برای unique، موجودی حسابداری و انبارداری یکسان است - تعداد instance های available)
+                        accounting_counts = (
+                            self.db.query(
+                                ProductInstance.product_id,
+                                func.count(ProductInstance.id).label('count')
                             )
+                            .filter(
+                                and_(
+                                    ProductInstance.business_id == business_id,
+                                    ProductInstance.product_id.in_(unique_product_ids),
+                                    ProductInstance.status == "available",
+                                )
+                            )
+                            .group_by(ProductInstance.product_id)
+                            .all()
                         )
-                        .group_by(ProductInstance.product_id)
-                        .all()
-                    )
                     
                     for pid, count in accounting_counts:
                         inventory_data[pid] = {
@@ -171,13 +176,15 @@ class ProductRepository(BaseRepository[Product]):
                 # محاسبه موجودی حسابداری (از اسناد حسابداری)
                 try:
                     from app.services.invoice_service import get_financial_stock_bulk
-                    accounting_stocks = get_financial_stock_bulk(
-                        db=self.db,
-                        business_id=business_id,
-                        product_ids=bulk_product_ids,
-                        as_of_date=as_of_date_obj,
-                        warehouse_id=None,  # موجودی کل (بدون تفکیک انبار)
-                    )
+                    # استفاده از timeout برای query های موجودی
+                    with query_timeout(self.db, timeout_seconds=30):
+                        accounting_stocks = get_financial_stock_bulk(
+                            db=self.db,
+                            business_id=business_id,
+                            product_ids=bulk_product_ids,
+                            as_of_date=as_of_date_obj,
+                            warehouse_id=None,  # موجودی کل (بدون تفکیک انبار)
+                        )
                     for pid, stock in accounting_stocks.items():
                         if pid not in inventory_data:
                             inventory_data[pid] = {}
@@ -188,12 +195,14 @@ class ProductRepository(BaseRepository[Product]):
                 # محاسبه موجودی انبارداری (از حواله‌های انبار)
                 try:
                     from app.services.warehouse_service import get_physical_stock_bulk
-                    warehouse_stocks = get_physical_stock_bulk(
-                        db=self.db,
-                        business_id=business_id,
-                        product_ids=bulk_product_ids,
-                        as_of_date=as_of_date_obj,
-                    )
+                    # استفاده از timeout برای query های موجودی
+                    with query_timeout(self.db, timeout_seconds=30):
+                        warehouse_stocks = get_physical_stock_bulk(
+                            db=self.db,
+                            business_id=business_id,
+                            product_ids=bulk_product_ids,
+                            as_of_date=as_of_date_obj,
+                        )
                     for pid, stock in warehouse_stocks.items():
                         if pid not in inventory_data:
                             inventory_data[pid] = {}
@@ -243,6 +252,7 @@ class ProductRepository(BaseRepository[Product]):
                 "attribute_ids": attribute_ids,
                 "image_file_id": p.image_file_id,
                 "image_url": f"/api/v1/business/{p.business_id}/storage/files/{p.image_file_id}/download" if p.image_file_id else None,
+                "thumbnail_url": f"/api/v1/business/{p.business_id}/storage/files/{p.image_file_id}/thumbnail?size=small" if p.image_file_id else None,
                 "default_warehouse_id": p.default_warehouse_id,
                 "default_warehouse_name": (p.default_warehouse.name if hasattr(p.default_warehouse, 'name') else None) if p.default_warehouse else None,
                 "default_warehouse_code": (p.default_warehouse.code if hasattr(p.default_warehouse, 'code') else None) if p.default_warehouse else None,

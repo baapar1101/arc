@@ -737,12 +737,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
 
   void _continueToInvoiceForm() {
     if (_selectedInvoiceType == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('لطفا نوع فاکتور را انتخاب کنید'),
-          backgroundColor: Theme.of(context).colorScheme.error,
-        ),
-      );
+      SnackBarHelper.showError(context, message: 'لطفا نوع فاکتور را انتخاب کنید');
       return;
     }
 
@@ -784,13 +779,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
         ? 'ارجاع: $_invoiceReference\n'
         : 'ارجاع: انتخاب نشده\n';
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('نوع فاکتور: ${_selectedInvoiceType!.label}\n$invoiceNumberText$customerText$sellerText$commissionText$invoiceDateText$dueDateText$currencyText$titleText$referenceText\nفرم کامل فاکتور به زودی اضافه خواهد شد'),
-        backgroundColor: Theme.of(context).colorScheme.primary,
-        duration: const Duration(seconds: 5),
-      ),
-    );
+    SnackBarHelper.show(context, message: 'نوع فاکتور: ${_selectedInvoiceType!.label}\n$invoiceNumberText$customerText$sellerText$commissionText$invoiceDateText$dueDateText$currencyText$titleText$referenceText\nفرم کامل فاکتور به زودی اضافه خواهد شد');
     
     // TODO: در آینده می‌توانید به صفحه فرم کامل فاکتور بروید
     // Navigator.push(

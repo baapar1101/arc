@@ -7,6 +7,8 @@ import '../../widgets/document/document_details_dialog.dart';
 import '../../widgets/warehouse/warehouse_document_form_dialog.dart';
 import '../../core/calendar_controller.dart';
 import '../../l10n/app_localizations.dart';
+import '../../utils/snackbar_helper.dart';
+
 import '../../utils/web/web_utils.dart' as web_utils;
 import '../../core/date_utils.dart' show HesabixDateUtils;
 
@@ -162,15 +164,11 @@ class _WarehouseDocumentDetailsDialogState extends State<WarehouseDocumentDetail
         payload: {'warehouse_id': warehouseId},
       );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('انبار به‌روزرسانی شد')),
-      );
+      SnackBarHelper.show(context, message: 'انبار به‌روزرسانی شد');
       _load();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('خطا: $e')),
-      );
+      SnackBarHelper.show(context, message: 'خطا: $e');
     }
   }
 
@@ -178,15 +176,11 @@ class _WarehouseDocumentDetailsDialogState extends State<WarehouseDocumentDetail
     try {
       await _svc.postDoc(businessId: widget.businessId, docId: widget.documentId);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('حواله پست شد')),
-      );
+      SnackBarHelper.show(context, message: 'حواله پست شد');
       _load();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('خطا در پست: $e')),
-      );
+      SnackBarHelper.show(context, message: 'خطا در پست: $e');
     }
   }
 
@@ -213,16 +207,12 @@ class _WarehouseDocumentDetailsDialogState extends State<WarehouseDocumentDetail
       final deleted = await _svc.deleteDoc(businessId: widget.businessId, docId: widget.documentId);
       if (!mounted) return;
       if (deleted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('حواله حذف شد')),
-        );
+        SnackBarHelper.show(context, message: 'حواله حذف شد');
         Navigator.of(context).pop();
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('خطا: $e')),
-      );
+      SnackBarHelper.show(context, message: 'خطا: $e');
     }
   }
 
@@ -252,15 +242,11 @@ class _WarehouseDocumentDetailsDialogState extends State<WarehouseDocumentDetail
       final message = cancelDocCode != null
           ? 'حواله لغو شد. حواله پیش‌نویس با کد $cancelDocCode ایجاد شد.'
           : 'حواله لغو شد و حواله معکوس ایجاد شد.';
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message)),
-      );
+      SnackBarHelper.show(context, message: message);
       _load();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('خطا: $e')),
-      );
+      SnackBarHelper.show(context, message: 'خطا: $e');
     }
   }
 
@@ -299,15 +285,11 @@ class _WarehouseDocumentDetailsDialogState extends State<WarehouseDocumentDetail
           mimeType: 'application/pdf',
         );
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('دانلود PDF در موبایل به زودی...')),
-        );
+        SnackBarHelper.show(context, message: 'دانلود PDF در موبایل به زودی...');
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('خطا در دانلود PDF: $e')),
-      );
+      SnackBarHelper.show(context, message: 'خطا در دانلود PDF: $e');
     }
   }
 

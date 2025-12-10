@@ -50,9 +50,7 @@ class _PriceListsPageState extends State<PriceListsPage> {
     } catch (e) {
       setState(() => _loading = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطا در بارگذاری لیست‌ها: $e')),
-        );
+        SnackBarHelper.show(context, message: 'خطا در بارگذاری لیست‌ها: $e');
       }
     }
   }
@@ -277,14 +275,10 @@ class _PriceListsPageState extends State<PriceListsPage> {
                 );
                 if (!ctx.mounted) return;
                 Navigator.of(ctx).pop(true);
-                ScaffoldMessenger.of(ctx).showSnackBar(
-                  const SnackBar(content: Text('لیست قیمت با موفقیت ایجاد شد')),
-                );
+                SnackBarHelper.show(ctx, message: 'لیست قیمت با موفقیت ایجاد شد');
               } catch (e) {
                 if (!ctx.mounted) return;
-                ScaffoldMessenger.of(ctx).showSnackBar(
-                  SnackBar(content: Text('خطا در ایجاد لیست قیمت: $e')),
-                );
+                SnackBarHelper.show(ctx, message: 'خطا در ایجاد لیست قیمت: $e');
               }
             },
             child: const Text('ایجاد'),
@@ -351,14 +345,10 @@ class _PriceListsPageState extends State<PriceListsPage> {
                 );
                 if (!ctx.mounted) return;
                 Navigator.of(ctx).pop(true);
-                ScaffoldMessenger.of(ctx).showSnackBar(
-                  const SnackBar(content: Text('لیست قیمت با موفقیت بروزرسانی شد')),
-                );
+                SnackBarHelper.show(ctx, message: 'لیست قیمت با موفقیت بروزرسانی شد');
               } catch (e) {
                 if (!ctx.mounted) return;
-                ScaffoldMessenger.of(ctx).showSnackBar(
-                  SnackBar(content: Text('خطا در ویرایش لیست قیمت: $e')),
-                );
+                SnackBarHelper.show(ctx, message: 'خطا در ویرایش لیست قیمت: $e');
               }
             },
             child: const Text('ذخیره'),
@@ -436,20 +426,14 @@ class _PriceListsPageState extends State<PriceListsPage> {
         
         if (!ctx.mounted) return;
         if (success) {
-          ScaffoldMessenger.of(ctx).showSnackBar(
-            SnackBar(content: Text('لیست قیمت "$priceListName" با موفقیت حذف شد')),
-          );
+          SnackBarHelper.show(ctx, message: 'لیست قیمت "$priceListName" با موفقیت حذف شد');
           _loadPriceLists(); // Refresh the list
         } else {
-          ScaffoldMessenger.of(ctx).showSnackBar(
-            const SnackBar(content: Text('خطا در حذف لیست قیمت')),
-          );
+          SnackBarHelper.show(ctx, message: 'خطا در حذف لیست قیمت');
         }
       } catch (e) {
         if (!ctx.mounted) return;
-        ScaffoldMessenger.of(ctx).showSnackBar(
-          SnackBar(content: Text('خطا در حذف لیست قیمت: $e')),
-        );
+        SnackBarHelper.show(ctx, message: 'خطا در حذف لیست قیمت: $e');
       }
     }
   }

@@ -8,6 +8,7 @@ from app.core.responses import ApiError
 from app.core.auth_dependency import get_current_user, AuthContext
 from app.core.permissions import require_business_access
 from adapters.db.models.business import Business
+from app.core.cache import get_cache
 
 
 router = APIRouter(prefix="/currencies", tags=["currencies"])
@@ -19,6 +20,14 @@ router = APIRouter(prefix="/currencies", tags=["currencies"])
     description="دریافت فهرست ارزهای قابل استفاده",
 )
 def list_currencies(request: Request, db: Session = Depends(get_db)) -> dict:
+    cache = get_cache()
+    cache_key = "currencies:all"
+
+    if cache.enabled:
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return success_response(cached, request)
+
     items = [
         {
             "id": c.id,
@@ -29,6 +38,10 @@ def list_currencies(request: Request, db: Session = Depends(get_db)) -> dict:
         }
         for c in db.query(Currency).order_by(Currency.title.asc()).all()
     ]
+
+    if cache.enabled:
+        cache.set(cache_key, items, ttl=300)
+
     return success_response(items, request)
 
 
@@ -44,6 +57,15 @@ def list_business_currencies(
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> dict:
+    # کش نتایج بر اساس کسب‌وکار
+    cache = get_cache()
+    cache_key = f"business_currencies:{business_id}"
+
+    if cache.enabled:
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return success_response(cached, request)
+
     # بهینه‌سازی: استفاده از query مستقیم به جای joinedload برای کاهش زمان
     from adapters.db.models.currency import Currency, BusinessCurrency
     
@@ -92,5 +114,8 @@ def list_business_currencies(
         seen_ids.add(c.id)
 
     # If nothing found, return empty list
+    if cache.enabled:
+        cache.set(cache_key, result, ttl=300)
+
     return success_response(result, request)
 

@@ -280,6 +280,12 @@ async def register(request: Request, payload: RegisterRequest, db: Session = Dep
 	key_func=lambda req: f"login:{get_client_ip(req)}",
 	error_message="تعداد درخواست‌های ورود بیش از حد مجاز است. لطفاً کمی صبر کنید."
 )
+@rate_limit(
+    max_requests=10,
+    window_seconds=60,
+    key_func=lambda req: f"login:{get_client_ip(req)}",
+    error_message="تعداد تلاش‌های ورود بیش از حد مجاز است. لطفاً کمی صبر کنید."
+)
 async def login(request: Request, payload: LoginRequest, db: Session = Depends(get_db)) -> dict:
 	user_agent = request.headers.get("User-Agent")
 	ip = request.client.host if request.client else None
@@ -1815,6 +1821,12 @@ def get_available_channels(
 		}
 	}
 )
+@rate_limit(
+	max_requests=5,
+	window_seconds=300,
+	key_func=lambda req: f"login_otp:{get_client_ip(req)}",
+	error_message="تعداد درخواست‌های ارسال کد ورود بیش از حد مجاز است. لطفاً چند دقیقه بعد دوباره تلاش کنید."
+)
 def send_login_otp(
 	request: Request,
 	payload: SendLoginOtpRequest,
@@ -1904,6 +1916,12 @@ def send_login_otp(
 			"description": "تعداد تلاش‌های مجاز به پایان رسیده است",
 		}
 	}
+)
+@rate_limit(
+	max_requests=10,
+	window_seconds=600,
+	key_func=lambda req: f"verify_login_otp:{get_client_ip(req)}",
+	error_message="تعداد تلاش‌های تایید کد ورود بیش از حد مجاز است. لطفاً بعداً تلاش کنید."
 )
 def verify_login_otp(
 	request: Request,

@@ -216,9 +216,7 @@ class _PriceListItemsPageState extends State<PriceListItemsPage> {
                     message = serverMsg?.isNotEmpty == true ? serverMsg! : (e.message ?? message);
                   }
                   if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(message)),
-                    );
+                    SnackBarHelper.show(context, message: message);
                   }
                 }
               },

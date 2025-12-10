@@ -15,6 +15,7 @@ from adapters.api.v1.schemas import (
 from app.core.responses import success_response, format_datetime_fields
 from app.core.auth_dependency import get_current_user, AuthContext
 from app.core.permissions import require_business_management, require_business_access, require_business_permission_dep
+from app.core.cache import get_cache
 from app.services.business_service import (
     create_business,
     get_business_by_id,
@@ -142,8 +143,29 @@ def list_user_businesses(
         "sort_desc": sort_desc,
         "search": search
     }
+
+    # کش لیست کسب‌وکارهای کاربر
+    cache = get_cache()
+    cache_key = None
+
+    if cache.enabled:
+        import json, hashlib
+        key_payload = {
+            "user_id": user_id,
+            "query": query_dict,
+        }
+        key_str = json.dumps(key_payload, sort_keys=True, ensure_ascii=False)
+        key_hash = hashlib.sha256(key_str.encode("utf-8")).hexdigest()[:16]
+        cache_key = f"user_businesses:{key_hash}"
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return success_response(cached, request)
+
     businesses = get_user_businesses(db, user_id, query_dict)
     formatted_data = format_datetime_fields(businesses, request)
+
+    if cache.enabled and cache_key:
+        cache.set(cache_key, formatted_data, ttl=60)
     
     return success_response(formatted_data, request)
 

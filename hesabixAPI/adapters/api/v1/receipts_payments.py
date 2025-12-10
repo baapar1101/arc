@@ -26,6 +26,7 @@ from adapters.db.session import get_db
 from adapters.db.models.document import Document
 from app.core.auth_dependency import get_current_user, AuthContext
 from app.core.responses import success_response, format_datetime_fields, ApiError
+from app.core.cache import get_cache
 from app.core.permissions import require_business_management_dep, require_business_access, require_business_permission_dep, require_business_permission_by_entity_dep
 from adapters.api.v1.schemas import QueryInfo, SuccessResponse
 from adapters.api.v1.schema_models.receipt_payment import (
@@ -86,7 +87,6 @@ async def list_receipts_payments_endpoint(
             for key in ["document_type", "from_date", "to_date"]:
                 if key in body_json:
                     query_dict[key] = body_json[key]
-                    print(f"API - پارامتر {key}: {body_json[key]}")
     except Exception:
         pass
     
@@ -98,8 +98,32 @@ async def list_receipts_payments_endpoint(
     except Exception:
         pass
 
+    # کش نتایج لیست دریافت/پرداخت
+    cache = get_cache()
+    cache_key = None
+
+    if cache.enabled:
+        import json, hashlib
+        key_payload = {
+            "business_id": business_id,
+            "query": query_dict,
+        }
+        key_str = json.dumps(key_payload, sort_keys=True, ensure_ascii=False)
+        key_hash = hashlib.sha256(key_str.encode("utf-8")).hexdigest()[:16]
+        cache_key = f"receipts_payments_list:{key_hash}"
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return success_response(
+                data=cached,
+                request=request,
+                message="RECEIPTS_PAYMENTS_LIST_FETCHED"
+            )
+
     result = list_receipts_payments(db, business_id, query_dict)
     result["items"] = [format_datetime_fields(item, request) for item in result.get("items", [])]
+
+    if cache.enabled and cache_key:
+        cache.set(cache_key, result, ttl=60)
     
     return success_response(
         data=result,

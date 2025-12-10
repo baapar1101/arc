@@ -113,24 +113,14 @@ class _WalletTopUpDialogState extends State<WalletTopUpDialog> {
     // بررسی وجود درگاه پرداخت
     if (_gateways.isEmpty) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('هیچ درگاه پرداختی تنظیم نشده است. لطفاً از بخش تنظیمات، درگاه پرداخت اضافه کنید.'),
-            backgroundColor: Colors.orange,
-          ),
-        );
+        SnackBarHelper.show(context, message: 'هیچ درگاه پرداختی تنظیم نشده است. لطفاً از بخش تنظیمات، درگاه پرداخت اضافه کنید.');
       }
       return;
     }
     
     if (_gatewayId == null) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('لطفاً درگاه پرداخت را انتخاب کنید.'),
-            backgroundColor: Colors.orange,
-          ),
-        );
+        SnackBarHelper.show(context, message: 'لطفاً درگاه پرداخت را انتخاب کنید.');
       }
       return;
     }
@@ -140,12 +130,7 @@ class _WalletTopUpDialogState extends State<WalletTopUpDialog> {
       final amount = double.tryParse(_amountCtrl.text.replaceAll(',', '')) ?? 0;
       if (amount <= 0) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('مبلغ باید بزرگتر از صفر باشد.'),
-              backgroundColor: Colors.red,
-            ),
-          );
+          SnackBarHelper.showError(context, message: 'مبلغ باید بزرگتر از صفر باشد.');
         }
         return;
       }
@@ -198,9 +183,7 @@ class _WalletTopUpDialogState extends State<WalletTopUpDialog> {
                 FilledButton(
                   onPressed: () {
                     Clipboard.setData(ClipboardData(text: paymentUrl));
-                    ScaffoldMessenger.of(ctx).showSnackBar(
-                      const SnackBar(content: Text('لینک کپی شد')),
-                    );
+                    SnackBarHelper.show(ctx, message: 'لینک کپی شد');
                   },
                   child: const Text('کپی لینک'),
                 ),
@@ -211,12 +194,7 @@ class _WalletTopUpDialogState extends State<WalletTopUpDialog> {
       } else {
         if (mounted) {
           final t = AppLocalizations.of(context);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(t.walletTopUpNoPaymentLink),
-              backgroundColor: Colors.orange,
-            ),
-          );
+          SnackBarHelper.show(context, message: t.walletTopUpNoPaymentLink);
         }
       }
 
@@ -228,13 +206,7 @@ class _WalletTopUpDialogState extends State<WalletTopUpDialog> {
       if (mounted) {
         final errorMsg = e.toString();
         widget.onError?.call(errorMsg);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('خطا در افزایش اعتبار: $errorMsg'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 5),
-          ),
-        );
+        SnackBarHelper.showError(context, message: 'خطا در افزایش اعتبار: $errorMsg');
       }
     } finally {
       if (mounted) {
