@@ -36,6 +36,15 @@ async def list_cash_registers_endpoint(
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
 ):
+    # دریافت سال مالی از header یا query
+    fiscal_year_id = None
+    fy_header = request.headers.get('X-Fiscal-Year-ID')
+    if fy_header:
+        try:
+            fiscal_year_id = int(fy_header)
+        except (ValueError, TypeError):
+            pass
+    
     query_dict: Dict[str, Any] = {
         "take": query_info.take,
         "skip": query_info.skip,
@@ -45,6 +54,9 @@ async def list_cash_registers_endpoint(
         "search_fields": query_info.search_fields,
         "filters": query_info.filters,
     }
+    
+    if fiscal_year_id:
+        query_dict["fiscal_year_id"] = fiscal_year_id
 
     # کش لیست صندوق‌ها
     cache = get_cache()

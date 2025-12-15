@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
+from decimal import Decimal
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, func
 
 from adapters.db.models.petty_cash import PettyCash
+from adapters.db.models.document import Document
+from adapters.db.models.document_line import DocumentLine
+from adapters.db.models.fiscal_year import FiscalYear
 from adapters.db.repositories.petty_cash_repository import PettyCashRepository
 from app.core.responses import ApiError
 
@@ -223,18 +227,149 @@ def bulk_delete_petty_cash(db: Session, business_id: int, ids: List[int]) -> Dic
 	}
 
 
+def _calculate_petty_cash_balance(
+	db: Session,
+	petty_cash_id: int,
+	business_id: int,
+	fiscal_year_id: Optional[int] = None,
+) -> Decimal:
+	"""
+	محاسبه موجودی یک تنخواه
+	
+	Args:
+		db: نشست پایگاه داده
+		petty_cash_id: شناسه تنخواه
+		business_id: شناسه کسب‌وکار
+		fiscal_year_id: شناسه سال مالی (اختیاری)
+	
+	Returns:
+		Decimal: موجودی تنخواه (debit - credit)
+	"""
+	query = db.query(
+		func.coalesce(func.sum(DocumentLine.debit), 0).label('total_debit'),
+		func.coalesce(func.sum(DocumentLine.credit), 0).label('total_credit')
+	).join(
+		Document, DocumentLine.document_id == Document.id
+	).filter(
+		Document.business_id == business_id,
+		Document.is_proforma == False,
+		DocumentLine.petty_cash_id == petty_cash_id
+	)
+	
+	# فیلتر سال مالی
+	if fiscal_year_id:
+		query = query.filter(Document.fiscal_year_id == fiscal_year_id)
+	
+	result = query.first()
+	if result:
+		total_debit = Decimal(str(result.total_debit or 0))
+		total_credit = Decimal(str(result.total_credit or 0))
+		return total_debit - total_credit
+	
+	return Decimal(0)
+
+
+def _calculate_petty_cash_balances_bulk(
+	db: Session,
+	petty_cash_ids: List[int],
+	business_id: int,
+	fiscal_year_id: Optional[int] = None,
+) -> Dict[int, Decimal]:
+	"""
+	محاسبه موجودی چند تنخواه به صورت bulk
+	
+	Args:
+		db: نشست پایگاه داده
+		petty_cash_ids: لیست شناسه‌های تنخواه‌ها
+		business_id: شناسه کسب‌وکار
+		fiscal_year_id: شناسه سال مالی (اختیاری)
+	
+	Returns:
+		Dict[int, Decimal]: دیکشنری {petty_cash_id: balance}
+	"""
+	if not petty_cash_ids:
+		return {}
+	
+	query = db.query(
+		DocumentLine.petty_cash_id,
+		func.coalesce(func.sum(DocumentLine.debit), 0).label('total_debit'),
+		func.coalesce(func.sum(DocumentLine.credit), 0).label('total_credit')
+	).join(
+		Document, DocumentLine.document_id == Document.id
+	).filter(
+		Document.business_id == business_id,
+		Document.is_proforma == False,
+		DocumentLine.petty_cash_id.in_(petty_cash_ids)
+	).group_by(
+		DocumentLine.petty_cash_id
+	)
+	
+	# فیلتر سال مالی
+	if fiscal_year_id:
+		query = query.filter(Document.fiscal_year_id == fiscal_year_id)
+	
+	results = query.all()
+	
+	balances = {}
+	for result in results:
+		pc_id = result.petty_cash_id
+		total_debit = Decimal(str(result.total_debit or 0))
+		total_credit = Decimal(str(result.total_credit or 0))
+		balances[pc_id] = total_debit - total_credit
+	
+	# برای تنخواه‌هایی که تراکنشی ندارند، موجودی صفر است
+	for pc_id in petty_cash_ids:
+		if pc_id not in balances:
+			balances[pc_id] = Decimal(0)
+	
+	return balances
+
+
 def list_petty_cash(db: Session, business_id: int, query: Dict[str, Any]) -> Dict[str, Any]:
+	# دریافت سال مالی از query (اختیاری)
+	fiscal_year_id = query.get("fiscal_year_id")
+	if fiscal_year_id is not None:
+		try:
+			fiscal_year_id = int(fiscal_year_id)
+		except (ValueError, TypeError):
+			fiscal_year_id = None
+	
+	# اگر سال مالی مشخص نشده، از سال مالی جاری استفاده کن
+	if fiscal_year_id is None:
+		fiscal_year = db.query(FiscalYear).filter(
+			and_(
+				FiscalYear.business_id == business_id,
+				FiscalYear.is_last == True
+			)
+		).first()
+		if fiscal_year:
+			fiscal_year_id = fiscal_year.id
+	
 	repo = PettyCashRepository(db)
 	res = repo.list(business_id, query)
+	
+	# محاسبه موجودی برای همه تنخواه‌ها به صورت bulk
+	petty_cash_ids = [item.id for item in res["items"]]
+	balances = _calculate_petty_cash_balances_bulk(
+		db, petty_cash_ids, business_id, fiscal_year_id
+	)
+	
+	# ساخت لیست با موجودی
+	result_items = []
+	for item in res["items"]:
+		item_dict = petty_cash_to_dict(item)
+		item_dict["balance"] = float(balances.get(item.id, Decimal(0)))
+		result_items.append(item_dict)
+	
 	return {
-		"items": [petty_cash_to_dict(i) for i in res["items"]],
+		"items": result_items,
 		"pagination": res["pagination"],
 		"query_info": res["query_info"],
 	}
 
 
-def petty_cash_to_dict(obj: PettyCash) -> Dict[str, Any]:
-	return {
+def petty_cash_to_dict(obj: PettyCash, balance: Optional[float] = None) -> Dict[str, Any]:
+	result = {
 		"id": obj.id,
 		"business_id": obj.business_id,
 		"name": obj.name,
@@ -246,3 +381,6 @@ def petty_cash_to_dict(obj: PettyCash) -> Dict[str, Any]:
 		"created_at": obj.created_at.isoformat(),
 		"updated_at": obj.updated_at.isoformat(),
 	}
+	if balance is not None:
+		result["balance"] = balance
+	return result

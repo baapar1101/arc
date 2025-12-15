@@ -621,9 +621,6 @@ def create_app() -> FastAPI:
             swagger_js_url="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js",
             swagger_css_url="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css",
             swagger_favicon_url="/assets/logo-blue.png",
-            # لود CSS های سفارشی برای ظاهر حرفه‌ای و RTL
-            custom_js_url=None,
-            custom_css_url=None,  # از init_oauth استفاده می‌کنیم
         )
 
     # اضافه کردن CSS های سفارشی به صورت دستی
@@ -1106,6 +1103,9 @@ def create_app() -> FastAPI:
         asyncio.create_task(monitoring_service_status_check_loop(120))
         # Business deletion check: هر 24 ساعت یکبار (فقط لاگ - حذف نمی‌کند)
         asyncio.create_task(check_expired_deleted_businesses_loop(24))
+        # Cache invalidation subscriber: برای دریافت پیام‌های invalidation از Redis Pub/Sub
+        from app.services.cache_invalidation_subscriber import start_cache_invalidation_subscriber
+        start_cache_invalidation_subscriber()
 
     @application.middleware("http")
     async def global_rate_limit_middleware(request: Request, call_next):

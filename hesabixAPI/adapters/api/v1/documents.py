@@ -97,6 +97,8 @@ async def list_documents_endpoint(
     # کش نتایج لیست اسناد بر اساس پارامترها
     cache = get_cache()
     cache_key = None
+    fiscal_year_id = query_dict.get("fiscal_year_id")
+    document_type = query_dict.get("document_type")
 
     if cache.enabled:
         import json, hashlib
@@ -122,8 +124,16 @@ async def list_documents_endpoint(
         format_datetime_fields(item, request) for item in result.get("items", [])
     ]
 
+    # ذخیره در cache با tag-based caching
     if cache.enabled and cache_key:
-        cache.set(cache_key, result, ttl=60)
+        cache.set_with_documents_tag(
+            key=cache_key,
+            value=result,
+            business_id=business_id,
+            fiscal_year_id=fiscal_year_id,
+            document_type=document_type,
+            ttl=60
+        )
     
     return success_response(
         data=result,

@@ -5,6 +5,7 @@
 
 import json
 import logging
+import threading
 import time
 import traceback
 import uuid
@@ -12,6 +13,7 @@ from typing import Any, Dict, List, Optional
 from datetime import datetime
 
 from sqlalchemy.orm import Session
+from simpleeval import SimpleEval
 
 from adapters.db.models.workflow import (
     Workflow,
@@ -31,7 +33,7 @@ class WorkflowEngine:
     
     # کلاس-سطح cache برای نتایج nodeها
     _result_cache: Dict[str, tuple] = {}  # cache_key -> (result, timestamp)
-    _cache_lock = None  # برای thread safety
+    _cache_lock = threading.Lock()  # برای thread safety
     
     def __init__(self, db: Session, business_id: int, user_id: Optional[int] = None):
         self.db = db
@@ -143,10 +145,25 @@ class WorkflowEngine:
             total_duration_ms = (time.time() - workflow_start_time) * 1000
             
             logger.error(f"Workflow execution failed: {e}", exc_info=True)
-            execution.status = WorkflowExecutionStatus.FAILED
-            execution.completed_at = datetime.utcnow()
-            execution.error_message = str(e)
-            self.db.commit()
+            
+            # Rollback transaction در صورت خطا
+            try:
+                self.db.rollback()
+            except Exception as rollback_error:
+                logger.error(f"Error during rollback: {rollback_error}", exc_info=True)
+            
+            # ایجاد execution record جدید برای خطا
+            try:
+                execution.status = WorkflowExecutionStatus.FAILED
+                execution.completed_at = datetime.utcnow()
+                execution.error_message = str(e)
+                self.db.commit()
+            except Exception as commit_error:
+                logger.error(f"Error committing failed execution: {commit_error}", exc_info=True)
+                try:
+                    self.db.rollback()
+                except Exception:
+                    pass
             
             self._log(
                 execution,
@@ -479,34 +496,38 @@ class WorkflowEngine:
     
     def _get_cached_result(self, cache_key: str) -> Optional[Any]:
         """
-        دریافت نتیجه از cache
+        دریافت نتیجه از cache (thread-safe)
         """
-        if cache_key not in WorkflowEngine._result_cache:
-            return None
-        
-        result, timestamp = WorkflowEngine._result_cache[cache_key]
-        
-        # بررسی expiration
-        if time.time() - timestamp > self.cache_ttl:
-            del WorkflowEngine._result_cache[cache_key]
-            return None
-        
-        return result
+        with WorkflowEngine._cache_lock:
+            if cache_key not in WorkflowEngine._result_cache:
+                return None
+            
+            result, timestamp = WorkflowEngine._result_cache[cache_key]
+            
+            # بررسی expiration
+            if time.time() - timestamp > self.cache_ttl:
+                del WorkflowEngine._result_cache[cache_key]
+                return None
+            
+            return result
     
     def _set_cached_result(self, cache_key: str, result: Any, ttl: float):
         """
-        ذخیره نتیجه در cache
+        ذخیره نتیجه در cache (thread-safe)
         """
-        WorkflowEngine._result_cache[cache_key] = (result, time.time())
-        
-        # پاکسازی cache قدیمی (هر 1000 مورد یکبار)
-        if len(WorkflowEngine._result_cache) > 1000:
-            self._cleanup_cache()
+        with WorkflowEngine._cache_lock:
+            WorkflowEngine._result_cache[cache_key] = (result, time.time())
+            
+            # پاکسازی cache قدیمی (هر 1000 مورد یکبار)
+            if len(WorkflowEngine._result_cache) > 1000:
+                self._cleanup_cache()
     
     def _cleanup_cache(self):
         """
-        پاکسازی cache منقضی شده
+        پاکسازی cache منقضی شده (thread-safe)
         """
+        # این متد باید از داخل _set_cached_result که lock دارد فراخوانی شود
+        # اما برای اطمینان، lock را چک می‌کنیم
         current_time = time.time()
         keys_to_remove = []
         
@@ -655,24 +676,58 @@ class WorkflowEngine:
         context: Dict[str, Any],
         node_results: Dict[str, Any]
     ) -> bool:
-        """اجرای شرط با expression (JavaScript-like)"""
+        """اجرای شرط با expression (JavaScript-like) - استفاده از simpleeval برای امنیت"""
         expression = config.get("expression")
         if not expression:
             return False
         
-        # ساخت یک محیط برای اجرای expression
-        env = {
-            "context": context,
-            "node_results": node_results,
-            "resolve": lambda v: WorkflowEngine._resolve_value_static(v, context, node_results),
-        }
-        
         try:
-            # استفاده از eval (در production باید از یک expression engine امن‌تر استفاده شود)
-            result = eval(expression, {"__builtins__": {}}, env)
+            # استفاده از SimpleEval برای evaluation امن expression
+            # SimpleEval فقط عملیات‌های مجاز را اجرا می‌کند و از اجرای کد دلخواه جلوگیری می‌کند
+            evaluator = SimpleEval(
+                names={
+                    "context": context,
+                    "node_results": node_results,
+                    "resolve": lambda v: WorkflowEngine._resolve_value_static(v, context, node_results),
+                },
+                functions={
+                    # اضافه کردن توابع مجاز
+                    "len": len,
+                    "str": str,
+                    "int": int,
+                    "float": float,
+                    "bool": bool,
+                    "abs": abs,
+                    "min": min,
+                    "max": max,
+                    "sum": sum,
+                },
+                operators={
+                    # فقط عملگرهای مجاز
+                    "Add": lambda a, b: a + b,
+                    "Sub": lambda a, b: a - b,
+                    "Mult": lambda a, b: a * b,
+                    "Div": lambda a, b: a / b if b != 0 else 0,
+                    "Mod": lambda a, b: a % b if b != 0 else 0,
+                    "Pow": lambda a, b: a ** b,
+                    "Lt": lambda a, b: a < b,
+                    "LtE": lambda a, b: a <= b,
+                    "Gt": lambda a, b: a > b,
+                    "GtE": lambda a, b: a >= b,
+                    "Eq": lambda a, b: a == b,
+                    "NotEq": lambda a, b: a != b,
+                    "And": lambda a, b: a and b,
+                    "Or": lambda a, b: a or b,
+                    "Not": lambda a: not a,
+                    "In": lambda a, b: a in b if hasattr(b, "__contains__") else False,
+                    "NotIn": lambda a, b: a not in b if hasattr(b, "__contains__") else True,
+                }
+            )
+            
+            result = evaluator.eval(expression)
             return bool(result)
         except Exception as e:
-            logger.error(f"Expression evaluation failed: {e}")
+            logger.error(f"Expression evaluation failed: {e}", exc_info=True)
             raise ValueError(f"Expression evaluation failed: {str(e)}")
     
     @staticmethod

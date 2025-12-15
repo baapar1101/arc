@@ -14,9 +14,72 @@ from sqlalchemy.orm import Session
 
 from adapters.db.repositories.document_repository import DocumentRepository
 from app.core.responses import ApiError
+from app.core.cache import get_cache
 from app.services.document_monetization_service import process_document_usage_for_document
 
 logger = logging.getLogger(__name__)
+
+
+def invalidate_documents_cache(business_id: int, fiscal_year_id: Optional[int] = None, document_id: Optional[int] = None, document_type: Optional[str] = None):
+	"""
+	حذف تمام کش‌های مربوط به لیست اسناد عمومی یک کسب‌وکار
+	
+	این تابع از چند روش استفاده می‌کند:
+	1. Tag-based invalidation با set ردیس: حذف انتخابی بر اساس business_id, fiscal_year_id و document_type (بهینه‌تر)
+	2. Pattern-based invalidation: حذف تمام کلیدهای documents_list:* (fallback برای اطمینان)
+	3. Redis Pub/Sub: انتشار پیام invalidation برای تمام instanceها
+	
+	Args:
+		business_id: شناسه کسب‌وکار
+		fiscal_year_id: شناسه سال مالی (اختیاری)
+			- اگر None باشد، تمام کش‌های مربوط به business_id حذف می‌شوند
+			- اگر مشخص باشد، فقط کش‌های مربوط به آن fiscal_year_id حذف می‌شوند
+		document_id: شناسه سند خاص (اختیاری)
+		document_type: نوع سند (expense, income, receipt, payment, ...) (اختیاری)
+	"""
+	cache = get_cache()
+	if not cache.enabled:
+		return
+	
+	try:
+		# روش 1: استفاده از invalidate_documents_by_business (بهینه‌ترین روش)
+		deleted_count = cache.invalidate_documents_by_business(business_id, fiscal_year_id, document_id, document_type)
+		if deleted_count > 0:
+			logger.info(f"Invalidated {deleted_count} cache keys for business_id {business_id}, fiscal_year_id {fiscal_year_id}, document_id {document_id}, document_type {document_type}")
+		
+		# روش 2: حذف تمام کلیدهای documents_list:* (fallback برای اطمینان کامل)
+		pattern = "documents_list:*"
+		deleted_pattern = cache.delete_pattern(pattern)
+		if deleted_pattern > 0:
+			logger.info(f"Invalidated {deleted_pattern} cache keys using pattern: {pattern}")
+		
+		# حذف کش سند خاص اگر مشخص شده باشد
+		if document_id:
+			document_pattern = f"document:{business_id}:{document_id}*"
+			deleted_document = cache.delete_pattern(document_pattern)
+			if deleted_document > 0:
+				logger.info(f"Invalidated {deleted_document} cache keys for document_id {document_id} using pattern: {document_pattern}")
+		
+		# روش 3: انتشار پیام invalidation از طریق Redis Pub/Sub
+		invalidation_message = {
+			"type": "documents_cache_invalidation",
+			"business_id": business_id,
+			"fiscal_year_id": fiscal_year_id,
+			"document_id": document_id,
+			"document_type": document_type,
+			"timestamp": None
+		}
+		try:
+			import time
+			invalidation_message["timestamp"] = time.time()
+			cache.publish_invalidation("cache_invalidation", invalidation_message)
+			logger.info(f"Published invalidation message for business_id {business_id}, fiscal_year_id {fiscal_year_id}, document_id {document_id}")
+		except Exception as pub_error:
+			logger.warning(f"Error publishing invalidation message: {pub_error}")
+	
+	except Exception as e:
+		# خطا در invalidate نباید مانع عملیات اصلی شود
+		logger.warning(f"Error invalidating documents cache for business_id {business_id}: {e}")
 
 
 def list_documents(
@@ -120,6 +183,11 @@ def delete_document(db: Session, document_id: int) -> bool:
             http_status=400
         )
     
+    # دریافت اطلاعات قبل از حذف برای invalidation
+    business_id = document.business_id
+    fiscal_year_id = document.fiscal_year_id
+    document_type = document.document_type
+    
     # حذف سند
     success = repo.delete_document(document_id)
     if not success:
@@ -128,6 +196,14 @@ def delete_document(db: Session, document_id: int) -> bool:
             "Failed to delete document",
             http_status=500
         )
+    
+    # Invalidate cache بعد از حذف موفق سند
+    invalidate_documents_cache(
+        business_id=business_id,
+        fiscal_year_id=fiscal_year_id,
+        document_id=document_id,
+        document_type=document_type
+    )
     
     return True
 
@@ -450,6 +526,14 @@ def create_manual_document(
                 extra={"document_id": document.id, "error": str(monetization_error)},
             )
         
+        # Invalidate cache بعد از ایجاد موفق سند
+        invalidate_documents_cache(
+            business_id=business_id,
+            fiscal_year_id=fiscal_year_id,
+            document_id=document.id,
+            document_type="manual"
+        )
+        
         result_data = result
         
         # فراخوانی workflow triggers
@@ -569,6 +653,14 @@ def update_manual_document(
                 "Failed to update document",
                 http_status=500
             )
+        
+        # Invalidate cache بعد از به‌روزرسانی موفق سند
+        invalidate_documents_cache(
+            business_id=document.business_id,
+            fiscal_year_id=document.fiscal_year_id,
+            document_id=document_id,
+            document_type=document.document_type
+        )
         
         # دریافت جزئیات کامل سند
         return repo.get_document_details(updated_document.id)

@@ -161,6 +161,9 @@ async def create_ticket(
     
     # ارسال ناتیفیکیشن به اپراتورها
     try:
+        logger = logging.getLogger(__name__)
+        logger.info(f"شروع ارسال ناتیفیکیشن برای تیکت جدید {ticket.id}")
+        
         notification_service = NotificationService(db)
         user = current_user.user
         user_name = f"{user.first_name or ''} {user.last_name or ''}".strip() or user.email or "کاربر"
@@ -176,14 +179,18 @@ async def create_ticket(
             "priority": ticket_with_details.priority.name if ticket_with_details.priority else "نامشخص"
         }
         
+        logger.info(f"فراخوانی notify_support_operators برای تیکت {ticket.id} با context: {list(context.keys())}")
+        
         notification_service.notify_support_operators(
             event_key="support.ticket_created",
             context=context
         )
+        
+        logger.info(f"notify_support_operators برای تیکت {ticket.id} با موفقیت اجرا شد")
     except Exception as e:
         # در صورت خطا، لاگ می‌کنیم اما فرآیند اصلی ادامه می‌یابد
         logger = logging.getLogger(__name__)
-        logger.error(f"خطا در ارسال ناتیفیکیشن برای تیکت جدید {ticket.id}: {e}")
+        logger.error(f"خطا در ارسال ناتیفیکیشن برای تیکت جدید {ticket.id}: {e}", exc_info=True)
     
     # Format datetime fields based on calendar type
     ticket_data = TicketResponse.from_orm(ticket_with_details).dict()

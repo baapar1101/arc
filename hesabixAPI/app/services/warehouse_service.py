@@ -3,9 +3,12 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional
 from decimal import Decimal
 from datetime import datetime, date
+import logging
 
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
+
+logger = logging.getLogger(__name__)
 
 from adapters.db.models.warehouse_document import WarehouseDocument
 from adapters.db.models.warehouse_document_line import WarehouseDocumentLine
@@ -663,6 +666,26 @@ def create_manual_warehouse_document(
 			db.add(wline)
 	
 	db.flush()
+	
+	# Invalidate cache بعد از ایجاد موفق سند انبار
+	invalidate_warehouse_docs_cache(
+		business_id=business_id,
+		fiscal_year_id=wh.fiscal_year_id,
+		doc_type=wh.doc_type,
+		warehouse_id=wh.warehouse_id_from or wh.warehouse_id_to,
+		status=wh.status,
+		document_id=wh.id
+	)
+	# اگر transfer باشد، هر دو انبار را invalidate کن
+	if wh.doc_type == "transfer" and wh.warehouse_id_from and wh.warehouse_id_to:
+		invalidate_warehouse_docs_cache(
+			business_id=business_id,
+			fiscal_year_id=wh.fiscal_year_id,
+			doc_type=wh.doc_type,
+			warehouse_id=wh.warehouse_id_to,
+			status=wh.status
+		)
+	
 	return wh
 
 
@@ -1376,6 +1399,51 @@ def update_warehouse_document(
 			
 			db.flush()
 	
+	# دریافت اطلاعات قبل از به‌روزرسانی برای invalidation
+	old_fiscal_year_id = wh.fiscal_year_id
+	old_doc_type = wh.doc_type
+	old_warehouse_id_from = wh.warehouse_id_from
+	old_warehouse_id_to = wh.warehouse_id_to
+	old_status = wh.status
+	
+	# Invalidate cache بعد از به‌روزرسانی موفق سند انبار
+	invalidate_warehouse_docs_cache(
+		business_id=business_id,
+		fiscal_year_id=old_fiscal_year_id,
+		doc_type=old_doc_type,
+		warehouse_id=old_warehouse_id_from or old_warehouse_id_to,
+		status=old_status,
+		document_id=wh.id
+	)
+	# اگر transfer باشد، هر دو انبار را invalidate کن
+	if old_doc_type == "transfer" and old_warehouse_id_from and old_warehouse_id_to:
+		invalidate_warehouse_docs_cache(
+			business_id=business_id,
+			fiscal_year_id=old_fiscal_year_id,
+			doc_type=old_doc_type,
+			warehouse_id=old_warehouse_id_to,
+			status=old_status
+		)
+	
+	# اگر fiscal_year_id، doc_type، warehouse_id یا status تغییر کرده، cache جدید را هم invalidate کن
+	if wh.fiscal_year_id != old_fiscal_year_id or wh.doc_type != old_doc_type or wh.status != old_status:
+		invalidate_warehouse_docs_cache(
+			business_id=business_id,
+			fiscal_year_id=wh.fiscal_year_id,
+			doc_type=wh.doc_type,
+			warehouse_id=wh.warehouse_id_from or wh.warehouse_id_to,
+			status=wh.status,
+			document_id=wh.id
+		)
+		if wh.doc_type == "transfer" and wh.warehouse_id_from and wh.warehouse_id_to:
+			invalidate_warehouse_docs_cache(
+				business_id=business_id,
+				fiscal_year_id=wh.fiscal_year_id,
+				doc_type=wh.doc_type,
+				warehouse_id=wh.warehouse_id_to,
+				status=wh.status
+			)
+	
 	return wh
 
 
@@ -1531,10 +1599,52 @@ def post_warehouse_document(db: Session, wh_id: int) -> Dict[str, Any]:
 							# در صورت خطا، ادامه بده
 							pass
 	
+	# دریافت اطلاعات قبل از تغییر status برای invalidation
+	old_status = wh.status
+	business_id = wh.business_id
+	fiscal_year_id = wh.fiscal_year_id
+	doc_type = wh.doc_type
+	warehouse_id_from = wh.warehouse_id_from
+	warehouse_id_to = wh.warehouse_id_to
+	
 	# تغییر وضعیت به posted
 	wh.status = "posted"
 	wh.touch()
 	db.flush()
+	
+	# Invalidate cache بعد از تغییر status به posted
+	invalidate_warehouse_docs_cache(
+		business_id=business_id,
+		fiscal_year_id=fiscal_year_id,
+		doc_type=doc_type,
+		warehouse_id=warehouse_id_from or warehouse_id_to,
+		status=old_status,
+		document_id=wh.id
+	)
+	invalidate_warehouse_docs_cache(
+		business_id=business_id,
+		fiscal_year_id=fiscal_year_id,
+		doc_type=doc_type,
+		warehouse_id=warehouse_id_from or warehouse_id_to,
+		status="posted",
+		document_id=wh.id
+	)
+	# اگر transfer باشد، هر دو انبار را invalidate کن
+	if doc_type == "transfer" and warehouse_id_from and warehouse_id_to:
+		invalidate_warehouse_docs_cache(
+			business_id=business_id,
+			fiscal_year_id=fiscal_year_id,
+			doc_type=doc_type,
+			warehouse_id=warehouse_id_to,
+			status=old_status
+		)
+		invalidate_warehouse_docs_cache(
+			business_id=business_id,
+			fiscal_year_id=fiscal_year_id,
+			doc_type=doc_type,
+			warehouse_id=warehouse_id_to,
+			status="posted"
+		)
 	
 	# اگر doc_type='transfer' باشد، یک سند حسابداری ایجاد کن
 	if wh.doc_type == "transfer":
@@ -1766,6 +1876,41 @@ def _to_dict(obj: Warehouse) -> Dict[str, Any]:
 	}
 
 
+def invalidate_warehouses_cache(business_id: int):
+	"""
+	Invalidate cache برای لیست انبارها
+	"""
+	from app.core.cache import get_cache
+	cache = get_cache()
+	if cache.enabled:
+		try:
+			deleted_count = cache.invalidate_warehouses_by_business(business_id)
+			logger.info(f"Invalidated {deleted_count} cache keys for warehouses, business_id {business_id}")
+		except Exception as e:
+			logger.warning(f"Error invalidating warehouses cache for business_id {business_id}: {e}")
+
+
+def invalidate_warehouse_docs_cache(business_id: int, fiscal_year_id: Optional[int] = None, doc_type: Optional[str] = None, warehouse_id: Optional[int] = None, status: Optional[str] = None, document_id: Optional[int] = None):
+	"""
+	Invalidate cache برای اسناد انبار
+	"""
+	from app.core.cache import get_cache
+	cache = get_cache()
+	if cache.enabled:
+		try:
+			deleted_count = cache.invalidate_warehouse_docs_by_business(
+				business_id=business_id,
+				fiscal_year_id=fiscal_year_id,
+				doc_type=doc_type,
+				warehouse_id=warehouse_id,
+				status=status,
+				document_id=document_id
+			)
+			logger.info(f"Invalidated {deleted_count} cache keys for warehouse_docs, business_id {business_id}, fiscal_year_id {fiscal_year_id}, doc_type {doc_type}, warehouse_id {warehouse_id}, status {status}, document_id {document_id}")
+		except Exception as e:
+			logger.warning(f"Error invalidating warehouse_docs cache for business_id {business_id}: {e}")
+
+
 def create_warehouse(db: Session, business_id: int, payload: WarehouseCreateRequest) -> Dict[str, Any]:
 	# تولید خودکار کد در صورت عدم ارسال
 	if payload.code is None or not payload.code.strip():
@@ -1793,6 +1938,10 @@ def create_warehouse(db: Session, business_id: int, payload: WarehouseCreateRequ
 	if obj.is_default:
 		db.query(Warehouse).filter(and_(Warehouse.business_id == business_id, Warehouse.id != obj.id)).update({Warehouse.is_default: False})
 		db.commit()
+	
+	# Invalidate cache بعد از ایجاد موفق انبار
+	invalidate_warehouses_cache(business_id)
+	
 	return {"message": "WAREHOUSE_CREATED", "data": _to_dict(obj)}
 
 
@@ -1835,6 +1984,10 @@ def update_warehouse(db: Session, business_id: int, warehouse_id: int, payload: 
 	if updated.is_default:
 		db.query(Warehouse).filter(and_(Warehouse.business_id == business_id, Warehouse.id != updated.id)).update({Warehouse.is_default: False})
 		db.commit()
+	
+	# Invalidate cache بعد از به‌روزرسانی موفق انبار
+	invalidate_warehouses_cache(business_id)
+	
 	return {"message": "WAREHOUSE_UPDATED", "data": _to_dict(updated)}
 
 
@@ -1843,7 +1996,24 @@ def delete_warehouse(db: Session, business_id: int, warehouse_id: int) -> bool:
 	if not obj or obj.business_id != business_id:
 		return False
 	repo = WarehouseRepository(db)
-	return repo.delete(warehouse_id)
+	result = repo.delete(warehouse_id)
+	
+	# Invalidate cache بعد از حذف موفق انبار
+	if result:
+		invalidate_warehouses_cache(business_id)
+		# همچنین اسناد انبار مرتبط با این انبار را هم invalidate کن
+		from app.core.cache import get_cache
+		cache = get_cache()
+		if cache.enabled:
+			try:
+				cache.invalidate_warehouse_docs_by_business(
+					business_id=business_id,
+					warehouse_id=warehouse_id
+				)
+			except Exception as e:
+				logger.warning(f"Error invalidating warehouse_docs cache for warehouse_id {warehouse_id}: {e}")
+	
+	return result
 
 
 def query_warehouses(db: Session, business_id: int, query_info: QueryInfo) -> Dict[str, Any]:
@@ -1887,8 +2057,35 @@ def delete_warehouse_document(db: Session, business_id: int, wh_id: int) -> bool
 	if wh.status != "draft":
 		raise ApiError("NOT_DELETABLE", "فقط حواله‌های draft قابل حذف هستند", http_status=400)
 	
+	# دریافت اطلاعات قبل از حذف برای invalidation
+	fiscal_year_id = wh.fiscal_year_id
+	doc_type = wh.doc_type
+	warehouse_id_from = wh.warehouse_id_from
+	warehouse_id_to = wh.warehouse_id_to
+	status = wh.status
+	
 	db.delete(wh)
 	db.flush()
+	
+	# Invalidate cache بعد از حذف موفق سند انبار
+	invalidate_warehouse_docs_cache(
+		business_id=business_id,
+		fiscal_year_id=fiscal_year_id,
+		doc_type=doc_type,
+		warehouse_id=warehouse_id_from or warehouse_id_to,
+		status=status,
+		document_id=wh_id
+	)
+	# اگر transfer باشد، هر دو انبار را invalidate کن
+	if doc_type == "transfer" and warehouse_id_from and warehouse_id_to:
+		invalidate_warehouse_docs_cache(
+			business_id=business_id,
+			fiscal_year_id=fiscal_year_id,
+			doc_type=doc_type,
+			warehouse_id=warehouse_id_to,
+			status=status
+		)
+	
 	return True
 
 
@@ -1999,11 +2196,71 @@ def cancel_warehouse_document(db: Session, business_id: int, wh_id: int, user_id
 		)
 		db.add(cancel_line)
 	
+	# دریافت اطلاعات قبل از تغییر status برای invalidation
+	old_status = wh.status
+	business_id = wh.business_id
+	fiscal_year_id = wh.fiscal_year_id
+	doc_type = wh.doc_type
+	warehouse_id_from = wh.warehouse_id_from
+	warehouse_id_to = wh.warehouse_id_to
+	
 	# تغییر وضعیت حواله اصلی به cancelled
 	wh.status = "cancelled"
 	wh.touch()
 	
 	db.flush()
+	
+	# Invalidate cache بعد از تغییر status به cancelled و ایجاد حواله معکوس
+	invalidate_warehouse_docs_cache(
+		business_id=business_id,
+		fiscal_year_id=fiscal_year_id,
+		doc_type=doc_type,
+		warehouse_id=warehouse_id_from or warehouse_id_to,
+		status=old_status,
+		document_id=wh.id
+	)
+	invalidate_warehouse_docs_cache(
+		business_id=business_id,
+		fiscal_year_id=fiscal_year_id,
+		doc_type=doc_type,
+		warehouse_id=warehouse_id_from or warehouse_id_to,
+		status="cancelled",
+		document_id=wh.id
+	)
+	# برای حواله معکوس جدید
+	invalidate_warehouse_docs_cache(
+		business_id=business_id,
+		fiscal_year_id=cancel_wh.fiscal_year_id,
+		doc_type=cancel_wh.doc_type,
+		warehouse_id=cancel_wh.warehouse_id_from or cancel_wh.warehouse_id_to,
+		status=cancel_wh.status,
+		document_id=cancel_wh.id
+	)
+	# اگر transfer باشد، هر دو انبار را invalidate کن
+	if doc_type == "transfer" and warehouse_id_from and warehouse_id_to:
+		invalidate_warehouse_docs_cache(
+			business_id=business_id,
+			fiscal_year_id=fiscal_year_id,
+			doc_type=doc_type,
+			warehouse_id=warehouse_id_to,
+			status=old_status
+		)
+		invalidate_warehouse_docs_cache(
+			business_id=business_id,
+			fiscal_year_id=fiscal_year_id,
+			doc_type=doc_type,
+			warehouse_id=warehouse_id_to,
+			status="cancelled"
+		)
+	if cancel_wh.doc_type == "transfer" and cancel_wh.warehouse_id_from and cancel_wh.warehouse_id_to:
+		invalidate_warehouse_docs_cache(
+			business_id=business_id,
+			fiscal_year_id=cancel_wh.fiscal_year_id,
+			doc_type=cancel_wh.doc_type,
+			warehouse_id=cancel_wh.warehouse_id_to,
+			status=cancel_wh.status
+		)
+	
 	return cancel_wh
 
 

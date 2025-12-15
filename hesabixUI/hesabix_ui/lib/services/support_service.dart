@@ -222,6 +222,42 @@ class SupportService {
     }
   }
 
+  // Bulk operations
+  Future<Map<String, dynamic>> bulkAssignTickets(List<int> ticketIds, int operatorId) async {
+    try {
+      final response = await _apiClient.post<Map<String, dynamic>>(
+        '/api/v1/support/operator/tickets/bulk-assign',
+        data: {
+          'ticket_ids': ticketIds,
+          'operator_id': operatorId,
+        },
+      );
+      return response.data!['data'] as Map<String, dynamic>;
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  Future<Map<String, dynamic>> bulkUpdateStatus(
+    List<int> ticketIds,
+    int statusId, {
+    int? assignedOperatorId,
+  }) async {
+    try {
+      final response = await _apiClient.post<Map<String, dynamic>>(
+        '/api/v1/support/operator/tickets/bulk-update-status',
+        data: {
+          'ticket_ids': ticketIds,
+          'status_id': statusId,
+          if (assignedOperatorId != null) 'assigned_operator_id': assignedOperatorId,
+        },
+      );
+      return response.data!['data'] as Map<String, dynamic>;
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
   // Error handling
   Exception _handleError(DioException e) {
     if (e.response != null) {

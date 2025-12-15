@@ -103,9 +103,65 @@ def search_products_endpoint(
 	# کش نتایج جستجوی محصولات بر اساس پارامترها
 	cache = get_cache()
 	cache_key = None
+	category_id = None
 
 	if cache.enabled:
 		import json, hashlib
+		from decimal import Decimal
+		from datetime import datetime, date
+		from adapters.api.v1.schemas import FilterItem
+		
+		# Helper function to convert objects to JSON-serializable format
+		def to_serializable(obj):
+			"""Convert Pydantic models and other non-serializable types to dict/primitive types"""
+			if hasattr(obj, 'model_dump'):  # Pydantic v2
+				return obj.model_dump()
+			elif hasattr(obj, 'dict'):  # Pydantic v1
+				return obj.dict()
+			elif isinstance(obj, (datetime, date)):
+				return obj.isoformat()
+			elif isinstance(obj, Decimal):
+				return float(obj)
+			elif isinstance(obj, dict):
+				return {k: to_serializable(v) for k, v in obj.items()}
+			elif isinstance(obj, list):
+				return [to_serializable(item) for item in obj]
+			else:
+				return obj
+		
+		# استخراج category_id از filters اگر موجود باشد
+		if query_info.filters:
+			for filter_item in query_info.filters:
+				# Convert FilterItem to dict if needed
+				if isinstance(filter_item, FilterItem):
+					filter_dict = to_serializable(filter_item)
+				else:
+					filter_dict = filter_item
+				
+				if isinstance(filter_dict, dict):
+					field = filter_dict.get("property") or filter_dict.get("field")
+					if field == "category_id":
+						value = filter_dict.get("value")
+						operator = filter_dict.get("operator", "=")
+						if operator == "=" and value:
+							try:
+								category_id = int(value)
+							except (ValueError, TypeError):
+								pass
+						# اگر operator "in" است، اولین category_id را می‌گیریم
+						# (برای سادگی، تمام کش‌های مربوط به این category ها invalidate می‌شوند)
+						elif operator == "in" and isinstance(value, list) and value:
+							try:
+								category_id = int(value[0])
+							except (ValueError, TypeError):
+								pass
+						break
+		
+		# Convert filters to serializable format
+		serializable_filters = None
+		if query_info.filters:
+			serializable_filters = [to_serializable(f) for f in query_info.filters]
+		
 		key_payload = {
 			"business_id": business_id,
 			"take": query_info.take,
@@ -113,7 +169,7 @@ def search_products_endpoint(
 			"sort_by": query_info.sort_by,
 			"sort_desc": query_info.sort_desc,
 			"search": query_info.search,
-			"filters": query_info.filters,
+			"filters": serializable_filters,
 			"include_inventory": query_info.include_inventory,
 			"inventory_as_of_date": query_info.inventory_as_of_date,
 		}
@@ -138,8 +194,15 @@ def search_products_endpoint(
 		formatted = format_datetime_fields(result, request)
 
 		if cache.enabled and cache_key:
+			# استفاده از tag-based caching برای مدیریت بهتر invalidation
 			# چون موجودی و قیمت ممکن است سریع تغییر کند، TTL کوتاه
-			cache.set(cache_key, formatted, ttl=30)
+			cache.set_with_products_tag(
+				key=cache_key,
+				value=formatted,
+				business_id=business_id,
+				category_id=category_id,
+				ttl=30
+			)
 
 		return success_response(data=formatted, request=request)
 	except (OperationalError, SQLTimeoutError) as e:
@@ -800,11 +863,13 @@ async def import_products_excel(
 
     try:
         is_dry_run = str(dry_run).lower() in ("true","1","yes","on")
+        logger.info(f"[IMPORT] Starting Excel import - business_id={business_id}, dry_run={is_dry_run}, match_by={match_by}, conflict_policy={conflict_policy}")
 
         if not file.filename or not file.filename.lower().endswith('.xlsx'):
             raise ApiError("INVALID_FILE", "فرمت فایل معتبر نیست. تنها xlsx پشتیبانی می‌شود", http_status=400)
 
         content = await file.read()
+        logger.info(f"[IMPORT] File received - filename={file.filename}, size={len(content)} bytes")
         if len(content) < 100 or not _validate_excel_signature(content):
             raise ApiError("INVALID_FILE", "فایل Excel معتبر نیست یا خالی است", http_status=400)
 
@@ -815,11 +880,13 @@ async def import_products_excel(
 
         ws = wb.active
         rows = list(ws.iter_rows(values_only=True))
+        logger.info(f"[IMPORT] Excel file loaded - total rows={len(rows)}")
         if not rows:
             return success_response(data={"summary": {"total": 0}}, request=request, message="EMPTY_FILE")
 
         headers = [str(h).strip() if h is not None else "" for h in rows[0]]
         data_rows = rows[1:]
+        logger.info(f"[IMPORT] Headers parsed: {headers}, data rows count: {len(data_rows)}")
 
         def _parse_bool(v: object) -> Optional[bool]:
             if v is None: return None
@@ -879,9 +946,15 @@ async def import_products_excel(
             for k in ['reorder_point','min_order_qty','lead_time_days','category_id','tax_type_id','tax_unit_id']:
                 if k in item:
                     item[k] = _parse_int(item.get(k))
+            # Handle boolean fields - always set them, default to False if not provided or invalid
             for k in ['track_inventory','is_sales_taxable','is_purchase_taxable']:
                 if k in item:
-                    item[k] = _parse_bool(item.get(k)) if item.get(k) is not None else None
+                    parsed = _parse_bool(item.get(k))
+                    # For boolean fields, if None or invalid, use False as default
+                    item[k] = parsed if parsed is not None else False
+                else:
+                    # If field doesn't exist in item, set default to False
+                    item[k] = False
 
             # attribute_ids: comma-separated
             if 'attribute_ids' in item and item['attribute_ids']:
@@ -898,20 +971,30 @@ async def import_products_excel(
 
             # if code is empty, it will be auto-generated in service
             code = item.get('code')
-            if code is not None and str(code).strip() == "":
-                item['code'] = None
+            if code is not None:
+                code_str = str(code).strip()
+                # Handle string "None" or empty string
+                if code_str == "" or code_str.lower() == "none":
+                    item['code'] = None
+                else:
+                    item['code'] = code_str
 
             if row_errors:
                 errors.append({"row": idx, "errors": row_errors})
+                logger.debug(f"[IMPORT] Row {idx} validation failed: {row_errors}")
                 continue
 
             valid_items.append(item)
+            logger.debug(f"[IMPORT] Row {idx} validated successfully - name={item.get('name')}, code={item.get('code')}")
 
         inserted = 0
         updated = 0
         skipped = 0
 
+        logger.info(f"[IMPORT] Processing summary - total_rows={len(data_rows)}, valid_items={len(valid_items)}, errors={len(errors)}, is_dry_run={is_dry_run}")
+
         if not is_dry_run and valid_items:
+            logger.info(f"[IMPORT] Starting REAL import (not dry-run) for {len(valid_items)} items")
             from sqlalchemy import and_ as _and
             from adapters.db.models.product import Product
             from adapters.api.v1.schema_models.product import ProductCreateRequest, ProductUpdateRequest
@@ -919,30 +1002,80 @@ async def import_products_excel(
 
             def _find_existing(session: Session, data: dict) -> Optional[Product]:
                 if match_by == 'code' and data.get('code'):
-                    return session.query(Product).filter(_and(Product.business_id == business_id, Product.code == str(data['code']).strip())).first()
+                    result = session.query(Product).filter(_and(Product.business_id == business_id, Product.code == str(data['code']).strip())).first()
+                    logger.debug(f"[IMPORT] Searching by code='{data.get('code')}' - found: {result is not None}")
+                    return result
                 if match_by == 'name' and data.get('name'):
-                    return session.query(Product).filter(_and(Product.business_id == business_id, Product.name == str(data['name']).strip())).first()
+                    result = session.query(Product).filter(_and(Product.business_id == business_id, Product.name == str(data['name']).strip())).first()
+                    logger.debug(f"[IMPORT] Searching by name='{data.get('name')}' - found: {result is not None}")
+                    return result
+                logger.debug(f"[IMPORT] No match criteria - match_by={match_by}, code={data.get('code')}, name={data.get('name')}")
                 return None
 
-            for data in valid_items:
+            for idx, data in enumerate(valid_items, start=1):
+                item_name = data.get('name', 'N/A')
+                item_code = data.get('code', 'N/A')
+                logger.info(f"[IMPORT] Processing item {idx}/{len(valid_items)}: name='{item_name}', code='{item_code}'")
+                logger.debug(f"[IMPORT] Full item data: {data}")
+                
                 existing = _find_existing(db, data)
                 if existing is None:
+                    logger.info(f"[IMPORT] Item '{item_name}' not found - will CREATE new product")
                     try:
-                        create_product(db, business_id, ProductCreateRequest(**data))
+                        logger.debug(f"[IMPORT] Calling create_product with business_id={business_id}, data keys: {list(data.keys())}")
+                        # Log data before creating ProductCreateRequest to see what's being passed
+                        logger.debug(f"[IMPORT] Data to create ProductCreateRequest: {json.dumps({k: str(v) for k, v in data.items()}, ensure_ascii=False, default=str)}")
+                        try:
+                            product_request = ProductCreateRequest(**data)
+                            logger.debug(f"[IMPORT] ProductCreateRequest created successfully")
+                        except Exception as validation_error:
+                            logger.error(f"[IMPORT] ❌ ValidationError creating ProductCreateRequest for '{item_name}': {validation_error}")
+                            # Try to get detailed validation errors
+                            try:
+                                if hasattr(validation_error, 'errors'):
+                                    errors_list = validation_error.errors()
+                                    logger.error(f"[IMPORT] Validation errors details: {json.dumps(errors_list, ensure_ascii=False, indent=2)}")
+                                elif hasattr(validation_error, 'error_dict'):
+                                    logger.error(f"[IMPORT] Validation error_dict: {json.dumps(validation_error.error_dict(), ensure_ascii=False, indent=2)}")
+                                # Log the string representation as fallback
+                                logger.error(f"[IMPORT] Full validation error: {str(validation_error)}")
+                            except Exception as log_error:
+                                logger.error(f"[IMPORT] Could not serialize validation error: {log_error}")
+                            raise
+                        result = create_product(db, business_id, product_request)
+                        logger.info(f"[IMPORT] ✅ Successfully CREATED product '{item_name}' - result: {result.get('message', 'N/A')}")
+                        if result.get('data', {}).get('id'):
+                            logger.info(f"[IMPORT] Created product ID: {result['data']['id']}")
                         inserted += 1
+                        logger.info(f"[IMPORT] Insert counter: {inserted}")
                     except Exception as e:
-                        logger.error(f"Create product failed: {e}")
+                        logger.error(f"[IMPORT] ❌ Create product failed for '{item_name}': {e}", exc_info=True)
+                        logger.error(f"[IMPORT] Exception type: {type(e).__name__}, args: {e.args}")
+                        if hasattr(e, 'errors'):
+                            logger.error(f"[IMPORT] Validation errors: {json.dumps(e.errors(), ensure_ascii=False, indent=2)}")
                         skipped += 1
                 else:
+                    logger.info(f"[IMPORT] Item '{item_name}' EXISTS (id={existing.id}) - conflict_policy={conflict_policy}")
                     if conflict_policy == 'insert':
+                        logger.info(f"[IMPORT] Skipping existing item due to conflict_policy='insert'")
                         skipped += 1
                     elif conflict_policy in ('update','upsert'):
+                        logger.info(f"[IMPORT] Will UPDATE existing product id={existing.id}")
                         try:
-                            update_product(db, existing.id, business_id, ProductUpdateRequest(**data))
+                            logger.debug(f"[IMPORT] Calling update_product with id={existing.id}, business_id={business_id}")
+                            result = update_product(db, existing.id, business_id, ProductUpdateRequest(**data))
+                            logger.info(f"[IMPORT] ✅ Successfully UPDATED product '{item_name}' (id={existing.id})")
                             updated += 1
+                            logger.info(f"[IMPORT] Update counter: {updated}")
                         except Exception as e:
-                            logger.error(f"Update product failed: {e}")
+                            logger.error(f"[IMPORT] ❌ Update product failed for '{item_name}' (id={existing.id}): {e}", exc_info=True)
+                            logger.error(f"[IMPORT] Exception type: {type(e).__name__}, args: {e.args}")
                             skipped += 1
+        else:
+            if is_dry_run:
+                logger.info(f"[IMPORT] DRY-RUN mode - skipping actual database operations")
+            else:
+                logger.warning(f"[IMPORT] No valid items to process (valid_items is empty)")
 
         summary = {
             "total": len(data_rows),
@@ -953,6 +1086,9 @@ async def import_products_excel(
             "skipped": skipped,
             "dry_run": is_dry_run,
         }
+
+        logger.info(f"[IMPORT] Final summary: {summary}")
+        logger.info(f"[IMPORT] Import completed - inserted={inserted}, updated={updated}, skipped={skipped}")
 
         return success_response(
             data={"summary": summary, "errors": errors},

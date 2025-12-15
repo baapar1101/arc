@@ -270,6 +270,8 @@
           return;
         }
 
+        var defaultFont = (window.getComputedStyle && window.getComputedStyle(document.body).fontFamily) || "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif";
+
         var banner = document.createElement('div');
         banner.id = UPDATE_BANNER_ID;
         banner.style.position = 'fixed';
@@ -278,56 +280,47 @@
         banner.style.transform = 'translateX(-50%)';
         banner.style.background = '#0175C2';
         banner.style.color = '#ffffff';
-        banner.style.padding = '10px 16px';
-        banner.style.borderRadius = '999px';
+        banner.style.padding = '12px 16px';
+        banner.style.borderRadius = '14px';
         banner.style.boxShadow = '0 8px 24px rgba(0, 0, 0, 0.25)';
         banner.style.zIndex = '10000';
         banner.style.display = 'flex';
         banner.style.alignItems = 'center';
-        banner.style.gap = '10px';
-        banner.style.fontFamily = "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif";
+        banner.style.gap = '12px';
+        banner.style.fontFamily = defaultFont;
         banner.style.fontSize = '14px';
         banner.style.direction = 'rtl';
+        banner.style.width = 'calc(100% - 24px)';
+        banner.style.maxWidth = '520px';
+        banner.style.flexWrap = 'wrap';
+        banner.style.justifyContent = 'space-between';
 
         var text = document.createElement('span');
-        text.textContent = 'نسخه جدید حسابیکس آماده استفاده است.';
+        text.textContent = 'نسخه جدید حسابیکس در حال اعمال است، صفحه به زودی به‌روزرسانی می‌شود.';
+        text.style.flex = '1';
+        text.style.fontFamily = 'inherit';
 
-        var refreshBtn = document.createElement('button');
-        refreshBtn.textContent = 'به\u200cروزرسانی';
-        refreshBtn.style.background = '#ffffff';
-        refreshBtn.style.color = '#0175C2';
-        refreshBtn.style.border = 'none';
-        refreshBtn.style.borderRadius = '999px';
-        refreshBtn.style.padding = '6px 14px';
-        refreshBtn.style.cursor = 'pointer';
-        refreshBtn.style.fontWeight = '600';
-        refreshBtn.style.fontSize = '13px';
+        var closeBtn = document.createElement('button');
+        closeBtn.textContent = 'بستن';
+        closeBtn.style.background = 'transparent';
+        closeBtn.style.color = '#ffffff';
+        closeBtn.style.border = '1px solid rgba(255, 255, 255, 0.6)';
+        closeBtn.style.borderRadius = '10px';
+        closeBtn.style.padding = '6px 12px';
+        closeBtn.style.cursor = 'pointer';
+        closeBtn.style.fontWeight = '600';
+        closeBtn.style.fontSize = '12px';
+        closeBtn.style.opacity = '0.9';
+        closeBtn.style.fontFamily = 'inherit';
 
-        var laterBtn = document.createElement('button');
-        laterBtn.textContent = 'بعداً';
-        laterBtn.style.background = 'transparent';
-        laterBtn.style.color = '#ffffff';
-        laterBtn.style.border = 'none';
-        laterBtn.style.cursor = 'pointer';
-        laterBtn.style.fontSize = '13px';
-        laterBtn.style.opacity = '0.9';
-
-        refreshBtn.addEventListener('click', function() {
-          try {
-            document.body.removeChild(banner);
-          } catch (e) {}
-          requestAppUpdate();
-        });
-
-        laterBtn.addEventListener('click', function() {
+        closeBtn.addEventListener('click', function() {
           try {
             document.body.removeChild(banner);
           } catch (e) {}
         });
 
         banner.appendChild(text);
-        banner.appendChild(refreshBtn);
-        banner.appendChild(laterBtn);
+        banner.appendChild(closeBtn);
         document.body.appendChild(banner);
       }
 
@@ -362,6 +355,8 @@
               // اگر صفحه فعلی از قبل توسط یک SW کنترل می‌شود، یعنی نسخه جدید نسبت به نسخه فعلی است
               if (navigator.serviceWorker.controller) {
                 createUpdateBanner();
+                // به‌صورت خودکار فعال‌سازی نسخه جدید را آغاز کن
+                requestAppUpdate();
               }
             }
 

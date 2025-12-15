@@ -551,8 +551,8 @@ class _CreateBomDialogState extends State<_CreateBomDialog> {
         businessId: widget.businessId,
         payload: {
           'product_id': widget.productId,
-          'version': _versionController.text.trim().isEmpty ? 'v1' : _versionController.text.trim(),
-          'name': _nameController.text.trim().isEmpty ? 'BOM' : _nameController.text.trim(),
+          'version': _versionController.text.trim(),
+          'name': _nameController.text.trim(),
           'is_default': _isDefault,
           'items': <Map<String, dynamic>>[],
           'outputs': <Map<String, dynamic>>[],
@@ -702,8 +702,14 @@ class _CreateBomDialogState extends State<_CreateBomDialog> {
                           ),
                           filled: true,
                           fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-                          helperText: 'اگر خالی بماند، به صورت خودکار v1 تنظیم می‌شود',
+                          helperText: 'نسخه فرمول تولید را مشخص کنید',
                         ),
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return 'لطفاً نسخه را وارد کنید';
+                          }
+                          return null;
+                        },
                       ),
                       const SizedBox(height: 16),
                       // Default checkbox with better styling
@@ -859,6 +865,7 @@ class _EditBomDialogState extends State<_EditBomDialog> {
   late final TextEditingController _versionController;
   late final TextEditingController _nameController;
   late bool _isDefault;
+  late String _status;
   bool _isLoading = false;
   String? _errorMessage;
   bool _hasChanges = false;
@@ -869,6 +876,7 @@ class _EditBomDialogState extends State<_EditBomDialog> {
     _versionController = TextEditingController(text: widget.bom.version);
     _nameController = TextEditingController(text: widget.bom.name);
     _isDefault = widget.bom.isDefault;
+    _status = widget.bom.status;
     
     // Track changes
     _versionController.addListener(_onFieldChanged);
@@ -879,7 +887,8 @@ class _EditBomDialogState extends State<_EditBomDialog> {
     if (!mounted) return;
     final hasChanges = _versionController.text.trim() != widget.bom.version ||
         _nameController.text.trim() != widget.bom.name ||
-        _isDefault != widget.bom.isDefault;
+        _isDefault != widget.bom.isDefault ||
+        _status != widget.bom.status;
     if (hasChanges != _hasChanges) {
       setState(() {
         _hasChanges = hasChanges;
@@ -910,6 +919,7 @@ class _EditBomDialogState extends State<_EditBomDialog> {
           'version': _versionController.text.trim(),
           'name': _nameController.text.trim(),
           'is_default': _isDefault,
+          'status': _status,
         },
       );
       if (!mounted) return;
@@ -1097,6 +1107,42 @@ class _EditBomDialogState extends State<_EditBomDialog> {
                         },
                       ),
                       const SizedBox(height: 16),
+                      // Status field
+                      DropdownButtonFormField<String>(
+                        value: _status,
+                        decoration: InputDecoration(
+                          labelText: 'وضعیت',
+                          prefixIcon: const Icon(Icons.info_outline),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          filled: true,
+                          fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                        ),
+                        items: const [
+                          DropdownMenuItem(
+                            value: 'draft',
+                            child: Text('پیش‌نویس'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'approved',
+                            child: Text('تایید شده'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'archived',
+                            child: Text('بایگانی'),
+                          ),
+                        ],
+                        onChanged: _isLoading ? null : (value) {
+                          if (value != null) {
+                            setState(() {
+                              _status = value;
+                              _onFieldChanged();
+                            });
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 16),
                       // Default checkbox with better styling
                       Container(
                         padding: const EdgeInsets.all(16),
@@ -1144,7 +1190,12 @@ class _EditBomDialogState extends State<_EditBomDialog> {
                               value: _isDefault,
                               onChanged: _isLoading
                                   ? null
-                                  : (v) => setState(() => _isDefault = v),
+                                  : (v) {
+                                      setState(() {
+                                        _isDefault = v;
+                                        _onFieldChanged();
+                                      });
+                                    },
                             ),
                           ],
                         ),

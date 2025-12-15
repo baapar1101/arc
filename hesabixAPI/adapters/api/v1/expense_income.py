@@ -91,6 +91,7 @@ async def list_expense_income_endpoint(
     # کش نتایج لیست هزینه/درآمد
     cache = get_cache()
     cache_key = None
+    fiscal_year_id = query_dict.get("fiscal_year_id")
 
     if cache.enabled:
         import json, hashlib
@@ -108,8 +109,15 @@ async def list_expense_income_endpoint(
     result = list_expense_income(db, business_id, query_dict)
     result["items"] = [format_datetime_fields(item, request) for item in result.get("items", [])]
 
+    # ذخیره در cache با tag-based caching
     if cache.enabled and cache_key:
-        cache.set(cache_key, result, ttl=60)
+        cache.set_with_expense_income_tag(
+            key=cache_key,
+            value=result,
+            business_id=business_id,
+            fiscal_year_id=fiscal_year_id,
+            ttl=60
+        )
 
     return success_response(data=result, request=request, message="EXPENSE_INCOME_LIST_FETCHED")
 

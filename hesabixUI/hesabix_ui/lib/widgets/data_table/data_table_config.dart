@@ -256,6 +256,8 @@ class DataTableConfig<T> {
   final double? borderWidth;
   final void Function(DateTime? fromDate, DateTime? toDate)? onDateRangeApply;
   final VoidCallback? onDateRangeClear;
+  // Custom filters callback
+  final List<FilterItem> Function()? getCustomFilters;
   
   // Export configuration
   final String? excelEndpoint;
@@ -363,6 +365,7 @@ class DataTableConfig<T> {
     this.borderWidth = 1.0,
     this.onDateRangeApply,
     this.onDateRangeClear,
+    this.getCustomFilters,
     this.excelEndpoint,
     this.pdfEndpoint,
     this.getExportParams,

@@ -73,8 +73,9 @@ class WorkflowEditorState extends ChangeNotifier {
       final nodesJson = nodesRaw is List ? List<dynamic>.from(nodesRaw) : <dynamic>[];
       final connectionsJson = connectionsRaw is List ? List<dynamic>.from(connectionsRaw) : <dynamic>[];
 
-      // تبدیل nodes
+      // تبدیل nodes و بررسی duplicate IDs
       final List<WorkflowNodeModel> loadedNodes = [];
+      final Set<String> seenIds = {};
       for (final nodeJson in nodesJson) {
         try {
           if (nodeJson is Map) {
@@ -85,8 +86,40 @@ class WorkflowEditorState extends ChangeNotifier {
             final node = WorkflowNodeModel.fromJson(nodeMap);
             // اطمینان از اینکه node معتبر است
             if (node.id.isNotEmpty && node.label.isNotEmpty) {
-              loadedNodes.add(node);
-              _nodesMap[node.id] = node;
+              // بررسی duplicate ID
+              if (seenIds.contains(node.id)) {
+                debugPrint('هشدار: node با ID تکراری "${node.id}" نادیده گرفته شد');
+                // ایجاد ID جدید
+                String newId;
+                int attempts = 0;
+                do {
+                  newId = _uuid.v4();
+                  attempts++;
+                  if (attempts > 10) {
+                    debugPrint('خطا: نمی‌توان ID یکتا برای node ایجاد کرد');
+                    continue; // skip this node
+                  }
+                } while (seenIds.contains(newId));
+                
+                // ایجاد node جدید با ID یکتا
+                final newNode = WorkflowNodeModel(
+                  id: newId,
+                  type: node.type,
+                  label: node.label,
+                  position: node.position,
+                  config: Map<String, dynamic>.from(node.config),
+                  key: node.key,
+                  icon: node.icon,
+                  comment: node.comment,
+                );
+                loadedNodes.add(newNode);
+                _nodesMap[newId] = newNode;
+                seenIds.add(newId);
+              } else {
+                loadedNodes.add(node);
+                _nodesMap[node.id] = node;
+                seenIds.add(node.id);
+              }
             }
           }
         } catch (e, stackTrace) {
@@ -209,8 +242,19 @@ class WorkflowEditorState extends ChangeNotifier {
       
       final config = <String, dynamic>{};
       
+      // ایجاد ID جدید و بررسی duplicate
+      String nodeId;
+      int attempts = 0;
+      do {
+        nodeId = _uuid.v4();
+        attempts++;
+        if (attempts > 10) {
+          throw StateError('نمی‌توان ID یکتا برای node ایجاد کرد');
+        }
+      } while (_nodesMap.containsKey(nodeId));
+      
       final node = WorkflowNodeModel(
-        id: _uuid.v4(),
+        id: nodeId,
         type: type,
         label: name,
         position: validPosition,
@@ -242,8 +286,38 @@ class WorkflowEditorState extends ChangeNotifier {
 
   /// افزودن node با موقعیت مشخص
   void addNodeWithPosition(WorkflowNodeModel node) {
-    _nodes.add(node);
-    _nodesMap[node.id] = node;
+    // بررسی duplicate ID
+    if (_nodesMap.containsKey(node.id)) {
+      debugPrint('هشدار: node با ID تکراری "${node.id}" نادیده گرفته شد');
+      // ایجاد ID جدید برای node
+      String newId;
+      int attempts = 0;
+      do {
+        newId = _uuid.v4();
+        attempts++;
+        if (attempts > 10) {
+          throw StateError('نمی‌توان ID یکتا برای node ایجاد کرد');
+        }
+      } while (_nodesMap.containsKey(newId));
+      
+      // ایجاد node جدید با ID یکتا
+      final newNode = WorkflowNodeModel(
+        id: newId,
+        type: node.type,
+        label: node.label,
+        position: node.position,
+        config: Map<String, dynamic>.from(node.config),
+        key: node.key,
+        icon: node.icon,
+        comment: node.comment,
+      );
+      
+      _nodes.add(newNode);
+      _nodesMap[newId] = newNode;
+    } else {
+      _nodes.add(node);
+      _nodesMap[node.id] = node;
+    }
     notifyListeners();
   }
 

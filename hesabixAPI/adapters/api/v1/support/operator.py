@@ -5,17 +5,20 @@ from sqlalchemy.orm import Session
 from adapters.db.session import get_db
 from adapters.db.repositories.support.ticket_repository import TicketRepository
 from adapters.db.repositories.support.message_repository import MessageRepository
+from adapters.db.models.support.ticket import Ticket
 from adapters.api.v1.schemas import QueryInfo, PaginatedResponse, SuccessResponse
 from adapters.api.v1.support.schemas import (
     CreateMessageRequest,
     UpdateStatusRequest,
     AssignTicketRequest,
+    BulkAssignRequest,
+    BulkUpdateStatusRequest,
     TicketResponse,
     MessageResponse
 )
 from app.core.auth_dependency import get_current_user, AuthContext
 from app.core.permissions import require_app_permission
-from app.core.responses import success_response, format_datetime_fields
+from app.core.responses import success_response, format_datetime_fields, ApiError
 from app.services.notification_service import NotificationService
 import logging
 
@@ -427,6 +430,145 @@ async def search_operator_ticket_messages(
     return success_response(formatted_data, request)
 
 
+@router.post("/tickets/bulk-assign", response_model=SuccessResponse)
+@require_app_permission("support_operator")
+async def bulk_assign_tickets(
+    request: Request,
+    bulk_request: BulkAssignRequest,
+    current_user: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """تخصیص گروهی تیکت‌ها به اپراتور"""
+    from adapters.db.repositories.user_repo import UserRepository
+    
+    ticket_repo = TicketRepository(db)
+    user_repo = UserRepository(db)
+    
+    # بررسی اینکه operator_id واقعاً یک اپراتور است
+    if not user_repo.is_support_operator(bulk_request.operator_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="کاربر مشخص شده یک اپراتور پشتیبانی نیست"
+        )
+    
+    # بررسی وجود تیکت‌ها
+    existing_tickets = ticket_repo.db.query(Ticket).filter(Ticket.id.in_(bulk_request.ticket_ids)).count()
+    if existing_tickets != len(bulk_request.ticket_ids):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"برخی از تیکت‌ها یافت نشدند. {existing_tickets} از {len(bulk_request.ticket_ids)} تیکت موجود است"
+        )
+    
+    # تخصیص گروهی
+    updated_count = ticket_repo.bulk_assign_tickets(bulk_request.ticket_ids, bulk_request.operator_id)
+    
+    # ارسال ناتیفیکیشن به اپراتور
+    if updated_count > 0:
+        try:
+            notification_service = NotificationService(db)
+            operator = user_repo.get_by_id(bulk_request.operator_id)
+            operator_name = f"{operator.first_name or ''} {operator.last_name or ''}".strip() if operator else "اپراتور پشتیبانی"
+            
+            context = {
+                "subject": f"{updated_count} تیکت به شما تخصیص داده شد",
+                "message": f"{updated_count} تیکت به شما تخصیص داده شد.",
+                "operator_name": operator_name,
+                "ticket_count": updated_count
+            }
+            
+            notification_service.send(
+                user_id=bulk_request.operator_id,
+                event_key="support.tickets_bulk_assigned",
+                context=context,
+                preferred_channels=["inapp", "email", "telegram"],
+                broadcast_mode=False
+            )
+        except Exception as e:
+            logger = logging.getLogger(__name__)
+            logger.error(f"خطا در ارسال ناتیفیکیشن برای تخصیص گروهی تیکت‌ها: {e}")
+    
+    return success_response(
+        {
+            "message": f"{updated_count} تیکت با موفقیت تخصیص داده شد",
+            "updated_count": updated_count,
+            "ticket_ids": bulk_request.ticket_ids
+        },
+        request
+    )
+
+
+@router.post("/tickets/bulk-update-status", response_model=SuccessResponse)
+@require_app_permission("support_operator")
+async def bulk_update_ticket_status(
+    request: Request,
+    bulk_request: BulkUpdateStatusRequest,
+    current_user: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """تغییر وضعیت گروهی تیکت‌ها"""
+    ticket_repo = TicketRepository(db)
+    
+    # بررسی وجود تیکت‌ها
+    existing_tickets = ticket_repo.db.query(Ticket).filter(Ticket.id.in_(bulk_request.ticket_ids)).count()
+    if existing_tickets != len(bulk_request.ticket_ids):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"برخی از تیکت‌ها یافت نشدند. {existing_tickets} از {len(bulk_request.ticket_ids)} تیکت موجود است"
+        )
+    
+    # تغییر وضعیت گروهی
+    updated_count = ticket_repo.bulk_update_status(
+        bulk_request.ticket_ids,
+        bulk_request.status_id,
+        bulk_request.assigned_operator_id or current_user.get_user_id()
+    )
+    
+    # ارسال ناتیفیکیشن به کاربران صاحب تیکت‌ها
+    if updated_count > 0:
+        try:
+            notification_service = NotificationService(db)
+            tickets = ticket_repo.db.query(Ticket).filter(Ticket.id.in_(bulk_request.ticket_ids)).all()
+            
+            # دریافت نام وضعیت جدید
+            from adapters.db.models.support.status import Status
+            new_status = db.query(Status).filter(Status.id == bulk_request.status_id).first()
+            new_status_name = new_status.name if new_status else "نامشخص"
+            
+            operator_name = f"{current_user.user.first_name or ''} {current_user.user.last_name or ''}".strip() or "اپراتور پشتیبانی"
+            
+            # ارسال ناتیفیکیشن به هر کاربر
+            user_ids = list(set([t.user_id for t in tickets if t.user_id]))
+            for user_id in user_ids:
+                user_tickets = [t for t in tickets if t.user_id == user_id]
+                context = {
+                    "subject": f"وضعیت {len(user_tickets)} تیکت شما تغییر کرد",
+                    "message": f"وضعیت {len(user_tickets)} تیکت شما به '{new_status_name}' تغییر کرد.",
+                    "operator_name": operator_name,
+                    "new_status": new_status_name,
+                    "ticket_count": len(user_tickets)
+                }
+                
+                notification_service.send(
+                    user_id=user_id,
+                    event_key="support.tickets_bulk_status_changed",
+                    context=context,
+                    preferred_channels=["inapp", "email", "telegram"],
+                    broadcast_mode=False
+                )
+        except Exception as e:
+            logger = logging.getLogger(__name__)
+            logger.error(f"خطا در ارسال ناتیفیکیشن برای تغییر وضعیت گروهی تیکت‌ها: {e}")
+    
+    return success_response(
+        {
+            "message": f"وضعیت {updated_count} تیکت با موفقیت تغییر کرد",
+            "updated_count": updated_count,
+            "ticket_ids": bulk_request.ticket_ids
+        },
+        request
+    )
+
+
 @router.delete("/tickets/{ticket_id}", response_model=SuccessResponse)
 @require_app_permission("superadmin")
 async def delete_ticket(
@@ -442,9 +584,12 @@ async def delete_ticket(
     deleted = ticket_repo.delete_ticket(ticket_id)
     
     if not deleted:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="تیکت یافت نشد یا قبلاً حذف شده است"
+        translator = getattr(request.state, "translator", None)
+        raise ApiError(
+            code="RESOURCE_NOT_FOUND",
+            message="تیکت یافت نشد یا قبلاً حذف شده است",
+            http_status=status.HTTP_404_NOT_FOUND,
+            translator=translator
         )
     
     return success_response(

@@ -10,6 +10,7 @@ class CashRegister {
   final String? paymentSwitchNumber;
   final String? paymentTerminalNumber;
   final String? merchantId;
+  final double? balance;
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -25,6 +26,7 @@ class CashRegister {
     this.paymentSwitchNumber,
     this.paymentTerminalNumber,
     this.merchantId,
+    this.balance,
     this.createdAt,
     this.updatedAt,
   });
@@ -42,6 +44,7 @@ class CashRegister {
       paymentSwitchNumber: json['payment_switch_number'] as String?,
       paymentTerminalNumber: json['payment_terminal_number'] as String?,
       merchantId: json['merchant_id'] as String?,
+      balance: json['balance'] != null ? (json['balance'] is num ? (json['balance'] as num).toDouble() : double.tryParse(json['balance'].toString())) : null,
       createdAt: json['created_at'] != null ? DateTime.tryParse(json['created_at'].toString()) : null,
       updatedAt: json['updated_at'] != null ? DateTime.tryParse(json['updated_at'].toString()) : null,
     );

@@ -1192,6 +1192,15 @@ def create_receipt_payment(
     
     result = document_to_dict(db, document)
     
+    # Invalidate cache بعد از ایجاد موفق سند دریافت/پرداخت
+    from app.services.document_service import invalidate_documents_cache
+    invalidate_documents_cache(
+        business_id=business_id,
+        fiscal_year_id=document.fiscal_year_id,
+        document_id=document.id,
+        document_type=document_type
+    )
+    
     # فراخوانی workflow triggers
     try:
         from app.services.workflow.workflow_trigger_service import trigger_receipt_payment_created
@@ -1412,8 +1421,22 @@ def delete_receipt_payment(db: Session, document_id: int) -> bool:
     except Exception:
         pass
     
+    # دریافت اطلاعات قبل از حذف برای invalidation
+    business_id = document.business_id
+    fiscal_year_id = document.fiscal_year_id
+    document_type = document.document_type
+    
     db.delete(document)
     db.commit()
+    
+    # Invalidate cache بعد از حذف موفق سند دریافت/پرداخت
+    from app.services.document_service import invalidate_documents_cache
+    invalidate_documents_cache(
+        business_id=business_id,
+        fiscal_year_id=fiscal_year_id,
+        document_id=document_id,
+        document_type=document_type
+    )
     
     return True
 
@@ -2123,6 +2146,20 @@ def update_receipt_payment(
                         total = item.get("total", 0)
                         logger.info(f"   قسط #{seq}: status={status}, paid={paid}, total={total}")
     result = document_to_dict(db, document)
+    
+    # دریافت اطلاعات قبل از به‌روزرسانی برای invalidation
+    business_id = document.business_id
+    old_fiscal_year_id = document.fiscal_year_id
+    document_type = document.document_type
+    
+    # Invalidate cache بعد از به‌روزرسانی موفق سند دریافت/پرداخت
+    from app.services.document_service import invalidate_documents_cache
+    invalidate_documents_cache(
+        business_id=business_id,
+        fiscal_year_id=old_fiscal_year_id,
+        document_id=document.id,
+        document_type=document_type
+    )
     
     # فراخوانی workflow triggers
     try:

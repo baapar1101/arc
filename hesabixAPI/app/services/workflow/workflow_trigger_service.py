@@ -8,7 +8,11 @@ from typing import Any, Dict, Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import select, and_
 
-from adapters.db.models.workflow import Workflow, WorkflowStatus
+from adapters.db.models.workflow import (
+    Workflow,
+    WorkflowStatus,
+    WorkflowExecutionStatus,
+)
 from app.services.workflow.workflow_engine import WorkflowEngine
 
 logger = logging.getLogger(__name__)
@@ -67,7 +71,7 @@ def trigger_workflows(
             engine = WorkflowEngine(db, business_id, user_id)
             execution = engine.execute_workflow(workflow, trigger_data)
             
-            if execution.status.value == "تکمیل شده":
+            if execution.status == WorkflowExecutionStatus.COMPLETED:
                 executed_count += 1
                 logger.info(f"Workflow {workflow.id} executed successfully")
             else:

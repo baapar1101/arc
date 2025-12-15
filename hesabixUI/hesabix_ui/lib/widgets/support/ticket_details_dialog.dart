@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/models/support_models.dart';
+import 'package:hesabix_ui/models/response_template.dart';
 import 'package:hesabix_ui/services/support_service.dart';
+import 'package:hesabix_ui/services/response_templates_service.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/widgets/support/message_bubble.dart';
 import 'package:hesabix_ui/widgets/support/ai_ticket_assistant.dart';
@@ -32,6 +34,7 @@ class _TicketDetailsDialogState extends State<TicketDetailsDialog> {
   bool _isSending = false;
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  List<ResponseTemplate> _templates = [];
 
   @override
   void initState() {
@@ -39,6 +42,43 @@ class _TicketDetailsDialogState extends State<TicketDetailsDialog> {
     _ticket = widget.ticket;
     _messages = _ticket.messages ?? [];
     _loadMessages();
+    if (widget.isOperator) {
+      _loadTemplates();
+    }
+  }
+
+  Future<void> _loadTemplates() async {
+    try {
+      final templates = await ResponseTemplatesService.getTemplates();
+      if (mounted) {
+        setState(() {
+          _templates = templates;
+        });
+      }
+    } catch (e) {
+      // Handle error silently
+    }
+  }
+
+  Future<void> _showTemplatesDialog() async {
+    if (!mounted) return;
+    
+    final selectedTemplate = await showDialog<ResponseTemplate>(
+      context: context,
+      builder: (context) => _TemplatesDialog(templates: _templates),
+    );
+
+    if (selectedTemplate != null) {
+      // Replace variables in template
+      final variables = {
+        'user_name': _ticket.user?.displayName ?? 'کاربر',
+        'ticket_id': _ticket.id.toString(),
+        'ticket_title': _ticket.title,
+      };
+      
+      final formattedContent = selectedTemplate.format(variables);
+      _messageController.text = formattedContent;
+    }
   }
 
   @override
@@ -475,9 +515,65 @@ class _TicketDetailsDialogState extends State<TicketDetailsDialog> {
                             top: BorderSide(color: Colors.grey[200]!),
                           ),
                         ),
-                        child: Row(
+                        child: Column(
                           children: [
-                            Expanded(
+                            // Quick Reply Buttons (only for operators)
+                            if (widget.isOperator && _templates.isNotEmpty) ...[
+                              Container(
+                                padding: const EdgeInsets.symmetric(vertical: 8),
+                                child: SizedBox(
+                                  height: 36,
+                                  child: ListView(
+                                    scrollDirection: Axis.horizontal,
+                                    children: [
+                                      ..._templates.take(4).map((template) {
+                                        return Padding(
+                                          padding: const EdgeInsets.only(right: 8),
+                                          child: OutlinedButton(
+                                            onPressed: () {
+                                              final variables = {
+                                                'user_name': _ticket.user?.displayName ?? 'کاربر',
+                                                'ticket_id': _ticket.id.toString(),
+                                                'ticket_title': _ticket.title,
+                                              };
+                                              final formattedContent = template.format(variables);
+                                              _messageController.text = formattedContent;
+                                            },
+                                            style: OutlinedButton.styleFrom(
+                                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                              minimumSize: const Size(0, 36),
+                                            ),
+                                            child: Text(
+                                              template.name,
+                                              style: const TextStyle(fontSize: 12),
+                                            ),
+                                          ),
+                                        );
+                                      }).toList(),
+                                      IconButton(
+                                        icon: const Icon(Icons.more_horiz, size: 20),
+                                        tooltip: 'مشاهده همه قالب‌ها',
+                                        onPressed: _showTemplatesDialog,
+                                        padding: EdgeInsets.zero,
+                                        constraints: const BoxConstraints(),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                            Row(
+                              children: [
+                                if (widget.isOperator && _templates.isNotEmpty) ...[
+                                  IconButton(
+                                    icon: const Icon(Icons.description),
+                                    tooltip: 'قالب‌های پاسخ',
+                                    onPressed: _showTemplatesDialog,
+                                    color: theme.primaryColor,
+                                  ),
+                                  const SizedBox(width: 4),
+                                ],
+                                Expanded(
                               child: TextField(
                                 controller: _messageController,
                                 decoration: InputDecoration(
@@ -535,6 +631,8 @@ class _TicketDetailsDialogState extends State<TicketDetailsDialog> {
                             ),
                           ],
                         ),
+                          ],
+                        ),
                       ),
                     ],
                   );
@@ -584,6 +682,83 @@ class _TicketDetailsDialogState extends State<TicketDetailsDialog> {
                 },
               ),
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Dialog for selecting response templates
+class _TemplatesDialog extends StatelessWidget {
+  final List<ResponseTemplate> templates;
+
+  const _TemplatesDialog({required this.templates});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    
+    return Dialog(
+      child: Container(
+        width: 500,
+        height: 600,
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                Text(
+                  'قالب‌های پاسخ',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const Spacer(),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ],
+            ),
+            const Divider(),
+            Expanded(
+              child: templates.isEmpty
+                  ? Center(
+                      child: Text(
+                        'هیچ قالبی یافت نشد',
+                        style: theme.textTheme.bodyLarge?.copyWith(
+                          color: Colors.grey,
+                        ),
+                      ),
+                    )
+                  : ListView.builder(
+                      itemCount: templates.length,
+                      itemBuilder: (context, index) {
+                        final template = templates[index];
+                        return Card(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          child: ListTile(
+                            title: Text(
+                              template.name,
+                              style: const TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                            subtitle: Text(
+                              template.content.length > 100
+                                  ? '${template.content.substring(0, 100)}...'
+                                  : template.content,
+                              maxLines: 3,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            onTap: () {
+                              Navigator.of(context).pop(template);
+                            },
+                            trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                          ),
+                        );
+                      },
+                    ),
             ),
           ],
         ),

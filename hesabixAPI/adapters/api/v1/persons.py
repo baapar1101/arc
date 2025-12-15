@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Body, Form
 from fastapi import UploadFile, File
+from fastapi.encoders import jsonable_encoder
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
 from typing import Dict, Any, List, Optional
@@ -21,6 +22,7 @@ from app.core.auth_dependency import get_current_user, AuthContext
 from app.core.permissions import require_business_management_dep, require_business_access, require_business_permission_dep, require_business_permission_by_entity_dep, require_business_access_dep
 from app.core.i18n import negotiate_locale
 from app.services.person_service import (
+    invalidate_persons_cache,
     create_person,
     get_person_by_id,
     get_persons_by_business,
@@ -137,6 +139,11 @@ async def bulk_delete_persons_endpoint(
             # In case of query issues, treat all as skipped
             skipped += len(codes)
             errors.append(f"خطا در جستجوی اشخاص: {str(e)}")
+
+    # Invalidate کش لیست اشخاص یک بار در انتها (بهینه‌سازی برای bulk delete)
+    # اگرچه delete_person خودش invalidate می‌کند، اما این کار برای اطمینان از حذف کامل کش انجام می‌شود
+    if deleted > 0:
+        invalidate_persons_cache(business_id, fiscal_year_id=None)
 
     return success_response({
         "deleted": deleted, 
@@ -264,16 +271,19 @@ async def get_persons_endpoint(
         "filters": query_info.filters,
     }
 
-    # کش نتایج لیست اشخاص بر اساس پارامترها
+    # کش نتایج لیست اشخاص بر اساس پارامترها (با بهینه‌سازی tag-based)
     cache = get_cache()
     cache_key = None
 
     if cache.enabled:
         import json, hashlib
+        # تبدیل query_info به dict برای serialize کردن (تبدیل FilterItem objects به dict)
+        # استفاده از jsonable_encoder برای تبدیل Pydantic models به dict قابل serialize
+        query_dict_for_cache = jsonable_encoder(query_dict)
         key_payload = {
             "business_id": business_id,
             "fiscal_year_id": fiscal_year_id,
-            "query": query_dict,
+            "query": query_dict_for_cache,
         }
         key_str = json.dumps(key_payload, sort_keys=True, ensure_ascii=False)
         key_hash = hashlib.sha256(key_str.encode("utf-8")).hexdigest()[:16]
@@ -294,7 +304,9 @@ async def get_persons_endpoint(
     ]
 
     if cache.enabled and cache_key:
-        cache.set(cache_key, result, ttl=60)
+        # استفاده از set_with_business_tag برای مدیریت بهتر با set ردیس
+        # این متد کلید را در set های مربوط به business_id و fiscal_year_id ذخیره می‌کند
+        cache.set_with_business_tag(cache_key, result, business_id=business_id, fiscal_year_id=fiscal_year_id, ttl=60)
     
     return success_response(
         data=result,
@@ -1261,6 +1273,10 @@ async def import_persons_excel(
             "skipped": skipped,
             "dry_run": dry_run_bool,
         }
+
+        # Invalidate کش لیست اشخاص یک بار در انتها (فقط اگر dry_run نباشد و تغییراتی انجام شده باشد)
+        if not dry_run_bool and (inserted > 0 or updated > 0):
+            invalidate_persons_cache(business_id, fiscal_year_id=None)
 
         return success_response(
             data={
@@ -2677,6 +2693,485 @@ async def export_creditors_report_excel(
         headers={
             "Content-Disposition": f"attachment; filename={filename}",
             "Content-Length": str(len(content)),
+            "Access-Control-Expose-Headers": "Content-Disposition",
+        },
+    )
+
+
+@router.post("/businesses/{business_id}/reports/creditors/export/pdf",
+    summary="خروجی PDF گزارش بستانکاران",
+    description="خروجی PDF گزارش بستانکاران با قابلیت فیلتر، انتخاب سطرها و رعایت ترتیب/نمایش ستون‌ها",
+)
+@require_business_access("business_id")
+async def export_creditors_report_pdf(
+    request: Request,
+    business_id: int,
+    body: Dict[str, Any] = Body(default={}),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """خروجی PDF گزارش بستانکاران"""
+    import json
+    import datetime
+    import re
+    from fastapi.responses import Response
+    from weasyprint import HTML, CSS
+    from weasyprint.text.fonts import FontConfiguration
+    from html import escape
+    
+    # بررسی دسترسی
+    if not ctx.can_read_section("reports"):
+        raise ApiError("FORBIDDEN", "Missing business permission: reports.read", http_status=403)
+    
+    # دریافت سال مالی از header یا body
+    fiscal_year_id = None
+    fy_header = request.headers.get('X-Fiscal-Year-ID')
+    if fy_header:
+        try:
+            fiscal_year_id = int(fy_header)
+        except (ValueError, TypeError):
+            pass
+    
+    if body.get('fiscal_year_id'):
+        try:
+            fiscal_year_id = int(body['fiscal_year_id'])
+        except (ValueError, TypeError):
+            pass
+    
+    if not fiscal_year_id:
+        fiscal_year = db.query(FiscalYear).filter(
+            and_(
+                FiscalYear.business_id == business_id,
+                FiscalYear.is_last == True
+            )
+        ).first()
+        if fiscal_year:
+            fiscal_year_id = fiscal_year.id
+    
+    # استخراج پارامترها از body
+    date_from = body.get('date_from')
+    date_to = body.get('date_to')
+    currency_id = body.get('currency_id')
+    if currency_id is not None:
+        try:
+            currency_id = int(currency_id)
+        except (ValueError, TypeError):
+            currency_id = None
+    
+    min_balance = body.get('min_balance')
+    if min_balance is not None:
+        try:
+            min_balance = float(min_balance)
+        except (ValueError, TypeError):
+            min_balance = None
+    
+    person_ids = body.get('person_ids')
+    if person_ids is not None and not isinstance(person_ids, list):
+        person_ids = None
+    
+    search = body.get('search')
+    
+    # برای export، همه رکوردها را بدون pagination می‌گیریم
+    max_export_records = 10000
+    result = get_creditors_report(
+        db=db,
+        business_id=business_id,
+        fiscal_year_id=fiscal_year_id,
+        currency_id=currency_id,
+        date_from=date_from,
+        date_to=date_to,
+        min_balance=min_balance,
+        person_ids=person_ids,
+        search=search,
+        skip=0,
+        take=max_export_records,
+    )
+    
+    items = result.get('items', [])
+    items = [format_datetime_fields(item, request) for item in items]
+    
+    # Get calendar type
+    calendar_type = "gregorian"
+    if hasattr(request.state, 'calendar_type'):
+        calendar_type = request.state.calendar_type
+    
+    # Helper function to format date based on calendar type
+    def format_date_for_export(item_dict: dict, date_key: str) -> str:
+        """Format date based on calendar type (date only, no time)"""
+        from app.core.calendar import CalendarConverter
+        
+        # First check if there's a _formatted field (from format_datetime_fields)
+        formatted_key = f"{date_key}_formatted"
+        if formatted_key in item_dict:
+            formatted_value = item_dict.get(formatted_key)
+            if isinstance(formatted_value, dict):
+                date_only = formatted_value.get("date_only")
+                if date_only:
+                    return str(date_only)
+                formatted = formatted_value.get("formatted", "")
+                if formatted:
+                    # Extract date part only (remove time)
+                    date_part = str(formatted).split(' ')[0].split('T')[0]
+                    return date_part
+        
+        # Get the main field value
+        value = item_dict.get(date_key)
+        if value is None:
+            return ""
+        
+        # If it's a dict (from _formatted field), use date_only
+        if isinstance(value, dict):
+            date_only = value.get("date_only")
+            if date_only:
+                return str(date_only)
+            formatted = value.get("formatted", "")
+            if formatted:
+                date_part = str(formatted).split(' ')[0].split('T')[0]
+                return date_part
+        
+        # If it's a datetime object, format it based on calendar type
+        if isinstance(value, datetime.datetime):
+            try:
+                formatted = CalendarConverter.format_datetime(value, calendar_type)
+                return formatted.get("date_only", "") or formatted.get("formatted", "").split(' ')[0]
+            except Exception:
+                pass
+        
+        # If it's a date object, format it based on calendar type
+        if isinstance(value, datetime.date):
+            try:
+                dt_value = datetime.datetime.combine(value, datetime.datetime.min.time())
+                formatted = CalendarConverter.format_datetime(dt_value, calendar_type)
+                return formatted.get("date_only", "") or formatted.get("formatted", "").split(' ')[0]
+            except Exception:
+                pass
+        
+        # If it's a string, check if it's already formatted
+        if isinstance(value, str):
+            if '/' in value and (len(value.split('/')) == 3):
+                if '-' in value:
+                    try:
+                        if 'T' in value:
+                            dt_value = datetime.datetime.fromisoformat(value.replace('Z', '+00:00'))
+                        else:
+                            date_value = datetime.date.fromisoformat(value)
+                            dt_value = datetime.datetime.combine(date_value, datetime.datetime.min.time())
+                        formatted = CalendarConverter.format_datetime(dt_value, calendar_type)
+                        return formatted.get("date_only", "") or formatted.get("formatted", "").split(' ')[0]
+                    except Exception:
+                        pass
+                else:
+                    if ' ' in value:
+                        return value.split(' ')[0]
+                    return value
+            else:
+                try:
+                    if 'T' in value:
+                        dt_value = datetime.datetime.fromisoformat(value.replace('Z', '+00:00'))
+                    else:
+                        date_value = datetime.date.fromisoformat(value)
+                        dt_value = datetime.datetime.combine(date_value, datetime.datetime.min.time())
+                    formatted = CalendarConverter.format_datetime(dt_value, calendar_type)
+                    return formatted.get("date_only", "") or formatted.get("formatted", "").split(' ')[0]
+                except Exception:
+                    if ' ' in value or 'T' in value:
+                        date_part = value.split(' ')[0].split('T')[0]
+                        return date_part
+                    return value
+        
+        # Fallback
+        return str(value) if value else ""
+    
+    # Handle selected rows
+    selected_only = bool(body.get('selected_only', False))
+    selected_indices = body.get('selected_indices')
+    if selected_only and selected_indices is not None:
+        indices = None
+        if isinstance(selected_indices, str):
+            try:
+                indices = json.loads(selected_indices)
+            except (json.JSONDecodeError, TypeError):
+                indices = None
+        elif isinstance(selected_indices, list):
+            indices = selected_indices
+        if isinstance(indices, list):
+            items = [items[i] for i in indices if isinstance(i, int) and 0 <= i < len(items)]
+    
+    # Check if we hit the limit
+    if len(items) >= max_export_records:
+        warning_item = {
+            'code': '⚠️',
+            'display_name': 'حداکثر ۱۰,۰۰۰ رکورد قابل export است',
+            'balance': '',
+            'total_debit': '',
+            'total_credit': '',
+            'last_transaction_date': '',
+            'status': '',
+        }
+        items.append(warning_item)
+    
+    # Get locale
+    locale = negotiate_locale(request.headers.get("Accept-Language"))
+    is_fa = locale == 'fa'
+    html_lang = 'fa' if is_fa else 'en'
+    html_dir = 'rtl' if is_fa else 'ltr'
+    
+    # Prepare headers based on export_columns
+    headers: List[str] = []
+    keys: List[str] = []
+    export_columns = body.get('export_columns')
+    if export_columns:
+        for col in export_columns:
+            key = col.get('key')
+            label = col.get('label', key)
+            if key:
+                keys.append(str(key))
+                headers.append(str(label))
+    else:
+        # Default columns
+        default_columns = [
+            ('code', 'کد' if is_fa else 'Code'),
+            ('display_name', 'نام' if is_fa else 'Name'),
+            ('balance', 'تراز' if is_fa else 'Balance'),
+            ('total_debit', 'بدهکار' if is_fa else 'Debit'),
+            ('total_credit', 'بستانکار' if is_fa else 'Credit'),
+            ('last_transaction_date', 'تاریخ آخرین تراکنش' if is_fa else 'Last Transaction Date'),
+            ('status', 'وضعیت' if is_fa else 'Status'),
+        ]
+        for key, label in default_columns:
+            if items and (key in items[0] or key == 'display_name'):
+                keys.append(key)
+                headers.append(label)
+    
+    # Load business info for header
+    business_name = ""
+    try:
+        biz = db.query(Business).filter(Business.id == business_id).first()
+        if biz is not None:
+            business_name = biz.name
+    except Exception:
+        business_name = ""
+    
+    def esc(s: Any) -> str:
+        try:
+            return escape(str(s))
+        except Exception:
+            return str(s)
+    
+    # Build table rows
+    rows_html = []
+    for item in items:
+        tds = []
+        for key in keys:
+            value = item.get(key, "")
+            
+            # Handle display_name specially
+            if key == 'display_name':
+                value = (
+                    item.get('display_name') or
+                    item.get('alias_name') or
+                    f"{item.get('first_name', '')} {item.get('last_name', '')}".strip()
+                )
+            
+            # Format numbers
+            if key in ['balance', 'total_debit', 'total_credit'] and value:
+                try:
+                    num_value = float(value) if not isinstance(value, (int, float)) else value
+                    # Format with thousand separators
+                    if is_fa:
+                        value = f"{num_value:,.0f}".replace(',', '٬')
+                    else:
+                        value = f"{num_value:,.2f}"
+                except (ValueError, TypeError):
+                    pass
+            
+            # Format dates
+            if key == 'last_transaction_date' and value:
+                value = format_date_for_export(item, 'last_transaction_date')
+            
+            if isinstance(value, list):
+                value = ", ".join(str(v) for v in value)
+            elif isinstance(value, dict):
+                value = str(value)
+            
+            tds.append(f"<td>{esc(value)}</td>")
+        rows_html.append(f"<tr>{''.join(tds)}</tr>")
+    
+    headers_html = ''.join(f"<th>{esc(h)}</th>" for h in headers)
+    
+    # Format report datetime based on X-Calendar-Type header
+    calendar_header = request.headers.get("X-Calendar-Type", "jalali").lower()
+    try:
+        from app.core.calendar import CalendarConverter
+        formatted_now = CalendarConverter.format_datetime(datetime.datetime.now(),
+            "jalali" if calendar_header in ["jalali", "persian", "shamsi"] else "gregorian")
+        now = formatted_now.get('formatted', formatted_now.get('date_time', ''))
+    except Exception:
+        now = datetime.datetime.now().strftime('%Y/%m/%d %H:%M')
+    
+    title_text = "گزارش بستانکاران" if is_fa else "Creditors Report"
+    label_biz = "نام کسب‌وکار" if is_fa else "Business Name"
+    label_date = "تاریخ گزارش" if is_fa else "Report Date"
+    footer_text = "تولید شده توسط Hesabix" if is_fa else "Generated by Hesabix"
+    page_label_left = "صفحه " if is_fa else "Page "
+    page_label_of = " از " if is_fa else " of "
+    
+    # تلاش برای رندر با قالب سفارشی (persons/reports/creditors)
+    resolved_html = None
+    try:
+        from app.services.report_template_service import ReportTemplateService
+        explicit_template_id = None
+        try:
+            if body.get("template_id") is not None:
+                explicit_template_id = int(body.get("template_id"))
+        except Exception:
+            explicit_template_id = None
+        template_context = {
+            "title_text": title_text,
+            "business_name": business_name,
+            "generated_at": now,
+            "is_fa": is_fa,
+            "headers": headers,
+            "keys": keys,
+            "items": items,
+            "table_headers_html": headers_html,
+            "table_rows_html": "".join(rows_html),
+        }
+        resolved_html = ReportTemplateService.try_render_resolved(
+            db=db,
+            business_id=business_id,
+            module_key="persons",
+            subtype="reports/creditors",
+            context=template_context,
+            explicit_template_id=explicit_template_id,
+        )
+    except Exception:
+        resolved_html = None
+    
+    table_html = f"""
+    <html lang="{html_lang}" dir="{html_dir}"> 
+      <head>
+        <meta charset='utf-8'>
+        <style>
+          @page {{
+            size: A4 landscape;
+            margin: 12mm;
+            @bottom-{'left' if is_fa else 'right'} {{
+              content: "{page_label_left}" counter(page) "{page_label_of}" counter(pages);
+              font-size: 10px;
+              color: #666;
+            }}
+          }}
+          body {{
+            font-family: sans-serif;
+            font-size: 11px;
+            color: #222;
+          }}
+          .header {{
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            border-bottom: 2px solid #444;
+            padding-bottom: 6px;
+          }}
+          .title {{
+            font-size: 16px;
+            font-weight: 700;
+          }}
+          .meta {{
+            font-size: 11px;
+            color: #555;
+          }}
+          .table-wrapper {{
+            width: 100%;
+          }}
+          table.report-table {{
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+          }}
+          thead th {{
+            background: #f0f3f7;
+            border: 1px solid #c7cdd6;
+            padding: 6px 4px;
+            text-align: center;
+            font-weight: 700;
+            white-space: nowrap;
+          }}
+          tbody td {{
+            border: 1px solid #d7dde6;
+            padding: 5px 4px;
+            vertical-align: top;
+            overflow-wrap: anywhere;
+            word-break: break-word;
+            white-space: normal;
+            text-align: {'right' if is_fa else 'left'};
+          }}
+          tbody td:has-text(number) {{
+            text-align: right;
+          }}
+          .footer {{
+            position: running(footer);
+            font-size: 10px;
+            color: #666;
+            margin-top: 8px;
+            text-align: {'left' if is_fa else 'right'};
+          }}
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div>
+            <div class="title">{title_text}</div>
+            <div class="meta">{label_biz}: {esc(business_name)}</div>
+          </div>
+          <div class="meta">{label_date}: {esc(now)}</div>
+        </div>
+        <div class="table-wrapper">
+          <table class="report-table">
+            <thead>
+              <tr>{headers_html}</tr>
+            </thead>
+            <tbody>
+              {''.join(rows_html)}
+            </tbody>
+          </table>
+        </div>
+        <div class="footer">{footer_text}</div>
+      </body>
+    </html>
+    """
+    
+    final_html = resolved_html or table_html
+    font_config = FontConfiguration()
+    pdf_bytes = HTML(string=final_html).write_pdf(font_config=font_config)
+    
+    # Build meaningful filename
+    biz_name = ""
+    try:
+        b = db.query(Business).filter(Business.id == business_id).first()
+        if b is not None:
+            biz_name = b.name or ""
+    except Exception:
+        biz_name = ""
+    
+    def slugify(text: str) -> str:
+        return re.sub(r"[^A-Za-z0-9_-]+", "_", text).strip("_")
+    
+    base = "creditors_report"
+    if biz_name:
+        base += f"_{slugify(biz_name)}"
+    if selected_only:
+        base += "_selected"
+    filename = f"{base}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+    
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f"attachment; filename={filename}",
+            "Content-Length": str(len(pdf_bytes)),
             "Access-Control-Expose-Headers": "Content-Disposition",
         },
     )

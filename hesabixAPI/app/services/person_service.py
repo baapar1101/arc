@@ -12,6 +12,65 @@ from adapters.api.v1.schema_models.person import (
     PersonCreateRequest, PersonUpdateRequest, PersonBankAccountCreateRequest
 )
 from app.core.responses import success_response
+from app.core.cache import get_cache
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+def invalidate_persons_cache(business_id: int, fiscal_year_id: Optional[int] = None):
+	"""
+	حذف تمام کش‌های مربوط به لیست اشخاص یک کسب‌وکار
+	
+	این تابع از چند روش استفاده می‌کند:
+	1. Tag-based invalidation با set ردیس: حذف انتخابی بر اساس business_id و fiscal_year_id (بهینه‌تر)
+	2. Pattern-based invalidation: حذف تمام کلیدهای persons_list:* (fallback برای اطمینان)
+	3. Redis Pub/Sub: انتشار پیام invalidation برای تمام instanceها
+	
+	Args:
+		business_id: شناسه کسب‌وکار
+		fiscal_year_id: شناسه سال مالی (اختیاری)
+			- اگر None باشد، تمام کش‌های مربوط به business_id حذف می‌شوند
+			- اگر مشخص باشد، فقط کش‌های مربوط به آن fiscal_year_id حذف می‌شوند
+	"""
+	cache = get_cache()
+	if not cache.enabled:
+		return
+	
+	try:
+		# روش 1: استفاده از invalidate_by_business (بهینه‌ترین روش)
+		# این متد از set ردیس برای نگهداری کلیدها استفاده می‌کند
+		deleted_count = cache.invalidate_by_business(business_id, fiscal_year_id)
+		if deleted_count > 0:
+			logger.info(f"Invalidated {deleted_count} cache keys for business_id {business_id}, fiscal_year_id {fiscal_year_id}")
+		
+		# روش 2: حذف تمام کلیدهای persons_list:* (fallback برای اطمینان کامل)
+		# این کار برای اطمینان از حذف کامل کش انجام می‌شود
+		# (در صورت وجود کلیدهای قدیمی که با tag-based ذخیره نشده‌اند)
+		pattern = "persons_list:*"
+		deleted_pattern = cache.delete_pattern(pattern)
+		if deleted_pattern > 0:
+			logger.info(f"Invalidated {deleted_pattern} cache keys using pattern: {pattern}")
+		
+		# روش 3: انتشار پیام invalidation از طریق Redis Pub/Sub
+		# این کار باعث می‌شود که تمام instanceهای برنامه کش را invalidate کنند
+		invalidation_message = {
+			"type": "persons_cache_invalidation",
+			"business_id": business_id,
+			"fiscal_year_id": fiscal_year_id,
+			"timestamp": None
+		}
+		try:
+			import time
+			invalidation_message["timestamp"] = time.time()
+			cache.publish_invalidation("cache_invalidation", invalidation_message)
+			logger.info(f"Published invalidation message for business_id {business_id}, fiscal_year_id {fiscal_year_id}")
+		except Exception as pub_error:
+			logger.warning(f"Error publishing invalidation message: {pub_error}")
+	
+	except Exception as e:
+		# خطا در invalidate نباید مانع عملیات اصلی شود
+		logger.warning(f"Error invalidating persons cache for business_id {business_id}: {e}")
 
 
 def create_person(db: Session, business_id: int, person_data: PersonCreateRequest) -> Dict[str, Any]:
@@ -135,6 +194,9 @@ def create_person(db: Session, business_id: int, person_data: PersonCreateReques
         db.rollback()
         raise ApiError("DUPLICATE_PERSON_CODE", "کد شخص تکراری است", http_status=400)
     db.refresh(person)
+    
+    # Invalidate کش لیست اشخاص
+    invalidate_persons_cache(business_id, fiscal_year_id=None)
     
     # فراخوانی workflow triggers
     try:
@@ -506,6 +568,9 @@ def update_person(
     db.commit()
     db.refresh(person)
     
+    # Invalidate کش لیست اشخاص
+    invalidate_persons_cache(business_id, fiscal_year_id=None)
+    
     return success_response(
         message="شخص با موفقیت ویرایش شد",
         data=_person_to_dict(person)
@@ -598,6 +663,10 @@ def delete_person(db: Session, person_id: int, business_id: int) -> tuple[bool, 
     try:
         db.delete(person)
         db.commit()
+        
+        # Invalidate کش لیست اشخاص
+        invalidate_persons_cache(business_id, fiscal_year_id=None)
+        
         return True, None
     except Exception as e:
         db.rollback()

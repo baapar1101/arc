@@ -7,6 +7,7 @@ class PettyCash {
   final bool isActive;
   final bool isDefault;
   final String? description;
+  final double? balance;
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -19,6 +20,7 @@ class PettyCash {
     this.isActive = true,
     this.isDefault = false,
     this.description,
+    this.balance,
     this.createdAt,
     this.updatedAt,
   });
@@ -33,6 +35,7 @@ class PettyCash {
       isActive: (json['is_active'] ?? true) as bool,
       isDefault: (json['is_default'] ?? false) as bool,
       description: json['description'] as String?,
+      balance: json['balance'] != null ? (json['balance'] is num ? (json['balance'] as num).toDouble() : double.tryParse(json['balance'].toString())) : null,
       createdAt: json['created_at'] != null ? DateTime.tryParse(json['created_at'].toString()) : null,
       updatedAt: json['updated_at'] != null ? DateTime.tryParse(json['updated_at'].toString()) : null,
     );
@@ -58,6 +61,7 @@ class PettyCash {
     bool? isActive,
     bool? isDefault,
     String? description,
+    double? balance,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -70,6 +74,7 @@ class PettyCash {
       isActive: isActive ?? this.isActive,
       isDefault: isDefault ?? this.isDefault,
       description: description ?? this.description,
+      balance: balance ?? this.balance,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );

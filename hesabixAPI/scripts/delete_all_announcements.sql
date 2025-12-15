@@ -19,3 +19,6 @@ SELECT COUNT(*) as remaining_user_announcements FROM user_announcements;
 
 SELECT '✅ تمام اعلان‌ها حذف شدند!' as result;
 
+
+
+

@@ -269,6 +269,10 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
       if (mounted) {
         SnackBarHelper.show(context, message: 'لوگو با موفقیت ذخیره شد');
       }
+    } on dio.DioException catch (e) {
+      if (mounted) {
+        await _handleUploadError(e);
+      }
     } catch (e) {
       if (mounted) {
         SnackBarHelper.showError(context, message: 'خطا در آپلود لوگو: $e');
@@ -301,6 +305,10 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
       if (mounted) {
         SnackBarHelper.show(context, message: 'مهر/امضا با موفقیت ذخیره شد');
       }
+    } on dio.DioException catch (e) {
+      if (mounted) {
+        await _handleUploadError(e);
+      }
     } catch (e) {
       if (mounted) {
         SnackBarHelper.showError(context, message: 'خطا در آپلود مهر/امضا: $e');
@@ -312,6 +320,220 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
         });
       }
     }
+  }
+
+  Future<void> _handleUploadError(dio.DioException e) async {
+    final response = e.response;
+    if (response != null && response.data is Map) {
+      final data = response.data as Map<String, dynamic>;
+      final error = data['error'];
+      
+      if (error is Map && error['code'] == 'STORAGE_LIMIT_EXCEEDED') {
+        await _showStorageLimitDialog(Map<String, dynamic>.from(error));
+        return;
+      }
+    }
+    
+    String errorMessage = 'خطا در آپلود فایل';
+    if (response?.data is Map) {
+      final data = response!.data as Map<String, dynamic>;
+      if (data.containsKey('message')) {
+        errorMessage = data['message'] as String;
+      } else if (data.containsKey('error') && data['error'] is Map) {
+        final errorMap = data['error'] as Map;
+        if (errorMap.containsKey('message')) {
+          errorMessage = errorMap['message'] as String;
+        }
+      }
+    }
+    
+    SnackBarHelper.showError(context, message: errorMessage);
+  }
+
+  Future<void> _showStorageLimitDialog(Map<String, dynamic> error) async {
+    final totalLimit = (error['total_limit_gb'] as num?)?.toDouble() ?? 0.0;
+    final currentUsage = (error['current_usage_gb'] as num?)?.toDouble() ?? 0.0;
+    final available = (error['available_gb'] as num?)?.toDouble() ?? 0.0;
+    final overUsage = (error['over_usage_gb'] as num?)?.toDouble() ?? 0.0;
+    final required = (error['required_gb'] as num?)?.toDouble() ?? 0.0;
+    
+    final theme = Theme.of(context);
+    
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                const Color(0xFFFF9800).withValues(alpha: 0.15),
+                const Color(0xFFFF9800).withValues(alpha: 0.05),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFF9800).withValues(alpha: 0.2),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.warning_amber_rounded,
+                  color: Color(0xFFFF9800),
+                  size: 32,
+                ),
+              ),
+              const SizedBox(width: 16),
+              const Expanded(
+                child: Text(
+                  'محدودیت ذخیره‌سازی',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 20,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                error['message'] as String? ?? 'حجم فایل از محدودیت ذخیره‌سازی تجاوز می‌کند',
+                style: theme.textTheme.bodyLarge?.copyWith(
+                  height: 1.6,
+                  color: theme.colorScheme.onSurface,
+                ),
+              ),
+              const SizedBox(height: 24),
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
+                      theme.colorScheme.primaryContainer.withValues(alpha: 0.1),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: theme.colorScheme.primary.withValues(alpha: 0.2),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildInfoRow('محدودیت کل:', '${totalLimit.toStringAsFixed(3)} GB', theme),
+                    const SizedBox(height: 12),
+                    _buildInfoRow('استفاده شده:', '${currentUsage.toStringAsFixed(3)} GB', theme),
+                    const SizedBox(height: 12),
+                    _buildInfoRow('موجود:', '${available.toStringAsFixed(3)} GB', theme),
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 16),
+                      child: Divider(),
+                    ),
+                    _buildInfoRow('حجم مورد نیاز:', '${required.toStringAsFixed(3)} GB', theme, isHighlight: true),
+                    const SizedBox(height: 12),
+                    _buildInfoRow('حجم اضافی:', '${overUsage.toStringAsFixed(3)} GB', theme, isHighlight: true, isError: true),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.lightbulb_outline_rounded,
+                      color: theme.colorScheme.primary,
+                      size: 24,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'برای آپلود این فایل، لطفاً پلن ذخیره‌سازی خود را ارتقا دهید.',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.onSurface.withValues(alpha: 0.8),
+                          height: 1.5,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            ),
+            child: const Text('متوجه شدم'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(String label, String value, ThemeData theme, {bool isHighlight = false, bool isError = false}) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Row(
+          children: [
+            Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(
+                color: isError
+                    ? const Color(0xFFEF5350)
+                    : isHighlight
+                        ? theme.colorScheme.primary
+                        : theme.colorScheme.onSurface.withValues(alpha: 0.4),
+                shape: BoxShape.circle,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Text(
+              label,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.8),
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+        Text(
+          value,
+          style: theme.textTheme.bodyLarge?.copyWith(
+            fontWeight: isHighlight ? FontWeight.w700 : FontWeight.w600,
+            color: isError
+                ? const Color(0xFFEF5350)
+                : isHighlight
+                    ? theme.colorScheme.primary
+                    : theme.colorScheme.onSurface,
+          ),
+        ),
+      ],
+    );
   }
 
   @override

@@ -6,8 +6,10 @@ from sqlalchemy.orm import Session, load_only
 from sqlalchemy import select, and_, or_, func, case
 from sqlalchemy.types import Numeric
 from decimal import Decimal
+import logging
 
 from app.core.responses import ApiError
+from app.core.cache import get_cache
 from adapters.db.models.product import Product, ProductItemType
 from adapters.db.models.product_attribute import ProductAttribute
 from adapters.db.models.product_attribute_link import ProductAttributeLink
@@ -15,6 +17,73 @@ from adapters.db.repositories.product_repository import ProductRepository
 from adapters.api.v1.schema_models.product import ProductCreateRequest, ProductUpdateRequest
 from adapters.db.models.category import BusinessCategory
 from sqlalchemy.exc import IntegrityError
+
+logger = logging.getLogger(__name__)
+
+
+def invalidate_products_cache(business_id: int, product_id: Optional[int] = None, category_id: Optional[int] = None):
+	"""
+	حذف تمام کش‌های مربوط به لیست محصولات یک کسب‌وکار
+	
+	این تابع از چند روش استفاده می‌کند:
+	1. Tag-based invalidation با set ردیس: حذف انتخابی بر اساس business_id و category_id (بهینه‌تر)
+	2. Pattern-based invalidation: حذف تمام کلیدهای products_search:* (fallback برای اطمینان)
+	3. Redis Pub/Sub: انتشار پیام invalidation برای تمام instanceها
+	
+	Args:
+		business_id: شناسه کسب‌وکار
+		product_id: شناسه محصول خاص (اختیاری)
+			- اگر مشخص باشد، کش محصول خاص هم حذف می‌شود
+		category_id: شناسه دسته‌بندی (اختیاری)
+			- اگر None باشد، تمام کش‌های مربوط به business_id حذف می‌شوند
+			- اگر مشخص باشد، فقط کش‌های مربوط به آن category_id حذف می‌شوند
+	"""
+	cache = get_cache()
+	if not cache.enabled:
+		return
+	
+	try:
+		# روش 1: استفاده از invalidate_products_by_business (بهینه‌ترین روش)
+		# این متد از set ردیس برای نگهداری کلیدها استفاده می‌کند
+		deleted_count = cache.invalidate_products_by_business(business_id, category_id, product_id)
+		if deleted_count > 0:
+			logger.info(f"Invalidated {deleted_count} cache keys for business_id {business_id}, category_id {category_id}, product_id {product_id}")
+		
+		# روش 2: حذف تمام کلیدهای products_search:* (fallback برای اطمینان کامل)
+		# این کار برای اطمینان از حذف کامل کش انجام می‌شود
+		# (در صورت وجود کلیدهای قدیمی که با tag-based ذخیره نشده‌اند)
+		pattern = f"products_search:{business_id}:*"
+		deleted_pattern = cache.delete_pattern(pattern)
+		if deleted_pattern > 0:
+			logger.info(f"Invalidated {deleted_pattern} cache keys using pattern: {pattern}")
+		
+		# حذف کش محصول خاص اگر مشخص شده باشد
+		if product_id:
+			product_pattern = f"product:{business_id}:{product_id}*"
+			deleted_product = cache.delete_pattern(product_pattern)
+			if deleted_product > 0:
+				logger.info(f"Invalidated {deleted_product} cache keys for product_id {product_id} using pattern: {product_pattern}")
+		
+		# روش 3: انتشار پیام invalidation از طریق Redis Pub/Sub
+		# این کار باعث می‌شود که تمام instanceهای برنامه کش را invalidate کنند
+		invalidation_message = {
+			"type": "products_cache_invalidation",
+			"business_id": business_id,
+			"product_id": product_id,
+			"category_id": category_id,
+			"timestamp": None
+		}
+		try:
+			import time
+			invalidation_message["timestamp"] = time.time()
+			cache.publish_invalidation("cache_invalidation", invalidation_message)
+			logger.info(f"Published invalidation message for business_id {business_id}, category_id {category_id}, product_id {product_id}")
+		except Exception as pub_error:
+			logger.warning(f"Error publishing invalidation message: {pub_error}")
+	
+	except Exception as e:
+		# خطا در invalidate نباید مانع عملیات اصلی شود
+		logger.warning(f"Error invalidating products cache for business_id {business_id}: {e}")
 
 
 def _generate_auto_code_by_category(
@@ -178,6 +247,7 @@ def create_product(db: Session, business_id: int, payload: ProductCreateRequest)
     """
     ایجاد کالا/خدمت جدید (با Retry Logic برای مدیریت Race Condition)
     """
+    logger.info(f"[CREATE_PRODUCT] Starting - business_id={business_id}, name='{payload.name}', code='{payload.code}'")
     repo = ProductRepository(db)
     _validate_tax(payload)
     _validate_item_type_inventory(payload)
@@ -185,12 +255,14 @@ def create_product(db: Session, business_id: int, payload: ProductCreateRequest)
     main_unit = _validate_unit_string(payload.main_unit)
     secondary_unit = _validate_unit_string(payload.secondary_unit)
     _validate_units(main_unit, secondary_unit, payload.unit_conversion_factor)
+    logger.debug(f"[CREATE_PRODUCT] Validation passed - main_unit='{main_unit}', secondary_unit='{secondary_unit}'")
 
     # Retry Logic برای مدیریت Race Condition در تولید کد خودکار
     max_retries = 2  # حداکثر 2 بار تلاش (با توجه به Row Locking، معمولاً یک بار کافی است)
     retry_count = 0
     
     while retry_count < max_retries:
+        logger.debug(f"[CREATE_PRODUCT] Attempt {retry_count + 1}/{max_retries}")
         try:
             # پردازش کد: اگر خالی، None یا برابر نام کالا باشد، کد خودکار تولید می‌شود
             code = None
@@ -209,7 +281,11 @@ def create_product(db: Session, business_id: int, payload: ProductCreateRequest)
             # اگر کد خالی است یا برابر نام کالا است، کد خودکار تولید کن
             if not code:
                 # استفاده از category_id برای تولید کد خودکار بر اساس دسته‌بندی
+                logger.debug(f"[CREATE_PRODUCT] Generating auto code - category_id={payload.category_id}")
                 code = _generate_auto_code(db, business_id, payload.category_id)
+                logger.info(f"[CREATE_PRODUCT] Auto-generated code: '{code}'")
+            else:
+                logger.info(f"[CREATE_PRODUCT] Using manual code: '{code}'")
 
             # ایجاد Product مستقیماً (بدون استفاده از repo.create که commit می‌کند)
             # تا همه چیز در یک transaction باشد و بتوانیم در صورت خطا rollback کنیم
@@ -244,15 +320,22 @@ def create_product(db: Session, business_id: int, payload: ProductCreateRequest)
                 image_file_id=payload.image_file_id,
                 default_warehouse_id=payload.default_warehouse_id,
             )
+            logger.debug(f"[CREATE_PRODUCT] Adding product to session - code='{code}', name='{payload.name}'")
             db.add(obj)
+            logger.debug(f"[CREATE_PRODUCT] Flushing to get ID...")
             db.flush()  # Flush برای دریافت id، اما commit نمی‌کند
+            logger.info(f"[CREATE_PRODUCT] Product flushed - ID={obj.id}")
 
             # _upsert_attributes را بدون commit صدا می‌زنیم تا همه چیز در یک transaction باشد
+            logger.debug(f"[CREATE_PRODUCT] Upserting attributes - attribute_ids={payload.attribute_ids}")
             _upsert_attributes(db, obj.id, business_id, payload.attribute_ids, auto_commit=False)
             
             # Commit همه چیز (product و attributes)
+            logger.info(f"[CREATE_PRODUCT] Committing transaction for product ID={obj.id}...")
             db.commit()
+            logger.info(f"[CREATE_PRODUCT] ✅ Transaction COMMITTED successfully for product ID={obj.id}")
             db.refresh(obj)  # Refresh برای دریافت اطلاعات کامل
+            logger.debug(f"[CREATE_PRODUCT] Product refreshed - final code='{obj.code}', name='{obj.name}'")
 
             data = _to_dict(obj, db)
             # enrich titles from payload if provided
@@ -261,12 +344,23 @@ def create_product(db: Session, business_id: int, payload: ProductCreateRequest)
             if getattr(payload, 'secondary_unit_title', None):
                 data["secondary_unit_title"] = str(getattr(payload, 'secondary_unit_title'))
 
+            # Invalidate cache بعد از ایجاد موفق محصول
+            logger.debug(f"[CREATE_PRODUCT] Invalidating cache - business_id={business_id}, category_id={payload.category_id}")
+            invalidate_products_cache(
+                business_id=business_id,
+                category_id=payload.category_id
+            )
+
+            logger.info(f"[CREATE_PRODUCT] ✅ Product created successfully - ID={obj.id}, code='{obj.code}', name='{obj.name}'")
             return {"message": "PRODUCT_CREATED", "data": data}
             
         except IntegrityError as e:
             # خطای تکراری بودن کد (UniqueConstraint violation)
+            logger.warning(f"[CREATE_PRODUCT] IntegrityError caught (attempt {retry_count + 1}): {e}")
+            logger.debug(f"[CREATE_PRODUCT] Rolling back transaction...")
             db.rollback()
             retry_count += 1
+            logger.info(f"[CREATE_PRODUCT] Will retry (retry_count={retry_count}/{max_retries})")
             
             # اگر کد دستی بود و تکراری است، بلافاصله خطا بده
             if manual_code:
@@ -291,7 +385,10 @@ def create_product(db: Session, business_id: int, payload: ProductCreateRequest)
             
         except Exception as e:
             # سایر خطاها
+            logger.error(f"[CREATE_PRODUCT] ❌ Unexpected exception (attempt {retry_count + 1}): {e}", exc_info=True)
+            logger.error(f"[CREATE_PRODUCT] Exception type: {type(e).__name__}, args: {e.args}")
             db.rollback()
+            logger.debug(f"[CREATE_PRODUCT] Transaction rolled back due to exception")
             raise
 
 
@@ -439,6 +536,26 @@ def update_product(db: Session, product_id: int, business_id: int, payload: Prod
         return None
 
     _upsert_attributes(db, product_id, business_id, payload.attribute_ids)
+    
+    # Invalidate cache بعد از به‌روزرسانی موفق محصول
+    # دریافت category_id قبلی و جدید
+    old_category_id = obj.category_id if obj else None
+    new_category_id = payload.category_id if 'category_id' in fields_set else old_category_id
+    
+    # Invalidate کش‌های مربوط به category قبلی
+    invalidate_products_cache(
+        business_id=business_id,
+        product_id=product_id,
+        category_id=old_category_id
+    )
+    
+    # اگر category تغییر کرده، کش‌های category جدید را هم invalidate کن
+    if new_category_id != old_category_id and new_category_id is not None:
+        invalidate_products_cache(
+            business_id=business_id,
+            category_id=new_category_id
+        )
+    
     data = _to_dict(updated, db)
     return {"message": "PRODUCT_UPDATED", "data": data}
 
@@ -544,9 +661,18 @@ def delete_product(db: Session, product_id: int, business_id: int) -> tuple[bool
         return False, error_msg
     
     try:
+        # دریافت category_id قبل از حذف
+        category_id = obj.category_id if obj else None
+        
         repo = ProductRepository(db)
         success = repo.delete(product_id)
         if success:
+            # Invalidate cache بعد از حذف موفق محصول
+            invalidate_products_cache(
+                business_id=business_id,
+                product_id=product_id,
+                category_id=category_id
+            )
             return True, None
         else:
             return False, "خطا در حذف کالا"

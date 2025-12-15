@@ -23,6 +23,7 @@ from app.services.warehouse_service import (
     get_warehouse_stock_report,
 )
 from adapters.db.models.warehouse import Warehouse
+from app.core.cache import get_cache
 
 
 router = APIRouter(prefix="/warehouses", tags=["انبارداری"])
@@ -51,7 +52,34 @@ def list_warehouses_endpoint(
     db: Session = Depends(get_db),
     _: None = Depends(require_business_permission_dep("warehouses", "view")),
 ) -> Dict[str, Any]:
+    # کش لیست انبارها
+    cache = get_cache()
+    cache_key = None
+    
+    if cache.enabled:
+        import json, hashlib
+        key_payload = {
+            "business_id": business_id,
+            "endpoint": "list_warehouses"
+        }
+        key_str = json.dumps(key_payload, sort_keys=True, ensure_ascii=False)
+        key_hash = hashlib.sha256(key_str.encode("utf-8")).hexdigest()[:16]
+        cache_key = f"warehouses_list:{key_hash}"
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return success_response(data=format_datetime_fields(cached, request), request=request)
+    
     result = list_warehouses(db, business_id)
+    
+    # ذخیره در cache با tag-based caching
+    if cache.enabled and cache_key:
+        cache.set_with_warehouses_tag(
+            key=cache_key,
+            value=result,
+            business_id=business_id,
+            ttl=60
+        )
+    
     return success_response(data=format_datetime_fields(result, request), request=request)
 
 
@@ -113,6 +141,52 @@ def query_warehouses_endpoint(
     db: Session = Depends(get_db),
     _: None = Depends(require_business_permission_dep("warehouses", "view")),
 ) -> Dict[str, Any]:
+    # کش لیست انبارها با query
+    cache = get_cache()
+    cache_key = None
+    
+    if cache.enabled:
+        import json, hashlib
+        from decimal import Decimal
+        from datetime import datetime, date
+        
+        # Helper function to convert objects to JSON-serializable format
+        def to_serializable(obj):
+            """Convert Pydantic models and other non-serializable types to dict/primitive types"""
+            if hasattr(obj, 'model_dump'):  # Pydantic v2
+                return obj.model_dump()
+            elif hasattr(obj, 'dict'):  # Pydantic v1
+                return obj.dict()
+            elif isinstance(obj, (datetime, date)):
+                return obj.isoformat()
+            elif isinstance(obj, Decimal):
+                return float(obj)
+            elif isinstance(obj, dict):
+                return {k: to_serializable(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [to_serializable(item) for item in obj]
+            else:
+                return obj
+        
+        key_payload = {
+            "business_id": business_id,
+            "query": {
+                "sort_by": payload.sort_by,
+                "sort_desc": payload.sort_desc,
+                "take": payload.take,
+                "skip": payload.skip,
+                "search": payload.search,
+                "search_fields": payload.search_fields,
+                "filters": [to_serializable(f) for f in (payload.filters or [])],
+            }
+        }
+        key_str = json.dumps(key_payload, sort_keys=True, ensure_ascii=False)
+        key_hash = hashlib.sha256(key_str.encode("utf-8")).hexdigest()[:16]
+        cache_key = f"warehouses_list:{key_hash}"
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return success_response(data=format_datetime_fields(cached, request), request=request)
+    
     result = query_warehouses(db, business_id, payload)
     # تطبیق خروجی با ساختار DataTableResponse (items + pagination)
     data = {
@@ -127,6 +201,16 @@ def query_warehouses_endpoint(
         },
         "query_info": payload.model_dump(),
     }
+    
+    # ذخیره در cache با tag-based caching
+    if cache.enabled and cache_key:
+        cache.set_with_warehouses_tag(
+            key=cache_key,
+            value=data,
+            business_id=business_id,
+            ttl=60
+        )
+    
     return success_response(data=data, request=request)
 
 

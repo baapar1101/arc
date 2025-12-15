@@ -106,9 +106,12 @@ class ResponsiveHelper {
         maxHeight: MediaQuery.of(context).size.height,
       );
     }
+    final screenSize = MediaQuery.of(context).size;
+    final targetWidth = screenSize.width * 0.95;
     return BoxConstraints(
-      maxWidth: 900,
-      maxHeight: MediaQuery.of(context).size.height * 0.9,
+      minWidth: 1000,
+      maxWidth: targetWidth.clamp(1000, 1400),
+      maxHeight: screenSize.height * 0.92,
     );
   }
 

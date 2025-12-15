@@ -483,6 +483,12 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
       }
     }
 
+    // Custom filters from callback
+    if (widget.config.getCustomFilters != null) {
+      final customFilters = widget.config.getCustomFilters!();
+      filters.addAll(customFilters);
+    }
+
     return filters;
   }
 
@@ -2221,12 +2227,12 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
       );
     }));
 
-    // بررسی می‌کنیم که ScrollController دارای ScrollPosition است یا نه
-    // برای جلوگیری از خطای "ScrollController has no ScrollPosition attached"
+    // استفاده از Scrollbar با controller برای اطمینان از اسکرول دوطرفه
+    // Scrollbar می‌تواند controller را حتی قبل از attach شدن handle کند
     final hasScrollPosition = _horizontalScrollController.hasClients;
     
     return Scrollbar(
-      controller: hasScrollPosition ? _horizontalScrollController : null,
+      controller: _horizontalScrollController,
       thumbVisibility: hasScrollPosition,
       child: DataTableTheme(
         data: DataTableThemeData(

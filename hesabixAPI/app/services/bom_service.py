@@ -189,8 +189,8 @@ def _to_bom_dict(bom: ProductBOM, db: Session) -> Dict[str, Any]:
             {
                 "line_no": it.line_no,
                 "component_product_id": it.component_product_id,
-                "component_product_name": getattr(products_by_id.get(it.component_product_id), "name", None) if products_by_id.get(it.component_product_id) else None,
-                "component_product_code": getattr(products_by_id.get(it.component_product_id), "code", None) if products_by_id.get(it.component_product_id) else None,
+                "component_product_name": (lambda p: p.name if p else None)(products_by_id.get(it.component_product_id)),
+                "component_product_code": (lambda p: p.code if p else None)(products_by_id.get(it.component_product_id)),
                 "qty_per": it.qty_per,
                 "uom": it.uom,
                 "wastage_percent": it.wastage_percent,
@@ -204,8 +204,8 @@ def _to_bom_dict(bom: ProductBOM, db: Session) -> Dict[str, Any]:
             {
                 "line_no": ot.line_no,
                 "output_product_id": ot.output_product_id,
-                "output_product_name": getattr(products_by_id.get(ot.output_product_id), "name", None) if products_by_id.get(ot.output_product_id) else None,
-                "output_product_code": getattr(products_by_id.get(ot.output_product_id), "code", None) if products_by_id.get(ot.output_product_id) else None,
+                "output_product_name": (lambda p: p.name if p else None)(products_by_id.get(ot.output_product_id)),
+                "output_product_code": (lambda p: p.code if p else None)(products_by_id.get(ot.output_product_id)),
                 "ratio": ot.ratio,
                 "uom": ot.uom,
             }
@@ -321,8 +321,17 @@ def update_bom(db: Session, business_id: int, bom_id: int, payload: ProductBOMUp
 
     # اعتبارسنجی نسخه تکراری در صورت تغییر
     if payload.version is not None:
-        version_to_check = payload.version.strip() if isinstance(payload.version, str) else payload.version
-        if version_to_check and version_to_check != bom.version:
+        # پردازش version: strip کردن و بررسی خالی نبودن
+        if isinstance(payload.version, str):
+            version_stripped = payload.version.strip()
+            if not version_stripped:
+                raise ApiError("INVALID_VERSION", "نسخه نمی‌تواند خالی باشد", http_status=400)
+            version_to_check = version_stripped
+        else:
+            version_to_check = payload.version
+        
+        # بررسی یکتایی فقط در صورت تغییر
+        if version_to_check != bom.version:
             _validate_version_uniqueness(db, business_id, bom.product_id, version_to_check, exclude_bom_id=bom_id)
     
     # اعتبارسنجی تاریخ‌های effective
@@ -357,10 +366,31 @@ def update_bom(db: Session, business_id: int, bom_id: int, payload: ProductBOMUp
         old_outputs = list(db.query(ProductBOMOutput).filter(ProductBOMOutput.bom_id == bom_id).all())
         old_operations = list(db.query(ProductBOMOperation).filter(ProductBOMOperation.bom_id == bom_id).all())
         
+        # پردازش version و name با بررسی رشته خالی
+        version_value = None
+        if payload.version is not None:
+            if isinstance(payload.version, str):
+                version_stripped = payload.version.strip()
+                if not version_stripped:
+                    raise ApiError("INVALID_VERSION", "نسخه نمی‌تواند خالی باشد", http_status=400)
+                version_value = version_stripped
+            else:
+                version_value = payload.version
+        
+        name_value = None
+        if payload.name is not None:
+            if isinstance(payload.name, str):
+                name_stripped = payload.name.strip()
+                if not name_stripped:
+                    raise ApiError("INVALID_NAME", "عنوان نمی‌تواند خالی باشد", http_status=400)
+                name_value = name_stripped
+            else:
+                name_value = payload.name
+        
         updated = repo.update_bom(
             bom_id,
-            version=payload.version.strip() if isinstance(payload.version, str) else None,
-            name=payload.name.strip() if isinstance(payload.name, str) else None,
+            version=version_value,
+            name=name_value,
             is_default=payload.is_default if payload.is_default is not None else None,
             effective_from=payload.effective_from,
             effective_to=payload.effective_to,
@@ -389,24 +419,30 @@ def update_bom(db: Session, business_id: int, bom_id: int, payload: ProductBOMUp
             db.commit()
         except Exception as e:
             db.rollback()
-            # بازگرداندن وضعیت قبلی
+            # بازگرداندن وضعیت قبلی child rows
             try:
-                # حذف همه child rows فعلی
-                db.query(ProductBOMItem).filter(ProductBOMItem.bom_id == bom_id).delete()
-                db.query(ProductBOMOutput).filter(ProductBOMOutput.bom_id == bom_id).delete()
-                db.query(ProductBOMOperation).filter(ProductBOMOperation.bom_id == bom_id).delete()
+                # حذف همه child rows فعلی که ممکن است اضافه شده باشند
+                db.query(ProductBOMItem).filter(ProductBOMItem.bom_id == bom_id).delete(synchronize_session=False)
+                db.query(ProductBOMOutput).filter(ProductBOMOutput.bom_id == bom_id).delete(synchronize_session=False)
+                db.query(ProductBOMOperation).filter(ProductBOMOperation.bom_id == bom_id).delete(synchronize_session=False)
                 
                 # بازگرداندن child rows قبلی
                 for item in old_items:
-                    db.add(item)
+                    db.merge(item)  # استفاده از merge به جای add برای جلوگیری از خطای duplicate
                 for output in old_outputs:
-                    db.add(output)
+                    db.merge(output)
                 for op in old_operations:
-                    db.add(op)
+                    db.merge(op)
                 
                 db.commit()
-            except Exception:
+            except Exception as rollback_error:
                 db.rollback()
+                # در صورت خطا در rollback، session را expire کنیم تا وضعیت قبلی بازگردد
+                db.expire_all()
+                # لاگ کردن خطا برای debugging
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"خطا در بازگرداندن وضعیت قبلی BOM {bom_id}: {str(rollback_error)}")
             
             if isinstance(e, ApiError):
                 raise

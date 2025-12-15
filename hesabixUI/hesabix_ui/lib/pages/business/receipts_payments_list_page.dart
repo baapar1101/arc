@@ -28,6 +28,7 @@ import 'package:hesabix_ui/utils/number_normalizer.dart';
 import 'package:hesabix_ui/models/business_dashboard_models.dart';
 import 'package:hesabix_ui/utils/web/web_utils.dart' as web_utils;
 import '../../utils/snackbar_helper.dart';
+import '../../utils/responsive_helper.dart';
 
 /// صفحه لیست اسناد دریافت و پرداخت با ویجت جدول
 class ReceiptsPaymentsListPage extends StatefulWidget {
@@ -937,22 +938,223 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final isMobile = ResponsiveHelper.isMobile(context);
+    
+    if (isMobile) {
+      return _buildMobileLayout();
+    } else {
+      return _buildDesktopLayout();
+    }
+  }
+
+  Widget _buildMobileLayout() {
     final t = AppLocalizations.of(context);
     final sumPersons = _personLines.fold<double>(0, (p, e) => p + e.amount);
     final sumCenters = _centerTransactions.fold<double>(0, (p, e) => p + (e.amount.toDouble()));
     final diff = (_isReceipt ? sumCenters - sumPersons : sumPersons - sumCenters).toDouble();
+    final padding = ResponsiveHelper.getPadding(context);
 
     return Dialog(
-      insetPadding: const EdgeInsets.all(16),
+      insetPadding: EdgeInsets.zero,
+      child: SafeArea(
+        child: Scaffold(
+          appBar: AppBar(
+            title: Text(t.receiptsAndPayments),
+            leading: IconButton(
+              icon: const Icon(Icons.close),
+              onPressed: () => Navigator.pop(context),
+            ),
+          ),
+          body: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // هدر موبایل
+                Padding(
+                  padding: EdgeInsets.all(padding),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (widget.initialDocument == null)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 16),
+                          child: SegmentedButton<bool>(
+                            segments: [
+                              ButtonSegment<bool>(value: true, label: Text(t.receipts)),
+                              ButtonSegment<bool>(value: false, label: Text(t.payments)),
+                            ],
+                            selected: {_isReceipt},
+                            onSelectionChanged: (s) => setState(() => _isReceipt = s.first),
+                          ),
+                        ),
+                      DateInputField(
+                        value: _docDate,
+                        calendarController: widget.calendarController,
+                        onChanged: (d) => setState(() => _docDate = d ?? DateTime.now()),
+                        labelText: 'تاریخ سند',
+                        hintText: 'انتخاب تاریخ',
+                      ),
+                      const SizedBox(height: 12),
+                      CurrencyPickerWidget(
+                        businessId: widget.businessId,
+                        selectedCurrencyId: _selectedCurrencyId,
+                        onChanged: (currencyId) => setState(() => _selectedCurrencyId = currencyId),
+                        label: 'ارز',
+                        hintText: 'انتخاب ارز',
+                      ),
+                      const SizedBox(height: 12),
+                      ProjectSelectorWidget(
+                        businessId: widget.businessId,
+                        apiClient: widget.apiClient,
+                        selectedProjectId: _selectedProjectId,
+                        onChanged: (projectId) => setState(() => _selectedProjectId = projectId),
+                        allowNull: true,
+                        labelText: 'پروژه',
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: _descriptionController,
+                        decoration: const InputDecoration(
+                          labelText: 'توضیحات کلی سند',
+                          hintText: 'توضیحات اختیاری...',
+                          border: OutlineInputBorder(),
+                        ),
+                        maxLines: 2,
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1),
+                // پنل‌ها با TabBar
+                Expanded(
+                  child: DefaultTabController(
+                    length: 2,
+                    child: Column(
+                      children: [
+                        TabBar(
+                          tabs: [
+                            Tab(text: t.people),
+                            Tab(text: t.accounts),
+                          ],
+                        ),
+                        Expanded(
+                          child: TabBarView(
+                            children: [
+                              _PersonsPanel(
+                                businessId: widget.businessId,
+                                lines: _personLines,
+                                onChanged: (ls) {
+                                  debugPrint('⚫ [BulkSettlementDialog] onChanged - old lines count: ${_personLines.length}, new lines count: ${ls.length}');
+                                  for (int i = 0; i < ls.length && i < _personLines.length; i++) {
+                                    if (_personLines[i].amount != ls[i].amount) {
+                                      debugPrint('⚫ [BulkSettlementDialog] line $i amount changed: ${_personLines[i].amount} -> ${ls[i].amount}');
+                                    }
+                                  }
+                                  setState(() {
+                                    _personLines.clear();
+                                    _personLines.addAll(ls);
+                                  });
+                                  debugPrint('⚫ [BulkSettlementDialog] after setState - _personLines[0].amount: ${_personLines.isNotEmpty ? _personLines[0].amount : "N/A"}');
+                                },
+                                calendarController: widget.calendarController,
+                                apiClient: widget.apiClient,
+                                selectedCurrencyId: _selectedCurrencyId,
+                                isReceipt: _isReceipt,
+                              ),
+                              Padding(
+                                padding: EdgeInsets.all(padding),
+                                child: InvoiceTransactionsWidget(
+                                  transactions: _centerTransactions,
+                                  onChanged: (txs) => setState(() {
+                                    _centerTransactions.clear();
+                                    _centerTransactions.addAll(txs);
+                                  }),
+                                  businessId: widget.businessId,
+                                  calendarController: widget.calendarController,
+                                  invoiceType: InvoiceType.sales,
+                                  checkPickerMode: _isReceipt ? CheckPickerMode.receipt : CheckPickerMode.payment,
+                                  authStore: widget.authStore,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const Divider(height: 1),
+                // فوتر موبایل
+                Padding(
+                  padding: EdgeInsets.all(padding),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        alignment: WrapAlignment.center,
+                        children: [
+                          _TotalChip(label: t.people, value: sumPersons),
+                          _TotalChip(label: t.accounts, value: sumCenters),
+                          _TotalChip(label: 'اختلاف', value: diff, isError: diff != 0),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextButton(
+                              onPressed: () => Navigator.pop(context),
+                              child: Text(t.cancel),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: FilledButton.icon(
+                              onPressed: diff == 0 && _personLines.isNotEmpty && _centerTransactions.isNotEmpty
+                                  ? _onSave
+                                  : null,
+                              icon: const Icon(Icons.save),
+                              label: Text(t.save),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDesktopLayout() {
+    final t = AppLocalizations.of(context);
+    final sumPersons = _personLines.fold<double>(0, (p, e) => p + e.amount);
+    final sumCenters = _centerTransactions.fold<double>(0, (p, e) => p + (e.amount.toDouble()));
+    final diff = (_isReceipt ? sumCenters - sumPersons : sumPersons - sumCenters).toDouble();
+    final padding = ResponsiveHelper.getPadding(context);
+
+    return Dialog(
+      insetPadding: ResponsiveHelper.getDialogPadding(context),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 1100, maxHeight: 720),
+        constraints: BoxConstraints(
+          maxWidth: 1400,
+          maxHeight: MediaQuery.of(context).size.height * 0.9,
+        ),
         child: Form(
           key: _formKey,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              // هدر دسکتاپ
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                padding: EdgeInsets.fromLTRB(padding, padding, padding, padding / 2),
                 child: Row(
                   children: [
                     Expanded(
@@ -963,12 +1165,12 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog> {
                     ),
                     if (widget.initialDocument == null)
                       SegmentedButton<bool>(
-                      segments: [
-                        ButtonSegment<bool>(value: true, label: Text(t.receipts)),
-                        ButtonSegment<bool>(value: false, label: Text(t.payments)),
-                      ],
-                      selected: {_isReceipt},
-                      onSelectionChanged: (s) => setState(() => _isReceipt = s.first),
+                        segments: [
+                          ButtonSegment<bool>(value: true, label: Text(t.receipts)),
+                          ButtonSegment<bool>(value: false, label: Text(t.payments)),
+                        ],
+                        selected: {_isReceipt},
+                        onSelectionChanged: (s) => setState(() => _isReceipt = s.first),
                       ),
                     const SizedBox(width: 12),
                     SizedBox(
@@ -1008,7 +1210,7 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog> {
                 ),
               ),
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                padding: EdgeInsets.fromLTRB(padding, 0, padding, padding / 2),
                 child: TextField(
                   controller: _descriptionController,
                   decoration: const InputDecoration(
@@ -1020,6 +1222,7 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog> {
                 ),
               ),
               const Divider(height: 1),
+              // پنل‌ها دسکتاپ
               Expanded(
                 child: Row(
                   children: [
@@ -1049,7 +1252,7 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog> {
                     const VerticalDivider(width: 1),
                     Expanded(
                       child: Padding(
-                        padding: const EdgeInsets.all(12),
+                        padding: EdgeInsets.all(padding),
                         child: InvoiceTransactionsWidget(
                           transactions: _centerTransactions,
                           onChanged: (txs) => setState(() {
@@ -1067,10 +1270,10 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog> {
                   ],
                 ),
               ),
-              // سکشن اقساط حذف شد؛ اقساط در هر ردیف شخص مدیریت می‌شود
               const Divider(height: 1),
+              // فوتر دسکتاپ
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                padding: EdgeInsets.fromLTRB(padding, padding / 2, padding, padding),
                 child: Row(
                   children: [
                     Expanded(
@@ -1588,14 +1791,22 @@ class _PersonsPanelState extends State<_PersonsPanel> {
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
+    final padding = ResponsiveHelper.getPadding(context);
+    final spacing = ResponsiveHelper.getGridSpacing(context);
+    
     return Padding(
-      padding: const EdgeInsets.all(12),
+      padding: EdgeInsets.all(padding),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
             children: [
-              Expanded(child: Text(t.people, style: Theme.of(context).textTheme.titleMedium)),
+              Expanded(
+                child: Text(
+                  t.people,
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+              ),
               IconButton(
                 onPressed: () {
                   final newLines = List<_PersonLine>.from(widget.lines);
@@ -1607,13 +1818,13 @@ class _PersonsPanelState extends State<_PersonsPanel> {
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: spacing),
           Expanded(
             child: widget.lines.isEmpty
                 ? Center(child: Text(t.noDataFound))
                 : ListView.separated(
                     itemCount: widget.lines.length,
-                    separatorBuilder: (_, _) => const SizedBox(height: 8),
+                    separatorBuilder: (_, _) => SizedBox(height: spacing),
                     itemBuilder: (ctx, i) {
                       final line = widget.lines[i];
                       return _PersonLineTile(

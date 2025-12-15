@@ -35,6 +35,7 @@ from adapters.db.models.business import Business
 from adapters.db.models.user import User
 from adapters.db.models.business_print_settings import BusinessPrintSettings
 from app.services.file_storage_service import FileStorageService
+from app.core.cache import get_cache
 
 
 router = APIRouter(tags=["اسناد انتقال", "مدیریت مالی"])
@@ -197,8 +198,38 @@ async def list_transfers_endpoint(
     except Exception:
         pass
 
+    # کش نتایج لیست انتقال‌ها
+    cache = get_cache()
+    cache_key = None
+    fiscal_year_id = query_dict.get("fiscal_year_id")
+
+    if cache.enabled:
+        import json, hashlib
+        key_payload = {
+            "business_id": business_id,
+            "query": query_dict,
+        }
+        key_str = json.dumps(key_payload, sort_keys=True, ensure_ascii=False)
+        key_hash = hashlib.sha256(key_str.encode("utf-8")).hexdigest()[:16]
+        cache_key = f"transfers_list:{key_hash}"
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return success_response(data=cached, request=request, message="TRANSFERS_LIST_FETCHED")
+
     result = list_transfers(db, business_id, query_dict)
     result["items"] = [format_datetime_fields(item, request) for item in result.get("items", [])]
+
+    # ذخیره در cache با tag-based caching
+    if cache.enabled and cache_key:
+        cache.set_with_documents_tag(
+            key=cache_key,
+            value=result,
+            business_id=business_id,
+            fiscal_year_id=fiscal_year_id,
+            document_type="transfer",
+            ttl=60
+        )
+
     return success_response(data=result, request=request, message="TRANSFERS_LIST_FETCHED")
 
 

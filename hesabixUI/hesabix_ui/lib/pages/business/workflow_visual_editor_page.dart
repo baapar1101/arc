@@ -578,12 +578,15 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
 
     setState(() => _saving = true);
     try {
+      // استفاده از enum value به جای localization string
+      final statusValue = _workflow?['status'] ?? 'پیش‌نویس'; // استفاده از enum value
+      
       final payload = {
         'name': workflowName,
         'description': descriptionController.text.trim().isEmpty 
             ? null 
             : descriptionController.text.trim(),
-        'status': _workflow?['status'] ?? AppLocalizations.of(context).workflowDraft,
+        'status': statusValue,
         'workflow_data': _editorState.toBackendFormat(),
       };
 
@@ -913,6 +916,14 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
     
     if (confirmed != true || nameController.text.trim().isEmpty) return;
     
+    // نمایش loading indicator
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(child: CircularProgressIndicator()),
+    );
+    
     try {
       final prefs = await SharedPreferences.getInstance();
       final templateName = nameController.text.trim();
@@ -934,17 +945,27 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
       await prefs.setString(templatesKey, jsonEncode(templates));
       
       if (mounted) {
+        Navigator.pop(context); // بستن loading indicator
         SnackBarHelper.show(context, message: 'قالب "$templateName" ذخیره شد');
       }
     } catch (e) {
       debugPrint('خطا در ذخیره template: $e');
       if (mounted) {
-        SnackBarHelper.show(context, message: 'خطا در ذخیره قالب');
+        Navigator.pop(context); // بستن loading indicator
+        SnackBarHelper.showError(context, message: 'خطا در ذخیره قالب: ${e.toString()}');
       }
     }
   }
 
   Future<void> _loadTemplate() async {
+    // نمایش loading indicator
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(child: CircularProgressIndicator()),
+    );
+    
     try {
       // دریافت قالب‌های آماده
       final builtInTemplates = WorkflowTemplates.getTemplates();

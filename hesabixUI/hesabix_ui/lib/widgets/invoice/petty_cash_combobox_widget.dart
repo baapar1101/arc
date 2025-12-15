@@ -10,7 +10,8 @@ class PettyCashOption {
   final String id;
   final String name;
   final int? currencyId;
-  const PettyCashOption(this.id, this.name, {this.currencyId});
+  final double? balance;
+  const PettyCashOption(this.id, this.name, {this.currencyId, this.balance});
 }
 
 class PettyCashComboboxWidget extends StatefulWidget {
@@ -145,10 +146,13 @@ class _PettyCashComboboxWidgetState extends State<PettyCashComboboxWidget> {
       var items = ((itemsRaw as List<dynamic>? ?? const <dynamic>[])).map((e) {
         final m = Map<String, dynamic>.from(e as Map);
         final currencyId = (m['currency_id'] ?? m['currencyId']);
+        final balance = m['balance'];
+        final balanceValue = balance is num ? balance.toDouble() : (balance != null ? double.tryParse(balance.toString()) : null);
         return PettyCashOption(
           '${m['id']}',
           (m['name']?.toString() ?? 'نامشخص'),
           currencyId: currencyId is int ? currencyId : int.tryParse('${currencyId ?? ''}'),
+          balance: balanceValue,
         );
       }).toList();
       if (widget.filterCurrencyId != null) {
@@ -301,6 +305,14 @@ class _PettyCashPickerBottomSheet extends StatelessWidget {
     this.onAddNew,
   });
 
+  String _formatBalance(double balance) {
+    final formatter = RegExp(r'\B(?=(\d{3})+(?!\d))');
+    final parts = balance.abs().toStringAsFixed(2).split('.');
+    final intPart = parts[0].replaceAllMapped(formatter, (m) => ',');
+    final formatted = '$intPart.${parts[1]}';
+    return balance < 0 ? '-$formatted' : formatted;
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -363,12 +375,29 @@ class _PettyCashPickerBottomSheet extends StatelessWidget {
                         itemBuilder: (context, index) {
                           final it = items[index];
                           final currencyText = (it.currencyId != null) ? (currencyLabelBuilder?.call(it.currencyId) ?? '') : '';
+                          final balanceText = it.balance != null 
+                              ? _formatBalance(it.balance!)
+                              : null;
+                          final subtitleText = balanceText != null 
+                              ? (currencyText.isNotEmpty ? '$balanceText $currencyText' : balanceText)
+                              : (currencyText.isNotEmpty ? currencyText : null);
                           return ListTile(
                             leading: CircleAvatar(
                               backgroundColor: colorScheme.primaryContainer,
                               child: Icon(Icons.wallet, color: colorScheme.onPrimaryContainer),
                             ),
                             title: Text(it.name),
+                            subtitle: subtitleText != null 
+                                ? Text(
+                                    subtitleText,
+                                    style: TextStyle(
+                                      color: (it.balance != null && it.balance! < 0)
+                                          ? colorScheme.error 
+                                          : colorScheme.onSurface,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  )
+                                : null,
                             trailing: currencyText.isNotEmpty
                                 ? Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),

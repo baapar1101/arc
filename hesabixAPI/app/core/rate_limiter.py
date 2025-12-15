@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import time
 import logging
+import inspect
 from typing import Optional, Tuple, Callable
 from functools import wraps
 from fastapi import Request, HTTPException, status, Response
@@ -161,51 +162,55 @@ def rate_limit(
 						request = value
 						break
 			
-			if not request:
-				# اگر Request پیدا نشد، بدون rate limiting ادامه می‌دهیم
-				return await func(*args, **kwargs)
-			
 			# ساخت کلید rate limit
-			if key_func:
-				rate_limit_key = key_func(request)
-			else:
-				# پیش‌فرض: استفاده از IP
-				client_ip = request.client.host if request.client else "unknown"
-				# بررسی IP از headers (برای proxy)
-				if not client_ip or client_ip == "unknown":
-					x_forwarded_for = request.headers.get("X-Forwarded-For")
-					if x_forwarded_for:
-						client_ip = x_forwarded_for.split(",")[0].strip()
-					else:
-						x_real_ip = request.headers.get("X-Real-IP")
-						if x_real_ip:
-							client_ip = x_real_ip
+			remaining = max_requests
+			reset_after = window_seconds
+			
+			if request:
+				if key_func:
+					rate_limit_key = key_func(request)
+				else:
+					# پیش‌فرض: استفاده از IP
+					client_ip = request.client.host if request.client else "unknown"
+					# بررسی IP از headers (برای proxy)
+					if not client_ip or client_ip == "unknown":
+						x_forwarded_for = request.headers.get("X-Forwarded-For")
+						if x_forwarded_for:
+							client_ip = x_forwarded_for.split(",")[0].strip()
+						else:
+							x_real_ip = request.headers.get("X-Real-IP")
+							if x_real_ip:
+								client_ip = x_real_ip
+					
+					rate_limit_key = f"ip:{client_ip}"
 				
-				rate_limit_key = f"ip:{client_ip}"
-			
-			# بررسی rate limit
-			limiter = get_rate_limiter()
-			allowed, remaining, reset_after = limiter.check_rate_limit(
-				rate_limit_key,
-				max_requests,
-				window_seconds,
-			)
-			
-			if not allowed:
-				raise ApiError(
-					"RATE_LIMIT_EXCEEDED",
-					error_message,
-					http_status=429,
-					headers={
-						"X-RateLimit-Limit": str(max_requests),
-						"X-RateLimit-Remaining": "0",
-						"X-RateLimit-Reset": str(int(time.time()) + reset_after),
-						"Retry-After": str(reset_after),
-					}
+				# بررسی rate limit
+				limiter = get_rate_limiter()
+				allowed, remaining, reset_after = limiter.check_rate_limit(
+					rate_limit_key,
+					max_requests,
+					window_seconds,
 				)
+				
+				if not allowed:
+					raise ApiError(
+						"RATE_LIMIT_EXCEEDED",
+						error_message,
+						http_status=429,
+						headers={
+							"X-RateLimit-Limit": str(max_requests),
+							"X-RateLimit-Remaining": "0",
+							"X-RateLimit-Reset": str(int(time.time()) + reset_after),
+							"Retry-After": str(reset_after),
+						}
+					)
 			
-			# اجرای function
-			response = await func(*args, **kwargs)
+			# اجرای function - بررسی اینکه آیا async است یا sync
+			if inspect.iscoroutinefunction(func):
+				response = await func(*args, **kwargs)
+			else:
+				# برای sync functions، مستقیماً فراخوانی می‌کنیم
+				response = func(*args, **kwargs)
 			
 			# اضافه کردن rate limit headers به response
 			# اگر response یک dict باشد (success_response)، باید از middleware استفاده کنیم

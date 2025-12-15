@@ -294,7 +294,7 @@ class _CustomPersianCalendarState extends State<_CustomPersianCalendar> {
         // Calendar grid
         Expanded(
           child: GridView.builder(
-            physics: const NeverScrollableScrollPhysics(),
+            physics: const ClampingScrollPhysics(),
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 7,
               childAspectRatio: 1.0,

@@ -11,6 +11,7 @@ import '../../services/petty_cash_service.dart';
 import '../../services/currency_service.dart';
 import '../../widgets/banking/petty_cash_form_dialog.dart';
 import '../../utils/snackbar_helper.dart';
+import '../../utils/number_formatters.dart';
 
 class PettyCashPage extends StatefulWidget {
 	final int businessId;
@@ -157,6 +158,50 @@ class _PettyCashPageState extends State<PettyCashPage> {
 					t.description,
 					width: ColumnWidth.large,
 					formatter: (row) => row.description ?? '-',
+				),
+				CustomColumn(
+					'balance',
+					(t.localeName == 'fa') ? 'موجودی' : 'Balance',
+					width: ColumnWidth.medium,
+					formatter: (row) {
+						if (row.balance == null) return '-';
+						return formatWithThousands(row.balance, decimalPlaces: 2);
+					},
+					builder: (row, index) {
+						if (row.balance == null) {
+							return const Text('-', textAlign: TextAlign.right);
+						}
+						final balance = row.balance!;
+						final formatted = formatWithThousands(balance, decimalPlaces: 2);
+						final isNegative = balance < 0;
+						
+						return Row(
+							mainAxisAlignment: MainAxisAlignment.end,
+							children: [
+								if (isNegative)
+									Padding(
+										padding: const EdgeInsetsDirectional.only(end: 4),
+										child: Icon(
+											Icons.warning_amber_rounded,
+											color: Theme.of(context).colorScheme.error,
+											size: 18,
+										),
+									),
+								Flexible(
+									child: Text(
+										formatted,
+										textAlign: TextAlign.right,
+										style: TextStyle(
+											color: isNegative 
+												? Theme.of(context).colorScheme.error 
+												: null,
+											fontWeight: isNegative ? FontWeight.w600 : FontWeight.normal,
+										),
+									),
+								),
+							],
+						);
+					},
 				),
 				ActionColumn(
 					'actions',

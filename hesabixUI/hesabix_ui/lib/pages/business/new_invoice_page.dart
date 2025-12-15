@@ -25,6 +25,7 @@ import '../../models/person_model.dart';
 import '../../widgets/invoice/line_items_table.dart';
 import '../../widgets/invoice/invoice_transactions_widget.dart';
 import '../../widgets/invoice/bom_explosion_widget.dart';
+import '../../services/bom_service.dart';
 import '../../widgets/invoice/warehouse_combobox_widget.dart';
 import '../../utils/number_formatters.dart';
 import '../../utils/number_normalizer.dart';
@@ -1887,8 +1888,85 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
     );
   }
 
+  Future<String?> _validateBomOutputs() async {
+    if (_selectedInvoiceType != InvoiceType.production || _bomIds.isEmpty) {
+      return null; // اعتبارسنجی BOM فقط برای فاکتور تولید لازم است
+    }
+
+    // جمع‌آوری product_id های موجود در ردیف‌های فاکتور با movement='in'
+    final outputProductIdsInInvoice = <int>{};
+    for (final line in _lineItems) {
+      final movement = line.extraInfo?['movement']?.toString();
+      if (movement == 'in' && line.productId != null) {
+        outputProductIdsInInvoice.add(line.productId!);
+      }
+    }
+
+    final bomService = BomService();
+    
+    // بررسی برای هر فرمول تولید
+    for (final bomId in _bomIds) {
+      try {
+        final bom = await bomService.getById(
+          businessId: widget.businessId,
+          bomId: bomId,
+        );
+
+        if (bom.outputs.isEmpty) {
+          // اگر فرمول خروجی ندارد، هشدار می‌دهیم اما خطا نمی‌دهیم
+          continue;
+        }
+
+        // بررسی اینکه product_id فرمول در خروجی‌ها باشد (هشدار)
+        final bomProductInOutputs = bom.outputs.any(
+          (output) => output.outputProductId == bom.productId,
+        );
+        if (!bomProductInOutputs) {
+          // این یک هشدار است، نه خطا - در لاگ ثبت می‌شود
+          debugPrint(
+            'هشدار: کالای فرمول تولید ${bom.name} (product_id: ${bom.productId}) '
+            'در خروجی‌های فرمول تعریف نشده است.',
+          );
+        }
+
+        // بررسی اینکه همه خروجی‌های فرمول در فاکتور وجود داشته باشند
+        final missingOutputs = <String>[];
+        for (final output in bom.outputs) {
+          if (!outputProductIdsInInvoice.contains(output.outputProductId)) {
+            final productName = output.outputProductName ?? 
+                               output.outputProductCode ?? 
+                               'کالا #${output.outputProductId}';
+            missingOutputs.add(productName);
+          }
+        }
+
+        if (missingOutputs.isNotEmpty) {
+          final missingNames = missingOutputs.join('، ');
+          return 'خروجی‌های فرمول تولید "${bom.name}" (نسخه: ${bom.version}) '
+                 'که در فاکتور وجود ندارند: $missingNames. '
+                 'لطفاً همه خروجی‌های فرمول تولید را در فاکتور شامل کنید.';
+        }
+      } catch (e) {
+        // در صورت خطا در دریافت فرمول، ادامه می‌دهیم (اعتبارسنجی در بک‌اند انجام می‌شود)
+        debugPrint('خطا در دریافت فرمول تولید $bomId: $e');
+      }
+    }
+
+    return null; // همه چیز درست است
+  }
+
   Future<void> _saveInvoice() async {
     final t = AppLocalizations.of(context);
+    
+    // اعتبارسنجی BOM outputs (async)
+    if (_selectedInvoiceType == InvoiceType.production) {
+      final bomValidation = await _validateBomOutputs();
+      if (bomValidation != null) {
+        _showError(bomValidation);
+        return;
+      }
+    }
+    
     final validation = _validateAndBuildPayload(t);
     if (validation is String) {
       _showError(validation);

@@ -11,6 +11,7 @@ import '../../widgets/banking/bank_account_form_dialog.dart';
 import '../../services/bank_account_service.dart';
 import '../../services/currency_service.dart';
 import '../../utils/snackbar_helper.dart';
+import '../../utils/number_formatters.dart';
 
 class BankAccountsPage extends StatefulWidget {
   final int businessId;
@@ -189,6 +190,50 @@ class _BankAccountsPageState extends State<BankAccountsPage> {
           t.isDefault,
           width: ColumnWidth.small,
           formatter: (account) => account.isDefault ? t.yes : t.no,
+        ),
+        CustomColumn(
+          'balance',
+          (t.localeName == 'fa') ? 'موجودی' : 'Balance',
+          width: ColumnWidth.medium,
+          formatter: (account) {
+            if (account.balance == null) return '-';
+            return formatWithThousands(account.balance, decimalPlaces: 2);
+          },
+          builder: (account, index) {
+            if (account.balance == null) {
+              return const Text('-', textAlign: TextAlign.right);
+            }
+            final balance = account.balance!;
+            final formatted = formatWithThousands(balance, decimalPlaces: 2);
+            final isNegative = balance < 0;
+            
+            return Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                if (isNegative)
+                  Padding(
+                    padding: const EdgeInsetsDirectional.only(end: 4),
+                    child: Icon(
+                      Icons.warning_amber_rounded,
+                      color: Theme.of(context).colorScheme.error,
+                      size: 18,
+                    ),
+                  ),
+                Flexible(
+                  child: Text(
+                    formatted,
+                    textAlign: TextAlign.right,
+                    style: TextStyle(
+                      color: isNegative 
+                          ? Theme.of(context).colorScheme.error 
+                          : null,
+                      fontWeight: isNegative ? FontWeight.w600 : FontWeight.normal,
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
         ),
         ActionColumn(
           'actions',

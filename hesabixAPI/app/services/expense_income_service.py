@@ -23,10 +23,71 @@ from adapters.db.models.fiscal_year import FiscalYear
 from adapters.db.models.user import User
 from adapters.db.models.check import Check, CheckType, CheckStatus
 from app.core.responses import ApiError
+from app.core.cache import get_cache
 from app.services.document_monetization_service import ensure_document_policy_allows_creation
 
 
 logger = logging.getLogger(__name__)
+
+
+def invalidate_expense_income_cache(business_id: int, fiscal_year_id: Optional[int] = None, document_id: Optional[int] = None):
+	"""
+	حذف تمام کش‌های مربوط به لیست هزینه/درآمد یک کسب‌وکار
+	
+	این تابع از چند روش استفاده می‌کند:
+	1. Tag-based invalidation با set ردیس: حذف انتخابی بر اساس business_id و fiscal_year_id (بهینه‌تر)
+	2. Pattern-based invalidation: حذف تمام کلیدهای expense_income_list:* (fallback برای اطمینان)
+	3. Redis Pub/Sub: انتشار پیام invalidation برای تمام instanceها
+	
+	Args:
+		business_id: شناسه کسب‌وکار
+		fiscal_year_id: شناسه سال مالی (اختیاری)
+			- اگر None باشد، تمام کش‌های مربوط به business_id حذف می‌شوند
+			- اگر مشخص باشد، فقط کش‌های مربوط به آن fiscal_year_id حذف می‌شوند
+		document_id: شناسه سند خاص (اختیاری)
+	"""
+	cache = get_cache()
+	if not cache.enabled:
+		return
+	
+	try:
+		# روش 1: استفاده از invalidate_expense_income_by_business (بهینه‌ترین روش)
+		deleted_count = cache.invalidate_expense_income_by_business(business_id, fiscal_year_id, document_id)
+		if deleted_count > 0:
+			logger.info(f"Invalidated {deleted_count} cache keys for business_id {business_id}, fiscal_year_id {fiscal_year_id}, document_id {document_id}")
+		
+		# روش 2: حذف تمام کلیدهای expense_income_list:* (fallback برای اطمینان کامل)
+		pattern = "expense_income_list:*"
+		deleted_pattern = cache.delete_pattern(pattern)
+		if deleted_pattern > 0:
+			logger.info(f"Invalidated {deleted_pattern} cache keys using pattern: {pattern}")
+		
+		# حذف کش سند خاص اگر مشخص شده باشد
+		if document_id:
+			document_pattern = f"expense_income:{business_id}:{document_id}*"
+			deleted_document = cache.delete_pattern(document_pattern)
+			if deleted_document > 0:
+				logger.info(f"Invalidated {deleted_document} cache keys for document_id {document_id} using pattern: {document_pattern}")
+		
+		# روش 3: انتشار پیام invalidation از طریق Redis Pub/Sub
+		invalidation_message = {
+			"type": "expense_income_cache_invalidation",
+			"business_id": business_id,
+			"fiscal_year_id": fiscal_year_id,
+			"document_id": document_id,
+			"timestamp": None
+		}
+		try:
+			import time
+			invalidation_message["timestamp"] = time.time()
+			cache.publish_invalidation("cache_invalidation", invalidation_message)
+			logger.info(f"Published invalidation message for business_id {business_id}, fiscal_year_id {fiscal_year_id}, document_id {document_id}")
+		except Exception as pub_error:
+			logger.warning(f"Error publishing invalidation message: {pub_error}")
+	
+	except Exception as e:
+		# خطا در invalidate نباید مانع عملیات اصلی شود
+		logger.warning(f"Error invalidating expense_income cache for business_id {business_id}: {e}")
 
 
 # نوع‌های سند
@@ -452,7 +513,25 @@ def create_expense_income(
     
     db.commit()
     db.refresh(document)
-    return document_to_dict(db, document)
+    result = document_to_dict(db, document)
+    
+    # Invalidate cache بعد از ایجاد موفق سند هزینه/درآمد
+    invalidate_expense_income_cache(
+        business_id=business_id,
+        fiscal_year_id=document.fiscal_year_id,
+        document_id=document.id
+    )
+    
+    # همچنین اسناد عمومی را هم invalidate کن
+    from app.services.document_service import invalidate_documents_cache
+    invalidate_documents_cache(
+        business_id=business_id,
+        fiscal_year_id=document.fiscal_year_id,
+        document_id=document.id,
+        document_type=document.document_type
+    )
+    
+    return result
 
 
 def document_to_dict(db: Session, document: Document) -> Dict[str, Any]:
@@ -957,7 +1036,25 @@ def update_expense_income(
     db.commit()
     db.refresh(document)
     
-    return document_to_dict(db, document)
+    result = document_to_dict(db, document)
+    
+    # Invalidate cache بعد از به‌روزرسانی موفق سند هزینه/درآمد
+    invalidate_expense_income_cache(
+        business_id=document.business_id,
+        fiscal_year_id=document.fiscal_year_id,
+        document_id=document.id
+    )
+    
+    # همچنین اسناد عمومی را هم invalidate کن
+    from app.services.document_service import invalidate_documents_cache
+    invalidate_documents_cache(
+        business_id=document.business_id,
+        fiscal_year_id=document.fiscal_year_id,
+        document_id=document.id,
+        document_type=document.document_type
+    )
+    
+    return result
 
 
 def delete_expense_income(db: Session, document_id: int) -> bool:
@@ -971,12 +1068,33 @@ def delete_expense_income(db: Session, document_id: int) -> bool:
         if document.document_type not in (DOCUMENT_TYPE_EXPENSE, DOCUMENT_TYPE_INCOME):
             return False
         
+        # دریافت اطلاعات قبل از حذف برای invalidation
+        business_id = document.business_id
+        fiscal_year_id = document.fiscal_year_id
+        document_type = document.document_type
+        
         # حذف خطوط سند
         db.query(DocumentLine).filter(DocumentLine.document_id == document_id).delete()
         
         # حذف سند
         db.delete(document)
         db.commit()
+        
+        # Invalidate cache بعد از حذف موفق سند هزینه/درآمد
+        invalidate_expense_income_cache(
+            business_id=business_id,
+            fiscal_year_id=fiscal_year_id,
+            document_id=document_id
+        )
+        
+        # همچنین اسناد عمومی را هم invalidate کن
+        from app.services.document_service import invalidate_documents_cache
+        invalidate_documents_cache(
+            business_id=business_id,
+            fiscal_year_id=fiscal_year_id,
+            document_id=document_id,
+            document_type=document_type
+        )
         
         return True
     except Exception as e:

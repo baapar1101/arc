@@ -9,6 +9,7 @@ from sqlalchemy import and_, or_, func
 from adapters.db.models.bank_account import BankAccount
 from adapters.db.models.document import Document
 from adapters.db.models.document_line import DocumentLine
+from adapters.db.models.fiscal_year import FiscalYear
 from app.core.responses import ApiError
 
 
@@ -207,11 +208,128 @@ def delete_bank_account(db: Session, account_id: int) -> tuple[bool, str | None]
 		return False, f"خطا در حذف حساب بانکی: {str(e)}"
 
 
+def _calculate_bank_account_balance(
+	db: Session,
+	bank_account_id: int,
+	business_id: int,
+	fiscal_year_id: Optional[int] = None,
+) -> Decimal:
+	"""
+	محاسبه موجودی یک حساب بانکی
+	
+	Args:
+		db: نشست پایگاه داده
+		bank_account_id: شناسه حساب بانکی
+		business_id: شناسه کسب‌وکار
+		fiscal_year_id: شناسه سال مالی (اختیاری)
+	
+	Returns:
+		Decimal: موجودی حساب (debit - credit)
+	"""
+	query = db.query(
+		func.coalesce(func.sum(DocumentLine.debit), 0).label('total_debit'),
+		func.coalesce(func.sum(DocumentLine.credit), 0).label('total_credit')
+	).join(
+		Document, DocumentLine.document_id == Document.id
+	).filter(
+		Document.business_id == business_id,
+		Document.is_proforma == False,
+		DocumentLine.bank_account_id == bank_account_id
+	)
+	
+	# فیلتر سال مالی
+	if fiscal_year_id:
+		query = query.filter(Document.fiscal_year_id == fiscal_year_id)
+	
+	result = query.first()
+	if result:
+		total_debit = Decimal(str(result.total_debit or 0))
+		total_credit = Decimal(str(result.total_credit or 0))
+		return total_debit - total_credit
+	
+	return Decimal(0)
+
+
+def _calculate_bank_accounts_balances_bulk(
+	db: Session,
+	bank_account_ids: List[int],
+	business_id: int,
+	fiscal_year_id: Optional[int] = None,
+) -> Dict[int, Decimal]:
+	"""
+	محاسبه موجودی چند حساب بانکی به صورت bulk
+	
+	Args:
+		db: نشست پایگاه داده
+		bank_account_ids: لیست شناسه‌های حساب‌های بانکی
+		business_id: شناسه کسب‌وکار
+		fiscal_year_id: شناسه سال مالی (اختیاری)
+	
+	Returns:
+		Dict[int, Decimal]: دیکشنری {bank_account_id: balance}
+	"""
+	if not bank_account_ids:
+		return {}
+	
+	query = db.query(
+		DocumentLine.bank_account_id,
+		func.coalesce(func.sum(DocumentLine.debit), 0).label('total_debit'),
+		func.coalesce(func.sum(DocumentLine.credit), 0).label('total_credit')
+	).join(
+		Document, DocumentLine.document_id == Document.id
+	).filter(
+		Document.business_id == business_id,
+		Document.is_proforma == False,
+		DocumentLine.bank_account_id.in_(bank_account_ids)
+	).group_by(
+		DocumentLine.bank_account_id
+	)
+	
+	# فیلتر سال مالی
+	if fiscal_year_id:
+		query = query.filter(Document.fiscal_year_id == fiscal_year_id)
+	
+	results = query.all()
+	
+	balances = {}
+	for result in results:
+		ba_id = result.bank_account_id
+		total_debit = Decimal(str(result.total_debit or 0))
+		total_credit = Decimal(str(result.total_credit or 0))
+		balances[ba_id] = total_debit - total_credit
+	
+	# برای حساب‌هایی که تراکنشی ندارند، موجودی صفر است
+	for ba_id in bank_account_ids:
+		if ba_id not in balances:
+			balances[ba_id] = Decimal(0)
+	
+	return balances
+
+
 def list_bank_accounts(
 	db: Session,
 	business_id: int,
 	query: Dict[str, Any],
 ) -> Dict[str, Any]:
+	# دریافت سال مالی از query (اختیاری)
+	fiscal_year_id = query.get("fiscal_year_id")
+	if fiscal_year_id is not None:
+		try:
+			fiscal_year_id = int(fiscal_year_id)
+		except (ValueError, TypeError):
+			fiscal_year_id = None
+	
+	# اگر سال مالی مشخص نشده، از سال مالی جاری استفاده کن
+	if fiscal_year_id is None:
+		fiscal_year = db.query(FiscalYear).filter(
+			and_(
+				FiscalYear.business_id == business_id,
+				FiscalYear.is_last == True
+			)
+		).first()
+		if fiscal_year:
+			fiscal_year_id = fiscal_year.id
+	
 	q = db.query(BankAccount).filter(BankAccount.business_id == business_id)
 
 	# جستجو
@@ -266,8 +384,21 @@ def list_bank_accounts(
 	total = q.count()
 	items = q.offset(skip).limit(take).all()
 
+	# محاسبه موجودی برای همه حساب‌ها به صورت bulk
+	bank_account_ids = [item.id for item in items]
+	balances = _calculate_bank_accounts_balances_bulk(
+		db, bank_account_ids, business_id, fiscal_year_id
+	)
+
+	# ساخت لیست با موجودی
+	result_items = []
+	for item in items:
+		item_dict = bank_account_to_dict(item)
+		item_dict["balance"] = float(balances.get(item.id, Decimal(0)))
+		result_items.append(item_dict)
+
 	return {
-		"items": [bank_account_to_dict(i) for i in items],
+		"items": result_items,
 		"pagination": {
 			"total": total,
 			"page": (skip // take) + 1,
@@ -320,8 +451,8 @@ def bulk_delete_bank_accounts(db: Session, business_id: int, account_ids: List[i
 	}
 
 
-def bank_account_to_dict(obj: BankAccount) -> Dict[str, Any]:
-	return {
+def bank_account_to_dict(obj: BankAccount, balance: Optional[float] = None) -> Dict[str, Any]:
+	result = {
 		"id": obj.id,
 		"business_id": obj.business_id,
 		"code": obj.code,
@@ -340,6 +471,9 @@ def bank_account_to_dict(obj: BankAccount) -> Dict[str, Any]:
 		"created_at": obj.created_at.isoformat(),
 		"updated_at": obj.updated_at.isoformat(),
 	}
+	if balance is not None:
+		result["balance"] = balance
+	return result
 
 
 def get_bank_accounts_turnover_report(

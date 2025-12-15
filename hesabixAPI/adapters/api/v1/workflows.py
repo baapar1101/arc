@@ -27,6 +27,95 @@ from adapters.api.v1.schemas import QueryInfo
 router = APIRouter(tags=["workflows"])
 
 
+def validate_workflow_data(workflow_data: Dict[str, Any]) -> List[str]:
+    """
+    اعتبارسنجی ساختار workflow_data
+    
+    Args:
+        workflow_data: داده‌های workflow برای validation
+        
+    Returns:
+        لیست خطاها (خالی اگر معتبر باشد)
+    """
+    errors = []
+    
+    if not isinstance(workflow_data, dict):
+        errors.append("workflow_data باید یک dictionary باشد")
+        return errors
+    
+    # بررسی وجود nodes
+    nodes = workflow_data.get("nodes", [])
+    if not isinstance(nodes, list):
+        errors.append("nodes باید یک لیست باشد")
+        return errors
+    
+    if len(nodes) == 0:
+        errors.append("workflow باید حداقل یک node داشته باشد")
+        return errors
+    
+    # بررسی وجود connections
+    connections = workflow_data.get("connections", [])
+    if not isinstance(connections, list):
+        errors.append("connections باید یک لیست باشد")
+        return errors
+    
+    # بررسی ساختار هر node
+    node_ids = set()
+    for i, node in enumerate(nodes):
+        if not isinstance(node, dict):
+            errors.append(f"node در index {i} باید یک dictionary باشد")
+            continue
+        
+        node_id = node.get("id")
+        if not node_id:
+            errors.append(f"node در index {i} باید دارای id باشد")
+            continue
+        
+        if node_id in node_ids:
+            errors.append(f"node با id تکراری '{node_id}' یافت شد")
+        node_ids.add(node_id)
+        
+        node_type = node.get("type")
+        if node_type not in ["trigger", "action", "condition", "loop"]:
+            errors.append(f"node '{node_id}' دارای type نامعتبر '{node_type}' است")
+        
+        if not node.get("label"):
+            errors.append(f"node '{node_id}' باید دارای label باشد")
+    
+    # بررسی ساختار connections
+    for i, conn in enumerate(connections):
+        if not isinstance(conn, dict):
+            errors.append(f"connection در index {i} باید یک dictionary باشد")
+            continue
+        
+        source = conn.get("source")
+        target = conn.get("target")
+        
+        if not source or not target:
+            errors.append(f"connection در index {i} باید دارای source و target باشد")
+            continue
+        
+        if source not in node_ids:
+            errors.append(f"connection در index {i} به node ناموجود '{source}' اشاره می‌کند")
+        
+        if target not in node_ids:
+            errors.append(f"connection در index {i} به node ناموجود '{target}' اشاره می‌کند")
+    
+    # بررسی حداقل یک trigger
+    trigger_nodes = [n for n in nodes if isinstance(n, dict) and n.get("type") == "trigger"]
+    if len(trigger_nodes) == 0:
+        errors.append("workflow باید حداقل یک trigger node داشته باشد")
+    
+    # بررسی محدودیت اندازه
+    import json
+    workflow_data_size = len(json.dumps(workflow_data))
+    max_size = 10 * 1024 * 1024  # 10 MB
+    if workflow_data_size > max_size:
+        errors.append(f"اندازه workflow_data ({workflow_data_size} bytes) بیش از حد مجاز ({max_size} bytes) است")
+    
+    return errors
+
+
 @router.post(
     "/businesses/{business_id}/workflows/create",
     summary="ایجاد workflow جدید",
@@ -49,6 +138,14 @@ async def create_workflow(
     workflow_data = body.get("workflow_data", {})
     if not workflow_data:
         raise ApiError("WORKFLOW_DATA_REQUIRED", "داده‌های workflow الزامی است")
+    
+    # اعتبارسنجی ساختار workflow_data
+    validation_errors = validate_workflow_data(workflow_data)
+    if validation_errors:
+        raise ApiError(
+            "WORKFLOW_DATA_INVALID",
+            f"ساختار workflow_data نامعتبر است: {'; '.join(validation_errors)}"
+        )
     
     workflow = Workflow(
         business_id=business_id,
@@ -183,6 +280,13 @@ async def update_workflow(
     if "status" in body:
         workflow.status = WorkflowStatus(body["status"])
     if "workflow_data" in body:
+        # اعتبارسنجی ساختار workflow_data
+        validation_errors = validate_workflow_data(body["workflow_data"])
+        if validation_errors:
+            raise ApiError(
+                "WORKFLOW_DATA_INVALID",
+                f"ساختار workflow_data نامعتبر است: {'; '.join(validation_errors)}"
+            )
         workflow.workflow_data = body["workflow_data"]
     if "settings" in body:
         workflow.settings = body["settings"]
@@ -281,10 +385,15 @@ async def list_workflow_executions(
     if not workflow or workflow.business_id != business_id:
         raise ApiError("WORKFLOW_NOT_FOUND", "Workflow یافت نشد")
     
+    # شمارش کل با استفاده از func.count() برای کارایی بهتر
+    count_stmt = select(func.count(WorkflowExecution.id)).where(
+        WorkflowExecution.workflow_id == workflow_id
+    )
+    total_count = db.execute(count_stmt).scalar_one() or 0
+    
+    # دریافت لیست با pagination
     stmt = select(WorkflowExecution).where(WorkflowExecution.workflow_id == workflow_id)
     stmt = stmt.order_by(WorkflowExecution.created_at.desc())
-    
-    total_count = len(list(db.execute(stmt).scalars().all()))
     
     offset = (page - 1) * page_size
     stmt = stmt.offset(offset).limit(page_size)
@@ -461,7 +570,7 @@ async def get_workflow_performance_analytics(
 ):
     """تحلیل عملکرد workflows"""
     
-    # Query پایه
+    # Query پایه - برای database-agnostic بودن، duration را در Python محاسبه می‌کنیم
     stmt = select(
         Workflow.id,
         Workflow.name,
@@ -477,15 +586,6 @@ async def get_workflow_performance_analytics(
                 (WorkflowExecution.status == WorkflowExecutionStatus.FAILED, 1),
             )
         ).label('failed'),
-        func.avg(
-            text("TIMESTAMPDIFF(SECOND, workflow_executions.started_at, workflow_executions.completed_at)")
-        ).label('avg_duration_seconds'),
-        func.min(
-            text("TIMESTAMPDIFF(SECOND, workflow_executions.started_at, workflow_executions.completed_at)")
-        ).label('min_duration_seconds'),
-        func.max(
-            text("TIMESTAMPDIFF(SECOND, workflow_executions.started_at, workflow_executions.completed_at)")
-        ).label('max_duration_seconds')
     ).select_from(Workflow) \
      .outerjoin(WorkflowExecution, WorkflowExecution.workflow_id == Workflow.id) \
      .where(
@@ -507,27 +607,50 @@ async def get_workflow_performance_analytics(
     
     results = list(db.execute(stmt).all())
     
+    # محاسبه duration برای هر workflow در Python (database-agnostic)
+    workflow_stats = []
+    for r in results:
+        # دریافت executions برای محاسبه duration
+        exec_stmt = select(WorkflowExecution).where(
+            and_(
+                WorkflowExecution.workflow_id == r.id,
+                WorkflowExecution.created_at >= datetime.utcnow() - timedelta(days=days),
+                WorkflowExecution.started_at.isnot(None),
+                WorkflowExecution.completed_at.isnot(None),
+            )
+        )
+        executions = list(db.execute(exec_stmt).scalars().all())
+        
+        durations = []
+        for exec in executions:
+            if exec.started_at and exec.completed_at:
+                duration = (exec.completed_at - exec.started_at).total_seconds()
+                durations.append(duration)
+        
+        avg_duration = sum(durations) / len(durations) if durations else 0
+        min_duration = min(durations) if durations else 0
+        max_duration = max(durations) if durations else 0
+        
+        workflow_stats.append({
+            "workflow_id": r.id,
+            "workflow_name": r.name,
+            "workflow_status": r.status.value if r.status else None,
+            "total_executions": r.total_executions or 0,
+            "successful": r.successful or 0,
+            "failed": r.failed or 0,
+            "success_rate": round(
+                (r.successful / r.total_executions * 100) if r.total_executions > 0 else 0,
+                2
+            ),
+            "avg_duration_seconds": round(avg_duration, 2),
+            "min_duration_seconds": round(min_duration, 2),
+            "max_duration_seconds": round(max_duration, 2)
+        })
+    
     return success_response(
         data={
             "period_days": days,
-            "workflows": [
-                {
-                    "workflow_id": r.id,
-                    "workflow_name": r.name,
-                    "workflow_status": r.status.value if r.status else None,
-                    "total_executions": r.total_executions or 0,
-                    "successful": r.successful or 0,
-                    "failed": r.failed or 0,
-                    "success_rate": round(
-                        (r.successful / r.total_executions * 100) if r.total_executions > 0 else 0,
-                        2
-                    ),
-                    "avg_duration_seconds": round(r.avg_duration_seconds, 2) if r.avg_duration_seconds else 0,
-                    "min_duration_seconds": round(r.min_duration_seconds, 2) if r.min_duration_seconds else 0,
-                    "max_duration_seconds": round(r.max_duration_seconds, 2) if r.max_duration_seconds else 0
-                }
-                for r in results
-            ]
+            "workflows": workflow_stats
         },
         request=request,
         message="WORKFLOW_PERFORMANCE_ANALYTICS_RETRIEVED",

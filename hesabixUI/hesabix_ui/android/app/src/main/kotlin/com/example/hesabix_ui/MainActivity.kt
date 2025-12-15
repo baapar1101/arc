@@ -1,4 +1,4 @@
-package com.example.hesabix_ui
+package ir.hsxn.hesabix_ui
 
 import io.flutter.embedding.android.FlutterActivity
 

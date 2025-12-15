@@ -1029,7 +1029,8 @@ class _BusinessShellState extends State<BusinessShell> {
           count++; // آیتم جداکننده هم شمرده می‌شود
         } else {
           count++; // آیتم اصلی
-          if (item.type == _MenuItemType.expandable && isExpanded(item) && railExtended) {
+          // نمایش زیرمجموعه‌ها در همه حالت‌ها (Rail و Extended)
+          if (item.type == _MenuItemType.expandable && isExpanded(item)) {
             count += item.children?.length ?? 0;
           }
         }
@@ -1141,11 +1142,11 @@ class _BusinessShellState extends State<BusinessShell> {
         body: Row(
           children: [
             Container(
-              width: railExtended ? 240 : 88,
+              width: railExtended ? 260 : 88,
               height: double.infinity,
               color: sideBg,
               child: ListView.builder(
-                padding: EdgeInsets.zero,
+                padding: const EdgeInsets.symmetric(vertical: 8),
                 itemCount: getTotalMenuItemsCount(),
                 itemBuilder: (ctx, index) {
                   // محاسبه ایندکس منو و تشخیص نوع آیتم
@@ -1163,7 +1164,8 @@ class _BusinessShellState extends State<BusinessShell> {
                     }
                     currentIndex++;
                     
-                    if (item.type == _MenuItemType.expandable && isExpanded(item) && railExtended) {
+                    // نمایش زیرمجموعه‌ها در همه حالت‌ها (Rail و Extended)
+                    if (item.type == _MenuItemType.expandable && isExpanded(item)) {
                       final childrenCount = item.children?.length ?? 0;
                       if (index >= currentIndex && index < currentIndex + childrenCount) {
                         menuIndex = i;
@@ -1187,9 +1189,8 @@ class _BusinessShellState extends State<BusinessShell> {
                       : Colors.transparent;
                   
                   if (isChildItem && item.children != null && childIndex >= 0 && childIndex < item.children!.length) {
-                    // زیرآیتم
+                    // زیرآیتم با انیمیشن و بهبود بصری
                     final child = item.children![childIndex];
-                    // بررسی اینکه آیا این زیرمنو فعال است یا نه
                     final bool isChildSelected = child.path != null && location.startsWith(child.path!);
                     final bool isChildHovered = index == _hoverIndex;
                     final bool isChildActive = isChildSelected || isChildHovered;
@@ -1201,103 +1202,103 @@ class _BusinessShellState extends State<BusinessShell> {
                             ? (isDark ? activeBg.withValues(alpha: 0.5) : activeBg.withValues(alpha: 0.7))
                             : activeBg)
                         : Colors.transparent;
-                    return MouseRegion(
-                      onEnter: (_) => setState(() => _hoverIndex = index),
-                      onExit: (_) => setState(() => _hoverIndex = -1),
-                      child: InkWell(
-                        borderRadius: childBr,
-                        onTap: () => onSelectChild(menuIndex, childIndex),
-                        child: Container(
-                          margin: EdgeInsets.zero,
-                          padding: EdgeInsets.symmetric(
-                            horizontal: railExtended ? 24 : 16, // بیشتر indent برای زیرآیتم
-                            vertical: 8,
-                          ),
-                          decoration: BoxDecoration(
-                            color: childBgColor,
-                            borderRadius: childBr,
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                isChildActive ? child.selectedIcon : child.icon,
-                                color: isChildActive ? activeFg : sideFg,
-                                size: 20,
+                    
+                    return AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      curve: Curves.easeInOut,
+                      child: MouseRegion(
+                        onEnter: (_) => setState(() => _hoverIndex = index),
+                        onExit: (_) => setState(() => _hoverIndex = -1),
+                        child: InkWell(
+                          borderRadius: childBr,
+                          onTap: () => onSelectChild(menuIndex, childIndex),
+                          child: Container(
+                            margin: EdgeInsets.zero,
+                            padding: EdgeInsets.symmetric(
+                              horizontal: railExtended ? 32 : 20,
+                              vertical: 10,
+                            ),
+                            decoration: BoxDecoration(
+                              color: childBgColor,
+                              borderRadius: childBr,
+                            ),
+                            child: Tooltip(
+                              message: child.label,
+                              waitDuration: const Duration(milliseconds: 500),
+                              child: Row(
+                                mainAxisAlignment: railExtended ? MainAxisAlignment.start : MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    isChildActive ? child.selectedIcon : child.icon,
+                                    color: isChildActive ? activeFg : sideFg,
+                                    size: railExtended ? 20 : 22,
+                                  ),
+                                  if (railExtended) ...[
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Text(
+                                        child.label,
+                                        style: TextStyle(
+                                          color: isChildActive ? activeFg : sideFg,
+                                          fontWeight: isChildActive ? FontWeight.w600 : FontWeight.w400,
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                                    ),
+                                    if (child.hasAddButton)
+                                      GestureDetector(
+                                        onTap: () {
+                                          // Navigate to add new item
+                                          if (child.label == t.personsList) {
+                                            showAddPersonDialog();
+                                          } else if (child.label == t.products) {
+                                            showAddProductDialog();
+                                          } else if (child.label == t.categories) {
+                                            // Navigate to add category
+                                          } else if (child.label == t.productAttributes) {
+                                            // Navigate to add product attribute
+                                          } else if (child.label == t.accounts) {
+                                            showAddBankAccountDialog();
+                                          } else if (child.label == t.pettyCash) {
+                                            showAddPettyCashDialog();
+                                          } else if (child.label == t.cashBox) {
+                                            showAddCashBoxDialog();
+                                          } else if (child.label == t.wallet) {
+                                            showWalletTopUpDialog();
+                                          } else if (child.label == t.checks) {
+                                            // Navigate to add check
+                                          } else if (child.label == t.invoice) {
+                                            context.go('/business/${widget.businessId}/invoice/new');
+                                          } else if (child.label == t.receiptsAndPayments) {
+                                            showAddReceiptPaymentDialog();
+                                          } else if (child.label == t.expenseAndIncome) {
+                                            showAddExpenseIncomeDialog();
+                                          } else if (child.label == t.warehouses) {
+                                            showAddWarehouseDialog();
+                                          } else if (child.label == 'حواله‌های انبار') {
+                                            showAddWarehouseDocumentDialog();
+                                          }
+                                        },
+                                        child: Container(
+                                          width: 22,
+                                          height: 22,
+                                          decoration: BoxDecoration(
+                                            color: isChildActive 
+                                                ? activeFg.withValues(alpha: 0.15)
+                                                : sideFg.withValues(alpha: 0.1),
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                          child: Icon(
+                                            Icons.add,
+                                            size: 14,
+                                            color: isChildActive ? activeFg : sideFg,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ],
                               ),
-                              if (railExtended) ...[
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Text(
-                                    child.label,
-                                    style: TextStyle(
-                                      color: isChildActive ? activeFg : sideFg,
-                                      fontWeight: isChildActive ? FontWeight.w600 : FontWeight.w400,
-                                    ),
-                                  ),
-                                ),
-                                if (child.hasAddButton)
-                                  GestureDetector(
-                                    onTap: () {
-                                      // Navigate to add new item
-                                      if (child.label == t.personsList) {
-                                        // Navigate to add person
-                                        showAddPersonDialog();
-                                      } else if (child.label == t.products) {
-                                        // Show add product dialog
-                                        showAddProductDialog();
-                                      } else if (child.label == t.categories) {
-                                        // Navigate to add category
-                                      } else if (child.label == t.productAttributes) {
-                                        // Navigate to add product attribute
-                                      } else if (child.label == t.accounts) {
-                                        // Open add bank account dialog
-                                        showAddBankAccountDialog();
-                                      } else if (child.label == t.pettyCash) {
-                                        // Open add petty cash dialog
-                                        showAddPettyCashDialog();
-                                      } else if (child.label == t.cashBox) {
-                                        // Open add cash register dialog
-                                        showAddCashBoxDialog();
-                                      } else if (child.label == t.wallet) {
-                                        // Show wallet top-up dialog
-                                        showWalletTopUpDialog();
-                                      } else if (child.label == t.checks) {
-                                        // Navigate to add check
-                                      } else if (child.label == t.invoice) {
-                                        // Navigate to add invoice
-                                        context.go('/business/${widget.businessId}/invoice/new');
-                                      } else if (child.label == t.receiptsAndPayments) {
-                                        // Show add receipt payment dialog
-                                        showAddReceiptPaymentDialog();
-                                      } else if (child.label == t.expenseAndIncome) {
-                                        // Show add expense/income dialog
-                                        showAddExpenseIncomeDialog();
-                                      } else if (child.label == t.warehouses) {
-                                        // Show add warehouse dialog
-                                        showAddWarehouseDialog();
-                                      } else if (child.label == 'حواله‌های انبار') {
-                                        // Show add warehouse document dialog
-                                        showAddWarehouseDocumentDialog();
-                                      }
-                                    },
-                                    child: Container(
-                                      width: 20,
-                                      height: 20,
-                                      decoration: BoxDecoration(
-                                        color: isChildActive 
-                                            ? activeFg.withValues(alpha: 0.15)
-                                            : sideFg.withValues(alpha: 0.1),
-                                        borderRadius: BorderRadius.circular(3),
-                                      ),
-                                      child: Icon(
-                                        Icons.add,
-                                        size: 14,
-                                        color: isChildActive ? activeFg : sideFg,
-                                      ),
-                                    ),
-                                  ),
-                              ],
-                            ],
+                            ),
                           ),
                         ),
                       ),
@@ -1309,7 +1310,7 @@ class _BusinessShellState extends State<BusinessShell> {
                       return Container(
                         margin: EdgeInsets.symmetric(
                           horizontal: railExtended ? 16 : 8,
-                          vertical: 8,
+                          vertical: 12,
                         ),
                         child: Row(
                           children: [
@@ -1325,8 +1326,9 @@ class _BusinessShellState extends State<BusinessShell> {
                                 item.label,
                                 style: TextStyle(
                                   color: sideFg.withValues(alpha: 0.7),
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w500,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  letterSpacing: 0.5,
                                 ),
                               ),
                               const SizedBox(width: 12),
@@ -1349,13 +1351,14 @@ class _BusinessShellState extends State<BusinessShell> {
                       );
                     } else {
                       // آیتم ساده یا آیتم بازشونده
-                      return MouseRegion(
+                      Widget menuItemWidget = MouseRegion(
                         onEnter: (_) => setState(() => _hoverIndex = index),
                         onExit: (_) => setState(() => _hoverIndex = -1),
                         child: InkWell(
                           borderRadius: br,
                           onTap: () {
                             if (item.type == _MenuItemType.expandable) {
+                              // در همه حالت‌ها (Rail و Extended) expand/collapse می‌کنیم
                               setState(() {
                                 if (item.label == t.productsAndServices) _isProductsAndServicesExpanded = !_isProductsAndServicesExpanded;
                                 if (item.label == t.banking) _isBankingExpanded = !_isBankingExpanded;
@@ -1370,19 +1373,53 @@ class _BusinessShellState extends State<BusinessShell> {
                           child: Container(
                             margin: EdgeInsets.zero,
                             padding: EdgeInsets.symmetric(
-                              horizontal: railExtended ? 16 : 8,
-                              vertical: 8,
+                              horizontal: railExtended ? 16 : 0,
+                              vertical: 12,
                             ),
                             decoration: BoxDecoration(
                               color: bgColor,
                               borderRadius: br,
                             ),
                             child: Row(
+                              mainAxisAlignment: railExtended ? MainAxisAlignment.start : MainAxisAlignment.center,
                               children: [
-                                Icon(
-                                  active ? item.selectedIcon : item.icon,
-                                  color: active ? activeFg : sideFg,
-                                  size: 24,
+                                Stack(
+                                  clipBehavior: Clip.none,
+                                  children: [
+                                    Icon(
+                                      active ? item.selectedIcon : item.icon,
+                                      color: active ? activeFg : sideFg,
+                                      size: railExtended ? 24 : 28,
+                                    ),
+                                    // آیکون expand/collapse کوچک در گوشه برای حالت Rail
+                                    if (!railExtended && item.type == _MenuItemType.expandable)
+                                      Positioned(
+                                        right: -4,
+                                        bottom: -4,
+                                        child: Container(
+                                          width: 14,
+                                          height: 14,
+                                          decoration: BoxDecoration(
+                                            color: sideBg,
+                                            shape: BoxShape.circle,
+                                            border: Border.all(
+                                              color: sideFg.withValues(alpha: 0.3),
+                                              width: 1,
+                                            ),
+                                          ),
+                                          child: AnimatedRotation(
+                                            turns: isExpanded(item) ? 0.5 : 0,
+                                            duration: const Duration(milliseconds: 200),
+                                            curve: Curves.easeInOut,
+                                            child: Icon(
+                                              Icons.expand_more,
+                                              color: sideFg,
+                                              size: 10,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                  ],
                                 ),
                                 if (railExtended) ...[
                                   const SizedBox(width: 12),
@@ -1391,15 +1428,21 @@ class _BusinessShellState extends State<BusinessShell> {
                                       item.label,
                                       style: TextStyle(
                                         color: active ? activeFg : sideFg,
-                                        fontWeight: active ? FontWeight.w600 : FontWeight.w400,
+                                        fontWeight: active ? FontWeight.w600 : FontWeight.w500,
+                                        fontSize: 14,
                                       ),
                                     ),
                                   ),
                                   if (item.type == _MenuItemType.expandable)
-                                    Icon(
-                                      isExpanded(item) ? Icons.expand_less : Icons.expand_more,
-                                      color: sideFg,
-                                      size: 20,
+                                    AnimatedRotation(
+                                      turns: isExpanded(item) ? 0.5 : 0,
+                                      duration: const Duration(milliseconds: 200),
+                                      curve: Curves.easeInOut,
+                                      child: Icon(
+                                        Icons.expand_more,
+                                        color: sideFg,
+                                        size: 20,
+                                      ),
                                     )
                                   else if (item.hasAddButton)
                                     Builder(builder: (ctx) {
@@ -1415,25 +1458,18 @@ class _BusinessShellState extends State<BusinessShell> {
                                           } else if (item.label == t.cashBox) {
                                             showAddCashBoxDialog();
                                           } else if (item.label == t.invoice) {
-                                            // Navigate to add invoice
                                             context.go('/business/${widget.businessId}/invoice/new');
                                           } else if (item.label == t.receiptsAndPayments) {
-                                            // Show add receipt payment dialog
                                             showAddReceiptPaymentDialog();
-                                      } else if (item.label == t.expenseAndIncome) {
-                                        // Show add expense/income dialog
-                                        showAddExpenseIncomeDialog();
-                                      } else if (item.label == t.transfers) {
-                                        // Show add transfer dialog
-                                        showAddTransferDialog();
+                                          } else if (item.label == t.expenseAndIncome) {
+                                            showAddExpenseIncomeDialog();
+                                          } else if (item.label == t.transfers) {
+                                            showAddTransferDialog();
                                           } else if (item.label == t.checks) {
-                                            // Show add check dialog
                                             showAddCheckDialog();
                                           } else if (item.label == t.documents) {
-                                            // Show add document dialog
                                             showAddDocumentDialog();
                                           }
-                                          // سایر مسیرهای افزودن در آینده متصل می‌شوند
                                         },
                                         child: Container(
                                           width: 24,
@@ -1456,6 +1492,17 @@ class _BusinessShellState extends State<BusinessShell> {
                           ),
                         ),
                       );
+                      
+                      // اضافه کردن Tooltip برای حالت Rail (عرض کم)
+                      if (!railExtended) {
+                        menuItemWidget = Tooltip(
+                          message: item.label,
+                          waitDuration: const Duration(milliseconds: 500),
+                          child: menuItemWidget,
+                        );
+                      }
+                      
+                      return menuItemWidget;
                     }
                   }
                 },

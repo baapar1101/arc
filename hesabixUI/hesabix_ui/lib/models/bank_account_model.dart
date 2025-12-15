@@ -14,6 +14,7 @@ class BankAccount {
   final String? description;
   final bool isActive;
   final bool isDefault;
+  final double? balance;
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -33,6 +34,7 @@ class BankAccount {
     this.description,
     this.isActive = true,
     this.isDefault = false,
+    this.balance,
     this.createdAt,
     this.updatedAt,
   });
@@ -54,6 +56,7 @@ class BankAccount {
       description: json['description'] as String?,
       isActive: (json['is_active'] ?? true) as bool,
       isDefault: (json['is_default'] ?? false) as bool,
+      balance: json['balance'] != null ? (json['balance'] is num ? (json['balance'] as num).toDouble() : double.tryParse(json['balance'].toString())) : null,
       createdAt: json['created_at'] != null ? DateTime.tryParse(json['created_at'].toString()) : null,
       updatedAt: json['updated_at'] != null ? DateTime.tryParse(json['updated_at'].toString()) : null,
     );

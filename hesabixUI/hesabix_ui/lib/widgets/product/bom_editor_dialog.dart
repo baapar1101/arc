@@ -3,10 +3,12 @@ import 'package:flutter/services.dart';
 
 import '../../models/bom_models.dart';
 import '../../services/bom_service.dart';
+import '../../services/product_service.dart';
 import '../invoice/product_combobox_widget.dart';
 import '../invoice/warehouse_combobox_widget.dart';
 import '../../utils/number_normalizer.dart';
 import '../../utils/snackbar_helper.dart';
+import '../../utils/responsive_helper.dart';
 
 class BomEditorDialog extends StatefulWidget {
   final int businessId;
@@ -20,6 +22,8 @@ class BomEditorDialog extends StatefulWidget {
 
 class _BomEditorDialogState extends State<BomEditorDialog> with SingleTickerProviderStateMixin {
   late final BomService _service;
+  late final ProductService _productService;
+  final _formKey = GlobalKey<FormState>();
 
   // Header fields
   late TextEditingController _nameController;
@@ -62,6 +66,7 @@ class _BomEditorDialogState extends State<BomEditorDialog> with SingleTickerProv
   void initState() {
     super.initState();
     _service = BomService();
+    _productService = ProductService();
     _nameController = TextEditingController(text: widget.bom.name);
     _versionController = TextEditingController(text: widget.bom.version);
     _isDefault = widget.bom.isDefault;
@@ -137,14 +142,16 @@ class _BomEditorDialogState extends State<BomEditorDialog> with SingleTickerProv
 
   @override
   Widget build(BuildContext context) {
-    final screenSize = MediaQuery.of(context).size;
-    final dialogWidth = (screenSize.width > 1000 ? 900.0 : (screenSize.width * 0.9).clamp(400.0, 900.0)).toDouble();
-    final dialogHeight = (screenSize.height > 800 ? 700.0 : (screenSize.height * 0.85).clamp(500.0, 700.0)).toDouble();
+    final isMobile = ResponsiveHelper.isMobile(context);
+    final isTablet = ResponsiveHelper.isTablet(context);
     
     return Dialog(
-      child: SizedBox(
-        width: dialogWidth,
-        height: dialogHeight,
+      insetPadding: ResponsiveHelper.getDialogPadding(context),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(isMobile ? 0 : 16),
+      ),
+      child: Container(
+        constraints: ResponsiveHelper.getDialogConstraints(context),
         child: Column(
           children: [
             _buildHeader(context),
@@ -231,127 +238,321 @@ class _BomEditorDialogState extends State<BomEditorDialog> with SingleTickerProv
         ),
         // Form fields
         Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _nameController,
-                      decoration: InputDecoration(
-                        labelText: 'عنوان',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        filled: true,
-                        fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-                        prefixIcon: const Icon(Icons.title),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: TextField(
-                      controller: _versionController,
-                      decoration: InputDecoration(
-                        labelText: 'نسخه',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        filled: true,
-                        fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-                        prefixIcon: const Icon(Icons.tag),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: _isDefault
-                            ? theme.colorScheme.primary
-                            : theme.colorScheme.outline.withValues(alpha: 0.3),
-                        width: _isDefault ? 2 : 1,
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          _isDefault ? Icons.star : Icons.star_border,
-                          color: _isDefault
-                              ? Colors.orange
-                              : theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                          size: 24,
-                        ),
-                        const SizedBox(width: 8),
-                        const Text('پیش‌فرض'),
-                        const SizedBox(width: 8),
-                        Switch(
-                          value: _isDefault,
-                          onChanged: (v) => setState(() => _isDefault = v),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: Tooltip(
-                      message: 'درصد بازده کل فرمول تولید (0-100). این مقدار در محاسبه مقدار مواد اولیه مورد نیاز استفاده می‌شود.',
-                      child: TextField(
-                        controller: _yieldController,
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        inputFormatters: [
-                          const EnglishDigitsFormatter(),
-                          FilteringTextInputFormatter.allow(RegExp(r'[-0-9.,]')),
-                        ],
-                        decoration: InputDecoration(
-                          labelText: 'بازده کل (%)',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
+          padding: EdgeInsets.all(ResponsiveHelper.getPadding(context)),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                ResponsiveHelper.isMobile(context)
+                    ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          TextFormField(
+                            controller: _nameController,
+                            enabled: !_saving,
+                            decoration: InputDecoration(
+                              labelText: 'عنوان',
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              filled: true,
+                              fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                              prefixIcon: const Icon(Icons.title),
+                            ),
+                            validator: (value) {
+                              if (value == null || value.trim().isEmpty) {
+                                return 'لطفاً عنوان فرمول را وارد کنید';
+                              }
+                              return null;
+                            },
                           ),
-                          filled: true,
-                          fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-                          prefixIcon: const Icon(Icons.trending_up),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Tooltip(
-                      message: 'درصد پرت کل فرمول تولید (0-100). این مقدار در محاسبه مقدار مواد اولیه مورد نیاز استفاده می‌شود.',
-                      child: TextField(
-                        controller: _wastageController,
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        inputFormatters: [
-                          const EnglishDigitsFormatter(),
-                          FilteringTextInputFormatter.allow(RegExp(r'[-0-9.,]')),
-                        ],
-                        decoration: InputDecoration(
-                          labelText: 'پرت کل (%)',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
+                          SizedBox(height: ResponsiveHelper.getGridSpacing(context)),
+                          TextFormField(
+                            controller: _versionController,
+                            enabled: !_saving,
+                            decoration: InputDecoration(
+                              labelText: 'نسخه',
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              filled: true,
+                              fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                              prefixIcon: const Icon(Icons.tag),
+                            ),
+                            validator: (value) {
+                              if (value == null || value.trim().isEmpty) {
+                                return 'لطفاً نسخه را وارد کنید';
+                              }
+                              return null;
+                            },
                           ),
-                          filled: true,
-                          fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-                          prefixIcon: const Icon(Icons.trending_down),
-                        ),
+                          SizedBox(height: ResponsiveHelper.getGridSpacing(context)),
+                          Container(
+                            padding: EdgeInsets.all(ResponsiveHelper.getPadding(context)),
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: _isDefault
+                                    ? theme.colorScheme.primary
+                                    : theme.colorScheme.outline.withValues(alpha: 0.3),
+                                width: _isDefault ? 2 : 1,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  _isDefault ? Icons.star : Icons.star_border,
+                                  color: _isDefault
+                                      ? Colors.orange
+                                      : theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                                  size: 24,
+                                ),
+                                const SizedBox(width: 8),
+                                const Text('پیش‌فرض'),
+                                const SizedBox(width: 8),
+                                Switch(
+                                  value: _isDefault,
+                                  onChanged: (v) => setState(() => _isDefault = v),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      )
+                    : Row(
+                        children: [
+                          Expanded(
+                            child: TextFormField(
+                              controller: _nameController,
+                              enabled: !_saving,
+                              decoration: InputDecoration(
+                                labelText: 'عنوان',
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                filled: true,
+                                fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                                prefixIcon: const Icon(Icons.title),
+                              ),
+                              validator: (value) {
+                                if (value == null || value.trim().isEmpty) {
+                                  return 'لطفاً عنوان فرمول را وارد کنید';
+                                }
+                                return null;
+                              },
+                            ),
+                          ),
+                          SizedBox(width: ResponsiveHelper.getGridSpacing(context)),
+                          Expanded(
+                            child: TextFormField(
+                              controller: _versionController,
+                              enabled: !_saving,
+                              decoration: InputDecoration(
+                                labelText: 'نسخه',
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                filled: true,
+                                fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                                prefixIcon: const Icon(Icons.tag),
+                              ),
+                              validator: (value) {
+                                if (value == null || value.trim().isEmpty) {
+                                  return 'لطفاً نسخه را وارد کنید';
+                                }
+                                return null;
+                              },
+                            ),
+                          ),
+                          SizedBox(width: ResponsiveHelper.getGridSpacing(context)),
+                          Container(
+                            padding: EdgeInsets.all(ResponsiveHelper.getPadding(context)),
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: _isDefault
+                                    ? theme.colorScheme.primary
+                                    : theme.colorScheme.outline.withValues(alpha: 0.3),
+                                width: _isDefault ? 2 : 1,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  _isDefault ? Icons.star : Icons.star_border,
+                                  color: _isDefault
+                                      ? Colors.orange
+                                      : theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                                  size: 24,
+                                ),
+                                const SizedBox(width: 8),
+                                const Text('پیش‌فرض'),
+                                const SizedBox(width: 8),
+                                Switch(
+                                  value: _isDefault,
+                                  onChanged: (v) => setState(() => _isDefault = v),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
+                SizedBox(height: ResponsiveHelper.getGridSpacing(context)),
+                ResponsiveHelper.isMobile(context)
+                    ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Tooltip(
+                            message: 'درصد بازده کل فرمول تولید (0-100). این مقدار در محاسبه مقدار مواد اولیه مورد نیاز استفاده می‌شود.',
+                            child: TextFormField(
+                              controller: _yieldController,
+                              enabled: !_saving,
+                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                              inputFormatters: [
+                                const EnglishDigitsFormatter(),
+                                FilteringTextInputFormatter.allow(RegExp(r'[-0-9.,]')),
+                              ],
+                              decoration: InputDecoration(
+                                labelText: 'بازده کل (%)',
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                filled: true,
+                                fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                                prefixIcon: const Icon(Icons.trending_up),
+                              ),
+                              validator: (value) {
+                                if (value != null && value.trim().isNotEmpty) {
+                                  final yield = double.tryParse(value.replaceAll(',', '.'));
+                                  if (yield == null) {
+                                    return 'مقدار نامعتبر';
+                                  }
+                                  if (yield < 0 || yield > 100) {
+                                    return 'باید بین 0 تا 100 باشد';
+                                  }
+                                }
+                                return null;
+                              },
+                            ),
+                          ),
+                          SizedBox(height: ResponsiveHelper.getGridSpacing(context)),
+                          Tooltip(
+                            message: 'درصد پرت کل فرمول تولید (0-100). این مقدار در محاسبه مقدار مواد اولیه مورد نیاز استفاده می‌شود.',
+                            child: TextFormField(
+                              controller: _wastageController,
+                              enabled: !_saving,
+                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                              inputFormatters: [
+                                const EnglishDigitsFormatter(),
+                                FilteringTextInputFormatter.allow(RegExp(r'[-0-9.,]')),
+                              ],
+                              decoration: InputDecoration(
+                                labelText: 'پرت کل (%)',
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                filled: true,
+                                fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                                prefixIcon: const Icon(Icons.trending_down),
+                              ),
+                              validator: (value) {
+                                if (value != null && value.trim().isNotEmpty) {
+                                  final wastage = double.tryParse(value.replaceAll(',', '.'));
+                                  if (wastage == null) {
+                                    return 'مقدار نامعتبر';
+                                  }
+                                  if (wastage < 0 || wastage > 100) {
+                                    return 'باید بین 0 تا 100 باشد';
+                                  }
+                                }
+                                return null;
+                              },
+                            ),
+                          ),
+                        ],
+                      )
+                    : Row(
+                        children: [
+                          Expanded(
+                            child: Tooltip(
+                              message: 'درصد بازده کل فرمول تولید (0-100). این مقدار در محاسبه مقدار مواد اولیه مورد نیاز استفاده می‌شود.',
+                              child: TextFormField(
+                                controller: _yieldController,
+                                enabled: !_saving,
+                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                inputFormatters: [
+                                  const EnglishDigitsFormatter(),
+                                  FilteringTextInputFormatter.allow(RegExp(r'[-0-9.,]')),
+                                ],
+                                decoration: InputDecoration(
+                                  labelText: 'بازده کل (%)',
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  filled: true,
+                                  fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                                  prefixIcon: const Icon(Icons.trending_up),
+                                ),
+                                validator: (value) {
+                                  if (value != null && value.trim().isNotEmpty) {
+                                    final yield = double.tryParse(value.replaceAll(',', '.'));
+                                    if (yield == null) {
+                                      return 'مقدار نامعتبر';
+                                    }
+                                    if (yield < 0 || yield > 100) {
+                                      return 'باید بین 0 تا 100 باشد';
+                                    }
+                                  }
+                                  return null;
+                                },
+                              ),
+                            ),
+                          ),
+                          SizedBox(width: ResponsiveHelper.getGridSpacing(context)),
+                          Expanded(
+                            child: Tooltip(
+                              message: 'درصد پرت کل فرمول تولید (0-100). این مقدار در محاسبه مقدار مواد اولیه مورد نیاز استفاده می‌شود.',
+                              child: TextFormField(
+                                controller: _wastageController,
+                                enabled: !_saving,
+                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                inputFormatters: [
+                                  const EnglishDigitsFormatter(),
+                                  FilteringTextInputFormatter.allow(RegExp(r'[-0-9.,]')),
+                                ],
+                                decoration: InputDecoration(
+                                  labelText: 'پرت کل (%)',
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  filled: true,
+                                  fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                                  prefixIcon: const Icon(Icons.trending_down),
+                                ),
+                                validator: (value) {
+                                  if (value != null && value.trim().isNotEmpty) {
+                                    final wastage = double.tryParse(value.replaceAll(',', '.'));
+                                    if (wastage == null) {
+                                      return 'مقدار نامعتبر';
+                                    }
+                                    if (wastage < 0 || wastage > 100) {
+                                      return 'باید بین 0 تا 100 باشد';
+                                    }
+                                  }
+                                  return null;
+                                },
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+              ],
+            ),
           ),
         ),
       ],
@@ -471,19 +672,91 @@ class _BomEditorDialogState extends State<BomEditorDialog> with SingleTickerProv
   }
 
   void _reindexControllers(Map<int, TextEditingController> controllers, int removedIndex) {
+    if (removedIndex < 0 || controllers.isEmpty) {
+      return; // index نامعتبر است یا لیست خالی است
+    }
+    
+    // بررسی اینکه آیا index در محدوده معتبر است
+    final maxKey = controllers.keys.isEmpty ? -1 : controllers.keys.reduce((a, b) => a > b ? a : b);
+    if (removedIndex > maxKey) {
+      return; // index خارج از محدوده است
+    }
+    
     final keys = controllers.keys.toList()..sort();
     final newMap = <int, TextEditingController>{};
     
     for (var oldKey in keys) {
       if (oldKey < removedIndex) {
+        // کلیدهای قبل از index حذف شده بدون تغییر باقی می‌مانند
         newMap[oldKey] = controllers[oldKey]!;
       } else if (oldKey > removedIndex) {
+        // کلیدهای بعد از index حذف شده باید یک واحد کاهش یابند
         newMap[oldKey - 1] = controllers[oldKey]!;
       }
+      // oldKey == removedIndex را نادیده می‌گیریم (قبلاً dispose شده)
     }
     
     controllers.clear();
     controllers.addAll(newMap);
+  }
+
+  /// به‌روزرسانی line_no برای همه items
+  List<BomItem> _updateItemsLineNos() {
+    return _items.asMap().entries.map((entry) {
+      final i = entry.key;
+      final item = entry.value;
+      if (item.lineNo != i + 1) {
+        return BomItem(
+          lineNo: i + 1,
+          componentProductId: item.componentProductId,
+          qtyPer: item.qtyPer,
+          uom: item.uom,
+          wastagePercent: item.wastagePercent,
+          isOptional: item.isOptional,
+          substituteGroup: item.substituteGroup,
+          suggestedWarehouseId: item.suggestedWarehouseId,
+        );
+      }
+      return item;
+    }).toList();
+  }
+
+  /// به‌روزرسانی line_no برای همه outputs
+  List<BomOutput> _updateOutputsLineNos() {
+    return _outputs.asMap().entries.map((entry) {
+      final i = entry.key;
+      final output = entry.value;
+      if (output.lineNo != i + 1) {
+        return BomOutput(
+          lineNo: i + 1,
+          outputProductId: output.outputProductId,
+          ratio: output.ratio,
+          uom: output.uom,
+          outputProductName: output.outputProductName,
+          outputProductCode: output.outputProductCode,
+        );
+      }
+      return output;
+    }).toList();
+  }
+
+  /// به‌روزرسانی line_no برای همه operations
+  List<BomOperation> _updateOperationsLineNos() {
+    return _operations.asMap().entries.map((entry) {
+      final i = entry.key;
+      final op = entry.value;
+      if (op.lineNo != i + 1) {
+        return BomOperation(
+          lineNo: i + 1,
+          operationName: op.operationName,
+          costFixed: op.costFixed,
+          costPerUnit: op.costPerUnit,
+          costUom: op.costUom,
+          workCenter: op.workCenter,
+        );
+      }
+      return op;
+    }).toList();
   }
 
   void _addOutputController(int index, BomOutput output) {
@@ -527,214 +800,494 @@ class _BomEditorDialogState extends State<BomEditorDialog> with SingleTickerProv
   }
 
   Widget _buildItemsEditor() {
-    return Padding(
-      padding: const EdgeInsets.all(12),
-      child: Column(
-        children: [
-          Align(
-            alignment: Alignment.centerLeft,
-            child: FilledButton.icon(
+    final isMobile = ResponsiveHelper.isMobile(context);
+    return Stack(
+      children: [
+        Padding(
+          padding: EdgeInsets.all(ResponsiveHelper.getPadding(context)),
+          child: Column(
+            children: [
+              if (!isMobile) ...[
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: FilledButton.icon(
+                    onPressed: () {
+                      setState(() {
+                        final newIndex = _items.length;
+                        final newLineNo = _items.isEmpty ? 1 : (_items.length + 1);
+                        final newItem = BomItem(lineNo: newLineNo, componentProductId: -1, qtyPer: 1);
+                        
+                        // افزودن به لیست‌ها
+                        _items = [..._items, newItem];
+                        _itemSelectedProducts = [..._itemSelectedProducts, null];
+                        
+                        // افزودن کنترلرها بعد از افزودن به لیست
+                        _addItemController(newIndex, newItem);
+                        
+                        // به‌روزرسانی key برای rebuild ListView
+                        _itemsListKey++;
+                      });
+                    },
+                    icon: const Icon(Icons.add),
+                    label: const Text('افزودن سطر مواد'),
+                  ),
+                ),
+                SizedBox(height: ResponsiveHelper.getGridSpacing(context)),
+              ],
+              Expanded(
+                child: _items.isEmpty
+                    ? _buildEmptyState(
+                        context,
+                        icon: Icons.inventory_2,
+                        title: 'هیچ ماده اولیه‌ای تعریف نشده',
+                        message: isMobile 
+                            ? 'برای افزودن مواد اولیه، روی دکمه + در پایین صفحه کلیک کنید.'
+                            : 'برای افزودن مواد اولیه مورد نیاز برای تولید، روی دکمه "افزودن سطر مواد" کلیک کنید.',
+                      )
+                    : ListView.separated(
+                        key: ValueKey('items_list_$_itemsListKey'),
+                        itemCount: _items.length,
+                        separatorBuilder: (context, index) => SizedBox(height: ResponsiveHelper.getGridSpacing(context)),
+                        itemBuilder: (context, index) {
+                      final it = _items[index];
+                      final actualLineNo = index + 1;
+                      
+                      // Debug log
+                      debugPrint('BOM Editor: Building item at index $index, lineNo: ${it.lineNo}, actualLineNo: $actualLineNo, controllers keys: ${_itemQtyControllers.keys.toList()}');
+                      
+                      // Ensure controllers exist
+                      if (!_itemQtyControllers.containsKey(index)) {
+                        debugPrint('BOM Editor: Creating controllers for index $index');
+                        _addItemController(index, it);
+                      }
+                      
+                      final qtyCtrl = _itemQtyControllers[index]!;
+                      final uomCtrl = _itemUomControllers[index]!;
+                      final wastCtrl = _itemWastageControllers[index]!;
+                      final substCtrl = _itemSubstituteControllers[index]!;
+                      
+                      final isValid = it.componentProductId > 0 && it.qtyPer > 0;
+                      final isMobile = ResponsiveHelper.isMobile(context);
+                      
+                      Widget rowContent = isMobile
+                          ? _buildMobileItemCard(context, index, it, actualLineNo, qtyCtrl, uomCtrl, wastCtrl, substCtrl, isValid)
+                          : _buildDesktopItemRow(context, index, it, actualLineNo, qtyCtrl, uomCtrl, wastCtrl, substCtrl, isValid);
+                      
+                      return Dismissible(
+                        key: ValueKey('item_$index'),
+                        direction: isMobile ? DismissDirection.endToStart : DismissDirection.horizontal,
+                        background: Container(
+                          alignment: Alignment.centerRight,
+                          padding: const EdgeInsets.only(right: 20),
+                          decoration: BoxDecoration(
+                            color: Colors.red.shade400,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(Icons.delete, color: Colors.white, size: 32),
+                        ),
+                        confirmDismiss: (direction) async {
+                          return await showDialog<bool>(
+                            context: context,
+                            builder: (context) => AlertDialog(
+                              title: const Text('تأیید حذف'),
+                              content: const Text('آیا از حذف این سطر اطمینان دارید؟'),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(context, false),
+                                  child: const Text('انصراف'),
+                                ),
+                                FilledButton(
+                                  onPressed: () => Navigator.pop(context, true),
+                                  style: FilledButton.styleFrom(backgroundColor: Colors.red),
+                                  child: const Text('حذف'),
+                                ),
+                              ],
+                            ),
+                          ) ?? false;
+                        },
+                        onDismissed: (direction) {
+                          setState(() {
+                            _itemQtyControllers[index]?.dispose();
+                            _itemUomControllers[index]?.dispose();
+                            _itemWastageControllers[index]?.dispose();
+                            _itemSubstituteControllers[index]?.dispose();
+                            _itemQtyControllers.remove(index);
+                            _itemUomControllers.remove(index);
+                            _itemWastageControllers.remove(index);
+                            _itemSubstituteControllers.remove(index);
+                            _items.removeAt(index);
+                            _itemSelectedProducts.removeAt(index);
+                            _reindexControllers(_itemQtyControllers, index);
+                            _reindexControllers(_itemUomControllers, index);
+                            _reindexControllers(_itemWastageControllers, index);
+                            _reindexControllers(_itemSubstituteControllers, index);
+                            _itemsListKey++;
+                          });
+                        },
+                        child: rowContent,
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
+    ),
+        if (isMobile)
+          Positioned(
+            bottom: ResponsiveHelper.getPadding(context),
+            right: ResponsiveHelper.getPadding(context),
+            child: FloatingActionButton.extended(
               onPressed: () {
                 setState(() {
                   final newIndex = _items.length;
                   final newLineNo = _items.isEmpty ? 1 : (_items.length + 1);
                   final newItem = BomItem(lineNo: newLineNo, componentProductId: -1, qtyPer: 1);
                   
-                  // افزودن به لیست‌ها
                   _items = [..._items, newItem];
                   _itemSelectedProducts = [..._itemSelectedProducts, null];
-                  
-                  // افزودن کنترلرها بعد از افزودن به لیست
                   _addItemController(newIndex, newItem);
-                  
-                  // به‌روزرسانی line_no همه سطرها
-                  for (var i = 0; i < _items.length; i++) {
-                    if (_items[i].lineNo != i + 1) {
-                      _items[i] = BomItem(
-                        lineNo: i + 1,
-                        componentProductId: _items[i].componentProductId,
-                        qtyPer: _items[i].qtyPer,
-                        uom: _items[i].uom,
-                        wastagePercent: _items[i].wastagePercent,
-                        isOptional: _items[i].isOptional,
-                        substituteGroup: _items[i].substituteGroup,
-                        suggestedWarehouseId: _items[i].suggestedWarehouseId,
-                      );
-                    }
-                  }
-                  
-                  // به‌روزرسانی key برای rebuild ListView
                   _itemsListKey++;
                 });
               },
               icon: const Icon(Icons.add),
-              label: const Text('افزودن سطر مواد'),
+              label: const Text('افزودن'),
             ),
           ),
-          const SizedBox(height: 8),
-          Expanded(
-            child: _items.isEmpty
-                ? _buildEmptyState(
-                    context,
-                    icon: Icons.inventory_2,
-                    title: 'هیچ ماده اولیه‌ای تعریف نشده',
-                    message: 'برای افزودن مواد اولیه مورد نیاز برای تولید، روی دکمه "افزودن سطر مواد" کلیک کنید.',
-                  )
-                : ListView.separated(
-                    itemCount: _items.length,
-                    key: ValueKey('items_list_$_itemsListKey'),
-                    separatorBuilder: (separatorContext, separatorIndex) => const Divider(height: 1),
-                    itemBuilder: (context, index) {
-                final it = _items[index];
-                final actualLineNo = index + 1;
-                
-                // Ensure controllers exist
-                if (!_itemQtyControllers.containsKey(index)) {
-                  _addItemController(index, it);
-                }
-                
-                final qtyCtrl = _itemQtyControllers[index]!;
-                final uomCtrl = _itemUomControllers[index]!;
-                final wastCtrl = _itemWastageControllers[index]!;
-                final substCtrl = _itemSubstituteControllers[index]!;
-                
-                return Padding(
-                  key: ValueKey('item_$index'),
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Tooltip(
-                          message: 'شماره ردیف به صورت خودکار تنظیم می‌شود',
-                          child: TextField(
-                            controller: TextEditingController(text: actualLineNo.toString()),
-                            enabled: false,
-                            decoration: const InputDecoration(
-                              labelText: 'ردیف',
-                              border: OutlineInputBorder(),
-                              filled: true,
-                            ),
-                          ),
-                        ),
-                      ),
+      ],
+    );
+  }
+
+  Widget _buildMobileItemCard(BuildContext context, int index, BomItem it, int actualLineNo,
+      TextEditingController qtyCtrl, TextEditingController uomCtrl, 
+      TextEditingController wastCtrl, TextEditingController substCtrl, bool isValid) {
+    final theme = Theme.of(context);
+    return Card(
+      margin: EdgeInsets.all(ResponsiveHelper.getGridSpacing(context)),
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: isValid 
+            ? BorderSide.none 
+            : BorderSide(color: Colors.red.shade300, width: 2),
+      ),
+      child: Padding(
+        padding: EdgeInsets.all(ResponsiveHelper.getPadding(context)),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    if (!isValid) ...[
+                      Icon(Icons.warning_amber_rounded, color: Colors.red.shade700, size: 20),
                       const SizedBox(width: 8),
-                      Expanded(
-                        flex: 2,
-                        child: Tooltip(
-                          message: 'کالای مصرفی که در تولید استفاده می‌شود',
-                          child: ProductComboboxWidget(
-                            businessId: widget.businessId,
-                            selectedProduct: _itemSelectedProducts[index],
-                            label: 'کالا',
-                            hintText: 'جست‌وجوی کالا',
-                            onChanged: (product) {
-                              setState(() {
-                                _itemSelectedProducts[index] = product;
-                                if (product != null) {
-                                  final pid = product['id'] as int?;
-                                  if (pid != null) {
-                                    // اگر واحد پیش‌فرض انتخاب نشده، واحد اصلی کالا را به عنوان پیش‌فرض انتخاب کن
-                                    final mainUnit = product['main_unit']?.toString();
-                                    final currentUom = _items[index].uom;
-                                    final newUom = (currentUom == null || currentUom.isEmpty) && mainUnit != null && mainUnit.isNotEmpty
-                                        ? mainUnit
-                                        : currentUom;
-                                    _updateItem(index, componentProductId: pid, uom: newUom);
-                                  } else {
-                                    _updateItem(index, componentProductId: -1);
-                                  }
-                                } else {
-                                  _updateItem(index, componentProductId: -1);
-                                }
-                              });
-                            },
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      _numWithTooltip(
-                        qtyCtrl,
-                        'مقدار برای 1 واحد',
-                        'مقدار این کالا برای تولید 1 واحد محصول نهایی',
-                        (v) => _updateItem(index, qtyPer: double.tryParse(v)),
-                      ),
-                      const SizedBox(width: 8),
-                      _buildUnitDropdown(
-                        index,
-                        _itemSelectedProducts[index],
-                        uomCtrl,
-                        (v) => _updateItem(index, uom: v),
-                      ),
-                      const SizedBox(width: 8),
-                      _numWithTooltip(
-                        wastCtrl,
-                        'پرت (%)',
-                        'درصد پرت این کالا در فرآیند تولید (0-100)',
-                        (v) => _updateItem(index, wastagePercent: double.tryParse(v)),
-                        min: 0,
-                        max: 100,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Tooltip(
-                          message: 'گروه جایگزین: کالاهای با گروه یکسان می‌توانند جایگزین یکدیگر شوند',
-                          child: _text(substCtrl, 'گروه جایگزین', (v) => _updateItem(index, substituteGroup: v.isEmpty ? null : v)),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Tooltip(
-                          message: 'انبار پیشنهادی برای برداشت این ماده اولیه در سند تولید',
-                          child: WarehouseComboboxWidget(
-                            businessId: widget.businessId,
-                            selectedWarehouseId: it.suggestedWarehouseId,
-                            label: 'انبار پیشنهادی',
-                            hintText: 'انتخاب انبار',
-                            onChanged: (warehouseId) => _updateItem(index, suggestedWarehouseId: warehouseId),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Tooltip(
-                        message: 'اگر فعال باشد، این ماده اولیه اختیاری است و می‌تواند در تولید استفاده نشود',
-                        child: Checkbox(
-                          value: it.isOptional,
-                          onChanged: (v) => _updateItem(index, isOptional: v ?? false),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      IconButton(
-                        onPressed: () {
-                          setState(() {
-                            _removeItemController(index);
-                            _items.removeAt(index);
-                            _itemSelectedProducts.removeAt(index);
-                            _itemsListKey++; // به‌روزرسانی key برای rebuild ListView
-                            // به‌روزرسانی line_no سطرهای باقی‌مانده
-                            for (var i = 0; i < _items.length; i++) {
-                              if (_items[i].lineNo != i + 1) {
-                                _items[i] = BomItem(
-                                  lineNo: i + 1,
-                                  componentProductId: _items[i].componentProductId,
-                                  qtyPer: _items[i].qtyPer,
-                                  uom: _items[i].uom,
-                                  wastagePercent: _items[i].wastagePercent,
-                                  isOptional: _items[i].isOptional,
-                                  substituteGroup: _items[i].substituteGroup,
-                                  suggestedWarehouseId: _items[i].suggestedWarehouseId,
-                                );
-                              }
-                            }
-                          });
-                        },
-                        icon: const Icon(Icons.delete_outline),
-                        tooltip: 'حذف سطر',
-                      ),
                     ],
-                  ),
-                );
+                    Text(
+                      'ردیف $actualLineNo',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+                IconButton(
+                  onPressed: () {
+                    setState(() {
+                      _itemQtyControllers[index]?.dispose();
+                      _itemUomControllers[index]?.dispose();
+                      _itemWastageControllers[index]?.dispose();
+                      _itemSubstituteControllers[index]?.dispose();
+                      _itemQtyControllers.remove(index);
+                      _itemUomControllers.remove(index);
+                      _itemWastageControllers.remove(index);
+                      _itemSubstituteControllers.remove(index);
+                      _items.removeAt(index);
+                      _itemSelectedProducts.removeAt(index);
+                      _reindexControllers(_itemQtyControllers, index);
+                      _reindexControllers(_itemUomControllers, index);
+                      _reindexControllers(_itemWastageControllers, index);
+                      _reindexControllers(_itemSubstituteControllers, index);
+                      _itemsListKey++;
+                    });
+                  },
+                  icon: const Icon(Icons.delete_outline, color: Colors.red),
+                ),
+              ],
+            ),
+            SizedBox(height: ResponsiveHelper.getGridSpacing(context)),
+            ProductComboboxWidget(
+              businessId: widget.businessId,
+              selectedProduct: _itemSelectedProducts[index],
+              label: 'کالا',
+              hintText: 'جست‌وجوی کالا',
+              onChanged: (product) {
+                setState(() {
+                  _itemSelectedProducts[index] = product;
+                  if (product != null) {
+                    final pid = product['id'] as int?;
+                    if (pid != null) {
+                      if (pid == widget.bom.productId) {
+                        SnackBarHelper.showError(
+                          context,
+                          message: 'کالا نمی‌تواند برای خودش به عنوان ماده اولیه استفاده شود',
+                        );
+                        _itemSelectedProducts[index] = null;
+                        _updateItem(index, componentProductId: -1);
+                        return;
+                      }
+                      final mainUnit = product['main_unit']?.toString();
+                      final currentUom = _items[index].uom;
+                      final newUom = (currentUom == null || currentUom.isEmpty) && mainUnit != null && mainUnit.isNotEmpty
+                          ? mainUnit
+                          : currentUom;
+                      _updateItem(index, componentProductId: pid, uom: newUom);
+                    } else {
+                      _updateItem(index, componentProductId: -1);
+                    }
+                  } else {
+                    _updateItem(index, componentProductId: -1);
+                  }
+                });
               },
             ),
+            SizedBox(height: ResponsiveHelper.getGridSpacing(context)),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: qtyCtrl,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: const InputDecoration(
+                      labelText: 'مقدار',
+                      border: OutlineInputBorder(),
+                    ),
+                    onChanged: (v) => _updateItem(index, qtyPer: double.tryParse(v)),
+                  ),
+                ),
+                SizedBox(width: ResponsiveHelper.getGridSpacing(context)),
+                Expanded(
+                  child: _buildUnitDropdown(
+                    index,
+                    _itemSelectedProducts[index],
+                    uomCtrl,
+                    (v) => _updateItem(index, uom: v),
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: ResponsiveHelper.getGridSpacing(context)),
+            TextField(
+              controller: wastCtrl,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(
+                labelText: 'پرت (%)',
+                border: OutlineInputBorder(),
+              ),
+              onChanged: (v) => _updateItem(index, wastagePercent: double.tryParse(v)),
+            ),
+            SizedBox(height: ResponsiveHelper.getGridSpacing(context)),
+            TextField(
+              controller: substCtrl,
+              decoration: const InputDecoration(
+                labelText: 'گروه جایگزین',
+                border: OutlineInputBorder(),
+              ),
+              onChanged: (v) => _updateItem(index, substituteGroup: v.isEmpty ? null : v),
+            ),
+            SizedBox(height: ResponsiveHelper.getGridSpacing(context)),
+            WarehouseComboboxWidget(
+              businessId: widget.businessId,
+              selectedWarehouseId: it.suggestedWarehouseId,
+              label: 'انبار پیشنهادی',
+              hintText: 'انتخاب انبار',
+              onChanged: (warehouseId) => _updateItem(index, suggestedWarehouseId: warehouseId),
+            ),
+            SizedBox(height: ResponsiveHelper.getGridSpacing(context)),
+            Row(
+              children: [
+                Checkbox(
+                  value: it.isOptional,
+                  onChanged: (v) => _updateItem(index, isOptional: v ?? false),
+                ),
+                const Text('اختیاری'),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDesktopItemRow(BuildContext context, int index, BomItem it, int actualLineNo,
+      TextEditingController qtyCtrl, TextEditingController uomCtrl, 
+      TextEditingController wastCtrl, TextEditingController substCtrl, bool isValid) {
+    return Padding(
+      padding: EdgeInsets.all(ResponsiveHelper.getPadding(context)),
+      child: Row(
+        children: [
+          // ستون 1: Warning icon (اگر نامعتبر)
+          if (!isValid) ...[
+            Tooltip(
+              message: 'این سطر نامعتبر است: کالا باید انتخاب شود و مقدار باید بزرگ‌تر از صفر باشد',
+              child: Icon(Icons.warning_amber_rounded, color: Colors.red.shade700, size: 20),
+            ),
+            SizedBox(width: ResponsiveHelper.getGridSpacing(context)),
+          ],
+          // ستون 2: شماره ردیف
+          SizedBox(
+            width: 60,
+            child: Tooltip(
+              message: 'شماره ردیف به صورت خودکار تنظیم می‌شود',
+              child: Text('ردیف $actualLineNo'),
+            ),
+          ),
+          SizedBox(width: ResponsiveHelper.getGridSpacing(context)),
+          // ستون 3: کالا
+          Expanded(
+            flex: 2,
+            child: ProductComboboxWidget(
+              businessId: widget.businessId,
+              selectedProduct: _itemSelectedProducts[index],
+              label: 'کالا',
+              hintText: 'جست‌وجوی کالا',
+              onChanged: (product) {
+                setState(() {
+                  _itemSelectedProducts[index] = product;
+                  if (product != null) {
+                    final pid = product['id'] as int?;
+                    if (pid != null) {
+                      // بررسی وابستگی چرخه‌ای
+                      if (pid == widget.bom.productId) {
+                        SnackBarHelper.showError(
+                          context,
+                          message: 'کالا نمی‌تواند برای خودش به عنوان ماده اولیه استفاده شود',
+                        );
+                        _itemSelectedProducts[index] = null;
+                        _updateItem(index, componentProductId: -1);
+                        return;
+                      }
+                      final mainUnit = product['main_unit']?.toString();
+                      final currentUom = _items[index].uom;
+                      final newUom = (currentUom == null || currentUom.isEmpty) && mainUnit != null && mainUnit.isNotEmpty
+                          ? mainUnit
+                          : currentUom;
+                      _updateItem(index, componentProductId: pid, uom: newUom);
+                    } else {
+                      _updateItem(index, componentProductId: -1);
+                    }
+                  } else {
+                    _updateItem(index, componentProductId: -1);
+                  }
+                });
+              },
+            ),
+          ),
+          SizedBox(width: ResponsiveHelper.getGridSpacing(context)),
+          // ستون 4: مقدار
+          Expanded(
+            child: Tooltip(
+              message: 'مقدار این کالا برای تولید 1 واحد محصول نهایی',
+              child: TextField(
+                controller: qtyCtrl,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(
+                  labelText: 'مقدار',
+                  border: OutlineInputBorder(),
+                ),
+                onChanged: (v) => _updateItem(index, qtyPer: double.tryParse(v)),
+              ),
+            ),
+          ),
+          SizedBox(width: ResponsiveHelper.getGridSpacing(context)),
+          // ستون 5: واحد
+          Expanded(
+            child: _buildUnitDropdown(
+              index,
+              _itemSelectedProducts[index],
+              uomCtrl,
+              (v) => _updateItem(index, uom: v),
+            ),
+          ),
+          SizedBox(width: ResponsiveHelper.getGridSpacing(context)),
+          // ستون 6: پرت %
+          Expanded(
+            child: Tooltip(
+              message: 'درصد پرت این کالا در فرآیند تولید (0-100)',
+              child: TextField(
+                controller: wastCtrl,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(
+                  labelText: 'پرت (%)',
+                  border: OutlineInputBorder(),
+                ),
+                onChanged: (v) => _updateItem(index, wastagePercent: double.tryParse(v)),
+              ),
+            ),
+          ),
+          SizedBox(width: ResponsiveHelper.getGridSpacing(context)),
+          // ستون 7: گروه جایگزین
+          Expanded(
+            child: Tooltip(
+              message: 'گروه جایگزین: کالاهای با گروه یکسان می‌توانند جایگزین یکدیگر شوند',
+              child: TextField(
+                controller: substCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'گروه جایگزین',
+                  border: OutlineInputBorder(),
+                ),
+                onChanged: (v) => _updateItem(index, substituteGroup: v.isEmpty ? null : v),
+              ),
+            ),
+          ),
+          SizedBox(width: ResponsiveHelper.getGridSpacing(context)),
+          // ستون 8: انبار پیشنهادی
+          Expanded(
+            child: Tooltip(
+              message: 'انبار پیشنهادی برای برداشت این ماده اولیه در سند تولید',
+              child: WarehouseComboboxWidget(
+                businessId: widget.businessId,
+                selectedWarehouseId: it.suggestedWarehouseId,
+                label: 'انبار پیشنهادی',
+                hintText: 'انتخاب انبار',
+                onChanged: (warehouseId) => _updateItem(index, suggestedWarehouseId: warehouseId),
+              ),
+            ),
+          ),
+          SizedBox(width: ResponsiveHelper.getGridSpacing(context)),
+          // ستون 9: اختیاری
+          Tooltip(
+            message: 'اگر فعال باشد، این ماده اولیه اختیاری است و می‌تواند در تولید استفاده نشود',
+            child: Checkbox(
+              value: it.isOptional,
+              onChanged: (v) => _updateItem(index, isOptional: v ?? false),
+            ),
+          ),
+          SizedBox(width: ResponsiveHelper.getGridSpacing(context)),
+          // ستون 10: دکمه حذف
+          IconButton(
+            onPressed: () {
+              setState(() {
+                _itemQtyControllers[index]?.dispose();
+                _itemUomControllers[index]?.dispose();
+                _itemWastageControllers[index]?.dispose();
+                _itemSubstituteControllers[index]?.dispose();
+                _itemQtyControllers.remove(index);
+                _itemUomControllers.remove(index);
+                _itemWastageControllers.remove(index);
+                _itemSubstituteControllers.remove(index);
+                _items.removeAt(index);
+                _itemSelectedProducts.removeAt(index);
+                _reindexControllers(_itemQtyControllers, index);
+                _reindexControllers(_itemUomControllers, index);
+                _reindexControllers(_itemWastageControllers, index);
+                _reindexControllers(_itemSubstituteControllers, index);
+                _itemsListKey++;
+              });
+            },
+            icon: const Icon(Icons.delete_outline),
+            tooltip: 'حذف سطر',
           ),
         ],
       ),
@@ -742,13 +1295,123 @@ class _BomEditorDialogState extends State<BomEditorDialog> with SingleTickerProv
   }
 
   Widget _buildOutputsEditor() {
-    return Padding(
-      padding: const EdgeInsets.all(12),
-      child: Column(
-        children: [
-          Align(
-            alignment: Alignment.centerLeft,
-            child: FilledButton.icon(
+    final isMobile = ResponsiveHelper.isMobile(context);
+    return Stack(
+      children: [
+        Padding(
+          padding: EdgeInsets.all(ResponsiveHelper.getPadding(context)),
+          child: Column(
+            children: [
+              if (!isMobile) ...[
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: FilledButton.icon(
+                    onPressed: () {
+                      setState(() {
+                        final newIndex = _outputs.length;
+                        final newLineNo = _outputs.isEmpty ? 1 : (_outputs.length + 1);
+                        final newOutput = BomOutput(lineNo: newLineNo, outputProductId: -1, ratio: 1);
+                        _outputs = [..._outputs, newOutput];
+                        _outputSelectedProducts = [..._outputSelectedProducts, null];
+                        _addOutputController(newIndex, newOutput);
+                        _outputsListKey++;
+                      });
+                    },
+                    icon: const Icon(Icons.add),
+                    label: const Text('افزودن سطر خروجی'),
+                  ),
+                ),
+                SizedBox(height: ResponsiveHelper.getGridSpacing(context)),
+              ],
+              Expanded(
+                child: _outputs.isEmpty
+                    ? _buildEmptyState(
+                        context,
+                        icon: Icons.output,
+                        title: 'هیچ محصول خروجی‌ای تعریف نشده',
+                        message: isMobile 
+                            ? 'برای افزودن محصول خروجی، روی دکمه + در پایین صفحه کلیک کنید.'
+                            : 'برای افزودن محصولات خروجی تولید، روی دکمه "افزودن سطر خروجی" کلیک کنید.',
+                      )
+                    : ListView.separated(
+                        key: ValueKey('outputs_list_$_outputsListKey'),
+                        itemCount: _outputs.length,
+                        separatorBuilder: (context, index) => SizedBox(height: ResponsiveHelper.getGridSpacing(context)),
+                        itemBuilder: (context, index) {
+                          final ot = _outputs[index];
+                          final actualLineNo = index + 1;
+                          
+                          // Ensure controllers exist
+                          if (!_outputRatioControllers.containsKey(index)) {
+                            _addOutputController(index, ot);
+                          }
+                          
+                          final ratioCtrl = _outputRatioControllers[index]!;
+                          final uomCtrl = _outputUomControllers[index]!;
+                          final isValid = ot.outputProductId > 0 && ot.ratio > 0;
+                          
+                          Widget rowContent = isMobile
+                              ? _buildMobileOutputCard(context, index, ot, actualLineNo, ratioCtrl, uomCtrl, isValid)
+                              : _buildDesktopOutputRow(context, index, ot, actualLineNo, ratioCtrl, uomCtrl, isValid);
+                          
+                          return Dismissible(
+                            key: ValueKey('output_$index'),
+                            direction: isMobile ? DismissDirection.endToStart : DismissDirection.horizontal,
+                            background: Container(
+                              alignment: Alignment.centerRight,
+                              padding: const EdgeInsets.only(right: 20),
+                              decoration: BoxDecoration(
+                                color: Colors.red.shade400,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(Icons.delete, color: Colors.white, size: 32),
+                            ),
+                            confirmDismiss: (direction) async {
+                              return await showDialog<bool>(
+                                context: context,
+                                builder: (context) => AlertDialog(
+                                  title: const Text('تأیید حذف'),
+                                  content: const Text('آیا از حذف این سطر اطمینان دارید؟'),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Navigator.pop(context, false),
+                                      child: const Text('انصراف'),
+                                    ),
+                                    FilledButton(
+                                      onPressed: () => Navigator.pop(context, true),
+                                      style: FilledButton.styleFrom(backgroundColor: Colors.red),
+                                      child: const Text('حذف'),
+                                    ),
+                                  ],
+                                ),
+                              ) ?? false;
+                            },
+                            onDismissed: (direction) {
+                              setState(() {
+                                _outputRatioControllers[index]?.dispose();
+                                _outputUomControllers[index]?.dispose();
+                                _outputRatioControllers.remove(index);
+                                _outputUomControllers.remove(index);
+                                _outputs.removeAt(index);
+                                _outputSelectedProducts.removeAt(index);
+                                _reindexControllers(_outputRatioControllers, index);
+                                _reindexControllers(_outputUomControllers, index);
+                                _outputsListKey++;
+                              });
+                            },
+                            child: rowContent,
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
+        ),
+        if (isMobile)
+          Positioned(
+            bottom: ResponsiveHelper.getPadding(context),
+            right: ResponsiveHelper.getPadding(context),
+            child: FloatingActionButton.extended(
               onPressed: () {
                 setState(() {
                   final newIndex = _outputs.length;
@@ -757,147 +1420,224 @@ class _BomEditorDialogState extends State<BomEditorDialog> with SingleTickerProv
                   _outputs = [..._outputs, newOutput];
                   _outputSelectedProducts = [..._outputSelectedProducts, null];
                   _addOutputController(newIndex, newOutput);
-                  _outputsListKey++; // به‌روزرسانی key برای rebuild ListView
-                  
-                  // به‌روزرسانی line_no همه سطرها
-                  for (var i = 0; i < _outputs.length; i++) {
-                    if (_outputs[i].lineNo != i + 1) {
-                      _outputs[i] = BomOutput(
-                        lineNo: i + 1,
-                        outputProductId: _outputs[i].outputProductId,
-                        ratio: _outputs[i].ratio,
-                        uom: _outputs[i].uom,
-                        outputProductName: _outputs[i].outputProductName,
-                        outputProductCode: _outputs[i].outputProductCode,
-                      );
-                    }
-                  }
+                  _outputsListKey++;
                 });
               },
               icon: const Icon(Icons.add),
-              label: const Text('افزودن سطر خروجی'),
+              label: const Text('افزودن'),
             ),
           ),
-          const SizedBox(height: 8),
-          Expanded(
-            child: _outputs.isEmpty
-                ? _buildEmptyState(
-                    context,
-                    icon: Icons.output,
-                    title: 'هیچ محصول خروجی‌ای تعریف نشده',
-                    message: 'برای افزودن محصولات خروجی تولید، روی دکمه "افزودن سطر خروجی" کلیک کنید.',
-                  )
-                : ListView.separated(
-                    itemCount: _outputs.length,
-                    key: ValueKey('outputs_list_$_outputsListKey'),
-                    separatorBuilder: (separatorContext, separatorIndex) => const Divider(height: 1),
-                    itemBuilder: (context, index) {
-                final ot = _outputs[index];
-                final actualLineNo = index + 1;
-                
-                // Ensure controllers exist
-                if (!_outputRatioControllers.containsKey(index)) {
-                  _addOutputController(index, ot);
-                }
-                
-                final ratioCtrl = _outputRatioControllers[index]!;
-                final uomCtrl = _outputUomControllers[index]!;
-                
-                return Padding(
-                  key: ValueKey('output_$index'),
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Tooltip(
-                          message: 'شماره ردیف به صورت خودکار تنظیم می‌شود',
-                          child: TextField(
-                            controller: TextEditingController(text: actualLineNo.toString()),
-                            enabled: false,
-                            decoration: const InputDecoration(
-                              labelText: 'ردیف',
-                              border: OutlineInputBorder(),
-                              filled: true,
-                            ),
-                          ),
-                        ),
-                      ),
+      ],
+    );
+  }
+
+  Widget _buildMobileOutputCard(BuildContext context, int index, BomOutput ot, int actualLineNo,
+      TextEditingController ratioCtrl, TextEditingController uomCtrl, bool isValid) {
+    final theme = Theme.of(context);
+    return Card(
+      margin: EdgeInsets.all(ResponsiveHelper.getGridSpacing(context)),
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: isValid 
+            ? BorderSide.none 
+            : BorderSide(color: Colors.red.shade300, width: 2),
+      ),
+      child: Padding(
+        padding: EdgeInsets.all(ResponsiveHelper.getPadding(context)),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    if (!isValid) ...[
+                      Icon(Icons.warning_amber_rounded, color: Colors.red.shade700, size: 20),
                       const SizedBox(width: 8),
-                      Expanded(
-                        flex: 2,
-                        child: ProductComboboxWidget(
-                          businessId: widget.businessId,
-                          selectedProduct: _outputSelectedProducts[index],
-                          label: 'محصول خروجی',
-                          hintText: 'جست‌وجوی محصول خروجی',
-                          onChanged: (product) {
-                            setState(() {
-                              _outputSelectedProducts[index] = product;
-                              if (product != null) {
-                                final pid = product['id'] as int?;
-                                if (pid != null) {
-                                  // اگر واحد پیش‌فرض انتخاب نشده، واحد اصلی کالا را به عنوان پیش‌فرض انتخاب کن
-                                  final mainUnit = product['main_unit']?.toString();
-                                  final currentUom = _outputs[index].uom;
-                                  final newUom = (currentUom == null || currentUom.isEmpty) && mainUnit != null && mainUnit.isNotEmpty
-                                      ? mainUnit
-                                      : currentUom;
-                                  _updateOutput(index, outputProductId: pid, uom: newUom);
-                                } else {
-                                  _updateOutput(index, outputProductId: -1);
-                                }
-                              } else {
-                                _updateOutput(index, outputProductId: -1);
-                              }
-                            });
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      _numWithTooltip(
-                        ratioCtrl,
-                        'نسبت',
-                        'نسبت خروجی این محصول به ازای هر واحد تولید',
-                        (v) => _updateOutput(index, ratio: double.tryParse(v)),
-                        min: 0.0001,
-                      ),
-                      const SizedBox(width: 8),
-                      _buildUnitDropdown(
-                        index,
-                        _outputSelectedProducts[index],
-                        uomCtrl,
-                        (v) => _updateOutput(index, uom: v),
-                      ),
-                      IconButton(
-                        onPressed: () {
-                          setState(() {
-                            _removeOutputController(index);
-                            _outputs.removeAt(index);
-                            _outputSelectedProducts.removeAt(index);
-                            _outputsListKey++; // به‌روزرسانی key برای rebuild ListView
-                            // به‌روزرسانی line_no سطرهای باقی‌مانده
-                            for (var i = 0; i < _outputs.length; i++) {
-                              if (_outputs[i].lineNo != i + 1) {
-                                _outputs[i] = BomOutput(
-                                  lineNo: i + 1,
-                                  outputProductId: _outputs[i].outputProductId,
-                                  ratio: _outputs[i].ratio,
-                                  uom: _outputs[i].uom,
-                                  outputProductName: _outputs[i].outputProductName,
-                                  outputProductCode: _outputs[i].outputProductCode,
-                                );
-                              }
-                            }
-                          });
-                        },
-                        icon: const Icon(Icons.delete_outline),
-                        tooltip: 'حذف سطر',
-                      ),
                     ],
-                  ),
-                );
+                    Text(
+                      'ردیف $actualLineNo',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+                IconButton(
+                  onPressed: () {
+                    setState(() {
+                      _outputRatioControllers[index]?.dispose();
+                      _outputUomControllers[index]?.dispose();
+                      _outputRatioControllers.remove(index);
+                      _outputUomControllers.remove(index);
+                      _outputs.removeAt(index);
+                      _outputSelectedProducts.removeAt(index);
+                      _reindexControllers(_outputRatioControllers, index);
+                      _reindexControllers(_outputUomControllers, index);
+                      _outputsListKey++;
+                    });
+                  },
+                  icon: const Icon(Icons.delete_outline, color: Colors.red),
+                ),
+              ],
+            ),
+            SizedBox(height: ResponsiveHelper.getGridSpacing(context)),
+            ProductComboboxWidget(
+              businessId: widget.businessId,
+              selectedProduct: _outputSelectedProducts[index],
+              label: 'محصول خروجی',
+              hintText: 'جست‌وجوی محصول خروجی',
+              onChanged: (product) {
+                setState(() {
+                  _outputSelectedProducts[index] = product;
+                  if (product != null) {
+                    final pid = product['id'] as int?;
+                    if (pid != null) {
+                      final mainUnit = product['main_unit']?.toString();
+                      final currentUom = _outputs[index].uom;
+                      final newUom = (currentUom == null || currentUom.isEmpty) && mainUnit != null && mainUnit.isNotEmpty
+                          ? mainUnit
+                          : currentUom;
+                      _updateOutput(index, outputProductId: pid, uom: newUom);
+                    } else {
+                      _updateOutput(index, outputProductId: -1);
+                    }
+                  } else {
+                    _updateOutput(index, outputProductId: -1);
+                  }
+                });
               },
             ),
+            SizedBox(height: ResponsiveHelper.getGridSpacing(context)),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: ratioCtrl,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: const InputDecoration(
+                      labelText: 'نسبت',
+                      border: OutlineInputBorder(),
+                    ),
+                    onChanged: (v) => _updateOutput(index, ratio: double.tryParse(v)),
+                  ),
+                ),
+                SizedBox(width: ResponsiveHelper.getGridSpacing(context)),
+                Expanded(
+                  child: _buildUnitDropdown(
+                    index,
+                    _outputSelectedProducts[index],
+                    uomCtrl,
+                    (v) => _updateOutput(index, uom: v),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDesktopOutputRow(BuildContext context, int index, BomOutput ot, int actualLineNo,
+      TextEditingController ratioCtrl, TextEditingController uomCtrl, bool isValid) {
+    return Padding(
+      padding: EdgeInsets.all(ResponsiveHelper.getPadding(context)),
+      child: Row(
+        children: [
+          // ستون 1: Warning icon (اگر نامعتبر)
+          if (!isValid) ...[
+            Tooltip(
+              message: 'این سطر نامعتبر است: محصول خروجی باید انتخاب شود و نسبت باید بزرگ‌تر از صفر باشد',
+              child: Icon(Icons.warning_amber_rounded, color: Colors.red.shade700, size: 20),
+            ),
+            SizedBox(width: ResponsiveHelper.getGridSpacing(context)),
+          ],
+          // ستون 2: شماره ردیف
+          SizedBox(
+            width: 60,
+            child: Tooltip(
+              message: 'شماره ردیف به صورت خودکار تنظیم می‌شود',
+              child: Text('ردیف $actualLineNo'),
+            ),
+          ),
+          SizedBox(width: ResponsiveHelper.getGridSpacing(context)),
+          // ستون 3: محصول خروجی
+          Expanded(
+            flex: 2,
+            child: ProductComboboxWidget(
+              businessId: widget.businessId,
+              selectedProduct: _outputSelectedProducts[index],
+              label: 'محصول خروجی',
+              hintText: 'جست‌وجوی محصول خروجی',
+              onChanged: (product) {
+                setState(() {
+                  _outputSelectedProducts[index] = product;
+                  if (product != null) {
+                    final pid = product['id'] as int?;
+                    if (pid != null) {
+                      final mainUnit = product['main_unit']?.toString();
+                      final currentUom = _outputs[index].uom;
+                      final newUom = (currentUom == null || currentUom.isEmpty) && mainUnit != null && mainUnit.isNotEmpty
+                          ? mainUnit
+                          : currentUom;
+                      _updateOutput(index, outputProductId: pid, uom: newUom);
+                    } else {
+                      _updateOutput(index, outputProductId: -1);
+                    }
+                  } else {
+                    _updateOutput(index, outputProductId: -1);
+                  }
+                });
+              },
+            ),
+          ),
+          SizedBox(width: ResponsiveHelper.getGridSpacing(context)),
+          // ستون 4: نسبت
+          Expanded(
+            child: Tooltip(
+              message: 'نسبت خروجی این محصول به ازای هر واحد تولید',
+              child: TextField(
+                controller: ratioCtrl,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(
+                  labelText: 'نسبت',
+                  border: OutlineInputBorder(),
+                ),
+                onChanged: (v) => _updateOutput(index, ratio: double.tryParse(v)),
+              ),
+            ),
+          ),
+          SizedBox(width: ResponsiveHelper.getGridSpacing(context)),
+          // ستون 5: واحد
+          Expanded(
+            child: _buildUnitDropdown(
+              index,
+              _outputSelectedProducts[index],
+              uomCtrl,
+              (v) => _updateOutput(index, uom: v),
+            ),
+          ),
+          SizedBox(width: ResponsiveHelper.getGridSpacing(context)),
+          // ستون 6: دکمه حذف
+          IconButton(
+            onPressed: () {
+              setState(() {
+                _outputRatioControllers[index]?.dispose();
+                _outputUomControllers[index]?.dispose();
+                _outputRatioControllers.remove(index);
+                _outputUomControllers.remove(index);
+                _outputs.removeAt(index);
+                _outputSelectedProducts.removeAt(index);
+                _reindexControllers(_outputRatioControllers, index);
+                _reindexControllers(_outputUomControllers, index);
+                _outputsListKey++;
+              });
+            },
+            icon: const Icon(Icons.delete_outline),
+            tooltip: 'حذف سطر',
           ),
         ],
       ),
@@ -905,159 +1645,382 @@ class _BomEditorDialogState extends State<BomEditorDialog> with SingleTickerProv
   }
 
   Widget _buildOperationsEditor() {
-    return Padding(
-      padding: const EdgeInsets.all(12),
-      child: Column(
-        children: [
-          Align(
-            alignment: Alignment.centerLeft,
-            child: FilledButton.icon(
+    final isMobile = ResponsiveHelper.isMobile(context);
+    return Stack(
+      children: [
+        Padding(
+          padding: EdgeInsets.all(ResponsiveHelper.getPadding(context)),
+          child: Column(
+            children: [
+              if (!isMobile) ...[
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: FilledButton.icon(
+                    onPressed: () {
+                      setState(() {
+                        final newIndex = _operations.length;
+                        final newLineNo = _operations.isEmpty ? 1 : (_operations.length + 1);
+                        final newOperation = BomOperation(lineNo: newLineNo, operationName: '');
+                        
+                        _operations = [..._operations, newOperation];
+                        _addOperationController(newIndex, newOperation);
+                        _operationsListKey++;
+                      });
+                    },
+                    icon: const Icon(Icons.add),
+                    label: const Text('افزودن عملیات'),
+                  ),
+                ),
+                SizedBox(height: ResponsiveHelper.getGridSpacing(context)),
+              ],
+              Expanded(
+                child: _operations.isEmpty
+                    ? _buildEmptyState(
+                        context,
+                        icon: Icons.build,
+                        title: 'هیچ عملیاتی تعریف نشده',
+                        message: isMobile 
+                            ? 'برای افزودن عملیات، روی دکمه + در پایین صفحه کلیک کنید.'
+                            : 'برای افزودن عملیات تولیدی (مثل برش، جوشکاری و ...)، روی دکمه "افزودن عملیات" کلیک کنید.',
+                      )
+                    : ListView.separated(
+                        key: ValueKey('operations_list_$_operationsListKey'),
+                        itemCount: _operations.length,
+                        separatorBuilder: (context, index) => SizedBox(height: ResponsiveHelper.getGridSpacing(context)),
+                        itemBuilder: (context, index) {
+                          final op = _operations[index];
+                          final actualLineNo = index + 1;
+                          
+                          // Ensure controllers exist
+                          if (!_operationNameControllers.containsKey(index)) {
+                            _addOperationController(index, op);
+                          }
+                          
+                          final nameCtrl = _operationNameControllers[index]!;
+                          final fixedCtrl = _operationFixedControllers[index]!;
+                          final perCtrl = _operationPerUnitControllers[index]!;
+                          final uomCtrl = _operationUomControllers[index]!;
+                          final wcCtrl = _operationWorkCenterControllers[index]!;
+                          
+                          Widget rowContent = isMobile
+                              ? _buildMobileOperationCard(context, index, op, actualLineNo, nameCtrl, fixedCtrl, perCtrl, uomCtrl, wcCtrl)
+                              : _buildDesktopOperationRow(context, index, op, actualLineNo, nameCtrl, fixedCtrl, perCtrl, uomCtrl, wcCtrl);
+                          
+                          return Dismissible(
+                            key: ValueKey('operation_$index'),
+                            direction: isMobile ? DismissDirection.endToStart : DismissDirection.horizontal,
+                            background: Container(
+                              alignment: Alignment.centerRight,
+                              padding: const EdgeInsets.only(right: 20),
+                              decoration: BoxDecoration(
+                                color: Colors.red.shade400,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(Icons.delete, color: Colors.white, size: 32),
+                            ),
+                            confirmDismiss: (direction) async {
+                              return await showDialog<bool>(
+                                context: context,
+                                builder: (context) => AlertDialog(
+                                  title: const Text('تأیید حذف'),
+                                  content: const Text('آیا از حذف این سطر اطمینان دارید؟'),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Navigator.pop(context, false),
+                                      child: const Text('انصراف'),
+                                    ),
+                                    FilledButton(
+                                      onPressed: () => Navigator.pop(context, true),
+                                      style: FilledButton.styleFrom(backgroundColor: Colors.red),
+                                      child: const Text('حذف'),
+                                    ),
+                                  ],
+                                ),
+                              ) ?? false;
+                            },
+                            onDismissed: (direction) {
+                              setState(() {
+                                _operationNameControllers[index]?.dispose();
+                                _operationFixedControllers[index]?.dispose();
+                                _operationPerUnitControllers[index]?.dispose();
+                                _operationUomControllers[index]?.dispose();
+                                _operationWorkCenterControllers[index]?.dispose();
+                                _operationNameControllers.remove(index);
+                                _operationFixedControllers.remove(index);
+                                _operationPerUnitControllers.remove(index);
+                                _operationUomControllers.remove(index);
+                                _operationWorkCenterControllers.remove(index);
+                                _operations.removeAt(index);
+                                _reindexControllers(_operationNameControllers, index);
+                                _reindexControllers(_operationFixedControllers, index);
+                                _reindexControllers(_operationPerUnitControllers, index);
+                                _reindexControllers(_operationUomControllers, index);
+                                _reindexControllers(_operationWorkCenterControllers, index);
+                                _operationsListKey++;
+                              });
+                            },
+                            child: rowContent,
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
+        ),
+        if (isMobile)
+          Positioned(
+            bottom: ResponsiveHelper.getPadding(context),
+            right: ResponsiveHelper.getPadding(context),
+            child: FloatingActionButton.extended(
               onPressed: () {
                 setState(() {
                   final newIndex = _operations.length;
                   final newLineNo = _operations.isEmpty ? 1 : (_operations.length + 1);
                   final newOperation = BomOperation(lineNo: newLineNo, operationName: '');
                   
-                  // افزودن به لیست
                   _operations = [..._operations, newOperation];
-                  
-                  // افزودن کنترلرها بعد از افزودن به لیست
                   _addOperationController(newIndex, newOperation);
-                  
-                  // به‌روزرسانی line_no همه سطرها
-                  for (var i = 0; i < _operations.length; i++) {
-                    if (_operations[i].lineNo != i + 1) {
-                      _operations[i] = BomOperation(
-                        lineNo: i + 1,
-                        operationName: _operations[i].operationName,
-                        costFixed: _operations[i].costFixed,
-                        costPerUnit: _operations[i].costPerUnit,
-                        costUom: _operations[i].costUom,
-                        workCenter: _operations[i].workCenter,
-                      );
-                    }
-                  }
-                  
-                  // به‌روزرسانی key برای rebuild ListView
                   _operationsListKey++;
                 });
               },
               icon: const Icon(Icons.add),
-              label: const Text('افزودن عملیات'),
+              label: const Text('افزودن'),
             ),
           ),
-          const SizedBox(height: 8),
-          Expanded(
-            child: _operations.isEmpty
-                ? _buildEmptyState(
-                    context,
-                    icon: Icons.build,
-                    title: 'هیچ عملیاتی تعریف نشده',
-                    message: 'برای افزودن عملیات تولیدی (مثل برش، جوشکاری و ...)، روی دکمه "افزودن عملیات" کلیک کنید.',
-                  )
-                : ListView.separated(
-                    itemCount: _operations.length,
-                    key: ValueKey('operations_list_$_operationsListKey'),
-                    separatorBuilder: (separatorContext, separatorIndex) => const Divider(height: 1),
-                    itemBuilder: (context, index) {
-                final op = _operations[index];
-                final actualLineNo = index + 1;
-                
-                // Ensure controllers exist
-                if (!_operationNameControllers.containsKey(index)) {
-                  _addOperationController(index, op);
-                }
-                
-                final nameCtrl = _operationNameControllers[index]!;
-                final fixedCtrl = _operationFixedControllers[index]!;
-                final perCtrl = _operationPerUnitControllers[index]!;
-                final uomCtrl = _operationUomControllers[index]!;
-                final wcCtrl = _operationWorkCenterControllers[index]!;
-                
-                return Padding(
-                  key: ValueKey('operation_$index'),
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Tooltip(
-                          message: 'شماره ردیف به صورت خودکار تنظیم می‌شود',
-                          child: TextField(
-                            controller: TextEditingController(text: actualLineNo.toString()),
-                            enabled: false,
-                            decoration: const InputDecoration(
-                              labelText: 'ردیف',
-                              border: OutlineInputBorder(),
-                              filled: true,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        flex: 2,
-                        child: Tooltip(
-                          message: 'نام عملیات تولیدی (مثال: برش، جوشکاری، رنگ‌آمیزی)',
-                          child: _text(nameCtrl, 'نام عملیات', (v) => _updateOperation(index, operationName: v)),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Tooltip(
-                          message: 'هزینه ثابت عملیات (در حال حاضر در تولید سند حسابداری استفاده نمی‌شود)',
-                          child: _num(fixedCtrl, 'هزینه ثابت', (v) => _updateOperation(index, costFixed: double.tryParse(v))),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Tooltip(
-                          message: 'هزینه به ازای هر واحد (در حال حاضر در تولید سند حسابداری استفاده نمی‌شود)',
-                          child: _num(perCtrl, 'هزینه واحد', (v) => _updateOperation(index, costPerUnit: double.tryParse(v))),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Tooltip(
-                          message: 'واحد هزینه (در حال حاضر در تولید سند حسابداری استفاده نمی‌شود)',
-                          child: _text(uomCtrl, 'واحد هزینه', (v) => _updateOperation(index, costUom: v.isEmpty ? null : v)),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Tooltip(
-                          message: 'ایستگاه کاری یا بخش انجام عملیات (فقط برای اطلاعات)',
-                          child: _text(wcCtrl, 'ایستگاه کاری', (v) => _updateOperation(index, workCenter: v.isEmpty ? null : v)),
-                        ),
-                      ),
-                      IconButton(
-                        onPressed: () {
-                          setState(() {
-                            _removeOperationController(index);
-                            _operations.removeAt(index);
-                            _operationsListKey++; // به‌روزرسانی key برای rebuild ListView
-                            // به‌روزرسانی line_no سطرهای باقی‌مانده
-                            for (var i = 0; i < _operations.length; i++) {
-                              if (_operations[i].lineNo != i + 1) {
-                                _operations[i] = BomOperation(
-                                  lineNo: i + 1,
-                                  operationName: _operations[i].operationName,
-                                  costFixed: _operations[i].costFixed,
-                                  costPerUnit: _operations[i].costPerUnit,
-                                  costUom: _operations[i].costUom,
-                                  workCenter: _operations[i].workCenter,
-                                );
-                              }
-                            }
-                          });
-                        },
-                        icon: const Icon(Icons.delete_outline),
-                        tooltip: 'حذف سطر',
-                      ),
-                    ],
+      ],
+    );
+  }
+
+  Widget _buildMobileOperationCard(BuildContext context, int index, BomOperation op, int actualLineNo,
+      TextEditingController nameCtrl, TextEditingController fixedCtrl, TextEditingController perCtrl,
+      TextEditingController uomCtrl, TextEditingController wcCtrl) {
+    final theme = Theme.of(context);
+    return Card(
+      margin: EdgeInsets.all(ResponsiveHelper.getGridSpacing(context)),
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Padding(
+        padding: EdgeInsets.all(ResponsiveHelper.getPadding(context)),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'ردیف $actualLineNo',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
                   ),
-                );
-              },
+                ),
+                IconButton(
+                  onPressed: () {
+                    setState(() {
+                      _operationNameControllers[index]?.dispose();
+                      _operationFixedControllers[index]?.dispose();
+                      _operationPerUnitControllers[index]?.dispose();
+                      _operationUomControllers[index]?.dispose();
+                      _operationWorkCenterControllers[index]?.dispose();
+                      _operationNameControllers.remove(index);
+                      _operationFixedControllers.remove(index);
+                      _operationPerUnitControllers.remove(index);
+                      _operationUomControllers.remove(index);
+                      _operationWorkCenterControllers.remove(index);
+                      _operations.removeAt(index);
+                      _reindexControllers(_operationNameControllers, index);
+                      _reindexControllers(_operationFixedControllers, index);
+                      _reindexControllers(_operationPerUnitControllers, index);
+                      _reindexControllers(_operationUomControllers, index);
+                      _reindexControllers(_operationWorkCenterControllers, index);
+                      _operationsListKey++;
+                    });
+                  },
+                  icon: const Icon(Icons.delete_outline, color: Colors.red),
+                ),
+              ],
             ),
+            SizedBox(height: ResponsiveHelper.getGridSpacing(context)),
+            TextField(
+              controller: nameCtrl,
+              decoration: const InputDecoration(
+                labelText: 'نام عملیات',
+                border: OutlineInputBorder(),
+              ),
+              onChanged: (v) => _updateOperation(index, operationName: v),
+            ),
+            SizedBox(height: ResponsiveHelper.getGridSpacing(context)),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: fixedCtrl,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: const InputDecoration(
+                      labelText: 'هزینه ثابت',
+                      border: OutlineInputBorder(),
+                    ),
+                    onChanged: (v) => _updateOperation(index, costFixed: double.tryParse(v)),
+                  ),
+                ),
+                SizedBox(width: ResponsiveHelper.getGridSpacing(context)),
+                Expanded(
+                  child: TextField(
+                    controller: perCtrl,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: const InputDecoration(
+                      labelText: 'هزینه واحد',
+                      border: OutlineInputBorder(),
+                    ),
+                    onChanged: (v) => _updateOperation(index, costPerUnit: double.tryParse(v)),
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: ResponsiveHelper.getGridSpacing(context)),
+            TextField(
+              controller: uomCtrl,
+              decoration: const InputDecoration(
+                labelText: 'واحد هزینه',
+                border: OutlineInputBorder(),
+              ),
+              onChanged: (v) => _updateOperation(index, costUom: v.isEmpty ? null : v),
+            ),
+            SizedBox(height: ResponsiveHelper.getGridSpacing(context)),
+            TextField(
+              controller: wcCtrl,
+              decoration: const InputDecoration(
+                labelText: 'ایستگاه کاری',
+                border: OutlineInputBorder(),
+              ),
+              onChanged: (v) => _updateOperation(index, workCenter: v.isEmpty ? null : v),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDesktopOperationRow(BuildContext context, int index, BomOperation op, int actualLineNo,
+      TextEditingController nameCtrl, TextEditingController fixedCtrl, TextEditingController perCtrl,
+      TextEditingController uomCtrl, TextEditingController wcCtrl) {
+    return Padding(
+      padding: EdgeInsets.all(ResponsiveHelper.getPadding(context)),
+      child: Row(
+        children: [
+          // ستون 1: شماره ردیف
+          SizedBox(
+            width: 60,
+            child: Tooltip(
+              message: 'شماره ردیف به صورت خودکار تنظیم می‌شود',
+              child: Text('ردیف $actualLineNo'),
+            ),
+          ),
+          SizedBox(width: ResponsiveHelper.getGridSpacing(context)),
+          // ستون 2: نام عملیات
+          Expanded(
+            flex: 2,
+            child: Tooltip(
+              message: 'نام عملیات تولیدی (مثال: برش، جوشکاری، رنگ‌آمیزی)',
+              child: TextField(
+                controller: nameCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'نام عملیات',
+                  border: OutlineInputBorder(),
+                ),
+                onChanged: (v) => _updateOperation(index, operationName: v),
+              ),
+            ),
+          ),
+          SizedBox(width: ResponsiveHelper.getGridSpacing(context)),
+          // ستون 3: هزینه ثابت
+          Expanded(
+            child: Tooltip(
+              message: 'هزینه ثابت عملیات (در حال حاضر در تولید سند حسابداری استفاده نمی‌شود)',
+              child: TextField(
+                controller: fixedCtrl,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(
+                  labelText: 'هزینه ثابت',
+                  border: OutlineInputBorder(),
+                ),
+                onChanged: (v) => _updateOperation(index, costFixed: double.tryParse(v)),
+              ),
+            ),
+          ),
+          SizedBox(width: ResponsiveHelper.getGridSpacing(context)),
+          // ستون 4: هزینه واحد
+          Expanded(
+            child: Tooltip(
+              message: 'هزینه به ازای هر واحد (در حال حاضر در تولید سند حسابداری استفاده نمی‌شود)',
+              child: TextField(
+                controller: perCtrl,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(
+                  labelText: 'هزینه واحد',
+                  border: OutlineInputBorder(),
+                ),
+                onChanged: (v) => _updateOperation(index, costPerUnit: double.tryParse(v)),
+              ),
+            ),
+          ),
+          SizedBox(width: ResponsiveHelper.getGridSpacing(context)),
+          // ستون 5: واحد هزینه
+          Expanded(
+            child: Tooltip(
+              message: 'واحد هزینه (در حال حاضر در تولید سند حسابداری استفاده نمی‌شود)',
+              child: TextField(
+                controller: uomCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'واحد هزینه',
+                  border: OutlineInputBorder(),
+                ),
+                onChanged: (v) => _updateOperation(index, costUom: v.isEmpty ? null : v),
+              ),
+            ),
+          ),
+          SizedBox(width: ResponsiveHelper.getGridSpacing(context)),
+          // ستون 6: ایستگاه کاری
+          Expanded(
+            child: Tooltip(
+              message: 'ایستگاه کاری یا بخش انجام عملیات (فقط برای اطلاعات)',
+              child: TextField(
+                controller: wcCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'ایستگاه کاری',
+                  border: OutlineInputBorder(),
+                ),
+                onChanged: (v) => _updateOperation(index, workCenter: v.isEmpty ? null : v),
+              ),
+            ),
+          ),
+          SizedBox(width: ResponsiveHelper.getGridSpacing(context)),
+          // ستون 7: دکمه حذف
+          IconButton(
+            onPressed: () {
+              setState(() {
+                _operationNameControllers[index]?.dispose();
+                _operationFixedControllers[index]?.dispose();
+                _operationPerUnitControllers[index]?.dispose();
+                _operationUomControllers[index]?.dispose();
+                _operationWorkCenterControllers[index]?.dispose();
+                _operationNameControllers.remove(index);
+                _operationFixedControllers.remove(index);
+                _operationPerUnitControllers.remove(index);
+                _operationUomControllers.remove(index);
+                _operationWorkCenterControllers.remove(index);
+                _operations.removeAt(index);
+                _reindexControllers(_operationNameControllers, index);
+                _reindexControllers(_operationFixedControllers, index);
+                _reindexControllers(_operationPerUnitControllers, index);
+                _reindexControllers(_operationUomControllers, index);
+                _reindexControllers(_operationWorkCenterControllers, index);
+                _operationsListKey++;
+              });
+            },
+            icon: const Icon(Icons.delete_outline),
+            tooltip: 'حذف سطر',
           ),
         ],
       ),
@@ -1065,23 +2028,50 @@ class _BomEditorDialogState extends State<BomEditorDialog> with SingleTickerProv
   }
 
   Widget _buildFooter(BuildContext context) {
+    final isMobile = ResponsiveHelper.isMobile(context);
     return Padding(
-      padding: const EdgeInsets.all(12),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          OutlinedButton(
-            onPressed: _saving ? null : () => Navigator.of(context).pop(),
-            child: const Text('انصراف'),
-          ),
-          const SizedBox(width: 8),
-          FilledButton.icon(
-            onPressed: _saving ? null : _save,
-            icon: _saving ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Icon(Icons.save),
-            label: const Text('ذخیره'),
-          ),
-        ],
-      ),
+      padding: EdgeInsets.all(ResponsiveHelper.getPadding(context)),
+      child: isMobile
+          ? Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: _saving ? null : _save,
+                    icon: _saving 
+                        ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) 
+                        : const Icon(Icons.save),
+                    label: const Text('ذخیره'),
+                  ),
+                ),
+                SizedBox(height: ResponsiveHelper.getGridSpacing(context)),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton(
+                    onPressed: _saving ? null : () => Navigator.of(context).pop(),
+                    child: const Text('انصراف'),
+                  ),
+                ),
+              ],
+            )
+          : Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                OutlinedButton(
+                  onPressed: _saving ? null : () => Navigator.of(context).pop(),
+                  child: const Text('انصراف'),
+                ),
+                SizedBox(width: ResponsiveHelper.getGridSpacing(context)),
+                FilledButton.icon(
+                  onPressed: _saving ? null : _save,
+                  icon: _saving 
+                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) 
+                      : const Icon(Icons.save),
+                  label: const Text('ذخیره'),
+                ),
+              ],
+            ),
     );
   }
 
@@ -1136,18 +2126,7 @@ class _BomEditorDialogState extends State<BomEditorDialog> with SingleTickerProv
             return null;
           },
           onChanged: (value) {
-            if (validator != null) {
-              validator(value);
-            } else {
-              final num = double.tryParse(value.replaceAll(',', '.'));
-              if (num != null) {
-                if (min != null && num < min) {
-                  // Show error
-                } else if (max != null && num > max) {
-                  // Show error
-                }
-              }
-            }
+            // اعتبارسنجی خودکار انجام می‌شود از طریق validator
             onChanged(value);
           },
         ),
@@ -1299,6 +2278,9 @@ class _BomEditorDialogState extends State<BomEditorDialog> with SingleTickerProv
   }
 
   void _updateOutput(int index, {int? lineNo, int? outputProductId, double? ratio, String? uom}) {
+    if (index >= _outputs.length) {
+      return;
+    }
     final current = _outputs[index];
     setState(() {
       _outputs[index] = BomOutput(
@@ -1313,6 +2295,9 @@ class _BomEditorDialogState extends State<BomEditorDialog> with SingleTickerProv
   }
 
   void _updateOperation(int index, {int? lineNo, String? operationName, double? costFixed, double? costPerUnit, String? costUom, String? workCenter}) {
+    if (index >= _operations.length) {
+      return;
+    }
     final current = _operations[index];
     setState(() {
       _operations[index] = BomOperation(
@@ -1440,9 +2425,172 @@ class _BomEditorDialogState extends State<BomEditorDialog> with SingleTickerProv
     return true;
   }
 
+  Future<bool> _showProductIdMissingDialog(String productName) async {
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Colors.orange.shade700, size: 28),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text('هشدار: کالای فرمول در خروجی‌ها نیست'),
+            ),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'کالای این فرمول تولید ("$productName") در لیست خروجی‌های فرمول تعریف نشده است.',
+                style: const TextStyle(fontSize: 15),
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.blue.shade200),
+                ),
+                child: const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'توصیه می‌شود:',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                    ),
+                    SizedBox(height: 8),
+                    Text(
+                      '• کالای فرمول باید در خروجی‌های فرمول تعریف شود',
+                      style: TextStyle(fontSize: 13),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      '• این کار باعث می‌شود فرمول تولید به درستی کار کند',
+                      style: TextStyle(fontSize: 13),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      '• در فاکتور تولید، این کالا به عنوان خروجی شناسایی می‌شود',
+                      style: TextStyle(fontSize: 13),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'آیا می‌خواهید کالای فرمول به صورت خودکار به خروجی‌ها اضافه شود؟',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('خیر، ادامه بدون اضافه کردن'),
+          ),
+          FilledButton.icon(
+            onPressed: () => Navigator.of(context).pop(true),
+            icon: const Icon(Icons.add_circle_outline),
+            label: const Text('بله، اضافه کن'),
+          ),
+        ],
+      ),
+    );
+    return result ?? false;
+  }
+
+  Future<void> _addProductIdToOutputs() async {
+    // بررسی اینکه product_id در outputs نباشد
+    final productIdInOutputs = _outputs.any(
+      (output) => output.outputProductId == widget.bom.productId,
+    );
+    
+    if (productIdInOutputs) {
+      return; // قبلاً اضافه شده است
+    }
+
+    // دریافت اطلاعات محصول برای نمایش نام و واحد
+    String productName = 'کالا #${widget.bom.productId}';
+    String? mainUnit;
+    
+    try {
+      final productData = await _productService.getProduct(
+        businessId: widget.businessId,
+        productId: widget.bom.productId,
+      );
+      productName = productData['name']?.toString() ?? productName;
+      mainUnit = productData['main_unit']?.toString();
+    } catch (e) {
+      // در صورت خطا، از نام پیش‌فرض استفاده می‌کنیم
+      debugPrint('خطا در دریافت اطلاعات محصول: $e');
+    }
+
+    // نمایش دیالوگ تایید
+    final shouldAdd = await _showProductIdMissingDialog(productName);
+    
+    if (shouldAdd && mounted) {
+      // اضافه کردن product_id به outputs
+      setState(() {
+        final newIndex = _outputs.length;
+        final newLineNo = _outputs.isEmpty 
+            ? 1 
+            : (_outputs.map((o) => o.lineNo).reduce((a, b) => a > b ? a : b) + 1);
+        
+        final newOutput = BomOutput(
+          lineNo: newLineNo,
+          outputProductId: widget.bom.productId,
+          ratio: 1.0, // نسبت پیش‌فرض 1
+          uom: mainUnit,
+        );
+        
+        _outputs = [..._outputs, newOutput];
+        _outputSelectedProducts = [..._outputSelectedProducts, null];
+        _addOutputController(newIndex, newOutput);
+        _outputsListKey++;
+        
+        // نمایش پیام موفقیت
+        SnackBarHelper.showSuccess(
+          context,
+          message: 'کالای فرمول ("$productName") به خروجی‌ها اضافه شد',
+        );
+      });
+    }
+  }
+
   Future<void> _save() async {
+    // اعتبارسنجی فرم
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+    
     if (!_validateBeforeSave()) {
       return;
+    }
+
+    // بررسی اینکه product_id فرمول در خروجی‌ها باشد
+    final productIdInOutputs = _outputs.any(
+      (output) => output.outputProductId == widget.bom.productId,
+    );
+    
+    if (!productIdInOutputs) {
+      // نمایش دیالوگ و اضافه کردن در صورت تایید
+      await _addProductIdToOutputs();
+      
+      // بررسی مجدد بعد از اضافه کردن (اگر کاربر تایید کرد)
+      final productIdStillMissing = !_outputs.any(
+        (output) => output.outputProductId == widget.bom.productId,
+      );
+      
+      if (productIdStillMissing) {
+        // کاربر تایید نکرده است، اما ادامه می‌دهیم (هشدار داده شده)
+        // می‌توانیم یک هشدار دیگر نمایش دهیم یا ادامه دهیم
+      }
     }
 
     setState(() => _saving = true);
@@ -1450,6 +2598,8 @@ class _BomEditorDialogState extends State<BomEditorDialog> with SingleTickerProv
       // فیلتر کردن آیتم‌هایی که componentProductId معتبر دارند
       final validItems = _items.where((item) => item.componentProductId > 0).toList();
       final validOutputs = _outputs.where((output) => output.outputProductId > 0).toList();
+      // فیلتر کردن عملیات با نام خالی
+      final validOperations = _operations.where((op) => op.operationName.trim().isNotEmpty).toList();
       
       final payload = <String, dynamic>{
         'version': _versionController.text.trim(),
@@ -1459,7 +2609,7 @@ class _BomEditorDialogState extends State<BomEditorDialog> with SingleTickerProv
         'wastage_percent': _wastageController.text.trim().isEmpty ? null : double.tryParse(_wastageController.text.replaceAll(',', '.')),
         'items': validItems.map((e) => e.toJson()).toList(),
         'outputs': validOutputs.map((e) => e.toJson()).toList(),
-        'operations': _operations.map((e) => e.toJson()).toList(),
+        'operations': validOperations.map((e) => e.toJson()).toList(),
       };
       final updated = await _service.update(
         businessId: widget.businessId,

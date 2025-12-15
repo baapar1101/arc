@@ -10,6 +10,7 @@ from adapters.db.models.cash_register import CashRegister
 from adapters.db.models.petty_cash import PettyCash
 from adapters.db.models.document import Document
 from adapters.db.models.document_line import DocumentLine
+from adapters.db.models.fiscal_year import FiscalYear
 from adapters.db.repositories.cash_register_repository import CashRegisterRepository
 from app.core.responses import ApiError
 
@@ -229,18 +230,149 @@ def bulk_delete_cash_registers(db: Session, business_id: int, ids: List[int]) ->
 	}
 
 
+def _calculate_cash_register_balance(
+	db: Session,
+	cash_register_id: int,
+	business_id: int,
+	fiscal_year_id: Optional[int] = None,
+) -> Decimal:
+	"""
+	محاسبه موجودی یک صندوق
+	
+	Args:
+		db: نشست پایگاه داده
+		cash_register_id: شناسه صندوق
+		business_id: شناسه کسب‌وکار
+		fiscal_year_id: شناسه سال مالی (اختیاری)
+	
+	Returns:
+		Decimal: موجودی صندوق (debit - credit)
+	"""
+	query = db.query(
+		func.coalesce(func.sum(DocumentLine.debit), 0).label('total_debit'),
+		func.coalesce(func.sum(DocumentLine.credit), 0).label('total_credit')
+	).join(
+		Document, DocumentLine.document_id == Document.id
+	).filter(
+		Document.business_id == business_id,
+		Document.is_proforma == False,
+		DocumentLine.cash_register_id == cash_register_id
+	)
+	
+	# فیلتر سال مالی
+	if fiscal_year_id:
+		query = query.filter(Document.fiscal_year_id == fiscal_year_id)
+	
+	result = query.first()
+	if result:
+		total_debit = Decimal(str(result.total_debit or 0))
+		total_credit = Decimal(str(result.total_credit or 0))
+		return total_debit - total_credit
+	
+	return Decimal(0)
+
+
+def _calculate_cash_registers_balances_bulk(
+	db: Session,
+	cash_register_ids: List[int],
+	business_id: int,
+	fiscal_year_id: Optional[int] = None,
+) -> Dict[int, Decimal]:
+	"""
+	محاسبه موجودی چند صندوق به صورت bulk
+	
+	Args:
+		db: نشست پایگاه داده
+		cash_register_ids: لیست شناسه‌های صندوق‌ها
+		business_id: شناسه کسب‌وکار
+		fiscal_year_id: شناسه سال مالی (اختیاری)
+	
+	Returns:
+		Dict[int, Decimal]: دیکشنری {cash_register_id: balance}
+	"""
+	if not cash_register_ids:
+		return {}
+	
+	query = db.query(
+		DocumentLine.cash_register_id,
+		func.coalesce(func.sum(DocumentLine.debit), 0).label('total_debit'),
+		func.coalesce(func.sum(DocumentLine.credit), 0).label('total_credit')
+	).join(
+		Document, DocumentLine.document_id == Document.id
+	).filter(
+		Document.business_id == business_id,
+		Document.is_proforma == False,
+		DocumentLine.cash_register_id.in_(cash_register_ids)
+	).group_by(
+		DocumentLine.cash_register_id
+	)
+	
+	# فیلتر سال مالی
+	if fiscal_year_id:
+		query = query.filter(Document.fiscal_year_id == fiscal_year_id)
+	
+	results = query.all()
+	
+	balances = {}
+	for result in results:
+		cr_id = result.cash_register_id
+		total_debit = Decimal(str(result.total_debit or 0))
+		total_credit = Decimal(str(result.total_credit or 0))
+		balances[cr_id] = total_debit - total_credit
+	
+	# برای صندوق‌هایی که تراکنشی ندارند، موجودی صفر است
+	for cr_id in cash_register_ids:
+		if cr_id not in balances:
+			balances[cr_id] = Decimal(0)
+	
+	return balances
+
+
 def list_cash_registers(db: Session, business_id: int, query: Dict[str, Any]) -> Dict[str, Any]:
+	# دریافت سال مالی از query (اختیاری)
+	fiscal_year_id = query.get("fiscal_year_id")
+	if fiscal_year_id is not None:
+		try:
+			fiscal_year_id = int(fiscal_year_id)
+		except (ValueError, TypeError):
+			fiscal_year_id = None
+	
+	# اگر سال مالی مشخص نشده، از سال مالی جاری استفاده کن
+	if fiscal_year_id is None:
+		fiscal_year = db.query(FiscalYear).filter(
+			and_(
+				FiscalYear.business_id == business_id,
+				FiscalYear.is_last == True
+			)
+		).first()
+		if fiscal_year:
+			fiscal_year_id = fiscal_year.id
+	
 	repo = CashRegisterRepository(db)
 	res = repo.list(business_id, query)
+	
+	# محاسبه موجودی برای همه صندوق‌ها به صورت bulk
+	cash_register_ids = [item.id for item in res["items"]]
+	balances = _calculate_cash_registers_balances_bulk(
+		db, cash_register_ids, business_id, fiscal_year_id
+	)
+	
+	# ساخت لیست با موجودی
+	result_items = []
+	for item in res["items"]:
+		item_dict = cash_register_to_dict(item)
+		item_dict["balance"] = float(balances.get(item.id, Decimal(0)))
+		result_items.append(item_dict)
+	
 	return {
-		"items": [cash_register_to_dict(i) for i in res["items"]],
+		"items": result_items,
 		"pagination": res["pagination"],
 		"query_info": res["query_info"],
 	}
 
 
-def cash_register_to_dict(obj: CashRegister) -> Dict[str, Any]:
-	return {
+def cash_register_to_dict(obj: CashRegister, balance: Optional[float] = None) -> Dict[str, Any]:
+	result = {
 		"id": obj.id,
 		"business_id": obj.business_id,
 		"name": obj.name,
@@ -255,6 +387,9 @@ def cash_register_to_dict(obj: CashRegister) -> Dict[str, Any]:
 		"created_at": obj.created_at.isoformat(),
 		"updated_at": obj.updated_at.isoformat(),
 	}
+	if balance is not None:
+		result["balance"] = balance
+	return result
 
 
 def get_cash_petty_turnover_report(

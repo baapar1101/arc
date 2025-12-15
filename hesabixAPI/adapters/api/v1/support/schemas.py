@@ -131,4 +131,15 @@ class AssignTicketRequest(BaseModel):
     operator_id: int
 
 
+class BulkAssignRequest(BaseModel):
+    ticket_ids: List[int] = Field(..., min_items=1, description="لیست شناسه تیکت‌ها")
+    operator_id: int = Field(..., description="شناسه اپراتور")
+
+
+class BulkUpdateStatusRequest(BaseModel):
+    ticket_ids: List[int] = Field(..., min_items=1, description="لیست شناسه تیکت‌ها")
+    status_id: int = Field(..., description="شناسه وضعیت جدید")
+    assigned_operator_id: Optional[int] = Field(None, description="شناسه اپراتور (اختیاری)")
+
+
 # PaginatedResponse is now imported from adapters.api.v1.schemas

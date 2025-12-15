@@ -529,24 +529,69 @@ def search_warehouse_docs(
 		raise ApiError("FORBIDDEN", "Missing business permission: inventory.read", http_status=403)
 	from app.services.transfer_service import _parse_iso_date as _parse_date
 	from sqlalchemy import or_
+	from app.core.cache import get_cache
+	
+	# استخراج پارامترهای فیلتر برای tag
+	doc_type = body.get("doc_type")
+	if isinstance(doc_type, list) and doc_type:
+		doc_type = doc_type[0]  # برای tag فقط اولین نوع را می‌گیریم
+	elif not isinstance(doc_type, str):
+		doc_type = None
+	
+	status = body.get("status")
+	if isinstance(status, list) and status:
+		status = status[0]  # برای tag فقط اولین status را می‌گیریم
+	elif not isinstance(status, str):
+		status = None
+	
+	warehouse_id = body.get("warehouse_id")
+	warehouse_ids = body.get("warehouse_ids")
+	if not warehouse_id and isinstance(warehouse_ids, list) and warehouse_ids:
+		warehouse_id = warehouse_ids[0]  # برای tag فقط اولین انبار را می‌گیریم
+	
+	# دریافت fiscal_year_id از header یا body
+	fiscal_year_id = None
+	try:
+		fy_header = request.headers.get("X-Fiscal-Year-ID")
+		if fy_header:
+			fiscal_year_id = int(fy_header)
+	except Exception:
+		pass
+	
+	# کش نتایج جستجوی اسناد انبار
+	cache = get_cache()
+	cache_key = None
+	
+	if cache.enabled:
+		import json, hashlib
+		key_payload = {
+			"business_id": business_id,
+			"query": body,
+		}
+		key_str = json.dumps(key_payload, sort_keys=True, ensure_ascii=False)
+		key_hash = hashlib.sha256(key_str.encode("utf-8")).hexdigest()[:16]
+		cache_key = f"warehouse_docs_list:{key_hash}"
+		cached = cache.get(cache_key)
+		if cached is not None:
+			return success_response(data=cached, request=request)
 	
 	q = db.query(WarehouseDocument).filter(WarehouseDocument.business_id == business_id)
 	
 	# فیلتر بر اساس نوع حواله
-	doc_type = body.get("doc_type")
 	if isinstance(doc_type, str) and doc_type:
 		q = q.filter(WarehouseDocument.doc_type == doc_type)
-	elif isinstance(doc_type, list):
-		if doc_type:
-			q = q.filter(WarehouseDocument.doc_type.in_(doc_type))
+	elif isinstance(body.get("doc_type"), list):
+		doc_type_list = body.get("doc_type")
+		if doc_type_list:
+			q = q.filter(WarehouseDocument.doc_type.in_(doc_type_list))
 	
 	# فیلتر بر اساس وضعیت
-	status = body.get("status")
 	if isinstance(status, str) and status:
 		q = q.filter(WarehouseDocument.status == status)
-	elif isinstance(status, list):
-		if status:
-			q = q.filter(WarehouseDocument.status.in_(status))
+	elif isinstance(body.get("status"), list):
+		status_list = body.get("status")
+		if status_list:
+			q = q.filter(WarehouseDocument.status.in_(status_list))
 	
 	# فیلتر بر اساس source
 	source_document_id = body.get("source_document_id")
@@ -569,8 +614,6 @@ def search_warehouse_docs(
 		pass
 	
 	# فیلتر بر اساس انبار
-	warehouse_id = body.get("warehouse_id")
-	warehouse_ids = body.get("warehouse_ids")
 	if warehouse_id:
 		q = q.filter(
 			or_(
@@ -619,13 +662,28 @@ def search_warehouse_docs(
 	total = q.count()
 	items = q.offset(skip).limit(take).all()
 	
-	return success_response(data={
+	result = {
 		"items": [warehouse_document_to_dict(db, wh) for wh in items],
 		"total": total,
 		"page": (skip // max(1, take)) + 1,
 		"limit": take,
 		"total_pages": (total + take - 1) // take,
-	}, request=request)
+	}
+	
+	# ذخیره در cache با tag-based caching
+	if cache.enabled and cache_key:
+		cache.set_with_warehouse_docs_tag(
+			key=cache_key,
+			value=result,
+			business_id=business_id,
+			fiscal_year_id=fiscal_year_id,
+			doc_type=doc_type,
+			warehouse_id=int(warehouse_id) if warehouse_id else None,
+			status=status,
+			ttl=60
+		)
+	
+	return success_response(data=result, request=request)
 
 
 @router.delete("/business/{business_id}/{wh_id}")

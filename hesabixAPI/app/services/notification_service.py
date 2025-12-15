@@ -133,13 +133,16 @@ class NotificationService:
 		# Render templates با جایگزینی پارامترها (fallback به متن ساده)
 		def render_for(channel: str) -> tuple[str, str]:
 			tpl = self.templates.get(event_key=event_key, channel=channel, locale=locale or None)
-			if tpl:
-				# استفاده از قالب با رندر پارامترها
-				subj_raw = tpl.subject or (context.get("subject") or "پیام سیستم")
-				body_raw = tpl.body
-				# رندر کردن subject و body با پارامترهای context
-				subj = self._render_template(subj_raw, context)
-				body = self._render_template(body_raw, context)
+		if tpl:
+			# استفاده از قالب با رندر پارامترها
+			subj_raw = tpl.subject or (context.get("subject") or "پیام سیستم")
+			body_raw = tpl.body or context.get("message", "")
+			# رندر کردن subject و body با پارامترهای context
+			subj = self._render_template(subj_raw, context)
+			body = self._render_template(body_raw, context)
+			# اگر بعد از رندر body خالی شد، از context استفاده می‌کنیم
+			if not body or not body.strip():
+				body = context.get("message", "")
 			else:
 				# اگر قالب پیدا نشد، از context استفاده می‌کنیم
 				subj_raw = context.get("subject", "پیام سیستم")
@@ -181,30 +184,52 @@ class NotificationService:
 				continue
 			outbox = self._create_outbox(user_id=user_id, channel=channel, event_key=event_key, payload=context, locale=locale)
 			if channel == "telegram":
-				chat_id = getattr(user, "telegram_chat_id", None)
-				if chat_id:
-					ok = self.telegram.send_text(chat_id=int(chat_id), text=body_tg)
-					self._log_attempt(outbox_id=outbox.id, channel=channel, success=ok, error_message=None if ok else "telegram_send_failed")
-					if ok:
-						outbox.status = "sent"
-						self.db.add(outbox)
-						self.db.commit()
-						sent = True
-						if not broadcast_mode:
-							break
-					else:
-						outbox.status = "failed"
-						outbox.retry_count = outbox.retry_count + 1
-						outbox.next_attempt_at = datetime.utcnow() + timedelta(minutes=5)
-						self.db.add(outbox)
-						self.db.commit()
-				else:
-					# No chat connected
+				# بررسی پیکربندی تلگرام
+				if not self.telegram.is_configured():
 					outbox.status = "failed"
-					outbox.error_message = "no_telegram_chat_id"
+					outbox.error_message = "telegram_not_configured"
+					self._log_attempt(outbox_id=outbox.id, channel=channel, success=False, error_message="ربات تلگرام پیکربندی نشده است")
 					self.db.add(outbox)
 					self.db.commit()
 					continue
+				
+				chat_id = getattr(user, "telegram_chat_id", None)
+				if not chat_id:
+					# No chat connected
+					outbox.status = "failed"
+					outbox.error_message = "no_telegram_chat_id"
+					self._log_attempt(outbox_id=outbox.id, channel=channel, success=False, error_message="کاربر به ربات تلگرام متصل نیست")
+					self.db.add(outbox)
+					self.db.commit()
+					continue
+				
+				# بررسی اینکه body_tg خالی نباشد - اگر خالی بود، از context استفاده می‌کنیم
+				if not body_tg or not body_tg.strip():
+					# Fallback به context.get("message")
+					body_tg = context.get("message", "")
+					if not body_tg or not body_tg.strip():
+						outbox.status = "failed"
+						outbox.error_message = "empty_telegram_body"
+						self._log_attempt(outbox_id=outbox.id, channel=channel, success=False, error_message="متن پیام تلگرام خالی است")
+						self.db.add(outbox)
+						self.db.commit()
+						continue
+				
+				ok = self.telegram.send_text(chat_id=int(chat_id), text=body_tg)
+				self._log_attempt(outbox_id=outbox.id, channel=channel, success=ok, error_message=None if ok else "telegram_send_failed")
+				if ok:
+					outbox.status = "sent"
+					self.db.add(outbox)
+					self.db.commit()
+					sent = True
+					if not broadcast_mode:
+						break
+				else:
+					outbox.status = "failed"
+					outbox.retry_count = outbox.retry_count + 1
+					outbox.next_attempt_at = datetime.utcnow() + timedelta(minutes=5)
+					self.db.add(outbox)
+					self.db.commit()
 			elif channel == "email":
 				# بررسی اینکه body_email خالی نباشد
 				if not body_email or not body_email.strip():
@@ -414,8 +439,11 @@ class NotificationService:
 				logger.warning("هیچ اپراتور پشتیبانی فعالی یافت نشد. اعلان ارسال نخواهد شد.")
 				return
 			
+			logger.info(f"ارسال ناتیفیکیشن {event_key} به {len(operators)} اپراتور")
 			for operator in operators:
 				try:
+					telegram_status = f"chat_id={operator.telegram_chat_id}" if operator.telegram_chat_id else "no_telegram_chat_id"
+					logger.info(f"ارسال به اپراتور {operator.id} ({operator.email}): {telegram_status}")
 					self.send(
 						user_id=operator.id,
 						event_key=event_key,
@@ -425,7 +453,7 @@ class NotificationService:
 					)
 				except Exception as e:
 					# در صورت خطا، ادامه می‌دهیم تا به سایر اپراتورها ارسال شود
-					logger.error(f"خطا در ارسال ناتیفیکیشن به اپراتور {operator.id}: {e}")
+					logger.error(f"خطا در ارسال ناتیفیکیشن به اپراتور {operator.id}: {e}", exc_info=True)
 					continue
 
 

@@ -174,6 +174,9 @@ fi
 MODE_FLAG=""
 if [ "$MODE" = "release" ]; then
   MODE_FLAG="--release"
+elif [ "$MODE" = "debug" ]; then
+  # Debug mode: no release flag, enables hot reload and debugging
+  MODE_FLAG=""
 fi
 
 DART_DEFINE_ARGS=()
@@ -181,9 +184,23 @@ if [ -n "$API_BASE_URL" ]; then
   DART_DEFINE_ARGS+=(--dart-define "API_BASE_URL=$API_BASE_URL")
 fi
 
+# Configure CPU cores for parallel compilation
+# Detect available CPU cores and use 80% of them
+AVAILABLE_CORES=$(nproc)
+BUILD_WORKERS=$((AVAILABLE_CORES * 80 / 100))
+# Ensure at least 1 worker is used
+[ "$BUILD_WORKERS" -lt 1 ] && BUILD_WORKERS=1
+# Cap at 16 workers to prevent issues
+[ "$BUILD_WORKERS" -gt 16 ] && BUILD_WORKERS=16
+
 echo "Repo root: $REPO_ROOT"
 echo "Project path: $APP_DIR"
 echo "Host: $HOST  | Port: $PORT  | Mode: $MODE"
+echo ""
+echo "CPU Optimization:"
+echo "  Total CPU cores: $AVAILABLE_CORES"
+echo "  Using cores (80%): $BUILD_WORKERS"
+echo ""
 echo "Command: flutter run -d web-server $MODE_FLAG --web-port $PORT --web-hostname $HOST ${DART_DEFINE_ARGS[*]:-}"
 
 cd "$APP_DIR"
@@ -191,6 +208,16 @@ cd "$APP_DIR"
 # Configure mirror to resolve pub.dev access issues
 export PUB_HOSTED_URL="https://pub.flutter-io.cn"
 export FLUTTER_STORAGE_BASE_URL="https://storage.flutter-io.cn"
+
+# Configure parallel workers for dart2js compiler
+# This significantly speeds up JavaScript compilation
+export DART_COMPILE_JS_WORKERS="$BUILD_WORKERS"
+
+# For debug mode, also enable faster compilation
+if [ "$MODE" = "debug" ]; then
+  # Enable faster incremental compilation in debug mode
+  export DART_VM_OPTIONS="--enable-asserts"
+fi
 
 exec flutter run -d web-server $MODE_FLAG --web-port "$PORT" --web-hostname "$HOST" ${DART_DEFINE_ARGS[@]:-}
 

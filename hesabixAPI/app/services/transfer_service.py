@@ -313,7 +313,19 @@ def create_transfer(
 
     db.commit()
     db.refresh(document)
-    return transfer_document_to_dict(db, document)
+    
+    result = transfer_document_to_dict(db, document)
+    
+    # Invalidate cache بعد از ایجاد موفق سند انتقال
+    from app.services.document_service import invalidate_documents_cache
+    invalidate_documents_cache(
+        business_id=business_id,
+        fiscal_year_id=document.fiscal_year_id,
+        document_id=document.id,
+        document_type=DOCUMENT_TYPE_TRANSFER
+    )
+    
+    return result
 
 
 def get_transfer(db: Session, document_id: int) -> Optional[Dict[str, Any]]:
@@ -430,8 +442,22 @@ def delete_transfer(db: Session, document_id: int) -> bool:
     except Exception:
         pass
 
+    # دریافت اطلاعات قبل از حذف برای invalidation
+    business_id = document.business_id
+    fiscal_year_id = document.fiscal_year_id
+    
     db.delete(document)
     db.commit()
+    
+    # Invalidate cache بعد از حذف موفق سند انتقال
+    from app.services.document_service import invalidate_documents_cache
+    invalidate_documents_cache(
+        business_id=business_id,
+        fiscal_year_id=fiscal_year_id,
+        document_id=document.id,
+        document_type=DOCUMENT_TYPE_TRANSFER
+    )
+    
     return True
 
 
@@ -444,6 +470,9 @@ def update_transfer(
     document = db.query(Document).filter(Document.id == document_id).first()
     if document is None or document.document_type != DOCUMENT_TYPE_TRANSFER:
         raise ApiError("DOCUMENT_NOT_FOUND", "Transfer document not found", http_status=404)
+    
+    # دریافت اطلاعات قبل از به‌روزرسانی برای invalidation
+    old_fiscal_year_id = document.fiscal_year_id
 
     try:
         fiscal_year = db.query(FiscalYear).filter(FiscalYear.id == document.fiscal_year_id).first()
@@ -601,7 +630,19 @@ def update_transfer(
 
     db.commit()
     db.refresh(document)
-    return transfer_document_to_dict(db, document)
+    
+    result = transfer_document_to_dict(db, document)
+    
+    # Invalidate cache بعد از به‌روزرسانی موفق سند انتقال
+    from app.services.document_service import invalidate_documents_cache
+    invalidate_documents_cache(
+        business_id=document.business_id,
+        fiscal_year_id=document.fiscal_year_id,
+        document_id=document.id,
+        document_type=DOCUMENT_TYPE_TRANSFER
+    )
+    
+    return result
 
 
 def transfer_document_to_dict(db: Session, document: Document) -> Dict[str, Any]:

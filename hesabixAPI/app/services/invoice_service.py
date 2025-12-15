@@ -24,6 +24,7 @@ from adapters.db.models.person import Person
 from adapters.db.models.product import Product
 from adapters.db.models.invoice_item_line import InvoiceItemLine
 from adapters.db.models.tax_unit import TaxUnit
+from adapters.db.models.product_bom import ProductBOM, ProductBOMOutput
 from app.core.calendar import CalendarConverter, CalendarType
 from app.core.responses import ApiError
 from app.services.document_monetization_service import ensure_document_policy_allows_creation
@@ -34,6 +35,71 @@ import csv
 
 
 logger = logging.getLogger(__name__)
+
+
+def invalidate_invoices_cache(business_id: int, fiscal_year_id: Optional[int] = None, invoice_id: Optional[int] = None, document_type: Optional[str] = None, project_id: Optional[int] = None):
+	"""
+	حذف تمام کش‌های مربوط به لیست فاکتورها یک کسب‌وکار
+	
+	این تابع از چند روش استفاده می‌کند:
+	1. Tag-based invalidation با set ردیس: حذف انتخابی بر اساس business_id, fiscal_year_id, document_type و project_id (بهینه‌تر)
+	2. Pattern-based invalidation: حذف تمام کلیدهای invoices_search:* (fallback برای اطمینان)
+	3. Redis Pub/Sub: انتشار پیام invalidation برای تمام instanceها
+	
+	Args:
+		business_id: شناسه کسب‌وکار
+		fiscal_year_id: شناسه سال مالی (اختیاری - بسیار مهم)
+			- اگر None باشد، تمام کش‌های مربوط به business_id حذف می‌شوند
+			- اگر مشخص باشد، فقط کش‌های مربوط به آن fiscal_year_id حذف می‌شوند
+		invoice_id: شناسه فاکتور خاص (اختیاری)
+		document_type: نوع فاکتور (invoice_sales, invoice_purchase, ...) (اختیاری)
+		project_id: شناسه پروژه (اختیاری)
+	"""
+	from app.core.cache import get_cache
+	cache = get_cache()
+	if not cache.enabled:
+		return
+	
+	try:
+		# روش 1: استفاده از invalidate_invoices_by_business (بهینه‌ترین روش)
+		deleted_count = cache.invalidate_invoices_by_business(business_id, fiscal_year_id, invoice_id, document_type, project_id)
+		if deleted_count > 0:
+			logger.info(f"Invalidated {deleted_count} cache keys for business_id {business_id}, fiscal_year_id {fiscal_year_id}, invoice_id {invoice_id}, document_type {document_type}, project_id {project_id}")
+		
+		# روش 2: حذف تمام کلیدهای invoices_search:* (fallback برای اطمینان کامل)
+		pattern = f"invoices_search:{business_id}:*"
+		deleted_pattern = cache.delete_pattern(pattern)
+		if deleted_pattern > 0:
+			logger.info(f"Invalidated {deleted_pattern} cache keys using pattern: {pattern}")
+		
+		# حذف کش فاکتور خاص اگر مشخص شده باشد
+		if invoice_id:
+			invoice_pattern = f"invoice:{business_id}:{invoice_id}*"
+			deleted_invoice = cache.delete_pattern(invoice_pattern)
+			if deleted_invoice > 0:
+				logger.info(f"Invalidated {deleted_invoice} cache keys for invoice_id {invoice_id} using pattern: {invoice_pattern}")
+		
+		# روش 3: انتشار پیام invalidation از طریق Redis Pub/Sub
+		invalidation_message = {
+			"type": "invoices_cache_invalidation",
+			"business_id": business_id,
+			"fiscal_year_id": fiscal_year_id,
+			"invoice_id": invoice_id,
+			"document_type": document_type,
+			"project_id": project_id,
+			"timestamp": None
+		}
+		try:
+			import time
+			invalidation_message["timestamp"] = time.time()
+			cache.publish_invalidation("cache_invalidation", invalidation_message)
+			logger.info(f"Published invalidation message for business_id {business_id}, fiscal_year_id {fiscal_year_id}, invoice_id {invoice_id}")
+		except Exception as pub_error:
+			logger.warning(f"Error publishing invalidation message: {pub_error}")
+	
+	except Exception as e:
+		# خطا در invalidate نباید مانع عملیات اصلی شود
+		logger.warning(f"Error invalidating invoices cache for business_id {business_id}: {e}")
 
 
 # Supported invoice types (Document.document_type)
@@ -1032,7 +1098,73 @@ def create_invoice(
         header_extra_check = data.get("extra_info") or {}
         bom_ids = header_extra_check.get("bom_ids")
         if not bom_ids or not isinstance(bom_ids, list) or len(bom_ids) == 0:
-            logger.warning(f"فاکتور تولید بدون bom_ids ثبت شد (business_id={business_id}). ممکن است از فرمول تولید استفاده نشده باشد.")
+            raise ApiError(
+                "BOM_REQUIRED",
+                "برای فاکتور تولید، باید حداقل یک فرمول تولید را منفجر کنید. فاکتور تولید بدون فرمول تولید قابل ثبت نیست.",
+                http_status=400
+            )
+        
+        # اعتبارسنجی خروجی‌های فرمول تولید
+        # جمع‌آوری product_id های موجود در ردیف‌های فاکتور با movement='in'
+        output_product_ids_in_invoice = set()
+        for line in lines_input:
+            extra_info = line.get("extra_info") or {}
+            movement = extra_info.get("movement")
+            if movement == "in":
+                product_id = line.get("product_id")
+                if product_id:
+                    output_product_ids_in_invoice.add(int(product_id))
+        
+        # بررسی برای هر فرمول تولید
+        for bom_id in bom_ids:
+            try:
+                bom_id_int = int(bom_id)
+            except (ValueError, TypeError):
+                continue
+            
+            # دریافت فرمول تولید
+            bom = db.get(ProductBOM, bom_id_int)
+            if not bom or bom.business_id != business_id:
+                continue
+            
+            # دریافت خروجی‌های فرمول
+            bom_outputs = db.query(ProductBOMOutput).filter(
+                ProductBOMOutput.bom_id == bom_id_int
+            ).all()
+            
+            if not bom_outputs:
+                # اگر فرمول خروجی ندارد، هشدار می‌دهیم اما خطا نمی‌دهیم
+                logger.warning(f"فرمول تولید {bom_id_int} (کالا: {bom.product_id}) هیچ خروجی تعریف نشده است")
+                continue
+            
+            # بررسی اینکه product_id فرمول در خروجی‌ها باشد
+            bom_product_in_outputs = any(
+                output.output_product_id == bom.product_id 
+                for output in bom_outputs
+            )
+            if not bom_product_in_outputs:
+                logger.warning(
+                    f"کالای فرمول تولید {bom_id_int} (product_id: {bom.product_id}) "
+                    f"در خروجی‌های فرمول تعریف نشده است. این ممکن است باعث سردرگمی شود."
+                )
+            
+            # بررسی اینکه همه خروجی‌های فرمول در فاکتور وجود داشته باشند
+            missing_outputs = []
+            for output in bom_outputs:
+                if output.output_product_id not in output_product_ids_in_invoice:
+                    # دریافت نام کالا برای پیام خطا
+                    output_product = db.get(Product, output.output_product_id)
+                    product_name = output_product.name if output_product else f"کالا #{output.output_product_id}"
+                    missing_outputs.append(product_name)
+            
+            if missing_outputs:
+                missing_names = "، ".join(missing_outputs)
+                raise ApiError(
+                    "MISSING_BOM_OUTPUTS",
+                    f"خروجی‌های فرمول تولید '{bom.name}' (نسخه: {bom.version}) که در فاکتور وجود ندارند: {missing_names}. "
+                    f"لطفاً همه خروجی‌های فرمول تولید را در فاکتور شامل کنید.",
+                    http_status=400
+                )
 
     # Basic person requirement for AR/AP invoices
     person_id = _person_id_from_header(data)
@@ -1913,7 +2045,36 @@ def create_invoice(
         # عدم موفقیت در trigger نباید مانع بازگشت فاکتور شود
         logger.warning(f"Failed to trigger workflows for invoice {document.id}: {e}")
 
-    return invoice_document_to_dict(db, document)
+    result = invoice_document_to_dict(db, document)
+    
+    # Invalidate cache بعد از ایجاد موفق فاکتور
+    invalidate_invoices_cache(
+        business_id=business_id,
+        fiscal_year_id=document.fiscal_year_id,
+        invoice_id=document.id,
+        document_type=document.document_type,
+        project_id=document.project_id
+    )
+    
+    # همچنین اسناد عمومی را هم invalidate کن (چون فاکتورها از Document ارث‌بری دارند)
+    from app.services.document_service import invalidate_documents_cache
+    invalidate_documents_cache(
+        business_id=business_id,
+        fiscal_year_id=document.fiscal_year_id,
+        document_id=document.id,
+        document_type=document.document_type
+    )
+    
+    # اگر expense/income باشد، cache آن را هم invalidate کن
+    if document.document_type in ['expense', 'income']:
+        from app.services.expense_income_service import invalidate_expense_income_cache
+        invalidate_expense_income_cache(
+            business_id=business_id,
+            fiscal_year_id=document.fiscal_year_id,
+            document_id=document.id
+        )
+    
+    return result
 
 
 def update_invoice(
@@ -2540,7 +2701,35 @@ def update_invoice(
 
     db.commit()
     db.refresh(document)
-    return invoice_document_to_dict(db, document)
+    result = invoice_document_to_dict(db, document)
+    
+    # Invalidate cache بعد از به‌روزرسانی موفق فاکتور
+    invalidate_invoices_cache(
+        business_id=document.business_id,
+        fiscal_year_id=document.fiscal_year_id,
+        invoice_id=document.id,
+        document_type=document.document_type,
+        project_id=document.project_id
+    )
+    
+    # همچنین اسناد عمومی را هم invalidate کن (چون فاکتورها از Document ارث‌بری دارند)
+    from app.services.document_service import invalidate_documents_cache
+    invalidate_documents_cache(
+        business_id=business_id,
+        fiscal_year_id=document.fiscal_year_id,
+        document_type=document.document_type
+    )
+    
+    # اگر expense/income باشد، cache آن را هم invalidate کن
+    if document.document_type in ['expense', 'income']:
+        from app.services.expense_income_service import invalidate_expense_income_cache
+        invalidate_expense_income_cache(
+            business_id=business_id,
+            fiscal_year_id=document.fiscal_year_id,
+            document_id=document.id
+        )
+    
+    return result
 
 
 def delete_invoice(db: Session, document_id: int) -> bool:
@@ -2765,6 +2954,12 @@ def delete_invoice(db: Session, document_id: int) -> bool:
         # اقساط در extra_info.installment_plan ذخیره می‌شوند و با حذف سند خودشان حذف می‌شوند
         # نیازی به حذف جداگانه نیست
         
+        # دریافت اطلاعات قبل از حذف برای invalidation
+        business_id = document.business_id
+        fiscal_year_id = document.fiscal_year_id
+        document_type = document.document_type
+        project_id = document.project_id
+        
         # حذف سند فاکتور
         db.delete(document)
         logger.info(f"[DELETE_INVOICE] Invoice {document_id}: Marked invoice document for deletion")
@@ -2773,6 +2968,34 @@ def delete_invoice(db: Session, document_id: int) -> bool:
         try:
             db.commit()
             logger.info(f"[DELETE_INVOICE] Invoice {document_id}: ===== Successfully committed all deletions =====")
+            
+            # Invalidate cache بعد از حذف موفق فاکتور
+            invalidate_invoices_cache(
+                business_id=business_id,
+                fiscal_year_id=fiscal_year_id,
+                invoice_id=document_id,
+                document_type=document_type,
+                project_id=project_id
+            )
+            
+            # همچنین اسناد عمومی را هم invalidate کن
+            from app.services.document_service import invalidate_documents_cache
+            invalidate_documents_cache(
+                business_id=business_id,
+                fiscal_year_id=fiscal_year_id,
+                document_id=document_id,
+                document_type=document_type
+            )
+            
+            # اگر expense/income باشد
+            if document_type in ['expense', 'income']:
+                from app.services.expense_income_service import invalidate_expense_income_cache
+                invalidate_expense_income_cache(
+                    business_id=business_id,
+                    fiscal_year_id=fiscal_year_id,
+                    document_id=document_id
+                )
+            
         except Exception as commit_ex:
             logger.error(f"[DELETE_INVOICE] Invoice {document_id}: Error committing transaction: {commit_ex}", exc_info=True)
             db.rollback()

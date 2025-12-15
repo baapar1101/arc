@@ -16,6 +16,7 @@ from adapters.db.session import get_db
 from app.core.auth_dependency import get_current_user, AuthContext
 from app.core.permissions import require_business_access, require_business_management_dep, require_business_permission_dep, require_business_permission_by_entity_dep
 from app.core.responses import success_response, format_datetime_fields
+from app.core.cache import get_cache
 from adapters.api.v1.schemas import QueryInfo
 from adapters.db.models.document import Document
 from adapters.db.models.document_line import DocumentLine
@@ -584,10 +585,32 @@ async def export_single_invoice_pdf(
         economic_id = getattr(person_obj, "economic_id", None)
         economic_code = getattr(person_obj, "economic_code", None)
 
+        # تعیین نام: اول display_name یا name، سپس first_name + last_name، در نهایت alias_name
+        display_name = getattr(person_obj, "display_name", None)
+        name = getattr(person_obj, "name", None)
+        first_name = getattr(person_obj, "first_name", None)
+        last_name = getattr(person_obj, "last_name", None)
+        alias_name = getattr(person_obj, "alias_name", None)
+        
+        person_name = display_name or name
+        if not person_name:
+            # اگر display_name و name خالی بودند، از first_name و last_name استفاده می‌کنیم
+            if first_name or last_name:
+                name_parts = []
+                if first_name:
+                    name_parts.append(first_name)
+                if last_name:
+                    name_parts.append(last_name)
+                person_name = " ".join(name_parts) if name_parts else None
+        
+        # اگر هنوز خالی است (یعنی first_name و last_name هم خالی بودند)، از alias_name استفاده می‌کنیم
+        if not person_name:
+            person_name = alias_name
+
         person_info = {
             "id": getattr(person_obj, "id", None),
             "code": getattr(person_obj, "code", None),
-            "name": getattr(person_obj, "display_name", None) or getattr(person_obj, "name", None),
+            "name": person_name,
             # برای سازگاری با قالب‌های قدیمی، هر دو کلید نگه داشته می‌شوند
             "national_id": national_id or national_code,
             "national_code": national_code or national_id,
@@ -1157,235 +1180,333 @@ async def export_single_invoice_pdf(
 @router.post("/business/{business_id}/search")
 @require_business_access("business_id")
 async def search_invoices_endpoint(
-    request: Request,
-    business_id: int,
-    body_data: Dict[str, Any] = Body(...),
-    ctx: AuthContext = Depends(get_current_user),
-    db: Session = Depends(get_db),
+	request: Request,
+	business_id: int,
+	body_data: Dict[str, Any] = Body(...),
+	ctx: AuthContext = Depends(get_current_user),
+	db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
-    """لیست فاکتورها با فیلتر، جست‌وجو، مرتب‌سازی و صفحه‌بندی استاندارد"""
+	"""لیست فاکتورها با فیلتر، جست‌وجو، مرتب‌سازی و صفحه‌بندی استاندارد"""
 
-    # Locale for labels
-    from app.core.i18n import negotiate_locale
-    locale = negotiate_locale(request.headers.get("Accept-Language"))
-    is_fa = locale == "fa"
+	# Locale for labels
+	from app.core.i18n import negotiate_locale
+	locale = negotiate_locale(request.headers.get("Accept-Language"))
+	is_fa = locale == "fa"
 
-    # Parse QueryInfo from body_data
-    query_info = QueryInfo(**{k: v for k, v in body_data.items() if k in ['take', 'skip', 'sort_by', 'sort_desc', 'search', 'search_fields', 'filters', 'include_inventory', 'inventory_as_of_date']})
-    
-    # Extract additional fields for filtering
-    body = body_data
+	# Parse QueryInfo from body_data
+	query_info = QueryInfo(**{k: v for k, v in body_data.items() if k in ['take', 'skip', 'sort_by', 'sort_desc', 'search', 'search_fields', 'filters', 'include_inventory', 'inventory_as_of_date']})
+	
+	# Extract additional fields for filtering
+	body = body_data
+	
+	# کش نتایج جستجوی فاکتورها
+	cache = get_cache()
+	cache_key = None
+	fiscal_year_id = None
+	document_type = None
+	project_id = None
+	
+	if cache.enabled:
+		import json, hashlib
+		from decimal import Decimal
+		from datetime import datetime, date
+		from adapters.api.v1.schemas import FilterItem
+		
+		# Helper function to convert objects to JSON-serializable format
+		def to_serializable(obj):
+			"""Convert Pydantic models and other non-serializable types to dict/primitive types"""
+			if hasattr(obj, 'model_dump'):  # Pydantic v2
+				return obj.model_dump()
+			elif hasattr(obj, 'dict'):  # Pydantic v1
+				return obj.dict()
+			elif isinstance(obj, (datetime, date)):
+				return obj.isoformat()
+			elif isinstance(obj, Decimal):
+				return float(obj)
+			elif isinstance(obj, dict):
+				return {k: to_serializable(v) for k, v in obj.items()}
+			elif isinstance(obj, list):
+				return [to_serializable(item) for item in obj]
+			else:
+				return obj
+		
+		# استخراج fiscal_year_id از header یا body
+		try:
+			fy_header = request.headers.get("X-Fiscal-Year-ID")
+			if fy_header:
+				fiscal_year_id = int(fy_header)
+		except Exception:
+			pass
+		if fiscal_year_id is None:
+			try:
+				if body.get("fiscal_year_id") is not None:
+					fiscal_year_id = int(body.get("fiscal_year_id"))
+			except Exception:
+				pass
+		
+		# استخراج document_type
+		document_type = body.get("document_type")
+		if isinstance(document_type, str) and document_type in SUPPORTED_INVOICE_TYPES:
+			pass  # document_type از قبل تنظیم شده
+		else:
+			document_type = None
+		
+		# استخراج project_id
+		try:
+			if body.get("project_id") is not None:
+				project_id = int(body.get("project_id"))
+		except Exception:
+			pass
+		
+		# Convert filters to serializable format
+		serializable_filters = None
+		if query_info.filters:
+			serializable_filters = [to_serializable(f) for f in query_info.filters]
+		
+		# Convert body_data to serializable format (might contain non-serializable objects)
+		serializable_body = to_serializable(body_data)
+		
+		key_payload = {
+			"business_id": business_id,
+			"take": query_info.take,
+			"skip": query_info.skip,
+			"sort_by": query_info.sort_by,
+			"sort_desc": query_info.sort_desc,
+			"search": query_info.search,
+			"filters": serializable_filters,
+			"body": serializable_body,  # شامل تمام فیلترها
+		}
+		key_str = json.dumps(key_payload, sort_keys=True, ensure_ascii=False)
+		key_hash = hashlib.sha256(key_str.encode("utf-8")).hexdigest()[:16]
+		cache_key = f"invoices_search:{business_id}:{ctx.get_user_id()}:{key_hash}"
+		cached = cache.get(cache_key)
+		if cached is not None:
+			return success_response(data=cached, request=request)
 
-    # Base query
-    q = db.query(Document).filter(
-        and_(
-            Document.business_id == business_id,
-            Document.document_type.in_(list(SUPPORTED_INVOICE_TYPES)),
-        )
-    )
+	# Base query
+	q = db.query(Document).filter(
+		and_(
+			Document.business_id == business_id,
+			Document.document_type.in_(list(SUPPORTED_INVOICE_TYPES)),
+		)
+	)
 
-    # Simple search on code/description
-    search: Optional[str] = getattr(query_info, 'search', None)
-    if isinstance(search, str) and search.strip():
-        s = f"%{search.strip()}%"
-        q = q.filter(or_(Document.code.ilike(s), Document.description.ilike(s)))
+	# Simple search on code/description
+	search: Optional[str] = getattr(query_info, 'search', None)
+	if isinstance(search, str) and search.strip():
+		s = f"%{search.strip()}%"
+		q = q.filter(or_(Document.code.ilike(s), Document.description.ilike(s)))
 
-    # Extra filters
-    doc_type = body.get("document_type")
-    if isinstance(doc_type, str) and doc_type in SUPPORTED_INVOICE_TYPES:
-        q = q.filter(Document.document_type == doc_type)
+	# Extra filters
+	doc_type = body.get("document_type")
+	if isinstance(doc_type, str) and doc_type in SUPPORTED_INVOICE_TYPES:
+		q = q.filter(Document.document_type == doc_type)
 
-    is_proforma = body.get("is_proforma")
-    if isinstance(is_proforma, bool):
-        q = q.filter(Document.is_proforma == is_proforma)
+	is_proforma = body.get("is_proforma")
+	if isinstance(is_proforma, bool):
+		q = q.filter(Document.is_proforma == is_proforma)
 
-    currency_id = body.get("currency_id")
-    try:
-        if currency_id is not None:
-            q = q.filter(Document.currency_id == int(currency_id))
-    except Exception:
-        pass
+	currency_id = body.get("currency_id")
+	try:
+		if currency_id is not None:
+			q = q.filter(Document.currency_id == int(currency_id))
+	except Exception:
+		pass
 
-    # Fiscal year from header or body
-    fiscal_year_id = None
-    try:
-        fy_header = request.headers.get("X-Fiscal-Year-ID")
-        if fy_header:
-            fiscal_year_id = int(fy_header)
-    except Exception:
-        fiscal_year_id = None
-    if fiscal_year_id is None:
-        try:
-            if body.get("fiscal_year_id") is not None:
-                fiscal_year_id = int(body.get("fiscal_year_id"))
-        except Exception:
-            fiscal_year_id = None
-    if fiscal_year_id is not None:
-        q = q.filter(Document.fiscal_year_id == fiscal_year_id)
+	# Fiscal year from header or body
+	fiscal_year_id = None
+	try:
+		fy_header = request.headers.get("X-Fiscal-Year-ID")
+		if fy_header:
+			fiscal_year_id = int(fy_header)
+	except Exception:
+		fiscal_year_id = None
+	if fiscal_year_id is None:
+		try:
+			if body.get("fiscal_year_id") is not None:
+				fiscal_year_id = int(body.get("fiscal_year_id"))
+		except Exception:
+			fiscal_year_id = None
+	if fiscal_year_id is not None:
+		q = q.filter(Document.fiscal_year_id == fiscal_year_id)
 
-    # Project filter
-    project_id = body.get("project_id")
-    try:
-        if project_id is not None:
-            q = q.filter(Document.project_id == int(project_id))
-    except Exception:
-        pass
+	# Project filter
+	project_id = body.get("project_id")
+	try:
+		if project_id is not None:
+			q = q.filter(Document.project_id == int(project_id))
+	except Exception:
+		pass
 
-    # Date range from filters or flat body
-    # 1) From QueryInfo.filters operators
-    try:
-        filters = getattr(query_info, 'filters', None)
-    except Exception:
-        filters = None
-    if filters and isinstance(filters, (list, tuple)):
-        for flt in filters:
-            try:
-                prop = getattr(flt, 'property', None) if not isinstance(flt, dict) else flt.get('property')
-                op = getattr(flt, 'operator', None) if not isinstance(flt, dict) else flt.get('operator')
-                val = getattr(flt, 'value', None) if not isinstance(flt, dict) else flt.get('value')
-                if prop == 'document_date' and isinstance(val, str) and val:
-                    from app.services.transfer_service import _parse_iso_date as _p
-                    dt = _p(val)
-                    col = getattr(Document, prop)
-                    if op == ">=":
-                        q = q.filter(col >= dt)
-                    elif op == "<=":
-                        q = q.filter(col <= dt)
-            except Exception:
-                pass
+	# Date range from filters or flat body
+	# 1) From QueryInfo.filters operators
+	try:
+		filters = getattr(query_info, 'filters', None)
+	except Exception:
+		filters = None
+	if filters and isinstance(filters, (list, tuple)):
+		for flt in filters:
+			try:
+				prop = getattr(flt, 'property', None) if not isinstance(flt, dict) else flt.get('property')
+				op = getattr(flt, 'operator', None) if not isinstance(flt, dict) else flt.get('operator')
+				val = getattr(flt, 'value', None) if not isinstance(flt, dict) else flt.get('value')
+				if prop == 'document_date' and isinstance(val, str) and val:
+					from app.services.transfer_service import _parse_iso_date as _p
+					dt = _p(val)
+					col = getattr(Document, prop)
+					if op == ">=":
+						q = q.filter(col >= dt)
+					elif op == "<=":
+						q = q.filter(col <= dt)
+			except Exception:
+				pass
 
-    # 2) From flat body keys
-    if isinstance(body.get("from_date"), str):
-        try:
-            from app.services.transfer_service import _parse_iso_date as _p
-            q = q.filter(Document.document_date >= _p(body.get("from_date")))
-        except Exception:
-            pass
-    if isinstance(body.get("to_date"), str):
-        try:
-            from app.services.transfer_service import _parse_iso_date as _p
-            q = q.filter(Document.document_date <= _p(body.get("to_date")))
-        except Exception:
-            pass
+	# 2) From flat body keys
+	if isinstance(body.get("from_date"), str):
+		try:
+			from app.services.transfer_service import _parse_iso_date as _p
+			q = q.filter(Document.document_date >= _p(body.get("from_date")))
+		except Exception:
+			pass
+	if isinstance(body.get("to_date"), str):
+		try:
+			from app.services.transfer_service import _parse_iso_date as _p
+			q = q.filter(Document.document_date <= _p(body.get("to_date")))
+		except Exception:
+			pass
 
-    # Sorting
-    sort_desc = bool(getattr(query_info, 'sort_desc', True))
-    sort_by = getattr(query_info, 'sort_by', None) or 'document_date'
-    sort_col = Document.document_date
-    if isinstance(sort_by, str):
-        if sort_by == 'code' and hasattr(Document, 'code'):
-            sort_col = Document.code
-        elif sort_by == 'created_at' and hasattr(Document, 'created_at'):
-            sort_col = Document.created_at
-        elif sort_by == 'registered_at' and hasattr(Document, 'registered_at'):
-            sort_col = Document.registered_at
-        else:
-            sort_col = Document.document_date
-    q = q.order_by(sort_col.desc() if sort_desc else sort_col.asc())
+	# Sorting
+	sort_desc = bool(getattr(query_info, 'sort_desc', True))
+	sort_by = getattr(query_info, 'sort_by', None) or 'document_date'
+	sort_col = Document.document_date
+	if isinstance(sort_by, str):
+		if sort_by == 'code' and hasattr(Document, 'code'):
+			sort_col = Document.code
+		elif sort_by == 'created_at' and hasattr(Document, 'created_at'):
+			sort_col = Document.created_at
+		elif sort_by == 'registered_at' and hasattr(Document, 'registered_at'):
+			sort_col = Document.registered_at
+		else:
+			sort_col = Document.document_date
+	q = q.order_by(sort_col.desc() if sort_desc else sort_col.asc())
 
-    # Pagination
-    take = int(getattr(query_info, 'take', 20) or 20)
-    skip = int(getattr(query_info, 'skip', 0) or 0)
+	# Pagination
+	take = int(getattr(query_info, 'take', 20) or 20)
+	skip = int(getattr(query_info, 'skip', 0) or 0)
 
-    total = q.count()
-    items: List[Document] = q.offset(skip).limit(take).all()
+	total = q.count()
+	items: List[Document] = q.offset(skip).limit(take).all()
 
-    # Helpers for display fields
-    def _type_name(tp: str) -> str:
-        mapping = {
-            'invoice_sales': ('فروش' if is_fa else 'Sales'),
-            'invoice_sales_return': ('برگشت از فروش' if is_fa else 'Sales return'),
-            'invoice_purchase': ('خرید' if is_fa else 'Purchase'),
-            'invoice_purchase_return': ('برگشت از خرید' if is_fa else 'Purchase return'),
-            'invoice_direct_consumption': ('مصرف مستقیم' if is_fa else 'Direct consumption'),
-            'invoice_production': ('تولید' if is_fa else 'Production'),
-            'invoice_waste': ('ضایعات' if is_fa else 'Waste'),
-        }
-        return mapping.get(str(tp), str(tp))
+	# Helpers for display fields
+	def _type_name(tp: str) -> str:
+		mapping = {
+			'invoice_sales': ('فروش' if is_fa else 'Sales'),
+			'invoice_sales_return': ('برگشت از فروش' if is_fa else 'Sales return'),
+			'invoice_purchase': ('خرید' if is_fa else 'Purchase'),
+			'invoice_purchase_return': ('برگشت از خرید' if is_fa else 'Purchase return'),
+			'invoice_direct_consumption': ('مصرف مستقیم' if is_fa else 'Direct consumption'),
+			'invoice_production': ('تولید' if is_fa else 'Production'),
+			'invoice_waste': ('ضایعات' if is_fa else 'Waste'),
+		}
+		return mapping.get(str(tp), str(tp))
 
-    data_items: List[Dict[str, Any]] = []
-    for d in items:
-        item = invoice_document_to_dict(db, d)
+	data_items: List[Dict[str, Any]] = []
+	for d in items:
+		item = invoice_document_to_dict(db, d)
 
-        # Tax workspace fields from extra_info
-        try:
-            extra = item.get("extra_info") or {}
-        except Exception:
-            extra = {}
-        tax_workspace = bool(extra.get("tax_workspace"))
-        tax_status = (extra.get("tax_status") or "").strip() if isinstance(extra.get("tax_status"), str) else extra.get("tax_status")
-        if not tax_status:
-            tax_status = "in_workspace" if tax_workspace else "not_in_workspace"
-        item["tax_status"] = tax_status
+		# Tax workspace fields from extra_info
+		try:
+			extra = item.get("extra_info") or {}
+		except Exception:
+			extra = {}
+		tax_workspace = bool(extra.get("tax_workspace"))
+		tax_status = (extra.get("tax_status") or "").strip() if isinstance(extra.get("tax_status"), str) else extra.get("tax_status")
+		if not tax_status:
+			tax_status = "in_workspace" if tax_workspace else "not_in_workspace"
+		item["tax_status"] = tax_status
 
-        # Installment sale flag: اگر طرح اقساط روی سند وجود داشته باشد
-        try:
-            item["is_installment_sale"] = bool(
-                isinstance(extra, dict) and isinstance(extra.get("installment_plan"), dict)
-            )
-        except Exception:
-            item["is_installment_sale"] = False
+		# Installment sale flag: اگر طرح اقساط روی سند وجود داشته باشد
+		try:
+			item["is_installment_sale"] = bool(
+				isinstance(extra, dict) and isinstance(extra.get("installment_plan"), dict)
+			)
+		except Exception:
+			item["is_installment_sale"] = False
 
-        # total_amount from extra_info.totals.net if available
-        total_amount = None
-        try:
-            totals = (item.get('extra_info') or {}).get('totals') or {}
-            if isinstance(totals, dict) and 'net' in totals:
-                total_amount = totals.get('net')
-        except Exception:
-            total_amount = None
-        # Fallback compute from product lines
-        if total_amount is None:
-            try:
-                net_sum = 0.0
-                for pl in item.get('product_lines', []) or []:
-                    info = pl.get('extra_info') or {}
-                    qty = float(pl.get('quantity') or 0)
-                    unit_price = float(info.get('unit_price') or 0)
-                    line_discount = float(info.get('line_discount') or 0)
-                    tax_amount = float(info.get('tax_amount') or 0)
-                    line_total = info.get('line_total')
-                    if line_total is None:
-                        line_total = (qty * unit_price) - line_discount + tax_amount
-                    net_sum += float(line_total)
-                total_amount = float(net_sum)
-            except Exception:
-                total_amount = None
+		# total_amount from extra_info.totals.net if available
+		total_amount = None
+		try:
+			totals = (item.get('extra_info') or {}).get('totals') or {}
+			if isinstance(totals, dict) and 'net' in totals:
+				total_amount = totals.get('net')
+		except Exception:
+			total_amount = None
+		# Fallback compute from product lines
+		if total_amount is None:
+			try:
+				net_sum = 0.0
+				for pl in item.get('product_lines', []) or []:
+					info = pl.get('extra_info') or {}
+					qty = float(pl.get('quantity') or 0)
+					unit_price = float(info.get('unit_price') or 0)
+					line_discount = float(info.get('line_discount') or 0)
+					tax_amount = float(info.get('tax_amount') or 0)
+					line_total = info.get('line_total')
+					if line_total is None:
+						line_total = (qty * unit_price) - line_discount + tax_amount
+					net_sum += float(line_total)
+				total_amount = float(net_sum)
+			except Exception:
+				total_amount = None
 
-        item['document_type_name'] = _type_name(item.get('document_type'))
-        if total_amount is not None:
-            item['total_amount'] = total_amount
-        
-        # افزودن counterparty
-        _add_counterparty_to_invoice_item(db, item)
-        
-        data_items.append(format_datetime_fields(item, request))
+		item['document_type_name'] = _type_name(item.get('document_type'))
+		if total_amount is not None:
+			item['total_amount'] = total_amount
+		
+		# افزودن counterparty
+		_add_counterparty_to_invoice_item(db, item)
+		
+		data_items.append(format_datetime_fields(item, request))
 
-    # Build pagination info
-    page = (skip // take) + 1 if take > 0 else 1
-    total_pages = (total + take - 1) // take if take > 0 else 1
+	# Build pagination info
+	page = (skip // take) + 1 if take > 0 else 1
+	total_pages = (total + take - 1) // take if take > 0 else 1
 
-    return success_response(
-        data={
-            "items": data_items,
-            "total": total,
-            "take": take,
-            "skip": skip,
-            # Optional standard pagination shape (supported by UI model)
-            "pagination": {
-                "page": page,
-                "per_page": take,
-                "total": total,
-                "total_pages": total_pages,
-            },
-            # Flat shape too, for compatibility
-            "page": page,
-            "limit": take,
-            "total_pages": total_pages,
-        },
-        request=request,
-        message="INVOICE_LIST",
-    )
+	result = {
+		"items": data_items,
+		"total": total,
+		"take": take,
+		"skip": skip,
+		# Optional standard pagination shape (supported by UI model)
+		"pagination": {
+			"page": page,
+			"per_page": take,
+			"total": total,
+			"total_pages": total_pages,
+		},
+		# Flat shape too, for compatibility
+		"page": page,
+		"limit": take,
+		"total_pages": total_pages,
+	}
+	
+	# ذخیره در cache با tag-based caching
+	if cache.enabled and cache_key:
+		cache.set_with_invoices_tag(
+			key=cache_key,
+			value=result,
+			business_id=business_id,
+			fiscal_year_id=fiscal_year_id,
+			document_type=document_type,
+			project_id=project_id,
+			ttl=30  # TTL کوتاه برای فاکتورها
+		)
+	
+	return success_response(
+		data=result,
+		request=request,
+		message="INVOICE_LIST",
+	)
 
 def _add_counterparty_to_invoice_item(db: Session, item: Dict[str, Any]) -> None:
     """افزودن فیلد counterparty به آیتم فاکتور بر اساس person_id در extra_info"""
