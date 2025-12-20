@@ -909,32 +909,44 @@ async def create_manual_document_endpoint(
         - حداقل 2 سطر داشته باشد
         - هر سطر باید یا بدهکار یا بستانکار داشته باشد (نه هر دو صفر)
     """
-    # دریافت سال مالی از header یا body
-    fiscal_year_id = body.fiscal_year_id
-    if not fiscal_year_id:
-        try:
-            fy_header = request.headers.get("X-Fiscal-Year-ID")
-            if fy_header:
-                fiscal_year_id = int(fy_header)
-        except Exception:
-            pass
-    
-    # اگر fiscal_year_id نبود، سال مالی فعال (is_last=True) را پیدا کن
-    if not fiscal_year_id:
-        from adapters.db.models.fiscal_year import FiscalYear
-        active_fy = db.query(FiscalYear).filter(
-            FiscalYear.business_id == business_id,
-            FiscalYear.is_last == True
-        ).first()
-        
-        if active_fy:
-            fiscal_year_id = active_fy.id
-        else:
-            raise ApiError(
-                "FISCAL_YEAR_REQUIRED",
-                "No active fiscal year found for this business. Please create a fiscal year first.",
-                http_status=400
-            )
+    # الزام: ایجاد سند دستی فقط در سال مالی جاری مجاز است.
+    # سال مالی جاری = FiscalYear.is_last == True
+    from adapters.db.models.fiscal_year import FiscalYear
+
+    active_fy = db.query(FiscalYear).filter(
+        FiscalYear.business_id == business_id,
+        FiscalYear.is_last == True  # noqa: E712
+    ).first()
+
+    if not active_fy:
+        raise ApiError(
+            "FISCAL_YEAR_REQUIRED",
+            "سال مالی جاری برای این کسب‌وکار یافت نشد. ابتدا سال مالی ایجاد/فعال کنید.",
+            http_status=400,
+        )
+
+    # اگر کاربر تلاش کند سال مالی دیگری را از طریق body/header تحمیل کند، خطا بده.
+    requested_fy = body.fiscal_year_id
+    try:
+        fy_header = request.headers.get("X-Fiscal-Year-ID")
+        header_fy = int(fy_header) if fy_header else None
+    except Exception:
+        header_fy = None
+
+    if requested_fy is not None and int(requested_fy) != int(active_fy.id):
+        raise ApiError(
+            "FISCAL_YEAR_NOT_CURRENT",
+            "ثبت سند فقط در سال مالی جاری مجاز است.",
+            http_status=400,
+        )
+    if header_fy is not None and int(header_fy) != int(active_fy.id):
+        raise ApiError(
+            "FISCAL_YEAR_NOT_CURRENT",
+            "ثبت سند فقط در سال مالی جاری مجاز است.",
+            http_status=400,
+        )
+
+    fiscal_year_id = active_fy.id
     
     # تبدیل Pydantic model به dict
     data = body.model_dump()
@@ -993,6 +1005,26 @@ async def update_manual_document_endpoint(
     business_id = doc.get("business_id")
     if business_id and not ctx.can_access_business(business_id):
         raise ApiError("FORBIDDEN", "Access denied", http_status=403)
+
+    # الزام: ویرایش سند دستی فقط در سال مالی جاری مجاز است
+    from adapters.db.models.fiscal_year import FiscalYear
+    active_fy = db.query(FiscalYear).filter(
+        FiscalYear.business_id == business_id,
+        FiscalYear.is_last == True  # noqa: E712
+    ).first()
+    if not active_fy:
+        raise ApiError(
+            "FISCAL_YEAR_REQUIRED",
+            "سال مالی جاری برای این کسب‌وکار یافت نشد.",
+            http_status=400,
+        )
+    doc_fy_id = doc.get("fiscal_year_id")
+    if doc_fy_id is not None and int(doc_fy_id) != int(active_fy.id):
+        raise ApiError(
+            "FISCAL_YEAR_NOT_CURRENT",
+            "ویرایش سند فقط در سال مالی جاری مجاز است.",
+            http_status=400,
+        )
     
     # تبدیل Pydantic model به dict (فقط فیلدهای set شده)
     data = body.model_dump(exclude_unset=True)

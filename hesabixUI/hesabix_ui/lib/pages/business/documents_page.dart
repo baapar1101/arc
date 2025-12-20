@@ -386,8 +386,8 @@ class _DocumentsPageState extends State<DocumentsPage> {
         calendarController: widget.calendarController,
         authStore: widget.authStore,
         apiClient: widget.apiClient,
-        fiscalYearId: null, // TODO: از context یا state بگیریم
-        currencyId: 1, // TODO: از تنظیمات بگیریم
+        fiscalYearId: null,
+        currencyId: null, // از CurrencyPickerWidget (پیش‌فرض کسب‌وکار) دریافت می‌شود
       ),
     );
 
@@ -474,7 +474,8 @@ class _DocumentsPageState extends State<DocumentsPage> {
           'document_date',
           'تاریخ',
           width: ColumnWidth.medium,
-          formatter: (item) => item.documentDateRaw ?? '-',
+          // نمایش تاریخ بر اساس خروجی سرور (متناسب با تقویم کاربر).
+          formatter: (item) => item.documentDateDisplay ?? '-',
         ),
 
         // سال مالی

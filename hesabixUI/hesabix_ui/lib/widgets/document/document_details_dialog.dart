@@ -576,9 +576,9 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                         _document!.getDocumentTypeName(),
                         theme,
                       ),
-                    if (_document?.documentDateRaw != null)
+                    if (_document?.documentDateDisplay != null)
                       _buildHeaderChip(
-                        'تاریخ: ${_document!.documentDateRaw}',
+                        'تاریخ: ${_document!.documentDateDisplay}',
                         theme,
                         icon: Icons.calendar_today,
                       ),
@@ -714,7 +714,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
           _buildInfoGrid([
             _InfoRow('شماره سند', document.code),
             _InfoRow('نوع سند', document.getDocumentTypeName()),
-            _InfoRow('تاریخ سند', document.documentDateRaw ?? '-'),
+            _InfoRow('تاریخ سند', document.documentDateDisplay ?? '-'),
             _InfoRow('سال مالی', document.fiscalYearTitle ?? '-'),
             _InfoRow('ارز', document.currencyCode ?? '-'),
             _InfoRow('وضعیت', document.statusText),

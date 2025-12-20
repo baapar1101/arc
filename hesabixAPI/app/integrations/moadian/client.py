@@ -3,9 +3,10 @@ from __future__ import annotations
 import time
 import json
 import base64
+import uuid
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import httpx
 from cryptography.hazmat.primitives import hashes, serialization
@@ -232,33 +233,32 @@ class MoadianClient:
         Returns:
             اطلاعات سرور شامل publicKey و keyId
         """
-        client = self._get_http_client()
-        
+        # مطابق SDK رسمی/کتابخانه Snapp: این درخواست باید به مسیر req/api/... و با packet امضا شده ارسال شود.
         try:
-            response = client.get(
-                "/api/self-tsp/GET_SERVER_INFORMATION",
-                timeout=self.config.timeout_seconds,
+            response_data = self._send_sync_packet(
+                packet_type="GET_SERVER_INFORMATION",
+                packet_data=None,
+                fiscal_id="",
+                authorization_required=False,
             )
-            response.raise_for_status()
-            data = response.json()
-            
-            api_response = MoadianApiResponse.from_dict(data)
-            
-            if not api_response.success or not api_response.result:
+            server_data = self._extract_packet_result_data(response_data)
+            if not isinstance(server_data, dict):
                 raise ApiError(
                     "TAX_SERVER_INFO_FAILED",
-                    "خطا در دریافت اطلاعات سرور مالیاتی",
+                    "پاسخ نامعتبر از سرویس اطلاعات سرور مالیاتی",
                     http_status=502,
+                    details={"raw_response": response_data},
                 )
-            
-            # ذخیره کلید عمومی سرور
-            public_keys = api_response.result.get('publicKeys', [])
-            if public_keys:
-                self._server_public_key = public_keys[0].get('key')
-                self._server_key_id = public_keys[0].get('id')
-            
-            return api_response.result
-            
+
+            public_keys = server_data.get("publicKeys") or []
+            if isinstance(public_keys, list) and public_keys:
+                first = public_keys[0] if isinstance(public_keys[0], dict) else {}
+                self._server_public_key = first.get("key")
+                self._server_key_id = first.get("id")
+
+            return server_data
+        except ApiError:
+            raise
         except httpx.HTTPError as exc:
             raise ApiError(
                 "TAX_NETWORK_ERROR",
@@ -274,50 +274,70 @@ class MoadianClient:
         Returns:
             Authentication token
         """
-        # ابتدا اطلاعات سرور را دریافت می‌کنیم (اگر قبلا دریافت نشده)
-        if not self._server_public_key:
-            self.get_server_information()
-        
+        # مطابق SDK رسمی: دریافت توکن با packet_type=GET_TOKEN و مسیر req/api/self-tsp/sync/GET_TOKEN
         if not self.private_key:
             raise ApiError("TAX_SETTINGS_INCOMPLETE", "کلید خصوصی برای لاگین الزامی است.", http_status=400)
-        
-        # ساخت payload لاگین
-        username = self.tax_memory_id
-        
-        client = self._get_http_client()
-        
+
+        username = (self.tax_memory_id or "").strip()
+        if not username:
+            raise ApiError("TAX_SETTINGS_INCOMPLETE", "شناسه حافظه مالیاتی برای لاگین الزامی است.", http_status=400)
+
         try:
-            response = client.post(
-                "/api/self-tsp/LOGIN",
-                json={"username": username},
-                timeout=self.config.timeout_seconds,
+            response_data = self._send_sync_packet(
+                packet_type="GET_TOKEN",
+                packet_data={"username": username},
+                fiscal_id=username,
+                authorization_required=False,
             )
-            response.raise_for_status()
-            data = response.json()
-            
-            api_response = MoadianApiResponse.from_dict(data)
-            
-            if not api_response.success or not api_response.result:
-                error_msg = extract_moadian_error_message(api_response.error or {})
+
+            token_data = self._extract_packet_result_data(response_data)
+            if not isinstance(token_data, dict):
                 raise ApiError(
                     "TAX_LOGIN_FAILED",
-                    f"خطا در احراز هویت: {error_msg}",
-                    http_status=401,
+                    "پاسخ نامعتبر از سرویس احراز هویت مالیاتی",
+                    # این 401 مربوط به سامانه مودیان است نه احراز هویت کاربر؛ 401 باعث ریدایرکت UI به صفحه ورود می‌شود.
+                    http_status=502,
+                    details={"raw_response": response_data},
                 )
-            
-            # استخراج token
-            token = api_response.result.get('token')
+
+            token = token_data.get("token")
             if not token:
-                raise ApiError("TAX_LOGIN_FAILED", "توکن احراز هویت دریافت نشد", http_status=401)
-            
-            # ذخیره token
-            self._auth_token = token
-            # فرض: token 24 ساعت اعتبار دارد
-            from datetime import timedelta
-            self._token_expiry = datetime.utcnow() + timedelta(hours=24)
-            
-            return token
-            
+                raise ApiError(
+                    "TAX_LOGIN_FAILED",
+                    "توکن احراز هویت دریافت نشد",
+                    # این 401 مربوط به سامانه مودیان است نه احراز هویت کاربر؛ 401 باعث ریدایرکت UI به صفحه ورود می‌شود.
+                    http_status=502,
+                    details={"raw_response": response_data},
+                )
+
+            self._auth_token = str(token)
+
+            expires_in = token_data.get("expiresIn")
+            now = datetime.utcnow()
+            expiry = None
+            if expires_in is not None:
+                try:
+                    v = int(expires_in)
+                    # بعضی پیاده‌سازی‌ها expiresIn را به صورت timestamp میلی‌ثانیه می‌دهند (مثلاً 1766...).
+                    if v > 10**11:
+                        expiry = datetime.utcfromtimestamp(v / 1000.0)
+                    # timestamp ثانیه
+                    elif v > 10**9:
+                        expiry = datetime.utcfromtimestamp(v)
+                    # مدت اعتبار به ثانیه
+                    elif v > 0:
+                        expiry = now + timedelta(seconds=v)
+                except (TypeError, ValueError, OverflowError):
+                    expiry = None
+
+            # fallback
+            if not expiry or expiry <= now:
+                expiry = now + timedelta(hours=24)
+            self._token_expiry = expiry
+
+            return self._auth_token
+        except ApiError:
+            raise
         except httpx.HTTPError as exc:
             raise ApiError(
                 "TAX_NETWORK_ERROR",
@@ -335,6 +355,224 @@ class MoadianClient:
         
         # لاگین مجدد
         self.login()
+
+    # -----------------------------
+    # Packet-based (SDK-compatible) transfer helpers
+    # -----------------------------
+    def _get_essential_transfer_headers(self, *, authorization_required: bool) -> Dict[str, str]:
+        """
+        هدرهای ضروری طبق SDK PHP:
+        - timestamp: میلی‌ثانیه (string)
+        - requestTraceId: uuid4 (string)
+        - Authorization: Bearer <token> (در صورت نیاز)
+        """
+        headers: Dict[str, str] = {
+            "timestamp": str(int(time.time() * 1000)),
+            "requestTraceId": str(uuid.uuid4()),
+        }
+        if authorization_required:
+            if not self._auth_token:
+                self._ensure_authenticated()
+            if not self._auth_token:
+                # این خطا مربوط به توکن سامانه مودیان است نه سشن کاربر؛ 401 باعث logout در UI می‌شود.
+                raise ApiError("TAX_LOGIN_FAILED", "توکن معتبر برای ارسال درخواست موجود نیست.", http_status=502)
+            headers["Authorization"] = f"Bearer {self._auth_token}"
+        return headers
+
+    def _build_packet(
+        self,
+        *,
+        packet_type: str,
+        packet_data: Dict[str, Any] | None,
+        fiscal_id: str,
+    ) -> Dict[str, Any]:
+        # این ساختار مطابق Packet::toArray در SDK PHP است.
+        return {
+            "uid": str(uuid.uuid4()),
+            "packetType": packet_type,
+            "retry": False,
+            "data": packet_data,
+            "encryptionKeyId": "",
+            "symmetricKey": "",
+            "iv": "",
+            "fiscalId": fiscal_id or "",
+            "dataSignature": "",
+        }
+
+    def _php_flatten(self, value: Any, prefix: str = "") -> Dict[str, Any]:
+        """
+        معادل Normalizer::flattenArray در SDK PHP
+        - dict: کلیدها با '.' ترکیب می‌شوند
+        - list/tuple: اندیس‌ها (0,1,2,...) به عنوان کلید استفاده می‌شود
+        """
+        result: Dict[str, Any] = {}
+
+        if isinstance(value, dict):
+            items = value.items()
+        elif isinstance(value, (list, tuple)):
+            items = enumerate(value)
+        else:
+            if prefix:
+                result[prefix] = value
+            return result
+
+        for k, v in items:
+            key = str(k)
+            new_prefix = f"{prefix}.{key}" if prefix else key
+            if isinstance(v, (dict, list, tuple)):
+                result.update(self._php_flatten(v, new_prefix))
+            else:
+                result[new_prefix] = v
+        return result
+
+    def _php_normalize_array(self, data: Dict[str, Any]) -> str:
+        """
+        معادل Normalizer::normalizeArray در SDK PHP:
+        1) flatten
+        2) ksort
+        3) تبدیل مقادیر به رشته و join با '#'
+        """
+        flattened = self._php_flatten(data)
+        parts: List[str] = []
+        for key in sorted(flattened.keys()):
+            value = flattened[key]
+            if isinstance(value, bool):
+                text_value = "true" if value else "false"
+            elif value == "" or value is None:
+                text_value = "#"
+            else:
+                text_value = str(value).replace("#", "##")
+            parts.append(text_value)
+        return "#".join(parts)
+
+    def _php_sign_text(self, text: str) -> str:
+        """امضای RSA-SHA256 مثل openssl_sign + base64 در PHP."""
+        if not self.private_key:
+            raise ApiError("TAX_SETTINGS_INCOMPLETE", "کلید خصوصی برای امضا الزامی است.", http_status=400)
+        try:
+            private_key_obj = self._load_private_key_obj()
+            signature = private_key_obj.sign(
+                text.encode("utf-8"),
+                padding.PKCS1v15(),
+                hashes.SHA256(),
+            )
+            return base64.b64encode(signature).decode("utf-8")
+        except Exception as exc:
+            raise ApiError("TAX_SIGNATURE_FAILED", f"خطا در امضای درخواست: {str(exc)}", http_status=500) from exc
+
+    def _load_private_key_obj(self):
+        """
+        تلاش برای بارگذاری کلید خصوصی در فرمت‌های رایج:
+        - PEM (با header/footer)
+        - Base64 DER (بدون header/footer) که در برخی داده‌ها دیده می‌شود
+        """
+        if not self.private_key:
+            raise ApiError("TAX_SETTINGS_INCOMPLETE", "کلید خصوصی برای امضا الزامی است.", http_status=400)
+
+        raw = (self.private_key or "").strip()
+        raw = raw.replace("\r\n", "\n").replace("\r", "\n")
+
+        # حالت PEM
+        if "-----BEGIN" in raw:
+            return serialization.load_pem_private_key(
+                raw.encode("utf-8"),
+                password=None,
+                backend=default_backend(),
+            )
+
+        # حالت Base64 DER (بدون header/footer) - حذف whitespace سپس decode
+        compact = "".join(raw.split())
+        der = base64.b64decode(compact)
+        return serialization.load_der_private_key(
+            der,
+            password=None,
+            backend=default_backend(),
+        )
+
+    def _send_sync_packet(
+        self,
+        *,
+        packet_type: str,
+        packet_data: Dict[str, Any] | None,
+        fiscal_id: str,
+        authorization_required: bool,
+    ) -> Dict[str, Any]:
+        """
+        ارسال packet مطابق SDK PHP:
+        POST /req/api/self-tsp/sync/<PACKET_TYPE>
+        body: { packet: <Packet::toArray>, signature: <base64(openssl_sign(normalized))> }
+        headers: timestamp, requestTraceId, Authorization(optional)
+        """
+        packet = self._build_packet(packet_type=packet_type, packet_data=packet_data, fiscal_id=fiscal_id)
+        transfer_headers = self._get_essential_transfer_headers(authorization_required=authorization_required)
+
+        # داده‌ای که امضا می‌شود: normalizeArray(array_merge(packet, cloneHeader))
+        clone_header = dict(transfer_headers)
+        if "Authorization" in clone_header:
+            clone_header["Authorization"] = str(clone_header["Authorization"]).replace("Bearer ", "", 1)
+        normalized_text = self._php_normalize_array({**packet, **clone_header})
+        signature_b64 = self._php_sign_text(normalized_text)
+
+        client = self._get_http_client()
+        http_headers: Dict[str, str] = {
+            "User-Agent": self.config.user_agent,
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+            **transfer_headers,
+        }
+        response = client.post(
+            f"/req/api/self-tsp/sync/{packet_type}",
+            json={"packet": packet, "signature": signature_b64},
+            headers=http_headers,
+            timeout=self.config.timeout_seconds,
+        )
+        try:
+            data = response.json()
+        except Exception:
+            data = {"raw_body": response.text}
+
+        # خطاهای سامانه مودیان معمولاً به صورت HTTP 4xx/5xx + errors برمی‌گردند.
+        if response.status_code >= 400:
+            if isinstance(data, dict) and data.get("errors"):
+                errs = data.get("errors") or []
+                messages: List[str] = []
+                if isinstance(errs, list):
+                    for item in errs:
+                        if isinstance(item, dict) and item.get("message"):
+                            messages.append(str(item["message"]))
+                msg = " / ".join(messages).strip() or "خطا از سمت سامانه مودیان"
+                err_code = "TAX_LOGIN_FAILED" if packet_type == "GET_TOKEN" else "TAX_REMOTE_ERROR"
+                # 401 برای «سامانه مودیان» نباید به UI پاس داده شود چون باعث هدایت به صفحه ورود می‌شود.
+                if packet_type == "GET_TOKEN":
+                    http_status = 502
+                else:
+                    http_status = response.status_code if response.status_code in (400, 403) else 502
+                raise ApiError(
+                    err_code,
+                    msg,
+                    http_status=http_status,
+                    details={"raw_response": data, "status_code": response.status_code},
+                )
+            raise ApiError(
+                "TAX_NETWORK_ERROR",
+                "خطا در ارتباط با سامانه مودیان",
+                http_status=502,
+                details={"raw_response": data, "status_code": response.status_code},
+            )
+
+        return data
+
+    def _extract_packet_result_data(self, response_data: Dict[str, Any]) -> Any:
+        """
+        پاسخ‌های packet-based معمولاً این شکل‌اند:
+        { timestamp: <int>, result: { ..., data: {...} } }
+        """
+        if not isinstance(response_data, dict):
+            return None
+        result = response_data.get("result")
+        if isinstance(result, dict) and "data" in result:
+            return result.get("data")
+        return None
 
     def _sign_payload(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -354,12 +592,7 @@ class MoadianClient:
             json_str = json.dumps(payload, ensure_ascii=False, separators=(',', ':'))
             json_bytes = json_str.encode('utf-8')
             
-            # بارگذاری کلید خصوصی
-            private_key_obj = serialization.load_pem_private_key(
-                self.private_key.encode('utf-8'),
-                password=None,
-                backend=default_backend()
-            )
+            private_key_obj = self._load_private_key_obj()
             
             # امضا کردن
             signature = private_key_obj.sign(

@@ -954,8 +954,8 @@ class _BusinessShellState extends State<BusinessShell> {
           calendarController: calendarController,
           authStore: widget.authStore,
           apiClient: ApiClient(),
-          fiscalYearId: null, // TODO: از context یا state بگیریم
-          currencyId: 1, // TODO: از تنظیمات بگیریم
+          fiscalYearId: null,
+          currencyId: null, // از CurrencyPickerWidget (پیش‌فرض کسب‌وکار) دریافت می‌شود
         ),
       );
       if (result == true) {

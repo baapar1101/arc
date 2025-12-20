@@ -501,7 +501,7 @@ class _DocumentsMobileViewState extends State<DocumentsMobileView> {
                     ),
                   ),
                   Text(
-                    doc.documentDateRaw ?? '-',
+                    doc.documentDateDisplay ?? '-',
                     style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                     textDirection: TextDirection.ltr,
                   ),

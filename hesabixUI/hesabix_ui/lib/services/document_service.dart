@@ -242,6 +242,7 @@ class DocumentService {
   Future<DocumentModel> createManualDocument({
     required int businessId,
     required CreateManualDocumentRequest request,
+    int? fiscalYearIdOverride,
   }) async {
     try {
       // اعتبارسنجی درخواست
@@ -260,6 +261,9 @@ class DocumentService {
       final response = await _apiClient.post(
         '/businesses/$businessId/documents/manual',
         data: request.toJson(),
+        options: fiscalYearIdOverride != null
+            ? Options(headers: {'X-Fiscal-Year-ID': fiscalYearIdOverride.toString()})
+            : null,
       );
 
       if (response.data['success'] == true) {
@@ -280,6 +284,7 @@ class DocumentService {
   Future<DocumentModel> updateManualDocument({
     required int documentId,
     required UpdateManualDocumentRequest request,
+    int? fiscalYearIdOverride,
   }) async {
     try {
       // اعتبارسنجی درخواست
@@ -291,6 +296,9 @@ class DocumentService {
       final response = await _apiClient.put(
         '/documents/$documentId',
         data: request.toJson(),
+        options: fiscalYearIdOverride != null
+            ? Options(headers: {'X-Fiscal-Year-ID': fiscalYearIdOverride.toString()})
+            : null,
       );
 
       if (response.data['success'] == true) {

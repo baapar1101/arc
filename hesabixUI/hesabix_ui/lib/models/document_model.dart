@@ -37,6 +37,9 @@ class DocumentModel {
   final Map<String, dynamic>? developerSettings;
 
   // فیلدهای formatted از سرور (برای نمایش)
+  /// تاریخ نمایشی سند (بر اساس تقویم انتخاب‌شده کاربر/خروجی سرور)
+  /// معمولاً از `document_date_formatted.date_only` یا `document_date` پر می‌شود.
+  final String? documentDateDisplay;
   final String? documentDateRaw;
   final String? registeredAtRaw;
   final String? createdAtRaw;
@@ -70,6 +73,7 @@ class DocumentModel {
     this.lines,
     this.extraInfo,
     this.developerSettings,
+    this.documentDateDisplay,
     this.documentDateRaw,
     this.registeredAtRaw,
     this.createdAtRaw,
@@ -77,6 +81,12 @@ class DocumentModel {
   });
 
   factory DocumentModel.fromJson(Map<String, dynamic> json) {
+    final String? documentDateRawIso = json['document_date_raw'] as String?;
+    final dynamic documentDateFormatted = json['document_date_formatted'];
+    final String? documentDateDisplay = (documentDateFormatted is Map<String, dynamic>)
+        ? (documentDateFormatted['date_only'] as String?)
+        : null;
+
     return DocumentModel(
       id: json['id'] as int,
       code: json['code'] as String,
@@ -85,7 +95,11 @@ class DocumentModel {
       currencyId: json['currency_id'] as int,
       createdByUserId: json['created_by_user_id'] as int,
       registeredAt: _parseDateTime(json['registered_at']),
-      documentDate: _parseDateTime(json['document_date']),
+      // document_date در بسیاری از پاسخ‌ها (به‌خصوص جلالی) رشته‌ی غیر-ISO است و قابل parse نیست.
+      // برای داشتن DateTime معتبر، از document_date_raw (ISO/Gregorian) استفاده می‌کنیم.
+      documentDate: documentDateRawIso != null
+          ? DateTime.parse(documentDateRawIso)
+          : _parseDateTime(json['document_date']),
       documentType: json['document_type'] as String,
       isProforma: json['is_proforma'] as bool? ?? false,
       description: json['description'] as String?,
@@ -109,7 +123,10 @@ class DocumentModel {
           : null,
       extraInfo: json['extra_info'] as Map<String, dynamic>?,
       developerSettings: json['developer_settings'] as Map<String, dynamic>?,
-      documentDateRaw: json['document_date_raw'] as String? ?? json['document_date'] as String?,
+      documentDateDisplay: documentDateDisplay ??
+          (json['document_date'] as String?) ??
+          documentDateRawIso,
+      documentDateRaw: documentDateRawIso ?? json['document_date'] as String?,
       registeredAtRaw: json['registered_at_raw'] as String? ?? json['registered_at'] as String?,
       createdAtRaw: json['created_at_raw'] as String? ?? json['created_at'] as String?,
       updatedAtRaw: json['updated_at_raw'] as String? ?? json['updated_at'] as String?,
@@ -201,7 +218,7 @@ class DocumentModel {
   bool get isDeletable => documentType == 'manual';
 
   /// دریافت وضعیت سند
-  String get statusText => isProforma ? 'پیش‌فاکتور' : 'قطعی';
+  String get statusText => isProforma ? 'پیش‌نویس' : 'قطعی';
 
   /// Parse DateTime from various formats
   static DateTime _parseDateTime(dynamic value) {
